@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+# lab — 読者が叩く唯一のコマンド。
+#
+# 設計の要点（works/learning-series/charter.md §6）:
+#   - check は「観測した事実」だけを出し、直し方は言わない
+#   - 合格時も「なぜ合格と判定したか」を1行出す（偶然通ったのか読者が判別できる）
+#   - exit 2 は前提不足。読者の失敗にせず代替経路へ誘導する
+#   - answer は閉じない。hint を使い切ったら solve で必ず到達できる
+set -uo pipefail
+
+LAB_HOME="${LAB_HOME:-/lab}"
+THEME="${LAB_THEME:-base}"
+STATE="${HOME}/.lab"
+PROGRESS="${STATE}/progress.json"
+WORK="${HOME}/work"
+
+mkdir -p "$STATE" "$WORK" 2>/dev/null
+# 進捗ファイルが書けない環境（ボリュームの所有者がずれている等）でも本体は動かす。
+# 黙って進捗が消えるのが最悪なので、そのときは理由を1行出す。
+if [ ! -f "$PROGRESS" ]; then
+  if ! printf '{}\n' > "$PROGRESS" 2>/dev/null; then
+    PROGRESS="$(mktemp)"; printf '{}\n' > "$PROGRESS"
+    RO_STATE=1
+  fi
+elif [ ! -w "$PROGRESS" ]; then
+  cp "$PROGRESS" "$(mktemp)" 2>/dev/null && PROGRESS="$_"
+  RO_STATE=1
+fi
+if [ "${RO_STATE:-0}" = 1 ]; then
+  printf '⚠ 進捗を保存できません（%s に書けない）。このセッション内だけ記録します。\n' "$STATE" >&2
+  printf '  起動コマンドに -v lab-%s-state:/home/lab/.lab があるか確認してください。\n\n' "${LAB_THEME:-x}" >&2
+fi
+
+c_ok=$'\033[32m'; c_ng=$'\033[31m'; c_wr=$'\033[33m'; c_d=$'\033[2m'; c_b=$'\033[1m'; c_0=$'\033[0m'
+[ -t 1 ] || { c_ok=; c_ng=; c_wr=; c_d=; c_b=; c_0=; }
+
+die() { printf '%s\n' "$*" >&2; exit 1; }
+
+# 演習番号の正規化（3 → 03）
+norm() { printf '%02d' "$((10#${1#0}))" 2>/dev/null || printf '%s' "$1"; }
+
+exercises() {
+  find "$LAB_HOME/verify" -maxdepth 1 -name '[0-9][0-9].sh' -printf '%f\n' 2>/dev/null \
+    | sed 's/\.sh$//' | sort
+}
+
+meta_get() {  # meta_get NN KEY
+  local f="$LAB_HOME/verify/$1.meta"
+  [ -f "$f" ] && sed -n "s/^$2=//p" "$f" | head -1
+}
+
+prog_get() { jq -r --arg k "$1" '.[$k].status // "todo"' "$PROGRESS"; }
+prog_set() { # prog_set NN STATUS
+  local tmp; tmp=$(mktemp)
+  jq --arg k "$1" --arg s "$2" --arg t "$(date -Iseconds)" \
+     '.[$k] = {status:$s, at:$t}' "$PROGRESS" > "$tmp" && mv "$tmp" "$PROGRESS"
+}
+hint_level() { jq -r --arg k "$1" '.[$k].hints // 0' "$PROGRESS"; }
+hint_bump() {
+  local tmp; tmp=$(mktemp)
+  jq --arg k "$1" --argjson n "$2" '.[$k].hints = $n' "$PROGRESS" > "$tmp" && mv "$tmp" "$PROGRESS"
+}
+
+mark() {
+  case "$1" in
+    done)  printf '%s' "${c_ok}✔${c_0}" ;;
+    solve) printf '%s' "${c_wr}◍${c_0}" ;;
+    *)     printf '%s' "${c_d}·${c_0}" ;;
+  esac
+}
+
+cmd_status() {
+  local total=0 done_n=0 next=""
+  for n in $(exercises); do
+    total=$((total+1))
+    case "$(prog_get "$n")" in
+      done|solve) done_n=$((done_n+1)) ;;
+      *) [ -z "$next" ] && next="$n" ;;
+    esac
+  done
+  printf '%s\n' "${c_b}lab-${THEME}${c_0}  進捗 ${done_n}/${total}"
+  if [ -n "$next" ]; then
+    printf '  次 → %s 「%s」 %s\n' "$next" "$(meta_get "$next" title)" \
+      "${c_d}(目安 $(meta_get "$next" est_min)分 / 影響度 $(meta_get "$next" impact))${c_0}"
+    printf '  %s\n' "${c_d}lab start $next で課題を開く${c_0}"
+  else
+    printf '  %s\n' "${c_ok}全問クリア${c_0}"
+  fi
+  printf '  %s\n' "${c_d}進捗の保存先: ${PROGRESS}（消すには docker volume rm lab-${THEME}-state）${c_0}"
+}
+
+cmd_ls() {
+  printf '%s\n' "${c_b}演習一覧${c_0}"
+  for n in $(exercises); do
+    printf '  %s %s  %-44s %s\n' "$(mark "$(prog_get "$n")")" "$n" \
+      "$(meta_get "$n" title)" "${c_d}$(meta_get "$n" est_min)分 / 影響度 $(meta_get "$n" impact)${c_0}"
+  done
+  printf '\n  %s\n' "${c_d}✔ 自力で達成   ◍ solve を見た   · 未着手${c_0}"
+}
+
+cmd_start() {
+  local n; n=$(norm "${1:?lab start NN}")
+  local task="$LAB_HOME/tasks/$n.md"
+  [ -f "$task" ] || die "演習 $n は存在しません（lab ls で一覧）"
+  # 作業ディレクトリは seed の有無に関わらず必ず作る。
+  # seed だけを条件にすると、配布ファイルが無い演習で ~/work/NN が生まれず、
+  # 読者が「どこで作業するのか」を自分で推測することになる。
+  mkdir -p "$WORK/$n"
+  local seed="$LAB_HOME/seed/$n"
+  if [ -d "$seed" ] && [ -n "$(ls -A "$seed" 2>/dev/null)" ]; then
+    cp -rn "$seed/." "$WORK/$n/" 2>/dev/null || true
+    chmod -R u+w "$WORK/$n" 2>/dev/null || true
+    printf '%s\n' "${c_d}作業ファイルを ~/work/$n に展開しました（$(ls -A "$seed" | tr '\n' ' ')）${c_0}"
+  else
+    printf '%s\n' "${c_d}作業場所: ~/work/$n${c_0}"
+  fi
+  printf '\n'; cat "$task"; printf '\n'
+}
+
+cmd_check() {
+  local list
+  if [ $# -ge 1 ]; then list=$(norm "$1"); else list=$(exercises); fi
+  local rc_all=0
+  for n in $list; do
+    local v="$LAB_HOME/verify/$n.sh"
+    [ -f "$v" ] || { printf '%s\n' "演習 $n は存在しません"; rc_all=1; continue; }
+    local out rc
+    out=$(cd "$WORK" && bash "$v" 2>&1); rc=$?
+    case $rc in
+      0)
+        printf '%s %s %s\n' "${c_ok}✔${c_0}" "$n" "達成"
+        printf '%s\n' "$out" | sed 's/^/  /'
+        [ "$(prog_get "$n")" = "solve" ] || prog_set "$n" done
+        ;;
+      2)
+        printf '%s %s %s\n' "${c_wr}⚠${c_0}" "$n" "この環境では判定できません"
+        printf '%s\n' "$out" | sed 's/^/  /'
+        rc_all=2
+        ;;
+      *)
+        printf '%s %s %s\n' "${c_ng}✗${c_0}" "$n" "未達"
+        printf '%s\n' "$out" | sed 's/^/  /'
+        printf '  %s\n' "${c_d}→ この事実から何が欠けているか考えてください。詰まったら lab hint $n${c_0}"
+        rc_all=1
+        ;;
+    esac
+  done
+  return $rc_all
+}
+
+cmd_hint() {
+  local n; n=$(norm "${1:?lab hint NN}")
+  local lv; lv=$(hint_level "$n"); lv=$((lv+1))
+  local f="$LAB_HOME/hints/$n.$lv.md"
+  if [ ! -f "$f" ]; then
+    local last=$((lv-1))
+    printf '%s\n' "ヒントは全${last}段まで使い切っています。"
+    printf '%s\n' "${c_d}模範解答を見るなら: lab solve $n${c_0}"
+    printf '%s\n' "${c_d}（見ても構いません。答えは1コマンド離れた場所にあります）${c_0}"
+    return 0
+  fi
+  hint_bump "$n" "$lv"
+  printf '\n%s\n\n' "${c_b}ヒント $lv 段目${c_0}"
+  cat "$f"; printf '\n'
+  [ -f "$LAB_HOME/hints/$n.$((lv+1)).md" ] \
+    && printf '%s\n' "${c_d}まだ足りなければ lab hint $n（次の段）${c_0}" \
+    || printf '%s\n' "${c_d}これが最後のヒントです。次は lab solve $n${c_0}"
+}
+
+cmd_solve() {
+  local n; n=$(norm "${1:?lab solve NN}")
+  local f="$LAB_HOME/solutions/$n.md"
+  [ -f "$f" ] || die "演習 $n の解答はありません"
+  printf '\n%s\n\n' "${c_b}模範解答 $n${c_0}"
+  cat "$f"; printf '\n'
+  [ "$(prog_get "$n")" = "done" ] || prog_set "$n" solve
+  printf '%s\n' "${c_d}この演習は「solve を見た」として記録しました（lab ls で ◍ 表示）${c_0}"
+}
+
+cmd_reset() {
+  local n; n=$(norm "${1:?lab reset NN}")
+  rm -rf "$WORK/$n"
+  local seed="$LAB_HOME/seed/$n"
+  [ -d "$seed" ] && { mkdir -p "$WORK/$n"; cp -r "$seed/." "$WORK/$n/"; }
+  local tmp; tmp=$(mktemp)
+  jq --arg k "$n" 'del(.[$k])' "$PROGRESS" > "$tmp" && mv "$tmp" "$PROGRESS"
+  printf '%s\n' "演習 $n を初期状態に戻しました（~/work/$n）"
+}
+
+cmd_env() {
+  # 本文の「検証環境ブロック」にそのまま貼れる形式で出す
+  printf 'テーマ    : lab-%s %s\n' "$THEME" "${LAB_VERSION:-?}"
+  printf 'イメージ  : %s\n' "${LAB_IMAGE:-未設定}"
+  printf 'ベース    : %s\n' "$(. /etc/os-release && printf '%s' "$PRETTY_NAME")"
+  printf 'apt 固定  : %s\n' "${LAB_APT_SNAPSHOT:-未設定}"
+  printf 'カーネル  : %s\n' "$(uname -r)"
+  printf 'アーキ    : %s\n' "$(uname -m)"
+  if [ -x "$LAB_HOME/bin/env-extra" ]; then "$LAB_HOME/bin/env-extra"; fi
+  printf '特権      : CapEff=%s\n' "$(awk '/^CapEff/{print $2}' /proc/self/status)"
+}
+
+cmd_diff() {
+  # 本文に載せた出力と、読者の実出力の差分行だけを出す。
+  # 「同じ画面が出る」という約束を運用可能にする唯一の部品。
+  local n; n=$(norm "${1:?lab diff NN}")
+  local expect="$LAB_HOME/expected/$n.txt"
+  [ -f "$expect" ] || die "演習 $n には期待出力が登録されていません"
+  local runner="$LAB_HOME/expected/$n.sh"
+  [ -f "$runner" ] || die "演習 $n には再現コマンドが登録されていません"
+  local got; got=$(mktemp)
+  (cd "$WORK" && bash "$runner") > "$got" 2>&1
+  if diff -u "$expect" "$got" > /dev/null; then
+    printf '%s %s\n' "${c_ok}✔${c_0}" "本文の出力と完全に一致しました"
+  else
+    printf '%s %s\n\n' "${c_wr}⚠${c_0}" "本文と違う出力が出ています。下の差分をそのまま issue に貼ってください。"
+    diff -u --label "本文（検証済み）" "$expect" --label "あなたの環境" "$got" | tail -n +3
+    printf '\n%s\n' "${c_d}$(cmd_env | tr '\n' '|')${c_0}"
+  fi
+  rm -f "$got"
+}
+
+usage() {
+  cat <<EOF
+lab — 学習ラボのコマンド
+
+  lab                現在地と次の一手
+  lab ls             演習一覧と達成状況
+  lab start NN       課題を開き、作業ファイルを ~/work/NN に展開する
+  lab check [NN]     答え合わせ（省略時は全問）
+  lab hint NN        ヒントを1段出す（呼ぶたび深くなる）
+  lab solve NN       模範解答を見る（使ったことは記録に残る）
+  lab reset NN       演習を初期状態に戻す
+  lab env            検証環境を表示する（本文に貼れる形式）
+  lab diff NN        本文の出力と自分の出力の差分だけを出す
+EOF
+}
+
+case "${1:-status}" in
+  ""|status) cmd_status ;;
+  ls)     cmd_ls ;;
+  start)  shift; cmd_start "$@" ;;
+  check)  shift; cmd_check "$@" ;;
+  hint)   shift; cmd_hint "$@" ;;
+  solve)  shift; cmd_solve "$@" ;;
+  reset)  shift; cmd_reset "$@" ;;
+  env)    cmd_env ;;
+  diff)   shift; cmd_diff "$@" ;;
+  -h|--help|help) usage ;;
+  *) printf 'unknown subcommand: %s\n\n' "$1"; usage; exit 1 ;;
+esac

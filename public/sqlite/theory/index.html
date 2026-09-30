@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>壊して覚える SQLite — 理論編</title>
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-theme="sqlite">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › 壊して覚える SQLite</nav>
+
+<h1>壊して覚える SQLite</h1>
+<p class="lead">サーバのいないデータベースが、どこまで普通のファイルなのかを手で確かめる。全5章・約2時間。</p>
+
+<div class="promise">
+  <h4>この教材の約束</h4>
+  <p>このページのコマンドは、<b>あなたの画面に本文と同じ文字を出します。</b>
+     出なければ教材のバグとして直します。</p>
+  <p>AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+     ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<div class="notfor">
+  <b>この教材が向かない人</b><br>
+  ・いま動かしたいだけの人 → 公式の <code>sqlite3</code> のチュートリアルのほうが速い<br>
+  ・答えだけ欲しい人 → AI に聞いたほうが速く、あなたの語彙に合う<br><br>
+  <b>向く人</b>: <code>sqlite3</code> は打てる。SQL も書ける。
+  でも「なぜ落ちたのか」を人に説明できない人。
+</div>
+
+<div class="goal">
+  <h4>読み終わったらできること</h4>
+  <ul>
+    <li>DB がファイル1個であることを、ヘッダのバイト列とプロセス一覧の両方で示せる</li>
+    <li><code>database is locked</code> と <code>readonly database</code> が出る条件を、原因まで切り分けられる</li>
+    <li>SQLite を選ぶ場面と、選ばない場面を自分の言葉で言える</li>
+  </ul>
+  <div class="skip"><b>ここで覚えなくていいこと</b>:
+    B-tree のページ構造 / ヘッダ100バイトの全フィールド / WAL ファイルの内部形式 /
+    ロックの5状態の遷移図 / <code>PRAGMA</code> の一覧 / SQL の文法そのもの</div>
+</div>
+
+<h2 id="spine">この教材が回収する1つの原理</h2>
+<div class="sgoal"><b>この節で分かること</b>: 5章すべてが、たった1つの事実から出てくること</div>
+<div class="analogy">
+  <b>背骨</b>: SQLite はサーバではなくライブラリである。データベースを動かしているのは
+  常駐プロセスではなく、<b>いまあなたが起動したそのプロセス自身</b>が、ファイルを直接読み書きしている。
+  <br>ただし<b>崩れる点</b>: 「だから遅い」わけではない。読み取りは、サーバへの往復が無いぶん速い。
+</div>
+<p>各章で出会う挙動は、ほぼ全部この1点から導けます。最終章でまとめて回収します。</p>
+
+<h2 id="cage">手を動かす場所</h2>
+<div class="sgoal"><b>この節で分かること</b>: 準備に要る時間と、あなたのマシンに何が起きるか</div>
+<div class="scroll"><table>
+<tr><th>檻</th><th>準備</th><th>ここで触れること</th><th>影響</th></tr>
+<tr><td>読むだけ</td><td>0分</td><td>全章の実行ログは本文に載っています</td><td>なし</td></tr>
+<tr><td>コンテナ</td><td>初回3分</td><td>全5演習。壊す操作を含みます</td><td>コンテナの中だけ</td></tr>
+</table></div>
+
+<pre><code>docker run --rm -it \
+  --name lab-sqlite --pull=always \
+  --cap-add NET_RAW \
+  -v lab-sqlite-work:/home/lab/work \
+  -v lab-sqlite-state:/home/lab/.lab \
+  ghcr.io/OWNER/lab-sqlite:1.0.0</code></pre>
+
+<div class="note">起動したら <code>lab</code> と打ってください。現在地と次の一手が出ます。
+  <code>lab check</code> が答え合わせ、<code>lab hint NN</code> が詰まったとき、
+  <code>lab solve NN</code> が模範解答です。<br>
+  <b>答えは閉じていません。</b> ヒントを使い切れば必ず解答に到達できます。
+  ただし使ったことは <code>lab ls</code> に残ります。</div>
+
+<div class="note warn"><b>後片付け</b>: 終わったら
+  <code>docker volume rm lab-sqlite-work lab-sqlite-state</code> で進捗ごと消えます。
+  <code>--rm</code> を付けているのでコンテナ自体は終了時に消えます。</div>
+
+<h2 id="toc">章立て</h2>
+<div class="sgoal"><b>この節で分かること</b>: 全体の流れと、各章にかかる時間</div>
+<div class="toc">
+  <a href="/sqlite/theory/01-file"><b>1. これはファイルである</b>
+    <span>ヘッダの16バイトを読み、<code>ps</code> に何もいないことを確かめる ／ 約15分</span></a>
+  <a href="/sqlite/theory/02-affinity"><b>2. 型は宣言ではなく提案</b>
+    <span>INTEGER 列に文字列が入る。<code>'123'</code> だけ変換される ／ 約20分</span></a>
+  <a href="/sqlite/theory/03-transaction"><b>3. まとめると速い</b>
+    <span>同じ2000行が 13秒 と 0.05秒 になる。待っていたのは CPU ではない ／ 約25分</span></a>
+  <a href="/sqlite/theory/04-lock"><b>4. 同時に書けるのは1人</b>
+    <span>WAL にしても書き込みは1人。変わるのは読み取り側だけ ／ 約25分</span></a>
+  <a href="/sqlite/theory/05-directory"><b>5. ディレクトリに書けないと、DB にも書けない</b>
+    <span>ファイルに <code>w</code> があるのに <code>readonly database</code>。1〜4章がここに収束する ／ 約30分</span></a>
+  <a href="/sqlite/theory/glossary"><b>用語辞書</b>
+    <span>本文中の点線の語をクリックすると、ここへ来ます</span></a>
+</div>
+
+<div class="verified"><b>検証環境</b>:
+イメージ ghcr.io/OWNER/lab-sqlite:1.0.0 / Ubuntu 24.04.5 LTS / sqlite3 3.45.1 /
+apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
+
+<footer>壊して覚える SQLite ／ 本文のコマンドはすべて上のイメージの中で実行して確認しています。</footer>
+</div>
+<script src="/sqlite/chapters.js"></script>
+<script src="/sqlite/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+</body></html>

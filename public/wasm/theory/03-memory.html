@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. 境界を越えられるのは数値だけ — 壊して覚える WASM</title>
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-ch="3" data-theme="wasm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/wasm/theory/">理論編</a> › 第3章</nav>
+
+<h1>3. 境界を越えられるのは数値だけ</h1>
+<p class="lead">この章で扱うモジュールには <code>hello wasm</code> がそのまま入っている。それでも関数から返ってくるのは <code>0</code> と <code>10</code> という数値2つだけで、文字列の形に戻す作業はホスト側にしか残っていない。</p>
+
+<div class="badges"><span>前提: 第2章まで読了</span><span>前提: wat2wasm が動く</span><span>前提: node が動く</span><span>所要 14分</span><span class="impact-a">影響度 A</span><span>最終検証 2026-09-30</span></div>
+
+<div class="goal"><h4>この章のゴール</h4>
+<ul>
+<li>線形メモリに置いた文字列を、ポインタと長さの2つの数値だけでホストに渡せる</li>
+<li>線形メモリの実体が1枚の <code>ArrayBuffer</code> であることを確かめられる</li>
+</ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>:
+メモリを後から広げる操作（grow）は扱わない。1ページのまま最後まで進む。
+何バイト境界に値を置くか（アラインメント）も扱わない。0 番地から詰めるだけで足りる。
+1つのモジュールが複数のメモリを持つ提案と、GC 提案の参照型も、この章の外に置く。読まなくても最後まで詰まらない。</div></div>
+
+<h2 id="numbers">返るのは数値だけ</h2>
+<div class="sgoal"><b>この節で分かること</b>: 文字列を持っているモジュールの関数を呼ぶと、実際に手元に来るもの。</div>
+
+<p>まず、この章で最後まで使うモジュールを見る。5行しかない。</p>
+
+<pre><code>$ cat mem.wat
+(module
+  (memory (export "mem") 1)
+  (data (i32.const 0) "hello wasm")
+  (func (export "ptr") (result i32) i32.const 0)
+  (func (export "len") (result i32) i32.const 10))
+$ wat2wasm mem.wat -o mem.wasm</code></pre>
+
+<p><code>hello wasm</code> という文字列がソースに書かれていて、外向きの入口が <code>ptr</code> と <code>len</code> の2つある。この状態で関数を呼ぶと何が来るか。</p>
+
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>モジュールが <code>hello wasm</code> を持っていて、関数を2つ export しているなら、どちらかを呼べば文字列が返ってくるはずだ。そういう入口として <code>ptr</code> か <code>len</code> のどちらかが用意されているように見える。両方呼んでみれば分かる。</p>
+<pre><code>$ wasmtime run --invoke ptr mem.wasm
+warning: using `--invoke` with a function that returns values is experimental and may break in the future
+0
+$ wasmtime run --invoke len mem.wasm
+warning: using `--invoke` with a function that returns values is experimental and may break in the future
+10</code></pre>
+<div class="then"><b>だめな理由</b>: 返ってきたのは <code>0</code> と <code>10</code> である。<code>0</code> は「線形メモリの 0 バイト目」、<code>10</code> は「そこから 10 バイト分」を指すつもりの数値だが、その「つもり」は戻り値のどこにも入っていない。関数の型は <code>() -&gt; i32</code> で、この i32 が位置なのか個数なのかを書く欄がそもそも無い。文字列に戻す作業は、2つの数値を受け取った側にしか残らない。</div></div>
+
+<div class="analogy"><b>たとえ</b>: 窓口が「3番の棚、10冊分」としか言わない図書館の受け渡し口に近い。棚の番号と冊数だけが口頭で渡り、本そのものは自分で棚まで行って取る。
+<br>ただし<b>崩れる点</b>: 図書館の職員は棚に何が並んでいるかを知っているが、このモジュールは <code>0</code> と <code>10</code> が何を指しているかを知らない。数を2つ出しただけで、指し先を確かめる手段を持っていない。</div>
+
+<h2 id="memory">線形メモリは区切りのないバイト列</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>(memory ...)</code> と <code>(data ...)</code> の2行が作っているもの。</div>
+
+<p>先の 5 行を1行ずつ読むと、文字列がどこに置かれたかが分かる。</p>
+
+<div class="scroll"><table>
+<tr><th>mem.wat の行</th><th>作っているもの</th></tr>
+<tr><td><code>(memory (export "mem") 1)</code></td><td>1ページ分のメモリ領域。<code>mem</code> という名前で外に出している</td></tr>
+<tr><td><code>(data (i32.const 0) "hello wasm")</code></td><td>そのメモリの 0 番地から <code>hello wasm</code> のバイト列を置く指示</td></tr>
+<tr><td><code>(func (export "ptr") (result i32) i32.const 0)</code></td><td>定数 <code>0</code> を返すだけの関数</td></tr>
+<tr><td><code>(func (export "len") (result i32) i32.const 10)</code></td><td>定数 <code>10</code> を返すだけの関数</td></tr>
+</table></div>
+
+<p>置き場所を決めているのは <code>(data (i32.const 0) ...)</code> の <code>0</code> で、長さを <code>10</code> と返しているのは人間が数えて書いた定数である。<strong>メモリ側には「ここからここまでが1つの文字列」という印が一切付かない</strong>。番地が 0 から順に振られたバイトが並んでいるだけで、境界の情報は外に出す数値のほうに持たせている。</p>
+
+<div class="analogy"><b>たとえ</b>: 罫線のない長いレシート用紙に文字を詰めて書いた状態に近い。先頭から何文字目かを数えれば位置は指せるが、紙の上に区切りは無い。
+<br>ただし<b>崩れる点</b>: レシートなら人が見て「ここが文の終わり」と判断できる。線形メモリを持っている側には読み手がいないので、どこで切るかを判断する主体が中に存在しない。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>ptr</code> が返した <code>0</code> は、何を 0 と言っているのか。</li>
+<li><code>len</code> が返す <code>10</code> を書いたのは誰か。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> 線形メモリの先頭から数えた 0 バイト目、という位置である。ただし戻り値そのものは <code>() -&gt; i32</code> の i32 でしかなく、「メモリの番地である」という情報は付いていない。受け取った側がそう解釈することで初めて位置になる。</p>
+<p><b>2.</b> モジュールを書いた人間である。<code>(func (export "len") (result i32) i32.const 10)</code> は定数 10 を返すだけの関数で、<code>hello wasm</code> を数えた結果ではない。文字列を書き換えて 10 を直し忘れれば、長さは合わなくなる。</p>
+</details></div>
+
+<h2 id="host">ホスト側で組み立てる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 2つの数値から <code>hello wasm</code> に戻すまでに、誰が何をしているか。</div>
+
+<p>ホスト側を Node にして、<code>ptr</code> と <code>len</code> を呼んでから文字列に組み立てる。</p>
+
+<pre><code>$ node readstr.mjs
+ptr = 0  len = 10
+組み立てた文字列 = hello wasm
+線形メモリの実体 = ArrayBuffer 65536 バイト</code></pre>
+
+<p>3行が別々の出どころを持っている。1行目の <code>ptr = 0  len = 10</code> は、関数を呼んだ結果をそのまま表示したものである。第1章で見た <code>add</code> と同じ、数値が返るだけの呼び出しにすぎない。</p>
+
+<p>2行目の <code>組み立てた文字列 = hello wasm</code> は、ホスト側の作業の結果である。export された <code>mem</code> から <code>mem.buffer</code> を取り、そこに <code>Uint8Array</code> をかぶせて 0 番地から 10 バイトを切り出し、<code>TextDecoder</code> に通している。切り出す位置と長さに使ったのが 1 行目の 2 つの数値で、<strong>バイト列をどの文字コードとして読むかを決めているのはデコーダ側</strong>である。その情報はモジュールから渡されていない。</p>
+
+<p>3行目の <code>ArrayBuffer 65536 バイト</code> が、この章のゴールの後半にあたる。線形メモリは特別な入れ物ではなく、<code>mem.buffer</code> を見れば 65536 バイトの <code>ArrayBuffer</code> が1枚あるだけだと分かる。<code>(memory ... 1)</code> と書いた <code>1</code> がこの 65536 の由来で、1ページ = 64KB である。ホストから見れば、ふつうのバイト配列として端から端まで読める。</p>
+
+<div class="analogy"><b>たとえ</b>: 金庫の中身ではなく「上から何段目、そこから何センチ分」というメモだけを受け取る受け渡しに近い。金庫を開けて測るのは受け取った側の仕事になる。
+<br>ただし<b>崩れる点</b>: 現実の受け渡しなら、取り出したものを見れば書類か現金かは分かる。ここで取り出せるのはバイトの並びだけで、それを文字として読むという判断は、メモにも金庫にも書かれていない。</div>
+
+<div class="note try">対応する演習は <code>lab start 03</code>。判定は <code>lab check 03</code>。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>node readstr.mjs</code> の出力3行のうち、WASM の関数を呼ぶだけで得られたのはどれか。</li>
+<li>線形メモリが 65536 バイトだと分かったのは、モジュールのどの記述の結果か。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> 1行目の <code>ptr = 0  len = 10</code> だけである。2行目は <code>mem.buffer</code> から <code>Uint8Array</code> を作って <code>TextDecoder</code> でデコードした結果、3行目は <code>mem.buffer</code> 自体を調べた結果で、どちらもホスト側の作業から出ている。</p>
+<p><b>2.</b> <code>(memory (export "mem") 1)</code> の <code>1</code> である。1ページが 64KB なので 65536 バイトになる。<code>export</code> していなければホストは <code>mem.buffer</code> に触れず、この行も出ない。</p>
+</details></div>
+
+<h2 id="bytes">バイナリの中では平文のバイト列</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>hello wasm</code> がファイルのどこに、どんな姿で入っているか。</div>
+
+<p><code>mem.wasm</code> の中身を一覧させると、文字列が隠されていないことが見える。</p>
+
+<pre><code>$ wasm-objdump -x mem.wasm
+
+mem.wasm:	file format wasm 0x1
+
+Section Details:
+
+Type[1]:
+ - type[0] () -&gt; i32
+Function[2]:
+ - func[0] sig=0 &lt;ptr&gt;
+ - func[1] sig=0 &lt;len&gt;
+Memory[1]:
+ - memory[0] pages: initial=1
+Export[3]:
+ - memory[0] -&gt; "mem"
+ - func[0] &lt;ptr&gt; -&gt; "ptr"
+ - func[1] &lt;len&gt; -&gt; "len"
+Code[2]:
+ - func[0] size=4 &lt;ptr&gt;
+ - func[1] size=4 &lt;len&gt;
+Data[1]:
+ - segment[0] memory=0 size=10 - init i32=0
+  - 0000000: 6865 6c6c 6f20 7761 736d                 hello wasm</code></pre>
+
+<p>見るのは最後の <code>Data</code> の2行である。<code>segment[0] memory=0 size=10 - init i32=0</code> が「0 番の メモリの、i32 の 0 番地から、10 バイトを置け」という指示で、その次の行が置かれるバイトそのもの。<code>6865 6c6c 6f20 7761 736d</code> の10バイトが、右側に <code>hello wasm</code> として並んで見えている。<strong>暗号化も圧縮もされておらず、バイナリの中にそのまま並んでいる</strong>。</p>
+
+<p>ここで注意する点が1つある。この <code>Data</code> セグメントに型は無い。「10バイトを 0 番地から置け」だけが書かれていて、それが文字なのか数値の列なのかはどこにも書かれていない。<code>wasm-objdump</code> の右側に <code>hello wasm</code> と出ているのは、印字できるバイトを文字として表示する <code>wasm-objdump</code> の親切であって、モジュールの中にその判断は入っていない。</p>
+
+<p>セクションの一覧そのものの読み方は第5章で扱う。ここでは <code>Data</code> の2行だけ見れば足りる。</p>
+
+<div class="analogy"><b>たとえ</b>: 箱に貼られたラベルではなく、箱の中に入れた砂に近い。<code>hello wasm</code> はある位置に並んだ10バイトで、「これは文字である」という札は付いていない。
+<br>ただし<b>崩れる点</b>: 砂は手に取れば砂だと分かる。バイト列は見ただけでは文字なのか数値なのか判別できず、判別の手続きを持っているのは読む側だけである。</div>
+
+<h2 id="promise">ptr と len は言語ではなく約束</h2>
+<div class="sgoal"><b>この節で分かること</b>: この受け渡しを成立させているものが、WASM の機能ではないこと。</div>
+
+<p>上の <code>wasm-objdump</code> の出力が、そのまま証拠になっている。<code>Type[1]</code> は型が1種類しか無いことを示し、<code>func[0] sig=0 &lt;ptr&gt;</code> と <code>func[1] sig=0 &lt;len&gt;</code> は2つの関数がどちらも同じ <code>sig=0</code>、つまり <code>() -&gt; i32</code> であることを示している。<strong>型のレベルでは、位置を返す関数と長さを返す関数が区別されていない</strong>。</p>
+
+<p>区別を作っているのは <code>Export[3]</code> の <code>"ptr"</code> と <code>"len"</code> という名前の文字列だけである。そしてこの名前を「前者が位置、後者が長さ」と読むのは、ホスト側のコードがそう書かれているからにすぎない。順序を逆に読むホストを書けば、同じ <code>mem.wasm</code> から別の結果が出る。</p>
+
+<p>文字列という概念は、この受け渡しのどちら側にあるか。モジュール側には、番地と、バイトと、i32 を返す関数しか無い。<code>ArrayBuffer</code> を <code>Uint8Array</code> で覗き、10バイトを切り出し、文字コードを決めてデコードする——この一連の判断は全部ホスト側にある。<code>(ptr, len)</code> の組は WASM の型でも命令でもなく、<strong>ホストとモジュールが事前に合わせた取り決め</strong>である。第2章で <code>import</code> として能力を手渡したのと同じ構図が、データの受け渡しにも出ている。</p>
+
+<div class="analogy"><b>たとえ</b>: 同じ番号札を使う2つの店に近い。片方は「番号札は棚の位置」、もう片方は「番号札は受付順」と決めている。札そのものはどちらでも同じ紙である。
+<br>ただし<b>崩れる点</b>: 店の番号札は人間が見て意味を取り違えれば気づける。<code>() -&gt; i32</code> が2つ並んでいる状態では、取り違えを教えてくれる仕組みがどこにも無い。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>wasm-objdump -x</code> の出力のどこを見れば、<code>ptr</code> と <code>len</code> が型で区別されていないと言えるか。</li>
+<li><code>Data</code> セグメントに <code>hello wasm</code> が見えている。このモジュールは自分が文字列を持っていることを知っているか。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> <code>Function[2]</code> の <code>func[0] sig=0</code> と <code>func[1] sig=0</code> が同じ <code>sig=0</code> を指していて、<code>Type[1]</code> にはその 0 番として <code>() -&gt; i32</code> が1つしか無い。2つの関数の型は同一である。区別は <code>Export</code> の名前の文字列にしか無い。</p>
+<p><b>2.</b> 知らない。<code>Data</code> セグメントは「0 番地から10バイトを置け」という指示で、型を持たない。<code>wasm-objdump</code> が右側に <code>hello wasm</code> と印字するのはツールの表示であって、モジュールの中に「これは文字列だ」という記述は無い。文字列という概念はホスト側にしかない。</p>
+</details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>境界を越えるのは数値だけである。<code>ptr</code> は <code>0</code>、<code>len</code> は <code>10</code> を返し、それ以上のものは返らない</li>
+<li>線形メモリの実体は1枚の <code>ArrayBuffer</code>。<code>(memory ... 1)</code> の <code>1</code> が <code>ArrayBuffer 65536 バイト</code> になる</li>
+<li><code>hello wasm</code> はバイナリの <code>Data</code> セグメントに <code>6865 6c6c 6f20 7761 736d</code> として平文で入っている。型は付いていない</li>
+<li><code>ptr</code> と <code>len</code> は型が同じ <code>() -&gt; i32</code> で、区別しているのは export の名前とホスト側のコードだけ。<code>(ptr, len)</code> は言語機能ではなく約束である</li>
+<li>文字列に組み立てる判断はすべてホスト側にある。モジュールは番地とバイトしか持っていない</li>
+</ul></div>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/&lt;owner&gt;/lab-wasm:1.0.0 / Ubuntu 24.04.5 LTS / wasmtime 49.0.1 / wabt 1.0.34 / node 18.19.1 / apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
+
+<nav class="pager"><a href="/wasm/theory/02-import">← 2. 能力は import でしか増えない</a><a href="/wasm/theory/04-host">次: 4. 同じ .wasm が、ホストが違うと動かない →</a></nav>
+<footer><a href="/">トップ</a> · <a href="/wasm/theory/">理論編 目次</a> · <a href="/wasm/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/wasm/chapters.js"></script>
+<script src="/wasm/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+</body></html>

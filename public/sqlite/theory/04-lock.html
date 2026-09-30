@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. 同時に書けるのは1人だけ — 壊して覚える SQLite</title>
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-ch="4" data-theme="sqlite">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/sqlite/theory/">理論編</a> › 第4章</nav>
+
+<h1>4. 同時に書けるのは1人だけ</h1>
+<p class="lead"><code>database is locked</code> は、DB が返してきた拒否通知ではない。自分が起動したプロセスが、ファイルに掛かった印を見て、自分で書いた1行である。</p>
+<div class="badges"><span>前提: 第3章まで</span><span>所要 14分</span><span class="impact-a">影響度 A</span><span>最終検証 2026-09-30</span></div>
+
+<div class="goal"><h4>この章のゴール</h4><ul>
+<li><code>database is locked</code> が出る条件を、そのとき誰がロックを持っているかで説明できる</li>
+<li>ロック中の読み取りが <code>0</code> を返す理由を説明できる</li>
+<li>WAL にして変わることと変わらないことを、出力を根拠に区別できる</li>
+</ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: ロックの5状態（SHARED / RESERVED / PENDING / EXCLUSIVE）の遷移図は覚えなくていい。この章は「印が掛かっているか、いないか」の2値だけで進む。<br>
+<code>busy_timeout</code> に何秒を入れるべきかも決めなくていい。既定が「待たない」であることだけ押さえる。<br>
+WAL ファイルの内部形式も読まなくていい。この章で扱うことは全部、外から観測できる。</div></div>
+
+<h2 id="who">この行を出しているのは、自分のプロセス</h2>
+<div class="sgoal"><b>この節で分かること</b>: ロックを持っている側と、エラーを出している側は別のプロセスである。</div>
+
+<p>まず、この DB がどのモードで動いているかを確かめる。テーブルを1つ作り、モードを聞く。</p>
+
+<pre><code>$ sqlite3 lock.db 'CREATE TABLE t(n INTEGER);'
+$ sqlite3 lock.db 'PRAGMA journal_mode;'
+delete</code></pre>
+
+<p><code>delete</code> が既定である。切り替えた覚えがなければ、手元の DB もこれで動いている。</p>
+
+<p>この <code>lock.db</code> に対して、別のプロセスが書き込みのトランザクションを開いたまま、まだ終えていない状態を作る。相手側を作る手順はこのページには出てこない。演習 04 が用意する。ここでは、その状態のときに<em>もう1つ</em>のプロセスから1行入れると何が返るかを見る。</p>
+
+<pre><code>$ sqlite3 lock.db 'INSERT INTO t VALUES(2);'
+Error: stepping, database is locked (5)</code></pre>
+
+<p>手元では <code>database is locked</code> という趣旨のメッセージが出る（文言は環境で変わる）。末尾の <code>(5)</code> は SQLite の結果コードで、プロセスの終了コードも 5 になる。</p>
+
+<p>この1行に何が<strong>書かれていない</strong>かを見てほしい。ロックを持っている相手の名前もプロセス ID も入っていない。つまりこのメッセージから分かるのは「自分ではない誰かが持っている」ところまでで、それが誰かは書いていない。障害の切り分けで「誰が持っているか」を知りたいなら、このメッセージの外を見に行くことになる。</p>
+
+<div class="analogy"><b>たとえ</b>: ロックは、受付が順番を管理する予約ではなく、ドアに掛かった札に近い。次に来たプロセスが自分で札を見て、掛かっていたら引き返す。<br>ただし<b>崩れる点</b>: 実物の札には掛けた人の名前や戻り時刻が書いてある。ここでは何も書いていない。だから引き返した側は、相手が誰でいつ終わるのかを知らないまま引き返す。</div>
+
+<p>もう1つ、時間の感覚に注意する。このエラーは待った末に諦めた結果ではない。既定の <code>busy_timeout</code> は 0 で、印が掛かっていればその場で返る。競合が長く続いたから出たのではなく、<strong>その瞬間に印があった</strong>という観測でしかない。だから「たまに出る」ではなく「当たれば必ず出る」性質のものになる。</p>
+
+<div class="analogy"><b>たとえ</b>: このエラーは、閉まった店の前で自分がメモ帳に「閉店」と書いたのに近い。店から連絡が来たわけではない。<br>ただし<b>崩れる点</b>: 店なら営業時間の札を出しているので、次にいつ来ればいいか分かる。DB 側は何も掲示しない。次に来た者が自分で確かめ直すしかない。</div>
+
+<p>ここが SQLite の輪郭が出るところである。順番待ちを仲裁する常駐プロセスが居ない。だから列ができない。印を見て引き返すか書き込むかを決めているのは、そのつど起動されたプロセス自身であり、ロックはファイルシステム上に置かれた印にすぎない。</p>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>database is locked</code> が、ほとんど待ち時間なしで返ってきた。ここから相手のプロセスの状態について何か言えるか。</li>
+<li>このメッセージを出力したのは、どのプロセスか。</li>
+</ol><details><summary>答え</summary>
+<p><b>1.</b> 何も言えない。待ち時間の長短は相手の状態ではなく、自分側の <code>busy_timeout</code> が決めている。既定は「待たない」なので、相手が 1 ミリ秒後に終わる場合でも同じように即座に返る。</p>
+<p><b>2.</b> 自分が起動した <code>sqlite3</code> プロセス。相手のプロセスから送られてきた返事ではない。だから相手の名前も入っていない。</p>
+</details></div>
+
+<h2 id="read">ロック中でも読める。ただし 0 が返る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 書き込みが弾かれた同じ瞬間に読み取りは通り、返る値はコミット済みの分だけになる。</div>
+
+<p>書き込みが弾かれたのと同じ状況で、読み取りを投げる。相手は1行入れたところで止まっている。</p>
+
+<pre><code>$ sqlite3 lock.db 'SELECT count(*) FROM t;'
+0</code></pre>
+
+<p>読み取りは通っている。終了コードは 0 で、エラーも出ていない。そして返ってきた値は <code>0</code> である。</p>
+
+<p>この <code>0</code> は「読めなかった」でも「DB が壊れている」でもない。<strong>確定している行数が 0 である、という正しい答え</strong>だと読む。相手が入れた1行は相手のトランザクションの中にあり、まだ確定していないので数に入らない。相手が終わったあと、同じコマンドを同じ DB に投げるとこうなる。</p>
+
+<pre><code>$ sqlite3 lock.db 'SELECT count(*) FROM t;'
+1</code></pre>
+
+<p>つまり <code>0</code> と <code>1</code> の差は、DB の状態の差ではなく、<em>いつ聞いたか</em>の差である。障害報告で「データが消えている」と言われたとき、この違いを切り分けられるかどうかが効く。</p>
+
+<div class="analogy"><b>たとえ</b>: 書き込み中の行は、まだ封をしていない封筒の中身に近い。外から数えられるのは、封をして箱に入った分だけである。<br>ただし<b>崩れる点</b>: 封筒は1通ずつ数えるものだが、ここでは1つの封に何百行でも入る。第3章で 2000 行を1つにまとめたのが、まさにその封である。</div>
+
+<p>ゴールの形に言い直すと、こうなる。印を持っているのは書き込み側で、その側が印を外していないから2人目は書けない。一方、この記録では印が掛かっている間も読み取りは通っている。<b>「ロックされている」は「何もできない」ではない。</b>誰が何を持っているかで、通るものと弾かれるものが分かれる。</p>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li>ロック中の <code>SELECT count(*) FROM t;</code> が <code>0</code> を返した。DB が壊れている可能性を疑うべきか。</li>
+<li>同じコマンドが後から <code>1</code> を返した。この記録から言えることは何か。</li>
+</ol><details><summary>答え</summary>
+<p><b>1.</b> 疑う必要はない。エラーも出ておらず終了コードも 0 で、確定した行が 0 行だという答えが返っている。相手が入れた行はまだ確定していないので見えないだけである。</p>
+<p><b>2.</b> 相手のトランザクションが終わり、行が確定したこと。あわせて、印が消えて読み取りが何も待たされずに通ったこと。印は、走っているプロセスが居る間だけの状態である。</p>
+</details></div>
+
+<h2 id="wal">WAL にしても、書けるのは1つだけ</h2>
+<div class="sgoal"><b>この節で分かること</b>: WAL が変えないのは書き込みの本数である。ここが最も誤解される。</div>
+
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>書き込みが1つしか通らないなら、<code>journal_mode</code> を WAL に切り替えればいい。WAL は同時実行のためのモードとして紹介されるのだから、切り替えれば2つ目の <code>INSERT</code> も通るはずだ。</p>
+<pre><code>$ sqlite3 wal.db 'PRAGMA journal_mode=WAL; CREATE TABLE t(n INTEGER);'
+wal</code></pre>
+<p>切り替えは成功している。<code>wal</code> が返っている。この DB に対して、さきほどと同じことをする。別のプロセスが書き込みのトランザクションを開いたまま止まっている状態で、もう1つのプロセスから1行入れる。</p>
+<pre><code>$ sqlite3 wal.db 'INSERT INTO t VALUES(2);'
+Error: stepping, database is locked (5)</code></pre>
+<div class="then"><b>だめな理由</b>: 返ってきた文字列が1文字も変わっていない。結果コードも <code>(5)</code> のままである。WAL に切り替えても、1つの DB に書き込めるプロセスは同時に1つだけで、2人目は同じように弾かれる。WAL は書き込みの本数を増やすモードではない。</div></div>
+
+<p>では WAL に切り替えて何が変わったのか。記録を並べて、言えることと言えないことを分ける。</p>
+
+<div class="scroll"><table>
+<tr><th>観測したこと</th><th>既定（<code>delete</code>）</th><th>WAL</th></tr>
+<tr><td><code>PRAGMA journal_mode</code> の返り値</td><td><code>delete</code></td><td><code>wal</code></td></tr>
+<tr><td>2つ目のプロセスの <code>INSERT</code></td><td><code>Error: stepping, database is locked (5)</code></td><td><code>Error: stepping, database is locked (5)</code></td></tr>
+<tr><td>その瞬間の <code>SELECT count(*)</code></td><td><code>0</code></td><td><code>0</code></td></tr>
+<tr><td><code>ls</code> で見えたファイル</td><td>この記録には無い</td><td><code>wal.db</code></td></tr>
+</table></div>
+
+<p>2行目が、この章で正す誤解の全部である。<strong>モードを替えても、同時に書ける本数は 1 から動いていない。</strong></p>
+
+<p>3行目も見ておく。読み取りはどちらのモードでも通り、返り値も同じ <code>0</code> だった。つまりこの記録は「WAL にしないと読めない」という逆向きの誤解も支持していない。WAL が読み取りと書き込みの関係を変えるモードだとしても、その差はこの記録には写っていない。写っていないものをここで断定しない。</p>
+
+<div class="analogy"><b>たとえ</b>: WAL は名前のとおり、本体を直す前に別紙へ書き足していく方式である。本体がそのまま残るので、読む側は本体を読み続けられる。<br>ただし<b>崩れる点</b>: 「各自が自分の紙に書ける」ようにはならない。別紙は1冊しかないので、書き足せるのは同時に1人である。だから2つ目の <code>INSERT</code> は弾かれる。</div>
+
+<p>最後に、WAL に切り替えた直後のディレクトリを見る。同じコマンドを、切り替えた直後と、すべて終わったあとの2回撮っている。返ってきたのはどちらも同じ1行だった。</p>
+
+<pre><code>$ ls wal.db*
+wal.db</code></pre>
+
+<p>ここから言えるのは「その瞬間、ディスクに見えたのは <code>wal.db</code> だけだった」ということだけである。だから <code>ls</code> の結果で WAL かどうかを判定してはいけない。判定に使うのは <code>PRAGMA journal_mode;</code> の返り値である。</p>
+
+<p>ロックもモードの効き方も、ファイル一覧には現れない。状態を持っているのは走っているプロセスのほうで、相手が終わった直後の <code>SELECT</code> が何も待たされずに <code>1</code> を返したのがその証拠になる。仲裁する者が居ないので、印が残るのも消えるのも、印を掛けたプロセスが生きている間の話である。</p>
+
+<div class="note try">対応する演習は <code>lab start 04</code>。ロックを持つ側のプロセスは演習が用意する。判定は <code>lab check 04</code>。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li>「WAL にすれば2つのプロセスから同時に <code>INSERT</code> できる」は正しいか。記録のどの行が根拠になるか。</li>
+<li>WAL に切り替えたあと <code>ls wal.db*</code> が <code>wal.db</code> の1行しか返さなかった。ここから「WAL になっていない」と結論できるか。</li>
+</ol><details><summary>答え</summary>
+<p><b>1.</b> 誤り。根拠は <code>sqlite3 wal.db 'INSERT INTO t VALUES(2);'</code> が、既定モードのときと同じ <code>Error: stepping, database is locked (5)</code> を返している行。文字列も結果コードも変わっていない。</p>
+<p><b>2.</b> 結論できない。<code>PRAGMA journal_mode=WAL;</code> は <code>wal</code> を返している。<code>ls</code> から言えるのは、その瞬間に見えたファイルが <code>wal.db</code> だけだったということまでで、モードの判定材料にはならない。判定には <code>PRAGMA journal_mode;</code> の返り値を使う。</p>
+</details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li><code>database is locked</code> は、自分のプロセスが印を見てその場で諦めた記録である。相手の名前は書かれていないので、「誰が持っているか」はこのメッセージの外を見る</li>
+<li>既定では待たない。だからこのエラーは「たまに出る」ではなく、当たれば必ず出る</li>
+<li>ロック中でも読める。返る値は確定済みの分だけで、<code>0</code> は異常ではない</li>
+<li>WAL にしても、同時に書けるプロセスは1つ。エラーの文字列も結果コードも変わらない</li>
+<li>モードの確認は <code>PRAGMA journal_mode;</code> の返り値で行う。ファイル一覧では判定できない</li>
+</ul></div>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/&lt;owner&gt;/lab-sqlite:1.0.0 / Ubuntu 24.04.5 LTS / sqlite3 3.45.1 / apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
+
+<nav class="pager"><a href="/sqlite/theory/03-transaction">← 3. 書き込みは、まとめると270倍速い</a><a href="/sqlite/theory/05-directory">次: 5. ディレクトリに書けないと、DB にも書けない →</a></nav>
+<footer><a href="/">トップ</a> · <a href="/sqlite/theory/">理論編 目次</a></footer>
+</div>
+<script src="/sqlite/chapters.js"></script>
+<script src="/sqlite/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+</body></html>

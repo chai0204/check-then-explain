@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>壊して覚える SQLite — 実践編</title>
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-theme="sqlite">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/sqlite/theory/">理論編</a> › 実践編</nav>
+
+<h1>壊して覚える SQLite — 実践編</h1>
+<p class="lead">理論編の各章に対応する演習が5本あります。全部コンテナの中で完結し、あなたのマシンには何も起きません。</p>
+
+<div class="badges"><span>演習5本</span><span>合計 約54分</span><span class="impact-b">影響度 B（コンテナ内のみ）</span><span>最終検証 2026-09-30</span></div>
+
+<h2 id="start">始める</h2>
+<div class="sgoal"><b>この節で分かること</b>: 1行で始める方法と、終わったときの消し方</div>
+
+<pre><code>docker run --rm -it \
+  --name lab-sqlite --pull=always \
+  --cap-add NET_RAW \
+  -v lab-sqlite-work:/home/lab/work \
+  -v lab-sqlite-state:/home/lab/.lab \
+  ghcr.io/OWNER/lab-sqlite:1.0.0</code></pre>
+
+<div class="scroll"><table>
+<tr><th>書いてあるもの</th><th>なぜ書くか</th></tr>
+<tr><td><code>--rm</code></td><td>終了でコンテナが消える。あなたのマシンに残骸を残さない</td></tr>
+<tr><td><code>--pull=always</code></td><td>手元の古いキャッシュと本文のタグがずれる事故を潰す</td></tr>
+<tr><td><code>--cap-add NET_RAW</code></td><td>Podman の rootless がこの権限を既定で落とすため。Docker では冗長だが害はない</td></tr>
+<tr><td><code>-v ...-work</code></td><td>作業ファイルの保存先。<b>名前付きボリュームなので、あなたのホームには触れません</b></td></tr>
+<tr><td><code>-v ...-state</code></td><td><b>進捗の保存先。これを省くと次回起動時に進捗が消えます</b></td></tr>
+</table></div>
+
+<div class="note warn"><b>Docker Desktop が使えない場合</b>:
+  Podman Desktop / Rancher Desktop / Colima で同じコマンドが通ります。
+  <code>docker</code> を <code>podman</code> に置き換えてください。<br>
+  <b>後片付け</b>: <code>docker volume rm lab-sqlite-work lab-sqlite-state</code></div>
+
+<h2 id="lab">コンテナの中のコマンド</h2>
+<div class="sgoal"><b>この節で分かること</b>: 覚えるコマンドは4つだけ</div>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>何をするか</th></tr>
+<tr><td><code>lab</code></td><td>現在地と次の一手。起動時にも自動で出ます</td></tr>
+<tr><td><code>lab start NN</code></td><td>課題を開く。作業場所は <code>~/work/NN</code></td></tr>
+<tr><td><code>lab check NN</code></td><td>答え合わせ。<b>観測した事実だけを出し、直し方は言いません</b></td></tr>
+<tr><td><code>lab hint NN</code></td><td>詰まったとき。呼ぶたびに深くなります</td></tr>
+</table></div>
+<p>他に <code>lab ls</code>（一覧）、<code>lab solve NN</code>（模範解答）、
+   <code>lab reset NN</code>（やり直し）、<code>lab env</code>（検証環境の表示）があります。</p>
+<div class="note"><b>答えは閉じていません。</b> ヒントを使い切れば <code>lab solve</code> で必ず解答に到達できます。
+  閉じても学習は起きず、読者が別のところへ聞きに行くだけなので、出口は先に見せます。
+  ただし使ったことは <code>lab ls</code> に <code>◍</code> として残ります。</div>
+
+<h2 id="exercises">演習</h2>
+<div class="sgoal"><b>この節で分かること</b>: 各演習が理論編のどの章に対応するか</div>
+<div class="scroll"><table>
+<tr><th>#</th><th>やること</th><th>対応する章</th><th>目安</th></tr>
+<tr><td>01</td><td>データベースを1個のファイルとして見る</td><td><a href="/sqlite/theory/01-file">1. これはファイルである</a></td><td>8分</td></tr>
+<tr><td>02</td><td>型に嘘をつかせる</td><td><a href="/sqlite/theory/02-affinity">2. 型は宣言ではなく提案</a></td><td>10分</td></tr>
+<tr><td>03</td><td>同じ2000行を、2通りの速さで入れる</td><td><a href="/sqlite/theory/03-transaction">3. まとめると速い</a></td><td>12分</td></tr>
+<tr><td>04</td><td>2人で同時に書こうとする</td><td><a href="/sqlite/theory/04-lock">4. 同時に書けるのは1人</a></td><td>12分</td></tr>
+<tr><td>05</td><td>書ける権限があるのに、書けない</td><td><a href="/sqlite/theory/05-directory">5. ディレクトリに書けないと</a></td><td>12分</td></tr>
+</table></div>
+
+<div class="note try">理論編を読まずに演習から始めても構いません。各課題文は単体で読めます。
+  ただし<b>なぜそうなるか</b>は理論編にあります。</div>
+
+<h2 id="diff">本文と違う出力が出たら</h2>
+<div class="sgoal"><b>この節で分かること</b>: それは教材のバグとして扱われる</div>
+<p>このシリーズは「本文と同じ文字があなたの画面に出る」ことを約束しています。
+   違ったときは <code>lab diff NN</code> を打つと、本文に載せた出力とあなたの出力の
+   <b>差分行だけ</b>が出ます。それをそのまま報告してください。</p>
+
+<div class="verified"><b>検証環境</b>:
+イメージ ghcr.io/OWNER/lab-sqlite:1.0.0 / Ubuntu 24.04.5 LTS / sqlite3 3.45.1 /
+apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
+
+<nav class="pager"><a href="/sqlite/theory/">← 理論編へ</a><a href="/sqlite/theory/glossary">用語辞書 →</a></nav>
+<footer>壊して覚える SQLite ／ 全5演習は上のイメージの中で実際に解いて、判定が通ることを確認しています。</footer>
+</div>
+<script src="/sqlite/chapters.js"></script>
+<script src="/sqlite/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+</body></html>

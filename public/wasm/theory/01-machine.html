@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. 41バイトの計算機 — 壊して覚える WASM</title>
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-ch="1" data-theme="wasm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/wasm/theory/">理論編</a> › 第1章</nav>
+
+<h1>1. 41バイトの計算機</h1>
+<p class="lead">テキスト5行を <code>wat2wasm</code> に通すと、41 バイトの <code>.wasm</code> ができる。
+その 41 バイトを1バイトずつ指して、中に何が入っているか、そして何が入っていないかを確かめる。</p>
+
+<div class="badges"><span>前提: シェルが打てる・16進ダンプを見たことがある</span><span>所要 20分</span><span class="impact-a">影響度 A</span><span>最終検証 2026-09-30</span></div>
+
+<div class="goal"><h4>この章のゴール</h4><ul>
+<li>WAT を手で書いて <code>.wasm</code> にコンパイルし、関数を呼び出せる</li>
+<li>41 バイトのバイナリの各バイトが何であるかを <code>xxd</code> の出力上で指せる</li>
+<li>WASM の値型に文字列が無いことを、コンパイルエラーで示せる</li>
+</ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>:
+オペコードの一覧は覚えない。この章に出てくるのは3つだけで、残りは必要になった時に引けばよい。
+セクション ID の番号も暗記しない。番号と名前の対応は <code>wasm-objdump</code> が出力に書いてくれる。
+バイナリ中の数の符号化規則（LEB128）には触らない。この章に現れる数はすべて1バイトに収まっていて、規則を知らなくても読める。
+Rust や C から <code>.wasm</code> を作る話も出さない。生成物が数十 KB になると、中身を指で追う練習にならない。</div></div>
+
+<h2 id="wat">WAT を書いて 41 バイトにする</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>.wasm</code> は言語処理系を用意しなくても、テキスト5行から作れる。</div>
+
+<p>WASM のバイナリを作るのに、コンパイラ一式は要らない。WAT というテキスト表記があり、
+それを <code>wat2wasm</code> に通せばバイナリになる。まず入力を見る。</p>
+
+<pre><code>$ cat add.wat
+(module
+  (func (export "add") (param i32 i32) (result i32)
+    local.get 0
+    local.get 1
+    i32.add))</code></pre>
+
+<p>読み方は上から順に、<code>module</code> が入れ物、<code>func</code> が関数1つ、
+<code>(export "add")</code> が外から呼ぶときの名前、<code>(param i32 i32) (result i32)</code> が型。
+残る3行が本体で、これはスタックに対する命令列である。
+<code>local.get 0</code> で1つめの引数を積み、<code>local.get 1</code> で2つめを積み、
+<code>i32.add</code> が上2つを降ろして和を積む。最後に積まれている1個が戻り値になる。</p>
+
+<div class="analogy"><b>たとえ</b>: WAT と <code>.wasm</code> の関係は、アセンブリとオブジェクトファイルの関係に近い。
+人が読める表記と、機械が読む表記が1対1で並んでいる。<br>
+ただし<b>崩れる点</b>: オブジェクトファイルはリンクすれば OS の上で単独に走り出せるが、
+<code>.wasm</code> には走り出す先が無い。誰かが呼ばない限り1命令も動かない。</div>
+
+<p>変換する。<code>wat2wasm</code> は成功すると何も言わない。</p>
+
+<pre><code>$ wat2wasm add.wat -o add.wasm
+$ ls -l add.wasm
+-rw-r--r-- 1 lab lab 41 Sep 30 19:11 add.wasm</code></pre>
+
+<p>41 バイト。この中に型情報と関数の本体と <code>add</code> という名前が全部入っている。
+呼び出してみる。</p>
+
+<pre><code>$ wasmtime run --invoke add add.wasm 3 4
+warning: using `--invoke` with a function that takes arguments is experimental and may break in the future
+warning: using `--invoke` with a function that returns values is experimental and may break in the future
+7</code></pre>
+
+<p>warning が2行出るのは正常で、隠す理由が無いのでそのまま載せている。
+<code>--invoke</code> は wasmtime が experimental と明示している機能で、
+引数や戻り値のある関数を名指しで叩くという使い方は将来変わりうる。
+この教材では「関数1つだけを外から突く」のに都合がいいので使い続ける。</p>
+
+<div class="note try">対応する演習は <code>lab start 01</code>。判定は <code>lab check 01</code>。</div>
+
+<h2 id="bytes">41 バイトを指で追う</h2>
+<div class="sgoal"><b>この節で分かること</b>: 41 バイトの内訳と、そこに外の世界の話が1バイトも無いこと。</div>
+
+<p>ダンプを取る。3行で終わる。</p>
+
+<pre><code>$ xxd add.wasm
+00000000: 0061 736d 0100 0000 0107 0160 027f 7f01  .asm.......`....
+00000010: 7f03 0201 0007 0701 0361 6464 0000 0a09  .........add....
+00000020: 0107 0020 0020 016a 0b                   ... . .j.</code></pre>
+
+<p>右端の ASCII 欄に手がかりが2つ見えている。1行目の <code>.asm</code> は先頭4バイト
+<code>0061 736d</code>、つまり先頭がヌルバイトで続く3文字が <code>asm</code> のマジックナンバーで、
+その直後の <code>0100 0000</code> がバージョン 1。
+2行目の <code>add</code> は <code>0361 6464</code> の後ろ3バイトで、
+<strong>export 名がバイナリの中に平文で入っている</strong>。</p>
+
+<p>残りの内訳を知るには、まずどこからどこまでが何のセクションかを絞る。
+<code>wasm-objdump</code> がそれを出す。</p>
+
+<pre><code>$ wasm-objdump -h add.wasm
+
+add.wasm:	file format wasm 0x1
+
+Sections:
+
+     Type start=0x0000000a end=0x00000011 (size=0x00000007) count: 1
+ Function start=0x00000013 end=0x00000015 (size=0x00000002) count: 1
+   Export start=0x00000017 end=0x0000001e (size=0x00000007) count: 1
+     Code start=0x00000020 end=0x00000029 (size=0x00000009) count: 1</code></pre>
+
+<p>ここで出ている <code>start</code> はセクションの<b>本体</b>の先頭である。
+Type は <code>0x0a</code> から始まると書いてあるが、ダンプの <code>0x0a</code> の
+2つ手前、<code>0x08</code> と <code>0x09</code> には <code>01 07</code> がある。
+この <code>07</code> は objdump の <code>size=0x00000007</code> と一致し、
+<code>01</code> がセクションの種類を表す番号である。
+同じ関係が他の3つでも成立する。Function の本体は <code>0x13</code> からで、
+手前の <code>0x11 0x12</code> は <code>03 02</code>。Export は <code>0x17</code> からで手前が <code>07 07</code>。
+Code は <code>0x20</code> からで手前が <code>0a 09</code>。
+つまり<strong>各セクションが「番号・自分の長さ・本体」の3点セットで並んでいる</strong>。</p>
+
+<div class="analogy"><b>たとえ</b>: 41 バイトは、章立てが決まった薄い冊子である。
+先頭8バイトが表紙（マジックとバージョン）で、そのあとに型の章・関数の章・輸出の章・本体の章が続く。<br>
+ただし<b>崩れる点</b>: 冊子なら先頭に全体の目次があるが、ここには無い。
+各章が自分の長さを自分で名乗っていて、読む側は先頭から長さ分だけ進んで次の章に着く。
+上の <code>start</code> と <code>end</code> が隙間なく繋がっているのはそのため。</div>
+
+<p>ここまで分かれば全バイトが埋まる。<code>xxd</code> は2バイトずつまとめて印字するので、
+下の表の1行が印字の1かたまりと揃わないことがある。オフセットで数える。</p>
+
+<div class="scroll"><table>
+<tr><th>オフセット</th><th>バイト</th><th>意味</th></tr>
+<tr><td>0x00</td><td><code>00 61 73 6d</code></td><td>マジック。ASCII 欄に <code>.asm</code> と出ている</td></tr>
+<tr><td>0x04</td><td><code>01 00 00 00</code></td><td>バージョン 1</td></tr>
+<tr><td>0x08</td><td><code>01</code></td><td>セクション番号 1。objdump が Type と呼んだもの</td></tr>
+<tr><td>0x09</td><td><code>07</code></td><td>本体 7 バイト（objdump の size と一致）</td></tr>
+<tr><td>0x0a</td><td><code>01</code></td><td>型は1つ（objdump の count: 1 と一致）</td></tr>
+<tr><td>0x0b</td><td><code>60</code></td><td>これは関数の型である</td></tr>
+<tr><td>0x0c</td><td><code>02 7f 7f</code></td><td>引数2個、どちらも i32</td></tr>
+<tr><td>0x0f</td><td><code>01 7f</code></td><td>戻り値1個、i32</td></tr>
+<tr><td>0x11</td><td><code>03 02</code></td><td>セクション番号 3（Function）、本体 2 バイト</td></tr>
+<tr><td>0x13</td><td><code>01 00</code></td><td>関数は1つ。その型は 0 番</td></tr>
+<tr><td>0x15</td><td><code>07 07</code></td><td>セクション番号 7（Export）、本体 7 バイト</td></tr>
+<tr><td>0x17</td><td><code>01</code></td><td>輸出は1つ</td></tr>
+<tr><td>0x18</td><td><code>03 61 64 64</code></td><td>名前の長さ 3、続けて <code>add</code></td></tr>
+<tr><td>0x1c</td><td><code>00 00</code></td><td>種別は関数、その番号は 0</td></tr>
+<tr><td>0x1e</td><td><code>0a 09</code></td><td>セクション番号 10（Code）、本体 9 バイト</td></tr>
+<tr><td>0x20</td><td><code>01 07</code></td><td>関数本体は1つ、その長さ 7 バイト</td></tr>
+<tr><td>0x22</td><td><code>00</code></td><td>ローカル変数の宣言なし</td></tr>
+<tr><td>0x23</td><td><code>20 00</code></td><td><code>local.get 0</code></td></tr>
+<tr><td>0x25</td><td><code>20 01</code></td><td><code>local.get 1</code></td></tr>
+<tr><td>0x27</td><td><code>6a</code></td><td><code>i32.add</code></td></tr>
+<tr><td>0x28</td><td><code>0b</code></td><td><code>end</code>。関数の終わり</td></tr>
+</table></div>
+
+<p>ダンプ3行目の ASCII 欄が <code>... . .j.</code> になっていて、途中に空白が2つ見える。
+これは <code>0x20</code> というバイトが ASCII の空白と同じ値だからで、
+その2つがちょうど <code>local.get</code> の2回に対応する。
+<code>6a</code> が <code>j</code> と表示されているのも同じ理由である。</p>
+
+<div class="analogy"><b>たとえ</b>: <code>0x18</code> からの <code>add</code> は荷札である。
+外の誰かがこの箱を名前で指名できるように、読める文字で貼ってある。<br>
+ただし<b>崩れる点</b>: 荷札は普通は中身を示すが、これは示さない。
+Export セクションがしているのは名前と関数番号 0 を結ぶことだけで、
+<code>add</code> と書いてあることは中の命令が足し算である保証にならない。</div>
+
+<p>ここで、埋まらなかった欄を数える。画面に文字を出す記述は無い。ファイルを開く記述も、
+時計を読む記述も、乱数をもらう記述も無い。あるのは型1つ、関数1つ、名前1つ、命令4つだけである。
+それでも先ほど端末には <code>7</code> が出た。
+<strong>3 と 4 を用意したのも、返ってきた 7 を印字したのも、41 バイトの外側にいた wasmtime である。</strong>
+WASM は外の世界を一切知らない。次章はここを起点に、外の世界に触れる機能をどう足すのかを扱う。</p>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>wasm-objdump -h</code> が Export セクションを <code>start=0x17</code> と報告した。
+このセクションが「番号 7・長さ 7 バイト」であることを、objdump を使わずにダンプだけから言うにはどこを見るか。</li>
+<li>この 41 バイトのどこにも「画面に出力する」という記述が無いのに、端末に <code>7</code> が表示された。誰が表示したか。</li>
+</ol><details><summary>答え</summary>
+<p><b>1.</b> 本体の先頭 <code>0x17</code> の2つ手前を見る。<code>0x15</code> と <code>0x16</code> が
+<code>07 07</code> で、前が番号、後ろが本体の長さ。各セクションが「番号・自分の長さ・本体」で並んでいるので、
+本体の開始位置が分かれば手前2バイトが読める。</p>
+<p><b>2.</b> wasmtime。<code>--invoke</code> に渡した 3 と 4 を引数として関数に入れ、
+戻ってきた値を標準出力に書いたのは wasmtime 側の仕事である。
+41 バイトの側には印字する手段が1バイトも入っていない。</p>
+</details></div>
+
+<h2 id="types">値型に文字列は無い</h2>
+<div class="sgoal"><b>この節で分かること</b>: 文字列を返す関数は書けず、実行前のコンパイルで止まる。</div>
+
+<p>ここまで出てきた型名は <code>i32</code> だけだった。これは例が単純だったからではない。
+<code>(result …)</code> に書ける語は決まっていて、その中に文字列は無い。</p>
+
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>足し算が動いたなら、次は挨拶を返す関数だろう。<code>(result i32)</code> の <code>i32</code> を
+<code>string</code> に替えて、<code>greet</code> という名前で export すればよさそうに見える。
+実際にそう書いて <code>wat2wasm</code> に通すと、こうなる。</p>
+<pre><code>$ wat2wasm str.wat -o str.wasm
+str.wat:2:34: error: unexpected token string, expected ).
+  (func (export "greet") (result string)
+                                 ^^^^^^</code></pre>
+<p><code>unexpected token string, expected ).</code> という趣旨のメッセージ（文言は wabt のバージョンで変わる）が出て、
+<code>wat2wasm</code> は終了コード 1 で落ちる。<code>str.wasm</code> は作られない。</p>
+<div class="then"><b>だめな理由</b>: エラーが出ているのは型の意味を検査する段階ではなく、
+その手前の、字面を読む段階である。<code>expected )</code> は「ここで括弧が閉じるはずだった」という意味で、
+つまり <code>wat2wasm</code> は <code>string</code> を<b>型名として認識すらしていない</b>。
+知らない語が来たので、<code>(result)</code> の中身は終わったものと解釈して括弧を探した。
+型が合わないのではなく、語彙に無い。だから実行時ではなくコンパイル時に止まる。</div></div>
+
+<p>キャレット <code>^^^^^^</code> が <code>string</code> の6文字をちょうど指し、
+行頭の <code>str.wat:2:34</code> が2行目34桁目を示している。
+どの語が原因かをエラーが自分で名指ししているので、ここは推測が要らない。</p>
+
+<div class="analogy"><b>たとえ</b>: WASM の値型は電卓のボタンである。数と演算のボタンはあるが、
+文字を打つボタンは最初から付いていない。<br>
+ただし<b>崩れる点</b>: 電卓は文字を扱えないまま完結しているが、WASM の上では文字を扱うプログラムが現に動いている。
+無いのは<b>型</b>であって、文字を扱えないという意味ではない。この差をどう埋めるかは後の章で扱う。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>(result string)</code> の誤りは、実行してみるまで分からないか。分かるとすれば何段目で分かるか。</li>
+<li>エラーの <code>expected ).</code> という部分は、何を期待していたと言っているか。</li>
+</ol><details><summary>答え</summary>
+<p><b>1.</b> 実行の前に分かる。<code>wat2wasm</code> がテキストを読む段階で落ちるので、
+<code>.wasm</code> ファイル自体が作られない。実行する対象が存在しないところまで手前で止まっている。</p>
+<p><b>2.</b> <code>(result</code> の中身がもう終わって括弧が閉じること。
+<code>string</code> を型名の候補として突き合わせたのではなく、型名が並ぶ場所に未知の語が来たので、
+リストの終端を探した結果である。</p>
+</details></div>
+
+<h2 id="roundtrip">バイナリからテキストへ戻す</h2>
+<div class="sgoal"><b>この節で分かること</b>: WAT は入力専用の補助表記ではなく、バイナリから復元できる正式な表現である。</div>
+
+<p>逆変換がある。<code>wasm2wat</code> にバイナリを渡すとテキストが返る。</p>
+
+<pre><code>$ wasm2wat add.wasm
+(module
+  (type (;0;) (func (param i32 i32) (result i32)))
+  (func (;0;) (type 0) (param i32 i32) (result i32)
+    local.get 0
+    local.get 1
+    i32.add)
+  (export "add" (func 0)))</code></pre>
+
+<p>命令列は元の <code>add.wat</code> と同じ3行が同じ順で出ている。型も <code>(param i32 i32) (result i32)</code> のまま。
+一方で、書き方は3か所変わった。<code>(type (;0;) …)</code> という宣言が独立して現れ、
+関数は <code>(type 0)</code> でそれを番号で指し、<code>export</code> は関数の内側から外へ出て
+<code>(export "add" (func 0))</code> になっている。<code>(;0;)</code> は WAT のコメント記法で、
+何番目かを人間向けに添えたものである。</p>
+
+<p>この変化は前節の表がそのまま説明する。バイナリには Type セクションと Function セクションと
+Export セクションが別々にあり、それぞれ番号で結ばれていた。
+元のテキストは型を関数の中にまとめて書く省略形を使っていたが、
+<strong>バイナリはその省略を持たないので、戻すときも省略できない</strong>。</p>
+
+<div class="analogy"><b>たとえ</b>: 和文を英訳して、また和訳し戻したときの往復に似ている。
+戻ってきた文は元の文と一字一句同じにはならない。<br>
+ただし<b>崩れる点</b>: 翻訳では意味が削れることがあるが、ここで変わったのは書き方だけである。
+型も命令も並び順も、上の出力と <code>add.wat</code> を見比べれば残っていることが確かめられる。</div>
+
+<p>往復できるということは、テキスト側が説明のための飾りではないことを意味する。
+その結果、<strong>手元の見知らぬ <code>.wasm</code> は必ず読める</strong>。分からない1バイトに当たったときの順序はこうなる。</p>
+
+<ol>
+<li><code>wasm2wat</code> でテキストに戻し、同じ位置に何があるかを見る。名前の付いたものが見えれば、だいたいそこで済む</li>
+<li>済まなければ <code>wasm-objdump -h</code> で、そのオフセットがどのセクションの本体に入るかを絞る</li>
+<li>そのうえで仕様のバイナリフォーマットの章を、絞ったセクション名で引く</li>
+</ol>
+
+<p>順序を逆にすると、仕様の全体を先に読むことになって量に飲まれる。
+先に objdump にセクション名を言わせてから引くのが、一次情報を最短で使う手順である。</p>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>wasm2wat</code> の出力に、元の <code>add.wat</code> には無かった <code>(type (;0;) …)</code> が現れた。
+情報が増えたのか。</li>
+<li>見知らぬ <code>.wasm</code> の <code>0x1a</code> 番目のバイトが何か知りたい。最初に打つのはどちらのコマンドか。</li>
+</ol><details><summary>答え</summary>
+<p><b>1.</b> 増えていない。元のテキストは型を関数の宣言の中に書く省略形を使っており、
+バイナリではそれが Type セクションとして独立して置かれていた。
+<code>wasm2wat</code> はバイナリにある形をそのまま書いているだけで、
+省略形に戻すという判断をしていない。</p>
+<p><b>2.</b> <code>wasm2wat</code>。テキストに戻して読めればそれで終わる。
+読めなかったときに <code>wasm-objdump -h</code> でセクションを絞り、それでも足りなければ仕様を引く。
+逆順にすると、名前が付いていて済む話に仕様を持ち出すことになる。</p>
+</details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>WAT を5行書いて <code>wat2wasm</code> に通せば <code>.wasm</code> になり、<code>wasmtime run --invoke</code> で関数を名指しで呼べる</li>
+<li>41 バイトの内訳は「マジック4・バージョン4」＋「番号・長さ・本体」を4組。オフセットから手前2バイトを見ればセクションの番号と長さが読める</li>
+<li>export 名は平文でバイナリに入っているが、名前と関数番号を結んでいるだけで、中身の保証にはならない</li>
+<li>値型に文字列は無い。<code>(result string)</code> はコンパイルの字面を読む段階で落ち、<code>.wasm</code> は生成されない</li>
+<li>バイナリはテキストに戻せる。読めない1バイトは <code>wasm2wat</code> → <code>wasm-objdump -h</code> → 仕様の順で詰める</li>
+<li>41 バイトの中に、外の世界に触れる記述は1バイトも無い。引数を用意し結果を印字したのは外側の wasmtime である</li>
+</ul></div>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/&lt;owner&gt;/lab-wasm:1.0.0 / Ubuntu 24.04.5 LTS / wasmtime 49.0.1 / wabt 1.0.34 / node 18.19.1 / apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
+
+<nav class="pager"><a href="/wasm/theory/">← 理論編 目次</a><a href="/wasm/theory/02-import">次: 2. 能力は import でしか増えない →</a></nav>
+<footer><a href="/">トップ</a> · <a href="/wasm/theory/">理論編 目次</a></footer>
+</div>
+<script src="/wasm/chapters.js"></script>
+<script src="/wasm/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+</body></html>

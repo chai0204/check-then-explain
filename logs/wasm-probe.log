@@ -1,0 +1,158 @@
+
+========== 0. 環境 ==========
+$ wasmtime --version
+wasmtime 49.0.1 (46c23a87d 2026-09-24)
+[exit 0]
+$ wat2wasm --version
+1.0.34
+[exit 0]
+$ node --version
+v18.19.1
+[exit 0]
+
+========== 1. 41バイトの計算機（WAT を手で書いて動かす） ==========
+$ cat add.wat
+(module
+  (func (export "add") (param i32 i32) (result i32)
+    local.get 0
+    local.get 1
+    i32.add))
+[exit 0]
+$ wat2wasm add.wat -o add.wasm
+[exit 0]
+$ ls -l add.wasm
+-rw-r--r-- 1 lab lab 41 Sep 30 19:11 add.wasm
+[exit 0]
+$ xxd add.wasm
+00000000: 0061 736d 0100 0000 0107 0160 027f 7f01  .asm.......`....
+00000010: 7f03 0201 0007 0701 0361 6464 0000 0a09  .........add....
+00000020: 0107 0020 0020 016a 0b                   ... . .j.
+[exit 0]
+$ wasmtime run --invoke add add.wasm 3 4
+warning: using `--invoke` with a function that takes arguments is experimental and may break in the future
+warning: using `--invoke` with a function that returns values is experimental and may break in the future
+7
+[exit 0]
+--- WASM の型に文字列は無い。(result i32) を文字列にしようとすると？ ---
+$ wat2wasm str.wat -o str.wasm
+str.wat:2:34: error: unexpected token string, expected ).
+  (func (export "greet") (result string)
+                                 ^^^^^^
+[exit 1]
+
+========== 2. 能力は import でしか増えない ==========
+$ cat imp.wat
+(module
+  (import "env" "log" (func $log (param i32)))
+  (func (export "run")
+    i32.const 42
+    call $log))
+[exit 0]
+$ wat2wasm imp.wat -o imp.wasm
+[exit 0]
+--- wasmtime は env.log を持っていない ---
+$ wasmtime run --invoke run imp.wasm
+Error: failed to run main module `imp.wasm`
+
+Caused by:
+    0: failed to instantiate "imp.wasm"
+    1: unknown import: `env::log` has not been defined
+
+[exit 1]
+--- Node から import を渡すと動くか ---
+$ node host_ok.mjs
+ホストが受け取った値: 42
+[exit 0]
+--- import を1つ削ると何が起きるか ---
+$ node host_ng.mjs
+LinkError: WebAssembly.instantiate(): Import #0 module="env" function="log" error: function import requires a callable
+[exit 0]
+
+========== 3. 境界を越えられるのは数値だけ（文字列は ptr と len の約束） ==========
+$ cat mem.wat
+(module
+  (memory (export "mem") 1)
+  (data (i32.const 0) "hello wasm")
+  (func (export "ptr") (result i32) i32.const 0)
+  (func (export "len") (result i32) i32.const 10))
+[exit 0]
+$ wat2wasm mem.wat -o mem.wasm
+[exit 0]
+--- 数値しか返らないことを確認する ---
+$ wasmtime run --invoke ptr mem.wasm
+warning: using `--invoke` with a function that returns values is experimental and may break in the future
+0
+[exit 0]
+$ wasmtime run --invoke len mem.wasm
+warning: using `--invoke` with a function that returns values is experimental and may break in the future
+10
+[exit 0]
+--- ホスト側で ptr と len を使って文字列に組み立てる ---
+$ node readstr.mjs
+ptr = 0  len = 10
+組み立てた文字列 = hello wasm
+線形メモリの実体 = ArrayBuffer 65536 バイト
+[exit 0]
+
+========== 4. 同じ .wasm が、ホストが違うと動かない ==========
+$ wat2wasm wasi.wat -o wasi.wasm
+[exit 0]
+--- wasmtime は WASI を持っている ---
+$ wasmtime run wasi.wasm
+hello from wasi
+[exit 0]
+--- ブラウザ相当（素の Node）は WASI を持っていない ---
+$ node wasi_browser.mjs
+TypeError: WebAssembly.instantiate(): Import #0 module="wasi_snapshot_preview1" error: module is not an object or function
+[exit 0]
+--- 逆に、ブラウザ用の .wasm を wasmtime に渡すと？ ---
+$ wasmtime run mem.wasm
+[exit 0]
+
+========== 5. バイナリの中身を読む ==========
+$ wasm-objdump -h add.wasm
+
+add.wasm:	file format wasm 0x1
+
+Sections:
+
+     Type start=0x0000000a end=0x00000011 (size=0x00000007) count: 1
+ Function start=0x00000013 end=0x00000015 (size=0x00000002) count: 1
+   Export start=0x00000017 end=0x0000001e (size=0x00000007) count: 1
+     Code start=0x00000020 end=0x00000029 (size=0x00000009) count: 1
+[exit 0]
+$ wasm-objdump -x mem.wasm
+
+mem.wasm:	file format wasm 0x1
+
+Section Details:
+
+Type[1]:
+ - type[0] () -> i32
+Function[2]:
+ - func[0] sig=0 <ptr>
+ - func[1] sig=0 <len>
+Memory[1]:
+ - memory[0] pages: initial=1
+Export[3]:
+ - memory[0] -> "mem"
+ - func[0] <ptr> -> "ptr"
+ - func[1] <len> -> "len"
+Code[2]:
+ - func[0] size=4 <ptr>
+ - func[1] size=4 <len>
+Data[1]:
+ - segment[0] memory=0 size=10 - init i32=0
+  - 0000000: 6865 6c6c 6f20 7761 736d                 hello wasm
+[exit 0]
+$ wasm2wat add.wasm
+(module
+  (type (;0;) (func (param i32 i32) (result i32)))
+  (func (;0;) (type 0) (param i32 i32) (result i32)
+    local.get 0
+    local.get 1
+    i32.add)
+  (export "add" (func 0)))
+[exit 0]
+
+========== 完了 ==========

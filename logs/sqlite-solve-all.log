@@ -1,0 +1,75 @@
+
+########## 01 データベースを1個のファイルとして見る ##########
+✔ 01 達成
+  判定 : 観測型（ファイルの先頭バイトとテーブルの中身を外から読んだ）
+  観測 : 01/notes.db は 8192 バイト、先頭に SQLite format 3 があり、notes に 1 行ある
+         スキーマ: CREATE TABLE notes(id INTEGER PRIMARY KEY, body TEXT)
+
+########## 02 型に嘘をつかせる ##########
+42|integer
+abc|text
+123|integer
+Error: stepping, cannot store TEXT value in INTEGER column tight.n (19)
+✔ 02 達成
+  判定 : 観測型（格納された値の typeof と、テーブル定義の SQL を外から読んだ）
+  観測 : loose には text 型の行が 1 件ある（INTEGER 宣言が拒否していない）
+         うち '123' は integer に変換されて入っている（affinity が働いた側）
+         tight は STRICT で定義されており、text 型の行は 0 件
+
+########## 03 同じ2000行を、2通りの速さで入れる ##########
+naive=13.00
+txn=0.02
+✔ 03 達成
+  判定 : 観測型（両テーブルの行数）＋痕跡型（あなたが測った秒数の記録）
+  観測 : a=2000行 / b=2000行 で同じ結果になっている
+         naive=13.00秒  txn=0.02秒  → 約 650 倍の差
+         （著者の環境では 12.996 秒 → 0.048 秒 ＝ 約270倍でした）
+
+########## 04 2人で同時に書こうとする ##########
+既定の journal_mode: delete
+[hold] lock.db にトランザクションを開きました。6 秒間そのままにします。
+[hold] いま別のコマンドで書き込みを試してください。
+[hold] コミットして解放しました。
+WAL へ変更: wal
+[hold] lock.db にトランザクションを開きました。6 秒間そのままにします。
+[hold] いま別のコマンドで書き込みを試してください。
+[hold] コミットして解放しました。
+--- observed.txt ---
+Error: stepping, database is locked (5)
+0
+Error: stepping, database is locked (5)
+1
+✔ 04 達成
+  判定 : 痕跡型（DB に保存された journal_mode）＋あなたの観測記録
+  観測 : journal_mode = wal に変更されている / t の行数 = 2
+         observed.txt に 'database is locked' が 2 箇所ある
+         2箇所以上あるので、WAL にしても書き込みが排他であることを自分で確かめられています
+
+########## 05 書ける権限があるのに、書けない ##########
+drwxr-xr-x 2 lab lab 4096 Sep 30 19:33 sub
+-rw-r--r-- 1 lab lab 8192 Sep 30 19:33 sub/d.db
+dr-xr-xr-x 2 lab lab 4096 Sep 30 19:33 sub
+-rw-r--r-- 1 lab lab 8192 Sep 30 19:33 sub/d.db
+--- observed.txt ---
+Error: stepping, attempt to write a readonly database (8)
+1
+Error: stepping, attempt to write a readonly database (8)
+2
+✔ 05 達成
+  判定 : 観測型（最終状態の行数と権限）＋あなたの観測記録
+  観測 : t の行数 = 2、sub = drwxr-xr-x、d.db = -rw-r--r--
+         observed.txt に 'readonly database' の記録があり、失敗を自分の目で見ています
+         （著者の環境では d.db が -rw-r--r-- のまま sub を dr-xr-xr-x にしただけで
+          attempt to write a readonly database (8) になりました）
+
+########## 最終状態 ##########
+演習一覧
+  ✔ 01  データベースを1個のファイルとして見る 8分 / 影響度 A
+  ✔ 02  型に嘘をつかせる                     10分 / 影響度 A
+  ✔ 03  同じ2000行を、2通りの速さで入れる 12分 / 影響度 A
+  ✔ 04  2人で同時に書こうとする           12分 / 影響度 A
+  ✔ 05  書ける権限があるのに、書けない 12分 / 影響度 A
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+総合: 全演習の verify が通った

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. 能力は import でしか増えない — 壊して覚える WASM</title>
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-ch="2" data-theme="wasm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/wasm/theory/">理論編</a> › 第2章</nav>
+
+<h1>2. 能力は import でしか増えない</h1>
+<p class="lead">1本の同じ .wasm が、渡す相手と渡すものを変えるだけで3通りに終わる。
+その3つを並べると、できることがモジュールの中ではなく渡す側にあることが見える。</p>
+<div class="badges"><span>前提: 第1章を読み終えている</span><span>前提: wat2wasm でビルドできる</span><span>前提: node が打てる</span><span>所要 14分</span><span class="impact-a">影響度 A</span><span>lab-wasm:1.0.0</span><span>最終検証 2026-09-30</span></div>
+
+<div class="goal"><h4>この章のゴール</h4><ul>
+<li>import した関数をホストから受け取って呼び出せる</li>
+<li>import が足りないときに何が起きるかを、wasmtime と Node の2つのホストで見分けられる</li>
+</ul>
+  <div class="skip"><b>ここで覚えなくていいこと</b>: WASI にどんな API が並んでいるかは1つも覚えなくていい。この章で扱うホストの能力は、自分で名前を決めた関数1つだけである。
+  コンポーネントモデルという上位の仕組みも出てこない。import の型が一致するかどうかの判定規則も、条文として覚える必要はない。
+  この章で必要なのは<b>「名前と形が合っていなければ繋がらない」という事実1つ</b>で、規則の全文はここでは使わない。</div></div>
+
+<h2 id="decl">注文票だけを持つモジュール</h2>
+<div class="sgoal"><b>この節で分かること</b>: モジュールが自分で「これが無いと動けない」と宣言する書き方と、その宣言が誰にも解決されないまま .wasm になること。</div>
+<p>第1章の add は外を一切必要としなかった。引数を2つ受けて足して返すだけで、話し相手がいない。
+今回のモジュールは、そこに1行だけ足したものである。</p>
+
+<pre><code>$ cat imp.wat
+(module
+  (import "env" "log" (func $log (param i32)))
+  (func (export "run")
+    i32.const 42
+    call $log))</code></pre>
+
+<p>足したのは <code>import</code> の行である。ここには3つの情報しかない。
+二段の名前 <code>"env"</code> と <code>"log"</code>、受け取る形 <code>(param i32)</code>、そしてモジュール内部で呼ぶためのラベル <code>$log</code>。
+<strong>この行は定義ではなく要求である。</strong>log の中身はどこにも書かれていない。</p>
+<p>もう一方の <code>run</code> は、42 を積んで <code>$log</code> を呼ぶ。それで終わりである。
+画面に出す命令も、書き出す命令も、1つも無い。42 がこのあとどうなるかは <code>$log</code> の中身次第で、その中身はこのファイルの外にある。</p>
+
+<div class="analogy"><b>たとえ</b>: import の行は<b>注文票</b>である。「env 売り場の log という品を、i32 を1つ受ける形で1つ」と書いてある。渡す側はこの票を見て品を揃える。
+<br>ただし<b>崩れる点</b>: 注文票は品名と形までしか書かない。log が実際に何をするか（画面に出すのか、数えるのか、捨てるのか）はどこにも書いていない。log という語は人間向けのラベルにすぎず、形が合う関数なら何を渡してもよい。</div>
+
+<pre><code>$ wat2wasm imp.wat -o imp.wasm</code></pre>
+
+<p>何も言わずに通る。log の中身が無いままでも .wasm になる。
+モジュール単体で見れば矛盾がないからである。要求が書いてあり、その要求に沿った呼び出しが書いてある。それで筋は通っている。</p>
+
+<div class="analogy"><b>たとえ</b>: プラグの付いた家電に近い。コンセントに差さなくても製品としては完成していて、箱に入って出荷できる。差した瞬間に、その部屋に合う口があるかどうかが決まる。
+<br>ただし<b>崩れる点</b>: 家電はプラグの形が合えばだいたい動くが、import は名前と形の<b>両方</b>が一致しないと繋がらない。形が合っていても名前が違えば繋がらない。</div>
+
+<h2 id="three">同じ1本の .wasm が3通りに終わる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 1本の imp.wasm を3つの条件に渡した実測。結末が分かれた原因がモジュール側に1つも無いこと。</div>
+<p>これから渡すのは3回とも同じ imp.wasm である。作り直さない。変えるのは渡す相手と、一緒に渡すものだけである。</p>
+
+<h3>(a) wasmtime に渡す</h3>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>42 を扱うモジュールを書いてビルドまで通ったのだから、wasmtime に渡せば 42 が出るはずだ。WASM は速い実行環境なのだから、数を1つ出すくらいのことは自前でできる。</p>
+<pre><code>$ wasmtime run --invoke run imp.wasm
+Error: failed to run main module `imp.wasm`
+
+Caused by:
+    0: failed to instantiate "imp.wasm"
+    1: unknown import: `env::log` has not been defined</code></pre>
+<div class="then"><b>だめな理由</b>: 42 を出す手段がモジュールの中に1つも無い。<code>i32.const 42</code> は値を積むだけで、積んだ値を外に見せる命令ではない。見せる仕事は <code>$log</code> に任されていて、その <code>$log</code> は要求されただけで供給されていない。
+しかもメッセージが止まっている場所は <code>failed to instantiate</code> である。<code>run</code> の途中で困ったのではなく、<strong>組み立ての段階で諦めている</strong>。42 を積む命令は1度も実行されていない。
+wasmtime は <code>env::log</code> という名前の関数を持っていないので、揃えられない品がある時点で先に進まなかった。</div></div>
+
+<p>手元では <code>unknown import: `env::log` has not been defined</code> という趣旨のメッセージが出る（文言は環境で変わる）。
+読むべきは文言そのものではなく、止まった段階と、名前の二段目までが指名されている事実である。</p>
+
+<h3>(b) Node に import を渡す</h3>
+<p>同じ imp.wasm を Node に渡す。違うのは、インスタンス化のときに <code>env</code> という入れ物を用意し、その中に <code>log</code> という関数を1つ入れて一緒に渡したことだけである。
+渡した関数の中身は、受け取った数をそのまま表示するだけのものにした。</p>
+
+<pre><code>$ node host_ok.mjs
+ホストが受け取った値: 42</code></pre>
+
+<p>42 が出た。ただし、この文字を画面に出したのはモジュールではない。
+ホスト側で用意した関数が、引数として受け取った 42 を表示している。モジュールがしたのは 42 を積んで <code>$log</code> を呼ぶところまでで、呼んだ先で何が起きたかをモジュールは知らない。</p>
+
+<h3>(c) Node で入れ物だけ渡す</h3>
+<p>3回目は、<code>env</code> という入れ物は渡すが、中の <code>log</code> を入れないでおく。</p>
+
+<pre><code>$ node host_ng.mjs
+LinkError: WebAssembly.instantiate(): Import #0 module="env" function="log" error: function import requires a callable</code></pre>
+
+<p>書式も語彙も (a) とはまったく違う。言っていることは同じ位置の同じ欠品である。
+<code>Import #0</code> が0番目の import、<code>module="env" function="log"</code> が二段の名前、<code>function import requires a callable</code> が「呼べるものが来ていない」。
+<code>env</code> そのものは届いているので、「入れ物が無い」ではなく「中身が呼べない」という言い方になっている。</p>
+
+<div class="scroll"><table>
+<tr><th>渡した相手</th><th>一緒に渡したもの</th><th>結末</th><th>観測した文字列</th></tr>
+<tr><td>wasmtime</td><td>何も渡していない</td><td>組み立ての段階で停止</td><td><code>unknown import: `env::log` has not been defined</code></td></tr>
+<tr><td>Node</td><td><code>env</code> の中に <code>log</code> を1つ</td><td><code>run</code> が動き、42 がホスト側の関数に届く</td><td><code>ホストが受け取った値: 42</code></td></tr>
+<tr><td>Node</td><td><code>env</code> は渡すが <code>log</code> は入れない</td><td>組み立ての段階で停止</td><td><code>function import requires a callable</code></td></tr>
+</table></div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>wat2wasm imp.wat -o imp.wasm</code> は何も言わずに通ったのに、wasmtime では動かなかった。ビルドが失敗していたということか。</li>
+<li>3回のうち 42 が画面に出たのは1回だけだった。その 42 を画面に出したのは誰か。</li>
+</ol><details><summary>答え</summary>
+<p><b>1.</b> 失敗していない。妥当かどうかはモジュール単体で決まり、要求した名前が実在するかどうかはそこでは見ない。見るのは渡す相手が決まってからである。wasmtime のメッセージが <code>failed to instantiate</code> で止まっているのがその証拠で、翻訳ではなく組み立ての段で落ちている。</p>
+<p><b>2.</b> ホスト側で用意した関数である。モジュールは 42 を積んで <code>$log</code> を呼んだだけで、表示する命令を1つも持っていない。同じ呼び出しでも、渡す関数を差し替えれば結果は変わる。</p>
+</details></div>
+
+<h2 id="read">2つのホストのメッセージを、同じものとして読む</h2>
+<div class="sgoal"><b>この節で分かること</b>: 文言の違いに惑わされず、import の欠品を同じ手順で特定する読み方。</div>
+<p>(a) と (c) のメッセージは、書式も語彙も共通点が少ない。それでも取り出すべきものは3つで、どちらからも同じように取り出せる。</p>
+<ol>
+<li><b>止まった段階</b> — <code>failed to instantiate</code> と <code>WebAssembly.instantiate()</code>。どちらも組み立ての段である。関数の中で落ちたのではない。ここが読めれば、モジュールの命令列を疑う手を止められる。</li>
+<li><b>二段の名前</b> — <code>env::log</code> と <code>module="env" function="log"</code>。区切りが <code>::</code> か <code>module=</code> / <code>function=</code> かの違いだけで、指している品は同一である。</li>
+<li><b>欠け方</b> — <code>has not been defined</code> は「その名前で揃うものが無い」、<code>requires a callable</code> は「来てはいるが呼べるものではない」。前者と後者では、次に見る場所が変わる。</li>
+</ol>
+<p>手元の文言が上のどれとも一致しないときに、まず文言で検索しても遠回りになる。
+突き合わせる相手は文言ではなく<strong>二段の名前</strong>である。モジュール側の二段名は WAT の <code>(import "env" "log" (func $log (param i32)))</code> の行にそのまま書いてあり、ホスト側で用意した名前と1文字ずつ照らせる。
+照らす対象が2つに絞れているので、読む量は文言の長さとは関係なく一定になる。</p>
+
+<div class="analogy"><b>たとえ</b>: 同じ欠品を、和文の納品書と英文のインボイスで受け取ったようなものである。書式も語彙も違うが、欠けている品番は同一である。
+<br>ただし<b>崩れる点</b>: 納品書の書式は取引先が決めたら当面変わらないが、エラー文言は実装とバージョンの都合で変わる。だから覚えるのは文言ではなく、二段名を突き合わせるという手順のほうである。</div>
+
+<div class="note try">対応する演習は <code>lab start 02</code>。判定は <code>lab check 02</code>。
+1本の imp.wasm を作り、渡す相手と渡すものだけを変えて、この章の3通りの結末をコンテナの中で自分の手で出す。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li>手元で <code>module="env" function="log" error: function import requires a callable</code> と出た。ホスト側で何を確認するか。</li>
+<li><code>unknown import</code> と <code>LinkError</code> は、別々の不具合なのか。</li>
+</ol><details><summary>答え</summary>
+<p><b>1.</b> <code>env</code> という入れ物は届いている。届いていないのは <code>env</code> の中の <code>log</code> で、そこに入っている値が呼べるものになっていない。確認するのは、<code>env</code> のキーに <code>log</code> があるか、そしてその値が関数かどうかである。入れ忘れ、別のキーに入っている、関数以外を入れた、のいずれかに当たる。</p>
+<p><b>2.</b> 同じ不具合の2通りの言い方である。どちらも組み立ての段で、モジュールが出した要求とホストが出した提供を突き合わせた結果として出ている。名前が同じ表記でないので別物に見えるだけである。</p>
+</details></div>
+
+<h2 id="spine">能力はここでしか増えない</h2>
+<div class="sgoal"><b>この節で分かること</b>: この教材が最後まで回収する1文と、それがこの章の実測のどこに現れていたか。</div>
+<p>この教材はこの1文を最後まで回収していく。</p>
+<p><strong>WASM は外の世界を一切知らない。できることは全部、ホストが import として手渡したものだけである。</strong></p>
+<p>この章の3回は、その1文が実物として見える最小の形である。imp.wasm は3回とも同じファイルだった。
+変わったのは渡す相手と、一緒に渡した import だけである。それなのに結末は、停止・成功・停止の3通りに分かれた。
+分かれた原因はモジュールの中に1つも無い。</p>
+<p>そして揃える作業は、組み立ての1回で終わる。(a) と (c) はどちらもそこで止まり、モジュールの命令は1行も動いていない。
+足りないものを実行中に取りに行く経路は、この章で観測した範囲には無い。
+だから「この .wasm は何ができるのか」を調べる場所は、.wasm ではなくホスト側のコードになる。</p>
+
+<div class="analogy"><b>たとえ</b>: 持ち物検査を通って手ぶらで作業室に入る職人に近い。使えるのは入室時に渡された工具だけで、部屋の中に道具箱は置かれていない。
+<br>ただし<b>崩れる点</b>: 職人は作業中に「ドライバーをください」と頼める。モジュールは頼めない。渡すものは入室の瞬間に全部決まり、足りなければ入室そのものが成立しない。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li>「この .wasm はファイルを読めますか」と聞かれた。.wasm だけを見て答えられるか。</li>
+<li>この章の観測の範囲で、実行が始まったあとにモジュールが新しい能力を要求する経路はあったか。</li>
+</ol><details><summary>答え</summary>
+<p><b>1.</b> 答えられない。読めるかどうかは、ホストがそれに当たる関数を import として渡すかどうかで決まる。.wasm から分かるのは「何を要求しているか」までで、要求が通るかどうかは渡す側の話である。</p>
+<p><b>2.</b> 無かった。足りない import は組み立ての段で突き合わされ、足りなければ組み立て自体が成立しなかった。実行が始まった (b) では、必要なものが最初から全部揃っていた。</p>
+</details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>.wasm 単体が妥当であることと、ホストに繋がることは別物である。突き合わせは組み立ての段で起きる</li>
+<li>import の欠品は「止まった段階・二段の名前・欠け方」の3点で読む。文言は実装とバージョンで変わる</li>
+<li>モジュールが同じでも、渡す import が違えば結末は変わる。能力を調べる場所はホスト側である</li>
+</ul></div>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/&lt;owner&gt;/lab-wasm:1.0.0 / Ubuntu 24.04.5 LTS / wasmtime 49.0.1 / wabt 1.0.34 / node 18.19.1 / apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
+
+<nav class="pager"><a href="/wasm/theory/01-machine">← 1. 41バイトの計算機</a><a href="/wasm/theory/03-memory">3. 境界を越えられるのは数値だけ →</a></nav>
+<footer><a href="/">トップ</a> · <a href="/wasm/theory/">理論編 目次</a> · <a href="/wasm/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/wasm/chapters.js"></script>
+<script src="/wasm/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+</body></html>

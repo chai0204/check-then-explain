@@ -1,0 +1,100 @@
+
+########## 01 41バイトの計算機をつくる ##########
+-rw-r--r-- 1 lab lab 41 Sep 30 19:43 add.wasm
+00000000: 0061 736d 0100 0000 0107 0160 027f 7f01  .asm.......`....
+00000010: 7f03 0201 0007 0701 0361 6464 0000 0a09  .........add....
+00000020: 0107 0020 0020 016a 0b                   ... . .j.
+7
+warning: using `--invoke` with a function that takes arguments is experimental and may break in the future
+warning: using `--invoke` with a function that returns values is experimental and may break in the future
+str.wat:2:34: error: unexpected token string, expected ).
+  (func (export "greet") (result string)
+                                 ^^^^^^
+✔ 01 達成
+  判定 : 観測型（2組の引数で実際に呼び出し、戻り値を確認した）
+  観測 : add.wasm は 41 バイト、先頭4バイトは 0061736d（\0asm）
+         add(3,4)=7 / add(100,-30)=70 — 引数を使って計算している
+         observed.txt に wat2wasm の型エラーの記録があり、string 型が無いことを自分で確かめています
+
+########## 02 ホストから能力をもらう ##########
+Error: failed to run main module `imp.wasm`
+
+Caused by:
+    0: failed to instantiate "imp.wasm"
+    1: unknown import: `env::log` has not been defined
+
+ホストが受け取った値: 42
+LinkError: WebAssembly.instantiate(): Import #0 module="env" function="log" error: function import requires a callable
+✔ 02 達成
+  判定 : 観測型（wasm-objdump で import を確認し、Node で2通り実行した）
+  観測 : imp.wasm は env からの import を持っている
+         node host.mjs の出力に 42 がある（ホスト側の関数が呼ばれた）
+         node ng.mjs は LinkError になる（import を外すと成立しない）
+         observed.txt に wasmtime の unknown import の記録がある
+         → 同じ .wasm が3通りの結末になることを、自分で確かめました
+
+########## 03 数値2つで文字列を渡す ##########
+ptr = 0  len = 10
+組み立てた文字列 = hello wasm
+線形メモリの実体 = ArrayBuffer 65536 バイト
+ - func[1] size=4 <len>
+Data[1]:
+ - segment[0] memory=0 size=10 - init i32=0
+  - 0000000: 6865 6c6c 6f20 7761 736d                 hello wasm
+✔ 03 達成
+  判定 : 観測型（独立した検証器で mem を読み、あなたのスクリプトも実行した）
+  観測 : ptr()=0 / len()=10 という数値だけが返る
+         その2つを使ってメモリから取り出すと「hello wasm」になる
+         線形メモリの実体は 65536 バイト（1ページ）
+         Data セクションに 'hello wasm' が平文で入っている
+
+########## 04 同じ .wasm を2つのホストに渡す ##########
+--- wasmtime ---
+hello from wasi
+--- ブラウザ相当 ---
+TypeError: WebAssembly.instantiate(): Import #0 module="wasi_snapshot_preview1" error: module is not an object or function
+--- 逆向き（WASI を使っていない .wasm を wasmtime に渡す） ---
+終了コード: 0
+✔ 04 達成
+  判定 : 観測型（2つのホストで同じ .wasm を実行し、逆向きも確かめた）
+  観測 : wasmtime では標準出力に「hello from wasi」が出た
+         ブラウザ相当（素の Node）では失敗する
+         逆向き: mem.wasm を wasmtime に渡すと終了コード 0 で、出力は空（何も起きない）
+         → 移植性は .wasm の性質ではなく、ホストが約束を満たすかで決まる
+
+########## 05 実行する前に調べる ##########
+1. import:
+   env.read_file  (i32,i32)->i32
+   env.http_post  (i32,i32)->nil
+2. export: memory（メモリ）と _start（関数）
+3. メモリの初期データ: オフセット0 に /etc/passwd、オフセット64 に https://example.invalid/collect
+4. 推測: /etc/passwd を read_file で読み、その URL へ http_post で送ろうとしている。
+   ホストが import を1つも渡さなければ、インスタンス化の段階で止まるので何もできない。
+5. 実際に実行した結果:
+   Error: failed to run main module `mystery.wasm`
+   
+   Caused by:
+       0: failed to instantiate "mystery.wasm"
+       1: unknown import: `env::read_file` has not been defined
+   
+✔ 05 達成
+  判定 : 痕跡型（あなたが書いた調査結果を、objdump の出力と突き合わせた）
+  観測 : answers.txt に import 2件・export 2件・Data の文字列2件が記録されている
+         mystery.wasm の Import セクションには env. から始まる項目が 2 件ある
+         import を渡さずに実行すると、次のように拒否される:
+           Error: failed to run main module `mystery.wasm`
+           Caused by:
+               1: unknown import: `env::read_file` has not been defined
+         → 配布された .wasm が何を要求しているかは、実行しなくても分かる
+
+########## 最終状態 ##########
+演習一覧
+  ✔ 01  41バイトの計算機をつくる          12分 / 影響度 A
+  ✔ 02  ホストから能力をもらう            12分 / 影響度 A
+  ✔ 03  数値2つで文字列を渡す              12分 / 影響度 A
+  ✔ 04  同じ .wasm を2つのホストに渡す    15分 / 影響度 A
+  ✔ 05  実行する前に調べる                  12分 / 影響度 A
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+総合: 全演習の verify が通った

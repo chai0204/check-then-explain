@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>壊して覚える WASM — 理論編</title>
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-theme="wasm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › 壊して覚える WASM</nav>
+
+<h1>壊して覚える WASM</h1>
+<p class="lead">41バイトのバイナリを手で書いて、それが何もできないことを確かめる。全5章・約2時間20分。</p>
+
+<div class="promise">
+  <h4>この教材の約束</h4>
+  <p>このページのコマンドは、<b>あなたの画面に本文と同じ文字を出します。</b>
+     出なければ教材のバグとして直します。</p>
+  <p>AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+     ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<div class="notfor">
+  <b>この教材が向かない人</b><br>
+  ・Rust や C から WASM を吐かせたいだけの人 → 各ツールチェーンの公式手順のほうが速い<br>
+  ・答えだけ欲しい人 → AI に聞いたほうが速く、あなたの語彙に合う<br><br>
+  <b>向く人</b>: JavaScript が読める。WASM が速いらしいことは知っている。
+  でも「なぜサンドボックスなのか」を人に説明できない人。
+</div>
+
+<div class="goal">
+  <h4>読み終わったらできること</h4>
+  <ul>
+    <li>WAT を手で書いて <code>.wasm</code> にし、関数を呼び出せる</li>
+    <li>配布された <code>.wasm</code> が何を要求しているかを、<b>実行せずに</b>調べられる</li>
+    <li>WASM が「できないこと」を、檻の形として説明できる</li>
+  </ul>
+  <div class="skip"><b>ここで覚えなくていいこと</b>:
+    全オペコードの一覧 / LEB128 の符号化規則 / セクション ID の番号 /
+    Rust・C のツールチェーン / WASI Preview 2 の全 API / コンポーネントモデル /
+    GC 提案 — <b>Rust も C も使いません。</b>WAT を直接書きます</div>
+</div>
+
+<h2 id="spine">この教材が回収する1つの原理</h2>
+<div class="sgoal"><b>この節で分かること</b>: 5章すべてが、たった1つの事実から出てくること</div>
+<div class="analogy">
+  <b>背骨</b>: WASM は外の世界を一切知らない。できることは全部、
+  <b>ホストが import として手渡したもの</b>だけである。
+  <br>ただし<b>崩れる点</b>: 「何も渡さなければ安全」ではない。計算だけで CPU を使い切ることはできる。
+  渡さないことで防げるのは、外への影響だけ。
+</div>
+<p>画面に文字を出すことも、ファイルを読むことも、WASM 単体にはできません。
+   第2章でそれを実際に確かめ、第5章でそれがセキュリティの道具になることを見ます。</p>
+
+<h2 id="cage">手を動かす場所</h2>
+<div class="sgoal"><b>この節で分かること</b>: 準備に要る時間と、あなたのマシンに何が起きるか</div>
+<div class="scroll"><table>
+<tr><th>檻</th><th>準備</th><th>ここで触れること</th><th>影響</th></tr>
+<tr><td>読むだけ</td><td>0分</td><td>全章の実行ログは本文に載っています</td><td>なし</td></tr>
+<tr><td>コンテナ</td><td>初回5分</td><td>全5演習。<code>wat2wasm</code> / <code>wasmtime</code> / <code>node</code></td><td>コンテナの中だけ</td></tr>
+</table></div>
+
+<pre><code>docker run --rm -it \
+  --name lab-wasm --pull=always \
+  --cap-add NET_RAW \
+  -v lab-wasm-work:/home/lab/work \
+  -v lab-wasm-state:/home/lab/.lab \
+  ghcr.io/OWNER/lab-wasm:1.0.0</code></pre>
+
+<div class="note">起動したら <code>lab</code> と打ってください。現在地と次の一手が出ます。
+  <code>lab check</code> が答え合わせ、<code>lab hint NN</code> が詰まったとき、
+  <code>lab solve NN</code> が模範解答です。<br>
+  <b>答えは閉じていません。</b> ヒントを使い切れば必ず解答に到達できます。
+  ただし使ったことは <code>lab ls</code> に残ります。</div>
+
+<div class="note warn"><b>後片付け</b>: 終わったら
+  <code>docker volume rm lab-wasm-work lab-wasm-state</code> で進捗ごと消えます。</div>
+
+<h2 id="toc">章立て</h2>
+<div class="sgoal"><b>この節で分かること</b>: 全体の流れと、各章にかかる時間</div>
+<div class="toc">
+  <a href="/wasm/theory/01-machine"><b>1. 41バイトの計算機</b>
+    <span>WAT を書き、<code>xxd</code> で全バイトを見る。文字列型が無いことを確かめる ／ 約25分</span></a>
+  <a href="/wasm/theory/02-import"><b>2. 能力は import から</b>
+    <span>同じ <code>.wasm</code> が3通りの結末になる。背骨が見える章 ／ 約25分</span></a>
+  <a href="/wasm/theory/03-memory"><b>3. 越えるのは数値だけ</b>
+    <span>返るのは <code>0</code> と <code>10</code>。文字列に組み立てるのはホストの仕事 ／ 約25分</span></a>
+  <a href="/wasm/theory/04-host"><b>4. ホストが違うと動かない</b>
+    <span>WASI を使うとブラウザで落ちる。エラーも出ず沈黙する結末もある ／ 約30分</span></a>
+  <a href="/wasm/theory/05-binary"><b>5. バイナリを読む</b>
+    <span>配布された <code>.wasm</code> を実行せずに調べる。背骨が守りの道具になる ／ 約30分</span></a>
+  <a href="/wasm/theory/glossary"><b>用語辞書</b>
+    <span>本文中の点線の語をクリックすると、ここへ来ます</span></a>
+</div>
+
+<div class="verified"><b>検証環境</b>:
+イメージ ghcr.io/OWNER/lab-wasm:1.0.0 / Ubuntu 24.04.5 LTS / wasmtime 49.0.1 /
+wabt 1.0.34 / node 18.19.1 / apt snapshot 20260929T000000Z /
+amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
+
+<footer>壊して覚える WASM ／ 本文のコマンドはすべて上のイメージの中で実行して確認しています。</footer>
+</div>
+<script src="/wasm/chapters.js"></script>
+<script src="/wasm/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+</body></html>

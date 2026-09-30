@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>用語辞書 — 壊して覚える WASM</title>
+<link rel="stylesheet" href="/shared/style.css">
+<style>
+/* 辞書だけで使う1行。誤解しやすい点を警告色で分ける */
+.gitem .misread{font-size:.86rem;color:var(--muted);border-left:3px solid var(--warn);padding:.1rem .7rem;margin-top:.45rem}
+.gitem .misread b{color:var(--warn)}
+.gcount{color:var(--muted);font-size:.85rem;margin:.2rem 0 0}
+</style></head>
+<body data-theme="wasm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/wasm/theory/">理論編</a> › <strong>用語辞書</strong></nav>
+
+<h1>用語辞書</h1>
+<p class="lead">本文中の<a class="term" href="#wat" title="例">点線の下線が付いた語</a>をクリックすると、ここへ飛びます。
+読み終えたら<strong>ブラウザの戻る（<kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>⌘</kbd>+<kbd>[</kbd>）</strong>で元の場所に戻れます。<br>
+全部を覚える必要はありません。<strong>読んでいて詰まった語だけ</strong>引いてください。</p>
+
+<input class="gsearch" id="q" type="search" placeholder="用語を検索（例: import、線形メモリ、fd_write）" autocomplete="off">
+<div class="gindex" id="gindex"></div>
+<p class="gcount" id="gcount"></p>
+<div id="glist"></div>
+
+<footer><a href="/wasm/theory/">← 理論編 目次</a> · <a href="/wasm/">実践編</a> · <a href="/">トップ</a></footer>
+</div>
+<script src="/wasm/theory/terms.js"></script>
+<script>
+(() => {
+  const groups = window.TERM_GROUPS || [];
+  const list = document.getElementById("glist");
+  const index = document.getElementById("gindex");
+  const count = document.getElementById("gcount");
+  const CH = {1:"1. 41バイトの計算機", 2:"2. 能力は import でしか増えない",
+              3:"3. 境界を越えられるのは数値だけ", 4:"4. 同じ .wasm が、ホストが違うと動かない",
+              5:"5. バイナリを読む"};
+  const CHURL = {1:"/wasm/theory/01-machine", 2:"/wasm/theory/02-import",
+                 3:"/wasm/theory/03-memory", 4:"/wasm/theory/04-host",
+                 5:"/wasm/theory/05-binary"};
+
+  let total = 0;
+  groups.forEach((g, gi) => {
+    const id = "g" + gi;
+    index.insertAdjacentHTML("beforeend", `<a href="#${id}">${g.g}</a>`);
+    const sec = document.createElement("section");
+    sec.innerHTML = `<h2 id="${id}">${g.g}</h2>`;
+    for (const t of g.terms) {
+      total++;
+      const alt = (t.alt || []).length ? `<small>${t.alt.join(" / ")}</small>` : "";
+      const misread = t.misread
+        ? `<p class="misread"><b>誤解しやすい:</b> ${t.misread}</p>` : "";
+      sec.insertAdjacentHTML("beforeend",
+        `<div class="gitem" id="${t.id}" data-k="${(t.t + " " + (t.alt||[]).join(" ") + " " + t.hint).toLowerCase()}">
+           <h3>${t.t}${alt}</h3>
+           <p><b>ひとことで:</b> ${t.hint}</p>
+           <p>${t.body}</p>
+           ${misread}
+           <p class="where">詳しく: <a href="${CHURL[t.ch]}">${CH[t.ch]}</a></p>
+         </div>`);
+    }
+    list.append(sec);
+  });
+  count.textContent = `全 ${total} 語`;
+
+  const q = document.getElementById("q");
+  q.addEventListener("input", () => {
+    const v = q.value.trim().toLowerCase();
+    let shown = 0;
+    document.querySelectorAll(".gitem").forEach((el) => {
+      const hit = !v || el.dataset.k.includes(v) || el.textContent.toLowerCase().includes(v);
+      el.style.display = hit ? "" : "none";
+      if (hit) shown++;
+    });
+    document.querySelectorAll("#glist section").forEach((s) => {
+      s.style.display = [...s.querySelectorAll(".gitem")].some((e) => e.style.display !== "none") ? "" : "none";
+    });
+    count.textContent = v ? `${shown} / ${total} 語` : `全 ${total} 語`;
+  });
+})();
+</script>
+</body></html>

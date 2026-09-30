@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. 同じ .wasm が、ホストが違うと動かない — 壊して覚える WASM</title>
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-ch="4" data-theme="wasm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/wasm/theory/">理論編</a> › 第4章</nav>
+
+<h1>4. 同じ .wasm が、ホストが違うと動かない</h1>
+<p class="lead">1つの .wasm ファイルを2つのホストに渡す。片方は標準出力に文字を出し、もう片方は命令を1つも実行しないまま止まる。
+「どこでも動く」の <em>どこ</em> を決めているのはファイルではない。</p>
+
+<div class="badges"><span>前提: 第3章を読んだ</span><span>前提: wasmtime が動く</span><span>前提: node が動く</span><span>所要 14分</span><span class="impact-a">影響度 A</span><span>最終検証 2026-09-30</span></div>
+
+<div class="goal"><h4>この章のゴール</h4>
+<ul>
+  <li>WASI を使った .wasm が動くホストと動かないホストを区別できる</li>
+  <li>「どこでも動く」の <em>どこ</em> が何で決まるかを言える</li>
+</ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>:
+WASI Preview 2 と Preview 1 の差分は追わない。この章で要るのは「名前にバージョンが埋まっている」という一点だけ。
+iovec のフィールドも、先頭位置と長さの2つ以外は扱わない。残りが要る場面はこの章のゴールの外。
+Node で WASI を動かす experimental フラグの詳細も不要。ここでは素の Node が WASI を持たないことだけを使う。</div></div>
+
+<h2 id="two-hosts">同じバイト列を2つのホストに渡す</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じ .wasm が、片方のホストでは文字を出し、もう片方では命令を1つも実行せずに止まる。</div>
+
+<p>結論から言う。.wasm は「どこでも動く」ファイルではない。動くかどうかを決めているのはファイルの中身ではなくホストである。これを1つのファイルで確かめる。</p>
+
+<p>使うのは <code>wasi.wat</code> を組み立てた <code>wasi.wasm</code>。標準出力への書き込みを1回だけ行う手書きのモジュールで、演習 04 の作業ディレクトリに置いてある。まず wasmtime に渡す。</p>
+
+<pre><code><span class="tag real">実測</span> wasmtime に渡す
+$ wat2wasm wasi.wat -o wasi.wasm
+[exit 0]
+$ wasmtime run wasi.wasm
+hello from wasi
+[exit 0]</code></pre>
+
+<p>端末に <code>hello from wasi</code> が出た。次に、<b>同じ</b> <code>wasi.wasm</code> を素の Node に渡す。ブラウザが持っている WebAssembly API とほぼ同じもので、import を何も渡さずに結び付けを試みる。</p>
+
+<pre><code><span class="tag real">実測</span> 素の Node に渡す
+$ node wasi_browser.mjs
+TypeError: WebAssembly.instantiate(): Import #0 module="wasi_snapshot_preview1" error: module is not an object or function
+[exit 0]</code></pre>
+
+<p><code>module is not an object or function</code> という趣旨のメッセージ（文言は環境で変わる）で止まる。なおこの行はスクリプトが例外を捕まえて印字したものなので、プロセスの終了コードは 0 になっている。<b>終了コードは何も教えていない。</b></p>
+
+<p>2回の実行で、渡したバイト列は同じである。命令もデータも1ビットも違わない。変わったのはホストだけで、結果は「文字が出る」と「結び付けに失敗する」に分かれた。</p>
+
+<div class="analogy"><b>たとえ</b>: 同じ電源プラグを、国の違うコンセントに差すのに近い。形が合う国では通電し、合わない国では何も起きない。プラグ側は自分が何国製かを知らない。
+<br>ただし<b>崩れる点</b>: プラグは変換アダプタで物理的に橋渡しできる。import は名前の一致しか見ないので、似た機能の別名では代替されない。逆に、ホスト側で同じ名前の関数を自分で書けば通る。決めているのは形ではなく名前である。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+  <li>wasmtime では動き、素の Node では失敗した。2回の実行で違っていたものを挙げてください。</li>
+  <li>素の Node での失敗は、モジュールの中の命令を実行している途中で起きましたか。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> ホストだけ。<code>wasi.wasm</code> のバイト列は2回とも同一のファイルである。</p>
+<p><b>2.</b> いいえ。<code>Import #0</code> と出ているのは import を解決している段階で止まったという意味で、モジュールの命令は1つも実行されていない。失敗は実行中ではなく<b>結び付けの前</b>に起きる。</p></details></div>
+
+<h2 id="who-prints">端末に文字を出したのは誰か</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>hello from wasi</code> の文字は .wasm の中にある。だが端末に書いたのは wasmtime である。</div>
+
+<p>失敗したほうのメッセージが、モジュールが何を要求していたかを教えている。<code>module="wasi_snapshot_preview1"</code> — これが要求している名前空間の名前で、<code>Import #0</code> なのでこれが最初の import である。要求している関数は <code>fd_write</code> ひとつ。</p>
+
+<p>モジュール本体がやることは、第3章の <a href="/wasm/theory/03-memory">ptr と len の約束</a>そのままである。書き出したい文字列は線形メモリの中に置いてある。モジュールはその先頭位置と長さという2つの数値を、決められた場所に並べる（WASI はこの2つ組を iovec と呼ぶ）。そのうえで、書き込み先の番号 1、並べた場所、並べた個数、書けたバイト数を書き戻す場所 — 全部ただの数値 — を渡して <code>fd_write</code> を呼ぶ。</p>
+
+<p>つまりモジュールは「1 番の出口へ、ここから何バイト」と番号で言っただけである。1 番が標準出力だと決めているのも、そこへ実際に書くのも wasmtime 側。<b>.wasm には端末という概念が無い。</b>だから <code>hello from wasi</code> は wasm が出力したのではなく、wasmtime が出力した。</p>
+
+<div class="analogy"><b>たとえ</b>: 声を出したのは通訳である。.wasm は原稿を机に置き「そこから16バイトを読み上げてくれ」と場所を番号で指しただけで、自分の口を持っていない。
+<br>ただし<b>崩れる点</b>: 人間の通訳は原稿が1文字ずれていても意味で補う。ホストは指された範囲のバイトをそのまま扱うので、置き場所を1バイト間違えれば間違ったものがそのまま出る。</div>
+
+<h2 id="silence">沈黙は成功ではない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 逆向き（ブラウザ用の .wasm を wasmtime に渡す）はエラーにならず、何も起きずに正常終了する。</div>
+
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>ホストが約束を満たしているかは、走らせてエラーが出るかどうかで確かめればよい。それなら逆向きも試せる。第3章で作った <code>mem.wasm</code> — ブラウザから使う前提で、import を1つも持たないモジュール — を wasmtime に渡してみる。</p>
+<pre><code><span class="tag real">実測</span> ブラウザ用の .wasm を wasmtime に渡す
+$ wasmtime run mem.wasm
+[exit 0]</code></pre>
+<div class="then"><b>だめな理由</b>: 出力が無く、エラーも無く、終了コードは 0。読者はここで「動いた」と読む。だが何も実行されていない。
+<code>mem.wasm</code> が export しているのは <code>mem</code> / <code>ptr</code> / <code>len</code> の3つで、<code>wasmtime run</code> が引数なしで呼べる入口が無い。第3章では <code>--invoke</code> で <code>ptr</code> や <code>len</code> を名指ししていた。名指しが無ければ wasmtime は呼ぶ先を持たない。一方 <code>wasi.wasm</code> は <code>_start</code> を export しているので、名指しなしで走った。
+そのうえ <code>mem.wasm</code> は import が0個なので、ホストが何も渡さなくても結び付けは成立する。<b>結び付けは成功し、呼ぶものが無い。</b>だから正常に終わる。
+エラーの有無では「ホストが約束を満たしたか」は判定できない。</div></div>
+
+<p>失敗の形が2つあることになる。片方は騒がしく、片方は静かである。前節の Node は <code>Import #0</code> で止まり、何が足りないかを名前で言った。ここでの wasmtime は何も言わない。言うことが無いからである。要求が0個のモジュールに対して、ホストは満たすべき約束を持たない。</p>
+
+<div class="analogy"><b>たとえ</b>: 入口の無い建物に近い。壁も部屋も中にあり、工事は完了しているので誰も異常を報告しない。だが外から入る扉が無いので、誰も中で何もしない。
+<br>ただし<b>崩れる点</b>: 建物なら「扉が無い」ことが外から一目で分かる。.wasm は渡して走らせただけでは分からず、成功と同じ終了コードが返る。</div>
+
+<div class="note try">対応する演習は <code>lab start 04</code>。判定は <code>lab check 04</code>。同じ .wasm を2つのホストに渡す往復を、自分の手元で通す。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+  <li><code>wasmtime run mem.wasm</code> が終了コード 0 で何も出さなかった。ここから「wasmtime は <code>mem.wasm</code> を実行できる」と言えますか。</li>
+  <li><code>mem.wasm</code> は import を1つも持たない。このモジュールがホストを選ばないのはなぜですか。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> 言えません。呼ぶ入口が無いので結び付けまでで終わっており、中の命令は実行されていない。「実行できる」ことも「実行できない」ことも、この1回からは分からない。</p>
+<p><b>2.</b> ホストに何も要求していないからです。動くために必要なものが全部モジュールの中に閉じているので、渡し先のホストが何を持っていようと結び付けは成立する。ただし成立するだけで、呼ばれるとは限らない。</p></details></div>
+
+<h2 id="where">「どこでも動く」の <em>どこ</em></h2>
+<div class="sgoal"><b>この節で分かること</b>: 動くホストの範囲を決めているのは、モジュールが要求する import 名の集合である。</div>
+
+<p>この章と第3章で観測した4通りを並べる。</p>
+
+<div class="scroll"><table>
+<tr><th>渡した .wasm</th><th>ホスト</th><th>観測</th><th>何が決めたか</th></tr>
+<tr><td><code>wasi.wasm</code></td><td><code>wasmtime run</code></td><td><code>hello from wasi</code> が出た</td><td>wasmtime が <code>wasi_snapshot_preview1</code> を定義している</td></tr>
+<tr><td><code>wasi.wasm</code></td><td>素の Node（import を渡さない）</td><td><code>Import #0</code> で停止</td><td>その名前空間を誰も渡していない</td></tr>
+<tr><td><code>mem.wasm</code>（第3章）</td><td><code>wasmtime run</code></td><td>何も出ず終了コード 0</td><td>要求が0個なので拒否されず、入口が無いので呼ばれない</td></tr>
+<tr><td><code>mem.wasm</code>（第3章）</td><td>Node</td><td>線形メモリを読んで文字列が組み立てられた</td><td>要求が0個。ホストは何も約束しなくてよい</td></tr>
+</table></div>
+
+<p>4行から読み取れることは1つである。<b>移植性は .wasm の性質ではない。</b>同じファイルが動く範囲は、そのファイルが要求する import 名をホストが全部定義しているかどうかで決まる。要求が0個のモジュールはどこでも結び付く。<code>wasi_snapshot_preview1</code> を要求するモジュールは、その名前空間を渡してくれるホストの中でしか動かない。wasmtime はそれを渡し、素の Node は渡さない。この差はホスト側の実装の差であって、ファイルの側にはどこにも書かれていない。</p>
+
+<div class="analogy"><b>たとえ</b>: .wasm が持っているのは鍵の刻みで、ホストが持っているのは錠である。刻みが合う錠なら回る。刻みは鍵の側に固定されていて、どの錠の前でも同じ形をしている。
+<br>ただし<b>崩れる点</b>: 鍵は1本で1つの錠を開ける。import は複数あり、1つ欠けただけで全部が回らない。半分の能力で半分動く状態は無い。</div>
+
+<h3>エラーの1行から何を読むか</h3>
+<p>結び付けに失敗したメッセージは、次に何を調べればいいかをそのまま書いている。前節で出た1行を分解する。</p>
+
+<div class="scroll"><table>
+<tr><th>断片</th><th>読み取れること</th></tr>
+<tr><td><code>Import #0</code></td><td>何番目の import で止まったか。0 番なので最初の1つ。以降は検査されていない</td></tr>
+<tr><td><code>module="wasi_snapshot_preview1"</code></td><td>欠けている名前空間の名前。ホストを選ぶ基準であり、そのまま調べるときの語になる</td></tr>
+<tr><td><code>module is not an object or function</code></td><td>名前空間そのものが渡されていない。個別の関数が足りないのとは別の段階の失敗</td></tr>
+</table></div>
+
+<p>ここで効いてくるのが名前の形である。<code>wasi_snapshot_preview1</code> には <code>preview1</code> が入っている。約束のバージョンが名前そのものに埋まっているので、ホストの説明に「WASI 対応」と書いてあるだけでは判断できない。モジュールが要求している文字列と一致するかを見る。</p>
+
+<p>そしてこの文字列が、一次情報を引くときの入口になる。WASI の仕様は名前空間ごとに関数を並べた表であり、<code>fd_write</code> の引数が何番目に何を意味するか、iovec をどう並べるかは、全部この1つの名前空間の取り決めの中に書かれている。関数名を単体で検索すると別の実装の話に混ざるので、名前空間名と関数名を組で引く。</p>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+  <li>知らない .wasm を渡されました。手元のホストで動くかどうかを、走らせる前に判断するには何を見ますか。</li>
+  <li>ホストの説明に「WASI 対応」と書いてありました。これで足りますか。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> そのモジュールが要求している import の名前空間と関数名の一覧と、ホストがそれを全部定義しているか。1つ欠ければ結び付け自体が失敗するので、部分的に動く可能性を考える必要はない。要求を .wasm から取り出す手立ては<a href="/wasm/theory/05-binary">第5章</a>で扱う。</p>
+<p><b>2.</b> 足りません。<code>wasi_snapshot_preview1</code> のように名前にバージョンが埋まっているので、モジュールが要求している文字列と一致するかを見る必要がある。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4>
+<ul>
+  <li>同じ .wasm が動くホストと動かないホストを分けているのは、モジュールが要求する import の名前空間である。<code>wasi.wasm</code> は <code>wasi_snapshot_preview1</code> を要求し、wasmtime はそれを定義し、素の Node は定義しない</li>
+  <li>結び付けの失敗は実行前に起きる。<code>Import #0</code> と出ていれば、モジュールの命令は1つも動いていない</li>
+  <li>標準出力に文字を出したのはホストである。モジュールは線形メモリ上の場所を数値で指し、数値で <code>fd_write</code> を呼んだだけ</li>
+  <li>エラーが出ないことは動いた証拠にならない。入口の無いモジュールは終了コード 0 で黙って終わる</li>
+  <li>「どこでも動く」の <em>どこ</em> は、ホストが名前で約束を満たす範囲。移植性はファイル側の性質ではない</li>
+</ul></div>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/&lt;owner&gt;/lab-wasm:1.0.0 / Ubuntu 24.04.5 LTS / wasmtime 49.0.1 / wabt 1.0.34 / node 18.19.1 / apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
+
+<nav class="pager"><a href="/wasm/theory/03-memory">← 3. 境界を越えられるのは数値だけ</a><a href="/wasm/theory/05-binary">次: 5. バイナリを読む →</a></nav>
+<footer><a href="/">トップ</a> · <a href="/wasm/theory/">理論編 目次</a></footer>
+</div>
+<script src="/wasm/chapters.js"></script>
+<script src="/wasm/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+</body></html>

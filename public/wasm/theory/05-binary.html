@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5. バイナリを読む — 壊して覚える WASM</title>
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-ch="5" data-theme="wasm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/wasm/theory/">理論編</a> › 第5章</nav>
+<h1>5. バイナリを読む</h1>
+<p class="lead">41バイトの <code>.wasm</code> を開けても、そこには4つの塊しか入っていない。
+その4つを読むだけで、モジュールが何を外に見せているか、そして<strong>外に何を要求しているか</strong>が実行前に分かる。</p>
+<div class="badges"><span>前提: 第1〜4章</span><span>前提: wabt（wasm-objdump, wasm2wat）</span><span>所要 18分</span><span class="impact-a">影響度 A</span><span>最終検証 2026-09-30</span></div>
+
+<div class="goal"><h4>この章のゴール</h4>
+<ul>
+<li>wasm-objdump でセクション構成を読み、どの export がどの関数かを対応づけられる</li>
+<li>手元の .wasm が何を import しているかを、実行する前に調べられる</li>
+</ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: セクション種類番号の全一覧は覚えない。この章で出てくる4種類＋3種類を、出力と突き合わせて読めれば足りる。
+custom section（規格が中身を決めていない、道具ごとの任意領域）の仕様も不要。
+DWARF デバッグ情報も不要で、この章の2つの道具はデバッグ情報が1バイトも無いファイルに対して動いている。</div></div>
+
+<h2 id="h">セクションという単位</h2>
+<div class="sgoal"><b>この節で分かること</b>: 41バイトのファイルが4つの塊に分かれていること、その境界がどのバイトで宣言されているか。</div>
+
+<p>結論から言う。<code>.wasm</code> は<strong>「種類番号1バイト」「長さ1バイト（この41バイトの範囲では）」「その長さぶんの中身」</strong>の繰り返しでできている。
+先頭8バイトだけが例外で、そこには識別子と版が入る。</p>
+
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>バイナリの中身を見たいのだから、まず <code>xxd</code> で開く。41バイトなら目で全部追える。</p>
+<pre><code>$ xxd add.wasm
+00000000: 0061 736d 0100 0000 0107 0160 027f 7f01  .asm.......`....
+00000010: 7f03 0201 0007 0701 0361 6464 0000 0a09  .........add....
+00000020: 0107 0020 0020 016a 0b                   ... . .j.</code></pre>
+<p>右の列に <code>.asm</code> と <code>add</code> が見えるので、手応えはある。</p>
+<div class="then"><b>だめな理由</b>: 16進が並んでいることは分かるが、<b>どこからどこまでが1つのまとまりか</b>がどこにも書いていない。
+<code>add</code> という名前が見えても、それが「0番の関数の名前」なのか「1番の関数の名前」なのかは、この画面からは決まらない。
+41バイトなら根気で読めるが、判断の根拠が「なんとなくこの辺が区切りだろう」になっている。
+必要なのは境界の位置であって、バイトの列そのものではない。</div></div>
+
+<p>境界だけを出す道具がある。</p>
+
+<pre><code>$ wasm-objdump -h add.wasm
+
+add.wasm:	file format wasm 0x1
+
+Sections:
+
+     Type start=0x0000000a end=0x00000011 (size=0x00000007) count: 1
+ Function start=0x00000013 end=0x00000015 (size=0x00000002) count: 1
+   Export start=0x00000017 end=0x0000001e (size=0x00000007) count: 1
+     Code start=0x00000020 end=0x00000029 (size=0x00000009) count: 1</code></pre>
+
+<p>この出力は中身を一切解釈していない。名前と、始まりと、終わりと、件数だけである。
+そして <code>xxd</code> の側と重ねると、<strong>境界の直前2バイトに規則性が現れる</strong>。
+下の表のバイトは、上の <code>xxd</code> の出力を切り出し直したものである。</p>
+
+<div class="scroll"><table>
+<tr><th>オフセット</th><th>バイト</th><th>読み</th></tr>
+<tr><td>0x00–0x07</td><td><code>0061 736d 0100 0000</code></td><td>識別子と版。右の ASCII 列に <code>.asm</code> が出る。<code>-h</code> の1行目が <code>file format wasm 0x1</code> と言う <code>0x1</code> は、0x04 の <code>01</code> にあたると読める</td></tr>
+<tr><td>0x08</td><td><code>01</code></td><td>種類番号。<code>-h</code> はこのあとの塊を Type と呼んだ</td></tr>
+<tr><td>0x09</td><td><code>07</code></td><td>長さ 7</td></tr>
+<tr><td>0x0a–0x10</td><td><code>01 60 02 7f 7f 01 7f</code></td><td>Type の中身。<code>start=0x0000000a end=0x00000011 (size=0x00000007)</code> と一致する</td></tr>
+<tr><td>0x11</td><td><code>03</code></td><td>種類番号。<code>-h</code> は Function と呼んだ</td></tr>
+<tr><td>0x12</td><td><code>02</code></td><td>長さ 2</td></tr>
+<tr><td>0x13–0x14</td><td><code>01 00</code></td><td>Function の中身。<code>start=0x00000013 end=0x00000015</code> と一致</td></tr>
+<tr><td>0x15</td><td><code>07</code></td><td>種類番号。<code>-h</code> は Export と呼んだ</td></tr>
+<tr><td>0x16</td><td><code>07</code></td><td>長さ 7</td></tr>
+<tr><td>0x17–0x1d</td><td><code>01 03 61 64 64 00 00</code></td><td>Export の中身。<code>61 64 64</code> が <code>xxd</code> の右列の <code>add</code></td></tr>
+<tr><td>0x1e</td><td><code>0a</code></td><td>種類番号。<code>-h</code> は Code と呼んだ</td></tr>
+<tr><td>0x1f</td><td><code>09</code></td><td>長さ 9</td></tr>
+<tr><td>0x20–0x28</td><td><code>01 07 00 20 00 20 01 6a 0b</code></td><td>Code の中身。<code>end=0x00000029</code> = 41 でファイルが尽きる</td></tr>
+</table></div>
+
+<p>ファイル順の種類番号は <code>01</code>, <code>03</code>, <code>07</code>, <code>0a</code> で、<code>-h</code> はそれぞれを Type, Function, Export, Code と呼んだ。
+種類番号の対応表は、この2つの出力を並べれば自分で作れる。仕様書を開く前に、手元の <code>.wasm</code> と <code>-h</code> の出力で確かめられる部分がここまである。</p>
+
+<p>長さが中身より先に置かれているので、読み手は種類番号を知らなくても <code>09</code> バイト読み飛ばして次へ進める。
+<code>-h</code> が中身を1バイトも解釈せずに境界だけを出せるのは、この形のおかげである。</p>
+
+<div class="analogy"><b>たとえ</b>: <code>-h</code> の出力は<b>目次</b>で、<code>xxd</code> の出力は<b>本文</b>。ページ番号（start / end）があるから、どこを読めばいいかが決まる。
+<br>ただし<b>崩れる点</b>: 本の目次は著者が本文とは別に作るが、この目次は<b>本文そのものの中に埋まっている</b>。0x08 の <code>01</code> と 0x09 の <code>07</code> がそのまま1行分の目次になっている。目次だけを差し替えることはできない。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>-h</code> の最初の <code>start</code> は 0x0a である。ファイル先頭の 10 バイトはどのセクションにも属していない。この 10 バイトは何か。</li>
+<li>Code セクションの <code>end=0x00000029</code> は 41 で、<code>xxd</code> の最後のバイトの次にあたる。ここから、<code>-h</code> の一覧に出てこないセクションについて何が言えるか。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> 先頭8バイトが識別子と版（<code>0061 736d 0100 0000</code>）、続く 0x08 と 0x09 の2バイトが最初のセクションの種類番号と長さ。<code>-h</code> が報告する <code>start</code> はセクションの<b>中身</b>の先頭なので、種類番号と長さの2バイトは範囲の外に出る。だから 8 + 2 = 10 バイトが余る。</p>
+<p><b>2.</b> 4つのセクションでファイルが尽きている。つまり一覧に無いセクションは「<code>-h</code> が省略した」のではなく、<b>ファイルに存在しない</b>。この性質が、あとで import を調べるときの根拠になる。</p>
+</details></div>
+
+<h2 id="x">名前と番号の対応</h2>
+<div class="sgoal"><b>この節で分かること</b>: export の名前が、どの関数の本体に結びついているか。</div>
+
+<p>境界だけでなく中身まで出すのが <code>-x</code> である。第3章で使った <code>mem.wasm</code> に通す。</p>
+
+<pre><code>$ wasm-objdump -x mem.wasm
+
+mem.wasm:	file format wasm 0x1
+
+Section Details:
+
+Type[1]:
+ - type[0] () -&gt; i32
+Function[2]:
+ - func[0] sig=0 &lt;ptr&gt;
+ - func[1] sig=0 &lt;len&gt;
+Memory[1]:
+ - memory[0] pages: initial=1
+Export[3]:
+ - memory[0] -&gt; "mem"
+ - func[0] &lt;ptr&gt; -&gt; "ptr"
+ - func[1] &lt;len&gt; -&gt; "len"
+Code[2]:
+ - func[0] size=4 &lt;ptr&gt;
+ - func[1] size=4 &lt;len&gt;
+Data[1]:
+ - segment[0] memory=0 size=10 - init i32=0
+  - 0000000: 6865 6c6c 6f20 7761 736d                 hello wasm</code></pre>
+
+<p>ここで見るべきは <code>Export[3]</code> の3行である。<strong>左が内部の番号、右が外から呼ぶときの名前</strong>で、
+<code>func[0] &lt;ptr&gt; -&gt; "ptr"</code> は「0番の関数を <code>"ptr"</code> という名前で外に出す」と読む。</p>
+
+<p><code>Code[2]</code> は本体を <code>func[0]</code>, <code>func[1]</code> の順に並べている。
+つまりホストが <code>"len"</code> を呼んだときに走るのは <code>func[1] size=4</code> の本体である。
+名前から本体へたどる経路は、Export の行が示す番号を Code の並びに当てるところにしかない。</p>
+
+<div class="analogy"><b>たとえ</b>: Export セクションは<b>内線表</b>である。外から掛ける人は <code>"len"</code> という名前しか知らず、交換台がそれを <code>func[1]</code> という番号に置き換える。
+<br>ただし<b>崩れる点</b>: 会社の内線表は席替えのたびに番号を付け替えれば済むが、ここでの番号は Code セクションの<b>並び順そのもの</b>である。表の番号だけ書き換えると、別の本体が呼ばれる。</div>
+
+<p>add.wasm でも同じことが起きている。Export の中身は <code>01 03 61 64 64 00 00</code> の7バイトで、
+先頭の <code>01</code> が件数、<code>03</code> が名前の長さ、<code>61 64 64</code> が <code>add</code>、残りが <code>00 00</code> の2バイトである。
+同じ場所を <code>wasm2wat</code> は <code>(export "add" (func 0))</code> と書き出す（次の節）。
+<code>func</code> という種別と <code>0</code> という番号の2つが、この2バイトに収まっていると読める。
+<strong>どちらが先かは add.wasm だけでは決められない</strong>。両方 <code>00</code> だからである。1つの標本で決まらないことは、決まらないままにしておく。</p>
+
+<h3>Memory と Data</h3>
+<p><code>Memory[1]</code> の <code>pages: initial=1</code> が、第3章でホスト側から 65536 バイトとして見えたものの宣言である。
+<code>Data[1]</code> はそのメモリの初期値で、<code>segment[0] memory=0 size=10 - init i32=0</code> は
+「0番のメモリのオフセット 0 に 10 バイト置く」と読む。置かれる 10 バイトは <code>6865 6c6c 6f20 7761 736d</code> で、
+右端に <code>hello wasm</code> と添えられている。</p>
+
+<div class="analogy"><b>たとえ</b>: Data セグメントは<b>入居前に部屋へ運び込んでおく荷物</b>である。モジュールが動き出す前に、線形メモリの決まった位置に決まったバイト列が置かれる。
+<br>ただし<b>崩れる点</b>: 荷物を運び込むのは住人ではなく<b>ホスト側のランタイム</b>である。しかも置かれるのは「文字列」ではなく 10 バイトの数値の並びで、それを <code>hello wasm</code> として読むかどうかは外側の解釈にすぎない（第3章で ptr と len から組み立てたのがその解釈である）。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li>ホストが <code>"len"</code> という名前で呼んだとき、<code>Code[2]</code> のどちらの本体が走るか。何を根拠にそう言えるか。</li>
+<li><code>Type[1]</code> は <code>type[0] () -&gt; i32</code> の1件しかないのに、関数は2つある。矛盾していないのはなぜか。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> <code>func[1] size=4</code> の本体。根拠は Export の <code>func[1] &lt;len&gt; -&gt; "len"</code> が名前 <code>"len"</code> を番号 1 に結びつけており、Code セクションが本体を同じ番号順に並べていること。名前は Export 側にしか無く、本体側は番号しか持っていない。</p>
+<p><b>2.</b> <code>Function[2]</code> の2行がどちらも <code>sig=0</code> で、同じ型を指しているから。<code>ptr</code> も <code>len</code> も「引数なしで i32 を1つ返す」形をしているので、型は1件で足りる。型は関数ごとに複製されず、番号で共有される。</p>
+</details></div>
+
+<h2 id="wat">構造は戻る、名前は戻らない</h2>
+<div class="sgoal"><b>この節で分かること</b>: バイナリから WAT を戻したときに、何が戻って何が戻らないか。</div>
+
+<p><code>wasm2wat</code> はバイナリを WAT の表記に戻す。翻訳ではなく、同じものの別表記である。</p>
+
+<pre><code>$ wasm2wat add.wasm
+(module
+  (type (;0;) (func (param i32 i32) (result i32)))
+  (func (;0;) (type 0) (param i32 i32) (result i32)
+    local.get 0
+    local.get 1
+    i32.add)
+  (export "add" (func 0)))</code></pre>
+
+<p>ここに出てくる <code>(;0;)</code> は番号であって名前ではない。
+この出力の中で<strong>名前として残っているのは <code>"add"</code> だけ</strong>で、それは Export セクションに書かれている文字列である。
+関数も型も、番号でしか指されていない。</p>
+
+<p><code>(param i32 i32) (result i32)</code> という形は、前の節で見た Type の中身 <code>01 60 02 7f 7f 01 7f</code> に対応する。
+<code>7f</code> が3回出るのが引数2つと戻り値1つで、<strong>並ぶのは型1つ1つの番号だけ</strong>である。
+第1章で <code>(result string)</code> が <code>wat2wasm</code> に受け付けられなかったのは、この列に文字列の型を置く場所が無いからだと読める。</p>
+
+<h2 id="recap">1〜4章で見たものは、どこにあったか</h2>
+<div class="sgoal"><b>この節で分かること</b>: これまで画面に出たものが、バイナリのどの部分に対応するか。</div>
+
+<div class="scroll"><table>
+<tr><th>章</th><th>画面で見たこと</th><th>バイナリのどこ</th></tr>
+<tr><td>1</td><td><code>add</code> を外から名前で呼べた</td><td>Export セクション（add.wasm の 0x17–0x1d）。名前 <code>add</code> はここにしか無い</td></tr>
+<tr><td>1</td><td><code>(result string)</code> が書けなかった</td><td>Type セクション（<code>01 60 02 7f 7f 01 7f</code>）。<code>7f</code> のような型の番号しか並ばない</td></tr>
+<tr><td>2</td><td><code>env::log</code> が無いと起動しなかった</td><td>Import セクション。add.wasm と mem.wasm には<strong>この塊が無い</strong></td></tr>
+<tr><td>3</td><td>ホストから見えた線形メモリ</td><td>Memory セクション（<code>pages: initial=1</code>）と、それを外に見せている Export の <code>memory[0] -&gt; "mem"</code></td></tr>
+<tr><td>3</td><td><code>hello wasm</code> の実体</td><td>Data セクション（<code>segment[0] memory=0 size=10 - init i32=0</code> と続く 10 バイト）</td></tr>
+<tr><td>4</td><td>同じ .wasm がホストによって動く／動かない</td><td>Import セクション。ファイルに書いてあるのは要求の名前だけで、それを満たせるかはホスト側の事情</td></tr>
+</table></div>
+
+<p>表の6行のうち2行が Import セクションを指している。そしてこれまで見てきた2つのファイルには、そのセクションが無い。</p>
+
+<h2 id="import">実行する前に、要求を読む</h2>
+<div class="sgoal"><b>この節で分かること</b>: 実行せずに、そのモジュールが何を要求しているかを読む手順。</div>
+
+<p>配布された <code>.wasm</code> を <code>wasm-objdump -x</code> に通すと、Import の行が出るか出ないかが分かる。
+<strong>Import に並んだ名前が、そのモジュールの能力の上限である</strong>。外の世界に触る手段は、ホストが手渡したものしか無い。</p>
+
+<p>上で見た2つの出力には Import の行が1つも無い。
+<code>-h add.wasm</code> は Type / Function / Export / Code の4つを挙げ、それで 41 バイトが尽きた。
+<code>-x mem.wasm</code> は Type / Function / Memory / Export / Code / Data を挙げ、Import はその中にいない。
+つまりこの2つは<strong>外へ出る口を1つも持っていない</strong>。できるのは、数値を受け取って数値を返すことと、自分の線形メモリを触ることだけである。</p>
+
+<p>逆向きの証拠は第2章にある。<code>imp.wasm</code> を wasmtime に読み込ませた時点で、
+<code>unknown import: `env::log` has not been defined</code> という趣旨のメッセージ（文言は環境で変わる）で止まった。
+関数が1行も走っていない段階で、wasmtime は <code>env::log</code> という名前を言い当てている。
+その文字列がファイルの中に書いてあるからである。読めば分かるものを、実行して確かめる必要はない。</p>
+
+<div class="analogy"><b>たとえ</b>: Import セクションは<b>買い物リスト</b>である。中身を開ける前にリストを読めば、その部品が何を要求するかが分かる。リストに無いものは要求できない。
+<br>ただし<b>崩れる点</b>: 買い物リストは買い忘れても後から買い足せるが、import は<b>読み込みの時点で全部揃っていないと起動しない</b>。第2章で1つ欠けただけで止まったのがそれで、あとから足す経路が無い。</div>
+
+<h3>読む順番</h3>
+<ol>
+<li><code>wasm-objdump -x</code> を通す。</li>
+<li>Import の行を読む。無ければ、そのモジュールは外に出られない。第1章の <code>add</code> のように、数値を受け取って数値を返すだけである。</li>
+<li>Export の行を読む。ここは向きが逆で、<strong>ホスト側がモジュールの中を覗ける範囲</strong>である。mem.wasm に <code>memory[0] -&gt; "mem"</code> があったから、第3章でホストは線形メモリを丸ごと読めた。この行が無ければホストは中を見られない。</li>
+<li>Memory と Data を読む。ただしここに何が置かれていても、それはモジュールの内側の話である。外に出る経路は Import、外から覗く経路は Export で、この2つ以外に境界を越える口は無い。</li>
+</ol>
+
+<p>「動かしてエラーを読む」のも調べることではある。ただし順番が逆で、調べたい相手をホストに読み込ませる側が、何を渡すかを先に決めていなければならない。
+<code>-x</code> はファイルを読むだけなので、読み込ませる前に決める材料になる。</p>
+
+<div class="note try">対応する演習は <code>lab start 05</code>。判定は <code>lab check 05</code>。
+第2章の <code>imp.wasm</code> に <code>wasm-objdump -x</code> を通し、Import の行を自分の画面に出す。
+そのうえで、add.wasm と mem.wasm には出ないことを確かめる。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li>配布された <code>.wasm</code> がファイルを読み書きしないことを、実行せずに確かめるには何を見るか。</li>
+<li>ある <code>.wasm</code> の Export に <code>memory[0] -&gt; "mem"</code> があった。これはそのモジュールが外のメモリを読めることを意味するか。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> <code>wasm-objdump -x</code> の Import の行。ファイルを読み書きする手段はホストから渡された関数しか無いので、Import に何も無ければその手段を持っていない。Code セクションが大きくても、Memory や Data に何が書かれていても、外へ出る口の有無とは関係がない。</p>
+<p><b>2.</b> 意味しない。向きが逆で、<b>ホストがそのモジュールの線形メモリを読める</b>という意味である。第3章でホスト側が <code>hello wasm</code> を組み立てられたのはこの Export があったからで、モジュールが外に出るには Import が要る。</p>
+</details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4>
+<ul>
+<li><code>.wasm</code> は「種類番号・長さ・中身」の繰り返し。<code>wasm-objdump -h</code> の start / end を <code>xxd</code> に重ねれば、種類番号の対応は自分で確かめられる。</li>
+<li>名前は Export セクションにしか無い。名前から本体へは、Export が示す番号を Code の並び順に当ててたどる。</li>
+<li><code>wasm2wat</code> で戻るのは構造だけで、番号は番号のまま出てくる。名前として残るのは Export に書かれた文字列だけ。</li>
+<li>Import の行を読めば、そのモジュールが何を要求しているかが実行前に分かる。行が無ければ外に出る口が無い。</li>
+<li>Export は「中を覗かせる窓」で、能力を増やす口ではない。できることの上限は Import が決めている。</li>
+</ul></div>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/&lt;owner&gt;/lab-wasm:1.0.0 / Ubuntu 24.04.5 LTS / wasmtime 49.0.1 / wabt 1.0.34 / node 18.19.1 / apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
+
+<nav class="pager"><a href="/wasm/theory/04-host">← 4. 同じ .wasm が、ホストが違うと動かない</a><a href="/wasm/">実践編へ進む →</a></nav>
+<footer><a href="/wasm/">実践編</a> · <a href="/wasm/theory/">理論編 目次</a> · <a href="/wasm/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/wasm/chapters.js"></script>
+<script src="/wasm/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+</body></html>

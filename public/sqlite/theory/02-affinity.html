@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. 型は宣言ではなく提案 — 壊して覚える SQLite</title>
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-ch="2" data-theme="sqlite">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/sqlite/theory/">理論編</a> › 第2章</nav>
+
+<h1>2. 型は宣言ではなく提案</h1>
+<p class="lead">INTEGER と宣言した列に、文字列がそのまま入る。これはバグではなく、SQLite では型宣言が「弾く条件」ではなく「変換の優先傾向」だからである。</p>
+
+<div class="badges"><span>前提: 第1章</span><span>所要 12分</span><span>影響度 B</span><span>最終検証 2026-09-30</span></div>
+
+<div class="note warn">この章のコマンドは DB ファイルを新しく作る。すべて配布イメージの中で実行し、母艦では実行しない。</div>
+
+<div class="goal"><h4>この章のゴール</h4><ul>
+<li>INTEGER と宣言した列に文字列が入る理由を type affinity の語で説明できる</li>
+<li>typeof() で実際に格納された型を確かめられる</li>
+<li>STRICT テーブルで何が変わるかを言える</li>
+</ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>:
+affinity は全部で5種類あるが、その全組み合わせ表は覚えない。この章で見るのは INTEGER 宣言の列だけである。
+CHECK 制約の書き方も扱わない。値の範囲を縛る話は型の話とは別の層にある。
+照合順序（COLLATE）も扱わない。文字列の比較規則は型が決まった後の話である。</div></div>
+
+<h2 id="declare">INTEGER と書いても、文字列は入る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 宣言に反する値を INSERT したとき、SQLite が何を返すか。</div>
+<p>結論から言う。ふつうに CREATE TABLE したテーブルでは、列の型宣言は INSERT を止めない。</p>
+
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>n INTEGER</code> と宣言したのだから、数値以外を入れれば INSERT は失敗するはずである。確かめるなら、テーブルを作って数値を1行、文字列を1行入れてみればよい。成功か失敗かで判定できる。</p>
+<pre><code>$ sqlite3 t2.db 'CREATE TABLE loose(n INTEGER);'
+[exit 0]
+$ sqlite3 t2.db 'INSERT INTO loose VALUES(42);'
+[exit 0]
+$ sqlite3 t2.db 'INSERT INTO loose VALUES("abc");'
+[exit 0]</code></pre>
+<div class="then"><b>だめな理由</b>: 3行目も <code>[exit 0]</code> である。文字列を入れても失敗しない。そして失敗しなかったという情報しか返ってこないので、この観測では「そのまま入ったのか、別の型に変換されて入ったのか」を区別できない。成否を見る方法では、宣言と実際の格納内容の関係が何ひとつ分からない。確かめたいのは INSERT の結果ではなく、<b>格納されたあとの値</b>である。</div></div>
+
+<p>SQLite の列宣言は、値を受け付ける条件ではない。格納するときにどの型へ寄せたいかという優先傾向であり、これを type affinity と呼ぶ。寄せられなければ寄せないまま格納する。宣言には「拒否する」という選択肢が用意されていない。</p>
+
+<div class="analogy"><b>たとえ</b>: 列の型宣言は入国審査官ではなく、荷物に貼る<b>仕分け希望票</b>に近い。希望票は「この荷物は整数の棚へ」と書いてあるだけで、違う荷物を持ち帰らせる権限を持たない。
+<br>ただし<b>崩れる点</b>: 希望票が完全に無視されるわけではない。次の節で見るように、整数として読める荷物は実際に書き換えられて整数の棚に入る。「無視される」と覚えると、この書き換えを説明できなくなる。</div>
+
+<h2 id="typeof">入った型を typeof() で見る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 宣言ではなく実際に格納された型を1行ずつ確かめる方法と、そこに現れる非対称。</div>
+<p>格納された値の型は <code>typeof()</code> で取れる。前節で 2 行入れた <code>loose</code> を、値と型を並べて読む。</p>
+
+<pre><code>$ sqlite3 t2.db 'SELECT n, typeof(n) FROM loose;'
+42|integer
+abc|text
+[exit 0]</code></pre>
+
+<p>宣言が 1 つしかない <code>loose</code> の <code>n</code> 列から、<code>integer</code> と <code>text</code> の 2 種類が返ってきた。型は列に付いているのではなく、<b>値ごとに付いている</b>。同じ列に別の型が同居できる。</p>
+
+<p>ここで、整数として読める文字列を入れてみる。</p>
+
+<pre><code>$ sqlite3 t2.db 'INSERT INTO loose VALUES("123"); SELECT n, typeof(n) FROM loose;'
+42|integer
+abc|text
+123|integer
+[exit 0]</code></pre>
+
+<p><code>"123"</code> は引用符を付けた文字列として渡したのに、typeof は <code>integer</code> を返す。一方 <code>"abc"</code> は <code>text</code> のまま残っている。同じ列、同じ書き方、違う結果である。</p>
+
+<p>この非対称が affinity の実体である。INTEGER affinity を持つ列は、渡された値を整数に変換できるなら変換してから格納し、変換できないなら渡されたままの型で格納する。<b>分岐するのは変換の成否だけで、格納の成否は分岐しない</b>。だから前節の INSERT は 3 回とも <code>[exit 0]</code> だった。</p>
+
+<div class="analogy"><b>たとえ</b>: 硬貨を入れると自動で数えてくれる<b>コインカウンター</b>に似ている。硬貨は数えられて金額になる。紙で作ったコインが混ざっても機械は止まらず、数えずに受け皿へ落とす。
+<br>ただし<b>崩れる点</b>: 実物のカウンターは異物を外へ返すが、SQLite は変換できなかった値も同じ列にそのまま保管する。あとから読むと、数えられた値と数えられなかった値が同じ場所から出てくる。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>SELECT n, typeof(n) FROM loose;</code> の 2 列目を捨てて 1 列目だけをプログラムで受け取るとき、何に備える必要があるか。</li>
+<li><code>"123"</code> が integer になり、<code>"abc"</code> が text のまま残ったのはなぜか。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> 同じ列から integer と text の両方が返ってくることに備える。型は列宣言ではなく値ごとに決まっているので、宣言を読んで「この列は必ず整数」と決め打ちできない。実際に何が入っているかは <code>typeof(n)</code> を一緒に取れば行ごとに分かる。</p>
+<p><b>2.</b> INTEGER affinity は「整数に変換できるなら変換する」であって「整数でなければ拒否する」ではない。<code>"123"</code> は変換できたので integer として格納され、<code>"abc"</code> は変換できなかったので渡された text のまま格納された。どちらの経路でも INSERT は成功する。</p>
+</details></div>
+
+<h2 id="why">なぜ弾かないのか — 弾く主体がいない</h2>
+<div class="sgoal"><b>この節で分かること</b>: この挙動が、SQLite の置かれ方そのものから出てくること。</div>
+<p>厳格な型検査には、すべての書き込みが通る関門が要る。SQLite にはその関門を置く場所が無い。</p>
+
+<p>前章で見たとおり、DB はファイル 1 個であり、それを世話する常駐プロセスは存在しない。<code>CREATE TABLE</code> を実行したのも <code>INSERT</code> を実行したのも、コマンドを打った瞬間に起動したそのプロセス自身であり、中にリンクされたライブラリがファイルを直接書いている。</p>
+
+<p>サーバ型の DB なら、宣言に反する値を送るクライアントが現れても、サーバ側が書き込みを拒否できる。関門はクライアントの外にある。SQLite で同じことをしようとすると、検査のコードを置ける場所は 1 つしかない。<b>書き込む当のプロセスの中</b>である。検査する側と検査される側が同じプロセスに同居する。</p>
+
+<p>この構造の下では、宣言に反する値でエラーを投げるかどうかは「ファイルを守る仕組み」ではなく、呼び出し側にとって都合がいいかどうかの問題になる。実測では、ふつうに作ったテーブルは投げない側に倒れている。倒れ方を変えたいなら、テーブルを作るときに指定する。</p>
+
+<div class="analogy"><b>たとえ</b>: サーバ型の DB が受付のある倉庫なら、SQLite は<b>受付のない共同倉庫</b>である。荷物を運び込む人が、自分で棚札を読んで自分で判断する。
+<br>ただし<b>崩れる点</b>: 倉庫の比喩だと「あとから受付を雇える」ように聞こえる。SQLite に常駐の受付は現れない。次の節で見る仕組みも、受付を置くのではなく、運び込む人が読む札を増やすものである。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li>SQLite で型検査のコードを置ける場所は 1 つしかない。どこか。</li>
+<li>スキーマに INTEGER と書いてあるファイルを渡された。「この列には整数しか入っていない」と言えるか。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> 書き込みを行うプロセスの中。SQLite はライブラリなので、DB を読み書きしているのは常駐プロセスではなく、いま起動したそのプロセス自身である。検査する側と検査される側が同じプロセスにいる。</p>
+<p><b>2.</b> 言えない。宣言は変換の優先傾向であり、変換できなかった値はそのままの型で格納される。何が入っているかを知るには、スキーマではなく値を <code>typeof()</code> で見る。</p>
+</details></div>
+
+<h2 id="strict">STRICT — 同じファイルの中に、厳しいテーブルを作る</h2>
+<div class="sgoal"><b>この節で分かること</b>: STRICT を付けたテーブルで何が変わり、何が変わらないか。</div>
+<p>CREATE TABLE の末尾に STRICT を付けると、変換できない値は INSERT の時点でエラーになる。</p>
+
+<pre><code>$ sqlite3 t2.db 'CREATE TABLE tight(n INTEGER) STRICT;'
+[exit 0]
+$ sqlite3 t2.db 'INSERT INTO tight VALUES("abc");'
+Error: stepping, cannot store TEXT value in INTEGER column tight.n (19)
+[exit 19]</code></pre>
+
+<p><code>cannot store TEXT value in INTEGER column</code> という趣旨のメッセージが出る（文言は環境で変わる）。終了コードも <code>[exit 0]</code> ではなく <code>[exit 19]</code> になっている。第1節でまったく同じ値を <code>loose</code> に入れたときは <code>[exit 0]</code> だった。違いはテーブルの作り方だけである。</p>
+
+<p>ここで見落としてはいけないのは、<code>loose</code> と <code>tight</code> が<b>同じ t2.db の中にある</b>ことである。STRICT は DB ファイル全体の設定ではない。CREATE TABLE ごとに付ける宣言で、効く範囲はそのテーブルだけである。</p>
+
+<p>宣言と合う値は、STRICT でも当然そのまま入る。</p>
+
+<pre><code>$ sqlite3 t2.db 'INSERT INTO tight VALUES(7); SELECT n, typeof(n) FROM tight;'
+7|integer
+[exit 0]</code></pre>
+
+<p>そして <code>[exit 19]</code> を返したのは、サーバではない。<code>sqlite3</code> を起動したそのプロセスである。STRICT は倉庫の外に関門を置く仕組みではなく、<b>書き込む側のライブラリが従う規則を、そのテーブルに結び付ける</b>仕組みである。検査する側と検査される側が同じプロセスにいるという構造は、STRICT を付けても変わらない。変わるのは、そのプロセスが自分の書き込みを止めるかどうかである。</p>
+
+<div class="analogy"><b>たとえ</b>: STRICT は棚 1 本ごとに貼る「この棚には決まった物だけ」という<b>札</b>である。札があるので運び込む人は自分で判断して持ち帰る。
+<br>ただし<b>崩れる点</b>: 札は棚ごとであって、倉庫の入口の掲示ではない。実測どおり、隣の <code>loose</code> には何の効果もない。同じファイルを開いたのだから全体に効く、と考えると外す。</div>
+
+<div class="note try">対応する演習は <code>lab start 02</code>。判定は <code>lab check 02</code>。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>tight</code> を STRICT で作った。これで <code>loose</code> への文字列 INSERT はどうなるか。</li>
+<li><code>INSERT INTO tight VALUES("abc")</code> の失敗を判定したのは、どのプロセスか。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> 何も変わらない。同じ t2.db の中にあっても別のテーブルであり、STRICT はテーブルごとの宣言である。<code>loose</code> への INSERT は引き続き <code>[exit 0]</code> で通り、値は typeof で text のまま見える。</p>
+<p><b>2.</b> <code>sqlite3</code> コマンドを起動したそのプロセス自身。常駐しているサーバが拒否したのではなく、プロセス内のライブラリが自分の書き込みを止めた。だから終了コード 19 はそのプロセスから返る。</p>
+</details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>ふつうに作ったテーブルでは、列の型宣言は INSERT を止めない。型は値ごとに付き、同じ列に integer と text が同居しうる</li>
+<li>INTEGER affinity は「変換できるなら変換し、できないならそのまま格納する」。<code>"123"</code> は integer になり、<code>"abc"</code> は text のまま残る。この非対称が type affinity の正体である</li>
+<li>スキーマの宣言からファイルの中身は分からない。確かめたいときは <code>typeof()</code> で値ごとに見る</li>
+<li>宣言どおりに弾かせたいなら CREATE TABLE ごとに STRICT を付ける。効く範囲はそのテーブルだけで、同じファイルの隣のテーブルには及ばない</li>
+<li>弾いたのはサーバではなく、あなたが起動したプロセスの中のライブラリである</li>
+</ul></div>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/&lt;owner&gt;/lab-sqlite:1.0.0 / Ubuntu 24.04.5 LTS / sqlite3 3.45.1 / apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
+
+<nav class="pager"><a href="/sqlite/theory/01-file">← 1. これはファイルである</a><a href="/sqlite/theory/03-transaction">次: 3. 書き込みは、まとめると270倍速い →</a></nav>
+<footer><a href="/sqlite/">実践編</a> · <a href="/sqlite/theory/">理論編 目次</a></footer>
+</div>
+<script src="/sqlite/chapters.js"></script>
+<script src="/sqlite/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+</body></html>

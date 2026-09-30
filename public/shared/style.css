@@ -1,0 +1,132 @@
+:root{
+  --bg:#fbfbfa; --fg:#1f2328; --muted:#5b6570; --line:#e3e5e8;
+  --card:#ffffff; --code-bg:#f4f5f7; --accent:#2f6feb; --warn:#b3541e; --ok:#1a7f37;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16181d; --fg:#e6e6e6; --muted:#9aa4b2; --line:#2b2f36;
+    --card:#1c1f26; --code-bg:#11131a; --accent:#7aa2f7; --warn:#e0af68; --ok:#9ece6a;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16181d; --fg:#e6e6e6; --muted:#9aa4b2; --line:#2b2f36;
+  --card:#1c1f26; --code-bg:#11131a; --accent:#7aa2f7; --warn:#e0af68; --ok:#9ece6a;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;line-height:1.75}
+.wrap{max-width:900px;margin:0 auto;padding:2rem 1.25rem 6rem}
+h1{font-size:1.85rem;line-height:1.3;margin:0 0 .4rem}
+h2{font-size:1.28rem;margin:3rem 0 .75rem;padding-bottom:.4rem;border-bottom:1px solid var(--line)}
+h3{font-size:1.04rem;margin:2rem 0 .5rem}
+h4{font-size:.95rem;margin:1.4rem 0 .4rem;color:var(--muted)}
+.lead{color:var(--muted);margin:0 0 1.5rem}
+code{font-family:var(--mono);font-size:.875em;background:var(--code-bg);padding:.15em .4em;border-radius:4px}
+pre{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:.9rem 1rem;
+  overflow-x:auto;font-family:var(--mono);font-size:.8rem;line-height:1.55;position:relative}
+pre code{background:none;padding:0;font-size:inherit}
+pre.wire{font-size:.74rem;line-height:1.5}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem 1.15rem;margin:1rem 0}
+.card h3{margin-top:0}
+table{border-collapse:collapse;width:100%;font-size:.86rem;margin:1rem 0}
+th,td{border:1px solid var(--line);padding:.4rem .55rem;text-align:left;vertical-align:top}
+th{background:var(--code-bg);font-weight:600}
+td code{font-size:.82em}
+.scroll{overflow-x:auto}
+.note{border-left:3px solid var(--accent);padding:.6rem .9rem;background:var(--code-bg);border-radius:0 6px 6px 0;margin:1rem 0}
+.note.warn{border-left-color:var(--warn)}
+.note.try{border-left-color:var(--ok)}
+.note.try::before{content:"▶ 実践編でやる ";font-weight:600;color:var(--ok)}
+nav.top{font-size:.85rem;margin-bottom:1.5rem;color:var(--muted)}
+nav.top a{margin-right:.3rem}
+nav.pager{display:flex;justify-content:space-between;gap:1rem;margin-top:3rem;padding-top:1.2rem;border-top:1px solid var(--line);font-size:.9rem}
+.toc{display:grid;gap:.75rem;margin:1.5rem 0}
+.toc a{display:block;padding:.85rem 1rem;border:1px solid var(--line);border-radius:9px;background:var(--card);
+  text-decoration:none;color:var(--fg)}
+.toc a:hover{border-color:var(--accent)}
+.toc b{display:block;color:var(--accent);font-size:.95rem}
+.toc span{color:var(--muted);font-size:.85rem}
+.tag{display:inline-block;font-size:.7rem;font-family:var(--mono);padding:.08rem .45rem;border-radius:999px;
+  border:1px solid var(--line);color:var(--muted);margin-right:.3rem;vertical-align:.12em}
+.tag.real{color:var(--ok);border-color:var(--ok)}
+footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+a{color:var(--accent)}
+button.copy{position:absolute;top:.5rem;right:.5rem;font-size:.7rem;font-family:var(--mono);
+  background:var(--card);color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:.2rem .5rem;cursor:pointer}
+button.copy:hover{color:var(--fg);border-color:var(--accent)}
+.cages{font-family:var(--mono);font-size:.78rem;white-space:pre;overflow-x:auto;
+  background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:1rem}
+
+/* ===== 理論編: 進捗表示 ===== */
+.progress{position:fixed;top:0;left:0;right:0;height:3px;background:var(--line);z-index:50}
+.progress > i{display:block;height:100%;width:0;background:var(--accent);transition:width .12s linear}
+.chapnav{margin:0 0 1.5rem;padding:.75rem .9rem;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.chapnav .meter{display:flex;align-items:center;gap:.6rem;font-size:.8rem;color:var(--muted);margin-bottom:.55rem}
+.chapnav .meter .track{flex:1;height:6px;border-radius:99px;background:var(--code-bg);overflow:hidden}
+.chapnav .meter .track i{display:block;height:100%;background:var(--accent)}
+.chapnav ol{display:flex;flex-wrap:wrap;gap:.3rem;list-style:none;margin:0;padding:0;font-size:.76rem}
+.chapnav li a{display:inline-block;padding:.12rem .5rem;border:1px solid var(--line);border-radius:99px;
+  text-decoration:none;color:var(--muted);white-space:nowrap}
+.chapnav li.done a{color:var(--ok);border-color:var(--ok)}
+.chapnav li.cur a{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.chapnav li a:hover{border-color:var(--accent);color:var(--fg)}
+
+/* ===== 理論編: 目標・確認問題・用語リンク ===== */
+.goal{border:1px solid var(--accent);border-radius:10px;padding:.9rem 1.1rem;margin:1.2rem 0;background:var(--card)}
+.goal h4{margin:0 0 .5rem;color:var(--accent);font-size:.9rem}
+.goal ul{margin:.3rem 0 0;padding-left:1.2rem}
+.goal li{margin:.15rem 0}
+.goal .skip{margin-top:.6rem;padding-top:.6rem;border-top:1px dashed var(--line);color:var(--muted);font-size:.85rem}
+.sgoal{font-size:.88rem;color:var(--muted);border-left:3px solid var(--line);padding:.35rem .8rem;margin:.6rem 0 1rem}
+.sgoal b{color:var(--fg)}
+.quiz{border:1px solid var(--line);border-left:3px solid var(--ok);border-radius:0 9px 9px 0;
+  padding:.85rem 1.1rem;margin:1.5rem 0;background:var(--card)}
+.quiz h4{margin:0 0 .5rem;color:var(--ok);font-size:.88rem}
+.quiz ol{margin:.3rem 0;padding-left:1.3rem}
+.quiz li{margin:.4rem 0}
+.quiz details{margin-top:.7rem;border-top:1px dashed var(--line);padding-top:.6rem}
+.quiz summary{cursor:pointer;color:var(--muted);font-size:.85rem}
+.quiz details p{margin:.5rem 0;font-size:.9rem}
+.analogy{background:var(--code-bg);border-radius:9px;padding:.8rem 1rem;margin:1rem 0;font-size:.93rem}
+.analogy b{color:var(--accent)}
+a.term{color:inherit;text-decoration:none;border-bottom:1px dotted var(--accent);cursor:help}
+a.term:hover{color:var(--accent);border-bottom-style:solid}
+
+/* ===== 辞書ページ ===== */
+.gsearch{width:100%;padding:.6rem .8rem;font-size:1rem;border:1px solid var(--line);border-radius:9px;
+  background:var(--card);color:var(--fg);margin:1rem 0}
+.gindex{display:flex;flex-wrap:wrap;gap:.3rem;margin:.5rem 0 1.5rem;font-size:.8rem}
+.gindex a{padding:.15rem .55rem;border:1px solid var(--line);border-radius:99px;text-decoration:none}
+.gitem{border-bottom:1px solid var(--line);padding:.9rem 0}
+.gitem h3{margin:0 0 .3rem;font-size:1rem;scroll-margin-top:4rem}
+.gitem h3 small{color:var(--muted);font-weight:400;font-size:.8rem;margin-left:.4rem}
+.gitem p{margin:.2rem 0;font-size:.92rem}
+.gitem .where{font-size:.8rem;color:var(--muted);margin-top:.35rem}
+.gitem:target{background:var(--code-bg);border-radius:8px;padding:.9rem .8rem;margin:0 -.8rem}
+
+/* ===== 新設: ふつうこう考える → だめな理由（苦C のつまずき先回り） ===== */
+.naive{border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:0 9px 9px 0;
+  padding:.85rem 1.1rem;margin:1.5rem 0;background:var(--card)}
+.naive h4{margin:0 0 .5rem;color:var(--warn);font-size:.88rem}
+.naive h4::before{content:"↯ "}
+.naive .then{margin-top:.6rem;padding-top:.6rem;border-top:1px dashed var(--line)}
+.naive .then b{color:var(--ok)}
+/* 検証環境ブロック */
+.verified{font-family:var(--mono);font-size:.74rem;color:var(--muted);background:var(--code-bg);
+  border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:1rem 0;overflow-x:auto}
+.verified b{color:var(--fg)}
+/* バッジ行 */
+.badges{display:flex;flex-wrap:wrap;gap:.4rem;margin:.2rem 0 1.2rem;font-size:.75rem}
+.badges span{font-family:var(--mono);padding:.1rem .5rem;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
+.badges span.impact-a{color:var(--ok);border-color:var(--ok)}
+/* 影響度 B（使い捨て環境の中だけ）。A は ok 色、B は既定色、C は warn 色にする */
+.badges span.impact-b{color:var(--accent);border-color:var(--accent)}
+.badges span.impact-c{color:var(--warn);border-color:var(--warn)}
+/* 入口ページ: 読者への約束を最上段に置く */
+.promise{border:2px solid var(--ok);border-radius:10px;padding:1rem 1.2rem;margin:1.5rem 0;background:var(--card)}
+.promise h4{margin:0 0 .5rem;color:var(--ok);font-size:.95rem}
+.promise p{margin:.4rem 0;font-size:.93rem}
+.notfor{border:1px solid var(--line);border-left:3px solid var(--muted);border-radius:0 9px 9px 0;
+  padding:.8rem 1.1rem;margin:1.2rem 0;font-size:.9rem;color:var(--muted)}
+.notfor b{color:var(--fg)}

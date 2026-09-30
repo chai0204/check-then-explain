@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. これはファイルである — 壊して覚える SQLite</title>
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-ch="1" data-theme="sqlite">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/sqlite/theory/">理論編</a> › 第1章</nav>
+
+<h1>1. これはファイルである</h1>
+<p class="lead">SQLite のデータベースは、ディスクの上にある1個のファイルである。
+この章では、そのファイルの先頭16バイトと、プロセス一覧という2箇所から、それを目で確かめる。</p>
+
+<div class="badges"><span>前提: sqlite3 が打てる・ls が読める・ps を見たことがある</span><span>所要 12分</span><span class="impact-a">影響度 A</span><span>最終検証 2026-09-30</span></div>
+
+<div class="goal"><h4>この章のゴール</h4><ul>
+<li>データベースがファイル1個であることを、ヘッダのバイト列で示せる</li>
+<li>データを預かる常駐プロセスが存在しないことを、プロセス一覧で示せる</li>
+<li>サーバが無いことが何を楽にし、何を難しくするかを言える</li>
+</ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>:
+B-tree のページがどう連結されているかは要らない。この章で使うのは「ページという単位がある」という事実だけである。
+ヘッダ100バイトの全フィールドも要らない。読むのは先頭16バイトと、<code>file</code> が拾ってくる2項目だけである。
+<code>VACUUM</code> が内部で何をするかも要らない。「ファイルを詰め直す操作がある」で先に進める。</div></div>
+
+<h2 id="file">「データベースを作る」はファイルを作ることである</h2>
+<div class="sgoal"><b>この節で分かること</b>: 表を1つ作ると、ディスクに何が増えるのか</div>
+
+<p>表を作って1行入れる。その前に立ち上げるサービスは無い。
+<code>sqlite3</code> に渡す引数はホスト名でもポート番号でもなく、<strong>パス</strong>である。</p>
+
+<pre><code>$ sqlite3 notes.db 'CREATE TABLE notes(id INTEGER PRIMARY KEY, body TEXT); INSERT INTO notes(body) VALUES("hello");'
+$ ls -la notes.db
+-rw-r--r-- 1 lab lab 8192 Sep 30 19:07 notes.db</code></pre>
+
+<p>増えたのは <code>notes.db</code> という1ファイルである。所有者と権限が付いている。
+つまりこのデータベースに対するアクセス制御は、いま画面に出ている <code>-rw-r--r-- 1 lab lab</code> がそのまま担っている。</p>
+
+<p>次に、そのファイルが何であるかを <code>file</code> に聞く。</p>
+
+<pre><code>$ file notes.db
+notes.db: SQLite 3.x database, last written using SQLite version 3045001, file counter 2, database pages 2, cookie 0x1, schema 4, UTF-8, version-valid-for 2</code></pre>
+
+<p>ここから2つだけ読む。<code>database pages 2</code> と、ファイルサイズ 8192 バイトである。
+割ると 1 ページ 4096 バイトになる。1行しか入れていないのにファイルが 8192 バイトあるのは、
+<strong>確保の単位がバイトではなくページだから</strong>である。残りのフィールドはこの章では読まない。</p>
+
+<div class="analogy"><b>たとえ</b>: 一冊のノート。<code>sqlite3 notes.db</code> の引数は「どのサーバに繋ぐか」ではなく「棚のどこにそのノートがあるか」である。
+<br>ただし<b>崩れる点</b>: ノートは書いた分だけ埋まっていくが、このファイルは1行書いた時点で 8192 バイトある。
+大きさは書いた文字数ではなくページ数で決まっていて、紙のノートのように「使った分」とは対応しない。</div>
+
+<h2 id="header">先頭16バイトに書名が書いてある</h2>
+<div class="sgoal"><b>この節で分かること</b>: このファイルが SQLite のものだと、どこを見て判断されているのか</div>
+
+<p>先頭16バイトを16進で見る。暗号化も圧縮もされていないので、文字がそのまま読める。</p>
+
+<pre class="wire"><code><span class="tag real">実測</span>
+$ xxd -l 16 notes.db
+00000000: 5351 4c69 7465 2066 6f72 6d61 7420 3300  SQLite format 3.
+          │                                  │ └ 16バイト目 0x00 が終端
+          │                                  └ 0x33 = 文字 '3'
+          └ 0x53 0x51 0x4c 0x69 … = S Q L i …（ASCII）
+</code></pre>
+
+<p>右端の <code>SQLite format 3.</code> は xxd が同じ16バイトを ASCII として並べ直したものである。
+末尾のドットは表示できない <code>0x00</code> の代わりに置かれた記号で、ピリオドという文字が入っているわけではない。
+<code>file</code> がこのファイルを「SQLite 3.x database」と言い当てられたのは、この並びを見たからである。</p>
+
+<p>さきほどの <code>file</code> の出力には <code>last written using SQLite version 3045001</code> があった。
+3桁ずつ区切ると 3 / 045 / 001 になる。手元の版を聞くとこうなる。</p>
+
+<pre><code>$ sqlite3 --version
+3.45.1 2024-01-30 16:01:20 e876e51a0ed5c5b3126f52e532044363a014bc594cfefa87ffb5b82257ccalt1 (64-bit)</code></pre>
+
+<p>3.45.1 と一致する。<strong>ファイルの中に、最後に書き込んだライブラリの版が刻まれている</strong>。
+書いた主体がファイルに署名を残しているわけで、この時点ですでに「誰が書いたのか」の答えが常駐プロセスではないことが見えている。</p>
+
+<div class="analogy"><b>たとえ</b>: この16バイトは<b>背表紙の書名</b>である。中を1ページも読まずに、何の本かが分かる。
+<br>ただし<b>崩れる点</b>: 本は背表紙が剥がれていても読める。この16バイトは飾りではなく判定に使われるので、
+違っているとライブラリはそのファイルをデータベースとして扱わない。次の節でそれを実際に起こす。</div>
+
+<h2 id="noserver">プロセス一覧にデータベースがいない</h2>
+<div class="sgoal"><b>この節で分かること</b>: いま SELECT を実行しているのは誰のプロセスか</div>
+
+<p>サーバ型のデータベースなら、ここに常駐プロセスの行が並ぶ。その行が接続先である。数えてみる。</p>
+
+<pre><code>$ ps -ef | grep -c "[s]qlite"
+1</code></pre>
+
+<p>1 である。この 1 は、いま打ったこの検査そのもののコマンドラインが数えられたものであって、
+データを預かって待っているプロセスではない。<strong>データベースのために常駐しているプロセスは1つも無い</strong>。</p>
+
+<p>では前の節の <code>CREATE TABLE</code> と <code>INSERT</code> は誰が実行したのか。
+<code>sqlite3</code> というコマンドを起動したそのプロセス自身である。SQLite はライブラリで、
+呼び出した側のプロセスの中で動き、ファイルを直接読み書きして、終われば消える。
+待ち受けている相手がいないので、接続という段階そのものが存在しない。</p>
+
+<div class="analogy"><b>たとえ</b>: <b>レストランと自炊</b>の違いである。サーバ型は厨房に注文を出し、厨房が作る。
+SQLite は自分の手で作る。だから厨房にあたるプロセスが <code>ps</code> に出てこない。
+<br>ただし<b>崩れる点</b>: 厨房が無いことは、何人でも同時に料理できることを意味しない。
+台所は1つで、そこに置いてあるノートも1冊である。この制約は後の章で扱う。</div>
+
+<div class="note try">対応する演習は <code>lab start 01</code>。判定は <code>lab check 01</code>。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>file notes.db</code> が「SQLite 3.x database」と答えた。これでファイルの中身が壊れていないと言えるか。</li>
+<li><code>ps</code> にデータベースのプロセスが1行も出ないのに <code>INSERT</code> が成立したのはなぜか。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> 言えない。<code>file</code> が見たのは先頭の並びである。先頭16バイトが揃っていることと、そのあとに続く 8000 バイト余りが筋の通った内容であることは別の話である。次の節で、先頭さえ揃っていない場合ですら操作が通ってしまう例を見る。</p>
+<p><b>2.</b> <code>sqlite3</code> を起動したプロセス自身がファイルを開いて書いたからである。SQLite はライブラリなので、呼び出した側のプロセスの中で動く。実行を頼む相手がいないから、頼み先のプロセスも <code>ps</code> に出ない。</p>
+</details></div>
+
+<h2 id="open">「開けた」は「正しい」ではない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 中身が SQLite のものでなくても通ってしまう操作がある</div>
+
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>手元のファイルが壊れていないかを確かめたい。いちばん手軽なのは、開いて軽いクエリを1本投げてみることだろう。
+通れば正常、エラーが出れば壊れている、という判定である。まず、確実に壊れているファイルを用意して試す。</p>
+<pre><code>$ printf "not a database at all, just text" &gt; broken.db
+$ sqlite3 broken.db 'SELECT 1;'
+1</code></pre>
+<p>中身はただのテキストである。それでも <code>SELECT 1;</code> は <code>1</code> を返して正常終了した。
+同じファイルに整合性検査をかけると、こうなる。</p>
+<pre><code>$ sqlite3 broken.db 'PRAGMA integrity_check;'
+Error: in prepare, file is not a database (26)</code></pre>
+<p><code>file is not a database</code> という趣旨のメッセージ（文言は環境で変わる）が出て、今度は失敗する。</p>
+<div class="then"><b>だめな理由</b>: 軽いクエリが通ったことは、ファイルが読まれた証拠にならない。
+<code>SELECT 1;</code> は表を1つも参照しないので、スキーマもデータページも必要ない。
+必要ないものをライブラリは読まない。開く操作が成功したのではなく、<b>読む理由がまだ発生していなかった</b>だけである。
+一方 <code>PRAGMA integrity_check;</code> は中身を見ないと答えが出せないので、そこで先頭16バイトが
+<code>SQLite format 3</code> で始まっていないことが露見する。エラーが <code>in prepare</code> の段で出ているのは、
+文の準備の時点でもう中身が要る種類の問い合わせだということである。</div></div>
+
+<p>ここが背骨の効くところである。ファイルを掴んだ瞬間に検査をしてくれる常駐プロセスがいないのではなく、
+<strong>「掴む瞬間」そのものが無い</strong>。読むのは呼び出し側のプロセスで、読むのは必要になったときである。
+だから「開けた」という事実が、サーバ型のデータベースで接続が成立したときほどの意味を持たない。</p>
+
+<h2 id="tradeoff">受付が無いと何が楽で、何が難しいか</h2>
+<div class="sgoal"><b>この節で分かること</b>: サーバの不在が、運用のどこを軽くしてどこを重くするか</div>
+
+<p>ここまでで見た事実だけから整理できる。左の列は常駐プロセスがいれば用意されていたもので、右の列がその代わりである。</p>
+
+<div class="scroll"><table>
+<tr><th>サーバがいれば担っていたもの</th><th>SQLite での代わり</th></tr>
+<tr><td>接続先の指定（ホスト名・ポート）</td><td>パス1つ。<code>sqlite3 notes.db</code> の引数がそれである</td></tr>
+<tr><td>使う前に起動しておくこと</td><td>不要。ライブラリは呼ばれた瞬間に動き、終われば消える</td></tr>
+<tr><td>データベース側のユーザとパスワード</td><td>ファイルの所有者と権限（<code>-rw-r--r-- 1 lab lab</code>）</td></tr>
+<tr><td>受け入れ時に中身を検める役</td><td>自分で <code>PRAGMA integrity_check;</code> を呼ぶ</td></tr>
+<tr><td>「いま誰が触っているか」を尋ねる窓口</td><td>無い。<code>ps</code> にも行は出ない</td></tr>
+</table></div>
+
+<p>上3行が楽になったところで、下2行が難しくなったところである。同じ1つの原因から両方が出ている。
+楽さと難しさは別の性質ではなく、<strong>常駐プロセスがいないという1つの事実の裏表</strong>である。</p>
+
+<div class="analogy"><b>たとえ</b>: 図書館の<b>貸出カウンター</b>と、玄関に置いた本棚。カウンターがあれば「いま誰が何を借りているか」を尋ねられる。
+本棚だけなら、尋ねる相手がいない。
+<br>ただし<b>崩れる点</b>: 玄関の本棚は誰が持っていったか一切分からないが、ファイルには所有者と権限がある。
+何も分からないのではなく、<b>OS が知っている範囲だけ分かる</b>。カウンターの仕事がそっくり消えるのではなく、OS に移っている。</div>
+
+<p>残る問いが1つある。調停する相手がいないのなら、2つのプロセスが同じファイルに同時に書こうとしたときに何が起きるのか。
+ファイルの上だけで折り合いを付けることになるはずである。これは後の章で扱う。</p>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li>SQLite の接続情報にホスト名とポート番号が無いのはなぜか。</li>
+<li>同じファイルに対して <code>SELECT 1;</code> は成功し、<code>PRAGMA integrity_check;</code> は失敗した。この差は何を示しているか。</li>
+</ol>
+<details><summary>答え</summary>
+<p><b>1.</b> 接続する相手が存在しないからである。ホスト名とポート番号は「どの機械のどの待ち受けプロセスに繋ぐか」を指すが、SQLite には待ち受けプロセスがない。指す必要があるのは読み書きする対象そのもの、つまりファイルのパスだけである。</p>
+<p><b>2.</b> ライブラリが、その問い合わせに答えるために必要な分しかファイルを読まないことを示している。<code>SELECT 1;</code> は表を参照しないので中身が要らず、<code>PRAGMA integrity_check;</code> は中身が要る。したがって「操作が1つ通った」ことをファイルの健全性の根拠にはできない。健全性を知りたいなら、中身を要求する操作を自分で呼ぶ必要がある。</p>
+</details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>データベースは1ファイルである。<code>ls</code> に1行、先頭16バイトに <code>SQLite format 3</code> が平文で入っている</li>
+<li>データを預かる常駐プロセスは存在しない。<code>ps -ef | grep -c "[s]qlite"</code> が数えた 1 は検査自身の行である</li>
+<li>書き込んだのは <code>sqlite3</code> を起動したプロセス自身で、その版がファイルの中に <code>3045001</code> として残っている</li>
+<li>読むのは必要になったときなので、操作が1つ通ったことはファイルが正しいことの証明にならない</li>
+<li>接続先も起動順もユーザ管理も消えるが、検める役と「いま誰が触っているか」を尋ねる窓口も同時に消える</li>
+</ul></div>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/&lt;owner&gt;/lab-sqlite:1.0.0 / Ubuntu 24.04.5 LTS / sqlite3 3.45.1 / apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
+
+<nav class="pager"><a href="/sqlite/theory/">← 理論編 目次</a><a href="/sqlite/theory/02-affinity">次: 2. 型は宣言ではなく提案 →</a></nav>
+<footer><a href="/">トップ</a> · <a href="/sqlite/theory/">理論編 目次</a></footer>
+</div>
+<script src="/sqlite/chapters.js"></script>
+<script src="/sqlite/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+</body></html>

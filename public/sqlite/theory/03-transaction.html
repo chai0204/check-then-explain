@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. 書き込みは、まとめると270倍速い — 壊して覚える SQLite</title>
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-ch="3" data-theme="sqlite">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/sqlite/theory/">理論編</a> › 第3章</nav>
+
+<h1>3. 書き込みは、まとめると270倍速い</h1>
+<p class="lead">同じ 2000 行の挿入が、12.996 秒と 0.048 秒になる。
+差を作っているのは SQL の書き方ではなく、ディスクの返事を何回待つかであり、その待ちを発生させているのは、いまあなたが起動したプロセス自身である。</p>
+
+<div class="badges"><span>前提: 第1章</span><span>前提: 第2章</span><span>前提: sqlite3 が打てる</span><span>所要 16分</span><span class="impact-a">影響度 A</span><span>最終検証 2026-09-30</span></div>
+
+<div class="goal"><h4>この章のゴール</h4><ul>
+<li><code>BEGIN</code> で囲まないと1行ごとにディスク同期が起きることを、実測の秒数で示せる</li>
+<li>なぜ遅いのかを「誰が <code>fsync</code> を呼んでいるか」で説明できる</li>
+</ul>
+  <div class="skip"><b>ここで覚えなくていいこと</b>: <code>PRAGMA synchronous</code> にどんなモードがあり、どれが何を省くのかは覚えなくていい。
+  WAL をいつどうやってチェックポイントするかも扱わない。
+  OS が「書き終わった」と返した先で、データが物理的にどこまで残る形になっているか（ディスク側のキャッシュ、電源が落ちたときの扱い）も、この章では追わない。
+  押さえるのは<b>コミットの回数が待ちの回数を決める</b>という関係ひとつだけで、モードの選択はその関係が分かったあとの話である。</div></div>
+
+<h2 id="two-runs">同じ 2000 行が、13 秒と 0.05 秒になる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 実測した2つの秒数と、その差が SQL の書き方から来ていないこと。</div>
+
+<p>使うのは、採取時に置いた2つのシェルスクリプトである。
+<code>naive.sh</code> は 2000 行の <code>INSERT</code> 文を <code>sqlite3</code> に流すだけのもの。
+<code>txn.sh</code> は同じ 2000 行の前に <code>BEGIN;</code>、後ろに <code>COMMIT;</code> を足して流すもの。
+違いはこの2行だけである。</p>
+
+<p>先に <code>naive.sh</code> のほうを走らせた記録を見る。
+各コマンドのあとの <code>[exit 0]</code> は採取スクリプトが終了コードを書き足したもので、<code>sqlite3</code> の出力ではない。</p>
+
+<pre><code><span class="tag real">実測</span>
+--- 1行1トランザクション（既定） ---
+$ time bash naive.sh
+
+real	0m12.996s
+user	0m0.078s
+sys	0m0.472s
+[exit 0]
+$ sqlite3 t3a.db 'SELECT count(*) FROM a;'
+2000
+[exit 0]
+</code></pre>
+
+<p>12.996 秒。行数は 2000 で、狙った分だけ入っている。
+次に <code>BEGIN;</code> と <code>COMMIT;</code> を足したほうを走らせる。</p>
+
+<pre><code><span class="tag real">実測</span>
+--- BEGIN...COMMIT で囲む ---
+$ time bash txn.sh
+
+real	0m0.048s
+user	0m0.033s
+sys	0m0.012s
+[exit 0]
+$ sqlite3 t3b.db 'SELECT count(*) FROM b;'
+2000
+[exit 0]
+</code></pre>
+
+<p>0.048 秒。<strong>12.996 を 0.048 で割ると約 270</strong> になる。
+入った行数はどちらも 2000 で同じ。仕事の量は変わっていない。
+変わったのは SQL 2行ぶんだけで、それが 270 倍の差になっている。</p>
+
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>2000 行の挿入に 13 秒かかるなら、重いのは SQL の処理側だろう。
+インデックスが張られていれば1行ごとに索引を更新するので、まずインデックスを落とす。
+それでも遅ければ <code>INSERT</code> の書き方を見直す。
+あるいは逆に、SQLite は軽量だと聞いているので 2000 行で 13 秒は出ないはずで、自分の測り方が間違っている、と考える。</p>
+  <div class="then"><b>だめな理由</b>: 上の記録には、それを否定する行が最初から入っている。
+  <code>user</code> が 0.078 秒、<code>sys</code> が 0.472 秒。合わせて 0.550 秒。
+  13 秒のうち CPU が回ったのは 0.55 秒だけである。
+  SQL の解析にも索引の更新にも CPU を使う。CPU が動いていないなら、そこは律速ではない。
+  落とすべきインデックスを探しても、削れるのは 0.550 秒の内側にすぎない。
+  残りの 12.4 秒でプロセスは何かを待っている。次の節はその 12.4 秒だけを見る。</div></div>
+
+<h2 id="cpu">13 秒のうち 12.4 秒は、CPU が動いていない</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>time</code> が出す3行の読み方と、<code>real</code> から <code>user</code>+<code>sys</code> を引いた残りが何を表すか。</div>
+
+<p><code>time</code> は3行を出す。<code>real</code> は走り始めてから終わるまでの経過時間。
+<code>user</code> はユーザ空間で CPU を使った時間。<code>sys</code> はカーネルの中で CPU を使った時間。
+前者は時計の進みで、後者2つは CPU が回った量である。単位が同じだけの別物なので、引き算には意味がある。</p>
+
+<div class="analogy"><b>たとえ</b>: <code>real</code> は家を出てから帰るまでの時間、<code>user</code> と <code>sys</code> は実際に口を動かして用件を話していた時間にあたる。13 分出かけて 33 秒しか話していなければ、残りは並んでいた時間である。<br>
+ただし<b>崩れる点</b>: 行列の前には他の客がいるが、ここには他の客がいない。窓口は空いている。自分が出した書き込みが落ち切るのを、自分で待つと決めているから待っている。混雑ではなく仕様である。</div>
+
+<div class="scroll"><table>
+<tr><th></th><th>real</th><th>user</th><th>sys</th><th>user+sys</th><th>real −(user+sys)</th></tr>
+<tr><td>BEGIN なし</td><td><code>0m12.996s</code></td><td><code>0m0.078s</code></td><td><code>0m0.472s</code></td><td>0.550 秒</td><td><strong>約 12.4 秒</strong></td></tr>
+<tr><td>BEGIN あり</td><td><code>0m0.048s</code></td><td><code>0m0.033s</code></td><td><code>0m0.012s</code></td><td>0.045 秒</td><td>約 0.003 秒</td></tr>
+</table></div>
+
+<p>読むべきは右端の列である。<code>BEGIN</code> なしでは経過時間の 96 パーセントが CPU を回していない時間で、<code>BEGIN</code> ありではほぼゼロになる。
+速くなった側は「同じ仕事を速く計算した」のではない。<strong>待たなくなっただけである。</strong></p>
+
+<p>厳密には、<code>real</code> から <code>user</code> と <code>sys</code> を引いた残りには、他のプロセスに CPU を譲っていた時間も混ざる。
+ただしその筋はこの記録では立たない。同じ機械で直後に走った <code>txn.sh</code> が 0.048 秒で終わっているので、機械が混んでいたのではない。
+<code>BEGIN</code> なしの側だけが、12.4 秒ぶん何かの完了を待っている。</p>
+
+<p>もう1列、<code>sys</code> も動いている。0.472 秒から 0.012 秒へ落ちている。
+<code>sys</code> はカーネルに頼んだ仕事に使われた CPU である。
+減ったのは SQL の処理ではなく、カーネルへの依頼のほうだった。</p>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>real</code> が 12.996s、<code>user</code>+<code>sys</code> が 0.550 秒のとき、残りの約 12.4 秒間、このプロセスは何をしているか。</li>
+<li>インデックスを落として測り直したら <code>real</code> はどこまで縮むと見積もれるか。上の6つの数字だけから答える。</li>
+</ol>
+  <details><summary>答え</summary>
+  <p><b>1.</b> 待っている。CPU を回さずに、何かの完了を待って止まっている。「処理が重い」と「時間がかかる」は、この2行で切り分けられる。</p>
+  <p><b>2.</b> ほとんど縮まない。索引の更新は CPU を使う仕事なので、削れるのは <code>user</code>+<code>sys</code> の 0.550 秒の内側だけである。12.4 秒には手が届かず、<code>real</code> は 13 秒近くのままになる。</p>
+  </details></div>
+
+<h2 id="who">待っているのは、自分が呼んだ同期の返事</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>BEGIN</code> を書かないと1文ごとにコミットが起き、コミットごとに同期の返事を待つ。その待ちを出しているのは自分のプロセスである。</div>
+
+<p><code>BEGIN</code> を書かなかった SQL 文は、それ単独で1つのトランザクションになる。
+2000 行流したなら、区切りが 2000 個できる。
+区切りのたびに、書いた内容がもう消えない場所まで落ちたという返事を待つ。
+この待ちが 2000 回直列に並んだものが、前節の 12.4 秒である。</p>
+
+<p>ディスクへの同期をカーネルに頼むシステムコールが <code>fsync</code> で、返事が返るまで呼んだ側は止まる。
+前節で <code>sys</code> が減ったのは、この依頼が減ったからである。
+そして <strong><code>fsync</code> を呼んでいるのは常駐サーバではない。</strong>
+<code>sqlite3</code> と打って起動した、そのプロセス自身である。</p>
+
+<p>ここで前提が効いてくる。SQLite にはサーバがない。
+返事を待っているプロセスと、待たせているプロセスが、同じ1つのプロセスである。
+自分でファイルに書き、自分で同期を頼み、自分で返事を待って止まっている。
+<strong>待ち時間を短くしてくれる係が、どこにもいない。</strong></p>
+
+<div class="analogy"><b>たとえ</b>: 1文ずつコミットするのは、手紙を1通出すたびに窓口へ行き、受領印をもらって帰ってくることにあたる。2000 通なら 2000 往復する。<code>BEGIN</code> と <code>COMMIT</code> で囲むのは、2000 通を1つの袋に入れて1回だけ持っていくことにあたる。<br>
+ただし<b>崩れる点</b>: 窓口の人は他人だが、ここには他人がいない。往復しているのは自分の足で、窓口に座っているのも自分である。他人が遅いのではなく、自分が 2000 回歩いている。</div>
+
+<div class="analogy"><b>たとえ</b>: コミットは、書いた紙を机に置くことではなく、金庫に入れて扉を閉め、閉まったことを確かめてから手を離すことにあたる。扉が閉まるまで次に進まないと決めているぶんだけ時間がかかる。<br>
+ただし<b>崩れる点</b>: 金庫の扉が閉まったかは目で見えるが、ディスクの内側は見えない。見えるのは OS が「終わった」と返したところまでで、その返事の先でデータが物理的にどこまで残る形になっているかは、この章では追わない。</div>
+
+<p>常駐プロセスがいる作りなら、複数の書き込みを束ねる判断をその常駐プロセスに置くことができる。
+SQLite にはその置き場所がない。束ねるかどうかを決める場所は1つだけで、あなたが流す SQL の中である。
+<code>BEGIN</code> はそのための語で、<strong>設定を変えているのではなく、自分のプロセスに「まだ待つな」と伝えている</strong>。</p>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li><code>BEGIN</code> を書かずに 2000 行流したとき、トランザクションはいくつ作られるか。</li>
+<li><code>naive.sh</code> と <code>txn.sh</code> は、終わったあとの行数がどちらも 2000 だった。この一致は、この章の主張にとってなぜ必要か。</li>
+</ol>
+  <details><summary>答え</summary>
+  <p><b>1.</b> 2000 個。文が単独でトランザクションになるので、行数と同じ数になる。区切りの数が待ちの数になる。</p>
+  <p><b>2.</b> 速いほうが手を抜いていない、という確認になるからである。「同じ仕事が 270 分の1の時間で終わった」と言えるのは、両方が 2000 行を入れ終えているときだけ。片方が 1500 行しか入れていなければ、秒数を並べても比較にならない。速さを比べる前に、結果が同じであることを先に見る。</p>
+  </details></div>
+
+<h2 id="begin">BEGIN は書式ではなく、待つ回数の宣言</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じ 2000 文でも、囲むと待ちが 2000 回から1回になる。囲む単位を決めるのは流す側である。</div>
+
+<p>数字の出どころは割れた。残るのは、この差をどう使うかである。
+結論は単純で、<strong>まとめて書けるものはまとめて囲む</strong>。2000 行を1つの <code>BEGIN</code> で囲めば、待ちは1回になる。</p>
+
+<p>1回のコミットで同期が何回起きるかは、SQLite が journal をどう扱うかによって変わる。この章ではそこを数えない。
+数えなくても結論は動かない。<strong>コミットの数が待ちの数を決める</strong>ので、コミットを 2000 から1にすれば待ちは減る。</p>
+
+<div class="analogy"><b>たとえ</b>: <code>BEGIN</code> と <code>COMMIT</code> は SQL に付ける括弧にあたる。中の 2000 文が1つのまとまりとして扱われる。<br>
+ただし<b>崩れる点</b>: 括弧はふつう読みやすさのための記法で、付けても実行されるものは変わらない。この括弧は違う。付けた瞬間に、ディスクの返事を待つ回数が 2000 から1に変わる。見た目の整理ではなく、実行される待ちの回数を書き換えている。</div>
+
+<p>逆から読むと、囲む範囲の決め方がそのまま速さの決め方になる。
+2000 行を1つに囲めば待ちは1回、200 行ずつ10個に囲めば10回、囲まなければ 2000 回。
+後ろの2つは上の記録から測ったものではなく、コミットの数が待ちの数を決めるという読みからの帰結である。
+どこで区切るかを SQLite は決めない。<strong>流す側が書いた <code>BEGIN</code> の位置が、そのまま待ちの回数になる。</strong></p>
+
+<div class="note try">対応する演習は <code>lab start 03</code>。判定は <code>lab check 03</code>。
+<code>naive.sh</code> と <code>txn.sh</code> は演習の中に置いてある。
+手元の <code>real</code> は機械によって変わるが、<code>real</code> と <code>user</code>+<code>sys</code> の差が <code>BEGIN</code> の有無で消えることは変わらない。そこを見る。</div>
+
+<div class="quiz"><h4>確認問題</h4><ol>
+<li>2000 行を1つの <code>BEGIN</code> で囲んだときと、200 行ずつ10個に分けて囲んだときで、同期の待ちは何回ずつになるか。</li>
+<li><code>BEGIN</code> を足したのに <code>real</code> がほとんど縮まなかった、という報告を受けた。<code>time</code> の3行のどこを最初に見るか。</li>
+</ol>
+  <details><summary>答え</summary>
+  <p><b>1.</b> 1回と10回。コミットの数がそのまま待ちの数になる。</p>
+  <p><b>2.</b> <code>user</code> と <code>sys</code> を見て、<code>real</code> との差が消えているかを確かめる。差が消えていれば待ちは無くなっていて、残っているのは CPU の仕事である（それ以上は縮まないのが正しい）。差がまだ大きければ待ちが残っているので、囲んだつもりの範囲が実際には囲めていない可能性を疑う。</p>
+  </details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>同じ 2000 行の挿入が 12.996 秒と 0.048 秒になる。違いは <code>BEGIN;</code> と <code>COMMIT;</code> の2行だけで、約 270 倍。</li>
+<li>遅い側の 13 秒のうち CPU が回ったのは 0.550 秒。残りの約 12.4 秒は待ち時間で、SQL やインデックスを直しても届かない。</li>
+<li><code>BEGIN</code> を書かない文は1文で1トランザクションになり、区切りごとに同期の返事を待つ。待ちの回数はコミットの回数で決まる。</li>
+<li>待たせているのも待っているのも、同じ1つのプロセスである。束ねてくれる常駐プロセスはいない。束ねる位置を決めるのは、流す SQL の中の <code>BEGIN</code> である。</li>
+</ul></div>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/&lt;owner&gt;/lab-sqlite:1.0.0 / Ubuntu 24.04.5 LTS / sqlite3 3.45.1 / apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
+
+<nav class="pager"><a href="/sqlite/theory/02-affinity">← 2. 型は宣言ではなく提案</a><a href="/sqlite/theory/04-lock">次: 4. 同時に書けるのは1人だけ →</a></nav>
+<footer><a href="/">トップ</a> · <a href="/sqlite/theory/">理論編 目次</a></footer>
+</div>
+<script src="/sqlite/chapters.js"></script>
+<script src="/sqlite/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+</body></html>
