@@ -40,17 +40,20 @@ lab start 04 >/dev/null
   cd ~/work/04 || exit 1
   sqlite3 lock.db 'CREATE TABLE t(n INTEGER);'
   echo "既定の journal_mode: $(sqlite3 lock.db 'PRAGMA journal_mode;')"
-  ./hold.sh lock.db 6 &
-  sleep 1
+  ./hold.sh lock.db 6
   sqlite3 lock.db 'INSERT INTO t VALUES(1);' >> observed.txt 2>&1
   sqlite3 lock.db 'SELECT count(*) FROM t;'  >> observed.txt 2>&1
-  wait
+  # 解放を待つ。journal_mode の変更は排他ロックを要求するので、
+  # 保持中に打つと database is locked で失敗する。
+  # hold.sh の子は呼び出し側のジョブに入らないため wait では待てない。
+  sleep 7
+
   echo "WAL へ変更: $(sqlite3 lock.db 'PRAGMA journal_mode=WAL;')"
-  ./hold.sh lock.db 6 &
-  sleep 1
+  ./hold.sh lock.db 6
   sqlite3 lock.db 'INSERT INTO t VALUES(2);' >> observed.txt 2>&1
   sqlite3 lock.db 'SELECT count(*) FROM t;'  >> observed.txt 2>&1
-  wait
+  sleep 7
+
   echo "--- observed.txt ---"; cat observed.txt
 )
 lab check 04 || fail=1

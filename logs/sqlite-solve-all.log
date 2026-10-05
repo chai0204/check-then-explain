@@ -17,22 +17,22 @@ Error: stepping, cannot store TEXT value in INTEGER column tight.n (19)
          tight は STRICT で定義されており、text 型の行は 0 件
 
 ########## 03 同じ2000行を、2通りの速さで入れる ##########
-naive=13.00
-txn=0.02
+naive=12.84
+txn=0.01
 ✔ 03 達成
   判定 : 観測型（両テーブルの行数）＋痕跡型（あなたが測った秒数の記録）
   観測 : a=2000行 / b=2000行 で同じ結果になっている
-         naive=13.00秒  txn=0.02秒  → 約 650 倍の差
+         naive=12.84秒  txn=0.01秒  → 約 1284 倍の差
          （著者の環境では 12.996 秒 → 0.048 秒 ＝ 約270倍でした）
 
 ########## 04 2人で同時に書こうとする ##########
 既定の journal_mode: delete
 [hold] lock.db にトランザクションを開きました。6 秒間そのままにします。
-[hold] いま別のコマンドで書き込みを試してください。
+[hold] いま書き込みを試してください（この時点でロックは効いています）。
 [hold] コミットして解放しました。
 WAL へ変更: wal
 [hold] lock.db にトランザクションを開きました。6 秒間そのままにします。
-[hold] いま別のコマンドで書き込みを試してください。
+[hold] いま書き込みを試してください（この時点でロックは効いています）。
 [hold] コミットして解放しました。
 --- observed.txt ---
 Error: stepping, database is locked (5)
@@ -46,10 +46,10 @@ Error: stepping, database is locked (5)
          2箇所以上あるので、WAL にしても書き込みが排他であることを自分で確かめられています
 
 ########## 05 書ける権限があるのに、書けない ##########
-drwxr-xr-x 2 lab lab 4096 Sep 30 19:33 sub
--rw-r--r-- 1 lab lab 8192 Sep 30 19:33 sub/d.db
-dr-xr-xr-x 2 lab lab 4096 Sep 30 19:33 sub
--rw-r--r-- 1 lab lab 8192 Sep 30 19:33 sub/d.db
+drwxr-xr-x 2 lab lab 4096 Oct  5 22:24 sub
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:24 sub/d.db
+dr-xr-xr-x 2 lab lab 4096 Oct  5 22:24 sub
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:24 sub/d.db
 --- observed.txt ---
 Error: stepping, attempt to write a readonly database (8)
 1

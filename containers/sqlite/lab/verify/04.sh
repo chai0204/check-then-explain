@@ -22,8 +22,15 @@ mode=$(sqlite3 "$DB" "PRAGMA journal_mode;" 2>/dev/null)
 [ -s "$OBS" ] || { echo "観測 : $OBS が空、または存在しない"; exit 1; }
 grep -qi 'database is locked' "$OBS" || {
   echo "観測 : $OBS に 'database is locked' が見つからない"
-  echo "       貼られている内容の先頭: $(head -c 150 "$OBS" | tr '\n' ' ')"
-  echo "       （hold.sh が動いている15秒の「あいだに」書き込みを試す必要があります）"
+  echo "       記録されている内容: $(head -c 150 "$OBS" | tr '\n' ' ')"
+  # 「エラーが無い」だけだと原因が分からないので、
+  # 書き込みが通ってしまった可能性を観測事実として示す。
+  if ! grep -qiE 'error' "$OBS"; then
+    echo "       エラーが1行もありません。SQLite は成功した INSERT には何も出力しないので、"
+    echo "       書き込みが通った場合も observed.txt は空に近くなります"
+  fi
+  rows=$(sqlite3 "$DB" "SELECT count(*) FROM t;" 2>/dev/null)
+  echo "       いまの t の行数: ${rows}（hold.sh が入れる 999 を含みます）"
   exit 1
 }
 
