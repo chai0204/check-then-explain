@@ -102,6 +102,27 @@ SQLite は自分の手で作る。だから厨房にあたるプロセスが <co
 
 <div class="note try">対応する演習は <code>lab start 01</code>。判定は <code>lab check 01</code>。</div>
 
+<div class="note warn"><b>詰まったら: <code>unable to open database file</code> が出る場合</b><br>
+<pre><code>$ sqlite3 notes.db 'CREATE TABLE notes(id INTEGER PRIMARY KEY, body TEXT);'
+Error: unable to open database "notes.db": unable to open database file</code></pre>
+このメッセージは「ファイルが開けない」と言うが、原因はたいてい
+<b>いまいるディレクトリに書き込めないこと</b>である。<code>pwd</code> と
+<code>ls -ld .</code> を打って、自分に <code>w</code> が付いているか確かめる。
+演習なら <code>cd ~/work/01</code> が先に要る。
+<br><br>
+なぜディレクトリの権限が関係するのか。SQLite は書き込みのとき
+<b>DB ファイルの隣にもう1つファイルを作る</b>。新しい名前を作る操作は
+ファイルへの書き込みではなく<b>ディレクトリへの書き込み</b>なので、
+DB ファイル側の権限だけでは足りない。
+<br><br>
+なお <code>sqlite3</code> を引数なしで打つとプロンプトは出る。これは
+<b>メモリ上の一時データベース</b>を開いていて、ファイルを作らないからである。
+「プロンプトは出るのにファイルを指定すると失敗する」は、この切り分けに使える。
+<br><br>
+<b>メッセージが指すものと実際の原因が食い違う</b>この現象は、
+<a href="/sqlite/theory/05-directory">第5章</a>の主題そのものである。
+ここで踏んだなら、第5章は半分終わっている。</div>
+
 <div class="quiz"><h4>確認問題</h4><ol>
 <li><code>file notes.db</code> が「SQLite 3.x database」と答えた。これでファイルの中身が壊れていないと言えるか。</li>
 <li><code>ps</code> にデータベースのプロセスが1行も出ないのに <code>INSERT</code> が成立したのはなぜか。</li>

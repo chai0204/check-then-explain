@@ -111,10 +111,13 @@ cmd_start() {
     cp -rn "$seed/." "$WORK/$n/" 2>/dev/null || true
     chmod -R u+w "$WORK/$n" 2>/dev/null || true
     printf '%s\n' "${c_d}作業ファイルを ~/work/$n に展開しました（$(ls -A "$seed" | tr '\n' ' ')）${c_0}"
-  else
-    printf '%s\n' "${c_d}作業場所: ~/work/$n${c_0}"
   fi
   printf '\n'; cat "$task"; printf '\n'
+  # 課題文の後に、移動するコマンドをそのまま打てる形で出す。
+  # これを出していなかったとき、読者が書き込めないディレクトリ（/home 等）のまま
+  # 作業を始めて `unable to open database file` で詰まった。
+  printf '%s\n' "${c_b}▶ 次はこれを打ってください${c_0}"
+  printf '%s\n\n' "    cd ~/work/$n"
 }
 
 cmd_check() {

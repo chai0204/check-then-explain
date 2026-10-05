@@ -14,6 +14,14 @@ if [ ! -f "$DB" ]; then
   else
     echo "       ~/work/01 そのものが無い（lab start 01 で作られます）"
   fi
+  # 別の書ける場所で作ってしまった場合に、そこを教える。
+  # （/home のような書けない場所で試した場合はファイル自体が無いので何も出ない）
+  found=$(find "$HOME" -maxdepth 4 -name 'notes.db' 2>/dev/null | grep -v "/work/01/" | head -3)
+  if [ -n "$found" ]; then
+    echo "       ただし別の場所に notes.db があります:"
+    printf '         %s\n' $found
+    echo "       判定は ~/work/01 の中だけを見ます"
+  fi
   exit 1
 fi
 
