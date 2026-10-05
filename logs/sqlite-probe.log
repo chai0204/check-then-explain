@@ -8,7 +8,7 @@ $ sqlite3 --version
 $ sqlite3 notes.db 'CREATE TABLE notes(id INTEGER PRIMARY KEY, body TEXT); INSERT INTO notes(body) VALUES("hello");'
 [exit 0]
 $ ls -la notes.db
--rw-r--r-- 1 lab lab 8192 Sep 30 19:07 notes.db
+-rw-r--r-- 1 lab lab 8192 Oct  5 20:27 notes.db
 [exit 0]
 $ file notes.db
 notes.db: SQLite 3.x database, last written using SQLite version 3045001, file counter 2, database pages 2, cookie 0x1, schema 4, UTF-8, version-valid-for 2
@@ -16,9 +16,19 @@ notes.db: SQLite 3.x database, last written using SQLite version 3045001, file c
 $ xxd -l 16 notes.db
 00000000: 5351 4c69 7465 2066 6f72 6d61 7420 3300  SQLite format 3.
 [exit 0]
+--- 常駐プロセスを探す。角括弧の有無で結果が割れる ---
 $ ps -ef | grep -c "[s]qlite"
+0
+[exit 1]
+$ ps -ef | grep -c "sqlite"
 1
 [exit 0]
+--- ↑ 1 のほうは grep 自身の行。何がヒットしたか ---
+$ ps -ef | grep "sqlite"
+lab           19       1  0 20:27 ?        00:00:00 grep sqlite
+[exit 0]
+注: ps -ef の全体はこの探査スクリプト自身が出るため、読者の画面とは一致しない。
+    本文には載せない（PID・時刻・起動の仕方で変わる）。
 
 ========== 2. 型は宣言ではなく提案（type affinity） ==========
 $ sqlite3 t2.db 'CREATE TABLE loose(n INTEGER);'
@@ -54,16 +64,16 @@ Error: in prepare, unrecognized token: ""INSERT"
   "INSERT
   ^--- error here
 
-real	0m0.016s
-user	0m0.004s
-sys	0m0.006s
+real	0m0.018s
+user	0m0.003s
+sys	0m0.009s
 [exit 1]
 --- 1行1トランザクション（既定） ---
 $ time bash naive.sh
 
-real	0m12.996s
-user	0m0.078s
-sys	0m0.472s
+real	0m13.069s
+user	0m0.093s
+sys	0m0.506s
 [exit 0]
 $ sqlite3 t3a.db 'SELECT count(*) FROM a;'
 2000
@@ -72,8 +82,8 @@ $ sqlite3 t3a.db 'SELECT count(*) FROM a;'
 $ time bash txn.sh
 
 real	0m0.048s
-user	0m0.033s
-sys	0m0.012s
+user	0m0.032s
+sys	0m0.016s
 [exit 0]
 $ sqlite3 t3b.db 'SELECT count(*) FROM b;'
 2000
@@ -120,16 +130,16 @@ $ sqlite3 subdir/d.db 'CREATE TABLE t(n INTEGER); INSERT INTO t VALUES(1);'
 [exit 0]
 $ ls -la subdir/
 total 16
-drwxr-xr-x 2 lab lab 4096 Sep 30 19:08 .
-drwx------ 3 lab lab 4096 Sep 30 19:08 ..
--rw-r--r-- 1 lab lab 8192 Sep 30 19:08 d.db
+drwxr-xr-x 2 lab lab 4096 Oct  5 20:27 .
+drwx------ 3 lab lab 4096 Oct  5 20:27 ..
+-rw-r--r-- 1 lab lab 8192 Oct  5 20:27 d.db
 [exit 0]
 --- DB ファイル自体は書き込み可のまま、ディレクトリだけ読み取り専用にする ---
 $ chmod 555 subdir
 [exit 0]
 $ ls -ld subdir; ls -l subdir/d.db
-dr-xr-xr-x 2 lab lab 4096 Sep 30 19:08 subdir
--rw-r--r-- 1 lab lab 8192 Sep 30 19:08 subdir/d.db
+dr-xr-xr-x 2 lab lab 4096 Oct  5 20:27 subdir
+-rw-r--r-- 1 lab lab 8192 Oct  5 20:27 subdir/d.db
 [exit 0]
 $ sqlite3 subdir/d.db 'INSERT INTO t VALUES(2);'
 Error: stepping, attempt to write a readonly database (8)

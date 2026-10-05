@@ -12,7 +12,13 @@ run "sqlite3 notes.db 'CREATE TABLE notes(id INTEGER PRIMARY KEY, body TEXT); IN
 run 'ls -la notes.db'
 run 'file notes.db'
 run 'xxd -l 16 notes.db'
+echo '--- 常駐プロセスを探す。角括弧の有無で結果が割れる ---'
 run 'ps -ef | grep -c "[s]qlite"'
+run 'ps -ef | grep -c "sqlite"'
+echo '--- ↑ 1 のほうは grep 自身の行。何がヒットしたか ---'
+run 'ps -ef | grep "sqlite"'
+echo '注: ps -ef の全体はこの探査スクリプト自身が出るため、読者の画面とは一致しない。'
+echo '    本文には載せない（PID・時刻・起動の仕方で変わる）。'
 
 say "2. 型は宣言ではなく提案（type affinity）"
 run "sqlite3 t2.db 'CREATE TABLE loose(n INTEGER);'"

@@ -40,8 +40,8 @@ docker build -t lab-sqlite:1.0.0 containers/sqlite
 docker build -t lab-wasm:1.0.0   containers/wasm
 
 # 模範解答どおりに全演習を解いて、判定が通ることを確かめる
-docker run --rm -v "$PWD/probe:/probe:ro" lab-sqlite:1.0.0 bash /probe/sqlite-solve-all.sh
-docker run --rm -v "$PWD/probe:/probe:ro" lab-wasm:1.0.0   bash /probe/wasm-solve-all.sh
+docker run --rm -v "$PWD/probe:/probe:ro" lab-sqlite:1.0.0 bash /probe/db-solve-all.sh
+docker run --rm -v "$PWD/probe:/probe:ro" lab-wasm:1.0.0   bash /probe/wa-solve-all.sh
 
 # 公開前の機械検査（error が1件でもあれば公開しない）
 node tools/check.mjs public

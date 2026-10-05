@@ -85,10 +85,25 @@ $ xxd -l 16 notes.db
 <p>サーバ型のデータベースなら、ここに常駐プロセスの行が並ぶ。その行が接続先である。数えてみる。</p>
 
 <pre><code>$ ps -ef | grep -c "[s]qlite"
+0
+
+$ ps -ef | grep -c "sqlite"
 1</code></pre>
 
-<p>1 である。この 1 は、いま打ったこの検査そのもののコマンドラインが数えられたものであって、
-データを預かって待っているプロセスではない。<strong>データベースのために常駐しているプロセスは1つも無い</strong>。</p>
+<p>同じものを数えているのに 0 と 1 で割れた。<code>[s]qlite</code> という書き方は
+<strong>grep 自身の行を数えないための定番</strong>である。パターンとしては <code>sqlite</code> に
+一致するが、<code>ps</code> の出力に並ぶ grep のコマンドラインは <code>grep -c [s]qlite</code> という
+文字列なので、角括弧のせいで自分自身には当たらない。</p>
+
+<p>角括弧を外したときの 1 は、その <code>grep sqlite</code> の行である。
+<code>ps -ef</code> をそのまま打つと、出るのは自分のシェルと、いま打った <code>ps</code> の
+2行だけになる（PID と時刻は環境ごとに違うので、ここには載せない）。
+<strong>データベースのために常駐しているプロセスは1つも無い。</strong>
+ここでは「見つからないこと」が答えになっている。</p>
+
+<div class="note warn"><code>grep -c</code> は一致が0件のとき<b>終了コード 1 を返す</b>。
+「0件だった」と「コマンドが失敗した」が同じ値になるので、スクリプトの中で
+<code>grep -c</code> の結果を条件に使うときは、出力の数字を見る必要がある。</div>
 
 <p>では前の節の <code>CREATE TABLE</code> と <code>INSERT</code> は誰が実行したのか。
 <code>sqlite3</code> というコマンドを起動したそのプロセス自身である。SQLite はライブラリで、
@@ -194,7 +209,7 @@ Error: in prepare, file is not a database (26)</code></pre>
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
 <li>データベースは1ファイルである。<code>ls</code> に1行、先頭16バイトに <code>SQLite format 3</code> が平文で入っている</li>
-<li>データを預かる常駐プロセスは存在しない。<code>ps -ef | grep -c "[s]qlite"</code> が数えた 1 は検査自身の行である</li>
+<li>データを預かる常駐プロセスは存在しない。<code>ps -ef | grep -c "[s]qlite"</code> は 0 を返し、角括弧を外した 1 は grep 自身の行である</li>
 <li>書き込んだのは <code>sqlite3</code> を起動したプロセス自身で、その版がファイルの中に <code>3045001</code> として残っている</li>
 <li>読むのは必要になったときなので、操作が1つ通ったことはファイルが正しいことの証明にならない</li>
 <li>接続先も起動順もユーザ管理も消えるが、検める役と「いま誰が触っているか」を尋ねる窓口も同時に消える</li>
