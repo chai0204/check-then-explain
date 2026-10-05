@@ -85,6 +85,91 @@ Error: stepping, database is locked (5)</code></pre>
 <p><b>2.</b> 相手のトランザクションが終わり、行が確定したこと。あわせて、印が消えて読み取りが何も待たされずに通ったこと。印は、走っているプロセスが居る間だけの状態である。</p>
 </details></div>
 
+<h2 id="journal">journal_mode は「取り消すための控えをどう取るか」</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>delete</code> と <code>WAL</code> が、それぞれ何をファイルに書いているか。</div>
+
+<p>次の節で <code>journal_mode</code> を切り替えるので、先にそれが何の設定なのかを見る。</p>
+
+<p>SQLite は書き込みの途中で電源が落ちても、DB が半端な状態で残らないようにしている。
+そのために<strong>元に戻せる材料を、書き込む前にファイルへ書き出しておく</strong>。
+その材料をどう取るかの方式が <code>journal_mode</code> である。既定は <code>delete</code>。</p>
+
+<pre><code>$ sqlite3 d.db 'PRAGMA journal_mode;'
+delete</code></pre>
+
+<h3 id="j-delete">delete: 変更前の内容を別ファイルに退避し、終わったら消す</h3>
+
+<p>書き込みを始めると、SQLite は<strong>これから書き換えるページの「変更前の内容」</strong>を
+<code>&lt;DB名&gt;-journal</code> というファイルに写す。そのうえで本体を直接書き換える。
+途中で落ちたら、次に開いたプロセスがこのファイルを見つけて、写してあった内容を本体へ戻す。</p>
+
+<p>書き込みを保持したまま、同じディレクトリを見るとこうなる。</p>
+
+<pre><code>$ ls -l d.db*
+-rw-r--r-- 1 lab lab 8192 d.db
+-rw-r--r-- 1 lab lab 4616 d.db-journal</code></pre>
+
+<p>そして相手がコミットしたあと、もう一度見るとこうなる。</p>
+
+<pre><code>$ ls d.db*
+d.db</code></pre>
+
+<p><code>-journal</code> が消えている。<strong>このファイルを削除することが「コミットが完了した」という
+印そのもの</strong>で、だからモード名が <code>delete</code> である。次に開いたプロセスは、
+<code>-journal</code> が無ければ「前回は無事に終わった」と判断する。</p>
+
+<div class="analogy"><b>たとえ</b>: 書き換える前のページをコピー機で控えておき、本に直接書き込む。
+無事に書き終えたら<b>控えをシュレッダーに掛ける</b>。控えが残っていたら、
+前回の作業が途中で止まったということなので、控えから本を元に戻す。
+<br>ただし<b>崩れる点</b>: 控えを捨てる行為が「完了」の合図なので、
+<b>捨てられない場所では作業自体を始められない</b>。ここは第5章で踏む。</div>
+
+<p>ロールバックジャーナル系には <code>delete</code> 以外にも
+<code>truncate</code>（消さずに長さ0に切る）、<code>persist</code>（消さずに先頭を潰す）、
+<code>memory</code>（ディスクに書かない）、<code>off</code>（取らない）がある。
+<strong>どれも「控えをどう始末するか」の違いで、控えを取ること自体は変わらない</strong>
+（<code>off</code> だけは取らないので、落ちたら壊れる）。</p>
+
+<h3 id="j-wal">WAL: 本体を触らず、変更後の内容を別ファイルに書き足す</h3>
+
+<p>WAL は Write-Ahead Log の略で、<strong>向きが逆</strong>になる。
+本体はそのまま置いておき、<strong>これから反映したい「変更後の内容」</strong>を
+<code>&lt;DB名&gt;-wal</code> に追記していく。本体はあとでまとめて更新する。
+その「あとでまとめて」を<strong>チェックポイント</strong>と呼ぶ。</p>
+
+<pre><code>$ sqlite3 w.db 'PRAGMA journal_mode=WAL;'
+wal
+
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab  8192 w.db
+-rw-r--r-- 1 lab lab 32768 w.db-shm
+-rw-r--r-- 1 lab lab     0 w.db-wal</code></pre>
+
+<p>ファイルが3つになる。<code>-wal</code> が書き足し先で、<code>-shm</code> は
+<strong>どのプロセスがどこまで読んでよいかを共有するための領域</strong>である
+（shared memory の shm）。複数のプロセスが同じ <code>-wal</code> を見るので、
+「いまどこまでが確定済みか」を互いに知る場所が要る。</p>
+
+<p>自動のチェックポイントは、<code>-wal</code> が一定のページ数を超えたときに走る。既定値は確かめられる。</p>
+
+<pre><code>$ sqlite3 d.db 'PRAGMA wal_autocheckpoint;'
+1000</code></pre>
+
+<div class="analogy"><b>たとえ</b>: 本には一切書き込まず、<b>変更したい内容を付箋に書いて貼っていく</b>。
+読む人は本と付箋を合わせて読む。付箋が溜まったら、まとめて本に書き写して付箋を剥がす。
+<br>ただし<b>崩れる点</b>: 付箋を貼れるのは同時に1人である。付箋の束は1つしかないので、
+2人が同時に書き足すことはできない。<b>だから書き込みの本数は増えない。</b></div>
+
+<div class="note warn"><code>journal_mode</code> の値は<strong>ファイルに保存される</strong>。
+接続ごとの設定ではないので、一度 WAL にすれば、別のプロセスが開いても WAL のままである。
+<pre><code>$ sqlite3 w.db 'PRAGMA journal_mode;'
+wal</code></pre>
+元に戻すこともできる（<code>PRAGMA journal_mode=DELETE;</code> が <code>delete</code> を返す）。</div>
+
+<p><strong>どちらのモードでも、本体とは別のファイルを DB と同じディレクトリに作る。</strong>
+名前が違い、書く内容が逆で、始末の仕方が違うだけである。
+この「別のファイルを作る」が効いてくるのが第5章になる。</p>
+
 <h2 id="wal">WAL にしても、書けるのは1つだけ</h2>
 <div class="sgoal"><b>この節で分かること</b>: WAL が変えないのは書き込みの本数である。ここが最も誤解される。</div>
 
@@ -109,9 +194,15 @@ Error: stepping, database is locked (5)</code></pre>
 
 <p>2行目が、この章で正す誤解の全部である。<strong>モードを替えても、同時に書ける本数は 1 から動いていない。</strong></p>
 
-<p>3行目も見ておく。読み取りはどちらのモードでも通り、返り値も同じ <code>0</code> だった。つまりこの記録は「WAL にしないと読めない」という逆向きの誤解も支持していない。WAL が読み取りと書き込みの関係を変えるモードだとしても、その差はこの記録には写っていない。写っていないものをここで断定しない。</p>
+<p>3行目も見ておく。読み取りはどちらのモードでも通り、返り値も同じ <code>0</code> だった。つまりこの記録は「WAL にしないと読めない」という逆向きの誤解も支持していない。</p>
 
-<div class="analogy"><b>たとえ</b>: WAL は名前のとおり、本体を直す前に別紙へ書き足していく方式である。本体がそのまま残るので、読む側は本体を読み続けられる。<br>ただし<b>崩れる点</b>: 「各自が自分の紙に書ける」ようにはならない。別紙は1冊しかないので、書き足せるのは同時に1人である。だから2つ目の <code>INSERT</code> は弾かれる。</div>
+<p>ただし<strong>この記録だけでは、WAL が何を解決するのかが分からない</strong>。
+上の実験はどちらも「<em>書き込み</em>を保持して、別の書き込みと読み取りを試す」形だった。
+WAL の効き目が出るのは向きが逆のとき、つまり<strong><em>読み取り</em>を保持して書き込みを試す</strong>ときである。
+それは次の節で別に測る。</p>
+
+<p>前の節の付箋のたとえで言えば、<strong>付箋の束は1つしかない</strong>。
+「各自が自分の紙に書ける」ようにはならないので、2つ目の <code>INSERT</code> は弾かれる。</p>
 
 <p>最後に、WAL に切り替えた直後のディレクトリを見る。同じコマンドを、切り替えた直後と、すべて終わったあとの2回撮っている。返ってきたのはどちらも同じ1行だった。</p>
 
@@ -132,6 +223,101 @@ wal.db</code></pre>
 <p><b>2.</b> 結論できない。<code>PRAGMA journal_mode=WAL;</code> は <code>wal</code> を返している。<code>ls</code> から言えるのは、その瞬間に見えたファイルが <code>wal.db</code> だけだったということまでで、モードの判定材料にはならない。判定には <code>PRAGMA journal_mode;</code> の返り値を使う。</p>
 </details></div>
 
+<h2 id="whywal">では WAL は何を解決するのか — 読み手が書き手を止めなくなる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 向きを逆にした実験で、2つのモードの差がはじめて出る。</div>
+
+<p>こんどは<strong>読み取りを保持したまま、書き込みを試す</strong>。
+別のプロセスで <code>BEGIN;</code> と <code>SELECT</code> を打って、そのまま止めておく。
+既定の <code>delete</code> モードでやるとこうなる。</p>
+
+<pre><code>$ sqlite3 d.db 'INSERT INTO t VALUES(2);'
+Error: stepping, database is locked (5)</code></pre>
+
+<p><strong>読んでいる人が居るだけで、書き込みが弾かれた。</strong>
+相手は1行も書き換えていない。ただ読んでいるだけである。
+相手が終わったあとに同じコマンドを打つと、こうなる。</p>
+
+<pre><code>$ sqlite3 d.db 'INSERT INTO t VALUES(2); SELECT count(*) FROM t;'
+3</code></pre>
+
+<p>同じことを WAL モードの DB でやる。</p>
+
+<pre><code>$ sqlite3 w.db 'INSERT INTO t VALUES(2);'
+$ sqlite3 w.db 'SELECT count(*) FROM t;'
+3</code></pre>
+
+<p><strong>エラーが出ていない。</strong>読み取りを保持したままでも書き込めた。
+これが WAL が解決することである。</p>
+
+<div class="scroll"><table>
+<tr><th>保持しているもの</th><th>試すこと</th><th><code>delete</code></th><th>WAL</th></tr>
+<tr><td>書き込み</td><td>別の書き込み</td><td>弾かれる</td><td><strong>弾かれる（同じ）</strong></td></tr>
+<tr><td>書き込み</td><td>読み取り</td><td>通る（古い値）</td><td>通る（古い値）</td></tr>
+<tr><td><strong>読み取り</strong></td><td><strong>書き込み</strong></td><td><strong>弾かれる</strong></td><td><strong>通る</strong></td></tr>
+</table></div>
+
+<p>表の最後の行だけが違う。言い換えるとこうなる。</p>
+
+<ul>
+<li><code>delete</code> では、<strong>読み手と書き手が互いを止める</strong></li>
+<li>WAL では、<strong>読み手は書き手を止めない。書き手同士だけが排他になる</strong></li>
+</ul>
+
+<p>理由は前の節の仕組みから出る。<code>delete</code> は<strong>本体を直接書き換える</strong>ので、
+読んでいる途中で書き換えられると、読み手は半端な状態を見てしまう。だから読み手が居る間は書けない。
+WAL は<strong>本体に触らず別ファイルに書き足す</strong>ので、読み手は本体を読み続けられる。
+だから同時でも構わない。</p>
+
+<div class="analogy"><b>たとえ</b>: <code>delete</code> は本に直接書き込むので、
+誰かが読んでいる最中にページを書き換えられない。WAL は付箋に書くので、
+読んでいる人はそのまま本を読み続けられる。
+<br>ただし<b>崩れる点</b>: 読み手が見ているのは<b>付箋を貼る前の状態</b>である。
+上の実測でも、書き込んだあとの <code>SELECT</code> は <code>3</code> を返しているが、
+保持している側のプロセスは最初に見た値を見続けている。
+「同時に読める」は「最新が読める」ではない。</div>
+
+<h2 id="walcost">WAL の代償</h2>
+<div class="sgoal"><b>この節で分かること</b>: 「とりあえず WAL」で済まない場面が3つある。</div>
+
+<p>いいことばかりではない。実測で出た代償を挙げる。</p>
+
+<h3 id="cost-ro">1. 読み取り専用の場所に置くと、読むことすらできなくなる</h3>
+
+<p>WAL の DB を、書き込めないディレクトリに置いて <code>SELECT</code> するだけでこうなる。</p>
+
+<pre><code>$ chmod 555 ro
+$ sqlite3 ro/w.db 'SELECT count(*) FROM t;'
+Error: in prepare, attempt to write a readonly database (8)</code></pre>
+
+<p><strong>読むだけなのに失敗する。</strong><code>-shm</code>（プロセス間で読み取り位置を共有する領域）を
+作ろうとして、ディレクトリに書けずに止まっている。
+読み取り専用だと分かっているなら、そう宣言すれば読める。</p>
+
+<pre><code>$ sqlite3 'file:ro/w.db?immutable=1' 'SELECT count(*) FROM t;'
+4000</code></pre>
+
+<p>CD-ROM や読み取り専用マウント、コンテナイメージに焼き込んだ DB を配る場合、
+<strong>WAL にしてあると開けない</strong>。<code>delete</code> のままなら読むだけなら通る。</p>
+
+<h3 id="cost-files">2. ファイルが増え、しかも見える時間が限られる</h3>
+
+<p><code>-wal</code> と <code>-shm</code> は<strong>接続が開いている間だけ存在する</strong>。
+最後の接続が閉じるとき、SQLite は自動でチェックポイントして2つとも削除する。
+だから1000行入れたあとでも、コマンドが終わった時点ではこう見える。</p>
+
+<pre><code>$ ls -l w.db*
+-rw-r--r-- 1 lab lab 45056 w.db</code></pre>
+
+<p>これは便利でもあり、厄介でもある。便利なのは、ふだんは1ファイルのままでいられること。
+厄介なのは、<strong>サーバが動いたまま本体だけコピーすると、<code>-wal</code> にある分が欠ける</strong>こと。
+バックアップは3つまとめて取るか、<code>.backup</code> のようにロックを見て整合を取る方法を使う。</p>
+
+<h3 id="cost-net">3. ネットワークファイルシステムで使えない</h3>
+
+<p><code>-shm</code> はプロセス間で共有するメモリを<strong>mmap で実現している</strong>。
+NFS のようなネットワーク越しのファイルシステムでは、この共有が別のマシン間では成立しない。
+同じマシンのプロセス同士なら動くが、複数のマシンから同じ DB を開く用途には使えない。</p>
+
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
 <li><code>database is locked</code> は、自分のプロセスが印を見てその場で諦めた記録である。相手の名前は書かれていないので、「誰が持っているか」はこのメッセージの外を見る</li>
@@ -139,6 +325,10 @@ wal.db</code></pre>
 <li>ロック中でも読める。返る値は確定済みの分だけで、<code>0</code> は異常ではない</li>
 <li>WAL にしても、同時に書けるプロセスは1つ。エラーの文字列も結果コードも変わらない</li>
 <li>モードの確認は <code>PRAGMA journal_mode;</code> の返り値で行う。ファイル一覧では判定できない</li>
+<li><code>journal_mode</code> は「取り消すための控えをどう取るか」の設定。<code>delete</code> は<strong>変更前</strong>の内容を <code>-journal</code> に退避して本体を直接書き換え、コミット時にその控えを<strong>削除する</strong>（名前の由来）。WAL は本体に触らず<strong>変更後</strong>の内容を <code>-wal</code> に書き足し、あとでまとめて反映する（チェックポイント）</li>
+<li><strong>WAL が解決するのは「読み手が書き手を止めること」だけ。</strong><code>delete</code> では読み取りを保持するだけで書き込みが弾かれるが、WAL では通る。書き手同士が排他なのは両方とも同じ</li>
+<li>WAL には代償がある。<strong>読み取り専用の場所に置くと読むことすらできなくなり</strong>（<code>-shm</code> を作れない）、ファイルが3つに増え、ネットワークファイルシステムでは使えない</li>
+<li>どちらのモードでも<strong>本体とは別のファイルを同じディレクトリに作る</strong>。これが第5章で踏む落とし穴の原因になる</li>
 </ul></div>
 
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/&lt;owner&gt;/lab-sqlite:1.0.0 / Ubuntu 24.04.5 LTS / sqlite3 3.45.1 / apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>

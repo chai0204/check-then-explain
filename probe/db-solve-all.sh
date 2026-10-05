@@ -54,7 +54,23 @@ lab start 04 >/dev/null
   sqlite3 lock.db 'SELECT count(*) FROM t;'  >> observed.txt 2>&1
   sleep 7
 
+  # 手順6: 読み取りを保持したときに書き込めるか（delete と WAL で割れる）
+  sqlite3 lock.db 'PRAGMA journal_mode=DELETE;'
+  ./holdr.sh lock.db 4
+  echo "[delete] 読み取り保持中の書き込み:"
+  sqlite3 lock.db 'INSERT INTO t VALUES(7);' >> observed.txt 2>&1
+  sqlite3 lock.db 'INSERT INTO t VALUES(7);' 2>&1 | sed 's/^/    /'
+  sleep 5
+
+  sqlite3 lock.db 'PRAGMA journal_mode=WAL;'
+  ./holdr.sh lock.db 4
+  echo "[wal] 読み取り保持中の書き込み:"
+  sqlite3 lock.db 'INSERT INTO t VALUES(8);' >> observed.txt 2>&1
+  echo "    exit=$?"
+  sleep 5
+
   echo "--- observed.txt ---"; cat observed.txt
+  echo "--- 最終 journal_mode: $(sqlite3 lock.db 'PRAGMA journal_mode;') ---"
 )
 lab check 04 || fail=1
 

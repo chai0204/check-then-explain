@@ -1,0 +1,85 @@
+$ sqlite3 w.db 'CREATE TABLE t(n INTEGER);'
+[exit 0]
+$ sqlite3 w.db 'PRAGMA journal_mode=WAL;'
+wal
+[exit 0]
+
+========== 7. チェックポイント: -wal はどこまで育ち、いつ本体に移るか ==========
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:39 w.db
+[exit 0]
+--- 1000行を1トランザクションで入れる ---
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 20480 Oct  5 22:39 w.db
+[exit 0]
+$ sqlite3 w.db 'SELECT count(*) FROM t;'
+1000
+[exit 0]
+--- もう3000行入れる（自動チェックポイントの閾値 1000 ページを超えるか） ---
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 45056 Oct  5 22:39 w.db
+[exit 0]
+--- 手で全部移す（TRUNCATE は -wal を 0 に切り詰める） ---
+$ sqlite3 w.db 'PRAGMA wal_checkpoint(TRUNCATE);'
+0|0|0
+[exit 0]
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 45056 Oct  5 22:39 w.db
+[exit 0]
+--- ↑ 3カラムは busy / log / checkpointed（移したページ数） ---
+
+========== 8. WAL の DB を読み取り専用ディレクトリに置くと読めるか ==========
+$ cp w.db ro/
+[exit 0]
+$ chmod 555 ro
+[exit 0]
+--- 読み取りだけでも -shm を作ろうとするか ---
+$ sqlite3 ro/w.db 'SELECT count(*) FROM t;'
+Error: in prepare, attempt to write a readonly database (8)
+[exit 8]
+$ sqlite3 'file:ro/w.db?immutable=1' 'SELECT count(*) FROM t;'
+4000
+[exit 0]
+$ chmod 755 ro
+[exit 0]
+
+========== 9. 本体だけコピーすると何が欠けるか（3ファイルの面倒さ） ==========
+--- -wal に未反映の変更を残した状態をつくる ---
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 45056 Oct  5 22:39 w.db
+[exit 0]
+$ sqlite3 w.db 'SELECT count(*) FROM t;'
+4050
+[exit 0]
+--- 本体だけコピーして、そちらを読む ---
+$ cp w.db only-main.db
+[exit 0]
+$ sqlite3 only-main.db 'SELECT count(*) FROM t;'
+4050
+[exit 0]
+--- 3ファイルまとめてコピーした場合 ---
+$ cp w.db full.db; cp w.db-wal full.db-wal 2>/dev/null; cp w.db-shm full.db-shm 2>/dev/null; ls -l full.db*
+-rw-r--r-- 1 lab lab 45056 Oct  5 22:39 full.db
+[exit 0]
+$ sqlite3 full.db 'SELECT count(*) FROM t;'
+4050
+[exit 0]
+--- 公式が勧める方法（.backup はロックを見て整合を取る） ---
+$ sqlite3 w.db '.backup safe.db'
+[exit 0]
+$ sqlite3 safe.db 'SELECT count(*) FROM t;'
+4050
+[exit 0]
+
+========== 10. 旧モードへ戻せるか / 戻すと何が消えるか ==========
+$ sqlite3 w.db 'PRAGMA journal_mode=DELETE;'
+delete
+[exit 0]
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 45056 Oct  5 22:39 w.db
+[exit 0]
+$ sqlite3 w.db 'PRAGMA journal_mode;'
+delete
+[exit 0]
+
+========== 完了 ==========

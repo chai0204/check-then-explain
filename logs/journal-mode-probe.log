@@ -1,0 +1,3285 @@
+
+========== 0. 既定値 ==========
+$ sqlite3 d.db 'CREATE TABLE t(n INTEGER); INSERT INTO t VALUES(1);'
+[exit 0]
+$ sqlite3 d.db 'PRAGMA journal_mode;'
+delete
+[exit 0]
+$ sqlite3 d.db 'PRAGMA wal_autocheckpoint;'
+1000
+[exit 0]
+$ sqlite3 d.db 'PRAGMA synchronous;'
+2
+[exit 0]
+
+========== 1. delete モード: 書き込み中にだけ -journal が現れる ==========
+$ ls d.db*
+d.db
+[exit 0]
+$ ls -l d.db*
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:38 d.db
+-rw-r--r-- 1 lab lab 4616 Oct  5 22:38 d.db-journal
+[exit 0]
+$ xxd -l 32 d.db-journal 2>/dev/null || echo "(-journal が無い)"
+00000000: 0000 0000 0000 0000 0000 0000 c7b6 63d2  ..............c.
+00000010: 0000 0002 0000 0200 0000 1000 0000 0000  ................
+[exit 0]
+--- 解放後 ---
+$ ls d.db*
+d.db
+[exit 0]
+
+========== 2. delete モード: 読み取りを保持すると書き込みは通るか ==========
+$ sqlite3 d.db 'INSERT INTO t VALUES(2);'
+Error: stepping, database is locked (5)
+[exit 5]
+$ sqlite3 d.db 'INSERT INTO t VALUES(2); SELECT count(*) FROM t;'
+3
+[exit 0]
+
+========== 3. WAL に切り替える ==========
+$ sqlite3 w.db 'CREATE TABLE t(n INTEGER); INSERT INTO t VALUES(1);'
+[exit 0]
+$ sqlite3 w.db 'PRAGMA journal_mode=WAL;'
+wal
+[exit 0]
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:38 w.db
+[exit 0]
+--- 別プロセスで開いても wal か（ファイルに永続化されているか） ---
+$ sqlite3 w.db 'PRAGMA journal_mode;'
+wal
+[exit 0]
+
+========== 4. WAL モード: 書き込み中に現れるファイル ==========
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab  8192 Oct  5 22:38 w.db
+-rw-r--r-- 1 lab lab 32768 Oct  5 22:38 w.db-shm
+-rw-r--r-- 1 lab lab     0 Oct  5 22:38 w.db-wal
+[exit 0]
+$ xxd -l 32 w.db-wal 2>/dev/null || echo "(-wal が無い)"
+[exit 0]
+--- 解放後（-wal は残るか） ---
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:38 w.db
+[exit 0]
+
+========== 5. WAL モード: 読み取りを保持しても書き込めるか（WAL の本当の利点） ==========
+$ sqlite3 w.db 'INSERT INTO t VALUES(2);'
+[exit 0]
+$ sqlite3 w.db 'SELECT count(*) FROM t;'
+3
+[exit 0]
+
+========== 6. WAL モード: 書き込みを保持したら、別の書き込みと読み取りはどうなるか ==========
+$ sqlite3 w.db 'INSERT INTO t VALUES(3);'
+Error: stepping, database is locked (5)
+[exit 5]
+$ sqlite3 w.db 'SELECT count(*) FROM t;'
+3
+[exit 0]
+
+========== 7. チェックポイント ==========
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:38 w.db
+[exit 0]
+$ sqlite3 w.db 'PRAGMA wal_checkpoint(TRUNCATE);'
+0|0|0
+[exit 0]
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:38 w.db
+[exit 0]
+--- 1000行入れて -wal がどれだけ育つか ---
+$ bash -c "{ echo 'BEGIN;'; seq 1 1000 | sed 's/.*/INSERT INTO t VALUES(\&);/'; echo 'COMMIT;'; } | sqlite3 w.db"
+Parse error near line 2: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 3: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 4: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 5: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 6: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 7: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 8: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 9: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 10: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 11: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 12: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 13: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 14: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 15: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 16: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 17: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 18: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 19: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 20: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 21: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 22: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 23: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 24: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 25: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 26: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 27: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 28: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 29: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 30: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 31: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 32: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 33: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 34: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 35: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 36: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 37: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 38: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 39: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 40: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 41: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 42: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 43: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 44: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 45: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 46: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 47: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 48: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 49: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 50: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 51: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 52: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 53: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 54: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 55: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 56: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 57: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 58: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 59: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 60: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 61: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 62: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 63: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 64: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 65: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 66: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 67: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 68: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 69: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 70: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 71: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 72: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 73: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 74: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 75: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 76: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 77: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 78: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 79: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 80: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 81: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 82: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 83: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 84: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 85: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 86: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 87: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 88: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 89: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 90: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 91: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 92: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 93: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 94: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 95: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 96: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 97: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 98: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 99: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 100: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 101: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 102: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 103: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 104: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 105: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 106: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 107: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 108: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 109: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 110: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 111: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 112: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 113: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 114: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 115: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 116: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 117: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 118: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 119: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 120: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 121: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 122: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 123: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 124: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 125: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 126: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 127: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 128: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 129: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 130: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 131: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 132: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 133: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 134: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 135: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 136: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 137: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 138: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 139: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 140: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 141: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 142: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 143: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 144: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 145: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 146: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 147: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 148: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 149: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 150: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 151: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 152: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 153: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 154: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 155: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 156: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 157: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 158: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 159: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 160: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 161: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 162: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 163: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 164: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 165: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 166: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 167: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 168: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 169: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 170: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 171: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 172: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 173: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 174: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 175: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 176: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 177: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 178: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 179: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 180: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 181: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 182: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 183: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 184: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 185: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 186: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 187: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 188: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 189: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 190: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 191: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 192: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 193: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 194: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 195: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 196: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 197: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 198: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 199: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 200: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 201: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 202: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 203: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 204: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 205: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 206: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 207: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 208: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 209: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 210: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 211: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 212: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 213: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 214: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 215: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 216: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 217: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 218: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 219: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 220: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 221: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 222: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 223: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 224: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 225: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 226: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 227: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 228: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 229: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 230: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 231: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 232: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 233: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 234: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 235: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 236: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 237: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 238: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 239: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 240: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 241: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 242: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 243: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 244: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 245: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 246: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 247: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 248: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 249: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 250: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 251: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 252: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 253: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 254: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 255: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 256: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 257: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 258: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 259: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 260: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 261: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 262: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 263: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 264: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 265: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 266: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 267: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 268: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 269: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 270: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 271: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 272: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 273: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 274: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 275: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 276: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 277: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 278: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 279: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 280: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 281: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 282: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 283: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 284: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 285: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 286: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 287: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 288: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 289: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 290: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 291: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 292: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 293: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 294: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 295: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 296: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 297: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 298: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 299: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 300: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 301: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 302: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 303: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 304: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 305: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 306: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 307: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 308: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 309: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 310: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 311: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 312: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 313: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 314: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 315: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 316: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 317: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 318: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 319: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 320: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 321: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 322: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 323: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 324: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 325: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 326: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 327: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 328: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 329: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 330: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 331: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 332: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 333: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 334: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 335: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 336: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 337: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 338: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 339: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 340: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 341: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 342: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 343: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 344: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 345: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 346: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 347: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 348: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 349: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 350: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 351: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 352: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 353: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 354: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 355: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 356: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 357: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 358: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 359: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 360: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 361: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 362: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 363: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 364: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 365: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 366: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 367: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 368: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 369: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 370: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 371: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 372: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 373: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 374: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 375: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 376: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 377: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 378: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 379: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 380: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 381: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 382: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 383: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 384: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 385: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 386: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 387: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 388: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 389: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 390: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 391: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 392: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 393: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 394: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 395: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 396: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 397: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 398: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 399: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 400: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 401: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 402: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 403: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 404: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 405: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 406: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 407: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 408: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 409: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 410: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 411: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 412: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 413: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 414: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 415: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 416: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 417: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 418: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 419: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 420: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 421: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 422: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 423: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 424: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 425: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 426: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 427: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 428: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 429: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 430: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 431: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 432: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 433: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 434: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 435: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 436: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 437: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 438: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 439: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 440: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 441: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 442: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 443: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 444: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 445: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 446: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 447: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 448: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 449: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 450: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 451: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 452: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 453: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 454: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 455: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 456: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 457: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 458: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 459: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 460: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 461: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 462: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 463: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 464: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 465: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 466: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 467: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 468: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 469: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 470: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 471: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 472: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 473: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 474: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 475: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 476: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 477: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 478: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 479: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 480: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 481: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 482: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 483: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 484: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 485: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 486: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 487: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 488: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 489: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 490: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 491: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 492: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 493: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 494: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 495: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 496: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 497: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 498: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 499: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 500: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 501: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 502: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 503: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 504: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 505: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 506: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 507: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 508: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 509: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 510: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 511: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 512: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 513: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 514: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 515: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 516: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 517: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 518: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 519: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 520: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 521: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 522: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 523: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 524: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 525: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 526: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 527: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 528: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 529: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 530: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 531: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 532: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 533: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 534: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 535: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 536: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 537: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 538: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 539: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 540: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 541: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 542: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 543: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 544: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 545: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 546: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 547: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 548: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 549: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 550: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 551: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 552: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 553: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 554: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 555: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 556: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 557: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 558: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 559: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 560: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 561: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 562: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 563: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 564: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 565: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 566: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 567: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 568: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 569: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 570: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 571: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 572: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 573: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 574: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 575: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 576: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 577: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 578: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 579: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 580: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 581: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 582: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 583: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 584: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 585: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 586: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 587: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 588: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 589: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 590: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 591: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 592: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 593: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 594: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 595: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 596: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 597: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 598: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 599: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 600: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 601: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 602: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 603: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 604: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 605: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 606: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 607: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 608: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 609: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 610: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 611: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 612: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 613: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 614: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 615: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 616: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 617: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 618: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 619: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 620: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 621: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 622: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 623: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 624: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 625: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 626: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 627: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 628: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 629: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 630: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 631: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 632: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 633: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 634: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 635: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 636: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 637: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 638: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 639: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 640: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 641: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 642: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 643: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 644: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 645: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 646: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 647: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 648: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 649: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 650: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 651: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 652: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 653: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 654: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 655: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 656: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 657: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 658: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 659: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 660: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 661: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 662: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 663: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 664: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 665: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 666: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 667: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 668: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 669: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 670: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 671: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 672: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 673: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 674: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 675: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 676: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 677: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 678: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 679: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 680: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 681: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 682: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 683: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 684: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 685: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 686: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 687: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 688: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 689: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 690: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 691: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 692: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 693: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 694: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 695: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 696: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 697: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 698: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 699: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 700: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 701: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 702: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 703: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 704: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 705: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 706: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 707: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 708: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 709: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 710: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 711: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 712: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 713: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 714: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 715: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 716: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 717: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 718: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 719: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 720: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 721: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 722: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 723: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 724: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 725: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 726: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 727: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 728: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 729: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 730: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 731: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 732: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 733: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 734: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 735: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 736: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 737: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 738: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 739: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 740: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 741: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 742: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 743: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 744: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 745: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 746: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 747: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 748: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 749: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 750: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 751: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 752: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 753: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 754: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 755: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 756: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 757: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 758: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 759: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 760: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 761: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 762: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 763: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 764: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 765: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 766: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 767: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 768: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 769: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 770: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 771: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 772: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 773: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 774: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 775: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 776: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 777: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 778: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 779: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 780: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 781: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 782: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 783: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 784: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 785: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 786: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 787: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 788: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 789: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 790: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 791: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 792: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 793: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 794: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 795: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 796: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 797: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 798: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 799: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 800: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 801: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 802: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 803: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 804: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 805: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 806: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 807: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 808: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 809: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 810: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 811: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 812: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 813: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 814: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 815: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 816: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 817: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 818: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 819: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 820: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 821: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 822: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 823: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 824: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 825: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 826: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 827: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 828: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 829: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 830: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 831: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 832: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 833: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 834: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 835: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 836: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 837: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 838: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 839: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 840: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 841: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 842: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 843: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 844: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 845: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 846: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 847: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 848: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 849: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 850: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 851: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 852: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 853: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 854: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 855: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 856: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 857: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 858: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 859: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 860: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 861: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 862: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 863: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 864: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 865: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 866: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 867: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 868: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 869: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 870: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 871: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 872: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 873: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 874: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 875: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 876: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 877: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 878: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 879: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 880: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 881: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 882: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 883: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 884: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 885: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 886: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 887: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 888: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 889: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 890: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 891: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 892: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 893: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 894: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 895: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 896: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 897: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 898: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 899: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 900: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 901: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 902: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 903: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 904: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 905: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 906: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 907: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 908: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 909: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 910: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 911: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 912: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 913: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 914: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 915: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 916: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 917: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 918: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 919: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 920: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 921: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 922: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 923: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 924: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 925: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 926: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 927: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 928: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 929: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 930: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 931: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 932: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 933: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 934: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 935: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 936: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 937: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 938: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 939: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 940: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 941: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 942: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 943: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 944: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 945: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 946: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 947: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 948: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 949: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 950: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 951: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 952: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 953: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 954: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 955: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 956: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 957: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 958: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 959: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 960: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 961: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 962: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 963: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 964: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 965: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 966: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 967: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 968: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 969: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 970: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 971: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 972: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 973: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 974: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 975: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 976: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 977: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 978: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 979: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 980: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 981: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 982: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 983: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 984: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 985: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 986: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 987: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 988: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 989: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 990: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 991: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 992: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 993: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 994: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 995: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 996: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 997: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 998: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 999: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 1000: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 1001: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+[exit 1]
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:38 w.db
+[exit 0]
+$ sqlite3 w.db 'PRAGMA wal_checkpoint(TRUNCATE);'
+0|0|0
+[exit 0]
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:38 w.db
+[exit 0]
+
+========== 8. WAL の DB を読み取り専用ディレクトリに置くと開けるか ==========
+$ sqlite3 w.db 'PRAGMA wal_checkpoint(TRUNCATE);'
+0|0|0
+[exit 0]
+$ cp w.db ro/
+[exit 0]
+$ chmod 555 ro
+[exit 0]
+$ sqlite3 ro/w.db 'SELECT count(*) FROM t;'
+Error: in prepare, attempt to write a readonly database (8)
+[exit 8]
+$ chmod 755 ro
+[exit 0]
+
+========== 9. 本体だけコピーすると何が欠けるか（3ファイルの面倒さ） ==========
+$ bash -c "{ echo 'BEGIN;'; seq 1 50 | sed 's/.*/INSERT INTO t VALUES(\&);/'; echo 'COMMIT;'; } | sqlite3 w.db"
+Parse error near line 2: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 3: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 4: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 5: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 6: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 7: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 8: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 9: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 10: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 11: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 12: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 13: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 14: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 15: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 16: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 17: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 18: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 19: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 20: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 21: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 22: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 23: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 24: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 25: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 26: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 27: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 28: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 29: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 30: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 31: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 32: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 33: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 34: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 35: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 36: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 37: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 38: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 39: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 40: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 41: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 42: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 43: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 44: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 45: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 46: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 47: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 48: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 49: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 50: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+Parse error near line 51: near "&": syntax error
+  INSERT INTO t VALUES(&);
+                       ^--- error here
+[exit 1]
+$ ls -l w.db*
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:38 w.db
+[exit 0]
+$ cp w.db only-main.db
+[exit 0]
+$ sqlite3 w.db 'SELECT count(*) FROM t;'
+4
+[exit 0]
+$ sqlite3 only-main.db 'SELECT count(*) FROM t;'
+4
+[exit 0]
+--- ↑ 本体だけコピーすると -wal にあった分が欠ける（はず） ---
+
+========== 完了 ==========

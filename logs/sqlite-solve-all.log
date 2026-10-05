@@ -17,12 +17,12 @@ Error: stepping, cannot store TEXT value in INTEGER column tight.n (19)
          tight は STRICT で定義されており、text 型の行は 0 件
 
 ########## 03 同じ2000行を、2通りの速さで入れる ##########
-naive=12.84
-txn=0.01
+naive=13.04
+txn=0.02
 ✔ 03 達成
   判定 : 観測型（両テーブルの行数）＋痕跡型（あなたが測った秒数の記録）
   観測 : a=2000行 / b=2000行 で同じ結果になっている
-         naive=12.84秒  txn=0.01秒  → 約 1284 倍の差
+         naive=13.04秒  txn=0.02秒  → 約 652 倍の差
          （著者の環境では 12.996 秒 → 0.048 秒 ＝ 約270倍でした）
 
 ########## 04 2人で同時に書こうとする ##########
@@ -34,22 +34,36 @@ WAL へ変更: wal
 [hold] lock.db にトランザクションを開きました。6 秒間そのままにします。
 [hold] いま書き込みを試してください（この時点でロックは効いています）。
 [hold] コミットして解放しました。
+delete
+[holdr] lock.db を読み取ったまま保持しています（4 秒間）。
+[holdr] いま書き込みを試してください。
+[delete] 読み取り保持中の書き込み:
+    Error: stepping, database is locked (5)
+[holdr] 読み取りを終えて解放しました。
+wal
+[holdr] lock.db を読み取ったまま保持しています（4 秒間）。
+[holdr] いま書き込みを試してください。
+[wal] 読み取り保持中の書き込み:
+    exit=0
+[holdr] 読み取りを終えて解放しました。
 --- observed.txt ---
 Error: stepping, database is locked (5)
 0
 Error: stepping, database is locked (5)
 1
+Error: stepping, database is locked (5)
+--- 最終 journal_mode: wal ---
 ✔ 04 達成
   判定 : 痕跡型（DB に保存された journal_mode）＋あなたの観測記録
-  観測 : journal_mode = wal に変更されている / t の行数 = 2
-         observed.txt に 'database is locked' が 2 箇所ある
+  観測 : journal_mode = wal に変更されている / t の行数 = 3
+         observed.txt に 'database is locked' が 3 箇所ある
          2箇所以上あるので、WAL にしても書き込みが排他であることを自分で確かめられています
 
 ########## 05 書ける権限があるのに、書けない ##########
-drwxr-xr-x 2 lab lab 4096 Oct  5 22:24 sub
--rw-r--r-- 1 lab lab 8192 Oct  5 22:24 sub/d.db
-dr-xr-xr-x 2 lab lab 4096 Oct  5 22:24 sub
--rw-r--r-- 1 lab lab 8192 Oct  5 22:24 sub/d.db
+drwxr-xr-x 2 lab lab 4096 Oct  5 22:48 sub
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:48 sub/d.db
+dr-xr-xr-x 2 lab lab 4096 Oct  5 22:48 sub
+-rw-r--r-- 1 lab lab 8192 Oct  5 22:48 sub/d.db
 --- observed.txt ---
 Error: stepping, attempt to write a readonly database (8)
 1
