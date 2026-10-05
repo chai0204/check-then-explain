@@ -92,10 +92,16 @@ for (const f of htmls) {
   const isChapter = /<body[^>]*data-ch="\d+"/.test(html);
   if (!isChapter) continue;
 
+  // たとえの上限は章の長さに比例させる。固定値（6個）にすると、
+  // 解説を厚くした長い章で必ず warn が出て、検査が信用されなくなる。
+  // 目安は 60行に1個まで（下限は 6個）。
+  const lines = html.split("\n").length;
+  const analogyMax = Math.max(6, Math.ceil(lines / 60));
+
   const need = [
     ["div.goal", count(html, /class="goal"/g), 1, Infinity],
     ["div.skip", count(html, /class="skip"/g), 1, Infinity],
-    ["div.analogy", count(html, /class="analogy"/g), 3, 6],
+    ["div.analogy", count(html, /class="analogy"/g), 3, analogyMax],
     ["div.quiz", count(html, /class="quiz"/g), 2, Infinity],
     ["div.note try", count(html, /class="note try"/g), 1, Infinity],
     ["div.verified", count(html, /class="verified"/g), 1, Infinity],

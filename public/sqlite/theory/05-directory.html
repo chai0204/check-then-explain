@@ -97,8 +97,13 @@ SQLite が書き込みのときに要求するのは、DB ファイルへの <co
 壊れているのはファイルへの到達ではなく、書き込みのために SQLite がやろうとしている別の作業である。</p>
 
 <div class="quiz"><h4>確認問題</h4><ol>
-<li><code>ls -l</code> で DB ファイルが <code>-rw-r--r--</code> で自分の所有だと確かめた。この観測から言えることと、言えないことをそれぞれ述べる。</li>
-<li>同じエラーが出ている別のマシンで、<code>SELECT</code> は通ることを確認した。この事実は原因の候補をどう狭めるか。</li>
+<li><b>状況</b>: 自分が書いたアプリが、書き込みのときだけ
+<code>attempt to write a readonly database</code> で落ちる。原因を探すため
+<code>ls -l</code> を打つと、DB ファイルは <code>-rw-r--r--</code> で自分の所有だった。
+<br>この観測から言えることと、言えないことをそれぞれ述べる。</li>
+<li><b>状況</b>: 同じアプリを別のマシンに置いたところ、そちらでも書き込みは同じエラーで落ちる。
+ただしそのマシンでは <code>SELECT</code> だけは通ることを確認した。
+<br>この事実は原因の候補をどう狭めるか。</li>
 </ol>
 <details><summary>答え</summary>
 <p><b>1.</b> 言えるのは「DB ファイルの権限は原因ではない」ことだけ。言えないのは、書き込みが通るかどうか。
@@ -208,7 +213,9 @@ $ sqlite3 subdir/d.db 'INSERT INTO t VALUES(2); SELECT count(*) FROM t;'
 
 <div class="quiz"><h4>確認問題</h4><ol>
 <li>あるサーバで <code>attempt to write a readonly database</code> が出ている。ファイル権限とディレクトリ権限の両方を確認したが、どちらにも <code>w</code> があった。この時点で立てるべき問いを1つ挙げる。</li>
-<li>このエラーに対して「DB ファイルを書き込み可能な別のディレクトリにコピーする」という対処が効くことがある。効いた場合、それは何を示しているか。</li>
+<li>同じ <code>attempt to write a readonly database</code> に対して、
+「DB ファイルを書き込み可能な別のディレクトリにコピーする」という対処が効くことがある。
+効いた場合、それは何を示しているか。</li>
 </ol>
 <details><summary>答え</summary>
 <p><b>1.</b> 「そのプロセスは、いま本当にそのディレクトリへファイルを作れるのか」。

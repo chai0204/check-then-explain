@@ -133,7 +133,12 @@ cmd_check() {
       0)
         printf '%s %s %s\n' "${c_ok}✔${c_0}" "$n" "達成"
         printf '%s\n' "$out" | sed 's/^/  /'
-        [ "$(prog_get "$n")" = "solve" ] || prog_set "$n" done
+        # 既に達成済みなら時刻を上書きしない。上書きすると、再チェックしたときに
+        # 全演習の達成時刻が揃ってしまい、完走メッセージの所要時間が 0 になる。
+        case "$(prog_get "$n")" in
+          done|solve) ;;
+          *) prog_set "$n" done ;;
+        esac
         ;;
       2)
         printf '%s %s %s\n' "${c_wr}⚠${c_0}" "$n" "この環境では判定できません"
@@ -148,7 +153,75 @@ cmd_check() {
         ;;
     esac
   done
+  finale_if_complete
   return $rc_all
+}
+
+# 全問達成したときに一度だけ出す。理論編には締めがあるのに実践編には無く、
+# 終わった実感が出ないという指摘を受けて足した（読者フィードバック 2026-10-05）。
+finale_if_complete() {
+  local total=0 cleared=0 solved=0 n st
+  for n in $(exercises); do
+    total=$((total+1))
+    st=$(prog_get "$n")
+    case "$st" in
+      done)  cleared=$((cleared+1)) ;;
+      solve) cleared=$((cleared+1)); solved=$((solved+1)) ;;
+    esac
+  done
+  [ "$total" -gt 0 ] && [ "$cleared" -eq "$total" ] || return 0
+  [ -f "$STATE/finale" ] && return 0
+  : > "$STATE/finale" 2>/dev/null || true
+
+  local sp="$LAB_HOME/spine.txt" title spine link
+  if [ -f "$sp" ]; then
+    title=$(sed -n '1p' "$sp")
+    spine=$(awk 'NR>2 && $0 != "---"' "$sp" | sed '$d')
+    link=$(tail -1 "$sp")
+  else
+    title="lab-${THEME}"; spine=""; link=""
+  fi
+
+  # 所要時間（最初の達成から最後の達成まで）
+  local t0 t1 secs human=""
+  t0=$(jq -r '[.[].at] | min // ""' "$PROGRESS" 2>/dev/null)
+  t1=$(jq -r '[.[].at] | max // ""' "$PROGRESS" 2>/dev/null)
+  if [ -n "$t0" ] && [ -n "$t1" ]; then
+    secs=$(( $(date -d "$t1" +%s 2>/dev/null || echo 0) - $(date -d "$t0" +%s 2>/dev/null || echo 0) ))
+    # 1分未満は出さない（「所要 0分」は不自然なので）
+    if [ "$secs" -ge 60 ]; then
+      if [ "$secs" -ge 3600 ]; then human="$((secs/3600))時間$(((secs%3600)/60))分"
+      else human="$((secs/60))分"; fi
+    fi
+  fi
+
+  # 罫線で囲まない。全角が混ざると桁が合わず、環境によって崩れる。
+  printf '\n'
+  printf '  %s\n' "${c_ok}════════════════════════════════════════${c_0}"
+  printf '   %s\n' "${c_b}${title} — 全${total}演習クリア${c_0}"
+  printf '  %s\n' "${c_ok}════════════════════════════════════════${c_0}"
+  printf '\n'
+  [ -n "$human" ] && printf '  %s\n\n' "${c_d}所要 ${human}（最初の達成から最後の達成まで）${c_0}"
+
+  printf '  %s\n\n' "${c_b}自分の手で確かめたこと${c_0}"
+  for n in $(exercises); do
+    local l; l=$(meta_get "$n" learned)
+    [ -n "$l" ] || l=$(meta_get "$n" title)
+    printf '   %s %s  %s\n' "$(mark "$(prog_get "$n")")" "$n" "$l"
+  done
+  printf '\n'
+
+  if [ -n "$spine" ]; then
+    printf '  %s\n\n' "この${total}つは全部、1つの事実から出ていました。"
+    printf '%s\n' "$spine" | sed "s/^/      ${c_b}/; s/$/${c_0}/"
+    printf '\n'
+  fi
+
+  if [ "$solved" -gt 0 ]; then
+    printf '  %s\n' "${c_d}うち ${solved} 問は lab solve を見ました（◍）。気になるなら lab reset で解き直せます${c_0}"
+  fi
+  [ -n "$link" ] && printf '  %s\n' "${c_d}理論編の最終章に、それぞれがどう繋がるかを書いてあります → ${link}${c_0}"
+  printf '\n'
 }
 
 cmd_hint() {

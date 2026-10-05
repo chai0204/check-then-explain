@@ -50,7 +50,7 @@ Error: stepping, database is locked (5)</code></pre>
 
 <div class="quiz"><h4>確認問題</h4><ol>
 <li><code>database is locked</code> が、ほとんど待ち時間なしで返ってきた。ここから相手のプロセスの状態について何か言えるか。</li>
-<li>このメッセージを出力したのは、どのプロセスか。</li>
+<li>その <code>database is locked</code> という文字列を画面に出力したのは、どのプロセスか。</li>
 </ol><details><summary>答え</summary>
 <p><b>1.</b> 何も言えない。待ち時間の長短は相手の状態ではなく、自分側の <code>busy_timeout</code> が決めている。既定は「待たない」なので、相手が 1 ミリ秒後に終わる場合でも同じように即座に返る。</p>
 <p><b>2.</b> 自分が起動した <code>sqlite3</code> プロセス。相手のプロセスから送られてきた返事ではない。だから相手の名前も入っていない。</p>
@@ -281,7 +281,7 @@ WAL は<strong>本体に触らず別ファイルに書き足す</strong>ので�
 
 <p>いいことばかりではない。実測で出た代償を挙げる。</p>
 
-<h3 id="cost-ro">1. 読み取り専用の場所に置くと、読むことすらできなくなる</h3>
+<h3 id="cost-ro">1. 読み取り専用の場所では、条件が揃わないと開けない</h3>
 
 <p>WAL の DB を、書き込めないディレクトリに置いて <code>SELECT</code> するだけでこうなる。</p>
 
@@ -289,15 +289,30 @@ WAL は<strong>本体に触らず別ファイルに書き足す</strong>ので�
 $ sqlite3 ro/w.db 'SELECT count(*) FROM t;'
 Error: in prepare, attempt to write a readonly database (8)</code></pre>
 
-<p><strong>読むだけなのに失敗する。</strong><code>-shm</code>（プロセス間で読み取り位置を共有する領域）を
-作ろうとして、ディレクトリに書けずに止まっている。
-読み取り専用だと分かっているなら、そう宣言すれば読める。</p>
+<p><strong>読むだけなのに失敗した。</strong><code>-shm</code>（プロセス間で読み取り位置を共有する領域）を
+作ろうとして、ディレクトリに書けずに止まっている。</p>
+
+<p>ただし「WAL だと読み取り専用で開けない」と覚えるのは<strong>正確ではない</strong>。
+これは 3.22.0（2018-01-22）より前の制約で、現在は緩和されている。
+<a href="https://www.sqlite.org/wal.html">公式の WAL 解説</a>は、次の<strong>いずれか1つ</strong>を
+満たせば読めると書いている。</p>
+
+<ul>
+<li><code>-shm</code> と <code>-wal</code> が既に存在して、読めること</li>
+<li>DB のあるディレクトリに書き込み権限があること（<code>-shm</code> を作れる）</li>
+<li><code>immutable</code> を付けて開くこと</li>
+</ul>
+
+<p>上の実測は3つとも満たしていない（ディレクトリを読み取り専用にし、<code>-shm</code> も無く、
+<code>immutable</code> も付けていない）。3つ目を満たすと読める。</p>
 
 <pre><code>$ sqlite3 'file:ro/w.db?immutable=1' 'SELECT count(*) FROM t;'
 4000</code></pre>
 
-<p>CD-ROM や読み取り専用マウント、コンテナイメージに焼き込んだ DB を配る場合、
-<strong>WAL にしてあると開けない</strong>。<code>delete</code> のままなら読むだけなら通る。</p>
+<p>そのうえで公式はこう添えている。<strong>読み取り専用メディアに焼く前には
+<code>journal_mode=DELETE</code> に戻しておくのが良い作法である</strong>と。
+CD-ROM、読み取り専用マウント、コンテナイメージに焼き込んだ DB を配る場合は、
+WAL のままにしない。</p>
 
 <h3 id="cost-files">2. ファイルが増え、しかも見える時間が限られる</h3>
 
@@ -314,9 +329,135 @@ Error: in prepare, attempt to write a readonly database (8)</code></pre>
 
 <h3 id="cost-net">3. ネットワークファイルシステムで使えない</h3>
 
-<p><code>-shm</code> はプロセス間で共有するメモリを<strong>mmap で実現している</strong>。
-NFS のようなネットワーク越しのファイルシステムでは、この共有が別のマシン間では成立しない。
-同じマシンのプロセス同士なら動くが、複数のマシンから同じ DB を開く用途には使えない。</p>
+<p>公式の欠点リストの先頭がこれである。
+<strong>「WAL を使うすべてのプロセスは同じホストにある必要がある。別のマシンのプロセス同士は
+メモリを共有できないからだ」</strong>と書かれている。</p>
+
+<p><code>-shm</code>（wal-index）を各プロセスが <strong>mmap して共有メモリとして使う</strong>ためで、
+NFS 越しではこの共有が成立しない。</p>
+
+<p>なぜ <code>/dev/shm</code> のような専用の場所ではなく、DB の隣に普通のファイルを置いて
+mmap しているのか。公式に理由が書かれている。<strong>chroot でルートが違うプロセスは
+別のファイルを見てしまい、別々の共有メモリを使って DB を壊す</strong>から、
+「同じ DB ファイルを開くプロセスが必ず同じ共有メモリを使う」ことを保証する唯一の方法として、
+DB と同じディレクトリのファイルを mmap している。</p>
+
+<p>ここでも「別のファイルを DB の隣に作る」が出てくる。第5章と同じ構造である。</p>
+
+<h3 id="cost-durable">4. 速さの大半は、耐久性を売って買っている</h3>
+
+<p>これが見落とされやすい。<code>journal_mode</code> と対になる
+<code>synchronous</code> という設定があり、こちらは「どこまでディスクの返事を待つか」を決める。
+既定は <code>2</code>（FULL）で、<strong>WAL にしても自動では変わらない</strong>。</p>
+
+<pre><code>$ sqlite3 d.db 'PRAGMA synchronous;'
+2</code></pre>
+
+<p>公式が載せている組み合わせの表がこうなっている。</p>
+
+<div class="scroll"><table>
+<tr><th><code>synchronous</code></th><th>ロールバック方式</th><th>WAL</th></tr>
+<tr><td>EXTRA (3)</td><td>ACID</td><td>ACID</td></tr>
+<tr><td>FULL (2)（既定）</td><td>耐久性が無いかもしれない</td><td><strong>ACID</strong></td></tr>
+<tr><td>NORMAL (1)</td><td>一貫性が無いかもしれない</td><td><strong>耐久性が無いかもしれない</strong></td></tr>
+<tr><td>OFF (0)</td><td>一貫性が無い</td><td>一貫性が無い</td></tr>
+</table></div>
+
+<p>WAL + NORMAL の欄が「耐久性が無いかもしれない」である。
+これは<strong>電源が落ちると、直近のコミットが巻き戻ることがある</strong>という意味である
+（壊れるのではなく、無かったことになる）。</p>
+
+<p>そして公式自身が、<strong>WAL にするなら FULL から NORMAL へ変えることを推奨している</strong>。
+WAL では NORMAL でも整合性は保証され、コミットが大幅に速くなるからである。</p>
+
+<div class="analogy"><b>たとえ</b>: FULL は<b>毎回「書けましたね？」と相手に確認してから次へ進む</b>。
+NORMAL は<b>確認を省いて進み、区切りのいいところでまとめて確認する</b>。
+<br>ただし<b>崩れる点</b>: 省いているのは確認だけで、書く順番は守られている。
+だから「途中まで混ざった壊れ方」にはならない。消えるのは<b>末尾のまとまり</b>だけである。</div>
+
+<p>つまり「WAL は速い」と言われる速さの大部分は、<strong>この取引で買っている</strong>。
+何を売ったのかを知らずに WAL を既定にするのが、いちばん危ない。</p>
+
+<h2 id="trend">「とりあえず WAL」という風潮はあるのか</h2>
+<div class="sgoal"><b>この節で分かること</b>: 実在する。ただし SQLite 公式の既定ではなく、周辺が既定にしている。</div>
+
+<p>WAL を勧める記事は多い。実際にどうなっているかを、各プロジェクトの公式ドキュメントと
+実際の設定値で確かめた。<strong>既定にしている側と、していない側が同じくらいある。</strong></p>
+
+<div class="scroll"><table>
+<tr><th>既定で WAL にする・必須にする</th><th>既定にしない</th></tr>
+<tr><td>
+Rails（ActiveRecord、7.1 以降）<br>
+Room（Android。3 では明示的に既定）<br>
+Core Data（iOS 7 / OS X Mavericks 以降）<br>
+Litestream（WAL 必須。自動で設定する）
+</td><td>
+<strong>SQLite 本体</strong>（既定は <code>delete</code>）<br>
+Django（設定も推奨もしていない）<br>
+Laravel（キーはあるが既定は未設定）<br>
+Python 標準の <code>sqlite3</code>（言及すら無い）<br>
+Android の <code>SQLiteDatabase</code>（既定は <code>truncate</code>）
+</td></tr>
+</table></div>
+
+<p>推奨はするが自動では設定しない、という中間もある（better-sqlite3、Expo SQLite、Bun の
+<code>bun:sqlite</code> はいずれもドキュメントで推奨しつつ、既定は <code>delete</code> のまま）。</p>
+
+<h3 id="trend-rails">「とりあえず」ではない例 — Rails の設定</h3>
+
+<p>Rails が既定にしているのは <code>journal_mode</code> だけではない。
+同時にこれらを設定している。</p>
+
+<div class="scroll"><table>
+<tr><th>設定</th><th>何に対応しているか</th></tr>
+<tr><td><code>journal_mode: wal</code></td><td>読み手が書き手を止めないようにする</td></tr>
+<tr><td><code>synchronous: normal</code></td><td>速さのために耐久性を売る（代償4を承知の上で選んでいる）</td></tr>
+<tr><td><code>journal_size_limit: 64MB</code></td><td><code>-wal</code> が無限に伸びるのを止める（代償2への対策）</td></tr>
+</table></div>
+
+<p>つまり<strong>この章で挙げた代償を1つずつ潰した結果としての WAL</strong>である。
+「とりあえず」ではない。真似するなら、この3つをまとめて真似するのが筋になる。</p>
+
+<h3 id="trend-apple">代償が実際に起きた例 — Core Data</h3>
+
+<p>Apple は iOS 7 で Core Data の既定を WAL に変えた。その結果、
+<strong>ストアのファイルをコピーしたり移動したりすると失敗する</strong>という事例が出て、
+Apple はそれ専用の技術 Q&amp;A（QA1809）を書いている。対処として案内されているのは
+<code>journal_mode</code> を <code>DELETE</code> に戻す設定である。</p>
+
+<p>代償2（ファイルが増える）が、実際に大規模に発生した記録として読める。</p>
+
+<h3 id="trend-why">なぜ SQLite 公式は既定を変えないのか</h3>
+
+<p><strong>公式がこれを説明している箇所は見つけられなかった。</strong>
+<code>wal.html</code>、<code>pragma.html</code>、「SQLite が向く用途」のページまで探したが、
+欠点の一覧と「既定は <code>delete</code> である」という事実しか書かれていない
+（そもそも「SQLite が向く用途」のページには WAL の語が1度も出てこない）。</p>
+
+<p>推測としていちばん強いのは<strong>後方互換性</strong>である。WAL にすると
+DB ヘッダの2バイトが 1 から 2 に変わり、3.7.0（2010年）より前の SQLite は
+そのファイルを「暗号化されているか、DB ではない」と報告して開けなくなる。
+既定を WAL にすれば、新しく作られるすべての DB が古い実装から読めなくなる。
+加えて、<code>-wal</code> と <code>-shm</code> が増えることは
+「1ファイルで持ち運べる」という SQLite の最大の売りを削る。</p>
+
+<div class="note warn">ただし<strong>これは推測である</strong>。公式がそう書いているわけではない。
+この章でここだけが、実測でも一次情報でも裏が取れていない部分である。</div>
+
+<h3 id="trend-answer">結論</h3>
+
+<p>「とりあえず WAL」で困らない場面は多い。1つのプロセスだけが書き、読み手が複数いて、
+ローカルのディスクに置いてあり、電源断で直近の数件が消えても困らないなら、
+WAL は素直に効く。<strong>そうでない条件が1つでもあるなら、この章の4つの代償を確認する</strong>。</p>
+
+<div class="scroll"><table>
+<tr><th>こういう場合</th><th>見るべき代償</th></tr>
+<tr><td>読み取り専用メディアやイメージに焼いて配る</td><td>代償1（<code>DELETE</code> に戻す）</td></tr>
+<tr><td>ファイルをコピー・バックアップして運用する</td><td>代償2（3つまとめて扱う）</td></tr>
+<tr><td>NFS など複数マシンから開く</td><td>代償3（WAL は使えない）</td></tr>
+<tr><td>電源断で直近のコミットを失えない</td><td>代償4（<code>synchronous</code> を確認する）</td></tr>
+<tr><td>書き込みが複数から同時に来る</td><td><strong>そもそも WAL では解決しない</strong>（この章の主題）</td></tr>
+</table></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
@@ -329,6 +470,8 @@ NFS のようなネットワーク越しのファイルシステムでは、こ�
 <li><strong>WAL が解決するのは「読み手が書き手を止めること」だけ。</strong><code>delete</code> では読み取りを保持するだけで書き込みが弾かれるが、WAL では通る。書き手同士が排他なのは両方とも同じ</li>
 <li>WAL には代償がある。<strong>読み取り専用の場所に置くと読むことすらできなくなり</strong>（<code>-shm</code> を作れない）、ファイルが3つに増え、ネットワークファイルシステムでは使えない</li>
 <li>どちらのモードでも<strong>本体とは別のファイルを同じディレクトリに作る</strong>。これが第5章で踏む落とし穴の原因になる</li>
+<li><strong>WAL の速さの大半は耐久性を売って買っている。</strong><code>synchronous</code> の既定は FULL のままで WAL にしても変わらず、公式は WAL なら NORMAL への変更を推奨している。NORMAL では電源断で直近のコミットが巻き戻りうる</li>
+<li>「とりあえず WAL」は実在する風潮だが、<strong>SQLite 公式の既定ではない</strong>。Rails は WAL と同時に <code>synchronous: normal</code> と <code>journal_size_limit</code> も設定している。真似するならまとめて真似する</li>
 </ul></div>
 
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/&lt;owner&gt;/lab-sqlite:1.0.0 / Ubuntu 24.04.5 LTS / sqlite3 3.45.1 / apt snapshot 20260929T000000Z / amd64 で検証（Apple Silicon は未検証）/ 検証日 2026-09-30</div>
