@@ -50,7 +50,24 @@ node tools/check.mjs public
 node tools/serve.mjs public 8788
 ```
 
-## 読者への配布
+## 手元でローカルビルドしたイメージを試す
+
+GHCR へ push する前は **`--pull=always` を付けてはいけない**。レジストリに無いので落ちる。
+
+```
+docker: Error response from daemon: pull access denied for lab-sqlite,
+repository does not exist or may require 'docker login'
+```
+
+```sh
+docker run --rm -it --name lab-sqlite --cap-add NET_RAW \
+  -v lab-sqlite-work:/home/lab/work -v lab-sqlite-state:/home/lab/.lab \
+  lab-sqlite:1.0.0
+```
+
+bind mount を使わないので、**ホストのどのディレクトリから打っても結果は同じ**。
+
+## 読者への配布（GHCR へ push した後）
 
 ```sh
 docker run --rm -it --name lab-sqlite --pull=always --cap-add NET_RAW \
@@ -60,6 +77,7 @@ docker run --rm -it --name lab-sqlite --pull=always --cap-add NET_RAW \
 
 `-v ...-state` を省くと進捗が毎回消える。`--cap-add NET_RAW` は Podman の rootless が
 この権限を既定で落とすため（Docker では冗長だが害はない）。
+`--pull=always` は、読者の手元の古いキャッシュと本文のタグがずれる事故を防ぐために付ける。
 
 ## 未了
 
