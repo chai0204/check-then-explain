@@ -56,15 +56,24 @@ node tools/serve.mjs public 8788
 
 ```sh
 npm install                 # jsdom（devDependency。サイト本体の依存は0のまま）
-npm run render-check        # 辞書を実際に描画して、語・章リンク・検索を確認する
+npm run render-check        # 全ページを実際に描画して確認する（下記）
 npm run check               # = node tools/check.mjs public
 npm run check:publish       # = --publish 付き
 npm run serve               # = ローカルサーバ
 ```
 
 `render-check` は jsdom が無ければ何もせず成功で抜ける。
-`check.mjs` が見るのは要素とデータの有無までで、**「辞書が空で表示される」は検出できない**。
+`check.mjs` が見るのは要素とデータの有無までなので、次の3つは検出できない。
 そこだけ実描画で確かめている。
+
+| 実描画でしか分からないこと | 確認する数 |
+|---|---|
+| 辞書が空で表示される | 語数・章リンク数・検索の絞り込み件数 |
+| 進捗バーが出ない | `.chapnav` の有無・章リストの数・現在章の印が1つか |
+| **用語リンクがコードブロックに漏れる** | `pre`/`code`/`h2` 内のリンク数が 0 か |
+
+最後の1つは、漏れるとコードが読めなくなる。`shared/theory.js` の除外タグを
+壊して実際に鳴ることを確認済み（`pre内に3本・code内に7本` が出る）。
 
 ## 手元でローカルビルドしたイメージを試す
 
