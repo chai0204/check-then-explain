@@ -144,6 +144,32 @@ for (const f of htmls.filter((f) => /glossary\.html$/.test(f))) {
     err(f, "辞書ページが shared/theory.js を読んでいる（辞書の中で自動リンクが走る）");
 }
 
+// ---- 4b. 公開前に残っていてはいけないプレースホルダ ----
+// 置換漏れは文字列の完全一致で判定できるので誤報しない。
+// ただし制作中は残っているのが正常なので、--publish を付けたときだけ error にする。
+const PUBLISH = process.argv.includes("--publish");
+const PLACEHOLDERS = [
+  "ghcr.io/OWNER",
+  "ghcr.io/&lt;owner&gt;",   // HTML エスケープされた綴り。別物として数える
+  "REPORT_URL",
+  "chai0204/REPO",
+  "<REPO>",
+];
+let phTotal = 0;
+for (const f of htmls) {
+  const html = readFileSync(f, "utf8");
+  for (const ph of PLACEHOLDERS) {
+    const n = html.split(ph).length - 1;
+    if (n > 0) {
+      phTotal += n;
+      (PUBLISH ? err : warn)(f, `プレースホルダが残っている: ${ph} ×${n}`);
+    }
+  }
+}
+if (phTotal > 0 && !PUBLISH) {
+  console.log(`\n  ※ プレースホルダ ${phTotal} 箇所。公開前に \`--publish\` を付けて走らせると error になります`);
+}
+
 // ---- 5. 用語の自動リンクが実際に発火するか ----
 // shared/theory.js は pre / code / h1-h4 / a / summary / nav と .no-term を走査しない。
 // 辞書に登録したのに、本文では常に <code> の中にしか出てこない語はリンクされない。
