@@ -293,6 +293,62 @@ for (const f of htmls.filter((f) => /glossary\.html$/.test(f))) {
   }
 }
 
+// ---- 4g. 読者に打たせてはいけないもの（憲章 §3） ----
+// 読者が見るページの docker run / podman run だけを対象にする。
+// README（著者向け）は対象外。
+for (const f of htmls) {
+  const h = readFileSync(f, "utf8");
+  for (const m of h.matchAll(/<pre><code>([\s\S]*?)<\/code><\/pre>/g)) {
+    const cmd = m[1];
+    if (!/\b(docker|podman)\s+run\b/.test(cmd)) continue;
+
+    if (/--privileged/.test(cmd)) err(f, "読者のコマンドに --privileged がある");
+
+    // bind mount は使わない（ホストを書き換える経路を構造的に作らない）。
+    // 名前付きボリュームは先頭が英数字なので、/ . $ ~ で始まるものだけを拾う。
+    for (const v of cmd.matchAll(/-v\s+([^\s:]+):/g)) {
+      if (/^[/.$~]/.test(v[1])) err(f, `読者のコマンドに bind mount がある: -v ${v[1]}:`);
+    }
+
+    // publish は待ち受け IP を書く。-p 8080:8080 はホストの firewall を貫通して LAN に出る。
+    for (const pm of cmd.matchAll(/-p\s+(\S+)/g)) {
+      const spec = pm[1];
+      if (!/^\d{1,3}(\.\d{1,3}){3}:/.test(spec) && !/^\[/.test(spec))
+        err(f, `読者のコマンドの -p ${spec} に待ち受け IP が無い（LAN に出る）`);
+    }
+  }
+}
+
+// ---- 4h. コンテナ定義（憲章 §8 の 4・5） ----
+// public/ の外にあるので、ディレクトリが存在するときだけ検査する。
+const containersDir = resolve(ROOT, "..", "containers");
+if (existsSync(containersDir)) {
+  const repoRoot = resolve(ROOT, "..");
+  for (const f of walk(containersDir)) {
+    const name = relative(repoRoot, f);
+
+    if (/compose\.ya?ml$/.test(f)) {
+      if (/^\s*privileged:\s*true/m.test(readFileSync(f, "utf8")))
+        errors.push(`${name}: privileged: true がある（読者に特権を渡さない）`);
+    }
+
+    if (/Dockerfile$/.test(f)) {
+      const d = readFileSync(f, "utf8");
+      const froms = [...d.matchAll(/^FROM\s+(\S+)/gm)].map((m) => m[1]);
+      for (const img of froms) {
+        if (img.includes("@sha256:")) continue;                    // digest 固定
+        if (/^lab-[a-z0-9-]+:\d+\.\d+\.\d+$/.test(img)) continue;  // 自前の固定タグ
+        errors.push(`${name}: FROM ${img} が固定されていない（digest を書く）`);
+      }
+      // 外部イメージから apt を使うなら時刻で固定する。
+      // lab-base から派生した層は base の sources.list を継承するので対象外。
+      const fromExternal = froms.some((i) => !/^lab-/.test(i));
+      if (fromExternal && /apt-get/.test(d) && !/snapshot\.ubuntu\.com/.test(d))
+        errors.push(`${name}: 外部イメージから apt を使っているが snapshot.ubuntu.com を指していない`);
+    }
+  }
+}
+
 // ---- 5. 用語の自動リンクが実際に発火するか ----
 // shared/theory.js は pre / code / h1-h4 / a / summary / nav と .no-term を走査しない。
 // 辞書に登録したのに、本文では常に <code> の中にしか出てこない語はリンクされない。
