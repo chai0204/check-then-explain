@@ -27,7 +27,19 @@ createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, "http://x").pathname);
   if (path.includes("..")) { res.writeHead(400).end("bad path"); return; }
   const found = await pick(join(ROOT, path));
-  if (!found) { res.writeHead(404, { "content-type": "text/plain" }).end("404 " + path); return; }
+  if (!found) {
+    // 本番は wrangler の not_found_handling: "404-page" が public/404.html を返す。
+    // ここで text/plain を返すと、404 ページの見た目をローカルで確認できなくなる。
+    const page = join(ROOT, "404.html");
+    try {
+      const body = await readFile(page);
+      res.writeHead(404, { "content-type": TYPES[".html"] });
+      res.end(body);
+    } catch {
+      res.writeHead(404, { "content-type": "text/plain; charset=utf-8" }).end("404 " + path);
+    }
+    return;
+  }
   res.writeHead(200, { "content-type": TYPES[extname(found)] ?? "application/octet-stream" });
   res.end(await readFile(found));
 }).listen(PORT, "127.0.0.1", () => console.log(`serving ${ROOT} on http://127.0.0.1:${PORT}`));
