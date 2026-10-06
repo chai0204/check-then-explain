@@ -1,0 +1,78 @@
+name: 本文と違う出力が出た
+description: 本文に載っている出力と、あなたの画面に出た出力が違う
+title: "[出力の不一致] "
+labels: ["output-mismatch"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        このシリーズは **本文のコマンドが、あなたの画面に本文と同じ文字を出す** ことを約束しています。
+        違ったときは**教材のバグ**です。報告していただけると直します。
+
+        そのためにイメージのダイジェストと apt の時刻を固定し、本文に載せる出力はすべて
+        そのイメージの中で実際に打った記録にしていますが、**それでも環境差は残ります**。
+
+        先に1つだけ確認してください。**カーネルの行だけは、あなたのホストの値が出ます**
+        （コンテナはホストのカーネルを使うため）。そこが違うのは正常です。
+
+  - type: input
+    id: page
+    attributes:
+      label: どのページか
+      description: URL をそのまま貼ってください
+      placeholder: "https://.../sqlite/theory/04-lock"
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: 打ったコマンド
+      description: コピーしてそのまま貼ってください。前後の `cd` も含めてもらえると切り分けが速くなります
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 本文に載っている出力
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: あなたの画面に出た出力
+      description: 一部ではなく全部貼ってください。省いた行に原因があることがよくあります
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: lab env の全文
+      description: コンテナの中で `lab env` を打って、出力をそのまま貼ってください
+      render: text
+      placeholder: |
+        テーマ    : lab-sqlite 1.0.0
+        イメージ  : ghcr.io/.../lab-sqlite:1.0.0
+        ベース    : Ubuntu 24.04.5 LTS
+        apt 固定  : 20260929T000000Z
+        カーネル  : 7.2.6
+        アーキ    : x86_64
+        ランタイム: docker
+        特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+    validations:
+      required: true
+
+  - type: input
+    id: host
+    attributes:
+      label: ホストの OS
+      description: コンテナを動かしているマシンのほうです（任意）
+      placeholder: "macOS 15 (Apple Silicon) / Windows 11 + WSL2 / Ubuntu 24.04"
+    validations:
+      required: false

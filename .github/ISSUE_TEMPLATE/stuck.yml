@@ -1,0 +1,66 @@
+name: 詰まった・指示が分からなかった
+description: 書いてあることの意味が取れない、何をすればいいか分からない、進めなくなった
+title: "[詰まった] "
+labels: ["stuck"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **これがいちばん報告してほしい種類です。**
+
+        著者は手が覚えているので、**必要な1行が抜けていても自分では気づけません**。
+        機械検査にも、著者自身の実機検証にも出ません。読者が詰まったときにだけ見つかります。
+
+        実例として、SQLite 編は著者が通した時点で4箇所の不備が出ましたが、
+        そのうち3件はこの種類でした。作業ディレクトリへの移動が書かれていない／
+        記録の取り方が散文で何を貼るのか分からない／確認問題の前提が足りない。
+
+        **「自分の読み方が悪いのかも」と思う必要はありません。** 書き方の問題として扱います。
+
+  - type: input
+    id: page
+    attributes:
+      label: どのページ・どの演習か
+      placeholder: "https://.../sqlite/ の演習04 / 理論編3章の確認問題"
+    validations:
+      required: true
+
+  - type: textarea
+    id: quote
+    attributes:
+      label: 分からなかった箇所
+      description: 本文をそのまま引用してください
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 何が分からなかったか
+      description: |
+        言葉にしづらければ箇条書きでも、一言でも構いません。例:
+        - どこで作業するのか書いていない
+        - 「出たメッセージ」が2つの出力のどちらを指すのか分からない
+        - その問題がどういう状況の話なのか分からない
+        - 次に何を打てばいいのか分からない
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: どうしたか（任意）
+      description: 自分で解決した場合、何をしたら進めたかを書いてもらえると、本文にそれを足せます
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: env
+    attributes:
+      label: lab env の全文（任意）
+      description: 演習中に詰まった場合のみ。コンテナの中で `lab env` を打ってください
+      render: text
+    validations:
+      required: false
