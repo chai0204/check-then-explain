@@ -60,7 +60,7 @@ repository does not exist or may require 'docker login'
 ```
 
 ```sh
-docker run --rm -it --name lab-sqlite --cap-add NET_RAW \
+docker run --rm -it --name lab-sqlite \
   -v lab-sqlite-work:/home/lab/work -v lab-sqlite-state:/home/lab/.lab \
   lab-sqlite:1.0.0
 ```
@@ -70,17 +70,44 @@ bind mount を使わないので、**ホストのどのディレクトリから�
 ## 読者への配布（GHCR へ push した後）
 
 ```sh
-docker run --rm -it --name lab-sqlite --pull=always --cap-add NET_RAW \
+docker run --rm -it --name lab-sqlite --pull=always \
   -v lab-sqlite-work:/home/lab/work -v lab-sqlite-state:/home/lab/.lab \
   ghcr.io/OWNER/lab-sqlite:1.0.0
 ```
 
-`-v ...-state` を省くと進捗が毎回消える。`--cap-add NET_RAW` は Podman の rootless が
-この権限を既定で落とすため（Docker では冗長だが害はない）。
+`-v ...-state` を省くと進捗が毎回消える。
 `--pull=always` は、読者の手元の古いキャッシュと本文のタグがずれる事故を防ぐために付ける。
+
+podman でも同じコマンドが通る（`docker` を `podman` に置き換える）。
+**podman 5.8.6 rootless で SQLite 編の全5演習の判定が通ることを実測した**（2026-10-06）。
+Rancher Desktop / Colima と、WASM 編の podman は未検証。
 
 ## 未了
 
+- シリーズ名の確定（リポジトリ名・サイトタイトル）
 - GHCR への push（`OWNER` が未確定）
 - 本番デプロイ（Cloudflare Workers）。`wrangler.jsonc` は未作成
+- コメント機能（giscus を想定。リポジトリ確定後）
 - 全文検索（Pagefind）。3テーマ目から入れる方針
+
+## 付録: `--cap-add NET_RAW` を外した理由（2026-10-06 実測）
+
+初版では読者に `--cap-add NET_RAW` を打たせ、本文に
+「Podman の rootless がこの権限を既定で落とすため」と書いていた。実測したら**何もしていなかった**。
+
+| 構成 | CapBnd | CapPrm | CapEff |
+|---|---|---|---|
+| docker 29.8.0・NET_RAW なし・uid 1000 | `a80425fb` | 0 | 0 |
+| docker 29.8.0・NET_RAW あり・uid 1000 | `a80425fb` | 0 | 0 |
+| docker 29.8.0・NET_RAW あり・uid 0 | `a80425fb` | `a80425fb` | `a80425fb` |
+| podman 5.8.6 rootless・uid 1000 | `800405fb` | 0 | 0 |
+
+- `CAP_NET_RAW`（bit 13）は **Docker の既定14個に最初から入っている**。
+  `--cap-add` しても `CapBnd` が1ビットも変わらない
+- イメージは `USER lab`（uid 1000）で動く。**非 root の execve では permitted/effective が落ちる**ので、
+  bounding に入っていても使えない。上の表の1行目と2行目が完全に同一なのがその証拠
+- SQLite / WASM の演習はネットワークを一切使わない。`ping` / `tcpdump` / `netem` はどの課題文にも無い
+
+ネットワーク系テーマ（TCP / HTTPS / VPN）で非 root に `ping` を使わせるなら、
+`--cap-add` ではなくイメージ側の `setcap cap_net_raw+ep` か ambient capability が要る。
+**Docker の `--cap-add` は ambient を設定しない**（上の表で `CapAmb` が常に 0）。

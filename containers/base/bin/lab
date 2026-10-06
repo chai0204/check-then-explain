@@ -271,8 +271,21 @@ cmd_env() {
   printf 'apt 固定  : %s\n' "${LAB_APT_SNAPSHOT:-未設定}"
   printf 'カーネル  : %s\n' "$(uname -r)"
   printf 'アーキ    : %s\n' "$(uname -m)"
+  # ランタイムは不具合の切り分けに要る。既定の Bounding セットが両者で違う
+  # （実測 2026-10-06: docker 29.8.0 → a80425fb / podman 5.8.6 rootless → 800405fb）。
+  # 判別は両者が置くファイルで行う。podman は /run/.containerenv、docker は /.dockerenv。
+  local rt
+  if   [ -e /run/.containerenv ]; then rt=podman
+  elif [ -e /.dockerenv ];        then rt=docker
+  else                                 rt='不明'
+  fi
+  printf 'ランタイム: %s\n' "$rt"
   if [ -x "$LAB_HOME/bin/env-extra" ]; then "$LAB_HOME/bin/env-extra"; fi
-  printf '特権      : CapEff=%s\n' "$(awk '/^CapEff/{print $2}' /proc/self/status)"
+  # CapEff はこのイメージでは常に 0（uid 1000 で動くため --cap-add は effective に入らない）。
+  # 0 でないなら読者が --user 0 などで起動している。CapBnd はランタイムの既定を示す。
+  printf '特権      : CapEff=%s CapBnd=%s\n' \
+    "$(awk '/^CapEff/{print $2}' /proc/self/status)" \
+    "$(awk '/^CapBnd/{print $2}' /proc/self/status)"
 }
 
 cmd_diff() {

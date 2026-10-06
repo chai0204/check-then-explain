@@ -27,7 +27,6 @@
 
 <pre><code>docker run --rm -it \
   --name lab-wasm --pull=always \
-  --cap-add NET_RAW \
   -v lab-wasm-work:/home/lab/work \
   -v lab-wasm-state:/home/lab/.lab \
   ghcr.io/OWNER/lab-wasm:1.0.0</code></pre>
@@ -41,7 +40,9 @@
 </table></div>
 
 <div class="note warn"><b>Docker Desktop が使えない場合</b>:
-  Podman Desktop / Rancher Desktop / Colima で同じコマンドが通ります。<br>
+  <code>docker</code> を <code>podman</code> に置き換えてください。
+  <b>このテーマは podman では未検証です</b>（SQLite 編は podman 5.8.6 rootless で
+  全演習が通ることを確認しましたが、WASM 編ではまだ試していません）。<br>
   <b>後片付け</b>: <code>docker volume rm lab-wasm-work lab-wasm-state</code></div>
 
 <h2 id="lab">コンテナの中のコマンド</h2>
@@ -86,9 +87,14 @@
 イメージ  : ghcr.io/&lt;owner&gt;/lab-wasm:1.0.0
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
-カーネル  : ...
+カーネル  : 7.2.6
 アーキ    : x86_64
-特権      : CapEff=0000000000000000</code></pre>
+ランタイム: docker
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb</code></pre>
+<p class="detail">このうち<b>カーネル行だけは、あなたのホストの値が出ます</b>（コンテナはホストのカーネルを使うため）。
+   podman で起動した場合は <code>ランタイム: podman</code>、<code>CapBnd</code> は
+   <code>00000000800405fb</code> になります（既定のケーパビリティが Docker より3つ少ない）。
+   どちらも正常です。<code>CapEff</code> が 0 でないなら、<code>--user 0</code> などを付けて起動しています。</p>
 <p>報告先は <a href="REPORT_URL">こちら</a>。</p>
 <div class="note warn">なお <code>wasmtime run --invoke</code> は
   <b>警告を2行出します</b>（引数と戻り値を伴う呼び出しが experimental であるため）。
