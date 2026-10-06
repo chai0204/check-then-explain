@@ -170,6 +170,51 @@ if (phTotal > 0 && !PUBLISH) {
   console.log(`\n  ※ プレースホルダ ${phTotal} 箇所。公開前に \`--publish\` を付けて走らせると error になります`);
 }
 
+// ---- 4c. ドラフト指定の整合 ----
+// 「著者が読者として通していないテーマ」には全ページに警告が要る。
+// 検索経由で章に直接来る読者がいるため、1ページ抜けると警告を見ない読者が発生する。
+// 指定（body の data-draft）と表示（div.draftbar）が1対1であることを機械で保証する。
+const themeDirs = [...new Set(
+  htmls.map((f) => relative(ROOT, f)).filter((r) => r.includes("/")).map((r) => r.split("/")[0])
+)];
+const draftThemes = new Set();
+for (const theme of themeDirs) {
+  const pages = htmls.filter((f) => relative(ROOT, f).startsWith(theme + "/"));
+  if (!pages.length) continue;
+  const drafted = [];
+  for (const f of pages) {
+    const h = readFileSync(f, "utf8");
+    const d = /<body[^>]*\bdata-draft="1"/.test(h);
+    const b = /class="draftbar/.test(h);
+    if (d) drafted.push(f);
+    if (d && !b) err(f, 'data-draft="1" があるのに draftbar の警告が本文に無い');
+    if (b && !d) err(f, 'draftbar があるのに body に data-draft="1" が無い');
+  }
+  if (drafted.length === pages.length && pages.length > 0) draftThemes.add(theme);
+  else if (drafted.length > 0) {
+    const missing = pages.filter((f) => !drafted.includes(f)).map((f) => relative(ROOT, f));
+    err(drafted[0], `テーマ ${theme} のドラフト指定が ${drafted.length}/${pages.length} ページしか無い。抜け: ${missing.join(", ")}`);
+    draftThemes.add(theme);
+  }
+}
+
+// ポータルの印が、実際のドラフト状態と一致しているか
+const topPage = join(ROOT, "index.html");
+if (existsSync(topPage)) {
+  const h = readFileSync(topPage, "utf8");
+  for (const theme of themeDirs) {
+    if (!htmls.some((f) => relative(ROOT, f).startsWith(theme + "/"))) continue;
+    const isDraft = draftThemes.has(theme);
+    const links = [...h.matchAll(/<a\s[^>]*href="\/([^/"]+)\/[^"]*"[\s\S]*?<\/a>/g)].filter((m) => m[1] === theme);
+    for (const m of links) {
+      const tagged = /class="tag draft"/.test(m[0]);
+      if (isDraft && !tagged) err(topPage, `ドラフトのテーマ ${theme} へのリンクに「ドラフト」の印が無い`);
+      if (!isDraft && tagged) err(topPage, `ドラフトでないテーマ ${theme} に「ドラフト」の印が付いている`);
+    }
+  }
+}
+if (draftThemes.size) console.log(`  ドラフト扱いのテーマ: ${[...draftThemes].join(", ")}`);
+
 // ---- 5. 用語の自動リンクが実際に発火するか ----
 // shared/theory.js は pre / code / h1-h4 / a / summary / nav と .no-term を走査しない。
 // 辞書に登録したのに、本文では常に <code> の中にしか出てこない語はリンクされない。
