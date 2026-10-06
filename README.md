@@ -87,7 +87,9 @@ Rancher Desktop / Colima と、WASM 編の podman は未検証。
 - シリーズ名の確定（リポジトリ名・サイトタイトル）
 - GHCR への push（`OWNER` が未確定）
 - 本番デプロイ（Cloudflare Workers）。`wrangler.jsonc` は未作成
-- コメント機能（giscus を想定。リポジトリ確定後）
+- コメント機能の設定値（giscus は実装済み。`GISCUS_REPO` 等3つがプレースホルダ）
+- CSP ヘッダー（`public/_headers`）。giscus を入れたので
+  `script-src`/`frame-src` に `https://giscus.app` が要る。未設定なので今は制限なし
 - 全文検索（Pagefind）。3テーマ目から入れる方針
 
 ## 付録: `--cap-add NET_RAW` を外した理由（2026-10-06 実測）

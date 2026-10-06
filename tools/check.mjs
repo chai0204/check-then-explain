@@ -73,7 +73,11 @@ for (const f of htmls) {
       }
       continue;
     }
-    if (!href.startsWith("/")) { warn(f, `相対パスのリンク: ${href}（ルート相対に揃える）`); continue; }
+    if (!href.startsWith("/")) {
+      // プレースホルダは 4b が数えるので、ここで二重に warn を出さない
+      if (href === "REPORT_URL") continue;
+      warn(f, `相対パスのリンク: ${href}（ルート相対に揃える）`); continue;
+    }
     const target = resolveTarget(href);
     if (!target) { err(f, `リンク先が存在しない: ${href}`); continue; }
     const hash = href.includes("#") ? href.split("#")[1] : null;
@@ -148,21 +152,31 @@ for (const f of htmls.filter((f) => /glossary\.html$/.test(f))) {
 // 置換漏れは文字列の完全一致で判定できるので誤報しない。
 // ただし制作中は残っているのが正常なので、--publish を付けたときだけ error にする。
 const PUBLISH = process.argv.includes("--publish");
+// 長いものから順に数える。GISCUS_REPO は GISCUS_REPO_ID の接頭辞なので、
+// 素朴に数えると後者が両方にカウントされて数が合わなくなる。
 const PLACEHOLDERS = [
   "ghcr.io/OWNER",
   "ghcr.io/&lt;owner&gt;",   // HTML エスケープされた綴り。別物として数える
   "REPORT_URL",
   "chai0204/REPO",
   "<REPO>",
-];
+  "GISCUS_CATEGORY_ID",
+  "GISCUS_REPO_ID",
+  "GISCUS_REPO",
+].sort((a, b) => b.length - a.length);
+
 let phTotal = 0;
-for (const f of htmls) {
-  const html = readFileSync(f, "utf8");
+// 対象は HTML だけでなく JS も見る。giscus の設定は shared/comments.js にある。
+const phTargets = [...htmls, ...files.filter((f) => f.endsWith(".js"))];
+for (const f of phTargets) {
+  let rest = readFileSync(f, "utf8");
   for (const ph of PLACEHOLDERS) {
-    const n = html.split(ph).length - 1;
+    const n = rest.split(ph).length - 1;
     if (n > 0) {
       phTotal += n;
       (PUBLISH ? err : warn)(f, `プレースホルダが残っている: ${ph} ×${n}`);
+      // 数えた箇所を潰してから次へ進む（接頭辞の二重カウントを防ぐ）
+      rest = rest.split(ph).join("\u0000".repeat(ph.length));
     }
   }
 }
@@ -236,6 +250,20 @@ if (existsSync(wranglerPath)) {
   if (/"not_found_handling"\s*:\s*"404-page"/.test(w) && !existsSync(join(ROOT, "404.html")))
     errors.push(`${name}: not_found_handling が 404-page なのに public/404.html が無い`);
 }
+
+// ---- 4e. コメント欄の整合 ----
+// <div id="giscus"> を置いただけでは何も出ない。comments.js が挿入する。
+// 片方だけ入った状態は、ページを開くまで気づけない。
+for (const f of htmls) {
+  const h = readFileSync(f, "utf8");
+  const slot = /id="giscus"/.test(h);
+  const script = /shared\/comments\.js/.test(h);
+  if (slot && !script) err(f, 'id="giscus" があるのに shared/comments.js を読んでいない（コメント欄が空のまま）');
+  if (script && !slot) err(f, 'shared/comments.js を読んでいるのに id="giscus" が無い');
+}
+const noComments = htmls.filter((f) => !/id="giscus"/.test(readFileSync(f, "utf8")))
+  .map((f) => relative(ROOT, f)).filter((r) => r !== "404.html");
+if (noComments.length) warn(htmls[0], `コメント欄が無いページ: ${noComments.join(", ")}`);
 
 // ---- 5. 用語の自動リンクが実際に発火するか ----
 // shared/theory.js は pre / code / h1-h4 / a / summary / nav と .no-term を走査しない。
