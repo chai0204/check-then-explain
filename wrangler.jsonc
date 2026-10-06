@@ -1,0 +1,19 @@
+{
+  // 静的アセットのみの配信。"main" は書かない。
+  // Workers は "main" があるとスクリプトを実行しようとするので、
+  // 存在しないファイルを指した時点で deploy が落ちる。
+  // ファイルだけを置くモードでは "assets" だけで足りる。
+  "name": "<WORKER_NAME>",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",
+
+    // /sqlite/theory/01-file → public/sqlite/theory/01-file.html を返す。
+    // 本文のリンクは拡張子なしで書いてあるので、この設定が要る。
+    "html_handling": "auto-trailing-slash",
+
+    // 見つからないパスで public/404.html を返す。
+    // tools/serve.mjs もこの挙動を再現しているので、ローカルで確認できる。
+    "not_found_handling": "404-page"
+  }
+}

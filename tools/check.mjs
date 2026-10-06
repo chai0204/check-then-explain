@@ -215,6 +215,28 @@ if (existsSync(topPage)) {
 }
 if (draftThemes.size) console.log(`  ドラフト扱いのテーマ: ${[...draftThemes].join(", ")}`);
 
+// ---- 4d. wrangler.jsonc の設定 ----
+// jsonc なので JSON.parse は使えない（コメントがある）。文字列で見る。
+// ここで止めたいのは、デプロイしてからでないと分からない事故。
+const wranglerPath = resolve(ROOT, "..", "wrangler.jsonc");
+if (existsSync(wranglerPath)) {
+  const w = readFileSync(wranglerPath, "utf8");
+  const name = "../wrangler.jsonc";
+  const say = (m) => (PUBLISH ? errors : warns).push(`${name}: ${m}`);
+  if (/"name"\s*:\s*"<[^"]*>"/.test(w)) say("name がプレースホルダのまま（wrangler が弾く）");
+  if (/^\s*"main"\s*:/m.test(w))
+    errors.push(`${name}: "main" がある。静的アセットのみなら書かない（存在しないファイルを指すとデプロイが落ちる）`);
+  if (!/"not_found_handling"\s*:\s*"404-page"/.test(w))
+    errors.push(`${name}: not_found_handling が "404-page" でない。public/404.html が使われない`);
+  if (!/"html_handling"\s*:\s*"auto-trailing-slash"/.test(w))
+    warns.push(`${name}: html_handling が auto-trailing-slash でない。本文のリンクは拡張子なしで書いてある`);
+  const dir = w.match(/"directory"\s*:\s*"([^"]+)"/)?.[1];
+  if (dir && resolve(dirname(wranglerPath), dir) !== ROOT)
+    errors.push(`${name}: assets.directory (${dir}) が検査したディレクトリ (${ROOT}) と違う`);
+  if (/"not_found_handling"\s*:\s*"404-page"/.test(w) && !existsSync(join(ROOT, "404.html")))
+    errors.push(`${name}: not_found_handling が 404-page なのに public/404.html が無い`);
+}
+
 // ---- 5. 用語の自動リンクが実際に発火するか ----
 // shared/theory.js は pre / code / h1-h4 / a / summary / nav と .no-term を走査しない。
 // 辞書に登録したのに、本文では常に <code> の中にしか出てこない語はリンクされない。
