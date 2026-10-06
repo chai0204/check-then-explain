@@ -2,6 +2,7 @@
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>用語辞書 — 壊して覚える SQLite</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-theme="sqlite">
 <div class="wrap">
@@ -14,6 +15,7 @@
 
 <input class="gsearch" id="q" type="search" placeholder="用語を検索（例: WAL、ロック、affinity、結果コード）" autocomplete="off">
 <div class="gindex" id="gindex"></div>
+<p class="gcount" id="gcount"></p>
 <div id="glist"></div>
 
 <section id="comments">
@@ -25,55 +27,8 @@
 </section>
 <footer><a href="/sqlite/theory/">← 理論編 目次</a> · <a href="/">トップ</a></footer>
 </div>
+<script src="/sqlite/chapters.js"></script>
 <script src="/sqlite/theory/terms.js"></script>
-<script>
-(() => {
-  const groups = window.TERM_GROUPS || [];
-  const list = document.getElementById("glist");
-  const index = document.getElementById("gindex");
-  const CH = {1:"1. これはファイルである",
-              2:"2. 型は宣言ではなく提案",
-              3:"3. 書き込みは、まとめると270倍速い",
-              4:"4. 同時に書けるのは1人だけ",
-              5:"5. ディレクトリに書けないと、DB にも書けない"};
-  const CHURL = {1:"/sqlite/theory/01-file",
-                 2:"/sqlite/theory/02-affinity",
-                 3:"/sqlite/theory/03-transaction",
-                 4:"/sqlite/theory/04-lock",
-                 5:"/sqlite/theory/05-directory"};
-
-  groups.forEach((g, gi) => {
-    const id = "g" + gi;
-    index.insertAdjacentHTML("beforeend", `<a href="#${id}">${g.g}</a>`);
-    const sec = document.createElement("section");
-    sec.innerHTML = `<h2 id="${id}">${g.g}</h2>`;
-    for (const t of g.terms) {
-      const alt = (t.alt || []).length ? `<small>${t.alt.join(" / ")}</small>` : "";
-      const mis = t.misread ? `<p class="misread"><b>まちがえやすい点:</b> ${t.misread}</p>` : "";
-      sec.insertAdjacentHTML("beforeend",
-        `<div class="gitem" id="${t.id}" data-k="${(t.t + " " + (t.alt||[]).join(" ") + " " + t.hint).toLowerCase()}">
-           <h3>${t.t}${alt}</h3>
-           <p><b>ひとことで:</b> ${t.hint}</p>
-           <p>${t.body}</p>
-           ${mis}
-           <p class="where">詳しく: <a href="${CHURL[t.ch]}">${CH[t.ch]}</a></p>
-         </div>`);
-    }
-    list.append(sec);
-  });
-
-  const q = document.getElementById("q");
-  q.addEventListener("input", () => {
-    const v = q.value.trim().toLowerCase();
-    document.querySelectorAll(".gitem").forEach((el) => {
-      const hit = !v || el.dataset.k.includes(v) || el.textContent.toLowerCase().includes(v);
-      el.style.display = hit ? "" : "none";
-    });
-    document.querySelectorAll("#glist section").forEach((s) => {
-      s.style.display = [...s.querySelectorAll(".gitem")].some((e) => e.style.display !== "none") ? "" : "none";
-    });
-  });
-})();
-</script>
+<script src="/shared/glossary.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

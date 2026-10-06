@@ -265,6 +265,34 @@ const noComments = htmls.filter((f) => !/id="giscus"/.test(readFileSync(f, "utf8
   .map((f) => relative(ROOT, f)).filter((r) => r !== "404.html");
 if (noComments.length) warn(htmls[0], `コメント欄が無いページ: ${noComments.join(", ")}`);
 
+// ---- 4f. 辞書ページの依存 ----
+// glossary.js は window.TERM_GROUPS と window.CHAPTERS の両方を読む。
+// 章データが欠けると「詳しく」のリンクが黙って消えるので、公開前に止める。
+for (const f of htmls.filter((f) => /glossary\.html$/.test(f))) {
+  const h = readFileSync(f, "utf8");
+  const theme = relative(ROOT, f).split("/")[0];
+  for (const id of ["glist", "gindex", "q"]) {
+    if (!new RegExp(`id="${id}"`).test(h)) err(f, `辞書に必須の要素 #${id} が無い（glossary.js が何も描かない）`);
+  }
+  if (!/shared\/glossary\.js/.test(h)) err(f, "shared/glossary.js を読んでいない（辞書が空になる）");
+  if (!new RegExp(`/${theme}/chapters\\.js`).test(h))
+    err(f, `${theme}/chapters.js を読んでいない（章タイトルが出ず「詳しく」のリンクが消える）`);
+  if (!new RegExp(`/${theme}/theory/terms\\.js`).test(h)) err(f, "terms.js を読んでいない");
+
+  // terms.js の ch が chapters.js に実在するか。
+  // 以前は辞書が章タイトルを自前で持っていて、chapters.js と値がずれていた
+  // （進捗バー「まとめると速い」／辞書「書き込みは、まとめると270倍速い」）。
+  const chaptersFile = join(ROOT, theme, "chapters.js");
+  const termsFile = join(ROOT, theme, "theory", "terms.js");
+  if (existsSync(chaptersFile) && existsSync(termsFile)) {
+    const ns = new Set([...readFileSync(chaptersFile, "utf8").matchAll(/\bn:\s*(\d+)/g)].map((m) => m[1]));
+    const chs = [...readFileSync(termsFile, "utf8").matchAll(/\bch:\s*(\d+)/g)].map((m) => m[1]);
+    const missing = [...new Set(chs.filter((c) => !ns.has(c)))];
+    if (missing.length)
+      err(termsFile, `ch: ${missing.join(", ")} が ${theme}/chapters.js に無い（辞書の「詳しく」リンクが消える）`);
+  }
+}
+
 // ---- 5. 用語の自動リンクが実際に発火するか ----
 // shared/theory.js は pre / code / h1-h4 / a / summary / nav と .no-term を走査しない。
 // 辞書に登録したのに、本文では常に <code> の中にしか出てこない語はリンクされない。

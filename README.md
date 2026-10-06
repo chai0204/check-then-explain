@@ -44,11 +44,27 @@ docker run --rm -v "$PWD/probe:/probe:ro" lab-sqlite:1.0.0 bash /probe/db-solve-
 docker run --rm -v "$PWD/probe:/probe:ro" lab-wasm:1.0.0   bash /probe/wa-solve-all.sh
 
 # 公開前の機械検査（error が1件でもあれば公開しない）
-node tools/check.mjs public
+node tools/check.mjs public              # 制作中。プレースホルダは warn
+node tools/check.mjs public --publish    # 公開前。プレースホルダも error にする
 
-# ローカルで表示を確認する（Workers と同じパス解決規則）
+# ローカルで表示を確認する（Workers と同じパス解決規則・404 ページも再現する）
 node tools/serve.mjs public 8788
 ```
+
+`check.mjs` は **Node 標準ライブラリだけ**で動く（`npm install` 不要）。
+辞書ページの実描画だけは DOM が必要なので、任意の開発依存として分けてある。
+
+```sh
+npm install                 # jsdom（devDependency。サイト本体の依存は0のまま）
+npm run render-check        # 辞書を実際に描画して、語・章リンク・検索を確認する
+npm run check               # = node tools/check.mjs public
+npm run check:publish       # = --publish 付き
+npm run serve               # = ローカルサーバ
+```
+
+`render-check` は jsdom が無ければ何もせず成功で抜ける。
+`check.mjs` が見るのは要素とデータの有無までで、**「辞書が空で表示される」は検出できない**。
+そこだけ実描画で確かめている。
 
 ## 手元でローカルビルドしたイメージを試す
 
@@ -88,8 +104,8 @@ Rancher Desktop / Colima と、WASM 編の podman は未検証。
 - GHCR への push（`OWNER` が未確定）
 - 本番デプロイ（Cloudflare Workers）。`wrangler.jsonc` は未作成
 - コメント機能の設定値（giscus は実装済み。`GISCUS_REPO` 等3つがプレースホルダ）
-- CSP ヘッダー（`public/_headers`）。giscus を入れたので
-  `script-src`/`frame-src` に `https://giscus.app` が要る。未設定なので今は制限なし
+- CSP を Report-Only から本番モードへ切り替える（`public/_headers`）。
+  公開後にコンソールで違反が出ないことを確認してから
 - 全文検索（Pagefind）。3テーマ目から入れる方針
 
 ## 付録: `--cap-add NET_RAW` を外した理由（2026-10-06 実測）

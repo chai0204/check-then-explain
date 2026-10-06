@@ -1,0 +1,25 @@
+# Cloudflare Workers の静的アセットが読むヘッダー定義。
+# 配置は assets ディレクトリの直下（= public/）。上限は100ルール・1行2000文字。
+# Worker コードが生成するレスポンスには適用されないが、このサイトは静的配信のみ。
+#
+# ───── CSP を Report-Only で始めている理由 ─────
+# このサイトが外部から読むのは https://giscus.app のスクリプトだけで、
+# 画像も外部フォントも inline script も inline style も無い（2026-10-06 時点で実測）。
+# だから原理的にはかなり厳しく締められる。
+#
+# ただし giscus の client.js が iframe に style 属性を直接書く可能性があり、
+# それは style-src 'self' で落ちる。落ちるとコメント欄が崩れた状態で読者に見える。
+#
+# そこで公開直後は Report-Only にして、ブラウザのコンソールに違反が出ないことを
+# 自分で確認してから、下の行をコメントアウトして上の行を有効にする。
+# 手順は works/learning-series/publish.md の §10。
+#
+# ───── 切り替え後に有効にする行（いまはコメント） ─────
+# /*
+#   Content-Security-Policy: default-src 'none'; script-src 'self' https://giscus.app; style-src 'self'; img-src 'self'; frame-src https://giscus.app; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+/*
+  Content-Security-Policy-Report-Only: default-src 'none'; script-src 'self' https://giscus.app; style-src 'self'; img-src 'self'; frame-src https://giscus.app; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Cross-Origin-Opener-Policy: same-origin
