@@ -33,5 +33,5 @@ COPY --from=wasmtime-src --chmod=0755 \
 
 COPY --chown=root:root --chmod=0555 lab/ /lab/
 ENV LAB_THEME=wasm LAB_VERSION=1.0.0 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/OWNER/lab-wasm:1.0.0
+    LAB_IMAGE=ghcr.io/chai0204/lab-wasm:1.0.0
 USER lab

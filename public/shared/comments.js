@@ -10,10 +10,10 @@
   if (!slot) return;
 
   var conf = {
-    "data-repo": "GISCUS_REPO",
-    "data-repo-id": "GISCUS_REPO_ID",
-    "data-category": "Comments",
-    "data-category-id": "GISCUS_CATEGORY_ID",
+    "data-repo": "chai0204/check-then-explain",
+    "data-repo-id": "R_kgDOVA4RNA",
+    "data-category": "Announcements",
+    "data-category-id": "DIC_kwDOVA4RNM4DHVN1",
 
     // URL のパスごとにスレッドを分ける。章ごとに independent なコメント欄になる。
     // title 方式にすると、見出しを変えた瞬間に過去のコメントが迷子になる。
