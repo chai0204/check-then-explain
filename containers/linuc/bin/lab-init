@@ -1,0 +1,43 @@
+#!/bin/bash
+# PID 1。systemd を立てる前に cgroup2 を書けるようにする。
+#
+# なぜ要るか（実測 2026-10-12・docker 29.8.0 / cgroup2fs）:
+#   docker は /sys/fs/cgroup を **ro** でマウントする。systemd は起動の最初に
+#   /init.scope を作るので、ro のままだと
+#       Failed to create /init.scope control group: Read-only file system
+#       Failed to allocate manager object.
+#   を出して exit 255 で即死する。--cgroupns=host でも
+#   --security-opt systempaths=unconfined でも ro のままだった。
+#   remount には CAP_SYS_ADMIN が要る（無いと mount が permission denied）。
+#   podman は --systemd=always で最初から rw にするので、ここは何もしない。
+set -u
+
+probe() { mkdir /sys/fs/cgroup/.lab-probe 2>/dev/null; }
+
+if probe; then
+  rmdir /sys/fs/cgroup/.lab-probe
+else
+  mount -o remount,rw /sys/fs/cgroup 2>/dev/null || true
+  if probe; then
+    rmdir /sys/fs/cgroup/.lab-probe
+  else
+    # systemd の exit 255 は読者には原因が読めない。前提不足として説明に変える。
+    cat >&2 <<'MSG'
+
+✗ この環境では systemd を起動できません（読者の操作ミスではありません）
+
+  観測 : /sys/fs/cgroup が読み取り専用で、書き込みに戻せなかった
+  理由 : docker は cgroup を ro でマウントする。戻すには CAP_SYS_ADMIN が要る
+
+  docker の場合 : 起動コマンドに --cap-add SYS_ADMIN があるか確認してください
+  podman の場合 : --systemd=always を付けてください
+
+  この教材の入口に、動作確認済みの起動コマンドをそのまま置いてあります。
+    https://check-then-explain.pages.dev/linuc/services/
+
+MSG
+    exit 3
+  fi
+fi
+
+exec /sbin/init

@@ -1,0 +1,13 @@
+[Unit]
+Description=lab NTP reference server (127.0.0.1:123)
+Documentation=https://check-then-explain.pages.dev/linuc/services/theory/03-ntp
+After=network.target
+
+[Service]
+Type=simple
+# -n = フォアグラウンド / -x = システムクロックを触らない（檻に CAP_SYS_TIME が無い）
+ExecStart=/usr/sbin/chronyd -n -x -f /etc/chrony/lab-ntp-server.conf
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

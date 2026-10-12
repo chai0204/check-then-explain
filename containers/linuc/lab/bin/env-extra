@@ -1,0 +1,6 @@
+#!/bin/bash
+# lab env の追加行。このテーマは systemd が動いているかどうかが切り分けの中心。
+printf 'PID1      : %s\n' "$(tr -d '\0' < /proc/1/cmdline | head -c 40)"
+printf 'systemd   : %s\n' "$(systemctl is-system-running 2>/dev/null || echo '起動していない')"
+printf 'cgroup    : %s\n' "$(awk '$2=="/sys/fs/cgroup"{print $4}' /proc/self/mounts | head -1)"
+printf 'journal   : %s\n' "$(journalctl --disk-usage 2>/dev/null | sed 's/^Archived and active journals take up //' || echo '読めない')"

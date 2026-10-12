@@ -1,0 +1,463 @@
+
+
+########## A. 何もしていない状態で lab check（全部 ✗ になるはず） ##########
+
+$ lab check; echo "exit=$?"
+✗ 01 未達
+  判定 : 観測型（3箇所の実効値をそのまま読む）
+  観測 : date +%Z                  = JST
+         timedatectl の Time zone  = Etc/UTC
+         /etc/localtime のリンク先 = Etc/UTC
+         /etc/timezone の中身      = Etc/UTC
+         → timedatectl が Asia/Tokyo ではない
+         → /etc/localtime が Asia/Tokyo を指していない
+         → /etc/timezone が Asia/Tokyo ではない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+✗ 02 未達
+  判定 : 観測型（chronyd 自身が報告する Reference ID と Leap status）
+  観測 : Reference ID = 00000000
+         Leap status  = Not synchronised
+         ソース本数   = 0
+         → Reference ID が 7F000001（127.0.0.1）ではない
+         → Leap status が Normal ではない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+✗ 03 未達
+  判定 : 観測型（判定の中で local3.info に1行投げ、どこに現れたかを見た）
+  観測 : 投げた目印 = labchk03-279-16108
+         /var/log/lab-app.log  に 0 行
+         /var/log/syslog        に 1 行
+         → /var/log/lab-app.log が存在しない
+         → /var/log/lab-app.log に現れなかった
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+✗ 04 未達
+  判定 : 観測型（systemd-journald 自身がログに書いた上限の行を読む）
+  観測 : Oct 12 22:02:59 6e2a59ee1edc systemd-journald[29]: System Journal (/var/log/journal/f5295b64ae1a49b9a1af1c892764514b) is 8.0M, max 4.0G, 3.9G free.
+         読み取った上限 = max 4.0G
+         → max 8.0M ではない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+⚠ 05 この環境では判定できません
+  前提不足: /var/log/lab-app.log がありません。先に演習 03 を終わらせてください
+✗ 06 未達
+  判定 : 観測型（判定の中で alice 宛に1通送り、どこに入ったかを見た）
+  観測 : 送った目印 = labchk06-306-28312 （宛先に書いた名前は alice）
+         /var/mail/root  に 0 行
+         /var/mail/bob   に 0 行
+         /var/mail/alice に 2 行
+         ログ最終行: 4CD2B114511C: to=<alice@lab.local>, orig_to=<alice>, relay=local, delay=0.02, delays=0.01/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+         → root のメールボックスに入っていない
+           1段目（alice→bob）も効いていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+exit=1
+
+
+########## B. 演習01 — 時刻の表示を3箇所で揃える ##########
+
+$ date +%Z; timedatectl show -p Timezone --value; cat /etc/timezone; env | grep "^TZ="
+JST
+Etc/UTC
+Etc/UTC
+TZ=Asia/Tokyo
+
+$ timedatectl set-timezone Asia/Tokyo
+
+$ ls -l /etc/localtime; cat /etc/timezone
+lrwxrwxrwx 1 root root 30 Oct 12 22:03 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
+Etc/UTC
+
+$ echo "Asia/Tokyo" > /etc/timezone; cat /etc/timezone
+Asia/Tokyo
+
+$ lab check 01; echo "exit=$?"
+✔ 01 達成
+  判定 : 観測型（3箇所の実効値をそのまま読む）
+  観測 : date +%Z                  = JST
+         timedatectl の Time zone  = Asia/Tokyo
+         /etc/localtime のリンク先 = Asia/Tokyo
+         /etc/timezone の中身      = Asia/Tokyo
+         4つすべてが Asia/Tokyo（date は JST）で一致している
+exit=0
+
+
+########## C. 演習02 — chrony に基準を与えて同期させる ##########
+
+$ chronyc sources; chronyc tracking | head -2
+MS Name/IP address         Stratum Poll Reach LastRx Last sample               
+===============================================================================
+Reference ID    : 00000000 ()
+Stratum         : 0
+
+$ echo 'server 127.0.0.1 iburst' >> /etc/chrony/chrony.conf
+
+$ systemctl restart chrony; sleep 9
+
+$ chronyc sources -v | tail -3
+MS Name/IP address         Stratum Poll Reach LastRx Last sample               
+===============================================================================
+^* localhost                     8   6    17     3    +14ns[  +69ns] +/- 3883ns
+
+$ chronyc tracking | head -3
+Reference ID    : 7F000001 (localhost)
+Stratum         : 9
+Ref time (UTC)  : Mon Oct 12 13:03:23 2026
+
+$ lab check 02; echo "exit=$?"
+✔ 02 達成
+  判定 : 観測型（chronyd 自身が報告する Reference ID と Leap status）
+  観測 : Reference ID = 7F000001
+         Leap status  = Normal
+         ソース本数   = 1
+         檻の中の基準サーバ（127.0.0.1）を選び、同期状態になっている
+         （時計は動かしていない。chronyd は -x で起動している）
+exit=0
+
+
+########## D. 演習03 — local3 のログを専用ファイルへ落とす ##########
+
+$ echo 'local3.*  /var/log/lab-app.log' > /etc/rsyslog.d/60-lab.conf
+
+$ systemctl restart rsyslog; sleep 2
+
+$ logger -p local3.info "解答どおり"; sleep 2; cat /var/log/lab-app.log
+2026-10-12T22:03:28.536612+09:00 6e2a59ee1edc root: 解答どおり
+
+$ lab check 03; echo "exit=$?"
+✔ 03 達成
+  判定 : 観測型（判定の中で local3.info に1行投げ、どこに現れたかを見た）
+  観測 : 投げた目印 = labchk03-450-31486
+         /var/log/lab-app.log  に 1 行
+         /var/log/syslog        に 1 行
+         同じ1行が2つのファイルに入っている
+         → 宛先を決めたのは logger ではなく /etc/rsyslog.d の設定
+exit=0
+
+
+########## E. 演習04 — journal の上限を自分で決める ##########
+
+$ mkdir -p /etc/systemd/journald.conf.d
+
+$ printf '[Journal]\nSystemMaxUse=8M\n' > /etc/systemd/journald.conf.d/10-lab.conf; cat /etc/systemd/journald.conf.d/10-lab.conf
+[Journal]
+SystemMaxUse=8M
+
+$ echo "--- まだ再起動していないので判定は通らないはず ---"; lab check 04; echo "exit=$?"
+--- まだ再起動していないので判定は通らないはず ---
+✗ 04 未達
+  判定 : 観測型（systemd-journald 自身がログに書いた上限の行を読む）
+  観測 : Oct 12 22:02:59 6e2a59ee1edc systemd-journald[29]: System Journal (/var/log/journal/f5295b64ae1a49b9a1af1c892764514b) is 8.0M, max 4.0G, 3.9G free.
+         読み取った上限 = max 4.0G
+         → max 8.0M ではない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+exit=1
+
+$ systemctl restart systemd-journald; sleep 2
+
+$ journalctl -t systemd-journald --no-pager | tail -1
+Oct 12 22:03:32 6e2a59ee1edc systemd-journald[504]: System Journal (/var/log/journal/f5295b64ae1a49b9a1af1c892764514b) is 8.0M, max 8.0M, 0B free.
+
+$ lab check 04; echo "exit=$?"
+✔ 04 達成
+  判定 : 観測型（systemd-journald 自身がログに書いた上限の行を読む）
+  観測 : Oct 12 22:03:32 6e2a59ee1edc systemd-journald[504]: System Journal (/var/log/journal/f5295b64ae1a49b9a1af1c892764514b) is 8.0M, max 8.0M, 0B free.
+         読み取った上限 = max 8.0M
+         journald は上限 8.0M で動いていると自分で言っている
+exit=0
+
+
+########## F. 演習05 — ログを切って3世代だけ残す ##########
+
+$ umask
+0000
+
+$ printf '/var/log/lab-app.log {\n    size 1k\n    rotate 3\n    missingok\n    notifempty\n    compress\n    create 0640 syslog adm\n    postrotate\n        systemctl kill -s HUP rsyslog.service\n    endscript\n}\n' > /etc/logrotate.d/lab-app
+
+$ ls -l /etc/logrotate.d/lab-app
+-rw-rw-rw- 1 root root 194 Oct 12 22:03 /etc/logrotate.d/lab-app
+
+$ echo "--- 権限を直す前はこうなる（これが罠） ---"; logrotate -v /etc/logrotate.d/lab-app; echo "exit=$?"
+--- 権限を直す前はこうなる（これが罠） ---
+warning: Potentially dangerous mode on /etc/logrotate.d/lab-app: 0666
+error: Ignoring /etc/logrotate.d/lab-app because it is writable by group or others.
+Creating stub state file: /var/lib/logrotate/status
+acquired lock on state file /var/lib/logrotate/statusReading state from file: /var/lib/logrotate/status
+Allocating hash table for state file, size 64 entries
+
+Handling 0 logs
+exit=0
+
+$ lab check 05; echo "exit=$?"
+✗ 05 未達
+  判定 : 観測型（世代ファイルが実在するか）
+  観測 : 世代ファイル = 
+         世代数       = 0
+         設定ファイル = /etc/logrotate.d/lab-app（権限 666）
+         → 1世代も切れていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+exit=1
+
+$ chmod 644 /etc/logrotate.d/lab-app; ls -l /etc/logrotate.d/lab-app
+-rw-r--r-- 1 root root 194 Oct 12 22:03 /etc/logrotate.d/lab-app
+
+$ for i in $(seq 1 60); do logger -p local3.info "かさ増し $i"; done; sleep 2; ls -l /var/log/lab-app.log
+-rw-r----- 1 syslog adm 4210 Oct 12 22:03 /var/log/lab-app.log
+
+$ echo "--- 権限を直しても、設定ファイルを直接渡すとまだ切れない（罠その2） ---"
+--- 権限を直しても、設定ファイルを直接渡すとまだ切れない（罠その2） ---
+
+$ logrotate -v /etc/logrotate.d/lab-app 2>&1 | tail -4
+empty log files are not rotated, old logs are removed
+considering log /var/log/lab-app.log
+error: skipping "/var/log/lab-app.log" because parent directory has insecure permissions (It's world writable or writable by group which is not "root") Set "su" directive in config file to tell logrotate which user/group should be used for rotation.
+Creating new state
+
+$ ls -ld /var/log
+drwxrwxr-x 1 root syslog 4096 Oct 12 22:03 /var/log
+
+$ grep -vE "^\s*#|^\s*$" /etc/logrotate.conf
+weekly
+su root adm
+rotate 4
+create
+include /etc/logrotate.d
+
+$ lab check 05; echo "exit=$?"
+✗ 05 未達
+  判定 : 観測型（世代ファイルが実在するか）
+  観測 : 世代ファイル = 
+         世代数       = 0
+         設定ファイル = /etc/logrotate.d/lab-app（権限 644）
+         → 1世代も切れていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+exit=1
+
+$ echo "--- 渡すファイルを /etc/logrotate.conf に変える ---"
+--- 渡すファイルを /etc/logrotate.conf に変える ---
+
+$ logrotate -v /etc/logrotate.conf 2>&1 | grep -E "rotating log /var/log/lab-app|creating new /var/log/lab-app|compressing"
+rotating log /var/log/lab-app.log, log->rotateCount is 3
+creating new /var/log/lab-app.log mode = 0640 uid = 101 gid = 4
+compressing log with: /bin/gzip
+
+$ ls -l /var/log/lab-app.log*
+-rw-r----- 1 syslog adm   0 Oct 12 22:03 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 542 Oct 12 22:03 /var/log/lab-app.log.1.gz
+
+$ lab check 05; echo "exit=$?"
+✔ 05 達成
+  判定 : 観測型（世代ファイルが実在するか）
+  観測 : 世代ファイル = /var/log/lab-app.log.1.gz 
+         世代数       = 1
+         設定ファイル = /etc/logrotate.d/lab-app（権限 644）
+         1k 超で切られ、圧縮された世代が残り、3世代以内に収まっている
+exit=0
+
+$ cat /var/lib/logrotate/status
+logrotate state -- version 2
+"/var/log/syslog" 2026-10-12-22:0:0
+"/var/log/dpkg.log" 2026-10-12-22:0:0
+"/var/log/auth.log" 2026-10-12-22:0:0
+"/var/log/apt/term.log" 2026-10-12-22:0:0
+"/var/log/lab-app.log" 2026-10-12-22:3:36
+"/var/log/apt/history.log" 2026-10-12-22:0:0
+"/var/log/alternatives.log" 2026-10-12-22:0:0
+"/var/log/mail.log" 2026-10-12-22:0:0
+"/var/log/kern.log" 2026-10-12-22:0:0
+"/var/log/wtmp" 2026-10-12-22:0:0
+"/var/log/chrony/*.log" 2026-10-12-22:0:0
+"/var/log/btmp" 2026-10-12-22:0:0
+"/var/log/user.log" 2026-10-12-22:0:0
+"/var/log/cron.log" 2026-10-12-22:0:0
+
+$ echo "--- 3世代を超えたら最古が捨てられる ---"
+--- 3世代を超えたら最古が捨てられる ---
+
+$ for r in 1 2 3 4; do for i in $(seq 1 60); do logger -p local3.info "回 $r 行 $i"; done; sleep 1; logrotate -f /etc/logrotate.conf >/dev/null 2>&1; done; ls -l /var/log/lab-app.log*
+-rw-r----- 1 syslog adm   0 Oct 12 22:03 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 481 Oct 12 22:03 /var/log/lab-app.log.1.gz
+-rw-r----- 1 syslog adm 477 Oct 12 22:03 /var/log/lab-app.log.2.gz
+-rw-r----- 1 syslog adm 480 Oct 12 22:03 /var/log/lab-app.log.3.gz
+
+
+########## G. 演習06 — メールを2回曲げて、ログで追う ##########
+
+$ id alice; id bob
+uid=1001(alice) gid=1001(alice) groups=1001(alice)
+uid=1002(bob) gid=1002(bob) groups=1002(bob)
+
+$ echo 'alice: bob' >> /etc/aliases; cat /etc/aliases
+postmaster: root
+alice: bob
+
+$ newaliases
+
+$ echo 'root' > /home/bob/.forward; chown bob:bob /home/bob/.forward; ls -l /home/bob/.forward
+-rw-rw-rw- 1 bob bob 5 Oct 12 22:03 /home/bob/.forward
+
+$ echo "--- chmod を忘れた状態（0666）でどうなるか ---"
+--- chmod を忘れた状態（0666）でどうなるか ---
+
+$ echo "権限を直す前" | mail -s "before-chmod" alice; sleep 4
+
+$ grep -c "権限を直す前" /var/mail/bob 2>/dev/null; grep -c "権限を直す前" /var/mail/root 2>/dev/null; echo "(bob / root の順)"
+1
+(bob / root の順)
+
+$ journalctl -t postfix/local --no-pager | grep -i forward | tail -2
+Oct 12 22:03:41 6e2a59ee1edc postfix/local[1013]: warning: file /home/bob/.forward is world writable
+
+$ lab check 06; echo "exit=$?"
+✗ 06 未達
+  判定 : 観測型（判定の中で alice 宛に1通送り、どこに入ったかを見た）
+  観測 : 送った目印 = labchk06-1023-15333 （宛先に書いた名前は alice）
+         /var/mail/root  に 0 行
+         /var/mail/bob   に 2 行
+         /var/mail/alice に 0 行
+         ログ最終行: 3485E114517A: to=<bob@lab.local>, orig_to=<alice>, relay=local, delay=0.01, delays=0.01/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+         → root のメールボックスに入っていない
+           1段目（alice→bob）までは効いている。2段目が効いていない
+           /home/bob/.forward は存在する（権限 666・所有 bob）
+           postfix がそれを読んだかどうかはログに書いてあります
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+exit=1
+
+$ chmod 644 /home/bob/.forward; ls -l /home/bob/.forward
+-rw-r--r-- 1 bob bob 5 Oct 12 22:03 /home/bob/.forward
+
+$ echo "2回曲がる" | mail -s "forward 経由" alice; sleep 4
+
+$ grep -c "2回曲がる" /var/mail/root
+1
+
+$ journalctl -t postfix/local --no-pager -n 3
+Oct 12 22:03:45 6e2a59ee1edc postfix/local[1013]: 3485E114517A: to=<bob@lab.local>, orig_to=<alice>, relay=local, delay=0.01, delays=0.01/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+Oct 12 22:03:49 6e2a59ee1edc postfix/local[1013]: 3E9FB114510C: to=<alice@lab.local>, orig_to=<alice>, relay=local, delay=0.02, delays=0.01/0/0/0, dsn=2.0.0, status=sent (forwarded as 3F6331143EF6)
+Oct 12 22:03:49 6e2a59ee1edc postfix/local[1013]: 3F6331143EF6: to=<root@lab.local>, orig_to=<alice>, relay=local, delay=0.01, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+
+$ lab check 06; echo "exit=$?"
+✔ 06 達成
+  判定 : 観測型（判定の中で alice 宛に1通送り、どこに入ったかを見た）
+  観測 : 送った目印 = labchk06-1073-18157 （宛先に書いた名前は alice）
+         /var/mail/root  に 2 行
+         /var/mail/bob   に 0 行
+         /var/mail/alice に 0 行
+         ログ最終行: 4BF511143EF6: to=<root@lab.local>, orig_to=<alice>, relay=local, delay=0.01, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+         alice と書いたものが root に届いている（2回書き換わった）
+
+  ════════════════════════════════════════
+   確かめて説明する LinuC 主題1.09 — 全6演習クリア
+  ════════════════════════════════════════
+
+  自分の手で確かめたこと
+
+   ✔ 01  タイムゾーンの設定が3箇所にあり、更新する仕組みが別々であること
+   ✔ 02  ソースが0本のとき Reference ID が 00000000 で Not synchronised になること
+   ✔ 03  同じ1行が設定次第で2つのファイルに同時に入ること
+   ✔ 04  journald が自分の上限を起動時にログへ書き出すこと
+   ✔ 05  group/other に書ける設定ファイルを logrotate が丸ごと無視すること
+   ✔ 06  To: に書いた名前が /etc/aliases と ~/.forward で2回書き換わること
+
+  この6つは全部、1つの事実から出ていました。
+
+      送り手は、中身とラベルだけを渡す。
+      宛先を決めているのは、受け手側にある設定ファイルである。
+      出題範囲にファイルパスが並ぶのは、そこに判断が置かれているからだ。
+
+  理論編の最終章に、それぞれがどう繋がるかを書いてあります → /linuc/services/theory/07-mail
+
+exit=0
+
+
+########## H. 全問通した状態で lab check（完走メッセージが出るはず） ##########
+
+$ lab check; echo "exit=$?"
+✔ 01 達成
+  判定 : 観測型（3箇所の実効値をそのまま読む）
+  観測 : date +%Z                  = JST
+         timedatectl の Time zone  = Asia/Tokyo
+         /etc/localtime のリンク先 = Asia/Tokyo
+         /etc/timezone の中身      = Asia/Tokyo
+         4つすべてが Asia/Tokyo（date は JST）で一致している
+✔ 02 達成
+  判定 : 観測型（chronyd 自身が報告する Reference ID と Leap status）
+  観測 : Reference ID = 7F000001
+         Leap status  = Normal
+         ソース本数   = 1
+         檻の中の基準サーバ（127.0.0.1）を選び、同期状態になっている
+         （時計は動かしていない。chronyd は -x で起動している）
+✔ 03 達成
+  判定 : 観測型（判定の中で local3.info に1行投げ、どこに現れたかを見た）
+  観測 : 投げた目印 = labchk03-1195-7068
+         /var/log/lab-app.log  に 1 行
+         /var/log/syslog        に 1 行
+         同じ1行が2つのファイルに入っている
+         → 宛先を決めたのは logger ではなく /etc/rsyslog.d の設定
+✔ 04 達成
+  判定 : 観測型（systemd-journald 自身がログに書いた上限の行を読む）
+  観測 : Oct 12 22:03:32 6e2a59ee1edc systemd-journald[504]: System Journal (/var/log/journal/f5295b64ae1a49b9a1af1c892764514b) is 8.0M, max 8.0M, 0B free.
+         読み取った上限 = max 8.0M
+         journald は上限 8.0M で動いていると自分で言っている
+✔ 05 達成
+  判定 : 観測型（世代ファイルが実在するか）
+  観測 : 世代ファイル = /var/log/lab-app.log.1.gz /var/log/lab-app.log.2.gz /var/log/lab-app.log.3.gz 
+         世代数       = 3
+         設定ファイル = /etc/logrotate.d/lab-app（権限 644）
+         1k 超で切られ、圧縮された世代が残り、3世代以内に収まっている
+✔ 06 達成
+  判定 : 観測型（判定の中で alice 宛に1通送り、どこに入ったかを見た）
+  観測 : 送った目印 = labchk06-1241-17168 （宛先に書いた名前は alice）
+         /var/mail/root  に 2 行
+         /var/mail/bob   に 0 行
+         /var/mail/alice に 0 行
+         ログ最終行: 79770114517A: to=<root@lab.local>, orig_to=<alice>, relay=local, delay=0, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+         alice と書いたものが root に届いている（2回書き換わった）
+exit=0
+
+$ lab ls
+演習一覧
+  ✔ 01  時刻の表示を3箇所で揃える        10分 / 影響度 B
+  ✔ 02  chrony に基準を与えて同期させる  12分 / 影響度 B
+  ✔ 03  local3 のログを専用ファイルへ落とす 12分 / 影響度 B
+  ✔ 04  journal の上限を自分で決める       10分 / 影響度 B
+  ✔ 05  ログを切って3世代だけ残す        12分 / 影響度 B
+  ✔ 06  メールを2回曲げて、ログで追う  15分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+
+########## I. 届かない宛先はキューではなく root に戻る ##########
+
+$ echo x | mail -s "届かない宛先" nosuchuser@invalid.example; sleep 4
+
+$ mailq
+Mail queue is empty
+
+$ ls -l /var/mail/
+total 16
+-rw------- 1 alice mail  516 Oct 12 22:03 alice
+-rw------- 1 bob   mail 1028 Oct 12 22:03 bob
+-rw------- 1 root  mail 4360 Oct 12 22:04 root
+
+$ grep -c "届かない宛先" /var/mail/root 2>/dev/null; echo "(root に戻った数)"
+1
+(root に戻った数)
+
+$ journalctl -t postfix/local --no-pager -n 3
+Oct 12 22:03:59 6e2a59ee1edc postfix/local[1013]: 78A6F114517E: to=<alice@lab.local>, orig_to=<alice>, relay=local, delay=0.02, delays=0.01/0/0/0, dsn=2.0.0, status=sent (forwarded as 79770114517A)
+Oct 12 22:03:59 6e2a59ee1edc postfix/local[1013]: 79770114517A: to=<root@lab.local>, orig_to=<alice>, relay=local, delay=0, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+Oct 12 22:04:03 6e2a59ee1edc postfix/local[1013]: 8E10B1145184: to=<root@lab.local>, relay=local, delay=0.01, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+
+
+########## J. 最終環境 ##########
+
+$ lab env
+テーマ    : lab-linuc-services 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+PID1      : /sbin/init
+systemd   : running
+cgroup    : rw,nosuid,nodev,noexec,relatime
+journal   : 8.0M in the file system.
+特権      : CapEff=00000000a82425fb CapBnd=00000000a82425fb
