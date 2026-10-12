@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. ログの宛先は、受け手の表が決める — 確かめて説明する LinuC 主題1.09</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="linuc-services">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-services/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/">詳しく</a></p>
+</div>
+<h1>4. ログの宛先は、受け手の表が決める</h1>
+<p class="lead"><code>logger -p local3.info</code> と打つと、行は <code>/var/log/syslog</code> に入る。<code>local3</code> という名前のファイルはどこにも無い。送り手は宛先を1文字も指定していない。決めたのは受け手の設定表である。</p>
+<div class="badges"><span>前提: 第3章まで読了</span><span>前提: 檻が起動している</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.2（重要度5）</span><span>最終検証 2026-10-12</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>facility.priority</code> のセレクタを読み書きできる</li><li>同じ1行が複数のファイルに同時に入る理由を、設定の構造から説明できる</li><li><code>logger</code> が何を渡し、何を渡していないかを列挙できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: rsyslog の RainerScript（<code>action()</code> 形式）、リモート転送（<code>@@host</code>）、テンプレートによる書式変更、キューの設計はここでは扱わない。<code>imklog</code> や <code>imfile</code> などの入力モジュールも、名前を見たとき「入力の口」と分かれば足りる。覚えるのはセレクタの文法と既定の宛先だけでよい。</div></div>
+<h2 id="mismatch">投げた先と、入った先が違う</h2>
+<div class="sgoal"><b>この節で分かること</b>: ログの宛先を決めているのが送り手ではないこと。</div>
+<pre><code>$ logger "はじめての logger"
+$ tail -3 /var/log/syslog
+2026-10-12T12:46:16.625635+00:00 a7c1d43cae23 chronyd[327]: Selected source 127.0.0.1
+2026-10-12T12:46:20.383363+00:00 a7c1d43cae23 chronyd[327]: Could not step system clock
+2026-10-12T12:46:20.434153+00:00 a7c1d43cae23 root: はじめての logger</code></pre>
+<p>自分が投げた行が、第3章で見た <code>chronyd</code> の行の隣に並んだ。デーモンのログと、手で打った1行が同じファイルに入っている。</p>
+<p>では宛先を指定して投げてみる。<code>-p</code> で <code>facility.priority</code> を渡せる。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>local3</code> という宛先を指定して投げたのだから、<code>local3</code> 向けの場所に入るはずだ。
+少なくとも、指定しなかったとき（<code>/var/log/syslog</code>）とは別の場所に行くだろう。</p>
+<pre><code>$ logger -p local3.info "local3 に投げる"
+$ grep local3 /var/log/syslog
+2026-10-12T12:46:21.437290+00:00 a7c1d43cae23 root: local3 に投げる</code></pre>
+<div class="then"><b>だめな理由</b>: 同じ <code>/var/log/syslog</code> に入っている。
+しかも行の中に <code>local3</code> という文字は残っていない（<code>grep</code> が当たったのは本文のほうである）。
+<code>local3</code> は宛先ではなく<b>ラベル</b>で、そのラベルをどう扱うかは受け手が決める。
+この環境の受け手は「どんなラベルでも <code>/var/log/syslog</code> に入れる」という設定になっていた。
+次の節でその1行を見る。</div></div>
+<p>受け手の設定を読む。rsyslog は本体の最後で、ディレクトリの中身を取り込んでいる。</p>
+<pre><code>$ grep IncludeConfig /etc/rsyslog.conf
+$IncludeConfig /etc/rsyslog.d/*.conf
+$ ls /etc/rsyslog.d/
+50-default.conf
+postfix.conf
+$ grep -vE '^\s*#|^\s*$' /etc/rsyslog.d/50-default.conf
+auth,authpriv.*			/var/log/auth.log
+*.*;auth,authpriv.none		-/var/log/syslog
+kern.*				-/var/log/kern.log
+mail.*				-/var/log/mail.log
+mail.err			/var/log/mail.err
+*.emerg				:omusrmsg:*</code></pre>
+<p>2行目が答えである。<code>*.*</code> は「どの facility の、どの priority も」という意味で、<code>;auth,authpriv.none</code> が「ただし auth と authpriv は除く」を付け足している。<code>local3.info</code> はこれに当てはまるので <code>/var/log/syslog</code> に入った。</p>
+<p>行頭の記号も読む。</p>
+<pre><code>-/var/log/syslog     先頭の - は「毎行 fsync しない」（速いが、落ちると最後の数行が消える）
+ /var/log/auth.log   - が無いと1行ごとに同期する（認証ログは落としたくない）
+:omusrmsg:*          ファイルではなく「ログイン中の全ユーザの端末」へ送る出力モジュール</code></pre>
+<div class="analogy"><b>たとえ</b>: 郵便物に「至急」と赤いスタンプを押して出す動作に近い。
+スタンプは宛先ではない。配達の優先度をどう扱うかは、受け取った郵便局の処理表が決める。
+<br>ただし<b>崩れる点</b>: 郵便物には宛先住所も書いてあるが、
+<code>logger</code> が渡す情報には宛先が1つも無い。ラベルと本文だけである。</div>
+<h2 id="selector">セレクタは facility と priority の2語でできている</h2>
+<div class="sgoal"><b>この節で分かること</b>: 設定の1行がどう組み立てられていて、どこまで絞れるか。</div>
+<p>設定の1行は、左が<b>セレクタ</b>、右が<b>宛先</b>である。</p>
+<pre><code>local3.*          /var/log/lab-app.log
+^^^^^^^^          ^^^^^^^^^^^^^^^^^^^^
+セレクタ           宛先
+
+local3  .  *
+facility   priority</code></pre>
+<p>facility は「どの種類の機能から出たか」を表す決まった名前の集合で、priority は「どれだけ重いか」の段である。どちらも <code>logger</code> の man に一覧がある。</p>
+<div class="scroll"><table>
+<tr><th>priority（重い順）</th><th>別名</th><th>意味の目安</th></tr>
+<tr><td><code>emerg</code></td><td><code>panic</code></td><td>システムが使えない</td></tr>
+<tr><td><code>alert</code></td><td>—</td><td>すぐ対応が要る</td></tr>
+<tr><td><code>crit</code></td><td>—</td><td>致命的</td></tr>
+<tr><td><code>err</code></td><td><code>error</code></td><td>エラー</td></tr>
+<tr><td><code>warning</code></td><td><code>warn</code></td><td>警告</td></tr>
+<tr><td><code>notice</code></td><td>—</td><td>通常だが注意に値する</td></tr>
+<tr><td><code>info</code></td><td>—</td><td>情報</td></tr>
+<tr><td><code>debug</code></td><td>—</td><td>開発用</td></tr>
+</table></div>
+<p>facility は <code>auth</code>、<code>authpriv</code>、<code>cron</code>、<code>daemon</code>、<code>kern</code>、<code>lpr</code>、<code>mail</code>、<code>news</code>、<code>syslog</code>、<code>user</code>、<code>uucp</code>、そして <code>local0</code> から <code>local7</code> である。<b><code>local0</code>〜<code>local7</code> は用途が決まっていない</b>ので、自分のアプリに割り当てて使う。だから演習で使うのもここである。</p>
+<p>priority の書き方は3通りあり、意味が違う。実際に投げて確かめる。</p>
+<pre><code>$ echo 'local4.warning  /var/log/lab-warn.log' &gt; /etc/rsyslog.d/61-lab.conf
+$ systemctl restart rsyslog
+$ logger -p local4.debug   "debug なので入らない"
+$ logger -p local4.info    "info なので入らない"
+$ logger -p local4.warning "warning だから入る"
+$ logger -p local4.err     "err だから入る"
+$ cat /var/log/lab-warn.log
+2026-10-12T21:46:25.560765+09:00 a7c1d43cae23 root: warning だから入る
+2026-10-12T21:46:25.561516+09:00 a7c1d43cae23 root: err だから入る</code></pre>
+<p><code>local4.warning</code> と書くと <b><code>warning</code> 以上</b>が入る。4つ投げて2つしか入っていない。<code>=</code> を付けるとその段だけになる。</p>
+<pre><code>$ echo 'local5.=notice  /var/log/lab-notice.log' &gt; /etc/rsyslog.d/62-lab.conf
+$ systemctl restart rsyslog
+$ logger -p local5.notice "notice"
+$ logger -p local5.err    "err"
+$ cat /var/log/lab-notice.log
+2026-10-12T21:46:27.613547+09:00 a7c1d43cae23 root: notice</code></pre>
+<p><code>err</code> は <code>notice</code> より重いのに入らない。これが <code>=</code> の効果である。</p>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>入るもの</th></tr>
+<tr><td><code>local4.warning</code></td><td>warning と、それより重いもの全部</td></tr>
+<tr><td><code>local4.=warning</code></td><td>warning だけ</td></tr>
+<tr><td><code>local4.*</code></td><td>全部</td></tr>
+<tr><td><code>local4.none</code></td><td>この facility を除外する（<code>*.*;local4.none</code> のように使う）</td></tr>
+<tr><td><code>local3,local4.err</code></td><td>facility を複数並べる（カンマ区切り）</td></tr>
+<tr><td><code>local3.err;local4.*</code></td><td>セレクタを複数並べる（セミコロン区切り）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 「課長以上を集めてください」という指示に近い。
+課長だけでなく部長も社長も来る。「課長だけ」と言いたいときは別の書き方が要る。
+<br>ただし<b>崩れる点</b>: 役職は上下1列だが、facility には上下が無い。
+<code>mail</code> と <code>local3</code> はどちらが上でもない。
+2つの語のうち片方（priority）だけに順序があることが、この文法の読みにくさの原因である。</div>
+<h2 id="both">同じ1行が、2つのファイルに入る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 受け手が宛先を1つに決めるわけではないこと。</div>
+<p>受け皿を1つ足す。既定の設定は消さない。</p>
+<pre><code>$ echo 'local3.*  /var/log/lab-app.log' &gt; /etc/rsyslog.d/60-lab.conf
+$ systemctl restart rsyslog
+$ logger -p local3.info "受け皿ができた後"
+$ cat /var/log/lab-app.log
+2026-10-12T21:46:23.491996+09:00 a7c1d43cae23 root: 受け皿ができた後
+$ grep "受け皿ができた後" /var/log/syslog
+2026-10-12T21:46:23.491996+09:00 a7c1d43cae23 root: 受け皿ができた後</code></pre>
+<p>同じ行が両方にある。rsyslog はセレクタに当てはまった行を、<b>当てはまったすべての宛先に書く</b>。最初に見つかったところで止まらない。</p>
+<pre><code>*.*;auth,authpriv.none   -/var/log/syslog        ← 既定。ほぼ全部を拾う
+local3.*                  /var/log/lab-app.log   ← 足したもの
+                          どちらも local3.info に当てはまる → 2回書かれる</code></pre>
+<p>ここが「移す」と「増やす」の違いである。<code>/var/log/lab-app.log</code> だけに入れたいなら、既定の行のほうに <code>local3.none</code> を足して除外する必要がある。<b>送り手側では何も変えられない。</b></p>
+<p>そして第3章で見た行をもう一度見る。</p>
+<pre><code>chronyd[327]: Could not step system clock</code></pre>
+<p>この行も <code>chronyd</code> が facility と priority を付けて投げただけで、<code>/var/log/syslog</code> に入ったのは <code>*.*</code> の行があったからである。<b>第3章で「理由はログに書かれていた」と言ったのは、この設定表がそう決めていたから</b>に過ぎない。設定を変えれば、その理由は別の場所に行くか、消える。</p>
+<div class="analogy"><b>たとえ</b>: 回覧板を「関係する部署すべて」に同時に回す運用に近い。
+1枚の紙が複数の部署の棚に写しとして置かれる。どこか1つに届いたら終わりではない。
+<br>ただし<b>崩れる点</b>: 回覧板は1枚を回すので同時に2箇所には置けないが、
+rsyslog は同じ内容をいくつでも複製する。コストはディスクだけである。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-services/">演習03</a>は、この「1行が2箇所に入る状態」を作る課題である。
+判定は実際に1行投げて、両方のファイルを <code>grep</code> して確かめる。</div>
+<h2 id="whatlogger">logger が渡しているものを数える</h2>
+<div class="sgoal"><b>この節で分かること</b>: 送り手が持っている情報の少なさ。</div>
+<p><code>logger</code> が渡せるものは少ない。</p>
+<pre><code>$ logger -p local3.err -t myapp "タグも付けられる"
+$ tail -1 /var/log/lab-app.log
+2026-10-12T21:46:28.617594+09:00 a7c1d43cae23 myapp: タグも付けられる</code></pre>
+<div class="scroll"><table>
+<tr><th>渡すもの</th><th>指定</th><th>行のどこに出るか</th></tr>
+<tr><td>facility</td><td><code>-p local3.</code></td><td><b>出ない</b>（宛先の判断にだけ使われる）</td></tr>
+<tr><td>priority</td><td><code>-p .err</code></td><td><b>出ない</b>（同じ）</td></tr>
+<tr><td>タグ</td><td><code>-t myapp</code></td><td><code>myapp:</code></td></tr>
+<tr><td>本文</td><td>引数</td><td>末尾</td></tr>
+<tr><td>時刻・ホスト名</td><td>指定しない</td><td>受け手が付ける</td></tr>
+</table></div>
+<p>facility と priority は<b>行の中に残らない</b>。分類に使われて消える。タグを省略するとユーザ名（<code>root:</code>）が入る。時刻とホスト名は <code>logger</code> が書いたものではなく、rsyslog が付けたものである。</p>
+<p>だから「このログの priority は何だったか」を後から <code>/var/log/syslog</code> から知ることはできない。知りたければ、priority ごとに別のファイルへ分けておくしかない。<b>ログ設計が設定ファイルの仕事になっているのはこのため</b>である。</p>
+<p>第5章で見る journald は、ここが違う。同じ1行を構造ごと保存している。</p>
+<div class="quiz"><b>確認</b>
+<p><code>logger -p local3.info "test"</code> と打った行を <code>/var/log/syslog</code> で見つけた。
+この行の facility を出力から特定できるか。</p>
+<details><summary>答え</summary>
+<p>できない。facility と priority は宛先を選ぶために使われたあと、行には書かれない。
+実測の行は <code>root: local3 に投げる</code> で、<code>local3</code> という語は本文に書いた文字列が
+残っているだけだった。知りたければ facility ごとに別ファイルへ分ける設定を先に作る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/rsyslog.d/60-lab.conf</code> に <code>local3.* /var/log/lab-app.log</code> を書いた。
+<code>local3</code> のログを <code>/var/log/syslog</code> には入れたくない。どこを直すか。</p>
+<details><summary>答え</summary>
+<p><code>/etc/rsyslog.d/50-default.conf</code> の <code>*.*;auth,authpriv.none -/var/log/syslog</code> に
+<code>local3.none</code> を足して <code>*.*;auth,authpriv.none;local3.none</code> にする。
+自分が足したファイルを直しても <code>/var/log/syslog</code> への経路は消えない。
+別の行が独立して拾っているからである。</p></details></div>
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>logger</code> が渡すのは facility・priority・タグ・本文だけ。宛先は1文字も渡していない</li><li>宛先を決めるのは <code>/etc/rsyslog.conf</code> と <code>/etc/rsyslog.d/*.conf</code> のセレクタ表</li><li>Debian 系の既定は <code>*.*;auth,authpriv.none -/var/log/syslog</code> という catch-all。だから何を投げても <code>/var/log/syslog</code> に入る</li><li><code>local4.warning</code> は warning 以上、<code>local4.=warning</code> は warning だけ、<code>local4.none</code> は除外</li><li>当てはまった宛先すべてに書かれる。だから設定を足すと「移る」のではなく「増える」</li><li>facility と priority は行に残らない。後から知りたければ、分けて保存する設定を先に作る</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.0@sha256:c54bda8193b64d391a025f3e216551af0c85a50f9b46cbeb42ab47ce2a83f6bb / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless でも同じ出力を確認）/ 検証日 2026-10-12</div>
+<nav class="pager"><a href="/linuc-services/theory/03-ntp">← 3. 時刻合わせは、基準を渡されるまで始まらない</a><a href="/linuc-services/theory/05-journald">次: 5. journald は隣にある別の箱 →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-services/chapters.js"></script>
+<script src="/linuc-services/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

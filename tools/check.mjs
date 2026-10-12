@@ -129,7 +129,8 @@ for (const f of htmls) {
   // 章ナビが動く前提（chapters.js と theory.js を読んでいるか）
   if (!/chapters\.js/.test(html)) err(f, "chapters.js を読み込んでいない（進捗バーが出ない）");
   if (!/shared\/theory\.js/.test(html)) err(f, "shared/theory.js を読み込んでいない");
-  if (!/data-theme="[a-z]+"/.test(html)) err(f, "body に data-theme が無い（用語リンク先が解決できない）");
+  // テーマ名はパスの一部なのでハイフンを含みうる（linuc-services）。
+  if (!/data-theme="[a-z0-9-]+"/.test(html)) err(f, "body に data-theme が無い（用語リンク先が解決できない）");
 }
 
 // ---- 3. 本文と実物がずれる書き方 ----
@@ -303,6 +304,20 @@ for (const f of htmls) {
     if (!/\b(docker|podman)\s+run\b/.test(cmd)) continue;
 
     if (/--privileged/.test(cmd)) err(f, "読者のコマンドに --privileged がある");
+
+    // cap を渡させるなら、何がどれだけ増えるかを本文で測って見せる（憲章 §3）。
+    // 「必要な cap を個別列挙し、なぜ要るかを本文に書く」を機械で担保する。
+    // 判定は文字列の有無なので誤報しない。
+    for (const cm of cmd.matchAll(/--cap-add[= ]([A-Za-z_]+)/g)) {
+      // 要求する綴りは CAP_ 付き（CAP_SYS_ADMIN）にする。
+      // 当初は素の名前（SYS_ADMIN）の有無を見ていたが、それは
+      // **起動コマンド自身が満たしてしまう**ので、どう壊しても鳴らない空の検査だった
+      // （2026-10-12 に壊して確認して判明）。CAP_ 付きはコマンドには書かれないので、
+      // 本文で説明したときだけ通る。
+      const cap = "CAP_" + cm[1].toUpperCase().replace(/^CAP_/, "");
+      if (!h.includes(cap)) err(f, `読者のコマンドに --cap-add ${cm[1]} があるのに、本文に ${cap} の説明が無い`);
+      if (!h.includes("CapEff")) err(f, `読者のコマンドに --cap-add ${cm[1]} があるのに、本文に CapEff の実測が無い（どれだけ増えるかを示す）`);
+    }
 
     // bind mount は使わない（ホストを書き換える経路を構造的に作らない）。
     // 名前付きボリュームは先頭が英数字なので、/ . $ ~ で始まるものだけを拾う。

@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. 時刻合わせは、基準を渡されるまで始まらない — 確かめて説明する LinuC 主題1.09</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="linuc-services">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-services/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/">詳しく</a></p>
+</div>
+<h1>3. 時刻合わせは、基準を渡されるまで始まらない</h1>
+<p class="lead">この檻では時刻合わせのデーモンが動いている。<code>systemctl is-active chrony</code> は <code>active</code> を返す。それでも <code>Reference ID</code> は <code>00000000</code> で、<code>Leap status</code> は <code>Not synchronised</code> のままである。動いていることと、合わせていることは別のことだ。</p>
+<div class="badges"><span>前提: 第2章まで読了</span><span>前提: 檻が起動している</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.1（重要度2）</span><span>最終検証 2026-10-12</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>NTP クライアントが「基準」を設定で渡されるまで何もしないことを、出力で示せる</li><li><code>chronyc sources</code> と <code>chronyc tracking</code> の読み分けができる</li><li><code>chronyd</code> と <code>ntpd</code> が同時に入らない理由をパッケージの宣言から言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: NTP のパケット形式、うるう秒の扱い、NTS（暗号化）、<code>stratum</code> の階層をどこまで深く追えるかは扱わない。ハードウェアタイムスタンプや PTP も外す。ここで覚えるのは「どのファイルに何を書くと、どのコマンドの出力がどう変わるか」だけである。</div></div>
+<h2 id="running">動いているのに、合っていない</h2>
+<div class="sgoal"><b>この節で分かること</b>: デーモンの稼働と、時刻が合っていることが別だという事実。</div>
+<pre><code>$ systemctl is-active chrony
+active
+$ chronyc sources
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+$ chronyc tracking
+Reference ID    : 00000000 ()
+Stratum         : 0
+Ref time (UTC)  : Thu Jan 01 00:00:00 1970
+System time     : 0.000000000 seconds fast of NTP time
+Last offset     : +0.000000000 seconds
+RMS offset      : 0.000000000 seconds
+Frequency       : 0.000 ppm slow
+Residual freq   : +0.000 ppm
+Skew            : 0.000 ppm
+Root delay      : 1.000000000 seconds
+Root dispersion : 1.000000000 seconds
+Update interval : 0.0 seconds
+Leap status     : Not synchronised</code></pre>
+<p><code>chronyc sources</code> は見出しだけを出して、行が1本も無い。<code>Ref time</code> が <code>1970-01-01</code> なのは「一度も基準と話していない」印である。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>デーモンが動いていないのではないか。あるいは起動に失敗しているのではないか。
+サービスの状態とログを見れば原因が出るはずだ。</p>
+<pre><code>$ systemctl is-active chrony
+active
+$ chronyc activity
+200 OK
+0 sources online
+0 sources offline
+0 sources doing burst (return to online)
+0 sources doing burst (return to offline)
+0 sources with unknown address</code></pre>
+<div class="then"><b>だめな理由</b>: 失敗していない。<code>200 OK</code> が返り、
+<code>chronyd</code> は問い合わせにきちんと答えている。答えの内容が
+「online が 0、offline が 0、unknown も 0」＝<b>基準の候補を1つも持っていない</b>というだけである。
+エラーを探すと何も見つからない。探す先は設定ファイルで、そこに「どこを基準にするか」が
+1行も書かれていない。</div></div>
+<p>設定を見る。</p>
+<pre><code>$ grep -vE '^\s*#|^\s*$' /etc/chrony/chrony.conf
+confdir /etc/chrony/conf.d
+sourcedir /run/chrony-dhcp
+sourcedir /etc/chrony/sources.d
+keyfile /etc/chrony/chrony.keys
+driftfile /var/lib/chrony/chrony.drift
+ntsdumpdir /var/lib/chrony
+logdir /var/log/chrony
+maxupdateskew 100.0
+rtcsync
+makestep 1 3
+leapsectz right/UTC</code></pre>
+<p>置き場所（<code>driftfile</code>、<code>logdir</code>）と振る舞い（<code>makestep</code>）は書いてあるが、<code>server</code> も <code>pool</code> も無い。</p>
+<p class='detail'>（この教材では既定の <code>pool ntp.ubuntu.com</code> を外してある。インターネットに出られる読者と出られない読者で出力が完全に変わり、「本文と同じ画面が出る」が壊れるため。著者の環境ではこの行を残したまま測ると、外部のサーバに <code>stratum 3</code> で同期してしまい、誰にも再現できない出力になった。）</p>
+<div class="analogy"><b>たとえ</b>: 検針員を雇ったが、どの家を回るかのリストを渡していない状態に近い。
+出勤はしているし、呼べば返事もする。回る先が0軒なので報告できる数字が無い。
+<br>ただし<b>崩れる点</b>: 検針員はリストが空なら「仕事がない」と言うが、
+<code>chronyd</code> は何も言わない。<code>chronyc</code> で聞いたときだけ 0 を返す。
+黙っていることを「正常」と読み違えないために、聞きに行く必要がある。</div>
+<h2 id="give">基準を1行与える</h2>
+<div class="sgoal"><b>この節で分かること</b>: 設定1行で出力がどこまで変わるか。</div>
+<p>この檻の中には、基準として使えるサーバがもう1台立っている。</p>
+<pre><code>$ systemctl is-active lab-ntp-server
+active
+$ grep -vE '^\s*#|^\s*$' /etc/chrony/lab-ntp-server.conf
+local stratum 8
+allow 127.0.0.1
+bindaddress 127.0.0.1
+driftfile /var/lib/chrony/lab-server.drift
+pidfile /run/chrony-lab-server.pid
+cmdport 0
+$ ss -lun | grep -E ':(123|323)'
+UNCONN 0      0          127.0.0.1:123       0.0.0.0:*
+UNCONN 0      0          127.0.0.1:323       0.0.0.0:*
+UNCONN 0      0              [::1]:323          [::]:*</code></pre>
+<p><code>123/udp</code> が NTP の待ち受けである（試験範囲のポート番号表にある）。<code>323/udp</code> は <code>chronyc</code> が使う管理用で、NTP ではない。</p>
+<p>クライアント側に1行足して読み直させる。</p>
+<pre><code>$ echo 'server 127.0.0.1 iburst' &gt;&gt; /etc/chrony/chrony.conf
+$ systemctl restart chrony
+$ sleep 8
+$ chronyc sources -v
+
+  .-- Source mode  '^' = server, '=' = peer, '#' = local clock.
+ / .- Source state '*' = current best, '+' = combined, '-' = not combined,
+| /             'x' = may be in error, '~' = too variable, '?' = unusable.
+||                                                 .- xxxx [ yyyy ] +/- zzzz
+||      Reachability register (octal) -.           |  xxxx = adjusted offset,
+||      Log2(Polling interval) --.      |          |  yyyy = measured offset,
+||                                \     |          |  zzzz = estimated error.
+||                                 |    |           \
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+^* localhost                     8   6    17     2    +49ns[ +289ns] +/- 3392ns</code></pre>
+<p><code>-v</code> を付けると記号の意味が先頭に出る。覚えなくてよい。読み方は毎回ここから引ける。</p>
+<pre><code>^   … 相手はサーバ（peer なら =、ローカル時計なら #）
+*   … いま選ばれている基準
+17  … Reach は8進数。直近8回の到達を1ビットずつ記録したもの</code></pre>
+<pre><code>$ chronyc tracking
+Reference ID    : 7F000001 (localhost)
+Stratum         : 9
+Ref time (UTC)  : Mon Oct 12 12:46:18 2026
+System time     : 0.000002802 seconds fast of NTP time
+Last offset     : +0.000000240 seconds
+RMS offset      : 0.000000240 seconds
+Frequency       : 0.069 ppm slow
+Residual freq   : +0.001 ppm
+Skew            : 1.484 ppm
+Root delay      : 0.000006719 seconds
+Root dispersion : 0.000004577 seconds
+Update interval : 2.0 seconds
+Leap status     : Normal</code></pre>
+<p><code>Reference ID</code> が <code>7F000001</code> になった。これは <code>127.0.0.1</code> を16進で書いたもの（7F=127, 00=0, 00=0, 01=1）である。<code>Stratum</code> が <code>9</code> なのは、基準側が <code>local stratum 8</code> だから1段深くなった結果である。</p>
+<p class='detail'>（ナノ秒の数値・時刻・<code>Skew</code> はあなたの環境で変わる。一致を見るのは <code>Reference ID</code>、<code>Stratum</code>、<code>Leap status</code> の3行だけ。）</p>
+<p><code>timedatectl</code> の側も変わる。第1章で見た行が、ここに繋がる。</p>
+<pre><code>$ timedatectl | tail -3
+System clock synchronized: yes
+              NTP service: active
+          RTC in local TZ: no</code></pre>
+<p>2つのコマンドの役割を分ける。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>答えること</th><th>ntpd 系での対応</th></tr>
+<tr><td><code>chronyc sources</code></td><td>候補が何本あって、どれが選ばれているか</td><td><code>ntpq -p</code></td></tr>
+<tr><td><code>chronyc tracking</code></td><td>いま何を基準にして、どれだけずれているか</td><td><code>ntpq -c rv</code></td></tr>
+<tr><td><code>chronyc sourcestats</code></td><td>各候補の測定のばらつき</td><td>—</td></tr>
+<tr><td><code>ntpdate -q &lt;host&gt;</code></td><td>1回問い合わせるだけ（時計は動かさない）</td><td>同じ</td></tr>
+</table></div>
+<pre><code>$ ntpdate -q 127.0.0.1
+2026-10-12 21:46:20.424878 (+0900) +0.000001 +/- 0.000048 127.0.0.1 s8 no-leap</code></pre>
+<p><code>s8</code> が相手の stratum、<code>+0.000001</code> がずれである。<code>-q</code> は問い合わせだけなので、権限が無くても通る。次の節でそれが効く。</p>
+<div class="analogy"><b>たとえ</b>: 時報に電話をかけて、自分の時計との差をメモする作業に近い。
+<code>sources</code> は「どの番号に何回繋がったか」の記録で、<code>tracking</code> は
+「いまどの番号を信じていて、何秒ずれているか」のまとめである。
+<br>ただし<b>崩れる点</b>: 人は時報を聞いたらその場で針を合わせるが、
+<code>chronyd</code> は差を測ることと針を動かすことを分けている。次の節で、測るだけで止まる場合を見る。</div>
+<h2 id="power">測るのと、動かすのは別の権限</h2>
+<div class="sgoal"><b>この節で分かること</b>: ずれを測れることと、時計を直せることが別だという切り分け。</div>
+<p>同期状態になった。では時計を動かしてみる。</p>
+<pre><code>$ chronyc makestep
+500 Failure
+$ date -s "2020-01-01 00:00:00"
+date: cannot set date: Operation not permitted
+Wed Jan  1 00:00:00 JST 2020</code></pre>
+<p><code>date -s</code> の出力に注意する。<b>エラーを出したあとに、設定しようとした時刻を表示している</b>。表示だけ見ると成功したように見えるが、直前の行が <code>Operation not permitted</code> である。<code>date</code> を打ち直せば元の時刻が返る。</p>
+<p>権限が無いのは、この檻に CAP_SYS_TIME というケーパビリティが無いからである。第1章で RTC のデバイスが無かったのと同じ理由で、コンテナに時計を動かす力は既定で渡されない。</p>
+<p>だからこの檻の <code>chronyd</code> は、最初から「時計を触らない」指定で起動している。</p>
+<pre><code>$ cat /etc/default/chrony
+DAEMON_OPTS="-F -1 -x"</code></pre>
+<p><code>-x</code> が「システムクロックを制御しない」である。それでも <code>Leap status : Normal</code> になった。つまり <code>chronyd</code> の仕事は2つに分かれている。</p>
+<pre><code>測る   … 基準と話して、ずれと揺らぎを求める     ← 権限は要らない
+直す   … 求めたずれをシステムクロックに反映する ← CAP_SYS_TIME が要る</code></pre>
+<p>そしてこの失敗は、ログに残っている。第4章でこの行をもう一度見る。</p>
+<pre><code>$ tail -3 /var/log/syslog
+2026-10-12T12:46:16.625635+00:00 a7c1d43cae23 chronyd[327]: Selected source 127.0.0.1
+2026-10-12T12:46:20.383363+00:00 a7c1d43cae23 chronyd[327]: Could not step system clock
+2026-10-12T12:46:20.434153+00:00 a7c1d43cae23 root: はじめての logger</code></pre>
+<p><code>Could not step system clock</code> が、いま打った <code>makestep</code> の結果である。<b>コマンドの手元には <code>500 Failure</code> という4文字しか返らなかったが、理由はログに書かれていた</b>。これがこの教材を通して繰り返す形になる。</p>
+<div class="analogy"><b>たとえ</b>: 時刻のずれを測る計測員と、時計の針を回す鍵を持つ管理人が
+別人になっている状態に近い。計測員は「3分遅れています」と正しく報告できるが、針には触れない。
+<br>ただし<b>崩れる点</b>: 人なら管理人を呼べるが、コンテナには呼ぶ相手がいない。
+権限は起動のときに決まり、あとから足せない。足すには起動コマンドを変える。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-services/">演習02</a>で、<code>Not synchronised</code> から
+<code>Reference ID : 7F000001</code> までを自分で通す。判定は <code>chronyd</code> 自身の報告だけを見る。</div>
+<h2 id="exclusive">ntpd と chronyd は同時に入らない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 試験範囲に2つ並ぶのに、実機には片方しか無い理由。</div>
+<p>試験範囲 1.09.1 には <code>ntpd</code>・<code>ntp.conf</code>・<code>ntpq</code> と、<code>chronyd</code>・<code>chrony.conf</code>・<code>chronyc</code> が並んで出てくる。両方入れて見比べればよさそうだが、できない。パッケージがそう宣言している。</p>
+<pre><code>$ apt-cache show chrony | grep -E '^(Provides|Conflicts):'
+Provides: time-daemon
+Conflicts: time-daemon
+$ apt-cache show ntpsec | grep -E '^(Provides|Conflicts):'
+Provides: time-daemon
+Conflicts: time-daemon</code></pre>
+<p>どちらも <code>time-daemon</code> を<b>提供し</b>、同時に <code>time-daemon</code> と<b>衝突する</b>と書いてある。自分と同じ役を名乗る相手を排除する書き方である。結果として、1台のマシンには時刻デーモンが1つしか入らない。</p>
+<p>理由は <code>123/udp</code> を2つのプロセスが取り合うからで、片方が先に bind すると他方は起動に失敗する。パッケージの段階で防いでいる。</p>
+<p>だから覚え方はこうなる。<b>コマンド名を別々に覚えるのではなく、対応表で覚える。</b></p>
+<div class="scroll"><table>
+<tr><th>やること</th><th>chrony（現行の既定）</th><th>ntpd / ntpsec</th></tr>
+<tr><td>設定ファイル</td><td><code>/etc/chrony/chrony.conf</code></td><td><code>/etc/ntp.conf</code></td></tr>
+<tr><td>デーモン</td><td><code>chronyd</code></td><td><code>ntpd</code></td></tr>
+<tr><td>候補の一覧</td><td><code>chronyc sources</code></td><td><code>ntpq -p</code></td></tr>
+<tr><td>基準の指定</td><td><code>server</code> / <code>pool</code></td><td><code>server</code> / <code>pool</code></td></tr>
+<tr><td>1回だけ問い合わせ</td><td><code>chronyd -q</code></td><td><code>ntpdate -q</code></td></tr>
+<tr><td>公開サーバ群の名前</td><td colspan="2"><code>pool.ntp.org</code>（どちらも同じものを使う）</td></tr>
+</table></div>
+<p>この檻には <code>ntpdate</code> だけ別パッケージ（<code>ntpsec-ntpdate</code>）として入っている。これは <code>time-daemon</code> を名乗らないので chrony と共存できる。逆に <code>ntpq</code> は <code>ntpsec</code> 本体に入っているため、この檻には無い。</p>
+<div class="quiz"><b>確認</b>
+<p><code>systemctl is-active chrony</code> が <code>active</code> を返しているのに、
+<code>chronyc tracking</code> の <code>Leap status</code> が <code>Not synchronised</code> だった。
+最初に見るべきものは何か。</p>
+<details><summary>答え</summary>
+<p>基準の候補が何本あるか（<code>chronyc sources</code> / <code>chronyc activity</code>）。
+0本なら設定に <code>server</code> も <code>pool</code> も無い。
+サービスのログを探してもエラーは出ていない。「動いている」と「仕事がある」は別である。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>chronyc tracking</code> の <code>Stratum</code> が <code>9</code> になった。
+基準にしたサーバの <code>Stratum</code> はいくつか。</p>
+<details><summary>答え</summary>
+<p>8。<code>stratum</code> は基準から何段離れているかを数えるので、
+基準にした相手より必ず1大きくなる。実測でも、基準側の設定は
+<code>local stratum 8</code> で、こちらは <code>9</code> になった。</p></details></div>
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>デーモンが <code>active</code> でも、基準を渡されていなければ時刻は合わない（<code>Reference ID : 00000000</code> / <code>Not synchronised</code>）</li><li>基準は設定の <code>server</code> か <code>pool</code> で渡す。1行足して読み直させるだけで <code>Reference ID : 7F000001</code> / <code>Stratum : 9</code> になった</li><li><code>sources</code> は候補の一覧、<code>tracking</code> はいまの基準とずれ。読み分ける</li><li>ずれを測るのに権限は要らないが、時計を動かすには <code>CAP_SYS_TIME</code> が要る。<code>makestep</code> は <code>500 Failure</code>、<code>date -s</code> は <code>Operation not permitted</code></li><li>手元に返るのは <code>500 Failure</code> の4文字でも、理由（<code>Could not step system clock</code>）はログに書かれている</li><li><code>chrony</code> と <code>ntpsec</code> はどちらも <code>Provides: time-daemon</code> かつ <code>Conflicts: time-daemon</code>。だから実機には片方しか無い</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.0@sha256:c54bda8193b64d391a025f3e216551af0c85a50f9b46cbeb42ab47ce2a83f6bb / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless でも同じ出力を確認）/ 検証日 2026-10-12</div>
+<nav class="pager"><a href="/linuc-services/theory/02-timezone">← 2. タイムゾーンは表示の都合だけ</a><a href="/linuc-services/theory/04-rsyslog">次: 4. ログの宛先は、受け手の表が決める →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-services/chapters.js"></script>
+<script src="/linuc-services/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

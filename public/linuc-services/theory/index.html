@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理論編 — 確かめて説明する LinuC 主題1.09</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="linuc-services">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <strong>理論編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文に載せた出力はすべて実機の記録で、演習6本は模範解答どおりに通ることを確認してあります
+   （未達のときに判定が鳴ることも、6本すべてで確認済み）。
+   それでも <b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、著者が読者として通した段階で
+   <b>4回に分けて不備が出ました</b>（説明の順序・リンク切れ・前提の省略・判定の誤り）。
+   同じ種類のものが残っていると考えてください。</p>
+<p>詰まったところ・本文と違う出力が出たところは、
+   <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   各ページ下のコメントに書いてください。それが直す順番になります。</p>
+</div>
+
+<h1>理論編 — 重要なシステムサービス</h1>
+<p class="lead">LinuC レベル1 <strong>102 試験・主題1.09</strong>（時刻・ログ・メール）を、
+全部コンテナの中で実際に打って確かめる7章。
+読むだけで終わらせないために、<strong>1章ごとに「実際に打つと何が出るか」を先に置いて</strong>います。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<h2 id="spine">この7章を貫いている1つの事実</h2>
+<div class="goal">
+<p><b>送り手は、中身とラベルだけを渡す。宛先を決めているのは、受け手側にある設定ファイルである。</b></p>
+<p><code>logger</code> は facility と priority しか渡さない。<code>chronyd</code> はずれを測るだけで時計は動かさない。
+メールの <code>To:</code> は希望でしかない。だから主題1.09 の「詳細」欄には、コマンドよりファイルパスが多く並んでいます。
+<b>判断がそこに置かれているから</b>です。</p>
+<div class="skip"><b>ここで覚えなくていいこと</b>:
+SMTP のやりとり、NTP のパケット形式、rsyslog の RainerScript、journal のバイナリ形式、
+リモート転送と TLS。どれもレベル1の範囲外で、この7章には1行も出てきません。</div>
+</div>
+
+<h2 id="range">LinuC 出題範囲との対応</h2>
+<p>公式の出題範囲（<a href="https://linuc.org/linuc1/range/102.html">LinuC-1 Version 10.0 / 102 試験</a>）の
+主題1.09 を、章に割り当てたものです。「詳細」欄に挙げられている語が、どの章で実際に手を動かす対象になるかを並べてあります。</p>
+<div class="scroll"><table>
+<tr><th>副題</th><th>重要度</th><th>章</th><th>この教材で実際に打つもの</th></tr>
+<tr><td rowspan="3">1.09.1 システム時刻の管理</td><td rowspan="3">2</td>
+    <td><a href="/linuc-services/theory/01-clock">1</a></td>
+    <td><code>date</code> <code>hwclock</code> <code>timedatectl</code> <code>/proc/driver/rtc</code></td></tr>
+<tr><td><a href="/linuc-services/theory/02-timezone">2</a></td>
+    <td><code>/usr/share/zoneinfo/</code> <code>/etc/localtime</code> <code>/etc/timezone</code> <code>TZ</code> <code>timedatectl set-timezone</code></td></tr>
+<tr><td><a href="/linuc-services/theory/03-ntp">3</a></td>
+    <td><code>chronyd</code> <code>chronyc</code> <code>chrony.conf</code> <code>ntpdate</code> <code>pool.ntp.org</code>（<code>ntpd</code> <code>ntpq</code> <code>ntp.conf</code> は対応表で）</td></tr>
+<tr><td rowspan="3">1.09.2 システムのログ</td><td rowspan="3">5</td>
+    <td><a href="/linuc-services/theory/04-rsyslog">4</a></td>
+    <td><code>rsyslogd</code> <code>rsyslog.conf</code> <code>/etc/rsyslog.d/</code> <code>logger</code> <code>/var/log/</code></td></tr>
+<tr><td><a href="/linuc-services/theory/05-journald">5</a></td>
+    <td><code>journalctl</code> <code>/etc/systemd/journald.conf</code> <code>/var/log/journal/</code> <code>systemd-cat</code></td></tr>
+<tr><td><a href="/linuc-services/theory/06-logrotate">6</a></td>
+    <td><code>logrotate</code> <code>/etc/logrotate.conf</code> <code>/etc/logrotate.d/</code></td></tr>
+<tr><td>1.09.3 メール配送エージェント(MTA)の基本</td><td>2</td>
+    <td><a href="/linuc-services/theory/07-mail">7</a></td>
+    <td><code>/etc/aliases</code> <code>newaliases</code> <code>~/.forward</code> <code>mail</code> <code>mailq</code> <code>postfix</code>（<code>exim</code> は対応表で）</td></tr>
+</table></div>
+<p class="detail">主題1.09 の「詳細」欄に挙げられた語のうち、この檻で<b>実際に打てないもの</b>は
+<code>hwclock --systohc</code>（RTC デバイスが無い）、<code>ntpq</code>（<code>ntpsec</code> が chrony と排他で入らない）、
+<code>exim</code>（postfix と排他）、<code>tzselect</code>（対話的なので本文では扱わない）です。
+打てない理由も本文に書いてあります。<b>打てないことを黙って飛ばしてはいません。</b></p>
+<p>他の主題（1.01〜1.08・1.10・1.11）の対応は
+<a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。どこがまだ無いかもそこで分かります。</p>
+
+<h2 id="chapters">章</h2>
+<div class="toc">
+<ol>
+<li><a href="/linuc-services/theory/01-clock">時計は2つある</a> —
+    <span class="detail"><code>hwclock</code> は失敗するのに <code>/proc/driver/rtc</code> には時刻がある。しかも32秒ずれている（12分）</span></li>
+<li><a href="/linuc-services/theory/02-timezone">タイムゾーンは表示の都合だけ</a> —
+    <span class="detail"><code>date</code> と <code>timedatectl</code> と <code>/etc/timezone</code> が3つ違うことを言う。全部正しい（12分）</span></li>
+<li><a href="/linuc-services/theory/03-ntp">基準を渡されるまで始まらない</a> —
+    <span class="detail">デーモンは <code>active</code>。それでも <code>Not synchronised</code>。設定1行で <code>Stratum : 9</code> になる（15分）</span></li>
+<li><a href="/linuc-services/theory/04-rsyslog">宛先は受け手の表が決める</a> —
+    <span class="detail"><code>local3</code> に投げた行が <code>/var/log/syslog</code> に入る理由。1行が2箇所に入る（18分）</span></li>
+<li><a href="/linuc-services/theory/05-journald">journald は隣にある別の箱</a> —
+    <span class="detail">同じ1行が両方に1件ずつ。保存先はディレクトリの有無で決まる（16分）</span></li>
+<li><a href="/linuc-services/theory/06-logrotate">捨てる判断も受け手側にある</a> —
+    <span class="detail">エラーを出しながら終了コード 0 で終わる。原因は2つあり、どちらも権限（16分）</span></li>
+<li><a href="/linuc-services/theory/07-mail">宛先に書いた名前は希望にすぎない</a> —
+    <span class="detail">2回書き換わる。書き換わったことはログにしか残らない。ここで7章が1本になる（18分）</span></li>
+</ol>
+</div>
+<p><a href="/linuc-services/theory/glossary">用語辞書</a> —
+   本文の点線付きの語をクリックすると引けます。19語。</p>
+
+<h2 id="use">実務のどこで効くか</h2>
+<p>資格の勉強として読んでも、使う場面はこの4つに集まります。</p>
+<div class="scroll"><table>
+<tr><th>場面</th><th>ここで効く理由</th><th>見落としやすい点</th><th>関連する章</th></tr>
+<tr><td>障害の時系列を組み立てる</td>
+    <td>複数ホストのログを並べるとき、ゾーンとオフセットが揃っていないと順序が狂う</td>
+    <td>rsyslog と journald で時刻の書式が違う。ログの時刻はオフセット付きかを先に見る</td><td>2・4・5</td></tr>
+<tr><td>アプリのログを分離する</td>
+    <td><code>local0</code>〜<code>local7</code> は用途が決まっていないので自分のアプリに割り当てられる</td>
+    <td>設定を足すと「移る」のではなく「増える」。既定の catch-all は残り続ける</td><td>4</td></tr>
+<tr><td>ディスクが埋まった</td>
+    <td>ログは放っておくと増える一方で、捨てる仕組みは2つに分かれている</td>
+    <td>journal は logrotate の対象外。<code>SystemMaxUse=</code> を別に見る</td><td>5・6</td></tr>
+<tr><td>システムからの通知を受け取る</td>
+    <td>cron・smartd・logrotate などは失敗を root 宛のメールで知らせる</td>
+    <td><code>mailq</code> が空でも成功ではない。差し戻しは <code>/var/mail/root</code> に溜まる</td><td>7</td></tr>
+</table></div>
+<p><b>この主題を使わない方がよい場面</b>も1つあります。
+コンテナで動くアプリのログを rsyslog や logrotate で扱おうとすることです。
+コンテナは標準出力をそのままランタイムに渡す設計なので、
+中に rsyslog を立てると二重管理になります
+（この教材の檻が systemd を立てているのは、<b>試験範囲を再現するため</b>の例外です）。</p>
+
+<h2 id="next">手を動かす</h2>
+<p>読んだあと、同じ操作を自分でやる演習が6本あります。判定は<b>観測できる結果だけ</b>で行い、
+コマンドの打ち方は見ません。</p>
+<p><a href="/linuc-services/">実践編（檻の入り方と演習6本）→</a></p>
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-services/">実践編</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

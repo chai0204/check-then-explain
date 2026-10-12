@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>7. 宛先に書いた名前は、希望にすぎない — 確かめて説明する LinuC 主題1.09</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="7" data-theme="linuc-services">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-services/theory/">理論編</a> › 第7章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/">詳しく</a></p>
+</div>
+<h1>7. 宛先に書いた名前は、希望にすぎない</h1>
+<p class="lead"><code>alice</code> 宛に送ったメールが <code>root</code> のメールボックスに入る。途中で2回書き換えられている。そして<b>書き換わったことは、ログを見ないと分からない</b>。この章で、主題1.09 の3つ（時刻・ログ・メール）が1本に繋がる。</p>
+<div class="badges"><span>前提: 第6章まで読了</span><span>前提: 檻が起動している</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.3（重要度2）</span><span>最終検証 2026-10-12</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>/etc/aliases</code> と <code>~/.forward</code> の役割と優先順を説明できる</li><li><code>newaliases</code> が必要な理由を、ファイルの形から説明できる</li><li>配送の経路を <code>orig_to</code> と <code>to</code> の2つでログから追える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: SMTP のやりとり、<code>main.cf</code> の各パラメータ、外部へのリレー・認証・TLS・DKIM は扱わない（レベル1の範囲外）。<code>exim</code> の設定方法も外す。試験で問われるのは「MTA が2つあって、どちらも sendmail 互換のコマンドを持つ」ことまでである。</div></div>
+<h2 id="bend">宛先が書き換わる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 送り手が書いた名前と、実際に配送された先が違いうること。</div>
+<p>まず素直に1通送る。</p>
+<pre><code>$ echo "本文です" | mail -s "最初の1通" alice
+$ ls -l /var/mail/
+total 4
+-rw------- 1 alice mail 505 Oct 12 21:46 alice
+$ cat /var/mail/alice
+From root@lab.local  Mon Oct 12 21:46:35 2026
+Return-Path: &lt;root@lab.local&gt;
+X-Original-To: alice
+Delivered-To: alice@lab.local
+Received: by lab.local (Postfix, from userid 0)
+	id EE9821143EB7; Mon, 12 Oct 2026 12:46:35 +0000 (UTC)
+To: alice@lab.local
+Subject: 最初の1通
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+Message-Id: &lt;20261012124635.EE9821143EB7@lab.local&gt;
+Date: Mon, 12 Oct 2026 12:46:35 +0000 (UTC)
+From: root &lt;root@lab.local&gt;
+
+本文です</code></pre>
+<p>ここで第2章が効く。<code>Date:</code> と <code>Received:</code> は <code>+0000 (UTC)</code> で書かれているが、<code>ls -l</code> の時刻は <code>21:46</code>（JST）である。<b>同じ瞬間を、2つのゾーンで表示している。</b>メールのヘッダはオフセット付きで書くので、受け取った側がどのゾーンで読んでも同じ瞬間を指せる。</p>
+<p>次に宛先を曲げる。表は <code>postconf</code> が答える。</p>
+<pre><code>$ postconf -n | grep alias
+alias_database = hash:/etc/aliases
+alias_maps = hash:/etc/aliases
+$ cat /etc/aliases
+postmaster: root</code></pre>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>/etc/aliases</code> はテキストファイルなのだから、1行書き足せば効くはずだ。</p>
+<pre><code>$ echo 'alice: bob' &gt;&gt; /etc/aliases
+$ cat /etc/aliases
+postmaster: root
+alice: bob
+$ echo "曲がったか" | mail -s "aliases 経由" alice
+$ ls -l /var/mail/
+total 4
+-rw------- 1 alice mail 1010 Oct 12 21:47 alice</code></pre>
+<div class="then"><b>だめな理由</b>: <code>alice</code> に届いたままで、<code>bob</code> のメールボックスは作られていない。
+<code>postconf -n</code> の出力をもう一度読むと <code>hash:/etc/aliases</code> と書いてある。
+<code>hash:</code> は「このテキストから作ったハッシュ形式のデータベースを読む」という指定で、
+postfix が実際に開くのは隣にある <code>/etc/aliases.db</code> である。
+テキストを書き換えても <code>.db</code> は古いままなので、効かない。</div></div>
+<pre><code>$ ls -l /etc/aliases /etc/aliases.db
+-rw-r--r-- 1 root root    31 Oct 12 21:47 /etc/aliases
+-rw-r--r-- 1 root root 12288 Oct 12 21:41 /etc/aliases.db
+$ newaliases
+$ ls -l /etc/aliases.db
+-rw-r--r-- 1 root root 12288 Oct 12 21:47 /etc/aliases.db
+$ echo "曲がったか" | mail -s "aliases 経由" alice
+$ ls -l /var/mail/
+total 8
+-rw------- 1 alice mail 505 Oct 12 21:46 alice
+-rw------- 1 bob   mail 509 Oct 12 21:46 bob</code></pre>
+<p><code>bob</code> のメールボックスができた。<code>newaliases</code> がテキストから <code>.db</code> を作り直したので効いた。</p>
+<p><b>この「テキストを直して、作り直す」形は試験で繰り返し出る。</b><code>newaliases</code> は <code>postalias /etc/aliases</code> と同じことをする別名である。</p>
+<div class="analogy"><b>たとえ</b>: 転居届を出す動作に近い。
+郵便物の表書きは変えないまま、郵便局側の台帳で配達先を差し替える。
+<br>ただし<b>崩れる点</b>: 転居届は本人が出すが、<code>/etc/aliases</code> は
+システム管理者が書く。本人の意思とは無関係に宛先を曲げられる。
+本人が自分で曲げる手段は次の節の <code>~/.forward</code> である。</div>
+<h2 id="forward">本人も曲げられる。ただし権限を見られる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 2段目の書き換えと、それが黙って無効になる条件。</div>
+<p><code>bob</code> 宛をさらに <code>root</code> へ曲げる。1段目のエイリアスは管理者が書く表だったが、2段目は本人のホームに置く .forward というファイルで、本人が書く。</p>
+<pre><code>$ printf 'root\n' &gt; /home/bob/.forward
+$ chown bob:bob /home/bob/.forward
+$ ls -l /home/bob/.forward
+-rw-rw-rw- 1 bob bob 5 Oct 12 21:46 /home/bob/.forward
+$ echo "2回曲がる" | mail -s "forward 経由" alice
+$ grep -c "2回曲がる" /var/mail/root
+grep: /var/mail/root: No such file or directory
+$ grep -c "2回曲がる" /var/mail/bob
+1</code></pre>
+<p>曲がっていない。<code>bob</code> のメールボックスに入って終わっている。エラーは1つも出ていない。<b>理由はログにだけ書かれている。</b></p>
+<pre><code>$ journalctl -t postfix/local --no-pager | tail -3
+Oct 12 21:46:40 a7c1d43cae23 postfix/local[553]: warning: file /home/bob/.forward is world writable
+Oct 12 21:46:40 a7c1d43cae23 postfix/local[553]: 0ACAE1143EC1: to=&lt;bob@lab.local&gt;, orig_to=&lt;alice&gt;, relay=local, delay=0.02, delays=0.02/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)</code></pre>
+<p><code>world writable</code> である。<code>.forward</code> を書ける人は他人のメールを自分に転送できるので、postfix は誰でも書けるファイルを読まない。第6章の logrotate と<b>同じ形の拒否</b>である。</p>
+<pre><code>$ chmod 644 /home/bob/.forward
+$ echo "2回曲がる" | mail -s "forward 経由" alice
+$ grep -c "2回曲がる" /var/mail/root
+1
+$ journalctl -t postfix/local --no-pager -n 2
+Oct 12 21:46:40 a7c1d43cae23 postfix/local[553]: 0ACAE1143EC1: to=&lt;bob@lab.local&gt;, orig_to=&lt;alice&gt;, relay=local, dsn=2.0.0, status=sent (delivered to mailbox)
+Oct 12 21:46:42 a7c1d43cae23 postfix/local[553]: 1E83B1143EC4: to=&lt;root@lab.local&gt;, relay=local, dsn=2.0.0, status=sent (delivered to mailbox)</code></pre>
+<p>2行に分かれている。1行目で <code>alice</code> → <code>bob</code>、2行目で <code>bob</code> → <code>root</code>。<code>orig_to</code> が送り手の書いた名前、<code>to</code> が実際の配送先である。</p>
+<p>2つの曲げ方を並べる。</p>
+<div class="scroll"><table>
+<tr><th></th><th><code>/etc/aliases</code></th><th><code>~/.forward</code></th></tr>
+<tr><td>書く人</td><td>管理者</td><td>本人</td></tr>
+<tr><td>適用範囲</td><td>システム全体</td><td>そのユーザ宛だけ</td></tr>
+<tr><td>書き換えた後</td><td><code>newaliases</code> が必要</td><td>不要（テキストをそのまま読む）</td></tr>
+<tr><td>権限の制約</td><td>root 所有</td><td>group/other 書き込み不可</td></tr>
+<tr><td>適用の順</td><td>先（alias を展開してから）</td><td>後（展開先のユーザについて見る）</td></tr>
+</table></div>
+<p><code>newaliases</code> が <code>.forward</code> に要らないのは、<code>.forward</code> が <code>hash:</code> ではなくテキストとして直接読まれるからである。<b>「作り直しが要るかどうか」は、設定の形式で決まる。</b></p>
+<div class="analogy"><b>たとえ</b>: 会社の受付が持つ配布先リスト（<code>/etc/aliases</code>）と、
+各自が自席に貼る「不在時はこの人へ」のメモ（<code>~/.forward</code>）の違いに近い。
+受付のリストが先に引かれ、届いた席でメモが見られる。
+<br>ただし<b>崩れる点</b>: 自席のメモは誰が書いても読まれるが、
+<code>.forward</code> は権限が緩いと読まれない。しかも読まなかったことを本人に伝えない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-services/">演習06</a>で、この2段の書き換えを自分で作る。
+判定は実際に1通送って、どのメールボックスに入ったかだけを見る。</div>
+<h2 id="bounce">届かないメールは、キューではなく root に戻る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 「キューが空だから問題なし」が成り立たない理由。</div>
+<p>存在しない宛先に送る。</p>
+<pre><code>$ echo x | mail -s "届かない宛先" nosuchuser@invalid.example
+$ mailq
+Mail queue is empty
+$ postqueue -p
+Mail queue is empty</code></pre>
+<p>キューは空である。しかし送れていない。どこへ行ったか。</p>
+<pre><code>$ journalctl -t postfix/local --no-pager -n 1
+Oct 12 21:46:42 a7c1d43cae23 postfix/local[553]: 1E83B1143EC4: to=&lt;root@lab.local&gt;, relay=local, dsn=2.0.0, status=sent (delivered to mailbox)
+$ ls -l /var/mail/root
+-rw------- 1 root mail 1821 Oct 12 21:46 /var/mail/root</code></pre>
+<p>配送できないと postfix は<b>差し戻し（bounce）を作り</b>、それを postmaster という予約された宛先へ送る。そして postmaster は<code>/etc/aliases</code> の1行目で <code>root</code> に向いている。</p>
+<pre><code>$ head -1 /etc/aliases
+postmaster: root</code></pre>
+<p>つまり<b>「<code>mailq</code> が空なら問題なし」ではない</b>。処理の結果は root のメールボックスに溜まる。実機でサーバを預かったとき、最初に見るのは <code>/var/mail/root</code> である。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>見るもの</th></tr>
+<tr><td><code>mailq</code> / <code>postqueue -p</code></td><td>まだ送れていないメール（これから再試行する分）</td></tr>
+<tr><td><code>postqueue -f</code></td><td>キューの再試行を今すぐ走らせる</td></tr>
+<tr><td><code>/var/mail/root</code></td><td>差し戻しと、システムからの通知</td></tr>
+<tr><td><code>/var/log/mail.log</code> / <code>journalctl -t postfix/local</code></td><td>1通ごとの配送結果</td></tr>
+</table></div>
+<p><code>/var/log/mail.log</code> が在るのは、第4章で見た設定の4行目があるからである。</p>
+<pre><code>mail.*				-/var/log/mail.log
+mail.err			/var/log/mail.err</code></pre>
+<p><b>postfix は facility <code>mail</code> で投げているだけで、<code>/var/log/mail.log</code> という名前を知らない。</b>決めたのは <code>/etc/rsyslog.d/50-default.conf</code> である。第4章の話が、そのままここに戻ってくる。</p>
+<div class="analogy"><b>たとえ</b>: 宛先不明で戻ってきた郵便が、
+差出人ではなく「総務」に積まれる運用に近い。窓口（キュー）には何も残らないので、
+窓口だけ見ていると全部送れたように見える。
+<br>ただし<b>崩れる点</b>: 郵便なら差出人に戻るのが普通だが、
+ここでは <code>postmaster</code> という役職宛に集まる。
+その役職が誰を指すかも、やはり <code>/etc/aliases</code> という表が決めている。</div>
+<h2 id="spine">7章が1つの事実から出ていた</h2>
+<div class="sgoal"><b>この節で分かること</b>: 主題1.09 のファイルパス群が、なぜ出題範囲に並んでいるのか。</div>
+<p>この教材で触ったものを並べる。</p>
+<div class="scroll"><table>
+<tr><th>章</th><th>送り手が渡したもの</th><th>宛先を決めた受け手の表</th></tr>
+<tr><td>1</td><td>RTC が持つ時刻</td><td>起動時にシステムクロックへ読み込む設定</td></tr>
+<tr><td>2</td><td>エポック秒（1つ）</td><td><code>TZ</code> / <code>/etc/localtime</code> / <code>/etc/timezone</code></td></tr>
+<tr><td>3</td><td>基準とのずれ（測った値）</td><td><code>chrony.conf</code> と <code>CAP_SYS_TIME</code>。反映するかは別の判断</td></tr>
+<tr><td>4</td><td>facility・priority・本文</td><td><code>/etc/rsyslog.conf</code>・<code>/etc/rsyslog.d/</code></td></tr>
+<tr><td>5</td><td>同じ1行</td><td><code>journald.conf</code>（保存先と上限）</td></tr>
+<tr><td>6</td><td>書き続けられるログ</td><td><code>/etc/logrotate.conf</code>・<code>/etc/logrotate.d/</code></td></tr>
+<tr><td>7</td><td><code>To:</code> に書いた名前</td><td><code>/etc/aliases</code>・<code>~/.forward</code></td></tr>
+</table></div>
+<p>7つとも同じ形をしている。</p>
+<pre><code>送り手は、中身とラベルだけを渡す。
+宛先を決めているのは、受け手側にある設定ファイルである。</code></pre>
+<p>だから出題範囲 1.09 の「詳細」欄に、コマンドよりファイルパスが多く並んでいる。<b>判断がそこに置かれているから</b>である。<code>/etc/localtime</code>・<code>/etc/timezone</code>・<code>chrony.conf</code>・<code>rsyslog.conf</code>・<code>journald.conf</code>・<code>logrotate.conf</code>・<code>/etc/aliases</code>・<code>~/.forward</code> — どれも「受け取ったものをどう扱うか」が書かれた表である。</p>
+<p>そしてこの構造が、同じ形の失敗を3回起こした。</p>
+<div class="scroll"><table>
+<tr><th>章</th><th>書いたのに効かなかった理由</th></tr>
+<tr><td>2</td><td><code>timedatectl set-timezone</code> は <code>/etc/timezone</code> を更新しない（担当が違う）</td></tr>
+<tr><td>6</td><td>設定ファイルが <code>0666</code> だと logrotate が丸ごと無視する（終了コードは 0）</td></tr>
+<tr><td>7</td><td><code>~/.forward</code> が world writable だと postfix が読まない（警告はログだけ）</td></tr>
+</table></div>
+<p>受け手が表を読むのだから、<b>受け手がその表を信用できるかどうかを先に判断する</b>。信用できなければ黙って従わない。そして「従わなかった」という事実は、ほとんどの場合ログにしか残らない。</p>
+<p>だから実機でこの主題の作業をするときの順番は決まる。</p>
+<pre><code>1. 設定を書く
+2. 読み直させる（restart / newaliases / HUP）
+3. 当人に聞く（chronyc tracking / journalctl -t systemd-journald / postconf -n）
+4. ログを読む（journalctl / /var/log/mail.log）</code></pre>
+<p>2 を飛ばすと第3章と第5章で止まり、4 を飛ばすと第6章と第7章で止まる。推測で埋めずに、当人に聞いてログを読む。それがこの主題の実技である。</p>
+<div class="analogy"><b>たとえ</b>: どの章も「申請書を出す側」と「受け付けて処理する側」に分かれていた。
+出す側は申請書の様式と中身しか決められず、処理の仕方は受付の規定集が決める。
+規定集が複数の棚（<code>/etc</code> の各ファイル）に分かれて置かれている。
+<br>ただし<b>崩れる点</b>: 役所なら不受理のときに通知が来るが、
+ここでは通知が来ないことが多い。ログを自分で見に行く必要がある。</div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/aliases</code> に <code>alice: bob</code> を書いた。<code>newaliases</code> は打っていない。
+<code>alice</code> 宛のメールはどこに届くか。</p>
+<details><summary>答え</summary>
+<p><code>alice</code> に届く。postfix が読むのは <code>alias_maps = hash:/etc/aliases</code> の
+<code>hash:</code> が示す <code>/etc/aliases.db</code> で、テキストを書き換えただけでは
+<code>.db</code> は古いまま。<code>newaliases</code>（= <code>postalias /etc/aliases</code>）で作り直す。
+一方 <code>~/.forward</code> はテキストを直接読むので作り直しは要らない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>mailq</code> が <code>Mail queue is empty</code> を返した。
+全部のメールが正しく配送されたと言えるか。</p>
+<details><summary>答え</summary>
+<p>言えない。配送できなかったメールは差し戻しが作られ、
+<code>postmaster</code>（既定で <code>/etc/aliases</code> により root）へ送られてキューから消える。
+確かめるのは <code>/var/mail/root</code> と <code>/var/log/mail.log</code>
+（または <code>journalctl -t postfix/local</code>）である。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>この主題で触った設定を書き換えたあと、必ずやることは何か。章をまたいで答えよ。</p>
+<details><summary>答え</summary>
+<p>読み直させること。<code>chrony.conf</code> と <code>rsyslog.d/*.conf</code> と
+<code>journald.conf</code> は <code>systemctl restart</code>、
+<code>/etc/aliases</code> は <code>newaliases</code>、
+rsyslog に開き直させるのは HUP シグナル。<code>~/.forward</code> だけは例外で、
+毎回読まれるので何も要らない。
+そして読み直させたあと、効いたかどうかを当人に聞く（<code>chronyc tracking</code>、
+<code>journalctl -t systemd-journald</code>、<code>postconf -n</code>）。</p></details></div>
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>To:</code> に書いた名前は希望でしかない。<code>/etc/aliases</code> と <code>~/.forward</code> で2回書き換わった</li><li><code>alias_maps = hash:/etc/aliases</code> なので、テキストを直したら <code>newaliases</code> で <code>.db</code> を作り直す。<code>~/.forward</code> は不要</li><li><code>~/.forward</code> が world writable だと postfix は読まない。警告は <code>journalctl -t postfix/local</code> にだけ出る</li><li>配送の経路はログの <code>orig_to</code>（送り手の名前）と <code>to</code>（実際の配送先）で追う</li><li><code>mailq</code> が空でも成功とは言えない。差し戻しは <code>postmaster</code> → root のメールボックスへ行く</li><li>7章すべてが「送り手はラベルだけを渡し、宛先は受け手の表が決める」という1つの形だった。だから出題範囲にファイルパスが並ぶ</li><li>書いたら読み直させ、当人に聞き、ログを読む。この3手を飛ばすと必ず止まる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.0@sha256:c54bda8193b64d391a025f3e216551af0c85a50f9b46cbeb42ab47ce2a83f6bb / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless でも同じ出力を確認）/ 検証日 2026-10-12</div>
+<nav class="pager"><a href="/linuc-services/theory/06-logrotate">← 6. 捨てる判断も、受け手側にある</a><a href="/linuc-services/">実践編へ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-services/chapters.js"></script>
+<script src="/linuc-services/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>
