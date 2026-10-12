@@ -171,7 +171,7 @@ $ tail -1 /var/log/lab-app.log
 別の行が独立して拾っているからである。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>logger</code> が渡すのは facility・priority・タグ・本文だけ。宛先は1文字も渡していない</li><li>宛先を決めるのは <code>/etc/rsyslog.conf</code> と <code>/etc/rsyslog.d/*.conf</code> のセレクタ表</li><li>Debian 系の既定は <code>*.*;auth,authpriv.none -/var/log/syslog</code> という catch-all。だから何を投げても <code>/var/log/syslog</code> に入る</li><li><code>local4.warning</code> は warning 以上、<code>local4.=warning</code> は warning だけ、<code>local4.none</code> は除外</li><li>当てはまった宛先すべてに書かれる。だから設定を足すと「移る」のではなく「増える」</li><li>facility と priority は行に残らない。後から知りたければ、分けて保存する設定を先に作る</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.0@sha256:c54bda8193b64d391a025f3e216551af0c85a50f9b46cbeb42ab47ce2a83f6bb / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless でも同じ出力を確認）/ 検証日 2026-10-12</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.0@sha256:85ce572926e60b1811fdd2bf04246eb249c4da18fb89b2d66993119d9d6cf3c6 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless でも同じ出力を確認）/ 検証日 2026-10-12</div>
 <nav class="pager"><a href="/linuc-services/theory/03-ntp">← 3. 時刻合わせは、基準を渡されるまで始まらない</a><a href="/linuc-services/theory/05-journald">次: 5. journald は隣にある別の箱 →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
