@@ -116,8 +116,15 @@ cmd_start() {
   # 課題文の後に、移動するコマンドをそのまま打てる形で出す。
   # これを出していなかったとき、読者が書き込めないディレクトリ（/home 等）のまま
   # 作業を始めて `unable to open database file` で詰まった。
-  printf '%s\n' "${c_b}▶ 次はこれを打ってください${c_0}"
-  printf '%s\n\n' "    cd ~/work/$n"
+  # 演習がシステム全体を触る型（workdir=no）のときは ~/work へ誘導しない。
+  # 誘導すると、読者は /etc を触る課題なのに作業ディレクトリを探し始める。
+  if [ "$(meta_get "$n" workdir)" = "no" ]; then
+    printf '%s\n' "${c_d}この演習はシステム全体を触ります（作業ディレクトリは使いません）${c_0}"
+    printf '%s\n\n' "${c_d}元に戻すには起動し直してください${c_0}"
+  else
+    printf '%s\n' "${c_b}▶ 次はこれを打ってください${c_0}"
+    printf '%s\n\n' "    cd ~/work/$n"
+  fi
 }
 
 cmd_check() {
@@ -288,26 +295,6 @@ cmd_env() {
     "$(awk '/^CapBnd/{print $2}' /proc/self/status)"
 }
 
-cmd_diff() {
-  # 本文に載せた出力と、読者の実出力の差分行だけを出す。
-  # 「同じ画面が出る」という約束を運用可能にする唯一の部品。
-  local n; n=$(norm "${1:?lab diff NN}")
-  local expect="$LAB_HOME/expected/$n.txt"
-  [ -f "$expect" ] || die "演習 $n には期待出力が登録されていません"
-  local runner="$LAB_HOME/expected/$n.sh"
-  [ -f "$runner" ] || die "演習 $n には再現コマンドが登録されていません"
-  local got; got=$(mktemp)
-  (cd "$WORK" && bash "$runner") > "$got" 2>&1
-  if diff -u "$expect" "$got" > /dev/null; then
-    printf '%s %s\n' "${c_ok}✔${c_0}" "本文の出力と完全に一致しました"
-  else
-    printf '%s %s\n\n' "${c_wr}⚠${c_0}" "本文と違う出力が出ています。下の差分をそのまま issue に貼ってください。"
-    diff -u --label "本文（検証済み）" "$expect" --label "あなたの環境" "$got" | tail -n +3
-    printf '\n%s\n' "${c_d}$(cmd_env | tr '\n' '|')${c_0}"
-  fi
-  rm -f "$got"
-}
-
 usage() {
   cat <<EOF
 lab — 学習ラボのコマンド
@@ -320,7 +307,6 @@ lab — 学習ラボのコマンド
   lab solve NN       模範解答を見る（使ったことは記録に残る）
   lab reset NN       演習を初期状態に戻す
   lab env            検証環境を表示する（本文に貼れる形式）
-  lab diff NN        本文の出力と自分の出力の差分だけを出す
 EOF
 }
 
@@ -333,7 +319,6 @@ case "${1:-status}" in
   solve)  shift; cmd_solve "$@" ;;
   reset)  shift; cmd_reset "$@" ;;
   env)    cmd_env ;;
-  diff)   shift; cmd_diff "$@" ;;
   -h|--help|help) usage ;;
   *) printf 'unknown subcommand: %s\n\n' "$1"; usage; exit 1 ;;
 esac
