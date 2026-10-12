@@ -2,24 +2,29 @@
 # 配置は assets ディレクトリの直下（= public/）。上限は100ルール・1行2000文字。
 # Worker コードが生成するレスポンスには適用されないが、このサイトは静的配信のみ。
 #
-# ───── CSP を Report-Only で始めている理由 ─────
-# このサイトが外部から読むのは https://giscus.app のスクリプトだけで、
-# 画像も外部フォントも inline script も inline style も無い（2026-10-06 時点で実測）。
-# だから原理的にはかなり厳しく締められる。
+# ───── CSP に giscus.app を3箇所書いている理由 ─────
+# giscus の client.js（3596バイト）の実物を読んで確定した（2026-10-12）。
+# 親ページに挿入するのは次の3つだけで、画像も fetch も無い。
 #
-# ただし giscus の client.js が iframe に style 属性を直接書く可能性があり、
-# それは style-src 'self' で落ちる。落ちるとコメント欄が崩れた状態で読者に見える。
+#   createElement("div")                      → 許可不要
+#   createElement("iframe")                   → frame-src  https://giscus.app
+#   createElement("link") rel="stylesheet"    → style-src   https://giscus.app
+#   client.js 自身                            → script-src  https://giscus.app
 #
-# そこで公開直後は Report-Only にして、ブラウザのコンソールに違反が出ないことを
-# 自分で確認してから、下の行をコメントアウトして上の行を有効にする。
-# 手順は works/learning-series/publish.md の §10。
+# iframe の中は iframe 自身の CSP が支配するので、親の connect-src / img-src は
+# giscus の API 呼び出しやアバター画像に関与しない（コンソールに出る
+# api/discussions の 404 は iframe 内のリクエストで、親の CSP では制御されない）。
 #
-# ───── 切り替え後に有効にする行（いまはコメント） ─────
-# /*
-#   Content-Security-Policy: default-src 'none'; script-src 'self' https://giscus.app; style-src 'self'; img-src 'self'; frame-src https://giscus.app; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+# ───── Report-Only から本番モードへ切り替えた経緯 ─────
+# 2026-10-08 の公開時は Report-Only で出した。giscus が親に何を注入するか
+# 確定していなかったため。実際に開いたところ style-src だけが報告され、
+# 読者には何も壊れずに原因が分かった。この順序は次のテーマでも踏む。
+#
+# 新しいテーマで画像やフォントを足したら img-src / font-src も足す。
+# 足し忘れると、そのテーマだけ画像が出ない。
 
 /*
-  Content-Security-Policy-Report-Only: default-src 'none'; script-src 'self' https://giscus.app; style-src 'self'; img-src 'self'; frame-src https://giscus.app; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'self' https://giscus.app; style-src 'self' https://giscus.app; img-src 'self'; frame-src https://giscus.app; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Cross-Origin-Opener-Policy: same-origin
