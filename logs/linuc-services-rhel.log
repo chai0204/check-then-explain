@@ -1,0 +1,164 @@
+
+
+========== 環境: docker.io/library/almalinux@sha256:e6d31b01fca10ed4f914e84e1139c3a40d6acf3d8346224a32f3e5649b1a3f7d ==========
+
+$ cat /etc/almalinux-release
+AlmaLinux release 8.10 (Cerulean Leopard)
+
+$ dnf -y -q --setopt=install_weak_deps=False --setopt=tsflags= install rsyslog chrony man-db > /dev/null 2>&1; echo "dnf: exit=$?"
+dnf: exit=0
+
+$ dnf -y -q --setopt=install_weak_deps=False --setopt=tsflags= install mailx > /dev/null 2>&1 || dnf -y -q --setopt=install_weak_deps=False --setopt=tsflags= install s-nail > /dev/null 2>&1; echo "dnf: exit=$?"
+dnf: exit=0
+
+$ rpm -q rsyslog chrony; rpm -qf /usr/bin/mailx
+rsyslog-8.2102.0-15.el8_10.1.x86_64
+chrony-4.5-2.el8_10.x86_64
+mailx-12.5-30.el8_10.x86_64
+
+
+========== 第4章: 一般のログは /var/log/messages。起動時のメッセージは /var/log/boot.log ==========
+
+$ grep -E '/var/log/(messages|secure|maillog|cron|boot\.log)' /etc/rsyslog.conf
+*.info;mail.none;authpriv.none;cron.none                /var/log/messages
+authpriv.*                                              /var/log/secure
+mail.*                                                  -/var/log/maillog
+cron.*                                                  /var/log/cron
+local7.*                                                /var/log/boot.log
+
+
+========== 第3章: chrony の設定ファイルとサービス名 ==========
+
+$ ls -l /etc/chrony.conf
+-rw-r--r-- 1 root root 1088 Nov  5  2024 /etc/chrony.conf
+
+$ grep -E '^(pool|server) ' /etc/chrony.conf
+pool 2.almalinux.pool.ntp.org iburst
+
+$ ls /usr/lib/systemd/system/ | grep -E '^chrony'
+chrony-dnssrv@.service
+chrony-dnssrv@.timer
+chrony-wait.service
+chronyd.service
+
+
+========== 第7章: mailx の -S（変数=値）で送り先の SMTP サーバーを渡す ==========
+
+$ man mailx 2>/dev/null | grep -A4 -E '^ +-S '
+       -S variable[=value]
+              Sets  the  internal  option  variable  and,  in case of a string
+              option, assigns value to it.  Note, that when setting from vari-
+              able,  domain  name of host is automatically added if value does
+              not contain any.  If you want to enter from address with owner's
+
+$ man mailx 2>/dev/null | grep -A4 -E '^ +(smtp|mta)( |$)'
+       smtp   Normally,  mailx  invokes  sendmail(8) directly to transfer mes-
+              sages.  If the smtp variable is set, a SMTP  connection  to  the
+              server  specified by the value of this variable is used instead.
+              If the SMTP server does not use the standard port,  a  value  of
+              server:port can be given, with port as a name or as a number.
+
+$ echo x | mailx -S smtp=smtp://127.0.0.1:25 -s test root@localhost; echo "exit=$?"
+exit=0
+could not connect: Connection refused
+. . . message not sent.
+
+
+========== 環境: docker.io/library/almalinux@sha256:dc973f4dffd28a1e6ae4d1662086d83bac34cd26f3b701e7ba51f4dcb300c80d ==========
+
+$ cat /etc/almalinux-release
+AlmaLinux release 9.8 (Olive Jaguar)
+
+$ dnf -y -q --setopt=install_weak_deps=False --setopt=tsflags= install rsyslog chrony man-db > /dev/null 2>&1; echo "dnf: exit=$?"
+dnf: exit=0
+
+$ dnf -y -q --setopt=install_weak_deps=False --setopt=tsflags= install mailx > /dev/null 2>&1 || dnf -y -q --setopt=install_weak_deps=False --setopt=tsflags= install s-nail > /dev/null 2>&1; echo "dnf: exit=$?"
+dnf: exit=0
+
+$ rpm -q rsyslog chrony; rpm -qf /usr/bin/mailx
+rsyslog-8.2510.0-2.el9_8.2.x86_64
+chrony-4.8-1.el9.x86_64
+s-nail-14.9.22-9.el9_7.x86_64
+
+
+========== 第4章: 一般のログは /var/log/messages。起動時のメッセージは /var/log/boot.log ==========
+
+$ grep -E '/var/log/(messages|secure|maillog|cron|boot\.log)' /etc/rsyslog.conf
+*.info;mail.none;authpriv.none;cron.none action(type="omfile" file="/var/log/messages")
+authpriv.* action(type="omfile" file="/var/log/secure")
+mail.* action(type="omfile" file="/var/log/maillog" sync="on")
+cron.* action(type="omfile" file="/var/log/cron")
+local7.* action(type="omfile" file="/var/log/boot.log")
+
+
+========== 第3章: chrony の設定ファイルとサービス名 ==========
+
+$ ls -l /etc/chrony.conf
+-rw-r--r-- 1 root root 1374 Apr  9  2026 /etc/chrony.conf
+
+$ grep -E '^(pool|server) ' /etc/chrony.conf
+pool 2.almalinux.pool.ntp.org iburst
+
+$ ls /usr/lib/systemd/system/ | grep -E '^chrony'
+chrony-wait.service
+chronyd-restricted.service
+chronyd.service
+
+
+========== 第7章: mailx の -S（変数=値）で送り先の SMTP サーバーを渡す ==========
+
+$ man mailx 2>/dev/null | grep -A4 -E '^ +-S '
+     -S var[=value], --set=..
+               set (or, with a prefix string `no', as documented in INTERNAL
+               VARIABLES, unset) variable and optionally assign value, if sup-
+               ported; [v15 behaviour may differ] the entire expression is
+               evaluated as if specified within dollar-single-quotes (see
+--
+               -S mta=smtps://mylogin@exam.ple:465 -Ssmtp-auth=none \
+               -S from=scriptreply@exam.ple \
+               -a /etc/mail.rc --end-options \
+               eric@exam.ple < /tmp/letter.txt
+
+     Email addresses and plain user names are subject to alternates filtering,
+--
+                 -S expandaddr=fail,-all,+addr,failinvaddr -s test \
+                 --end-options 'Imagine John <cold@turk.ey>'
+
+     Before messages are sent they undergo editing in Compose mode.  But many
+     settings are static and can be set more generally.  The envelope sender
+--
+               -S mta=smtps://mylogin@exam.ple:465 -Ssmtp-auth=login \
+               -S from=scriptreply@exam.ple \
+               -s 'Subject to go' -a attachment_file \
+               -Sfullnames -. \
+               'Recipient 1 <rec1@exam.ple>' rec2@exam.ple \
+               < content_file
+
+$ man mailx 2>/dev/null | grep -A4 -E '^ +(smtp|mta)( |$)'
+               mta individually via -F name.  Even though not a recipient the
+               `shquote' expandaddr flag is supported.
+
+               If an empty string is passed as from-addr then the content of
+               the variable from (or, if that contains multiple addresses,
+--
+     mta       Select an alternate Mail-Transfer-Agent by either specifying
+               the full pathname of an executable (a `file://' prefix may be
+               given), or [Option]ally a SMTP aka SUBMISSION protocol URL
+               [v15-compat]:
+
+--
+     smtp      [Obsolete][Option] To use the built-in SMTP transport, specify
+               a SMTP URL in mta.  [v15 behaviour may differ] For compatibil-
+               ity reasons a set smtp is used in preference of mta.
+
+     smtp-auth-USER@HOST, smtp-auth-HOST, smtp-auth
+
+$ echo x | mailx -S smtp=smtp://127.0.0.1:25 -s test root@localhost; echo "exit=$?"
+s-nail: Warning: variable superseded or obsoleted: smtp
+s-nail: Obsoletion warning: please do not use *smtp*, instead assign a smtp:// URL to *mta*!
+s-nail: Obsoletion warning: Use of old-style credentials, which will vanish in v15!
+s-nail:   Please read the manual section "On URL syntax and credential lookup"
+s-nail: Could not connect(2): Connection refused
+/root/dead.letter 10/215
+s-nail: ... message not sent
+exit=4

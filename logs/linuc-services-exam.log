@@ -1,0 +1,377 @@
+
+
+========== 0. 環境 ==========
+
+$ lab env
+テーマ    : lab-linuc-services 1.0.2
+イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.2
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+PID1      : /sbin/init
+systemd   : running
+cgroup    : rw,nosuid,nodev,noexec,relatime
+journal   : 8.0M in the file system.
+特権      : CapEff=00000000a82425fb CapBnd=00000000a82425fb
+
+
+========== 第1章: hwclock の短い形と --adjust ==========
+
+$ hwclock --help | grep -E -- '--(show|hctosys|systohc|adjust) '
+ -r, --show                      display the RTC time
+ -s, --hctosys                   set the system time from the RTC
+ -w, --systohc                   set the RTC from the system time
+ -a, --adjust                    adjust the RTC to account for systematic drift
+
+$ man 8 hwclock 2>/dev/null | grep -A3 -E '^ +-a, --adjust'
+       -a, --adjust
+           Add or subtract time from the Hardware Clock to account for
+           systematic drift since the last time the clock was set or adjusted.
+           See the discussion below, under The Adjust Function.
+
+
+========== 第1章: date の書式は年が最後（年を先頭に置くと、先頭の2桁を月として読もうとする） ==========
+
+$ date 202202140900; echo "exit=$?"
+date: invalid date ‘202202140900’
+exit=1
+
+
+========== 第1章: timedatectl の status は省略時の既定 / set-time の書式 / set-ntp false は時刻合わせのサービスを止める ==========
+
+$ man 1 timedatectl 2>/dev/null | grep -A5 -E '^ +status$'
+       status
+           Show current settings of the system clock and RTC, including
+           whether network time synchronization is active. If no command is
+           specified, this is the implied default.
+
+           Added in version 195.
+
+$ man 1 timedatectl 2>/dev/null | grep -A3 -E '^ +set-time \[TIME\]'
+       set-time [TIME]
+           Set the system clock to the specified time. This will also update
+           the RTC time accordingly. The time may be specified in the format
+           "2012-10-30 18:17:16".
+
+$ man 1 timedatectl 2>/dev/null | grep -A6 -E '^ +set-ntp \[BOOL\]'
+       set-ntp [BOOL]
+           Takes a boolean argument. Controls whether network time
+           synchronization is active and enabled (if available). If the
+           argument is true, this enables and starts the first existing
+           network synchronization service. If the argument is false, then
+           this disables and stops the known network synchronization services.
+           The way that the list of services is built is described in systemd-
+
+
+========== 第2章: tzselect は質問に答えるとゾーン名を出すだけ（質問の画面も残す） ==========
+
+$ printf '7\n7\n1\n' | tzselect
+Please identify a location so that time zone rules can be set correctly.
+Please select a continent, ocean, "coord", or "TZ".
+ 1) Africa
+ 2) Americas
+ 3) Antarctica
+ 4) Asia
+ 5) Atlantic Ocean
+ 6) Australia
+ 7) Europe
+ 8) Indian Ocean
+ 9) Pacific Ocean
+10) coord - I want to use geographical coordinates.
+11) TZ - I want to specify the timezone using the Posix TZ format.
+#? Please select a country whose clocks agree with yours.
+ 1) Albania		  18) Guernsey		    35) Poland
+ 2) Andorra		  19) Hungary		    36) Portugal
+ 3) Austria		  20) Ireland		    37) Romania
+ 4) Belarus		  21) Isle of Man	    38) Russia
+ 5) Belgium		  22) Italy		    39) San Marino
+ 6) Bosnia & Herzegovina  23) Jersey		    40) Serbia
+ 7) Britain (UK)	  24) Latvia		    41) Slovakia
+ 8) Bulgaria		  25) Liechtenstein	    42) Slovenia
+ 9) Croatia		  26) Lithuania		    43) Spain
+10) Czech Republic	  27) Luxembourg	    44) Svalbard & Jan Mayen
+11) Denmark		  28) Malta		    45) Sweden
+12) Estonia		  29) Moldova		    46) Switzerland
+13) Finland		  30) Monaco		    47) Turkey
+14) France		  31) Montenegro	    48) Ukraine
+15) Germany		  32) Netherlands	    49) Vatican City
+16) Gibraltar		  33) North Macedonia	    50) Åland Islands
+17) Greece		  34) Norway
+#? 
+The following information has been given:
+
+	Britain (UK)
+
+Therefore TZ='Europe/London' will be used.
+Selected time is now:	Tue Oct 13 11:42:19 BST 2026.
+Universal Time is now:	Tue Oct 13 10:42:19 UTC 2026.
+Is the above information OK?
+1) Yes
+2) No
+#? Europe/London
+
+$ readlink /etc/localtime
+/usr/share/zoneinfo/Etc/UTC
+
+$ date +%Z
+JST
+
+
+========== 第3章: ntpq（ntpsec 本体に入っていて、この檻には無い。パッケージの中のマニュアルを読む） ==========
+
+$ command -v ntpq; echo "exit=$?"
+exit=1
+
+$ apt-get update > /dev/null 2>&1; echo "apt-get update: exit=$?"
+apt-get update: exit=0
+
+$ cd /tmp && apt-get download ntpsec > /dev/null 2>&1; ls /tmp/*.deb; cd /root
+/tmp/ntpsec_1.2.2+dfsg1-4build2_amd64.deb
+
+$ dpkg-deb -c /tmp/ntpsec_*.deb | grep ntpq
+-rwxr-xr-x root/root     71074 2024-04-01 16:02 ./usr/bin/ntpq
+-rw-r--r-- root/root     10875 2024-04-01 16:02 ./usr/share/man/man1/ntpq.1.gz
+
+$ dpkg-deb --fsys-tarfile /tmp/ntpsec_*.deb | tar -xO ./usr/share/man/man1/ntpq.1.gz > /tmp/ntpq.1.gz
+
+$ man -l /tmp/ntpq.1.gz 2>/dev/null | sed -n '/^SYNOPSIS/,/^DESCRIPTION/p'
+SYNOPSIS
+       ntpq [-46adhinpkwWu] [-c command] [host] [...]
+
+DESCRIPTION
+
+$ man -l /tmp/ntpq.1.gz 2>/dev/null | grep -A8 'If one or more request options'
+       If one or more request options are included on the command line when
+       ntpq is executed, each of the requests will be sent to the NTP servers
+       running on each of the hosts given as command line arguments, or on
+       localhost by default. If no request options are given, ntpq will
+       attempt to read commands from the standard input and execute these on
+       the NTP server running on the first host given on the command line,
+       again defaulting to localhost when no other host is specified. ntpq
+       will prompt for commands if the standard input is a terminal device.
+
+
+$ man -l /tmp/ntpq.1.gz 2>/dev/null | grep -A4 -E '^ +-p, --peers'
+       -p, --peers
+           Print a list of the peers known to the server as well as a summary
+           of their state; this is equivalent to the peers interactive
+           command. The refid field is as described under "Event Messages and
+           Status Words" in the NTP documentation on the Web.
+
+$ dpkg-deb --fsys-tarfile /tmp/ntpsec_*.deb | tar -xO ./usr/bin/ntpq | grep -n 'ntpq> '
+66:        self.prompt = "ntpq> " if os.isatty(0) else ""
+
+
+========== 第4章: logger -p（man の言葉。数字でもよく、既定は user.notice） ==========
+
+$ man 1 logger 2>/dev/null | grep -A5 -E '^ +-p, --priority'
+       -p, --priority priority
+           Enter the message into the log with the specified priority. The
+           priority may be specified numerically or as a facility.level pair.
+           For example, -p local3.info logs the message as informational in
+           the local3 facility. The default is user.notice.
+
+
+$ logger -p 6 "数字だけ"
+
+$ journalctl --no-pager -n 1 -o verbose | grep -E "PRIORITY=|SYSLOG_FACILITY=|MESSAGE="
+    PRIORITY=6
+    SYSLOG_FACILITY=1
+    MESSAGE=数字だけ
+
+
+========== 第6章: dateext と compress を両方書くと、日付の後ろに .gz が付く（確認問題の答え） ==========
+
+$ echo "1行" > /root/work/demo2.log
+
+$ printf '/root/work/demo2.log {\n    rotate 3\n    dateext\n    compress\n}\n' > /root/work/demo2.conf
+
+$ chmod 644 /root/work/demo2.conf
+
+$ logrotate -f /root/work/demo2.conf
+
+$ ls /root/work/demo2*
+/root/work/demo2.conf
+/root/work/demo2.log-20261013.gz
+
+
+========== 第7章: mail の書き方（-s 件名・-c・-b・-r。宛先は最後、本文は標準入力） ==========
+
+$ readlink -f /usr/bin/mail
+/usr/bin/bsd-mailx
+
+$ man 1 mail 2>/dev/null | sed -n '/^SYNOPSIS/,/^DESCRIPTION/p'
+SYNOPSIS
+       mail  [-dEIinv]  [-a  header] [-b bcc-addr] [-c cc-addr] [-r from-addr]
+            [-s subject] [--] to-addr ...
+       mail [-dEIiNnv] -f [file]
+       mail [-dEIiNnv] [-u user]
+
+DESCRIPTION
+
+$ man 1 mail 2>/dev/null | grep -A2 -E '^ +-(s|c|b|r) '
+       -b bcc-addr
+               Send blind carbon copies to bcc-addr.
+
+       -c cc-addr
+               Send carbon copies to list of users.  cc-addr should be a comma
+               separated list of names.
+--
+       -r from-addr
+               Use  from-addr as the from address in the message and envelope.
+               Overrides any from options in the startup files.
+--
+       -s subject
+               Specify subject on command line (only the first argument  after
+               the  -s flag is used as a subject; be careful to quote subjects
+
+$ echo "本文は標準入力から" | mail -s "オプションの確認" -c alice -b bob -r noreply@lab.local lab
+
+$ ls /var/mail/
+alice
+bob
+lab
+
+$ grep -E '^(Return-Path|From|To|Cc|Bcc|Subject):' /var/mail/lab
+Return-Path: <noreply@lab.local>
+From: noreply@lab.local
+To: lab@lab.local
+Subject: オプションの確認
+Cc: alice@lab.local
+
+$ grep -E '^(Return-Path|From|To|Cc|Bcc|Subject):' /var/mail/alice
+Return-Path: <noreply@lab.local>
+From: noreply@lab.local
+To: lab@lab.local
+Subject: オプションの確認
+Cc: alice@lab.local
+
+$ grep -E '^(Return-Path|From|To|Cc|Bcc|Subject):' /var/mail/bob
+Return-Path: <noreply@lab.local>
+From: noreply@lab.local
+To: lab@lab.local
+Subject: オプションの確認
+Cc: alice@lab.local
+
+$ echo x | mail -s "差出人を変えて届かない宛先へ" -r lab@lab.local nosuchuser@invalid.example
+
+$ grep -E '^Subject:' /var/mail/lab
+Subject: オプションの確認
+Subject: Undelivered Mail Returned to Sender
+Subject: 差出人を変えて届かない宛先へ
+
+$ journalctl -t postfix/bounce -t postfix/local --no-pager | tail -2
+Oct 13 19:42:34 linuc postfix/bounce[620]: 26F221184FFD: sender non-delivery notification: 2DA861185002
+Oct 13 19:42:34 linuc postfix/local[604]: 2DA861185002: to=<lab@lab.local>, relay=local, delay=0.01, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+
+$ echo x | mail -S smtp=smtp://127.0.0.1 -s test root; echo "exit=$?"
+mail: invalid option -- 'S'
+usage: mail [-dEIinv] [-a header] [-b bcc-addr] [-c cc-addr] [-r from-addr] [-s subject] [--] to-addr ...
+       mail [-dEIiNnv] -f [name]
+       mail [-dEIiNnv] [-u user]
+exit=1
+
+
+========== 第7章: MTA は1台に1つ（sendmail も同じ宣言）。exim4 も sendmail 互換のコマンドを持つ ==========
+
+$ apt-cache show --no-all-versions sendmail-bin | grep -E '^(Provides|Conflicts):'
+Provides: mail-transport-agent
+Conflicts: mail-transport-agent
+
+$ apt-cache show --no-all-versions exim4 | grep -E '^Depends:'
+Depends: debconf (>= 1.4.69) | cdebconf (>= 0.39), exim4-base (<< 4.97-4ubuntu4.8.1), exim4-base (>= 4.97-4ubuntu4.8), exim4-daemon-light (>= 4.97-4ubuntu4.8) | exim4-daemon-heavy (>= 4.97-4ubuntu4.8) | exim4-daemon-custom (>= 4.97-4ubuntu4.8), debconf (>= 0.5) | debconf-2.0
+
+$ cd /tmp && apt-get download exim4-base exim4-daemon-light > /dev/null 2>&1; ls /tmp/exim4*.deb; cd /root
+/tmp/exim4-base_4.97-4ubuntu4.8_amd64.deb
+/tmp/exim4-daemon-light_4.97-4ubuntu4.8_amd64.deb
+
+$ for d in /tmp/exim4*.deb; do dpkg-deb -c $d | grep -E 'sbin/sendmail|bin/mailq|bin/newaliases'; done
+lrwxrwxrwx root/root         0 2026-09-23 03:24 ./usr/bin/mailq -> ../sbin/exim4
+lrwxrwxrwx root/root         0 2026-09-23 03:24 ./usr/bin/newaliases -> ../sbin/exim4
+lrwxrwxrwx root/root         0 2026-09-23 03:24 ./usr/sbin/sendmail -> exim4
+
+
+========== 第7章: /etc/aliases の右側はカンマで複数（全員に1通ずつ届く） ==========
+
+$ man 5 aliases 2>/dev/null | grep -B2 -A1 'name: value1, value2'
+       •      An alias definition has the form
+
+                   name: value1, value2, ...
+
+
+$ echo 'support: alice, bob' >> /etc/aliases
+
+$ newaliases
+
+$ echo "全員に届くか" | mail -s "カンマで2人" support
+
+$ grep -c "全員に届くか" /var/mail/alice /var/mail/bob
+/var/mail/alice:1
+/var/mail/bob:1
+
+$ journalctl -t postfix/local --no-pager | tail -2
+Oct 13 19:42:42 linuc postfix/local[682]: DC0441185008: to=<alice@lab.local>, orig_to=<support>, relay=local, delay=0.02, delays=0.01/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+Oct 13 19:42:42 linuc postfix/local[682]: DC0441185008: to=<bob@lab.local>, orig_to=<support>, relay=local, delay=0.02, delays=0.01/0/0/0.01, dsn=2.0.0, status=sent (delivered to mailbox)
+
+
+========== 第7章: ~/.forward は1行に1宛先。手元にも残すなら \自分の名前 ==========
+
+$ printf '\\bob\nroot\n' > /home/bob/.forward
+
+$ chown bob:bob /home/bob/.forward; chmod 644 /home/bob/.forward
+
+$ cat /home/bob/.forward
+\bob
+root
+
+$ echo "手元にも残す" | mail -s "backslash" bob
+
+$ grep -c "手元にも残す" /var/mail/bob /var/mail/root
+/var/mail/bob:1
+/var/mail/root:1
+
+$ printf 'bob\nroot\n' > /home/bob/.forward
+
+$ echo "バックスラッシュなし" | mail -s "no-backslash" bob
+
+$ grep -c "バックスラッシュなし" /var/mail/bob /var/mail/root
+/var/mail/bob:1
+/var/mail/root:1
+
+$ printf 'root, lab\n' > /home/bob/.forward
+
+$ echo "1行にカンマで2つ" | mail -s "comma-forward" bob
+
+$ grep -c "1行にカンマで2つ" /var/mail/bob /var/mail/root /var/mail/lab
+/var/mail/bob:0
+/var/mail/root:1
+/var/mail/lab:1
+
+$ man 8postfix local 2>/dev/null | grep -B3 -A4 'own ~/.forward'
+       ward file has the same syntax as the right-hand part of an alias.
+
+       When  an  address is found in its own alias expansion, delivery is made
+       to the user instead. When a user is listed in the user's own ~/.forward
+       file, delivery is made to the user's mailbox instead.  An empty ~/.for‐
+       ward file means do not forward mail.
+
+       In order to prevent the mail system from using up unreasonable  amounts
+
+
+========== 完了 ==========
+
+$ lab env
+テーマ    : lab-linuc-services 1.0.2
+イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.2
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+PID1      : /sbin/init
+systemd   : running
+cgroup    : rw,nosuid,nodev,noexec,relatime
+journal   : 8.0M in the file system.
+特権      : CapEff=00000000a82425fb CapBnd=00000000a82425fb

@@ -12,35 +12,49 @@
 </div>
 <h1>7. 宛先に書いた名前は、希望にすぎない</h1>
 <p class="lead"><code>alice</code> 宛に送ったメールが <code>root</code> のメールボックスに入る。途中で2回書き換えられている。そして<b>途中の経路（bob を経由したこと）は、届いたメールを見ても分からない</b>。設定とログを読んで追う。この章で、主題1.09 の3つ（時刻・ログ・メール）が1本に繋がる。</p>
-<div class="badges"><span>前提: 第6章まで読了</span><span>前提: 檻が起動している</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.3（重要度2）</span><span>最終検証 2026-10-13</span></div>
+<div class="badges"><span>前提: 第6章まで読了</span><span>前提: 檻が起動している</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.3（重要度2）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>/etc/aliases</code> と <code>~/.forward</code> の役割と優先順を説明できる</li><li><code>newaliases</code> が必要な理由を、ファイルの形から説明できる</li><li>配送の経路を <code>orig_to</code> と <code>to</code> の2つでログから追える</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: SMTP のやりとり、<code>main.cf</code> の各パラメータ、外部へのリレー・認証・TLS・DKIM は扱わない（レベル1の範囲外）。<code>exim</code> の設定方法も外す。試験で問われるのは「MTA が2つあって、どちらも sendmail 互換のコマンドを持つ」ことまでである。</div></div>
+<ul><li><code>/etc/aliases</code> と <code>~/.forward</code> の役割と優先順を説明できる</li><li><code>newaliases</code> が必要な理由を、ファイルの形から説明できる</li><li>配送の経路を <code>orig_to</code> と <code>to</code> の2つでログから追える</li><li><code>mail</code> のオプション（<code>-s</code>・<code>-c</code>・<code>-b</code>・<code>-r</code>）と、MTA が1台に1つしか入らない理由を言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: SMTP のやりとり、<code>main.cf</code> の各パラメータ、外部へのリレー・認証・TLS・DKIM は扱わない（レベル1の範囲外）。<code>exim</code> の設定方法も外す。試験で問われるのは「MTA が2つあって、どちらも sendmail 互換のコマンドを持つ」ことまでである（章の後半の対応表で扱う）。</div></div>
 <h2 id="bend">宛先が書き換わる</h2>
 <div class="sgoal"><b>この節で分かること</b>: 送り手が書いた名前と、実際に配送された先が違いうること。</div>
 <p>まず素直に1通送る。</p>
 <pre><code>$ echo "本文です" | mail -s "最初の1通" alice
 $ ls -l /var/mail/
 total 4
--rw------- 1 alice mail 505 Oct 13 11:42 alice
+-rw------- 1 alice mail 505 Oct 13 19:33 alice
 $ cat /var/mail/alice
-From root@lab.local  Tue Oct 13 11:42:40 2026
+From root@lab.local  Tue Oct 13 19:33:21 2026
 Return-Path: &lt;root@lab.local&gt;
 X-Original-To: alice
 Delivered-To: alice@lab.local
 Received: by lab.local (Postfix, from userid 0)
-	id 551C11185251; Tue, 13 Oct 2026 02:42:40 +0000 (UTC)
+	id DB59B1184D50; Tue, 13 Oct 2026 10:33:21 +0000 (UTC)
 To: alice@lab.local
 Subject: 最初の1通
 MIME-Version: 1.0
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: 8bit
-Message-Id: &lt;20261013024240.551C11185251@lab.local&gt;
-Date: Tue, 13 Oct 2026 02:42:40 +0000 (UTC)
+Message-Id: &lt;20261013103321.DB59B1184D50@lab.local&gt;
+Date: Tue, 13 Oct 2026 10:33:21 +0000 (UTC)
 From: root &lt;root@lab.local&gt;
 
 本文です</code></pre>
-<p>ここで第2章が効く。<code>Date:</code> と <code>Received:</code> は <code>+0000 (UTC)</code> で書かれているが、<code>ls -l</code> の時刻は <code>11:42</code>（JST）である。<b>同じ瞬間を、2つのゾーンで表示している。</b>メールのヘッダはオフセット付きで書くので、受け取った側がどのゾーンで読んでも同じ瞬間を指せる。</p>
+<p>ここで第2章が効く。<code>Date:</code> と <code>Received:</code> は <code>+0000 (UTC)</code> で書かれているが、<code>ls -l</code> の時刻は <code>19:33</code>（JST）である。<b>同じ瞬間を、2つのゾーンで表示している。</b>メールのヘッダはオフセット付きで書くので、受け取った側がどのゾーンで読んでも同じ瞬間を指せる。</p>
+<p id="mailcmd"><code>mail</code> の書き方を押さえておく。宛先は最後に並べ、本文は標準入力から渡す（上では <code>echo</code> の出力をパイプで渡した）。オプションは宛先より前に置く。</p>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>意味</th></tr>
+<tr><td><code>-s 件名</code></td><td>件名（<code>Subject:</code>）。空白を含むなら引用符で囲む</td></tr>
+<tr><td><code>-c 宛先</code></td><td>Cc。ヘッダの <code>Cc:</code> に載る</td></tr>
+<tr><td><code>-b 宛先</code></td><td>Bcc。届くが、どのヘッダにも載らない</td></tr>
+<tr><td><code>-r 送信元</code></td><td><code>From:</code> と差出人（エンベロープ）を変える。届かなかったときの差し戻しも、ここへ戻る</td></tr>
+<tr><td>宛先</td><td>最後に並べる（複数可）</td></tr>
+<tr><td>本文</td><td>標準入力から（<code>echo 本文 | mail …</code>、<code>mail … &lt; ファイル</code>）</td></tr>
+</table></div>
+<p class='detail'>（別の新しい檻で <code>mail -s "オプションの確認" -c alice -b bob -r noreply@lab.local lab</code> と送ると、3人とも1通ずつ受け取り、どの1通のヘッダにも <code>Bcc:</code> は無く、<code>From:</code> と <code>Return-Path:</code> は <code>noreply@lab.local</code> になった。<code>-r lab@lab.local</code> を付けて届かない宛先へ送ると、差し戻しは <code>lab</code> のメールボックスに入った。）</p>
+<p>Red Hat 系の <code>mail</code>（mailx）は、<code>-S 変数=値</code> で設定を渡せる。試験に出る <code>-S smtp=サーバー</code> は「<code>sendmail</code> を呼ばずに、このサーバーへ SMTP で直接送る」という指定である（AlmaLinux 8.10 の mailx 12.5 の man）。
+AlmaLinux 9.8 の mailx（s-nail）でも同じ書き方で送ろうとするが、<code>smtp</code> は古い書き方だという警告が出て、<code>-S mta=smtp://サーバー</code> を使うよう勧められる。
+Ubuntu の <code>mail</code>（bsd-mailx）には、この <code>-S</code> が無い（<code>mail: invalid option -- 'S'</code>）。どれも lab の podman と別の檻で実測した。</p>
 <p>次に宛先を曲げる。表は <code>postconf</code> が答える。</p>
 <pre><code>$ postconf -n | grep alias
 alias_database = hash:/etc/aliases
@@ -56,25 +70,27 @@ alice: bob
 $ echo "曲がったか" | mail -s "aliases 経由" alice
 $ ls -l /var/mail/
 total 4
--rw------- 1 alice mail 1014 Oct 13 11:42 alice</code></pre>
+-rw------- 1 alice mail 1014 Oct 13 19:33 alice</code></pre>
 <div class="then"><b>だめな理由</b>: <code>alice</code> に届いたままで、<code>bob</code> のメールボックスは作られていない。
 <code>postconf -n</code> の出力をもう一度読むと <code>hash:/etc/aliases</code> と書いてある。
 <code>hash:</code> は「このテキストから作ったハッシュ形式のデータベースを読む」という指定で、
 postfix が実際に開くのは隣にある <code>/etc/aliases.db</code> である。
 テキストを書き換えても <code>.db</code> は古いままなので、効かない。</div></div>
 <pre><code>$ ls -l /etc/aliases /etc/aliases.db
--rw-r--r-- 1 root root    28 Oct 13 11:42 /etc/aliases
+-rw-r--r-- 1 root root    28 Oct 13 19:33 /etc/aliases
 -rw-r--r-- 1 root root 12288 Oct 12 21:58 /etc/aliases.db
 $ newaliases
 $ ls -l /etc/aliases.db
--rw-r--r-- 1 root root 12288 Oct 13 11:42 /etc/aliases.db
+-rw-r--r-- 1 root root 12288 Oct 13 19:33 /etc/aliases.db
 $ echo "曲がったか" | mail -s "aliases 経由" alice
 $ ls -l /var/mail/
 total 8
--rw------- 1 alice mail 1014 Oct 13 11:42 alice
--rw------- 1 bob   mail  509 Oct 13 11:42 bob</code></pre>
+-rw------- 1 alice mail 1014 Oct 13 19:33 alice
+-rw------- 1 bob   mail  509 Oct 13 19:33 bob</code></pre>
 <p><code>bob</code> のメールボックスができた。<code>newaliases</code> がテキストから <code>.db</code> を作り直したので効いた。</p>
 <p><b>この「テキストを直して、作り直す」形は試験で繰り返し出る。</b><code>newaliases</code> は sendmail 互換のコマンドで、<code>sendmail -bi</code> と同じものである（<code>/usr/bin/newaliases</code> は <code>sendmail</code> へのリンク）。postfix の <code>newaliases</code> は、中で <code>postalias</code> を走らせて <code>.db</code> を作り直す（<code>man 1 sendmail</code>）。</p>
+<p><code>/etc/aliases</code> の右側には、カンマで区切って複数の宛先を書ける（<code>man 5 aliases</code> の書式は <code>name: value1, value2, ...</code>）。
+<code>support: alice, bob</code> と書いて <code>newaliases</code> を打てば、<code>support</code> 宛の1通が <code>alice</code> と <code>bob</code> に1通ずつ届く（別の新しい檻で実測）。</p>
 <div class="analogy"><b>たとえ</b>: 転居届を出す動作に近い。
 郵便物の表書きは変えないまま、郵便局側の台帳で配達先を差し替える。
 <br>ただし<b>崩れる点</b>: 転居届は本人が出すが、<code>/etc/aliases</code> は
@@ -86,7 +102,7 @@ total 8
 <pre><code>$ printf 'root\n' &gt; /home/bob/.forward
 $ chown bob:bob /home/bob/.forward
 $ ls -l /home/bob/.forward
--rw-rw-rw- 1 bob bob 5 Oct 13 11:42 /home/bob/.forward
+-rw-rw-rw- 1 bob bob 5 Oct 13 19:33 /home/bob/.forward
 $ echo "2回曲がる" | mail -s "forward 経由" alice
 $ grep -c "2回曲がる" /var/mail/root
 grep: /var/mail/root: No such file or directory
@@ -94,13 +110,13 @@ $ grep -c "2回曲がる" /var/mail/bob
 1</code></pre>
 <p>曲がっていない。<code>bob</code> のメールボックスに入って終わっている。エラーは1つも出ていない。<b>理由はログにだけ書かれている。</b></p>
 <pre><code>$ journalctl -t postfix/local --no-pager | tail -3
-Oct 13 11:42:46 linuc postfix/local[1174]: 64C54118527A: to=&lt;bob@lab.local&gt;, orig_to=&lt;alice&gt;, relay=local, delay=0.01, delays=0.01/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
-Oct 13 11:42:49 linuc postfix/local[1174]: warning: file /home/bob/.forward is world writable
-Oct 13 11:42:49 linuc postfix/local[1174]: 69F111185294: to=&lt;bob@lab.local&gt;, orig_to=&lt;alice&gt;, relay=local, delay=0.01, delays=0.01/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)</code></pre>
+Oct 13 19:33:27 linuc postfix/local[1252]: EC5871184D57: to=&lt;bob@lab.local&gt;, orig_to=&lt;alice&gt;, relay=local, delay=0.01, delays=0.01/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+Oct 13 19:33:30 linuc postfix/local[1252]: warning: file /home/bob/.forward is world writable
+Oct 13 19:33:30 linuc postfix/local[1252]: F26C11184D5B: to=&lt;bob@lab.local&gt;, orig_to=&lt;alice&gt;, relay=local, delay=0.02, delays=0.01/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)</code></pre>
 <p><code>world writable</code> である。<code>.forward</code> を書ける人は他人のメールを自分に転送できるので、postfix は誰でも書けるファイルを読まない。第6章の logrotate と<b>同じ形の拒否</b>である。ただし条件は少し違う。logrotate は group か other が書けると拒否したが、postfix が拒否するのは other（world）が書けるときだけで、group だけが書ける <code>664</code> の <code>.forward</code> は読まれて転送された（別の檻で実測）。</p>
 <p>同じ警告は <code>/var/log/mail.log</code> にも入っている。postfix が facility <code>mail</code> で投げ、journald から回された rsyslog が振り分けた先である（第4章・第5章）。</p>
 <pre><code>$ grep "world writable" /var/log/mail.log
-2026-10-13T11:42:49.437000+09:00 linuc postfix/local[1174]: warning: file /home/bob/.forward is world writable</code></pre>
+2026-10-13T19:33:30.997261+09:00 linuc postfix/local[1252]: warning: file /home/bob/.forward is world writable</code></pre>
 <p>どちらにしても、警告はログに出るだけで、送り手には何も返らない。</p>
 <p class='detail'>（podman で入った場合は、シェルの <code>umask</code> が <code>0022</code> なので <code>.forward</code> は <code>0644</code> で作られ、この拒否は起きずに1回目から <code>root</code> まで曲がる。podman 5.8.6 rootless で実測。）</p>
 <pre><code>$ chmod 644 /home/bob/.forward
@@ -108,9 +124,9 @@ $ echo "2回曲がる" | mail -s "forward 経由" alice
 $ grep -c "2回曲がる" /var/mail/root
 1
 $ journalctl -t postfix/local --no-pager -n 2
-Oct 13 11:42:52 linuc postfix/local[1174]: 7100411853C1: to=&lt;alice@lab.local&gt;, orig_to=&lt;alice&gt;, relay=local, delay=0.02, delays=0.01/0/0/0, dsn=2.0.0, status=sent (forwarded as 71EF11185324)
-Oct 13 11:42:52 linuc postfix/local[1174]: 71EF11185324: to=&lt;root@lab.local&gt;, orig_to=&lt;alice&gt;, relay=local, delay=0.01, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)</code></pre>
-<p>2行に分かれている。1行目では <code>to</code> はまだ <code>alice</code> のままで、結果は <code>forwarded as 71EF11185324</code>（<b>別の1通として送り直した</b>）である。2行目で、その新しい1通（<code>71EF11185324</code>）の <code>to</code> が <code>root</code> になり、<code>delivered to mailbox</code> で終わっている。<code>orig_to</code> はどちらも <code>alice</code> で、送り手が書いた名前は最後まで残る。<code>to</code> を順に追えば、どこへ曲がったかが分かる。</p>
+Oct 13 19:33:34 linuc postfix/local[1252]: 057041184D5B: to=&lt;alice@lab.local&gt;, orig_to=&lt;alice&gt;, relay=local, delay=0.02, delays=0.02/0/0/0, dsn=2.0.0, status=sent (forwarded as 0661B1184D59)
+Oct 13 19:33:34 linuc postfix/local[1252]: 0661B1184D59: to=&lt;root@lab.local&gt;, orig_to=&lt;alice&gt;, relay=local, delay=0.01, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)</code></pre>
+<p>2行に分かれている。1行目では <code>to</code> はまだ <code>alice</code> のままで、結果は <code>forwarded as 0661B1184D59</code>（<b>別の1通として送り直した</b>）である。2行目で、その新しい1通（<code>0661B1184D59</code>）の <code>to</code> が <code>root</code> になり、<code>delivered to mailbox</code> で終わっている。<code>orig_to</code> はどちらも <code>alice</code> で、送り手が書いた名前は最後まで残る。<code>to</code> を順に追えば、どこへ曲がったかが分かる。</p>
 <p>途中の <code>bob</code> はこの2行には出てこない。<code>/etc/aliases</code> で <code>bob</code> へ、<code>~bob/.forward</code> で <code>root</code> へ、という2回の書き換えは、どちらも配送を受け持つ <code>postfix/local</code> の中で済んでいる（1段目だけだったときは、さきほどのログのように <code>to=&lt;bob@lab.local&gt;, orig_to=&lt;alice&gt;</code> と出ていた）。</p>
 <p>届いたメールのヘッダにも、跡は一部残る。</p>
 <pre><code>$ grep -E '^(X-Original-To|Delivered-To):' /var/mail/root
@@ -118,6 +134,11 @@ X-Original-To: alice
 Delivered-To: root@lab.local
 Delivered-To: alice@lab.local</code></pre>
 <p><code>X-Original-To</code> が送り手の書いた名前、<code>Delivered-To</code> は配送の段ごとに付く宛先で、<code>root</code> と <code>alice</code> が並んでいる。しかし途中で <code>bob</code> を経由したことは、ヘッダにも、最後の2行のログにも出てこない。どこで曲がったかを確かめるには、<code>/etc/aliases</code> と <code>~bob/.forward</code> を読み、ログを順に追う。</p>
+<p id="keep"><code>~/.forward</code> には、転送先を1行に1つずつ書く（各行は <code>/etc/aliases</code> の右側と同じ書き方なので、カンマで並べても通る）。転送しながら自分の手元にも残したいときは、自分の名前に <code>\</code> を付けた行を足す。</p>
+<pre><code>\bob
+root</code></pre>
+<p><code>\</code> は「この名前をそれ以上展開しない（<code>.forward</code> をもう一度読みに行かない）」という印である。別の新しい檻でこの2行を <code>~bob/.forward</code> に置くと、<code>bob</code> 宛の1通が <code>bob</code> のメールボックスと <code>root</code> の両方に1通ずつ入った。
+なお postfix は、<code>\</code> が無くても、自分自身の名前を見つけたらメールボックスに入れる（<code>man 8postfix local</code>: <code>When a user is listed in the user's own ~/.forward file, delivery is made to the user's mailbox instead.</code>）。試験では <code>\自分の名前</code> の形で問われる。</p>
 <p>2つの曲げ方を並べる。</p>
 <div class="scroll"><table>
 <tr><th></th><th><code>/etc/aliases</code></th><th><code>~/.forward</code></th></tr>
@@ -126,6 +147,7 @@ Delivered-To: alice@lab.local</code></pre>
 <tr><td>書き換えた後</td><td><code>newaliases</code> が必要</td><td>不要（テキストをそのまま読む）</td></tr>
 <tr><td>権限の制約</td><td>root 所有</td><td>other（world）書き込み不可（group だけなら読まれる）</td></tr>
 <tr><td>適用の順</td><td>先（alias を展開してから）</td><td>後（展開先のユーザについて見る）</td></tr>
+<tr><td>宛先を複数書く</td><td>右側にカンマで並べる（<code>support: alice, bob</code>）</td><td>1行に1つ。手元にも残すなら <code>\自分の名前</code> の行を足す</td></tr>
 </table></div>
 <p><code>newaliases</code> が <code>.forward</code> に要らないのは、<code>.forward</code> が <code>hash:</code> ではなくテキストとして直接読まれるからである。<b>「作り直しが要るかどうか」は、設定の形式で決まる。</b></p>
 <div class="analogy"><b>たとえ</b>: 会社の受付が持つ配布先リスト（<code>/etc/aliases</code>）と、
@@ -146,12 +168,12 @@ $ postqueue -p
 Mail queue is empty</code></pre>
 <p>キューは空である。しかし送れていない。どこへ行ったか。</p>
 <pre><code>$ journalctl -t postfix/smtp -t postfix/bounce -t postfix/local --no-pager -n 3
-Oct 13 11:42:55 linuc postfix/smtp[1217]: 7720D1180793: to=&lt;nosuchuser@invalid.example&gt;, relay=none, delay=0.03, delays=0.01/0/0.01/0, dsn=5.4.4, status=bounced (Host or domain name not found. Name service error for name=invalid.example type=A: Host not found)
-Oct 13 11:42:55 linuc postfix/bounce[1218]: 7720D1180793: sender non-delivery notification: 7D3641180A20
-Oct 13 11:42:55 linuc postfix/local[1174]: 7D3641180A20: to=&lt;root@lab.local&gt;, relay=local, delay=0.01, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+Oct 13 19:33:37 linuc postfix/smtp[1295]: 0A80C1184D5C: to=&lt;nosuchuser@invalid.example&gt;, relay=none, delay=0.02, delays=0.01/0/0.01/0, dsn=5.4.4, status=bounced (Host or domain name not found. Name service error for name=invalid.example type=A: Host not found)
+Oct 13 19:33:37 linuc postfix/bounce[1296]: 0A80C1184D5C: sender non-delivery notification: 102E41184D60
+Oct 13 19:33:37 linuc postfix/local[1252]: 102E41184D60: to=&lt;root@lab.local&gt;, relay=local, delay=0.01, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
 $ ls -l /var/mail/root
--rw------- 1 root mail 3088 Oct 13 11:42 /var/mail/root</code></pre>
-<p>3行で1つの話になっている。1行目で、配送を試みた <code>smtp</code> が宛先のドメインを引けず、<code>status=bounced</code> で諦めた（<code>dsn</code> の先頭の 5 は恒久的な失敗を表し、再試行しない）。2行目で <code>postfix/bounce</code> が<b>差し戻し</b>を作った。<code>sender non-delivery notification</code>、つまり<b>送り手への</b>不達通知で、新しい1通（<code>7D3641180A20</code>）になっている。3行目で、その1通が <code>root</code> のメールボックスに入った。<b>送り手が root だったからである</b>。元の1通はこの時点でキューから消えている。</p>
+-rw------- 1 root mail 3088 Oct 13 19:33 /var/mail/root</code></pre>
+<p>3行で1つの話になっている。1行目で、配送を試みた <code>smtp</code> が宛先のドメインを引けず、<code>status=bounced</code> で諦めた（<code>dsn</code> の先頭の 5 は恒久的な失敗を表し、再試行しない）。2行目で <code>postfix/bounce</code> が<b>差し戻し</b>を作った。<code>sender non-delivery notification</code>、つまり<b>送り手への</b>不達通知で、新しい1通（<code>102E41184D60</code>）になっている。3行目で、その1通が <code>root</code> のメールボックスに入った。<b>送り手が root だったからである</b>。元の1通はこの時点でキューから消えている。</p>
 <p>サーバの上でメールを出すのは、多くが root として動くプログラムである。だから届かなかった通知も root に戻る。管理者宛ての予約された名前 postmaster も、<code>/etc/aliases</code> の1行目で <code>root</code> に向いている。</p>
 <pre><code>$ head -1 /etc/aliases
 postmaster: root</code></pre>
@@ -173,6 +195,28 @@ mail.err			/var/log/mail.err</code></pre>
 <br>ただし<b>崩れる点</b>: 郵便の差出人は人ごとに違うが、サーバの上でメールを出すプログラムの多くは
 root として動いている。だから戻ってきた封筒は1つの箱（<code>/var/mail/root</code>）に集まる。
 管理者宛ての <code>postmaster</code> も、<code>/etc/aliases</code> で同じ箱に向けてある。</div>
+<h2 id="mta">MTA は1台に1つ — postfix と exim</h2>
+<div class="sgoal"><b>この節で分かること</b>: 出題範囲に並ぶ MTA の名前と、1台に1つしか入らない理由。</div>
+<p>この檻の MTA（メールを配送するプログラム）は postfix である。試験範囲にはもう1つ exim が並んでいる。第3章の chrony と ntpsec と同じく、パッケージの宣言を見る（exim は入っていないので、第3章で <code>apt-get update</code> を通した檻でだけ読める）。</p>
+<pre><code>$ dpkg -s postfix | grep -E '^(Provides|Conflicts):'
+Provides: default-mta, mail-transport-agent
+Conflicts: mail-transport-agent, smail
+$ apt-cache show --no-all-versions exim4-daemon-light | grep -E '^(Provides|Conflicts):'
+Provides: exim4-localscanapi-6.0, mail-transport-agent
+Conflicts: mail-transport-agent
+$ ls -l /usr/sbin/sendmail /usr/bin/mailq /usr/bin/newaliases
+lrwxrwxrwx 1 root root    16 May  6 00:47 /usr/bin/mailq -&gt; ../sbin/sendmail
+lrwxrwxrwx 1 root root    16 May  6 00:47 /usr/bin/newaliases -&gt; ../sbin/sendmail
+-rwxr-xr-x 1 root root 31184 May  6 00:47 /usr/sbin/sendmail</code></pre>
+<p>どちらも <code>mail-transport-agent</code> を<b>提供し</b>、同時にそれと<b>衝突する</b>。だから1台に MTA は1つしか入らない（<code>sendmail</code> のパッケージ <code>sendmail-bin</code> も同じ宣言をしている。別の檻で実測）。</p>
+<p>そして postfix は <code>sendmail</code> という名前のコマンドを持ち、<code>mailq</code> と <code>newaliases</code> はそこへのリンクになっている。exim も同じ名前のコマンドを用意している（Ubuntu の exim4 では <code>/usr/sbin/sendmail</code>・<code>/usr/bin/mailq</code>・<code>/usr/bin/newaliases</code> が <code>exim4</code> へのリンク。別の檻でパッケージの中身を見て確かめた）。
+<b>どの MTA が入っていても、<code>sendmail</code>・<code>mailq</code>・<code>newaliases</code> という名前のコマンドは打てる</b>ように作られている（名前が同じでも、中で動くのはそれぞれの MTA である）。</p>
+<div class="scroll"><table>
+<tr><th></th><th>postfix</th><th>exim</th><th>sendmail</th></tr>
+<tr><td>Ubuntu のパッケージ</td><td><code>postfix</code></td><td><code>exim4</code>（本体は <code>exim4-daemon-light</code> など）</td><td><code>sendmail-bin</code></td></tr>
+<tr><td><code>sendmail</code>・<code>mailq</code>・<code>newaliases</code> の名前のコマンド</td><td>ある（この檻）</td><td>ある（<code>exim4</code> へのリンク）</td><td>本家（互換コマンドの名前の由来）</td></tr>
+<tr><td>同時に入るか</td><td colspan="3">入らない。どれも <code>mail-transport-agent</code> を提供し、それと衝突する</td></tr>
+</table></div>
 <h2 id="spine">7章が1つの事実から出ていた</h2>
 <div class="sgoal"><b>この節で分かること</b>: 主題1.09 のファイルパス群が、なぜ出題範囲に並んでいるのか。</div>
 <p>この教材で触ったものを並べる。</p>
@@ -235,8 +279,13 @@ rsyslog に開き直させるのは HUP シグナル。<code>~/.forward</code> �
 使うたびに読まれるので何も要らない（logrotate は常駐しない）。
 そして読み直させたあと、効いたかどうかを当人に聞く（<code>chronyc tracking</code>、
 <code>journalctl -t systemd-journald</code>、<code>postconf -n</code>）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>bob が、自分宛のメールを <code>alice</code> へ転送しつつ、自分のメールボックスにも残したい。<code>~bob/.forward</code> に何を書くか。</p>
+<details><summary>答え</summary>
+<p><code>alice</code> と <code>\bob</code> の2行。<code>\</code> は「この名前をそれ以上展開しない」印で、<code>\bob</code> の分は bob のメールボックスに入る。
+<code>alice</code> の1行だけだと、転送されて bob の手元には残らない。ファイルは other（world）が書けない権限にしておく（書けると postfix は読まない）。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>To:</code> に書いた名前は希望でしかない。<code>/etc/aliases</code> と <code>~/.forward</code> で2回書き換わった</li><li><code>alias_maps = hash:/etc/aliases</code> なので、テキストを直したら <code>newaliases</code> で <code>.db</code> を作り直す。<code>~/.forward</code> は不要</li><li><code>~/.forward</code> が world writable（other が書ける）だと postfix は読まない（group だけなら読む）。警告はログ（journal と <code>/var/log/mail.log</code>）に出るだけで、送り手には返らない</li><li>配送の経路はログの <code>orig_to</code>（送り手の名前）と <code>to</code>（実際の配送先）で追う</li><li><code>mailq</code> が空でも成功とは言えない。差し戻しは送り手（この檻では root）のメールボックスへ行き、元の1通はキューから消える</li><li>7章すべてが「送り手はラベルだけを渡し、宛先は受け手の表が決める」という1つの形だった。だから出題範囲にファイルパスが並ぶ</li><li>書いたら読み直させ、当人に聞き、ログを読む。この3手を飛ばすと必ず止まる</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>To:</code> に書いた名前は希望でしかない。<code>/etc/aliases</code> と <code>~/.forward</code> で2回書き換わった</li><li><code>alias_maps = hash:/etc/aliases</code> なので、テキストを直したら <code>newaliases</code> で <code>.db</code> を作り直す。<code>~/.forward</code> は不要</li><li><code>/etc/aliases</code> の右側はカンマで複数（<code>support: alice, bob</code>）。<code>~/.forward</code> は1行に1宛先で、手元にも残すなら <code>\自分の名前</code> の行を足す</li><li><code>mail -s 件名 [-c Cc] [-b Bcc] [-r 送信元] 宛先…</code>。本文は標準入力から。<code>-S smtp=…</code> は Red Hat 系の mailx の書き方で、Ubuntu の <code>mail</code> には無い</li><li><code>~/.forward</code> が world writable（other が書ける）だと postfix は読まない（group だけなら読む）。警告はログ（journal と <code>/var/log/mail.log</code>）に出るだけで、送り手には返らない</li><li>配送の経路はログの <code>orig_to</code>（送り手の名前）と <code>to</code>（実際の配送先）で追う</li><li><code>mailq</code> が空でも成功とは言えない。差し戻しは送り手（この檻では root）のメールボックスへ行き、元の1通はキューから消える</li><li>MTA は1台に1つ。postfix・exim・sendmail はどれも <code>mail-transport-agent</code> を提供し、それと衝突する。どれも <code>sendmail</code>・<code>mailq</code>・<code>newaliases</code> の名前のコマンドを持つ</li><li>7章すべてが「送り手はラベルだけを渡し、宛先は受け手の表が決める」という1つの形だった。だから出題範囲にファイルパスが並ぶ</li><li>書いたら読み直させ、当人に聞き、ログを読む。この3手を飛ばすと必ず止まる</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動と、umask の違いで .forward の拒否が起きないことを確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/06-logrotate">← 6. 捨てる判断も、受け手側にある</a><a href="/linuc-services/">実践編へ →</a></nav>
 <section id="comments">

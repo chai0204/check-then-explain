@@ -12,10 +12,10 @@
 </div>
 <h1>6. 捨てる判断も、受け手側にある</h1>
 <p class="lead">ログを書くプログラムは、自分のログを切らない。切るのは別のプログラムで、いつ切るかは設定ファイルが決める。そして <code>logrotate</code> は、設定ファイルの<b>権限</b>が気に入らないと、エラーを出しながら終了コード 0 で正常終了する。</p>
-<div class="badges"><span>前提: 第5章まで読了</span><span>前提: 演習03 を終えている</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.2（重要度5）</span><span>最終検証 2026-10-13</span></div>
+<div class="badges"><span>前提: 第5章まで読了</span><span>前提: 演習03 を終えている</span><span>所要 21分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.2（重要度5）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>/etc/logrotate.conf</code> と <code>/etc/logrotate.d/</code> の関係を説明できる</li><li><code>logrotate</code> が設定を拒否する2つの条件を、出力から特定できる</li><li>ログを切る判断が「いつ」「何世代」「圧縮するか」のどこに書かれているかを言える</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: <code>dateext</code> による命名、<code>sharedscripts</code> と <code>prerotate</code> の細かい使い分け、<code>mail</code> ディレクティブ、<code>copytruncate</code> が要る場面の見極めは扱わない。journald の捨て方は第5章で済んでいる（logrotate の対象外）。</div></div>
+<ul><li><code>/etc/logrotate.conf</code> と <code>/etc/logrotate.d/</code> の関係を説明できる</li><li><code>logrotate</code> が設定を拒否する2つの条件を、出力から特定できる</li><li>ログを切る判断が「いつ」「何世代」「圧縮するか」のどこに書かれているかを言える</li><li><code>dateext</code>・<code>create</code>・<code>missingok</code> がそれぞれいつ働くかを、出力から言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>sharedscripts</code> と <code>prerotate</code> の細かい使い分け、<code>mail</code> ディレクティブ、<code>copytruncate</code> が要る場面の見極めは扱わない。journald の捨て方は第5章で済んでいる（logrotate の対象外）。</div></div>
 <h2 id="layers">設定は2段ある</h2>
 <div class="sgoal"><b>この節で分かること</b>: 全体の既定と、対象ごとの設定の関係。</div>
 <pre><code>$ grep -vE '^\s*#|^\s*$' /etc/logrotate.conf
@@ -65,6 +65,7 @@ wtmp</code></pre>
 <tr><td><code>missingok</code></td><td>対象が無くてもエラーにしない</td></tr>
 <tr><td><code>notifempty</code></td><td>空のファイルは切らない</td></tr>
 <tr><td><code>create 0640 syslog adm</code></td><td>切った後、この権限で新しいファイルを作る</td></tr>
+<tr><td><code>dateext</code></td><td>切ったファイルの名前を、番号（<code>.1</code>）ではなく日付（<code>-20261013</code> のような <code>-年月日</code>）にする</td></tr>
 <tr><td><code>su root adm</code></td><td>どのユーザ・グループとして作業するか</td></tr>
 <tr><td><code>postrotate … endscript</code></td><td>切った後に走らせるコマンド</td></tr>
 </table></div>
@@ -102,7 +103,7 @@ logrotate は設定に書かれたコマンドを root で実行するので、
 <pre><code>$ chmod 644 /etc/logrotate.d/lab-app
 $ for i in $(seq 1 60); do logger -p local3.info "かさ増し $i"; done
 $ ls -l /var/log/lab-app.log
--rw-r----- 1 syslog adm 3914 Oct 13 11:42 /var/log/lab-app.log</code></pre>
+-rw-r----- 1 syslog adm 3914 Oct 13 19:33 /var/log/lab-app.log</code></pre>
 <p>3914 バイトで、<code>size 1k</code> の条件は満たしている。もう一度打つ。</p>
 <pre><code>$ logrotate -v /etc/logrotate.d/lab-app
 reading config file /etc/logrotate.d/lab-app
@@ -120,7 +121,7 @@ $ echo $?
 1</code></pre>
 <p>まだ切れない。ただし今度は終了コードが <code>1</code> になった。1つ目の拒否（設定ファイルの権限）は 0、2つ目は 1 である。<b>2段目の条件は、ログの親ディレクトリの権限である。</b></p>
 <pre><code>$ ls -ld /var/log
-drwxrwxr-x 1 root syslog 4096 Oct 13 11:42 /var/log</code></pre>
+drwxrwxr-x 1 root syslog 4096 Oct 13 19:33 /var/log</code></pre>
 <p><code>/var/log</code> は <code>syslog</code> グループが書ける。rsyslog が自分でログファイルを作れるようにそうなっている。logrotate はこれを危険と見て飛ばす。メッセージが解決策を名指ししている — <code>Set &quot;su&quot; directive</code>。この su ディレクティブは、<b>すでにどこかに書かれている</b>。</p>
 <pre><code>$ grep -n su /etc/logrotate.conf
 10:su root adm
@@ -134,10 +135,10 @@ Handling 9 logs
 ...
 rotating pattern: /var/log/lab-app.log  1024 bytes (3 rotations)
 empty log files are rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 838)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 902)
 considering log /var/log/lab-app.log
-  Now: 2026-10-13 11:42
-  Last rotated at 2026-10-13 11:00
+  Now: 2026-10-13 19:33
+  Last rotated at 2026-10-13 19:00
   log needs rotating
 rotating log /var/log/lab-app.log, log-&gt;rotateCount is 3
 ...
@@ -146,8 +147,8 @@ creating new /var/log/lab-app.log mode = 0640 uid = 101 gid = 4
 compressing log with: /bin/gzip
 ...
 $ ls -l /var/log/lab-app.log*
--rw-r----- 1 syslog adm   0 Oct 13 11:42 /var/log/lab-app.log
--rw-r----- 1 syslog adm 621 Oct 13 11:42 /var/log/lab-app.log.1.gz</code></pre>
+-rw-r----- 1 syslog adm   0 Oct 13 19:33 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 608 Oct 13 19:33 /var/log/lab-app.log.1.gz</code></pre>
 <p>切れた。<code>.log</code> が 0 バイトで作り直され、前の内容は <code>.log.1.gz</code> になっている。途中の <code>switching euid from 0 to 0 and egid from 0 to 4</code> が、<code>su root adm</code> が効いた跡である（グループ ID 4 は <code>adm</code>）。</p>
 <p class='detail'>（この設定には <code>postrotate</code> が無いので、rsyslog はこの時点ではまだ、名前を変えられて（圧縮のあとに）消えた古いファイルを開いたままである。次の節の <code>logrotate -f</code> で、rsyslog 側の設定（<code>/etc/logrotate.d/rsyslog</code>）の <code>postrotate</code> が HUP を送るまで、新しい <code>lab-app.log</code> には書かれない。）</p>
 <p><b>Ubuntu 標準の <code>/etc/logrotate.d/rsyslog</code> に <code>su</code> が書かれていないのに動くのは、単体で実行される前提になっていないから</b>である。<code>logrotate.conf</code> から <code>include</code> され、そこにある <code>su root adm</code> を受け継いで動いている。設定の階層は「どのファイルを渡して実行したか」で変わる。</p>
@@ -172,21 +173,21 @@ $ ls -l /var/log/lab-app.log*
 <div class="sgoal"><b>この節で分かること</b>: logrotate が状態を持っていること、そして誰が呼ぶのか。</div>
 <pre><code>$ cat /var/lib/logrotate/status
 logrotate state -- version 2
-"/var/log/syslog" 2026-10-13-11:0:0
-"/var/log/dpkg.log" 2026-10-13-11:0:0
-"/var/log/auth.log" 2026-10-13-11:0:0
-"/var/log/apt/term.log" 2026-10-13-11:0:0
-"/var/log/lab-app.log" 2026-10-13-11:42:36
-"/var/log/apt/history.log" 2026-10-13-11:0:0
-"/var/log/alternatives.log" 2026-10-13-11:0:0
-"/var/log/mail.log" 2026-10-13-11:0:0
-"/var/log/kern.log" 2026-10-13-11:0:0
-"/var/log/wtmp" 2026-10-13-11:0:0
-"/var/log/chrony/*.log" 2026-10-13-11:0:0
-"/var/log/btmp" 2026-10-13-11:0:0
-"/var/log/user.log" 2026-10-13-11:0:0
-"/var/log/cron.log" 2026-10-13-11:0:0</code></pre>
-<p>対象ごとに「前回切った時刻」を持っている。<code>lab-app.log</code> だけ分と秒まで入っているのは、実際に切った時刻だからである（ほかは初めて見たときに記録された時刻で、<code>-v</code> の出力の <code>Last rotated at 2026-10-13 11:00</code> と同じく時の単位に丸められている）。だから <code>weekly</code> の設定で1日に何度打っても1回しか切らない。条件を無視させたいときだけ <code>-f</code> を使う。</p>
+"/var/log/syslog" 2026-10-13-19:0:0
+"/var/log/dpkg.log" 2026-10-13-19:0:0
+"/var/log/auth.log" 2026-10-13-19:0:0
+"/var/log/apt/term.log" 2026-10-13-19:0:0
+"/var/log/lab-app.log" 2026-10-13-19:33:18
+"/var/log/apt/history.log" 2026-10-13-19:0:0
+"/var/log/alternatives.log" 2026-10-13-19:0:0
+"/var/log/mail.log" 2026-10-13-19:0:0
+"/var/log/kern.log" 2026-10-13-19:0:0
+"/var/log/wtmp" 2026-10-13-19:0:0
+"/var/log/chrony/*.log" 2026-10-13-19:0:0
+"/var/log/btmp" 2026-10-13-19:0:0
+"/var/log/user.log" 2026-10-13-19:0:0
+"/var/log/cron.log" 2026-10-13-19:0:0</code></pre>
+<p>対象ごとに「前回切った時刻」を持っている。<code>lab-app.log</code> だけ分と秒まで入っているのは、実際に切った時刻だからである（ほかは初めて見たときに記録された時刻で、<code>-v</code> の出力の <code>Last rotated at 2026-10-13 19:00</code> と同じく時の単位に丸められている）。だから <code>weekly</code> の設定で1日に何度打っても1回しか切らない。条件を無視させたいときだけ <code>-f</code> を使う。</p>
 <pre><code>$ logrotate -f /etc/logrotate.conf</code></pre>
 <p>世代の上限が効いていることも確かめられる。4回切ると最古が消える。</p>
 <pre><code>$ for r in 1 2 3 4; do
@@ -194,15 +195,15 @@ logrotate state -- version 2
 &gt;   logrotate -f /etc/logrotate.conf
 &gt; done
 $ ls -l /var/log/lab-app.log*
--rw-r----- 1 syslog adm   0 Oct 13 11:42 /var/log/lab-app.log
--rw-r----- 1 syslog adm 473 Oct 13 11:42 /var/log/lab-app.log.1.gz
--rw-r----- 1 syslog adm 486 Oct 13 11:42 /var/log/lab-app.log.2.gz
--rw-r----- 1 syslog adm 481 Oct 13 11:42 /var/log/lab-app.log.3.gz</code></pre>
+-rw-r----- 1 syslog adm   0 Oct 13 19:33 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 471 Oct 13 19:33 /var/log/lab-app.log.1.gz
+-rw-r----- 1 syslog adm 460 Oct 13 19:33 /var/log/lab-app.log.2.gz
+-rw-r----- 1 syslog adm 476 Oct 13 19:33 /var/log/lab-app.log.3.gz</code></pre>
 <p><code>rotate 3</code> なので <code>.4.gz</code> は作られず、捨てられている。</p>
 <p>では誰が <code>logrotate</code> を呼ぶのか。常駐していない。</p>
 <pre><code>$ systemctl list-timers logrotate.timer --no-pager
-NEXT                        LEFT LAST PASSED UNIT            ACTIVATES
-Wed 2026-10-14 00:00:00 JST  12h -         - logrotate.timer logrotate.service
+NEXT                            LEFT LAST PASSED UNIT            ACTIVATES
+Wed 2026-10-14 00:00:00 JST 4h 26min -         - logrotate.timer logrotate.service
 
 1 timers listed.
 Pass --all to see loaded but inactive timers, too.
@@ -227,6 +228,42 @@ WantedBy=timers.target</code></pre>
 <br>ただし<b>崩れる点</b>: 業者は来れば必ず何かするが、
 logrotate は条件を満たさなければ何もせずに帰る。来たことすら分かりにくい。
 だから台帳とタイマーの両方を見る。</div>
+<h2 id="naming">名前の付け方と、対象が無いとき — dateext・create・missingok</h2>
+<div class="sgoal"><b>この節で分かること</b>: 切ったファイルの名前を日付にする <code>dateext</code> と、<code>create</code>・<code>missingok</code> が働く場面の違い。</div>
+<p>全体設定には、説明のコメントが付いた行がある。<code>create</code> は有効で、<code>dateext</code> はコメントにしてある。</p>
+<pre><code>$ grep -n -B1 -E '^#?(create|dateext)$' /etc/logrotate.conf
+15-# create new (empty) log files after rotating old ones
+16:create
+--
+18-# use date as a suffix of the rotated file
+19:#dateext</code></pre>
+<p><code>create</code> は「切ったあとに空の新しいファイルを作る」、<code>dateext</code> は「切ったファイルの名前に日付を付ける」である。ここまでの切り方で <code>.1.gz</code> のような番号が付いたのは、<code>dateext</code> が無効だからである。</p>
+<p>小さな練習用のログで確かめる。置き場所は <code>/root/work</code> にする（root だけが書けるディレクトリなので、親ディレクトリの権限による拒否は起きない。<code>lab-app.log</code> の設定と状態にも触らない）。設定ファイルは <code>logrotate.conf</code> を通さず、単体で渡す（<code>chmod 644</code> は、この章の前半で踏んだ1つ目の拒否を避けるため）。</p>
+<pre><code>$ echo "練習の1行" &gt; /root/work/demo.log
+$ printf '/root/work/demo.log {\n    rotate 3\n    dateext\n}\n' &gt; /root/work/demo.conf
+$ chmod 644 /root/work/demo.conf
+$ logrotate -f /root/work/demo.conf
+$ ls /root/work/demo*
+/root/work/demo.conf
+/root/work/demo.log-20261013</code></pre>
+<p>切ったファイルは <code>demo.log-20261013</code> になった（<code>-年月日</code>。日付は打った日になる）。そして <code>demo.log</code> が無い。単体で渡したので <code>logrotate.conf</code> の <code>create</code> が効かず、空のファイルが作られなかった。この状態で、もう一度打つ。</p>
+<pre><code>$ logrotate -f /root/work/demo.conf
+error: stat of /root/work/demo.log failed: No such file or directory
+$ echo $?
+1</code></pre>
+<p>対象が無いことがエラーになった（終了コード 1）。<code>missingok</code> を足すと、無ければ黙って飛ばす。</p>
+<pre><code>$ printf '/root/work/demo.log {\n    rotate 3\n    dateext\n    missingok\n}\n' &gt; /root/work/demo.conf
+$ logrotate -f /root/work/demo.conf
+$ echo $?
+0</code></pre>
+<div class="scroll"><table>
+<tr><th>ディレクティブ</th><th>働くとき</th><th>書かないと</th></tr>
+<tr><td><code>create</code></td><td>切った<b>後</b>。空の新しいファイルを作る（<code>create 0640 syslog adm</code> のように権限と所有者も書ける）</td><td>次に書く側が作るまで、ファイルが無い</td></tr>
+<tr><td><code>missingok</code></td><td>切る<b>前</b>に対象を探すとき。見つからなくてもエラーにしない</td><td><code>error: stat of … failed</code> を出して終了コード 1</td></tr>
+<tr><td><code>dateext</code></td><td>切るとき。切ったファイルの名前を <code>-年月日</code> にする</td><td><code>.1</code> <code>.2</code> … の番号になる</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 古いノートを倉庫へ移す係の、3つの決まりごとに近い。<code>create</code> は「移したら机に新しいノートを置いておく」、<code>missingok</code> は「机にノートが無くても騒がずに次へ行く」、<code>dateext</code> は「箱に番号ではなく日付のラベルを貼る」。
+<br>ただし<b>崩れる点</b>: 人なら机にノートが無ければ理由を考えるが、<code>missingok</code> は理由を問わずに黙る。書く側が止まっていてログが無いのか、パスを書き間違えたのかを区別しない。</div>
 <div class="quiz"><b>確認</b>
 <p><code>logrotate -v /etc/logrotate.d/myapp</code> を打ったら
 <code>Handling 0 logs</code> と出て終了コードは 0 だった。何を疑うか。</p>
@@ -246,8 +283,13 @@ logrotate は条件を満たさなければ何もせずに帰る。来たこと�
 （この章の su の節で、設定ファイルを単体で渡したときに見たとおり）。
 <code>delaycompress</code> を付けていれば <code>.1</code> が非圧縮のまま残り、
 <code>.2.gz</code> 以降が圧縮される。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/var/log/myapp.log</code> を切る設定に <code>dateext</code> を書き、<code>missingok</code> は書かなかった。2026年10月13日に切ったファイルの名前は何になるか。また、対象のログがまだ無い日に logrotate が動くとどうなるか。</p>
+<details><summary>答え</summary>
+<p>切ったファイルは <code>myapp.log-20261013</code> になる（<code>dateext</code> が無ければ <code>myapp.log.1</code>。<code>compress</code> があれば、どちらも後ろに <code>.gz</code> が付く）。
+対象が無い日は <code>error: stat of /var/log/myapp.log failed: No such file or directory</code> を出し、終了コードは 1 になる。無くてもよいログなら <code>missingok</code> を書く。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>書く側（rsyslog）と捨てる側（logrotate）は別のプログラムで、設定ファイルも別</li><li><code>logrotate</code> は設定ファイルが group/other に書けると<b>丸ごと無視</b>する。しかも終了コードは 0</li><li>ログの親ディレクトリが group 書き込み可だと、<code>su</code> ディレクティブが無い限り飛ばす（こちらは終了コード 1）</li><li><code>/etc/logrotate.d/&lt;名前&gt;</code> を直接渡すと <code>/etc/logrotate.conf</code> の既定（<code>su root adm</code> など）が効かない。渡すのは <code>logrotate.conf</code></li><li>前回切った時刻は <code>/var/lib/logrotate/status</code> にある。無視させるのは <code>-f</code></li><li>logrotate は常駐しない。<code>logrotate.timer</code>（<code>OnCalendar=daily</code> / <code>Persistent=true</code>）が呼ぶ</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>書く側（rsyslog）と捨てる側（logrotate）は別のプログラムで、設定ファイルも別</li><li><code>logrotate</code> は設定ファイルが group/other に書けると<b>丸ごと無視</b>する。しかも終了コードは 0</li><li>ログの親ディレクトリが group 書き込み可だと、<code>su</code> ディレクティブが無い限り飛ばす（こちらは終了コード 1）</li><li><code>/etc/logrotate.d/&lt;名前&gt;</code> を直接渡すと <code>/etc/logrotate.conf</code> の既定（<code>su root adm</code> など）が効かない。渡すのは <code>logrotate.conf</code></li><li>前回切った時刻は <code>/var/lib/logrotate/status</code> にある。無視させるのは <code>-f</code></li><li>logrotate は常駐しない。<code>logrotate.timer</code>（<code>OnCalendar=daily</code> / <code>Persistent=true</code>）が呼ぶ</li><li><code>dateext</code> を付けると、切ったファイルの名前が <code>.1</code> ではなく <code>-年月日</code>（例 <code>demo.log-20261013</code>）になる</li><li><code>create</code> は切った後に空のファイルを作る。<code>missingok</code> は対象が無くてもエラーにしない（書かないと <code>error: stat of … failed</code>・終了コード 1）</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動と、umask の違いで1つ目の拒否が起きないことを確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/05-journald">← 5. journald は隣にある別の箱</a><a href="/linuc-services/theory/07-mail">次: 7. 宛先に書いた名前は、希望にすぎない →</a></nav>
 <section id="comments">

@@ -31,6 +31,8 @@
 #   probe/linuc-services-extra.sh     … 地の文の裏取りのうち、この流れに混ぜると状態が変わるもの
 #   probe/linuc-services-extra2.sh    … 事実確認（2026-10-13）で直した地の文の裏取り
 #   probe/linuc-services-podman.sh    … podman（rootless）の読者で出力が変わる箇所（umask が 0022）
+#   probe/linuc-services-exam.sh      … 試験対策で足した地の文（mail のオプション・aliases・.forward・ntpq など）の裏取り
+#   probe/linuc-services-rhel.sh      … 「Red Hat 系では」と書いたところの裏取り（AlmaLinux 8.10 / 9.8、lab の podman）
 set -u
 LAST=0
 R() {
@@ -61,7 +63,17 @@ R 'hwclock'
 R 'hwclock --show'
 R 'cat /proc/driver/rtc'
 R 'ls -l /dev/rtc*'
+R "hwclock --help | grep -E -- '--(show|hctosys|systohc|adjust) '"
 R 'timedatectl show'
+R 'date --help | grep MMDDhhmm'
+R 'date 021409002022'
+R 'echo $?'
+R 'touch --help | grep STAMP'
+R 'touch -t 202202140900 /tmp/stamp'
+R 'date -r /tmp/stamp'
+R "timedatectl --help | sed -n '/^Commands:/,/^\$/p'"
+R 'timedatectl set-clock 2022-02-14'
+R 'timedatectl set-time "2022-02-14 09:00:00"'
 
 S "第2章 タイムゾーンは表示の都合だけ（1.09.1）"
 R 'date +%Z'
@@ -82,6 +94,8 @@ R 'ls /usr/share/zoneinfo | head -20'
 R 'file /usr/share/zoneinfo/Asia/Tokyo'
 R 'timedatectl list-timezones | grep -c .'
 R 'timedatectl list-timezones | grep Tokyo'
+R "printf '7\n7\n1\n' | tzselect 2>/dev/null"
+R 'readlink /etc/localtime'
 
 S "第3章 時刻合わせは、基準を渡されるまで始まらない（1.09.1）"
 R 'systemctl is-active chrony'
@@ -138,6 +152,13 @@ R 'logger -p local5.notice "notice"'
 R 'logger -p local5.err    "err"'
 W 1
 R 'cat /var/log/lab-notice.log'
+R 'logger --help | grep -- --priority'
+R 'logger -p local4.4 "数字の 4 は warning"'
+R 'logger -p local4.6 "数字の 6 は info"'
+W 1
+R 'grep "数字の" /var/log/lab-warn.log'
+R 'logger -p local0 "priority を省くと"'
+R 'echo $?'
 R "echo 'local3.*  /var/log/lab-app.log' > /etc/rsyslog.d/60-lab.conf"
 R 'systemctl restart rsyslog'
 W 1
@@ -230,6 +251,17 @@ W 2
 R 'ls -l /var/log/lab-app.log*'
 R 'systemctl list-timers logrotate.timer --no-pager'
 R 'systemctl cat logrotate.timer | head -12'
+R "grep -n -B1 -E '^#?(create|dateext)\$' /etc/logrotate.conf"
+R 'echo "練習の1行" > /root/work/demo.log'
+R "printf '/root/work/demo.log {\n    rotate 3\n    dateext\n}\n' > /root/work/demo.conf"
+R 'chmod 644 /root/work/demo.conf'
+R 'logrotate -f /root/work/demo.conf'
+R 'ls /root/work/demo*'
+R 'logrotate -f /root/work/demo.conf'
+R 'echo $?'
+R "printf '/root/work/demo.log {\n    rotate 3\n    dateext\n    missingok\n}\n' > /root/work/demo.conf"
+R 'logrotate -f /root/work/demo.conf'
+R 'echo $?'
 
 S "第7章 宛先に書いた名前は、希望にすぎない（1.09.3）"
 R 'echo "本文です" | mail -s "最初の1通" alice'
@@ -271,6 +303,9 @@ R 'postqueue -p'
 R 'journalctl -t postfix/smtp -t postfix/bounce -t postfix/local --no-pager -n 3'
 R 'ls -l /var/mail/root'
 R 'head -1 /etc/aliases'
+R "dpkg -s postfix | grep -E '^(Provides|Conflicts):'"
+R "apt-cache show --no-all-versions exim4-daemon-light | grep -E '^(Provides|Conflicts):'"
+R 'ls -l /usr/sbin/sendmail /usr/bin/mailq /usr/bin/newaliases'
 
 S "裏取り（本文の地の文が言っていること。章の状態を乱さないよう最後にまとめて打つ）"
 R 'command -v hwclock ntpdate chronyd; command -v ntpq; echo "ntpq: exit=$?"'

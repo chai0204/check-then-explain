@@ -54,9 +54,9 @@ journal のバイナリ形式、TLS による暗号化。どれもレベル1の�
     <td><a href="/linuc-services/theory/01-clock">1</a></td>
     <td><code>date</code> <code>hwclock</code> <code>timedatectl</code> <code>/proc/driver/rtc</code></td></tr>
 <tr><td><a href="/linuc-services/theory/02-timezone">2</a></td>
-    <td><code>/usr/share/zoneinfo/</code> <code>/etc/localtime</code> <code>/etc/timezone</code> <code>TZ</code> <code>timedatectl set-timezone</code></td></tr>
+    <td><code>/usr/share/zoneinfo/</code> <code>/etc/localtime</code> <code>/etc/timezone</code> <code>TZ</code> <code>timedatectl set-timezone</code> <code>tzselect</code></td></tr>
 <tr><td><a href="/linuc-services/theory/03-ntp">3</a></td>
-    <td><code>chronyd</code> <code>chronyc</code> <code>chrony.conf</code> <code>ntpdate</code> <code>pool.ntp.org</code>（<code>ntpd</code> <code>ntpq</code> <code>ntp.conf</code> は対応表で）</td></tr>
+    <td><code>chronyd</code> <code>chronyc</code> <code>chrony.conf</code> <code>ntpdate</code> <code>pool.ntp.org</code>（<code>ntpd</code> <code>ntpq</code> <code>ntp.conf</code> は<a href="/linuc-services/theory/03-ntp#exclusive">対応表</a>で）</td></tr>
 <tr><td rowspan="3">1.09.2 システムのログ</td><td rowspan="3">5</td>
     <td><a href="/linuc-services/theory/04-rsyslog">4</a></td>
     <td><code>rsyslogd</code> <code>rsyslog.conf</code> <code>/etc/rsyslog.d/</code> <code>logger</code> <code>/var/log/</code>、ログサーバーへの送受信（<code>@</code> / <code>@@</code>・514 番・<code>imudp</code> / <code>imtcp</code>・<code>logger -n</code>）</td></tr>
@@ -66,32 +66,82 @@ journal のバイナリ形式、TLS による暗号化。どれもレベル1の�
     <td><code>logrotate</code> <code>/etc/logrotate.conf</code> <code>/etc/logrotate.d/</code></td></tr>
 <tr><td>1.09.3 メール配送エージェント(MTA)の基本</td><td>2</td>
     <td><a href="/linuc-services/theory/07-mail">7</a></td>
-    <td><code>/etc/aliases</code> <code>newaliases</code> <code>~/.forward</code> <code>mail</code> <code>mailq</code> <code>postfix</code>（<code>exim</code> は対応表で）</td></tr>
+    <td><code>/etc/aliases</code> <code>newaliases</code> <code>~/.forward</code> <code>mail</code> <code>mailq</code> <code>postfix</code>（<code>exim</code> は<a href="/linuc-services/theory/07-mail#mta">対応表</a>で）</td></tr>
 </table></div>
 <p class="detail">主題1.09 の「詳細」欄に挙げられた語のうち、この檻で<b>実際に打てないもの</b>は
 <code>hwclock --systohc</code>（RTC デバイスが無い）、<code>ntpq</code>（<code>ntpsec</code> が chrony と排他で入らない）、
-<code>exim</code>（postfix と排他）、<code>tzselect</code>（対話的なので本文では扱わない）です。
-打てない理由も本文に書いてあります。<b>打てないことを黙って飛ばしてはいません。</b></p>
+<code>exim</code>（postfix と排他）です。
+打てない理由も本文に書いてあります。<b>打てないことを黙って飛ばしてはいません。</b>
+<code>ntpq</code> はパッケージの中のマニュアルで、<code>exim</code> はパッケージの宣言と中身で確かめました。
+<code>tzselect</code> は質問に番号で答える対話式なので、答えを流し込んで最後の1行だけを見ています（第2章）。</p>
 <p>他の主題（1.01〜1.08・1.10・1.11）の対応は
 <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。どこがまだ無いかもそこで分かります。</p>
+
+<h2 id="cram">試験の直前に見る表</h2>
+<p>出題範囲の「詳細」欄に並ぶ語を、上から順に1行ずつ並べました。公式の例題で問われる書き方（<code>date</code> の書式、<code>dateext</code>、<code>mail</code> のオプションなど）も1行に入れてあります。意味が出てこない語だけ、右の章に戻ってください。</p>
+<div class="scroll"><table>
+<tr><th>語</th><th>一行の意味</th><th>章</th></tr>
+<tr><td colspan="3"><b>1.09.1 システム時刻の管理（重要度2）</b></td></tr>
+<tr><td><code>date</code></td><td>表示と設定。設定は <code>date MMDDhhmm[[CC]YY][.ss]</code>（年は<b>最後</b>。例 <code>date 021409002022</code>）か <code>date -s "2022-02-14 09:00"</code>。<code>touch -t</code> は <code>[[CC]YY]MMDDhhmm</code> で年が<b>先頭</b></td><td><a href="/linuc-services/theory/01-clock#set">1</a></td></tr>
+<tr><td><code>hwclock</code></td><td>RTC（ハードウェアクロック）を扱う。<code>-r</code>（<code>--show</code>）読む、<code>-w</code>（<code>--systohc</code>）システム → RTC、<code>-s</code>（<code>--hctosys</code>）RTC → システム、<code>-a</code>（<code>--adjust</code>）進み・遅れの癖を補正</td><td><a href="/linuc-services/theory/01-clock#nodevice">1</a></td></tr>
+<tr><td><code>/usr/share/zoneinfo/</code></td><td>ゾーン定義（バイナリ）の置き場所。ゾーン名がそのままパスになる</td><td><a href="/linuc-services/theory/02-timezone#files">2</a></td></tr>
+<tr><td><code>/etc/timezone</code></td><td>Debian 系が持つ、ゾーン名1行のテキスト。<code>timedatectl set-timezone</code> は更新しない</td><td><a href="/linuc-services/theory/02-timezone#three">2</a></td></tr>
+<tr><td><code>/etc/localtime</code></td><td>zoneinfo のファイルへのリンク（コピーでも C ライブラリは読む）。<code>timedatectl set-timezone</code> が張り替える</td><td><a href="/linuc-services/theory/02-timezone#three">2</a></td></tr>
+<tr><td><code>TZ</code></td><td>環境変数。プロセスごとに効き、<code>/etc/localtime</code> より優先される</td><td><a href="/linuc-services/theory/02-timezone#three">2</a></td></tr>
+<tr><td><code>tzselect</code></td><td>質問に番号で答えると、ゾーン名を1行出すだけ。設定は変えない</td><td><a href="/linuc-services/theory/02-timezone#files">2</a></td></tr>
+<tr><td><code>timedatectl</code></td><td><code>status</code>（省略時）・<code>show</code>・<code>set-time</code>・<code>set-timezone</code>・<code>list-timezones</code>・<code>set-local-rtc</code>・<code>set-ntp</code> の7つ。<code>set-clock</code> は無い。<code>set-time</code> は NTP が有効な間は拒否される</td><td><a href="/linuc-services/theory/01-clock#set">1</a>・<a href="/linuc-services/theory/02-timezone#three">2</a></td></tr>
+<tr><td><code>ntpd</code></td><td>NTP の時刻合わせのデーモン（Ubuntu のパッケージは <code>ntpsec</code>）。<code>chronyd</code> と同時には入らない（どちらも <code>time-daemon</code>）</td><td><a href="/linuc-services/theory/03-ntp#exclusive">3</a></td></tr>
+<tr><td><code>ntpdate</code></td><td>基準に1回だけ問い合わせる（<code>-q</code>）か、1回だけ合わせる。chrony と共存できる別パッケージ</td><td><a href="/linuc-services/theory/03-ntp#give">3</a></td></tr>
+<tr><td><code>ntp.conf</code></td><td>ntpd の設定。<code>/etc/ntp.conf</code>（Ubuntu の ntpsec は <code>/etc/ntpsec/ntp.conf</code>）。基準は <code>server</code> / <code>pool</code></td><td><a href="/linuc-services/theory/03-ntp#exclusive">3</a></td></tr>
+<tr><td><code>chronyd</code></td><td>chrony のデーモン（サービス名は Ubuntu が <code>chrony</code>、RHEL 系が <code>chronyd</code>）。本来は時計を合わせるが、この檻は <code>-x</code> で測るだけ</td><td><a href="/linuc-services/theory/03-ntp#power">3</a></td></tr>
+<tr><td><code>chronyc</code></td><td>chronyd に聞く。<code>sources</code>（候補の一覧）・<code>tracking</code>（いまの基準とずれ）・<code>makestep</code>（すぐ合わせる）</td><td><a href="/linuc-services/theory/03-ntp#give">3</a></td></tr>
+<tr><td><code>chrony.conf</code></td><td>基準を <code>server</code> / <code>pool</code> で書く。Ubuntu は <code>/etc/chrony/chrony.conf</code>、RHEL 系は <code>/etc/chrony.conf</code></td><td><a href="/linuc-services/theory/03-ntp#running">3</a>・<a href="/linuc-services/theory/03-ntp#exclusive">3</a></td></tr>
+<tr><td><code>pool.ntp.org</code></td><td>公開の NTP サーバ群。Ubuntu の既定は <code>ntp.ubuntu.com</code> と <code>0〜2.ubuntu.pool.ntp.org</code></td><td><a href="/linuc-services/theory/03-ntp#running">3</a></td></tr>
+<tr><td><code>ntpq</code></td><td>ntpd に状態を聞く（chronyc に当たる）。引数なしは対話モード（<code>ntpq&gt;</code> で <code>peers</code>）、<code>-p</code> で同期先の一覧</td><td><a href="/linuc-services/theory/03-ntp#exclusive">3</a></td></tr>
+<tr><td colspan="3"><b>1.09.2 システムのログ（重要度5）</b></td></tr>
+<tr><td><code>rsyslog.conf</code></td><td>左がセレクタ（<code>facility.priority</code>）、右がアクション（行き先）の表。<code>/etc/rsyslog.d/*.conf</code> も読む。当てはまった行き先すべてに書く</td><td><a href="/linuc-services/theory/04-rsyslog#selector">4</a>・<a href="/linuc-services/theory/04-rsyslog#both">4</a></td></tr>
+<tr><td><code>rsyslogd</code></td><td>表に従って振り分けて書くデーモン。<code>logger</code> の行は journald から回してもらい、ネットワーク（514 番）からの行は直接受け取る</td><td><a href="/linuc-services/theory/04-rsyslog#mismatch">4</a>・<a href="/linuc-services/theory/05-journald#entry">5</a></td></tr>
+<tr><td>ファシリティ</td><td>送り手の種類を表すラベル（<code>auth</code> <code>cron</code> <code>mail</code> <code>user</code> <code>local0</code>〜<code>local7</code> など）。行の中には残らない</td><td><a href="/linuc-services/theory/04-rsyslog#selector">4</a></td></tr>
+<tr><td>優先度</td><td>重さの段。<code>emerg</code>（0）〜 <code>debug</code>（7）。<code>.warning</code> はそれ以上、<code>.=warning</code> はそれだけ、<code>.none</code> は除外</td><td><a href="/linuc-services/theory/04-rsyslog#selector">4</a></td></tr>
+<tr><td>アクション</td><td>当てはまった行の行き先。ファイル、<code>@ホスト</code>（UDP）・<code>@@ホスト</code>（TCP）、<code>:omusrmsg:*</code>（ログイン中の全員の端末）</td><td><a href="/linuc-services/theory/04-rsyslog#selector">4</a>・<a href="/linuc-services/theory/04-rsyslog#remote">4</a></td></tr>
+<tr><td><code>logger</code></td><td>1行投げる。<code>-p</code>（<code>--priority</code>）<code>facility.priority</code>（priority は数字でもよく、省けない。facility は省くと <code>user</code>）、<code>-t</code> タグ、<code>-n</code> 送り先</td><td><a href="/linuc-services/theory/04-rsyslog#numeric">4</a>・<a href="/linuc-services/theory/04-rsyslog#whatlogger">4</a></td></tr>
+<tr><td><code>systemd-cat</code></td><td>コマンドの標準出力を journal へ渡す。<code>-t</code> タグ、<code>-p</code> priority（facility は付かない）</td><td><a href="/linuc-services/theory/05-journald#filter">5</a></td></tr>
+<tr><td><code>journalctl</code></td><td>journal を読む。<code>-u</code> ユニット、<code>-t</code> タグ、<code>-p</code> 優先度、<code>--since</code>、<code>-b</code>、<code>-f</code>、<code>-k</code>。削除は <code>--vacuum-size</code> / <code>--vacuum-time</code></td><td><a href="/linuc-services/theory/05-journald#filter">5</a>・<a href="/linuc-services/theory/05-journald#limit">5</a></td></tr>
+<tr><td><code>/etc/systemd/journald.conf</code></td><td><code>Storage=</code>・<code>SystemMaxUse=</code> など。差分は <code>journald.conf.d/</code> に置き、journald を再起動して読ませる</td><td><a href="/linuc-services/theory/05-journald#limit">5</a></td></tr>
+<tr><td><code>/var/log/journal/</code></td><td>在れば永続（<code>Storage=auto</code> の既定）。無ければ <code>/run/log/journal/</code> に置かれ、再起動で消える</td><td><a href="/linuc-services/theory/05-journald#storage">5</a></td></tr>
+<tr><td><code>logrotate</code></td><td>切る・圧縮する・捨てる。常駐せず、timer か cron が呼ぶ。<code>-f</code> 強制、<code>-v</code> 経過を出す、<code>-d</code> 判断だけ</td><td><a href="/linuc-services/theory/06-logrotate#state">6</a></td></tr>
+<tr><td><code>/etc/logrotate.conf</code></td><td>全体の既定（<code>weekly</code> <code>rotate 4</code> <code>create</code> <code>su root adm</code> <code>include</code>）。渡すのはこちら</td><td><a href="/linuc-services/theory/06-logrotate#layers">6</a></td></tr>
+<tr><td><code>/etc/logrotate.d/</code></td><td>対象ごとの設定。group か other が書けると丸ごと無視される（終了コードは 0）</td><td><a href="/linuc-services/theory/06-logrotate#trap">6</a></td></tr>
+<tr><td><code>dateext</code> / <code>create</code> / <code>missingok</code></td><td>切ったファイルの名前を <code>-年月日</code> にする / 切った後に空のファイルを作る / 対象が無くてもエラーにしない</td><td><a href="/linuc-services/theory/06-logrotate#naming">6</a></td></tr>
+<tr><td><code>/var/log/</code></td><td>一般のログは Debian 系が <code>/var/log/syslog</code>、Red Hat 系が <code>/var/log/messages</code>（<code>*.info;mail.none;authpriv.none;cron.none</code>）。<code>boot.log</code> は起動のとき（<code>local7</code>）だけ</td><td><a href="/linuc-services/theory/04-rsyslog#messages">4</a></td></tr>
+<tr><td>ログサーバー（<code>@@</code>・514）</td><td><code>*.* @@ホスト</code> で TCP、<code>@</code> で UDP、宛先のポートは既定で 514。受ける側は <code>imudp</code> / <code>imtcp</code> を有効にする</td><td><a href="/linuc-services/theory/04-rsyslog#remote">4</a></td></tr>
+<tr><td colspan="3"><b>1.09.3 メール配送エージェント(MTA)の基本（重要度2）</b></td></tr>
+<tr><td><code>/etc/aliases</code></td><td>宛先の書き換え表。<code>名前: 宛先, 宛先</code>（カンマで複数）。直したら <code>newaliases</code></td><td><a href="/linuc-services/theory/07-mail#bend">7</a></td></tr>
+<tr><td><code>newaliases</code></td><td><code>/etc/aliases</code> から <code>.db</code> を作り直す（<code>sendmail -bi</code> と同じ）</td><td><a href="/linuc-services/theory/07-mail#bend">7</a></td></tr>
+<tr><td><code>~/.forward</code></td><td>本人が書く転送先。1行に1宛先。手元にも残すなら <code>\自分の名前</code>。other（world）が書けると読まれない</td><td><a href="/linuc-services/theory/07-mail#forward">7</a>・<a href="/linuc-services/theory/07-mail#keep">7</a></td></tr>
+<tr><td><code>mail</code></td><td><code>mail -s 件名 [-c Cc] [-b Bcc] [-r 送信元] 宛先…</code>。本文は標準入力。<code>-S smtp=…</code> は Red Hat 系の mailx の書き方</td><td><a href="/linuc-services/theory/07-mail#mailcmd">7</a></td></tr>
+<tr><td><code>mailq</code></td><td>まだ送れていないメールの一覧（<code>postqueue -p</code> と同じ）。空でも、全部届いたとは限らない</td><td><a href="/linuc-services/theory/07-mail#bounce">7</a></td></tr>
+<tr><td><code>postfix</code></td><td>この檻の MTA。<code>sendmail</code>・<code>mailq</code>・<code>newaliases</code> の名前のコマンドを持つ</td><td><a href="/linuc-services/theory/07-mail#mta">7</a></td></tr>
+<tr><td><code>exim</code></td><td>もう1つの MTA（Ubuntu では <code>exim4</code>）。postfix とは同時に入らない（どちらも <code>mail-transport-agent</code>）</td><td><a href="/linuc-services/theory/07-mail#mta">7</a></td></tr>
+</table></div>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
 <ol>
 <li><a href="/linuc-services/theory/01-clock">時計は2つある</a> —
-    <span class="detail"><code>hwclock</code> は失敗するのに <code>/proc/driver/rtc</code> には時刻がある。しかも32秒ずれている（12分）</span></li>
+    <span class="detail"><code>hwclock</code> は失敗するのに <code>/proc/driver/rtc</code> には時刻がある。しかも33秒ずれている。時刻を設定する書式は、<code>date</code> と <code>touch -t</code> で年の位置が逆（17分）</span></li>
 <li><a href="/linuc-services/theory/02-timezone">タイムゾーンは表示の都合だけ</a> —
-    <span class="detail"><code>date</code> と <code>timedatectl</code> と <code>/etc/timezone</code> が3つ違うことを言う。全部正しい（12分）</span></li>
+    <span class="detail"><code>date</code> と <code>timedatectl</code> と <code>/etc/timezone</code> が3つ違うことを言う。全部正しい（14分）</span></li>
 <li><a href="/linuc-services/theory/03-ntp">基準を渡されるまで始まらない</a> —
     <span class="detail">デーモンは <code>active</code>。それでも <code>Not synchronised</code>。設定1行で <code>Stratum : 9</code> になる（15分）</span></li>
 <li><a href="/linuc-services/theory/04-rsyslog">宛先は受け手の表が決める</a> —
-    <span class="detail"><code>local3</code> に投げた行が <code>/var/log/syslog</code> に入る理由。1行が2箇所に入る。別のマシン（ログサーバー）へも送れる（22分）</span></li>
+    <span class="detail"><code>local3</code> に投げた行が <code>/var/log/syslog</code> に入る理由。1行が2箇所に入る。別のマシン（ログサーバー）へも送れる。Red Hat 系の一般ログは <code>/var/log/messages</code>（26分）</span></li>
 <li><a href="/linuc-services/theory/05-journald">journald は隣にある別の箱</a> —
     <span class="detail">同じ1行が両方に1件ずつ。保存は別々だが、入口は journald の1本。保存先はディレクトリの有無で決まる（20分）</span></li>
 <li><a href="/linuc-services/theory/06-logrotate">捨てる判断も受け手側にある</a> —
-    <span class="detail">1つ目の拒否はエラーを出しながら終了コード 0 で終わる。止まる原因は2つあり、どちらも権限（16分）</span></li>
+    <span class="detail">1つ目の拒否はエラーを出しながら終了コード 0 で終わる。止まる原因は2つあり、どちらも権限。<code>dateext</code>・<code>create</code>・<code>missingok</code> の違い（21分）</span></li>
 <li><a href="/linuc-services/theory/07-mail">宛先に書いた名前は希望にすぎない</a> —
-    <span class="detail">2回書き換わる。途中の経路は、届いたメールを見ても分からない。ここで7章が1本になる（18分）</span></li>
+    <span class="detail">2回書き換わる。途中の経路は、届いたメールを見ても分からない。<code>mail</code> のオプションと MTA の対応表。ここで7章が1本になる（25分）</span></li>
 </ol>
 </div>
 <p><a href="/linuc-services/theory/glossary">用語辞書</a> —

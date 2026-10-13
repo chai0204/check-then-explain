@@ -47,14 +47,14 @@ lab-linuc-services  進捗 0/6
 ========== 第1章 時計は2つある（1.09.1） ==========
 
 $ date
-Tue Oct 13 11:41:59 JST 2026
+Tue Oct 13 19:32:37 JST 2026
 
 $ date -u
-Tue Oct 13 02:41:59 UTC 2026
+Tue Oct 13 10:32:37 UTC 2026
 
 $ timedatectl
-               Local time: Tue 2026-10-13 02:42:00 UTC
-           Universal time: Tue 2026-10-13 02:42:00 UTC
+               Local time: Tue 2026-10-13 10:32:37 UTC
+           Universal time: Tue 2026-10-13 10:32:37 UTC
                  RTC time: n/a
                 Time zone: Etc/UTC (UTC, +0000)
 System clock synchronized: yes
@@ -70,7 +70,7 @@ hwclock: Cannot access the Hardware Clock via any known method.
 hwclock: Use the --verbose option to see the details of our search for an access method.
 
 $ cat /proc/driver/rtc
-rtc_time	: 02:41:27
+rtc_time	: 10:32:04
 rtc_date	: 2026-10-13
 alrm_time	: 13:32:01
 alrm_date	: 2026-10-11
@@ -85,13 +85,55 @@ max user IRQ frequency	: 64
 $ ls -l /dev/rtc*
 ls: cannot access '/dev/rtc*': No such file or directory
 
+$ hwclock --help | grep -E -- '--(show|hctosys|systohc|adjust) '
+ -r, --show                      display the RTC time
+ -s, --hctosys                   set the system time from the RTC
+ -w, --systohc                   set the RTC from the system time
+ -a, --adjust                    adjust the RTC to account for systematic drift
+
 $ timedatectl show
 Timezone=Etc/UTC
 LocalRTC=no
 CanNTP=yes
 NTP=yes
 NTPSynchronized=yes
-TimeUSec=Tue 2026-10-13 11:42:00 JST
+TimeUSec=Tue 2026-10-13 19:32:37 JST
+
+$ date --help | grep MMDDhhmm
+  or:  date [-u|--utc|--universal] [MMDDhhmm[[CC]YY][.ss]]
+With -s, or with [MMDDhhmm[[CC]YY][.ss]], set the date and time.
+
+$ date 021409002022
+date: cannot set date: Operation not permitted
+Mon Feb 14 09:00:00 JST 2022
+
+$ echo $?
+1
+
+$ touch --help | grep STAMP
+  -t STAMP               use [[CC]YY]MMDDhhmm[.ss] instead of current time
+
+$ touch -t 202202140900 /tmp/stamp
+
+$ date -r /tmp/stamp
+Mon Feb 14 09:00:00 JST 2022
+
+$ timedatectl --help | sed -n '/^Commands:/,/^$/p'
+Commands:
+  status                   Show current time settings
+  show                     Show properties of systemd-timedated
+  set-time TIME            Set system time
+  set-timezone ZONE        Set system time zone
+  list-timezones           Show known time zones
+  set-local-rtc BOOL       Control whether RTC is in local time
+  set-ntp BOOL             Enable or disable network time synchronization
+
+
+$ timedatectl set-clock 2022-02-14
+Unknown command verb 'set-clock', did you mean 'set-time'?
+
+$ timedatectl set-time "2022-02-14 09:00:00"
+Failed to set time: Automatic time synchronization is enabled
 
 
 ========== 第2章 タイムゾーンは表示の都合だけ（1.09.1） ==========
@@ -108,26 +150,26 @@ Etc/UTC
 $ timedatectl set-timezone Asia/Tokyo
 
 $ ls -l /etc/localtime
-lrwxrwxrwx 1 root root 30 Oct 13 11:42 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
+lrwxrwxrwx 1 root root 30 Oct 13 19:32 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
 
 $ cat /etc/timezone
 Etc/UTC
 
 $ date
-Tue Oct 13 11:42:00 JST 2026
+Tue Oct 13 19:32:37 JST 2026
 
 $ date -u
-Tue Oct 13 02:42:00 UTC 2026
+Tue Oct 13 10:32:37 UTC 2026
 
 $ env | grep '^TZ='
 TZ=Asia/Tokyo
 
 $ date +%s; TZ=UTC date; TZ=Asia/Tokyo date; TZ=America/New_York date; date +%s
-1791859320
-Tue Oct 13 02:42:00 UTC 2026
-Tue Oct 13 11:42:00 JST 2026
-Mon Oct 12 22:42:00 EDT 2026
-1791859320
+1791887557
+Tue Oct 13 10:32:37 UTC 2026
+Tue Oct 13 19:32:37 JST 2026
+Tue Oct 13 06:32:37 EDT 2026
+1791887557
 
 $ date -d @0
 Thu Jan  1 09:00:00 JST 1970
@@ -136,10 +178,10 @@ $ TZ=UTC date -d @0
 Thu Jan  1 00:00:00 UTC 1970
 
 $ date '+%Y-%m-%d %H:%M:%S %Z %z'
-2026-10-13 11:42:00 JST +0900
+2026-10-13 19:32:37 JST +0900
 
 $ ls -l /etc/localtime
-lrwxrwxrwx 1 root root 30 Oct 13 11:42 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
+lrwxrwxrwx 1 root root 30 Oct 13 19:32 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
 
 $ ls /usr/share/zoneinfo | head -20
 Africa
@@ -171,6 +213,12 @@ $ timedatectl list-timezones | grep -c .
 
 $ timedatectl list-timezones | grep Tokyo
 Asia/Tokyo
+
+$ printf '7\n7\n1\n' | tzselect 2>/dev/null
+Europe/London
+
+$ readlink /etc/localtime
+/usr/share/zoneinfo/Asia/Tokyo
 
 
 ========== 第3章 時刻合わせは、基準を渡されるまで始まらない（1.09.1） ==========
@@ -261,20 +309,20 @@ $ chronyc sources -v
 ||                                 |    |           \
 MS Name/IP address         Stratum Poll Reach LastRx Last sample               
 ===============================================================================
-^* localhost                     8   6    17     2    +18us[  +18us] +/-   22us
+^* localhost                     8   6    17     2   +161ns[ +411ns] +/- 5001ns
 
 $ chronyc tracking
 Reference ID    : 7F000001 (localhost)
 Stratum         : 9
-Ref time (UTC)  : Tue Oct 13 02:42:05 2026
-System time     : 0.000003198 seconds fast of NTP time
-Last offset     : +0.000000066 seconds
-RMS offset      : 0.000000066 seconds
-Frequency       : 0.092 ppm slow
-Residual freq   : -0.000 ppm
-Skew            : 18.112 ppm
-Root delay      : 0.000044635 seconds
-Root dispersion : 0.000046090 seconds
+Ref time (UTC)  : Tue Oct 13 10:32:43 2026
+System time     : 0.000002806 seconds fast of NTP time
+Last offset     : +0.000000250 seconds
+RMS offset      : 0.000000250 seconds
+Frequency       : 0.160 ppm slow
+Residual freq   : +0.000 ppm
+Skew            : 1.784 ppm
+Root delay      : 0.000009934 seconds
+Root dispersion : 0.000006165 seconds
 Update interval : 2.0 seconds
 Leap status     : Normal
 
@@ -284,7 +332,7 @@ System clock synchronized: yes
           RTC in local TZ: no
 
 $ ntpdate -q 127.0.0.1
-2026-10-13 11:42:08.208499 (+0900) -0.000004 +/- 0.000067 127.0.0.1 s8 no-leap
+2026-10-13 19:32:45.366912 (+0900) +0.000005 +/- 0.000047 127.0.0.1 s8 no-leap
 
 $ chronyc makestep
 500 Failure
@@ -297,13 +345,13 @@ $ cat /etc/default/chrony
 DAEMON_OPTS="-F -1 -x"
 
 $ tail -3 /var/log/syslog
-2026-10-13T02:42:00.165109+00:00 linuc systemd[1]: Started chrony.service - chrony, an NTP client/server.
-2026-10-13T02:42:04.442509+00:00 linuc chronyd[413]: Selected source 127.0.0.1
-2026-10-13T02:42:08.216251+00:00 linuc chronyd[413]: Could not step system clock
+2026-10-13T10:32:37.323976+00:00 linuc systemd[1]: Started chrony.service - chrony, an NTP client/server.
+2026-10-13T10:32:41.568585+00:00 linuc chronyd[461]: Selected source 127.0.0.1
+2026-10-13T10:32:45.374576+00:00 linuc chronyd[461]: Could not step system clock
 
 $ journalctl --no-pager -u chrony | grep "control of system clock"
-Oct 13 11:41:58 linuc chronyd[98]: Disabled control of system clock
-Oct 13 11:42:00 linuc chronyd[413]: Disabled control of system clock
+Oct 13 19:32:35 linuc chronyd[93]: Disabled control of system clock
+Oct 13 19:32:37 linuc chronyd[461]: Disabled control of system clock
 
 $ apt-cache show chrony | grep -E '^(Provides|Conflicts):'
 Provides: time-daemon
@@ -322,7 +370,7 @@ Get:6 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates/universe
 Get:7 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates/main amd64 Packages [1633 kB]
 Get:8 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security/main amd64 Packages [1310 kB]
 Get:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security/universe amd64 Packages [1542 kB]
-Fetched 28.3 MB in 7s (4347 kB/s)
+Fetched 28.3 MB in 10s (2875 kB/s)
 Reading package lists...
 
 $ apt-cache show ntpsec | grep -E '^(Provides|Conflicts):'
@@ -335,14 +383,14 @@ Conflicts: time-daemon
 $ logger "はじめての logger"
 
 $ tail -3 /var/log/syslog
-2026-10-13T02:42:04.442509+00:00 linuc chronyd[413]: Selected source 127.0.0.1
-2026-10-13T02:42:08.216251+00:00 linuc chronyd[413]: Could not step system clock
-2026-10-13T02:42:16.335989+00:00 linuc root: はじめての logger
+2026-10-13T10:32:41.568585+00:00 linuc chronyd[461]: Selected source 127.0.0.1
+2026-10-13T10:32:45.374576+00:00 linuc chronyd[461]: Could not step system clock
+2026-10-13T10:32:56.837537+00:00 linuc root: はじめての logger
 
 $ logger -p local3.info "local3 に投げる"
 
 $ grep local3 /var/log/syslog
-2026-10-13T02:42:17.346742+00:00 linuc root: local3 に投げる
+2026-10-13T10:32:57.842854+00:00 linuc root: local3 に投げる
 
 $ grep IncludeConfig /etc/rsyslog.conf
 $IncludeConfig /etc/rsyslog.d/*.conf
@@ -372,8 +420,8 @@ $ logger -p local4.warning "warning だから入る"
 $ logger -p local4.err     "err だから入る"
 
 $ cat /var/log/lab-warn.log
-2026-10-13T11:42:19.416733+09:00 linuc root: warning だから入る
-2026-10-13T11:42:19.418365+09:00 linuc root: err だから入る
+2026-10-13T19:32:59.926153+09:00 linuc root: warning だから入る
+2026-10-13T19:32:59.927897+09:00 linuc root: err だから入る
 
 $ echo 'local5.=notice  /var/log/lab-notice.log' > /etc/rsyslog.d/62-lab.conf
 
@@ -384,7 +432,23 @@ $ logger -p local5.notice "notice"
 $ logger -p local5.err    "err"
 
 $ cat /var/log/lab-notice.log
-2026-10-13T11:42:21.472220+09:00 linuc root: notice
+2026-10-13T19:33:01.986652+09:00 linuc root: notice
+
+$ logger --help | grep -- --priority
+ -p, --priority <prio>    mark given message with this priority
+
+$ logger -p local4.4 "数字の 4 は warning"
+
+$ logger -p local4.6 "数字の 6 は info"
+
+$ grep "数字の" /var/log/lab-warn.log
+2026-10-13T19:33:02.998523+09:00 linuc root: 数字の 4 は warning
+
+$ logger -p local0 "priority を省くと"
+logger: unknown priority name: local0
+
+$ echo $?
+1
 
 $ echo 'local3.*  /var/log/lab-app.log' > /etc/rsyslog.d/60-lab.conf
 
@@ -393,10 +457,10 @@ $ systemctl restart rsyslog
 $ logger -p local3.info "受け皿ができた後"
 
 $ cat /var/log/lab-app.log
-2026-10-13T11:42:23.529517+09:00 linuc root: 受け皿ができた後
+2026-10-13T19:33:05.063387+09:00 linuc root: 受け皿ができた後
 
 $ grep "受け皿ができた後" /var/log/syslog
-2026-10-13T11:42:23.529517+09:00 linuc root: 受け皿ができた後
+2026-10-13T19:33:05.063387+09:00 linuc root: 受け皿ができた後
 
 $ grep -n -E 'imudp|imtcp' /etc/rsyslog.conf
 17:#module(load="imudp")
@@ -427,8 +491,8 @@ $ logger -n 127.0.0.1 -P 514 -d "UDP で届いた"
 $ logger -n 127.0.0.1 -P 514 -T "TCP で届いた"
 
 $ grep "で届いた" /var/log/syslog
-2026-10-13T11:42:25.611155+09:00 linuc root UDP で届いた
-2026-10-13T11:42:25.612490+09:00 linuc root TCP で届いた
+2026-10-13T19:33:07.146429+09:00 linuc root UDP で届いた
+2026-10-13T19:33:07.149622+09:00 linuc root TCP で届いた
 
 $ journalctl | grep -c "で届いた"
 0
@@ -436,7 +500,7 @@ $ journalctl | grep -c "で届いた"
 $ logger -p local3.err -t myapp "タグも付けられる"
 
 $ tail -1 /var/log/lab-app.log
-2026-10-13T11:42:26.621744+09:00 linuc myapp: タグも付けられる
+2026-10-13T19:33:08.158582+09:00 linuc myapp: タグも付けられる
 
 
 ========== 第5章 journald は隣にある別の箱（1.09.2） ==========
@@ -453,7 +517,7 @@ $ journalctl --disk-usage
 Archived and active journals take up 8.0M in the file system.
 
 $ journalctl --no-pager -t myapp -o verbose
-Tue 2026-10-13 11:42:26.621586 JST [s=7862faf881244922895fff133ab494fc;i=b6;b=e5d039e944a940f79a88cd842c8332fd;m=1f2700944f;t=65dafc3d7c4d9;x=70a9b30e12212940]
+Tue 2026-10-13 19:33:08.158105 JST [s=00e6d3df1d71404f8546b7d1024e21bb;i=b9;b=e5d039e944a940f79a88cd842c8332fd;m=25ba543aa1;t=65db6572b6b2a;x=f76f75d534fe2125]
     _UID=0
     _GID=0
     _BOOT_ID=e5d039e944a940f79a88cd842c8332fd
@@ -464,13 +528,13 @@ Tue 2026-10-13 11:42:26.621586 JST [s=7862faf881244922895fff133ab494fc;i=b6;b=e5
     PRIORITY=3
     SYSLOG_FACILITY=19
     SYSLOG_IDENTIFIER=myapp
-    SYSLOG_TIMESTAMP=Oct 13 11:42:26 
+    SYSLOG_TIMESTAMP=Oct 13 19:33:08 
     MESSAGE=タグも付けられる
-    _PID=664
-    _SOURCE_REALTIME_TIMESTAMP=1791859346621586
+    _PID=725
+    _SOURCE_REALTIME_TIMESTAMP=1791887588158105
 
 $ ls -l /dev/log
-lrwxrwxrwx 1 root root 28 Oct 13 11:41 /dev/log -> /run/systemd/journal/dev-log
+lrwxrwxrwx 1 root root 28 Oct 13 19:32 /dev/log -> /run/systemd/journal/dev-log
 
 $ cat /usr/lib/systemd/journald.conf.d/syslog.conf
 # Undo upstream commit 46b131574fdd7d77 for now. For details see
@@ -524,12 +588,12 @@ $ printf '[Journal]\nSystemMaxUse=8M\n' > /etc/systemd/journald.conf.d/10-lab.co
 $ systemctl restart systemd-journald
 
 $ journalctl -t systemd-journald --no-pager | tail -1
-Oct 13 11:42:32 linuc systemd-journald[728]: System Journal (/var/log/journal/f5295b64ae1a49b9a1af1c892764514b) is 8.0M, max 8.0M, 0B free.
+Oct 13 19:33:14 linuc systemd-journald[789]: System Journal (/var/log/journal/f5295b64ae1a49b9a1af1c892764514b) is 8.0M, max 8.0M, 0B free.
 
 $ journalctl --vacuum-size=1M
 Vacuuming done, freed 0B of archived journals from /var/log/journal.
-Vacuuming done, freed 0B of archived journals from /run/log/journal.
 Vacuuming done, freed 0B of archived journals from /var/log/journal/f5295b64ae1a49b9a1af1c892764514b.
+Vacuuming done, freed 0B of archived journals from /run/log/journal.
 
 $ journalctl --vacuum-time=2d
 Vacuuming done, freed 0B of archived journals from /var/log/journal.
@@ -537,18 +601,18 @@ Vacuuming done, freed 0B of archived journals from /var/log/journal/f5295b64ae1a
 Vacuuming done, freed 0B of archived journals from /run/log/journal.
 
 $ journalctl --no-pager -u rsyslog -n 3
-Oct 13 11:42:24 linuc rsyslogd[636]: rsyslogd's groupid changed to 102
-Oct 13 11:42:24 linuc rsyslogd[636]: rsyslogd's userid changed to 101
-Oct 13 11:42:24 linuc rsyslogd[636]: [origin software="rsyslogd" swVersion="8.2312.0" x-pid="636" x-info="https://www.rsyslog.com"] start
+Oct 13 19:33:06 linuc rsyslogd[698]: rsyslogd's userid changed to 101
+Oct 13 19:33:06 linuc rsyslogd[698]: [origin software="rsyslogd" swVersion="8.2312.0" x-pid="698" x-info="https://www.rsyslog.com"] start
+Oct 13 19:33:06 linuc systemd[1]: Started rsyslog.service - System Logging Service.
 
 $ journalctl --no-pager -p err -n 3
-Oct 13 11:42:24 linuc rsyslogd[636]: imklog: cannot open kernel log (/proc/kmsg): Operation not permitted.
-Oct 13 11:42:24 linuc rsyslogd[636]: activation of module imklog failed [v8.2312.0 try https://www.rsyslog.com/e/2145 ]
-Oct 13 11:42:26 linuc myapp[664]: タグも付けられる
+Oct 13 19:33:06 linuc rsyslogd[698]: imklog: cannot open kernel log (/proc/kmsg): Operation not permitted.
+Oct 13 19:33:06 linuc rsyslogd[698]: activation of module imklog failed [v8.2312.0 try https://www.rsyslog.com/e/2145 ]
+Oct 13 19:33:08 linuc myapp[725]: タグも付けられる
 
 $ journalctl --list-boots
 IDX BOOT ID                          FIRST ENTRY                 LAST ENTRY
-  0 e5d039e944a940f79a88cd842c8332fd Tue 2026-10-13 11:41:58 JST Tue 2026-10-13 11:42:32 JST
+  0 e5d039e944a940f79a88cd842c8332fd Tue 2026-10-13 19:32:35 JST Tue 2026-10-13 19:33:14 JST
 
 $ cat /proc/sys/kernel/random/boot_id
 e5d039e9-44a9-40f7-9a88-cd842c8332fd
@@ -556,10 +620,10 @@ e5d039e9-44a9-40f7-9a88-cd842c8332fd
 $ systemd-cat -t lab-cat echo "systemd-cat から1行"
 
 $ journalctl --no-pager -t lab-cat
-Oct 13 11:42:33 linuc lab-cat[746]: systemd-cat から1行
+Oct 13 19:33:15 linuc lab-cat[808]: systemd-cat から1行
 
 $ journalctl --no-pager -t lab-cat -o verbose
-Tue 2026-10-13 11:42:33.839485 JST [s=7862faf881244922895fff133ab494fc;i=c3;b=e5d039e944a940f79a88cd842c8332fd;m=1f276eb6f3;t=65dafc445e77d;x=1df38eae81e1ecbd]
+Tue 2026-10-13 19:33:15.368730 JST [s=00e6d3df1d71404f8546b7d1024e21bb;i=c7;b=e5d039e944a940f79a88cd842c8332fd;m=25bac24090;t=65db65799711a;x=3b110a6381ea4c9d]
     PRIORITY=6
     _UID=0
     _GID=0
@@ -567,11 +631,16 @@ Tue 2026-10-13 11:42:33.839485 JST [s=7862faf881244922895fff133ab494fc;i=c3;b=e5
     _MACHINE_ID=f5295b64ae1a49b9a1af1c892764514b
     _HOSTNAME=linuc
     _RUNTIME_SCOPE=system
+    _CAP_EFFECTIVE=a82425fb
+    _SYSTEMD_CGROUP=/init.scope
+    _SYSTEMD_UNIT=init.scope
+    _SYSTEMD_SLICE=-.slice
     _TRANSPORT=stdout
-    _STREAM_ID=93a8b21478fc4b57841463e8ffa82c56
+    _STREAM_ID=7002f333d822455abab22c75bcf59a4b
     SYSLOG_IDENTIFIER=lab-cat
     MESSAGE=systemd-cat から1行
-    _PID=746
+    _PID=808
+    _COMM=echo
 
 
 ========== 第6章 捨てる判断も、受け手側にある（1.09.2） ==========
@@ -631,7 +700,7 @@ $ chmod 644 /etc/logrotate.d/lab-app
 $ for i in $(seq 1 60); do logger -p local3.info "かさ増し $i"; done
 
 $ ls -l /var/log/lab-app.log
--rw-r----- 1 syslog adm 3914 Oct 13 11:42 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 3914 Oct 13 19:33 /var/log/lab-app.log
 
 $ logrotate -v /etc/logrotate.d/lab-app
 reading config file /etc/logrotate.d/lab-app
@@ -650,7 +719,7 @@ $ echo $?
 1
 
 $ ls -ld /var/log
-drwxrwxr-x 1 root syslog 4096 Oct 13 11:42 /var/log
+drwxrwxr-x 1 root syslog 4096 Oct 13 19:33 /var/log
 
 $ grep -n su /etc/logrotate.conf
 10:su root adm
@@ -675,69 +744,69 @@ Handling 9 logs
 
 rotating pattern: /var/log/alternatives.log  monthly (12 rotations)
 empty log files are not rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 838)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 902)
 considering log /var/log/alternatives.log
 Creating new state
-  Now: 2026-10-13 11:42
-  Last rotated at 2026-10-13 11:00
+  Now: 2026-10-13 19:33
+  Last rotated at 2026-10-13 19:00
   log does not need rotating (log has already been rotated)
-switching euid from 0 to 0 and egid from 4 to 0 (pid 838)
+switching euid from 0 to 0 and egid from 4 to 0 (pid 902)
 
 rotating pattern: /var/log/apt/term.log  monthly (12 rotations)
 empty log files are not rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 838)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 902)
 considering log /var/log/apt/term.log
 Creating new state
-  Now: 2026-10-13 11:42
-  Last rotated at 2026-10-13 11:00
+  Now: 2026-10-13 19:33
+  Last rotated at 2026-10-13 19:00
   log does not need rotating (log has already been rotated)
-switching euid from 0 to 0 and egid from 4 to 0 (pid 838)
+switching euid from 0 to 0 and egid from 4 to 0 (pid 902)
 
 rotating pattern: /var/log/apt/history.log  monthly (12 rotations)
 empty log files are not rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 838)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 902)
 considering log /var/log/apt/history.log
 Creating new state
-  Now: 2026-10-13 11:42
-  Last rotated at 2026-10-13 11:00
+  Now: 2026-10-13 19:33
+  Last rotated at 2026-10-13 19:00
   log does not need rotating (log has already been rotated)
-switching euid from 0 to 0 and egid from 4 to 0 (pid 838)
+switching euid from 0 to 0 and egid from 4 to 0 (pid 902)
 
 rotating pattern: /var/log/btmp  monthly (1 rotations)
 empty log files are rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 838)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 902)
 considering log /var/log/btmp
 Creating new state
-  Now: 2026-10-13 11:42
-  Last rotated at 2026-10-13 11:00
+  Now: 2026-10-13 19:33
+  Last rotated at 2026-10-13 19:00
   log does not need rotating (log has already been rotated)
-switching euid from 0 to 0 and egid from 4 to 0 (pid 838)
+switching euid from 0 to 0 and egid from 4 to 0 (pid 902)
 
 rotating pattern: /var/log/chrony/*.log  weekly (4 rotations)
 empty log files are rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 838)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 902)
 considering log /var/log/chrony/*.log
   log /var/log/chrony/*.log does not exist -- skipping
 Creating new state
 not running postrotate script, since no logs were rotated
-switching euid from 0 to 0 and egid from 4 to 0 (pid 838)
+switching euid from 0 to 0 and egid from 4 to 0 (pid 902)
 
 rotating pattern: /var/log/dpkg.log  monthly (12 rotations)
 empty log files are not rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 838)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 902)
 considering log /var/log/dpkg.log
 Creating new state
-  Now: 2026-10-13 11:42
-  Last rotated at 2026-10-13 11:00
+  Now: 2026-10-13 19:33
+  Last rotated at 2026-10-13 19:00
   log does not need rotating (log has already been rotated)
-switching euid from 0 to 0 and egid from 4 to 0 (pid 838)
+switching euid from 0 to 0 and egid from 4 to 0 (pid 902)
 
 rotating pattern: /var/log/lab-app.log  1024 bytes (3 rotations)
 empty log files are rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 838)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 902)
 considering log /var/log/lab-app.log
-  Now: 2026-10-13 11:42
-  Last rotated at 2026-10-13 11:00
+  Now: 2026-10-13 19:33
+  Last rotated at 2026-10-13 19:00
   log needs rotating
 rotating log /var/log/lab-app.log, log->rotateCount is 3
 dateext suffix '-20261013'
@@ -752,8 +821,8 @@ log /var/log/lab-app.log.4.gz doesn't exist -- won't try to dispose of it
 renaming /var/log/lab-app.log to /var/log/lab-app.log.1
 creating new /var/log/lab-app.log mode = 0640 uid = 101 gid = 4
 compressing log with: /bin/gzip
-switching uid to 0 and gid to 4 permanently (pid 839)
-switching euid from 0 to 0 and egid from 4 to 0 (pid 838)
+switching uid to 0 and gid to 4 permanently (pid 903)
+switching euid from 0 to 0 and egid from 4 to 0 (pid 902)
 
 rotating pattern: /var/log/syslog
 /var/log/mail.log
@@ -763,25 +832,23 @@ rotating pattern: /var/log/syslog
 /var/log/cron.log
  weekly (4 rotations)
 empty log files are not rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 838)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 902)
 considering log /var/log/syslog
 Creating new state
-  Now: 2026-10-13 11:42
-  Last rotated at 2026-10-13 11:00
+  Now: 2026-10-13 19:33
+  Last rotated at 2026-10-13 19:00
   log does not need rotating (log has already been rotated)
 considering log /var/log/mail.log
 Creating new state
-  Now: 2026-10-13 11:42
-  Last rotated at 2026-10-13 11:00
+  Now: 2026-10-13 19:33
+  Last rotated at 2026-10-13 19:00
   log does not need rotating (log has already been rotated)
 considering log /var/log/kern.log
   log /var/log/kern.log does not exist -- skipping
 Creating new state
 considering log /var/log/auth.log
+  log /var/log/auth.log does not exist -- skipping
 Creating new state
-  Now: 2026-10-13 11:42
-  Last rotated at 2026-10-13 11:00
-  log does not need rotating (log has already been rotated)
 considering log /var/log/user.log
   log /var/log/user.log does not exist -- skipping
 Creating new state
@@ -789,38 +856,38 @@ considering log /var/log/cron.log
   log /var/log/cron.log does not exist -- skipping
 Creating new state
 not running postrotate script, since no logs were rotated
-switching euid from 0 to 0 and egid from 4 to 0 (pid 838)
+switching euid from 0 to 0 and egid from 4 to 0 (pid 902)
 
 rotating pattern: /var/log/wtmp  monthly (1 rotations)
 empty log files are rotated, only log files >= 1048576 bytes are rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 838)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 902)
 considering log /var/log/wtmp
 Creating new state
-  Now: 2026-10-13 11:42
-  Last rotated at 2026-10-13 11:00
+  Now: 2026-10-13 19:33
+  Last rotated at 2026-10-13 19:00
   log does not need rotating (log has already been rotated)
-switching euid from 0 to 0 and egid from 4 to 0 (pid 838)
+switching euid from 0 to 0 and egid from 4 to 0 (pid 902)
 
 $ ls -l /var/log/lab-app.log*
--rw-r----- 1 syslog adm   0 Oct 13 11:42 /var/log/lab-app.log
--rw-r----- 1 syslog adm 621 Oct 13 11:42 /var/log/lab-app.log.1.gz
+-rw-r----- 1 syslog adm   0 Oct 13 19:33 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 608 Oct 13 19:33 /var/log/lab-app.log.1.gz
 
 $ cat /var/lib/logrotate/status
 logrotate state -- version 2
-"/var/log/syslog" 2026-10-13-11:0:0
-"/var/log/dpkg.log" 2026-10-13-11:0:0
-"/var/log/auth.log" 2026-10-13-11:0:0
-"/var/log/apt/term.log" 2026-10-13-11:0:0
-"/var/log/lab-app.log" 2026-10-13-11:42:36
-"/var/log/apt/history.log" 2026-10-13-11:0:0
-"/var/log/alternatives.log" 2026-10-13-11:0:0
-"/var/log/mail.log" 2026-10-13-11:0:0
-"/var/log/kern.log" 2026-10-13-11:0:0
-"/var/log/wtmp" 2026-10-13-11:0:0
-"/var/log/chrony/*.log" 2026-10-13-11:0:0
-"/var/log/btmp" 2026-10-13-11:0:0
-"/var/log/user.log" 2026-10-13-11:0:0
-"/var/log/cron.log" 2026-10-13-11:0:0
+"/var/log/syslog" 2026-10-13-19:0:0
+"/var/log/dpkg.log" 2026-10-13-19:0:0
+"/var/log/auth.log" 2026-10-13-19:0:0
+"/var/log/apt/term.log" 2026-10-13-19:0:0
+"/var/log/lab-app.log" 2026-10-13-19:33:18
+"/var/log/apt/history.log" 2026-10-13-19:0:0
+"/var/log/alternatives.log" 2026-10-13-19:0:0
+"/var/log/mail.log" 2026-10-13-19:0:0
+"/var/log/kern.log" 2026-10-13-19:0:0
+"/var/log/wtmp" 2026-10-13-19:0:0
+"/var/log/chrony/*.log" 2026-10-13-19:0:0
+"/var/log/btmp" 2026-10-13-19:0:0
+"/var/log/user.log" 2026-10-13-19:0:0
+"/var/log/cron.log" 2026-10-13-19:0:0
 
 $ logrotate -f /etc/logrotate.conf
 
@@ -830,14 +897,14 @@ $ for r in 1 2 3 4; do
 > done
 
 $ ls -l /var/log/lab-app.log*
--rw-r----- 1 syslog adm   0 Oct 13 11:42 /var/log/lab-app.log
--rw-r----- 1 syslog adm 473 Oct 13 11:42 /var/log/lab-app.log.1.gz
--rw-r----- 1 syslog adm 486 Oct 13 11:42 /var/log/lab-app.log.2.gz
--rw-r----- 1 syslog adm 481 Oct 13 11:42 /var/log/lab-app.log.3.gz
+-rw-r----- 1 syslog adm   0 Oct 13 19:33 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 471 Oct 13 19:33 /var/log/lab-app.log.1.gz
+-rw-r----- 1 syslog adm 460 Oct 13 19:33 /var/log/lab-app.log.2.gz
+-rw-r----- 1 syslog adm 476 Oct 13 19:33 /var/log/lab-app.log.3.gz
 
 $ systemctl list-timers logrotate.timer --no-pager
-NEXT                        LEFT LAST PASSED UNIT            ACTIVATES
-Wed 2026-10-14 00:00:00 JST  12h -         - logrotate.timer logrotate.service
+NEXT                            LEFT LAST PASSED UNIT            ACTIVATES
+Wed 2026-10-14 00:00:00 JST 4h 26min -         - logrotate.timer logrotate.service
 
 1 timers listed.
 Pass --all to see loaded but inactive timers, too.
@@ -856,6 +923,38 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 
+$ grep -n -B1 -E '^#?(create|dateext)$' /etc/logrotate.conf
+15-# create new (empty) log files after rotating old ones
+16:create
+--
+18-# use date as a suffix of the rotated file
+19:#dateext
+
+$ echo "練習の1行" > /root/work/demo.log
+
+$ printf '/root/work/demo.log {\n    rotate 3\n    dateext\n}\n' > /root/work/demo.conf
+
+$ chmod 644 /root/work/demo.conf
+
+$ logrotate -f /root/work/demo.conf
+
+$ ls /root/work/demo*
+/root/work/demo.conf
+/root/work/demo.log-20261013
+
+$ logrotate -f /root/work/demo.conf
+error: stat of /root/work/demo.log failed: No such file or directory
+
+$ echo $?
+1
+
+$ printf '/root/work/demo.log {\n    rotate 3\n    dateext\n    missingok\n}\n' > /root/work/demo.conf
+
+$ logrotate -f /root/work/demo.conf
+
+$ echo $?
+0
+
 
 ========== 第7章 宛先に書いた名前は、希望にすぎない（1.09.3） ==========
 
@@ -863,22 +962,22 @@ $ echo "本文です" | mail -s "最初の1通" alice
 
 $ ls -l /var/mail/
 total 4
--rw------- 1 alice mail 505 Oct 13 11:42 alice
+-rw------- 1 alice mail 505 Oct 13 19:33 alice
 
 $ cat /var/mail/alice
-From root@lab.local  Tue Oct 13 11:42:40 2026
+From root@lab.local  Tue Oct 13 19:33:21 2026
 Return-Path: <root@lab.local>
 X-Original-To: alice
 Delivered-To: alice@lab.local
 Received: by lab.local (Postfix, from userid 0)
-	id 551C11185251; Tue, 13 Oct 2026 02:42:40 +0000 (UTC)
+	id DB59B1184D50; Tue, 13 Oct 2026 10:33:21 +0000 (UTC)
 To: alice@lab.local
 Subject: 最初の1通
 MIME-Version: 1.0
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: 8bit
-Message-Id: <20261013024240.551C11185251@lab.local>
-Date: Tue, 13 Oct 2026 02:42:40 +0000 (UTC)
+Message-Id: <20261013103321.DB59B1184D50@lab.local>
+Date: Tue, 13 Oct 2026 10:33:21 +0000 (UTC)
 From: root <root@lab.local>
 
 本文です
@@ -901,30 +1000,30 @@ $ echo "曲がったか" | mail -s "aliases 経由" alice
 
 $ ls -l /var/mail/
 total 4
--rw------- 1 alice mail 1014 Oct 13 11:42 alice
+-rw------- 1 alice mail 1014 Oct 13 19:33 alice
 
 $ ls -l /etc/aliases /etc/aliases.db
--rw-r--r-- 1 root root    28 Oct 13 11:42 /etc/aliases
+-rw-r--r-- 1 root root    28 Oct 13 19:33 /etc/aliases
 -rw-r--r-- 1 root root 12288 Oct 12 21:58 /etc/aliases.db
 
 $ newaliases
 
 $ ls -l /etc/aliases.db
--rw-r--r-- 1 root root 12288 Oct 13 11:42 /etc/aliases.db
+-rw-r--r-- 1 root root 12288 Oct 13 19:33 /etc/aliases.db
 
 $ echo "曲がったか" | mail -s "aliases 経由" alice
 
 $ ls -l /var/mail/
 total 8
--rw------- 1 alice mail 1014 Oct 13 11:42 alice
--rw------- 1 bob   mail  509 Oct 13 11:42 bob
+-rw------- 1 alice mail 1014 Oct 13 19:33 alice
+-rw------- 1 bob   mail  509 Oct 13 19:33 bob
 
 $ printf 'root\n' > /home/bob/.forward
 
 $ chown bob:bob /home/bob/.forward
 
 $ ls -l /home/bob/.forward
--rw-rw-rw- 1 bob bob 5 Oct 13 11:42 /home/bob/.forward
+-rw-rw-rw- 1 bob bob 5 Oct 13 19:33 /home/bob/.forward
 
 $ echo "2回曲がる" | mail -s "forward 経由" alice
 
@@ -935,12 +1034,12 @@ $ grep -c "2回曲がる" /var/mail/bob
 1
 
 $ journalctl -t postfix/local --no-pager | tail -3
-Oct 13 11:42:46 linuc postfix/local[1174]: 64C54118527A: to=<bob@lab.local>, orig_to=<alice>, relay=local, delay=0.01, delays=0.01/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
-Oct 13 11:42:49 linuc postfix/local[1174]: warning: file /home/bob/.forward is world writable
-Oct 13 11:42:49 linuc postfix/local[1174]: 69F111185294: to=<bob@lab.local>, orig_to=<alice>, relay=local, delay=0.01, delays=0.01/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+Oct 13 19:33:27 linuc postfix/local[1252]: EC5871184D57: to=<bob@lab.local>, orig_to=<alice>, relay=local, delay=0.01, delays=0.01/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+Oct 13 19:33:30 linuc postfix/local[1252]: warning: file /home/bob/.forward is world writable
+Oct 13 19:33:30 linuc postfix/local[1252]: F26C11184D5B: to=<bob@lab.local>, orig_to=<alice>, relay=local, delay=0.02, delays=0.01/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
 
 $ grep "world writable" /var/log/mail.log
-2026-10-13T11:42:49.437000+09:00 linuc postfix/local[1174]: warning: file /home/bob/.forward is world writable
+2026-10-13T19:33:30.997261+09:00 linuc postfix/local[1252]: warning: file /home/bob/.forward is world writable
 
 $ chmod 644 /home/bob/.forward
 
@@ -950,8 +1049,8 @@ $ grep -c "2回曲がる" /var/mail/root
 1
 
 $ journalctl -t postfix/local --no-pager -n 2
-Oct 13 11:42:52 linuc postfix/local[1174]: 7100411853C1: to=<alice@lab.local>, orig_to=<alice>, relay=local, delay=0.02, delays=0.01/0/0/0, dsn=2.0.0, status=sent (forwarded as 71EF11185324)
-Oct 13 11:42:52 linuc postfix/local[1174]: 71EF11185324: to=<root@lab.local>, orig_to=<alice>, relay=local, delay=0.01, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+Oct 13 19:33:34 linuc postfix/local[1252]: 057041184D5B: to=<alice@lab.local>, orig_to=<alice>, relay=local, delay=0.02, delays=0.02/0/0/0, dsn=2.0.0, status=sent (forwarded as 0661B1184D59)
+Oct 13 19:33:34 linuc postfix/local[1252]: 0661B1184D59: to=<root@lab.local>, orig_to=<alice>, relay=local, delay=0.01, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
 
 $ grep -E '^(X-Original-To|Delivered-To):' /var/mail/root
 X-Original-To: alice
@@ -967,15 +1066,28 @@ $ postqueue -p
 Mail queue is empty
 
 $ journalctl -t postfix/smtp -t postfix/bounce -t postfix/local --no-pager -n 3
-Oct 13 11:42:55 linuc postfix/smtp[1217]: 7720D1180793: to=<nosuchuser@invalid.example>, relay=none, delay=0.03, delays=0.01/0/0.01/0, dsn=5.4.4, status=bounced (Host or domain name not found. Name service error for name=invalid.example type=A: Host not found)
-Oct 13 11:42:55 linuc postfix/bounce[1218]: 7720D1180793: sender non-delivery notification: 7D3641180A20
-Oct 13 11:42:55 linuc postfix/local[1174]: 7D3641180A20: to=<root@lab.local>, relay=local, delay=0.01, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
+Oct 13 19:33:37 linuc postfix/smtp[1295]: 0A80C1184D5C: to=<nosuchuser@invalid.example>, relay=none, delay=0.02, delays=0.01/0/0.01/0, dsn=5.4.4, status=bounced (Host or domain name not found. Name service error for name=invalid.example type=A: Host not found)
+Oct 13 19:33:37 linuc postfix/bounce[1296]: 0A80C1184D5C: sender non-delivery notification: 102E41184D60
+Oct 13 19:33:37 linuc postfix/local[1252]: 102E41184D60: to=<root@lab.local>, relay=local, delay=0.01, delays=0/0/0/0, dsn=2.0.0, status=sent (delivered to mailbox)
 
 $ ls -l /var/mail/root
--rw------- 1 root mail 3088 Oct 13 11:42 /var/mail/root
+-rw------- 1 root mail 3088 Oct 13 19:33 /var/mail/root
 
 $ head -1 /etc/aliases
 postmaster: root
+
+$ dpkg -s postfix | grep -E '^(Provides|Conflicts):'
+Provides: default-mta, mail-transport-agent
+Conflicts: mail-transport-agent, smail
+
+$ apt-cache show --no-all-versions exim4-daemon-light | grep -E '^(Provides|Conflicts):'
+Provides: exim4-localscanapi-6.0, mail-transport-agent
+Conflicts: mail-transport-agent
+
+$ ls -l /usr/sbin/sendmail /usr/bin/mailq /usr/bin/newaliases
+lrwxrwxrwx 1 root root    16 May  6 00:47 /usr/bin/mailq -> ../sbin/sendmail
+lrwxrwxrwx 1 root root    16 May  6 00:47 /usr/bin/newaliases -> ../sbin/sendmail
+-rwxr-xr-x 1 root root 31184 May  6 00:47 /usr/sbin/sendmail
 
 
 ========== 裏取り（本文の地の文が言っていること。章の状態を乱さないよう最後にまとめて打つ） ==========
@@ -990,10 +1102,10 @@ $ dpkg -S /usr/sbin/ntpdate
 ntpsec-ntpdate: /usr/sbin/ntpdate
 
 $ chronyd -Q "server 127.0.0.1 iburst"
-2026-10-13T02:43:00Z chronyd version 4.5 starting (+CMDMON +NTP +REFCLOCK +RTC +PRIVDROP +SCFILTER +SIGND +ASYNCDNS +NTS +SECHASH +IPV6 -DEBUG)
-2026-10-13T02:43:00Z Disabled control of system clock
-2026-10-13T02:43:04Z System clock wrong by -0.000007 seconds (ignored)
-2026-10-13T02:43:04Z chronyd exiting
+2026-10-13T10:33:42Z chronyd version 4.5 starting (+CMDMON +NTP +REFCLOCK +RTC +PRIVDROP +SCFILTER +SIGND +ASYNCDNS +NTS +SECHASH +IPV6 -DEBUG)
+2026-10-13T10:33:42Z Disabled control of system clock
+2026-10-13T10:33:46Z System clock wrong by -0.000003 seconds (ignored)
+2026-10-13T10:33:46Z chronyd exiting
 
 $ man 8 chronyd 2>/dev/null | grep -A3 -E '^ +-[qQ]$'
        -q
@@ -1067,7 +1179,7 @@ $ ls /var/log/journal/*/
 system.journal
 
 $ journalctl -t myapp -o json | head -1
-{"_PID":"664","SYSLOG_TIMESTAMP":"Oct 13 11:42:26 ","_GID":"0","__MONOTONIC_TIMESTAMP":"133798335567","PRIORITY":"3","__REALTIME_TIMESTAMP":"1791859346621657","__SEQNUM":"182","_HOSTNAME":"linuc","_MACHINE_ID":"f5295b64ae1a49b9a1af1c892764514b","__SEQNUM_ID":"7862faf881244922895fff133ab494fc","_BOOT_ID":"e5d039e944a940f79a88cd842c8332fd","_RUNTIME_SCOPE":"system","_UID":"0","_TRANSPORT":"syslog","SYSLOG_FACILITY":"19","_SOURCE_REALTIME_TIMESTAMP":"1791859346621586","MESSAGE":"タグも付けられる","__CURSOR":"s=7862faf881244922895fff133ab494fc;i=b6;b=e5d039e944a940f79a88cd842c8332fd;m=1f2700944f;t=65dafc3d7c4d9;x=70a9b30e12212940","SYSLOG_IDENTIFIER":"myapp"}
+{"_RUNTIME_SCOPE":"system","_PID":"725","_GID":"0","_HOSTNAME":"linuc","__CURSOR":"s=00e6d3df1d71404f8546b7d1024e21bb;i=b9;b=e5d039e944a940f79a88cd842c8332fd;m=25ba543aa1;t=65db6572b6b2a;x=f76f75d534fe2125","_SOURCE_REALTIME_TIMESTAMP":"1791887588158105","__MONOTONIC_TIMESTAMP":"162039872161","_TRANSPORT":"syslog","_BOOT_ID":"e5d039e944a940f79a88cd842c8332fd","PRIORITY":"3","SYSLOG_IDENTIFIER":"myapp","__SEQNUM":"185","__REALTIME_TIMESTAMP":"1791887588158250","_MACHINE_ID":"f5295b64ae1a49b9a1af1c892764514b","_UID":"0","__SEQNUM_ID":"00e6d3df1d71404f8546b7d1024e21bb","MESSAGE":"タグも付けられる","SYSLOG_FACILITY":"19","SYSLOG_TIMESTAMP":"Oct 13 19:33:08 "}
 
 $ grep -E '^(From|To|Subject):' /var/mail/root
 To: alice@lab.local
@@ -1081,8 +1193,8 @@ Subject: 届かない宛先
 From: root <root@lab.local>
 
 $ ls -l /var/spool/postfix/etc/localtime /etc/localtime
-lrwxrwxrwx 1 root root  30 Oct 13 11:42 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
--rw-r--r-- 1 root root 114 Oct 13 11:41 /var/spool/postfix/etc/localtime
+lrwxrwxrwx 1 root root  30 Oct 13 19:32 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
+-rw-r--r-- 1 root root 114 Oct 13 19:32 /var/spool/postfix/etc/localtime
 
 
 ========== 完了 ==========

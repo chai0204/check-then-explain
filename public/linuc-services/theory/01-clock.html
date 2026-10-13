@@ -11,21 +11,21 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/">詳しく</a></p>
 </div>
 <h1>1. 時計は2つある</h1>
-<p class="lead">この檻で <code>hwclock</code> を打つと、時刻は1行も返らない。ところが <code>/proc/driver/rtc</code> には時刻が入っていて、しかも <code>date</code> が返す時刻と32秒ずれている。片方だけ見ていると気づかないが、1台のマシンの中で別々に進む時計が2つある。</p>
-<div class="badges"><span>前提: コマンドを打てる</span><span>前提: 檻が起動している</span><span>所要 12分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.1（重要度2）</span><span>最終検証 2026-10-13</span></div>
+<p class="lead">この檻で <code>hwclock</code> を打つと、時刻は1行も返らない。ところが <code>/proc/driver/rtc</code> には時刻が入っていて、しかも <code>date</code> が返す時刻と33秒ずれている。片方だけ見ていると気づかないが、1台のマシンの中で別々に進む時計が2つある。</p>
+<div class="badges"><span>前提: コマンドを打てる</span><span>前提: 檻が起動している</span><span>所要 17分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.1（重要度2）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>date</code> と <code>timedatectl</code> と <code>hwclock</code> が、それぞれ何を読んでいるかを区別して言える</li><li>ハードウェアクロック（RTC）とシステムクロックの役割を分けて説明できる</li><li>コンテナで <code>hwclock</code> が失敗する理由を、コマンドの有無ではなくデバイスの有無から説明できる</li></ul>
+<ul><li><code>date</code> と <code>timedatectl</code> と <code>hwclock</code> が、それぞれ何を読んでいるかを区別して言える</li><li>ハードウェアクロック（RTC）とシステムクロックの役割を分けて説明できる</li><li>コンテナで <code>hwclock</code> が失敗する理由を、コマンドの有無ではなくデバイスの有無から説明できる</li><li><code>date</code> で時刻を設定する書式（年は最後）と、<code>touch -t</code> の書式（年が先頭）を取り違えずに書ける</li><li><code>timedatectl</code> のサブコマンドを、無いもの（<code>set-clock</code>）と区別して挙げられる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: NTP による時刻合わせは第3章で扱う。うるう秒、<code>tzdata</code> の更新手順、<code>hwclock --systohc</code> で RTC に書き戻す操作はここでは扱わない（書き戻しには RTC デバイスが要るので、この檻では試せない。出る出力は後で示す）。<code>clock_gettime</code> の精度やクロックソースの選択も、合格に要らないので外す。</div></div>
 <h2 id="two">時計を2つ見つける</h2>
 <div class="sgoal"><b>この節で分かること</b>: 同じマシンの中に、別々に進む時計が2つあること。</div>
 <p>まず2つ並べて打つ。どちらも時刻を出すコマンドだが、出てくる内容が違う。</p>
 <pre><code>$ date
-Tue Oct 13 11:41:59 JST 2026
+Tue Oct 13 19:32:37 JST 2026
 $ date -u
-Tue Oct 13 02:41:59 UTC 2026
+Tue Oct 13 10:32:37 UTC 2026
 $ timedatectl
-               Local time: Tue 2026-10-13 02:42:00 UTC
-           Universal time: Tue 2026-10-13 02:42:00 UTC
+               Local time: Tue 2026-10-13 10:32:37 UTC
+           Universal time: Tue 2026-10-13 10:32:37 UTC
                  RTC time: n/a
                 Time zone: Etc/UTC (UTC, +0000)
 System clock synchronized: yes
@@ -48,7 +48,7 @@ hwclock: Use the --verbose option to see the details of our search for an access
 そして「読む先が無い」ことは「RTC が存在しない」ことと同じではない。次でそれを確かめる。</div></div>
 <p>RTC が本当に存在しないのかを、別の経路から見る。カーネルは <code>/proc</code> の下に、自分が把握しているデバイスの状態をテキストで出している。</p>
 <pre><code>$ cat /proc/driver/rtc
-rtc_time	: 02:41:27
+rtc_time	: 10:32:04
 rtc_date	: 2026-10-13
 alrm_time	: 13:32:01
 alrm_date	: 2026-10-11
@@ -60,10 +60,10 @@ periodic IRQ frequency	: 1
 max user IRQ frequency	: 64
 24hr		: yes</code></pre>
 <p>RTC は在る。時刻も入っている。ここで2つの数字を並べる。</p>
-<pre><code>date -u            → 02:41:59   ← システムクロック
-/proc/driver/rtc   → 02:41:27   ← RTC
-                     差 32秒</code></pre>
-<p>同じマシンの、同じ瞬間に読んだ2つの時計が32秒ずれている。どちらかが壊れているのではない。<b>2つは別々に進んでいて、合わせる仕組みが別にある</b>。その仕組みが第3章の NTP である。</p>
+<pre><code>date -u            → 10:32:37   ← システムクロック
+/proc/driver/rtc   → 10:32:04   ← RTC
+                     差 33秒</code></pre>
+<p>同じマシンの、同じ瞬間に読んだ2つの時計が33秒ずれている。どちらかが壊れているのではない。<b>2つは別々に進んでいて、合わせる仕組みが別にある</b>。その仕組みが第3章の NTP である。</p>
 <p class='detail'>（秒数と日付はあなたの環境で変わる。見るのは「2つの値が一致しない」ことだけ。一致していたら、直前に合わせた直後だったということになる。）</p>
 <div class="analogy"><b>たとえ</b>: 壁掛け時計と腕時計を両方持っている状態に近い。
 腕時計（システムクロック）は普段見る側で、動かすのも簡単。壁掛け時計（RTC）は電池で勝手に動き続け、
@@ -84,6 +84,15 @@ hwclock --show            # RTC を読む
 hwclock --systohc         # システムクロック → RTC に書き戻す
 hwclock --hctosys         # RTC → システムクロックに読み込む</code></pre>
 <p>試験では <code>hwclock</code> が「ハードウェアクロックを扱うコマンド」として問われる。方向が2つある（<code>--systohc</code> と <code>--hctosys</code>）ことと、RTC は UTC で持つのが既定であること（<code>timedatectl</code> の <code>RTC in local TZ: no</code>）が要点になる。</p>
+<p>短い形もある。どれがどれかは <code>--help</code> に並んでいる（表示するだけなのでデバイスは要らない）。</p>
+<pre><code>$ hwclock --help | grep -E -- '--(show|hctosys|systohc|adjust) '
+ -r, --show                      display the RTC time
+ -s, --hctosys                   set the system time from the RTC
+ -w, --systohc                   set the RTC from the system time
+ -a, --adjust                    adjust the RTC to account for systematic drift</code></pre>
+<p><code>-r</code> が <code>--show</code>（RTC を読む）、<code>-w</code> が <code>--systohc</code>（システムクロック → RTC）、<code>-s</code> が <code>--hctosys</code>（RTC → システムクロック）である。
+覚え方の一例: <code>-w</code> は RTC に書く（write）、<code>-s</code> はシステムの時刻を合わせる（system）。
+<code>-a</code>（<code>--adjust</code>）は、RTC が一定の割合で進む・遅れる癖（systematic drift）の分を、前回合わせてから経った時間に応じて足し引きする（<code>man 8 hwclock</code>）。</p>
 <div class="analogy"><b>たとえ</b>: 建物の中に金庫があることは館内図（<code>/proc/driver/rtc</code>）で分かるが、
 金庫室の扉（<code>/dev/rtc0</code>）の鍵を渡されていない状態に近い。
 中身の一部は館内図に書き写されているので読めるが、開け閉めはできない。
@@ -101,7 +110,7 @@ LocalRTC=no
 CanNTP=yes
 NTP=yes
 NTPSynchronized=yes
-TimeUSec=Tue 2026-10-13 11:42:00 JST</code></pre>
+TimeUSec=Tue 2026-10-13 19:32:37 JST</code></pre>
 <p><code>NTPSynchronized=yes</code> と出ている。RTC は読めないままである。つまり「同期している」という判断は RTC とは無関係に下されている。判断の材料は、カーネルが持っている時計の状態である（<code>timedatectl</code> は systemd を通してカーネルに問い合わせている）。そしてコンテナはホストのカーネルをそのまま使うので、ここに出ているのは<b>ホスト側の時刻合わせの結果</b>である。第3章で見るとおり、檻の中の時刻合わせのデーモンは、この時点ではまだ何とも同期していない。</p>
 <p>整理すると、時刻に関わる登場人物はこうなる。</p>
 <div class="scroll"><table>
@@ -110,12 +119,68 @@ TimeUSec=Tue 2026-10-13 11:42:00 JST</code></pre>
 <tr><td>システムクロック</td><td>カーネルが持つ時刻。起動時に RTC から受け取る</td><td>消える</td><td><code>date</code> / <code>timedatectl</code></td></tr>
 <tr><td>NTP デーモン</td><td>外の基準と比べてずれを測り、システムクロックを合わせる（この檻の chronyd は測るだけ。第3章）</td><td>止まる</td><td><code>chronyc</code> / <code>ntpq</code></td></tr>
 </table></div>
-<p>この章の時点で押さえるのは、<b>システムクロックは起動のときに RTC から値を受け取るが、そのあとは別々に進む</b>という点である。システムクロックの値を RTC へ書き戻す仕組み（<code>hwclock --systohc</code> や、chrony.conf の <code>rtcsync</code> のような同期の機能）が働かなければ、2つのずれは開いていく。さきほどの32秒がどういう経緯で生じたかまでは、この檻の中からは確かめられない（RTC はホストのものである）。</p>
+<p>この章の時点で押さえるのは、<b>システムクロックは起動のときに RTC から値を受け取るが、そのあとは別々に進む</b>という点である。システムクロックの値を RTC へ書き戻す仕組み（<code>hwclock --systohc</code> や、chrony.conf の <code>rtcsync</code> のような同期の機能）が働かなければ、2つのずれは開いていく。さきほどの33秒がどういう経緯で生じたかまでは、この檻の中からは確かめられない（RTC はホストのものである）。</p>
 <div class="analogy"><b>たとえ</b>: 出社したときに壁の時計を見て自分の腕時計を合わせ、
 そのあとは腕時計だけを見て1日働く、という動き方に近い。合わせるのは朝の1回だけで、
 日中に腕時計が遅れても壁の時計は教えてくれない。
 <br>ただし<b>崩れる点</b>: 人は気になれば壁を見られるが、システムクロックは RTC を定期的に見ない。
 ずれを見つける役は RTC ではなく、外の基準と話す NTP デーモンが担っている。</div>
+<h2 id="set">時刻を設定する書式 — date は年が最後、touch -t は年が先</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>date</code> に日時を渡す書式と、よく似た <code>touch -t</code> の書式の違い。<code>timedatectl</code> のサブコマンドの全体。</div>
+<p><code>date</code> は表示するだけでなく、システムクロックを設定することもできる。引数に数字の並びを1つ渡すと設定になる。書式は <code>--help</code> にある。</p>
+<pre><code>$ date --help | grep MMDDhhmm
+  or:  date [-u|--utc|--universal] [MMDDhhmm[[CC]YY][.ss]]
+With -s, or with [MMDDhhmm[[CC]YY][.ss]], set the date and time.</code></pre>
+<p>月・日・時・分（<code>MMDDhhmm</code>）が先に来て、年（<code>CC</code> が西暦の上2桁、<code>YY</code> が下2桁。どちらも省ける）はその後ろ、秒は最後に <code>.ss</code> で付ける。2022年2月14日 9時0分なら <code>021409002022</code> である。打ってみる。</p>
+<pre><code>$ date 021409002022
+date: cannot set date: Operation not permitted
+Mon Feb 14 09:00:00 JST 2022
+$ echo $?
+1</code></pre>
+<p>設定は失敗した（終了コード 1）。この檻には時計を動かす権限（CAP_SYS_TIME）が無いからで、第3章でもう一度見る。それでも <code>date</code> は、解釈した日時を表示してから終わる。
+<code>Mon Feb 14 09:00:00 JST 2022</code> と読まれたので、末尾の4桁が年だったと分かる。実機で root が打てば、この時刻に設定される（<code>date -s "2022-02-14 09:00"</code> のように、文字列で渡す書き方もある）。</p>
+<p>ファイルの時刻を変える <code>touch -t</code> も数字の並びを取るが、年の位置が逆である。</p>
+<pre><code>$ touch --help | grep STAMP
+  -t STAMP               use [[CC]YY]MMDDhhmm[.ss] instead of current time
+$ touch -t 202202140900 /tmp/stamp
+$ date -r /tmp/stamp
+Mon Feb 14 09:00:00 JST 2022</code></pre>
+<p><code>touch -t</code> の書式は <code>[[CC]YY]MMDDhhmm[.ss]</code> で、年が先頭に来る。<code>date -r ファイル</code> はファイルの更新時刻を表示するので、<code>date</code> に渡したのと同じ瞬間になったと分かる。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>書式</th><th>2022年2月14日 9:00 を渡す</th></tr>
+<tr><td><code>date</code>（設定）</td><td><code>MMDDhhmm[[CC]YY][.ss]</code> — 年は<b>最後</b></td><td><code>date 021409002022</code></td></tr>
+<tr><td><code>date -s</code></td><td>日時の文字列</td><td><code>date -s "2022-02-14 09:00"</code></td></tr>
+<tr><td><code>touch -t</code></td><td><code>[[CC]YY]MMDDhhmm[.ss]</code> — 年は<b>先頭</b></td><td><code>touch -t 202202140900 ファイル</code></td></tr>
+<tr><td><code>timedatectl set-time</code></td><td><code>"YYYY-MM-DD hh:mm:ss"</code></td><td><code>timedatectl set-time "2022-02-14 09:00:00"</code></td></tr>
+</table></div>
+<p><code>timedatectl</code> にも時刻を設定するサブコマンドがある。サブコマンドは全部で7つで、<code>--help</code> に並んでいる。</p>
+<pre><code>$ timedatectl --help | sed -n '/^Commands:/,/^$/p'
+Commands:
+  status                   Show current time settings
+  show                     Show properties of systemd-timedated
+  set-time TIME            Set system time
+  set-timezone ZONE        Set system time zone
+  list-timezones           Show known time zones
+  set-local-rtc BOOL       Control whether RTC is in local time
+  set-ntp BOOL             Enable or disable network time synchronization</code></pre>
+<div class="scroll"><table>
+<tr><th>サブコマンド</th><th>すること</th></tr>
+<tr><td><code>status</code></td><td>いまの状態を人間向けに出す。サブコマンドを省いたときはこれになる（この章の最初の表示）</td></tr>
+<tr><td><code>show</code></td><td>同じ内容を <code>キー=値</code> の形で出す（機械向け）</td></tr>
+<tr><td><code>set-time</code></td><td>システムクロックを設定する。NTP による時刻合わせが有効な間は拒否される</td></tr>
+<tr><td><code>set-timezone</code></td><td>タイムゾーンを設定する（<code>/etc/localtime</code> を張り替える。第2章）</td></tr>
+<tr><td><code>list-timezones</code></td><td>指定できるゾーン名の一覧（第2章）</td></tr>
+<tr><td><code>set-local-rtc</code></td><td>RTC を地方時で持つかどうか（既定は <code>no</code> ＝ UTC。<code>RTC in local TZ</code> の行）</td></tr>
+<tr><td><code>set-ntp</code></td><td>NTP による時刻合わせを有効・無効にする（<code>NTP service</code> の行）</td></tr>
+</table></div>
+<p>似た名前で間違えやすいものを打ってみる。</p>
+<pre><code>$ timedatectl set-clock 2022-02-14
+Unknown command verb 'set-clock', did you mean 'set-time'?
+$ timedatectl set-time "2022-02-14 09:00:00"
+Failed to set time: Automatic time synchronization is enabled</code></pre>
+<p><code>set-clock</code> というサブコマンドは無い（<code>did you mean 'set-time'?</code> と返る）。時刻を設定するのは <code>set-time</code> である。こちらは日時の書き方は通ったが、NTP による時刻合わせが有効なので断られた（<code>Automatic time synchronization is enabled</code>）。手で合わせたいときは、先に <code>set-ntp false</code> で自動の時刻合わせを止める。</p>
+<div class="analogy"><b>たとえ</b>: 同じ日付を、月を先に書く国と年を先に書く国の書き方で書き分けるのに近い。<code>date</code> は「月日時分年」、<code>touch -t</code> は「年月日時分」で書く。
+<br>ただし<b>崩れる点</b>: 人は <code>2022</code> を見れば年だと分かるので、並びが違っても読み取れる。コマンドは<b>位置だけ</b>で読む。<code>date</code> に年を先頭にした <code>202202140900</code> を渡すと、先頭の <code>20</code> を月として読もうとして <code>invalid date</code> で止まる（別の檻で実測）。</div>
 <div class="quiz"><b>確認</b>
 <p><code>hwclock</code> が <code>Cannot access the Hardware Clock</code> を返した。
 このマシンに RTC が無いと結論できるか。</p>
@@ -132,8 +197,13 @@ TimeUSec=Tue 2026-10-13 11:42:00 JST</code></pre>
 実際この檻では <code>RTC time: n/a</code> のまま <code>synchronized: yes</code> になっていた。
 RTC にシステムクロックを書き戻すのは別の操作（<code>hwclock --systohc</code>、
 あるいは <code>chrony.conf</code> の <code>rtcsync</code>）である。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>root が <code>date 101309302026</code> と打った（時刻を設定できる環境とする）。何年何月何日の何時何分に設定されるか。また、同じ日時をファイルに付ける <code>touch -t</code> の引数はどう書くか。</p>
+<details><summary>答え</summary>
+<p>2026年10月13日 9時30分。<code>date</code> の書式は <code>MMDDhhmm[[CC]YY]</code> で、<code>10</code> が月、<code>13</code> が日、<code>0930</code> が時と分、末尾の <code>2026</code> が年である。
+<code>touch -t</code> は年が先頭の <code>[[CC]YY]MMDDhhmm</code> なので、<code>touch -t 202610130930 ファイル</code> になる。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>1台のマシンに時計は2つある。RTC は電池で動き続け、システムクロックはカーネルが持ち、電源で消える</li><li>システムクロックは起動時に RTC から値を受け取り、そのあとは別々に進む。書き戻す仕組みが働かなければずれる（この檻では32秒ずれていた）</li><li><code>hwclock</code> の失敗は「コマンドが無い」ではなく「<code>/dev/rtc*</code> が無い」。同じ RTC は <code>/proc/driver/rtc</code> から読めた</li><li>コンテナにデバイスを渡さないのは設計どおり。だからこの章の失敗は読者の操作ミスではない</li><li><code>System clock synchronized</code> はシステムクロックの話であって、RTC が合っているとは言っていない。しかもこの檻では、その判断もホストのカーネルの状態から来ている</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>1台のマシンに時計は2つある。RTC は電池で動き続け、システムクロックはカーネルが持ち、電源で消える</li><li>システムクロックは起動時に RTC から値を受け取り、そのあとは別々に進む。書き戻す仕組みが働かなければずれる（この檻では33秒ずれていた）</li><li><code>hwclock</code> の失敗は「コマンドが無い」ではなく「<code>/dev/rtc*</code> が無い」。同じ RTC は <code>/proc/driver/rtc</code> から読めた</li><li>コンテナにデバイスを渡さないのは設計どおり。だからこの章の失敗は読者の操作ミスではない</li><li><code>hwclock</code> の短い形は <code>-r</code>（<code>--show</code>）・<code>-w</code>（<code>--systohc</code>、システム → RTC）・<code>-s</code>（<code>--hctosys</code>、RTC → システム）。<code>-a</code>（<code>--adjust</code>）は進み・遅れの癖を補正する</li><li>時刻の設定は <code>date MMDDhhmm[[CC]YY][.ss]</code>（年は最後。例 <code>date 021409002022</code>）か <code>date -s "文字列"</code>。<code>touch -t</code> は <code>[[CC]YY]MMDDhhmm[.ss]</code> で年が先頭。この檻では CAP_SYS_TIME が無いので設定は失敗するが、<code>date</code> は解釈した日時を表示する</li><li><code>timedatectl</code> のサブコマンドは <code>status</code>（省略時）・<code>show</code>・<code>set-time</code>・<code>set-timezone</code>・<code>list-timezones</code>・<code>set-local-rtc</code>・<code>set-ntp</code> の7つ。<code>set-clock</code> は無い。<code>set-time</code> は NTP が有効な間は拒否される</li><li><code>System clock synchronized</code> はシステムクロックの話であって、RTC が合っているとは言っていない。しかもこの檻では、その判断もホストのカーネルの状態から来ている</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/">← 理論編 目次</a><a href="/linuc-services/theory/02-timezone">次: 2. タイムゾーンは表示の都合だけ →</a></nav>
 <section id="comments">
