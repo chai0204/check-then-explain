@@ -276,7 +276,7 @@ labhello: RSA/SHA256, Tue Oct 13 10:08:48 2026, Key ID 0ba6fe4393f77b82</code></
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>rpm -ivh</code> は依存関係が足りないと1つも入れずに止まる。必要なファイルを並べて渡せば順番は rpm が決める</li><li><code>rpm -e</code> は依存されているものを消さない。<code>--nodeps</code> は台帳の整合を崩し、<code>rpm -V</code> が <code>Unsatisfied dependencies</code> を報告する</li><li><code>-i</code> は新しく入れる（古い版があれば衝突）、<code>-U</code> は上げるか入れる、<code>-F</code> は入っているものだけ上げる</li><li><code>rpm -K</code> の <code>digests OK</code> は「署名が無い」。署名の語（RHEL 8 以降は <code>signatures</code>、RHEL 7 は <code>rsa</code>・<code>pgp</code>）が小文字で OK のときだけ、署名が確かめられている。大文字は失敗</li><li>確かめる鍵は台帳（<code>gpg-pubkey</code>）に入っている。<code>rpm --import</code> で取り込む</li><li>署名の確認を強制するのは yum の <code>gpgcheck=1</code>。rpm は署名が無くても入れる</li><li>主題1.04 のコマンドは「台帳・目録・ファイルのどれを、どちら向きに引くか」で整理できる</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.1@sha256:__DIGEST__ / AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / リポジトリ vault.almalinux.org 9.7（2026-05-20 で凍結）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.1@sha256:4eb5ddf9488295b831dbf8316e8a19fc3b7292f14b6b6441e4776745f3e99429 / AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / リポジトリ vault.almalinux.org 9.7（2026-05-20 で凍結）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/06-rpm-query">← 6. rpm -V が黙っているのは、台帳どおりだから</a><a href="/linuc-packages/">次: 実践編（演習6本）→</a></nav>
 <section id="comments">
 <h2>コメント</h2>
