@@ -1,0 +1,11 @@
+#!/bin/bash
+# lab env の追加行（外側で走る）。仮想マシン型の檻は、練習機が動いているかと、
+# 中のカーネル・仮想化の方式（KVM なしの TCG か）が切り分けの中心になる。
+export LIBVIRT_DEFAULT_URI=qemu:///session   # ログインシェルの設定に左右されないように固定する
+st=$(virsh domstate "${LAB_VM_NAME:-linuc}" 2>/dev/null | head -1)
+printf '練習機    : %s\n' "${st:-未定義}"
+if [ "$st" = "running" ]; then
+  g=$(lab-guest '. /etc/os-release; printf "%s / カーネル %s / 仮想化 %s" "$PRETTY_NAME" "$(uname -r)" "$(systemd-detect-virt)"' 2>/dev/null) \
+    || g="（エージェントに届かない: vm status）"
+  printf 'ゲスト    : %s\n' "$g"
+fi

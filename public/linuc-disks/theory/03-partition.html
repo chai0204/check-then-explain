@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. パーティションの表は、目次にすぎない — 確かめて説明する LinuC 主題1.05</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="linuc-disks">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-disks/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+</div>
+<h1>3. パーティションの表は、目次にすぎない</h1>
+<p class="lead">fdisk でパーティションを消し、同じ位置に作り直すと、中に書いたファイルがそのまま読める。消したのはディスクの先頭にある 64 バイトの表の1行で、中身には1バイトも触れていないからだ。</p>
+<div class="badges"><span>前提: 第2章まで読了</span><span>前提: 練習機が起動している</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>fdisk でパーティションを作る・消す・書き込む操作（n・d・p・w）ができる</li><li>MBR の表がどこにあり、基本パーティションが4つまでの理由を説明できる。5つ目以降を拡張・論理パーティションで作れる</li><li>fdisk・gdisk・parted の違い（扱える形式・書き込むタイミング）を言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: CHS（シリンダ・ヘッド・セクタ）での位置の書き方、EBR の連鎖の細かい形、<code>sfdisk</code> のスクリプトの書式、パーティションの種類の番号の一覧（83・82・8e・5・ef だけ覚えればよい）は扱わない。</div></div>
+
+<h2 id="create">fdisk で切る</h2>
+<div class="sgoal"><b>この節で分かること</b>: fdisk の対話の流れと、書き込むまで何も変わらないこと。</div>
+<p>練習用のディスク <code>vdb</code>（2GiB）は、まだまっさらである。<code>fdisk -l</code> で見ると、ディスクの情報だけで表が無い。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk -l /dev/vdb
+Disk /dev/vdb: 2 GiB, 2147483648 bytes, 4194304 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes</code></pre>
+<p>200MiB のパーティションを1つ作る。fdisk は1文字のコマンドで操作し、<b><code>w</code> を打つまではメモリの上でしか変わらない</b>（<code>q</code> で抜ければ何も書かない）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk /dev/vdb
+Welcome to fdisk (util-linux 2.39.3).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS (MBR) disklabel with disk identifier 0xa741c5ae.   ← 表が無かったので、空の MBR の表をメモリの上に作った
+
+Command (m for help): n   ← n: 新しいパーティション
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 1
+First sector (2048-4194303, default 2048): 
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (2048-4194303, default 4194303): +200M   ← +200M: 大きさで答えられる
+
+Created a new partition 1 of type 'Linux' and of size 200 MiB.
+
+Command (m for help): p   ← p: 表示（まだ書いていない）
+Disk /dev/vdb: 2 GiB, 2147483648 bytes, 4194304 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xa741c5ae
+
+Device     Boot Start    End Sectors  Size Id Type
+/dev/vdb1        2048 411647  409600  200M 83 Linux
+
+Command (m for help): w   ← w: ここで初めてディスクに書く
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+$ lsblk /dev/vdb
+NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+vdb    253:16   0    2G  0 disk 
+└─vdb1 253:17   0  200M  0 part </code></pre>
+<div class="scroll"><table>
+<tr><th>キー</th><th>すること</th></tr>
+<tr><td><code>m</code></td><td>キーの一覧（help）</td></tr>
+<tr><td><code>p</code></td><td>いまの表を表示（print）</td></tr>
+<tr><td><code>n</code></td><td>パーティションを作る（new）</td></tr>
+<tr><td><code>d</code></td><td>パーティションを消す（delete）</td></tr>
+<tr><td><code>t</code></td><td>種類を変える（type。83 = Linux、82 = Linux swap、8e = Linux LVM など）</td></tr>
+<tr><td><code>l</code></td><td>種類の一覧（list）</td></tr>
+<tr><td><code>o</code> / <code>g</code></td><td>空の MBR（DOS）の表 / 空の GPT の表を作る</td></tr>
+<tr><td><code>w</code></td><td>ディスクに書いて終わる（write）</td></tr>
+<tr><td><code>q</code></td><td>書かずに終わる（quit）</td></tr>
+</table></div>
+
+<h2 id="naive">消すと、中身も消える？</h2>
+<div class="sgoal"><b>この節で分かること</b>: パーティションの表と、その中身が別のものであること。</div>
+<p>作ったパーティションにファイルシステムを作り（第6章で詳しく扱う）、1行書いておく。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mkfs.ext4 -q /dev/vdb1
+$ sudo mount /dev/vdb1 /mnt
+$ echo "まだここにある" | sudo tee /mnt/memo.txt
+まだここにある
+$ sudo umount /mnt</code></pre>
+<p>パーティションを消す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk /dev/vdb
+Welcome to fdisk (util-linux 2.39.3).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): d   ← d: 1つしか無いので番号を聞かずに選んだ
+Selected partition 1
+Partition 1 has been deleted.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+$ lsblk /dev/vdb
+NAME
+    MAJ:MIN RM SIZE RO TYPE MOUNTPOINTS
+vdb 253:16   0   2G  0 disk 
+$ sudo mount /dev/vdb1 /mnt
+mount: /mnt: special device /dev/vdb1 does not exist.
+       dmesg(1) may have more information after failed mount system call.</code></pre>
+<p><code>vdb1</code> という装置そのものが無くなった。では、同じ位置・同じ大きさで作り直す。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>パーティションを消したのだから、中のファイルも消えた。作り直しても空の区画ができるだけで、
+<code>memo.txt</code> は戻ってこないはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk /dev/vdb
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 1
+First sector (2048-4194303, default 2048): 
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (2048-4194303, default 4194303): +200M
+
+Created a new partition 1 of type 'Linux' and of size 200 MiB.
+Partition #1 contains a ext4 signature.   ← 中に ext4 の印（signature）がある
+
+Do you want to remove the signature? [Y]es/[N]o: N   ← 消すか、と聞いてくる。N と答える
+
+Command (m for help): w
+
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+$ sudo mount /dev/vdb1 /mnt
+$ cat /mnt/memo.txt
+まだここにある
+$ sudo umount /mnt</code></pre>
+<div class="then"><b>だめな理由</b>: そのまま読めた。fdisk が消したのは<b>表の1行</b>で、区画の中身（ext4 の構造とファイル）には触れていない。
+同じ位置に行を書き戻したので、カーネルはまた <code>vdb1</code> を作り、その先頭には前のままの ext4 が残っていた。
+fdisk 自身もそれを知っていて、「中に ext4 の印（signature）がある。消すか」と聞いてきた。
+ここで Y と答えると、その印（ext4 の数バイト）が消されて、ファイルが残っていても ext4 として読めなくなる。</div></div>
+<div class="analogy"><b>たとえ</b>: 本の<b>目次</b>に近い。目次から章を1行消しても、本文のページは破られていない。同じページ番号で目次に書き戻せば、その章はまた引ける。
+<br>ただし<b>崩れる点</b>: 本なら目次が無くてもページをめくれば読めるが、ディスクは表に行が無いと、Linux がその区画を装置（<code>/dev/vdb1</code>）として作らない。中身はあっても手が届かない。</div>
+
+<h2 id="bytes">表の実体は、先頭の 64 バイト</h2>
+<div class="sgoal"><b>この節で分かること</b>: MBR の表がどこにあり、なぜ4行しか無いか。</div>
+<p>MBR（Master Boot Record）はディスクの先頭のセクタ（512 バイト）のことで、表はその 446 バイト目からの 64 バイトにある。読んでみる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo dd if=/dev/vdb bs=1 skip=446 count=66 status=none | od -A d -t x1
+0000000 00 00 21 02 83 06 46 98 00 08 00 00 00 40 06 00   ← 1行目（16 バイト）が vdb1
+0000016 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ← 2行目は空
+*   ← 3〜4行目も同じ（* は「上と同じ行の繰り返し」）
+0000064 55 aa   ← 最後の2バイトが MBR の印
+0000066</code></pre>
+<pre><code>00 00 21 02  83  06 46 98  00 08 00 00  00 40 06 00
+│  └──────┘  │   └──────┘  └─────────┘  └─────────┘
+│   開始の   種類  終わりの    開始位置      大きさ
+│   CHS     83=   CHS       0x00000800   0x00064000
+起動フラグ  Linux            = 2048       = 409600 セクタ（200MiB）
+                              （下位のバイトが先に並ぶ）</code></pre>
+<p>1行 16 バイトで、64 バイトには4行しか入らない。だから <b>MBR の基本パーティションは4つまで</b>である。位置と大きさは 32 ビットのセクタ数なので、扱えるのは 2<sup>32</sup> × 512 バイト = <b>2TiB まで</b>。最後の <code>55 aa</code> は「ここに MBR がある」という印である。</p>
+
+<h2 id="extended">5つ目からは、拡張パーティションの中に作る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 4つの制限の越え方と、論理パーティションの番号。</div>
+<p>基本パーティションを1つ足し、3つ目を拡張パーティションにして、その中に2つ作る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk /dev/vdb
+Command (m for help): n
+Partition type
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (2-4, default 2): 2
+First sector (411648-4194303, default 411648): 
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (411648-4194303, default 4194303): +100M
+
+Created a new partition 2 of type 'Linux' and of size 100 MiB.
+
+Command (m for help): n
+Partition type
+   p   primary (2 primary, 0 extended, 2 free)
+   e   extended (container for logical partitions)
+Select (default p): e   ← e: 拡張パーティション
+Partition number (3,4, default 3): 3
+First sector (616448-4194303, default 616448): 
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (616448-4194303, default 4194303): 
+
+Created a new partition 3 of type 'Extended' and of size 1.7 GiB.
+
+Command (m for help): n
+All space for primary partitions is in use.   ← 拡張の中にしか空きが無いので、自動で論理パーティションになる
+Adding logical partition 5   ← 番号は 5 から
+First sector (618496-4194303, default 618496): 
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (618496-4194303, default 4194303): +100M
+
+Created a new partition 5 of type 'Linux' and of size 100 MiB.
+...
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+$ sudo fdisk -l /dev/vdb
+Disk /dev/vdb: 2 GiB, 2147483648 bytes, 4194304 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xa741c5ae
+
+Device     Boot  Start     End Sectors  Size Id Type
+/dev/vdb1         2048  411647  409600  200M 83 Linux
+/dev/vdb2       411648  616447  204800  100M 83 Linux
+/dev/vdb3       616448 4194303 3577856  1.7G  5 Extended
+/dev/vdb5       618496  823295  204800  100M 83 Linux
+/dev/vdb6       825344 1030143  204800  100M 83 Linux</code></pre>
+<p>拡張パーティション（<code>vdb3</code>、種類 5 の Extended）は、残りの空きを全部抱える<b>入れ物</b>で、それ自体にはファイルシステムを作らない。中に作った論理パーティションは、4 が空いていても <b>5 から</b>番号が付く（1〜4 は基本パーティションのために取ってある）。論理パーティションの位置は、拡張の中に置かれた小さな表（EBR）を順にたどって決まる。開始位置が 616448 ではなく 618496 から始まっているのは、その小さな表の置き場所を空けたからである。</p>
+<div class="analogy"><b>たとえ</b>: 棚板が4枚しかない<b>本棚</b>に近い。5種類目の本を置きたければ、棚板の1枚を<b>引き出し</b>に替えて、その中を仕切って並べる。
+<br>ただし<b>崩れる点</b>: 本棚の引き出しは開ければ中が全部見えるが、論理パーティションの位置は、引き出しの中に順につないだ小さな表（EBR）を先頭からたどらないと分からない。だから途中の1つが壊れると、その先の論理パーティションも見失う。</div>
+
+<h2 id="tools">fdisk・gdisk・parted</h2>
+<div class="sgoal"><b>この節で分かること</b>: 3つの道具の違いと、どれで同じ表を読めるか。</div>
+<p>同じ表を3つの道具で読む。<code>gdisk</code> は GPT（第4章）専用の道具で、MBR を見ると「メモリの上で GPT に変換して」表示する（<code>w</code> を打たなければディスクは変わらない）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo gdisk -l /dev/vdb
+GPT fdisk (gdisk) version 1.0.10
+
+Partition table scan:
+  MBR: MBR only
+  BSD: not present
+  APM: not present
+  GPT: not present
+
+
+***************************************************************
+Found invalid GPT and valid MBR; converting MBR to GPT format
+in memory. 
+***************************************************************
+
+Disk /dev/vdb: 4194304 sectors, 2.0 GiB
+Sector size (logical/physical): 512/512 bytes
+Disk identifier (GUID): BEE035D7-4CC3-4C0D-AC8C-76964683841F
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 4194270
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 3170237 sectors (1.5 GiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048          411647   200.0 MiB   8300  Linux filesystem
+   2          411648          616447   100.0 MiB   8300  Linux filesystem
+   5          618496          823295   100.0 MiB   8300  Linux filesystem
+   6          825344         1030143   100.0 MiB   8300  Linux filesystem
+$ sudo parted /dev/vdb print
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdb: 2147MB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start   End     Size    Type      File system  Flags
+ 1      1049kB  211MB   210MB   primary   ext4
+ 2      211MB   316MB   105MB   primary
+ 3      316MB   2147MB  1832MB  extended
+ 5      317MB   422MB   105MB   logical
+ 6      423MB   527MB   105MB   logical</code></pre>
+<p><code>gdisk</code> の一覧には拡張パーティション（3）が無い。GPT には拡張という考え方が無く、128 個まで平らに並べられるからである。<code>parted</code> は大きさを MB（1000×1000 バイト）で表示する。</p>
+<p>そして <code>parted</code> は、<b>打った瞬間にディスクへ書く</b>。<code>w</code> も確認も無い。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo parted /dev/vdb rm 6
+Information: You may need to update /etc/fstab.
+$ sudo parted /dev/vdb print
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdb: 2147MB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start   End     Size    Type      File system  Flags
+ 1      1049kB  211MB   210MB   primary   ext4
+ 2      211MB   316MB   105MB   primary
+ 3      316MB   2147MB  1832MB  extended
+ 5      317MB   422MB   105MB   logical</code></pre>
+<div class="scroll"><table>
+<tr><th></th><th>fdisk</th><th>gdisk</th><th>parted</th></tr>
+<tr><td>扱える表</td><td>MBR と GPT（<code>o</code> / <code>g</code> で作る）</td><td>GPT（MBR は変換して読む）</td><td>MBR（msdos）と GPT（gpt）</td></tr>
+<tr><td>書き込むとき</td><td><code>w</code> を打ったとき</td><td><code>w</code> を打ったとき</td><td><b>コマンドを打った瞬間</b></td></tr>
+<tr><td>使い方</td><td>対話（1文字のキー）。<code>-l</code> で一覧</td><td>対話（1文字のキー）。<code>-l</code> で一覧。<code>sgdisk</code> は一括版</td><td>対話でも、引数に続けて書いても使える（<code>parted /dev/vdb rm 6</code>）</td></tr>
+<tr><td>大きさの単位</td><td>セクタ。<code>+200M</code> で MiB</td><td>セクタ。<code>+100M</code> で MiB</td><td>MB・GB（<code>unit</code> で変えられる）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: fdisk と gdisk は<b>下書きしてから清書する</b>書き方、parted は<b>ペンで直接書く</b>書き方に近い。下書きなら破り捨てられるが、ペンは書いた瞬間に残る。
+<br>ただし<b>崩れる点</b>: ペンで書いた字は消せないが、parted で消した区画も、中身はまだディスクに残っている（この章の前半と同じ）。消えたのは表の1行だけで、同じ位置で作り直せば読める。</div>
+<p>演習03 のディスク <code>vdd</code> を見ておく。先頭の 100MiB に、表の行が無い区画がある。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk -l /dev/vdd
+Disk /dev/vdd: 256 MiB, 268435456 bytes, 524288 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x4c696e75
+
+Device     Boot  Start    End Sectors  Size Id Type
+/dev/vdd2       206848 411647  204800  100M 83 Linux</code></pre>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-disks/">演習03</a>は、この <code>vdd</code> から消えた <code>vdd1</code> を取り戻し、中のファイルを読む課題である。
+判定は表の行と、vdd1 の中の ext4 を直接読んで確かめる。<code>mkfs</code> してはいけない。</div>
+
+<div class="quiz"><b>確認</b>
+<p>MBR のディスクで、基本パーティションを3つ作ったあと、さらに3つ作りたい。どうするか。新しくできるパーティションの番号は何番になるか。</p>
+<details><summary>答え</summary>
+<p>4つ目を拡張パーティションにして、その中に論理パーティションを3つ作る。論理パーティションの番号は 5・6・7（4 が空いていても 5 から始まる）。MBR の表は 64 バイトで4行しか書けないので、基本パーティションは4つまでである。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>fdisk でパーティションを作る操作をしたが、まだ <code>w</code> を打っていない。この状態で <code>q</code> を打つと、ディスクはどうなるか。parted で <code>rm 6</code> を打った場合はどうか。</p>
+<details><summary>答え</summary>
+<p>fdisk は何も書かずに終わるので、ディスクは変わらない（変更はメモリの上だけ）。parted は打った瞬間に書くので、6番はもう表から消えている。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>パーティションを fdisk の <code>d</code> で消してしまった。中のデータは取り戻せるか。取り戻すときに気を付けることは何か。</p>
+<details><summary>答え</summary>
+<p>取り戻せる可能性が高い。消えたのは表の1行で、中身は残っている。同じ開始位置・同じ大きさで作り直せばよい。作り直すとき fdisk が「中のファイルシステムの印を消すか」と聞いてくるので、N と答える。<code>mkfs</code> をすると中身は失われる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>パーティションテーブルは「どこからどこまで」を書いた目次で、fdisk・gdisk・parted が書き換えるのはこの目次だけ。中身には触れない</li><li>消したパーティションも、同じ位置に行を書き戻せば読める。作り直すときに「印を消すか」と聞かれたら N</li><li>MBR の表は先頭のセクタの 64 バイト（16 バイト × 4行）。だから基本パーティションは4つまでで、2TiB まで</li><li>5つ目以降は、拡張パーティション（種類 5）の中に論理パーティションとして作る。番号は 5 から</li><li>fdisk と gdisk は <code>w</code> で書き、parted は打った瞬間に書く。gdisk は GPT 専用、fdisk と parted は両方扱える</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・fdisk（util-linux）2.39.3・gdisk 1.0.10・parted 3.6 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-disks/theory/02-modules">← 2. ドライバは、外しても戻ってくる</a><a href="/linuc-disks/theory/04-esp">次: 4. 起動の入口は、マウントしなくても見つかる →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-disks/chapters.js"></script>
+<script src="/linuc-disks/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

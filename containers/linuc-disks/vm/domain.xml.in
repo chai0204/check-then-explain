@@ -1,0 +1,83 @@
+<!--
+  LinuC 主題1.05（ハードウェア・ディスク・パーティション・ファイルシステム）の練習機。
+  土台の定義（containers/linuc-machine/host/etc/domain.xml.in）に、練習用のディスクと光学ドライブと
+  USB の口を足したもの。@VMDIR@ は vm が置き換える。追加ディスクのファイルは pre-start.sh が外側で作る。
+
+  足したもの（練習機の中での名前）:
+    vdb  virtio 2G    … 本文で「新しいサーバのディスク」として、表 → ファイルシステム → マウントと積み上げる
+    vdc  virtio 1G    … LVM の物理ボリューム（sda と組んで1つのボリュームグループにする）
+    vdd  virtio 256M  … 演習03 の「パーティションを消してしまったディスク」（provision.sh が用意する）
+    sda  SATA   1G    … rotation_rate='1' で「回転しない装置（SSD）」と名乗らせる。中身は vdc と同じ種類のファイル
+    sr0  SATA 光学    … 読み取り専用の CD（イメージに同梱した ISO）
+    USB の口（qemu-xhci）… USB メモリは起動後に virsh attach-device で挿す（~/vm/extra/usb-*.xml）
+
+  - SATA のディスクは1本だけにしている。2本にすると sda と sdb の割り当てが起動ごとに入れ替わりうる
+    （SCSI ディスクの名前付けは非同期）。光学ドライブは sr0 という別の名前の列なので影響しない。
+  - virtio のディスクに serial を付けると、練習機の中に /dev/disk/by-id/virtio-<serial> ができる。
+  - ssh 用の NIC（qemu:commandline）とゲストエージェントの channel は土台と同じ（判定と ssh がここを通る）。
+-->
+<domain type='qemu' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
+  <name>linuc</name>
+  <title>LinuC 練習機（ディスク）</title>
+  <memory unit='MiB'>1536</memory>
+  <vcpu>2</vcpu>
+  <os firmware='efi'>
+    <type arch='x86_64' machine='q35'>hvm</type>
+    <nvram>@VMDIR@/linuc_VARS.fd</nvram>
+  </os>
+  <features><acpi/></features>
+  <cpu mode='maximum'/>
+  <clock offset='utc'/>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <devices>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' discard='unmap'/>
+      <source file='@VMDIR@/linuc.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' discard='unmap'/>
+      <source file='@VMDIR@/extra/vdb.qcow2'/>
+      <target dev='vdb' bus='virtio'/>
+      <serial>LAB-VDB</serial>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' discard='unmap'/>
+      <source file='@VMDIR@/extra/vdc.qcow2'/>
+      <target dev='vdc' bus='virtio'/>
+      <serial>LAB-VDC</serial>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' discard='unmap'/>
+      <source file='@VMDIR@/extra/vdd.qcow2'/>
+      <target dev='vdd' bus='virtio'/>
+      <serial>LAB-VDD</serial>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' discard='unmap'/>
+      <source file='@VMDIR@/extra/sda.qcow2'/>
+      <target dev='sda' bus='sata' rotation_rate='1'/>
+      <serial>LAB-SSD</serial>
+    </disk>
+    <disk type='file' device='cdrom'>
+      <driver name='qemu' type='raw'/>
+      <source file='/usr/share/lab-disks/linuc-media.iso'/>
+      <target dev='sdb' bus='sata'/>
+      <readonly/>
+    </disk>
+    <controller type='usb' index='0' model='qemu-xhci' ports='8'/>
+    <serial type='pty'/>
+    <console type='pty'/>
+    <channel type='unix'>
+      <target type='virtio' name='org.qemu.guest_agent.0'/>
+    </channel>
+    <rng model='virtio'><backend model='random'>/dev/urandom</backend></rng>
+  </devices>
+  <qemu:commandline>
+    <qemu:arg value='-netdev'/>
+    <qemu:arg value='user,id=lab0,hostfwd=tcp:127.0.0.1:2222-:22'/>
+    <qemu:arg value='-device'/>
+    <qemu:arg value='virtio-net-pci,netdev=lab0,mac=52:54:00:12:34:56,addr=0x10'/>
+  </qemu:commandline>
+</domain>

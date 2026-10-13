@@ -1,0 +1,1896 @@
+
+
+========== 0. 環境（検証環境ブロックの版の出どころ） ==========
+
+$ lab env
+テーマ    : lab-linuc-disks 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:disks-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+練習機    : running
+ゲスト    : Ubuntu 24.04.5 LTS / カーネル 6.8.0-142-generic / 仮想化 qemu
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+$ vm status
+練習機     : linuc
+状態       : running
+エージェント: 応答あり
+ssh        : 待ち受け中（127.0.0.1:2222 → 練習機の 22）
+ディスク   : /home/lab/vm/linuc.qcow2（土台 /var/lib/lab-vm/linuc-guest.qcow2）
+
+$ virsh list --all
+ Id   Name    State
+-----------------------
+ 1    linuc   running
+
+
+$ virsh --version
+10.0.0
+
+$ qemu-system-x86_64 --version | head -1
+QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+
+$ uname -r
+6.8.0-142-generic
+
+$ dpkg-query -W -f="\${Package} \${Version}\n" util-linux fdisk e2fsprogs xfsprogs btrfs-progs dosfstools gdisk parted lvm2 udev kmod usbutils pciutils efibootmgr
+btrfs-progs 6.6.3-1.1build2
+dosfstools 4.2-1.1build1
+e2fsprogs 1.47.0-2.4~exp1ubuntu4.1
+efibootmgr 18-1build2
+fdisk 2.39.3-9ubuntu6.6
+gdisk 1.0.10-1build1
+kmod 31+20240202-2ubuntu7.2
+lvm2 2.03.16-3ubuntu3.2
+parted 3.6-4build1
+pciutils 1:3.10.0-2build1
+udev 255.4-1ubuntu8.17
+usbutils 1:017-3build1
+util-linux 2.39.3-9ubuntu6.6
+xfsprogs 6.6.0-1ubuntu2.1
+
+
+========== 0b. ログインしたときに出る表示（実践編の入口に載せる） ==========
+
+$ bash -lic exit 2>/dev/null
+練習機 linuc: running（エージェント 応答あり / ssh 待ち受け中）
+  vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
+
+
+── lab-linuc-disks 1.0.0 ────────────────────────────────────────
+lab-linuc-disks  進捗 0/8
+  次 → 01 「vdb を SSD として扱わせる（再起動しても）」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-disks-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Tue Oct 13 11:36:25 2026 from 10.0.2.2
+student@linuc:~$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ lab
+lab-linuc-disks  進捗 0/8
+  次 → 01 「vdb を SSD として扱わせる（再起動しても）」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-disks-state）
+
+
+========== 第1章 HDD か SSD かは、装置の申告で決まる（1.05.1） ==========
+
+$ findmnt -t proc,sysfs,devtmpfs -o TARGET,SOURCE,FSTYPE
+TARGET
+      SOURCE   FSTYPE
+/dev  devtmpfs devtmpfs
+/proc proc     proc
+/sys  sysfs    sysfs
+
+$ ls -l /proc/cpuinfo
+-r--r--r-- 1 root root 0 Oct 13 11:35 /proc/cpuinfo
+
+$ grep -m1 "model name" /proc/cpuinfo
+model name	: QEMU TCG CPU version 2.5+
+
+$ grep -c ^processor /proc/cpuinfo
+2
+
+$ head -3 /proc/meminfo
+MemTotal:        1459128 kB
+MemFree:         1177460 kB
+MemAvailable:    1217252 kB
+
+$ head -4 /proc/interrupts
+           CPU0       CPU1       
+  0:        302          0   IO-APIC   2-edge      timer
+  1:          9          0   IO-APIC   1-edge      i8042
+  4:        492          0   IO-APIC   4-edge      ttyS0
+
+$ head -5 /proc/ioports
+0000-0000 : PCI Bus 0000:00
+  0000-0000 : dma1
+  0000-0000 : pic1
+  0000-0000 : timer0
+  0000-0000 : timer1
+
+$ sudo head -5 /proc/ioports
+0000-0cf7 : PCI Bus 0000:00
+  0000-001f : dma1
+  0020-0021 : pic1
+  0040-0043 : timer0
+  0050-0053 : timer1
+
+$ cat /proc/dma
+ 4: cascade
+
+$ cat /proc/partitions
+major minor  #blocks  name
+
+ 253        0   20971520 vda
+ 253        1   19921903 vda1
+ 253       14       4096 vda14
+ 253       15     108544 vda15
+ 259        0     934912 vda16
+ 253       16    2097152 vdb
+ 253       32    1048576 vdc
+ 253       48     262144 vdd
+ 253       50     102400 vdd2
+   8        0    1048576 sda
+  11        0        368 sr0
+
+$ ls /sys/block
+loop0  loop2  loop4  loop6  sda  vda  vdc
+loop1  loop3  loop5  loop7  sr0  vdb  vdd
+
+$ cat /sys/block/vdb/size
+4194304
+
+$ ls -l /dev/vda /dev/sda /dev/sr0
+brw-rw---- 1 root disk    8, 0 Oct 13 11:36 /dev/sda
+brw-rw---- 1 root cdrom  11, 0 Oct 13 11:36 /dev/sr0
+brw-rw---- 1 root disk  253, 0 Oct 13 11:36 /dev/vda
+
+$ lspci
+00:00.0 Host bridge: Intel Corporation 82G33/G31/P35/P31 Express DRAM Controller
+00:01.0 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:01.1 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:01.2 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:01.3 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:01.4 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:01.5 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:01.6 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:01.7 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:02.0 PCI bridge: Red Hat, Inc. QEMU PCIe Root port
+00:10.0 Ethernet controller: Red Hat, Inc. Virtio network device
+00:1f.0 ISA bridge: Intel Corporation 82801IB (ICH9) LPC Interface Controller (rev 02)
+00:1f.2 SATA controller: Intel Corporation 82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode] (rev 02)
+00:1f.3 SMBus: Intel Corporation 82801I (ICH9 Family) SMBus Controller (rev 02)
+01:00.0 USB controller: Red Hat, Inc. QEMU XHCI Host Controller (rev 01)
+02:00.0 Communication controller: Red Hat, Inc. Virtio 1.0 console (rev 01)
+03:00.0 SCSI storage controller: Red Hat, Inc. Virtio 1.0 block device (rev 01)
+04:00.0 SCSI storage controller: Red Hat, Inc. Virtio 1.0 block device (rev 01)
+05:00.0 SCSI storage controller: Red Hat, Inc. Virtio 1.0 block device (rev 01)
+06:00.0 SCSI storage controller: Red Hat, Inc. Virtio 1.0 block device (rev 01)
+07:00.0 Unclassified device [00ff]: Red Hat, Inc. Virtio 1.0 memory balloon (rev 01)
+08:00.0 Unclassified device [00ff]: Red Hat, Inc. Virtio 1.0 RNG (rev 01)
+
+$ lspci -k -s 00:1f.2
+00:1f.2 SATA controller: Intel Corporation 82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode] (rev 02)
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Kernel driver in use: ahci
+	Kernel modules: ahci
+
+$ lspci -nn -s 03:00.0
+03:00.0 SCSI storage controller [0100]: Red Hat, Inc. Virtio 1.0 block device [1af4:1042] (rev 01)
+
+$ lsusb
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+
+$ lsusb -t
+/:  Bus 001.Port 001: Dev 001, Class=root_hub, Driver=xhci_hcd/8p, 480M
+/:  Bus 002.Port 001: Dev 001, Class=root_hub, Driver=xhci_hcd/8p, 5000M
+
+$ virsh domblklist linuc
+ Target   Source
+------------------------------------------------
+ vda      /home/lab/vm/linuc.qcow2
+ vdb      /home/lab/vm/extra/vdb.qcow2
+ vdc      /home/lab/vm/extra/vdc.qcow2
+ vdd      /home/lab/vm/extra/vdd.qcow2
+ sda      /home/lab/vm/extra/sda.qcow2
+ sdb      /usr/share/lab-disks/linuc-media.iso
+
+
+$ lsblk -d -o NAME,TRAN,ROTA,RM,RO,SIZE,MODEL
+NAME
+    TRAN   ROTA RM RO  SIZE MODEL
+sda sata      0  0  0    1G QEMU HARDDISK
+sr0 sata      1  1  1  368K QEMU DVD-ROM
+vda virtio    1  0  0   20G 
+vdb virtio    1  0  0    2G 
+vdc virtio    1  0  0    1G 
+vdd virtio    1  0  0  256M 
+
+$ ls -l ~/vm/extra/*.qcow2
+-rw-r--r-- 1 lab lab  196624 Oct 13 11:35 /home/lab/vm/extra/sda.qcow2
+-rw-r--r-- 1 lab lab  196616 Oct 13 11:35 /home/lab/vm/extra/usb-a.qcow2
+-rw-r--r-- 1 lab lab  196616 Oct 13 11:35 /home/lab/vm/extra/usb-b.qcow2
+-rw-r--r-- 1 lab lab  196616 Oct 13 11:35 /home/lab/vm/extra/usb-check.qcow2
+-rw-r--r-- 1 lab lab  196640 Oct 13 11:35 /home/lab/vm/extra/vdb.qcow2
+-rw-r--r-- 1 lab lab  196624 Oct 13 11:35 /home/lab/vm/extra/vdc.qcow2
+-rw-r--r-- 1 lab lab 1048576 Oct 13 11:36 /home/lab/vm/extra/vdd.qcow2
+
+$ virsh dumpxml linuc | grep rotation_rate
+      <target dev='sda' bus='sata' rotation_rate='1'/>
+
+$ cat /sys/block/sda/queue/rotational /sys/block/vdb/queue/rotational
+0
+1
+
+$ echo 0 | sudo tee /sys/block/vdb/queue/rotational
+0
+
+$ lsblk -d -o NAME,ROTA /dev/vdb
+NAME
+    ROTA
+vdb    0
+
+$ sudo mount /dev/sr0 /mnt
+mount: /mnt: WARNING: source write-protected, mounted read-only.
+
+$ cat /mnt/README.TXT
+LinuC 練習用の光学メディア（CD-ROM のイメージ）
+
+このディスクは読み取り専用です。
+書き込もうとすると、ファイルシステムの権限ではなく、装置の側で断られます。
+
+$ touch /mnt/test.txt
+touch: cannot touch '/mnt/test.txt': Read-only file system
+
+$ sudo umount /mnt
+
+$ virsh change-media linuc sdb --eject
+Successfully ejected media.
+
+$ lsblk -d -o NAME,TYPE,RM,RO,SIZE /dev/sr0
+NAME
+    TYPE RM RO  SIZE
+sr0 rom   1  1  368K
+
+$ sudo mount /dev/sr0 /mnt
+mount: /mnt: no medium found on /dev/sr0.
+       dmesg(1) may have more information after failed mount system call.
+
+$ virsh change-media linuc sdb /usr/share/lab-disks/linuc-media.iso --insert
+Successfully inserted media.
+
+$ lsblk -d -o NAME,TYPE,RM,RO,SIZE /dev/sr0
+NAME
+    TYPE RM RO  SIZE
+sr0 rom   1  1  368K
+
+
+========== 第2章 ドライバは、外しても戻ってくる（1.05.1） ==========
+
+$ lsmod | head -5
+Module                  Size  Used by
+isofs                  61440  0
+kvm_amd               212992  0
+ccp                   147456  1 kvm_amd
+kvm                  1404928  1 kvm_amd
+
+$ lsmod | wc -l
+33
+
+$ grep -E "/(vfat|ext4|sr_mod)\.ko" /lib/modules/$(uname -r)/modules.builtin
+kernel/fs/ext4/ext4.ko
+kernel/fs/fat/vfat.ko
+kernel/drivers/scsi/sr_mod.ko
+
+$ lspci -k -s 00:1f.2
+00:1f.2 SATA controller: Intel Corporation 82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode] (rev 02)
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Kernel driver in use: ahci
+	Kernel modules: ahci
+
+$ lsmod | grep ahci
+ahci                   49152  0
+libahci                53248  1 ahci
+
+$ sudo modprobe -r ahci
+
+$ lsblk -d -o NAME,TRAN,SIZE
+NAME
+    TRAN    SIZE
+vda virtio   20G
+vdb virtio    2G
+vdc virtio    1G
+vdd virtio  256M
+
+$ lspci -k -s 00:1f.2
+00:1f.2 SATA controller: Intel Corporation 82801IR/IO/IH (ICH9R/DO/DH) 6 port SATA Controller [AHCI mode] (rev 02)
+	Subsystem: Red Hat, Inc. QEMU Virtual Machine
+	Kernel modules: ahci
+
+$ sudo modprobe ahci
+
+$ lsblk -d -o NAME,TRAN,SIZE
+NAME
+    TRAN    SIZE
+sda sata      1G
+sr0 sata    368K
+vda virtio   20G
+vdb virtio    2G
+vdc virtio    1G
+vdd virtio  256M
+
+$ modinfo -F depends btrfs
+raid6_pq,xor,libcrc32c
+
+$ sudo insmod /lib/modules/$(uname -r)/kernel/fs/btrfs/btrfs.ko.zst
+insmod: ERROR: could not insert module /lib/modules/6.8.0-142-generic/kernel/fs/btrfs/btrfs.ko.zst: Unknown symbol in module
+
+$ sudo dmesg | tail -4
+[  113.758486] btrfs: Unknown symbol xor_blocks (err -2)
+[  113.759027] btrfs: Unknown symbol raid6_2data_recov (err -2)
+[  113.760922] btrfs: Unknown symbol crc32c (err -2)
+[  113.760989] btrfs: Unknown symbol raid6_call (err -2)
+
+$ sudo modprobe -v btrfs
+insmod /lib/modules/6.8.0-142-generic/kernel/lib/libcrc32c.ko.zst 
+insmod /lib/modules/6.8.0-142-generic/kernel/lib/raid6/raid6_pq.ko.zst 
+insmod /lib/modules/6.8.0-142-generic/kernel/crypto/xor.ko.zst 
+insmod /lib/modules/6.8.0-142-generic/kernel/crypto/blake2b_generic.ko.zst 
+insmod /lib/modules/6.8.0-142-generic/kernel/fs/btrfs/btrfs.ko.zst 
+
+$ lsmod | grep -E "^(btrfs|xor|raid6_pq|libcrc32c|blake2b_generic) "
+btrfs                2060288  0
+blake2b_generic        24576  0
+xor                    20480  1 btrfs
+raid6_pq              126976  1 btrfs
+libcrc32c              12288  1 btrfs
+
+$ sudo modprobe -rv btrfs
+rmmod btrfs
+rmmod libcrc32c
+rmmod raid6_pq
+rmmod xor
+rmmod blake2b_generic
+
+$ virsh attach-device linuc ~/vm/extra/usb-a.xml
+Device attached successfully
+
+
+$ sudo timeout 30 udevadm monitor --subsystem-match=usb --subsystem-match=block
+monitor will print the received events for:
+UDEV - the event which udev sends out after rule processing
+KERNEL - the kernel uevent
+
+KERNEL[124.885724] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1 (usb)
+KERNEL[124.887977] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0 (usb)
+KERNEL[124.888367] bind     /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1 (usb)
+UDEV  [124.917820] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1 (usb)
+KERNEL[124.986812] bind     /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0 (usb)
+UDEV  [125.001829] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0 (usb)
+UDEV  [125.026645] bind     /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1 (usb)
+UDEV  [125.043855] bind     /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0 (usb)
+KERNEL[126.081845] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb (block)
+KERNEL[126.107919] change   /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb (block)
+UDEV  [126.182831] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb (block)
+UDEV  [126.235372] change   /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb (block)
+
+$ lsusb
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 002 Device 002: ID 46f4:0001 QEMU QEMU USB HARDDRIVE
+
+$ lsusb -t
+/:  Bus 001.Port 001: Dev 001, Class=root_hub, Driver=xhci_hcd/8p, 480M
+/:  Bus 002.Port 001: Dev 001, Class=root_hub, Driver=xhci_hcd/8p, 5000M
+    |__ Port 001: Dev 002, If 0, Class=Mass Storage, Driver=usb-storage, 5000M
+
+$ lsblk -d -o NAME,TRAN,ROTA,RM,SIZE,MODEL,SERIAL
+NAME
+    TRAN   ROTA RM  SIZE MODEL         SERIAL
+sda sata      0  0    1G QEMU HARDDISK LAB-SSD
+sdb usb       1  1   64M QEMU HARDDISK LAB-USB-A
+sr0 sata      1  1  368K QEMU DVD-ROM  QM00003
+vda virtio    1  0   20G               
+vdb virtio    0  0    2G               LAB-VDB
+vdc virtio    1  0    1G               LAB-VDC
+vdd virtio    1  0  256M               LAB-VDD
+
+$ lsmod | grep -E "usb_storage|uas"
+uas                    28672  0
+usb_storage            86016  1 uas
+
+$ sudo dmesg | tail -12
+[  125.003891] usb-storage 2-1:1.0: USB Mass Storage device detected
+[  125.010403] scsi host6: usb-storage 2-1:1.0
+[  125.015845] usbcore: registered new interface driver usb-storage
+[  125.026365] usbcore: registered new interface driver uas
+[  126.069707] scsi 6:0:0:0: Direct-Access     QEMU     QEMU HARDDISK    2.5+ PQ: 0 ANSI: 5
+[  126.078626] sd 6:0:0:0: Attached scsi generic sg2 type 0
+[  126.080038] sd 6:0:0:0: Power-on or device reset occurred
+[  126.085137] sd 6:0:0:0: [sdb] 131072 512-byte logical blocks: (67.1 MB/64.0 MiB)
+[  126.086747] sd 6:0:0:0: [sdb] Write Protect is off
+[  126.086871] sd 6:0:0:0: [sdb] Mode Sense: 63 00 00 08
+[  126.089002] sd 6:0:0:0: [sdb] Write cache: enabled, read cache: enabled, doesn't support DPO or FUA
+[  126.108442] sd 6:0:0:0: [sdb] Attached SCSI removable disk
+
+$ ls -l /dev/disk/by-id/ | grep usb
+lrwxrwxrwx 1 root root  9 Oct 13 11:37 usb-QEMU_QEMU_HARDDISK_LAB-USB-A-0:0 -> ../../sdb
+
+$ sudo modprobe -r usb_storage
+modprobe: FATAL: Module usb_storage is in use.
+
+$ sudo rmmod usb_storage
+rmmod: ERROR: Module usb_storage is in use by: uas
+
+$ sudo modprobe -r uas
+
+$ lsmod | grep -E "usb_storage|uas"
+
+$ lsblk -d -o NAME,TRAN,SIZE,SERIAL
+NAME
+    TRAN    SIZE SERIAL
+sda sata      1G LAB-SSD
+sr0 sata    368K QM00003
+vda virtio   20G 
+vdb virtio    2G LAB-VDB
+vdc virtio    1G LAB-VDC
+vdd virtio  256M LAB-VDD
+
+$ lsusb
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 002 Device 002: ID 46f4:0001 QEMU QEMU USB HARDDRIVE
+
+$ lsusb -t
+/:  Bus 001.Port 001: Dev 001, Class=root_hub, Driver=xhci_hcd/8p, 480M
+/:  Bus 002.Port 001: Dev 001, Class=root_hub, Driver=xhci_hcd/8p, 5000M
+    |__ Port 001: Dev 002, If 0, Class=Mass Storage, Driver=[none], 5000M
+
+$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+Device detached successfully
+
+
+$ virsh attach-device linuc ~/vm/extra/usb-a.xml
+Device attached successfully
+
+
+$ lsmod | grep -E "usb_storage|uas"
+uas                    28672  0
+usb_storage            86016  1 uas
+
+$ lsblk -d -o NAME,TRAN,SIZE,SERIAL
+NAME
+    TRAN    SIZE SERIAL
+sda sata      1G LAB-SSD
+sdb usb      64M LAB-USB-A
+sr0 sata    368K QM00003
+vda virtio   20G 
+vdb virtio    2G LAB-VDB
+vdc virtio    1G LAB-VDC
+vdd virtio  256M LAB-VDD
+
+$ cat /sys/bus/usb/devices/2-1:1.0/modalias
+usb:v46F4p0001d0000dc00dsc00dp00ic08isc06ip50in00
+
+$ modprobe --resolve-alias $(cat /sys/bus/usb/devices/2-1:1.0/modalias)
+uas
+usb_storage
+
+$ modinfo usb_storage | grep -m3 alias
+alias:          usb:v*p*d*dc*dsc*dp*ic08isc06ip50in*
+alias:          usb:v*p*d*dc*dsc*dp*ic08isc05ip50in*
+alias:          usb:v*p*d*dc*dsc*dp*ic08isc04ip50in*
+
+$ grep -n "kmod load" /usr/lib/udev/rules.d/80-drivers.rules | head -1
+5:ENV{MODALIAS}=="?*", RUN{builtin}+="kmod load"
+
+$ ls /etc/modprobe.d/
+amd64-microcode-blacklist.conf  blacklist.conf
+blacklist-ath_pci.conf          disable-algif_aead.conf
+blacklist-firewire.conf         intel-microcode-blacklist.conf
+blacklist-framebuffer.conf      iwlwifi.conf
+blacklist-rare-network.conf
+
+$ cat /etc/modules
+# /etc/modules is obsolete and has been replaced by /etc/modules-load.d/.
+# Please see modules-load.d(5) and modprobe.d(5) for details.
+#
+# Updating this file still works, but it is undocumented and unsupported.
+
+$ echo "blacklist usb_storage" | sudo tee /etc/modprobe.d/lab-usb.conf
+blacklist usb_storage
+
+$ sudo modprobe -r uas
+
+$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+Device detached successfully
+
+
+$ virsh attach-device linuc ~/vm/extra/usb-a.xml
+Device attached successfully
+
+
+$ lsmod | grep -E "usb_storage|uas"
+uas                    28672  0
+usb_storage            86016  1 uas
+
+$ sudo systemctl restart systemd-udevd
+
+$ sudo modprobe -r uas
+
+$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+Device detached successfully
+
+
+$ virsh attach-device linuc ~/vm/extra/usb-a.xml
+Device attached successfully
+
+
+$ lsmod | grep -E "usb_storage|uas"
+uas                    28672  0
+usb_storage            86016  1 uas
+
+$ modprobe --show-depends uas
+insmod /lib/modules/6.8.0-142-generic/kernel/drivers/usb/storage/usb-storage.ko.zst 
+insmod /lib/modules/6.8.0-142-generic/kernel/drivers/usb/storage/uas.ko.zst 
+
+$ echo "install usb_storage /bin/false" | sudo tee /etc/modprobe.d/lab-usb.conf
+install usb_storage /bin/false
+
+$ sudo systemctl restart systemd-udevd
+
+$ sudo modprobe -r uas
+
+$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+Device detached successfully
+
+
+$ virsh attach-device linuc ~/vm/extra/usb-a.xml
+Device attached successfully
+
+
+$ lsmod | grep -E "usb_storage|uas"
+
+$ lsusb -t
+/:  Bus 001.Port 001: Dev 001, Class=root_hub, Driver=xhci_hcd/8p, 480M
+/:  Bus 002.Port 001: Dev 001, Class=root_hub, Driver=xhci_hcd/8p, 5000M
+    |__ Port 001: Dev 006, If 0, Class=Mass Storage, Driver=[none], 5000M
+
+$ lsblk -d -o NAME,TRAN,SIZE,SERIAL
+NAME
+    TRAN    SIZE SERIAL
+sda sata      1G LAB-SSD
+sr0 sata    368K QM00003
+vda virtio   20G 
+vdb virtio    2G LAB-VDB
+vdc virtio    1G LAB-VDC
+vdd virtio  256M LAB-VDD
+
+$ sudo modprobe usb_storage
+modprobe: ERROR: ../libkmod/libkmod-module.c:1084 command_do() Error running install command '/bin/false' for module usb_storage: retcode 1
+modprobe: ERROR: could not insert 'usb_storage': Invalid argument
+
+$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+Device detached successfully
+
+
+$ busctl list --no-pager | grep -E "^org\.freedesktop\.(systemd1|login1|hostname1|timedate1|network1)"
+org.freedesktop.hostname1         - -               -               (activatable) -                           -       -
+org.freedesktop.login1          448 systemd-logind  root            :1.3          systemd-logind.service      -       -
+org.freedesktop.network1        210 systemd-network systemd-network :1.0          systemd-networkd.service    -       -
+org.freedesktop.systemd1          1 systemd         root            :1.2          init.scope                  -       -
+org.freedesktop.timedate1         - -               -               (activatable) -                           -       -
+
+
+========== 第3章 パーティションの表は、目次にすぎない（1.05.2 / 1.05.3 MBR） ==========
+
+$ sudo fdisk -l /dev/vdb
+Disk /dev/vdb: 2 GiB, 2147483648 bytes, 4194304 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+$ sudo fdisk /dev/vdb
+
+Welcome to fdisk (util-linux 2.39.3).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS (MBR) disklabel with disk identifier 0xa741c5ae.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 1
+First sector (2048-4194303, default 2048): 
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (2048-4194303, default 4194303): +200M
+
+Created a new partition 1 of type 'Linux' and of size 200 MiB.
+
+Command (m for help): p
+Disk /dev/vdb: 2 GiB, 2147483648 bytes, 4194304 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xa741c5ae
+
+Device     Boot Start    End Sectors  Size Id Type
+/dev/vdb1        2048 411647  409600  200M 83 Linux
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+
+$ lsblk /dev/vdb
+NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+vdb    253:16   0    2G  0 disk 
+└─vdb1 253:17   0  200M  0 part 
+
+$ sudo mkfs.ext4 -q /dev/vdb1
+
+$ sudo mount /dev/vdb1 /mnt
+
+$ echo "まだここにある" | sudo tee /mnt/memo.txt
+まだここにある
+
+$ sudo umount /mnt
+
+$ sudo fdisk /dev/vdb
+
+Welcome to fdisk (util-linux 2.39.3).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): d
+Selected partition 1
+Partition 1 has been deleted.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+
+$ lsblk /dev/vdb
+NAME
+    MAJ:MIN RM SIZE RO TYPE MOUNTPOINTS
+vdb 253:16   0   2G  0 disk 
+
+$ sudo mount /dev/vdb1 /mnt
+mount: /mnt: special device /dev/vdb1 does not exist.
+       dmesg(1) may have more information after failed mount system call.
+
+$ sudo fdisk /dev/vdb
+
+Welcome to fdisk (util-linux 2.39.3).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 1
+First sector (2048-4194303, default 2048): 
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (2048-4194303, default 4194303): +200M
+
+Created a new partition 1 of type 'Linux' and of size 200 MiB.
+Partition #1 contains a ext4 signature.
+
+Do you want to remove the signature? [Y]es/[N]o: N
+
+Command (m for help): w
+
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+
+$ sudo mount /dev/vdb1 /mnt
+
+$ cat /mnt/memo.txt
+まだここにある
+
+$ sudo umount /mnt
+
+$ sudo dd if=/dev/vdb bs=1 skip=446 count=66 status=none | od -A d -t x1
+0000000 00 00 21 02 83 06 46 98 00 08 00 00 00 40 06 00
+0000016 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+*
+0000064 55 aa
+0000066
+
+$ sudo fdisk /dev/vdb
+
+Welcome to fdisk (util-linux 2.39.3).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+Partition type
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (2-4, default 2): 2
+First sector (411648-4194303, default 411648): 
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (411648-4194303, default 4194303): +100M
+
+Created a new partition 2 of type 'Linux' and of size 100 MiB.
+
+Command (m for help): n
+Partition type
+   p   primary (2 primary, 0 extended, 2 free)
+   e   extended (container for logical partitions)
+Select (default p): e
+Partition number (3,4, default 3): 3
+First sector (616448-4194303, default 616448): 
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (616448-4194303, default 4194303): 
+
+Created a new partition 3 of type 'Extended' and of size 1.7 GiB.
+
+Command (m for help): n
+All space for primary partitions is in use.
+Adding logical partition 5
+First sector (618496-4194303, default 618496): 
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (618496-4194303, default 4194303): +100M
+
+Created a new partition 5 of type 'Linux' and of size 100 MiB.
+
+Command (m for help): n
+All space for primary partitions is in use.
+Adding logical partition 6
+First sector (825344-4194303, default 825344): 
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (825344-4194303, default 4194303): +100M
+
+Created a new partition 6 of type 'Linux' and of size 100 MiB.
+
+Command (m for help): p
+Disk /dev/vdb: 2 GiB, 2147483648 bytes, 4194304 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xa741c5ae
+
+Device     Boot  Start     End Sectors  Size Id Type
+/dev/vdb1         2048  411647  409600  200M 83 Linux
+/dev/vdb2       411648  616447  204800  100M 83 Linux
+/dev/vdb3       616448 4194303 3577856  1.7G  5 Extended
+/dev/vdb5       618496  823295  204800  100M 83 Linux
+/dev/vdb6       825344 1030143  204800  100M 83 Linux
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+
+$ sudo fdisk -l /dev/vdb
+Disk /dev/vdb: 2 GiB, 2147483648 bytes, 4194304 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xa741c5ae
+
+Device     Boot  Start     End Sectors  Size Id Type
+/dev/vdb1         2048  411647  409600  200M 83 Linux
+/dev/vdb2       411648  616447  204800  100M 83 Linux
+/dev/vdb3       616448 4194303 3577856  1.7G  5 Extended
+/dev/vdb5       618496  823295  204800  100M 83 Linux
+/dev/vdb6       825344 1030143  204800  100M 83 Linux
+
+$ sudo gdisk -l /dev/vdb
+GPT fdisk (gdisk) version 1.0.10
+
+Partition table scan:
+  MBR: MBR only
+  BSD: not present
+  APM: not present
+  GPT: not present
+
+
+***************************************************************
+Found invalid GPT and valid MBR; converting MBR to GPT format
+in memory. 
+***************************************************************
+
+Disk /dev/vdb: 4194304 sectors, 2.0 GiB
+Sector size (logical/physical): 512/512 bytes
+Disk identifier (GUID): BEE035D7-4CC3-4C0D-AC8C-76964683841F
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 4194270
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 3170237 sectors (1.5 GiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048          411647   200.0 MiB   8300  Linux filesystem
+   2          411648          616447   100.0 MiB   8300  Linux filesystem
+   5          618496          823295   100.0 MiB   8300  Linux filesystem
+   6          825344         1030143   100.0 MiB   8300  Linux filesystem
+
+$ sudo parted /dev/vdb print
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdb: 2147MB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start   End     Size    Type      File system  Flags
+ 1      1049kB  211MB   210MB   primary   ext4
+ 2      211MB   316MB   105MB   primary
+ 3      316MB   2147MB  1832MB  extended
+ 5      317MB   422MB   105MB   logical
+ 6      423MB   527MB   105MB   logical
+
+
+$ sudo parted /dev/vdb rm 6
+Information: You may need to update /etc/fstab.
+
+                                                                          
+$ sudo parted /dev/vdb print
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdb: 2147MB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start   End     Size    Type      File system  Flags
+ 1      1049kB  211MB   210MB   primary   ext4
+ 2      211MB   316MB   105MB   primary
+ 3      316MB   2147MB  1832MB  extended
+ 5      317MB   422MB   105MB   logical
+
+
+$ sudo fdisk -l /dev/vdd
+Disk /dev/vdd: 256 MiB, 268435456 bytes, 524288 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x4c696e75
+
+Device     Boot  Start    End Sectors  Size Id Type
+/dev/vdd2       206848 411647  204800  100M 83 Linux
+
+
+========== 第4章 起動の入口は、マウントしなくても見つかる（1.05.2） ==========
+
+$ lsblk -o NAME,SIZE,FSTYPE,PARTTYPENAME,MOUNTPOINTS /dev/vda
+NAME     SIZE FSTYPE PARTTYPENAME        MOUNTPOINTS
+vda       20G                            
+├─vda1    19G ext4   Linux filesystem    /
+├─vda14    4M        BIOS boot           
+├─vda15  106M vfat   EFI System          /boot/efi
+└─vda16  913M ext4   Linux extended boot /boot
+
+$ cat /etc/fstab
+LABEL=cloudimg-rootfs	/	 ext4	discard,commit=30,errors=remount-ro	0 1
+LABEL=BOOT	/boot	ext4	defaults	0 2
+LABEL=UEFI	/boot/efi	vfat	umask=0077	0 1
+
+$ df -h / /boot /boot/efi
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root        19G  863M   18G   5% /
+/dev/vda16      881M  181M  639M  23% /boot
+/dev/vda15      105M  6.2M   99M   6% /boot/efi
+
+$ swapon --show
+
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           1.4Gi       238Mi       1.1Gi       784Ki       195Mi       1.2Gi
+Swap:             0B          0B          0B
+
+$ ls /boot/efi
+ls: cannot open directory '/boot/efi': Permission denied
+
+$ sudo ls -R /boot/efi/EFI
+/boot/efi/EFI:
+BOOT  ubuntu
+
+/boot/efi/EFI/BOOT:
+BOOTX64.EFI  fbx64.efi	mmx64.efi
+
+/boot/efi/EFI/ubuntu:
+BOOTX64.CSV  grub.cfg  grubx64.efi  mmx64.efi  shimx64.efi
+
+$ sudo efibootmgr
+BootCurrent: 0001
+Timeout: 0 seconds
+BootOrder: 0002,0001,0000
+Boot0000* UiApp	FvVol(7cb8bdc9-f8eb-4f34-aaea-3ee4af6516a1)/FvFile(462caa21-7614-4503-836e-8ab6f4662331)
+Boot0001* UEFI Misc Device	PciRoot(0x0)/Pci(0x1,0x2)/Pci(0x0,0x0){auto_created_boot_option}
+Boot0002* Ubuntu	HD(15,GPT,9606bc98-2904-4577-9584-a8310313a04c,0x2800,0x35000)/File(\EFI\ubuntu\shimx64.efi)
+
+$ sudo blkid /dev/vda15 /dev/vda16
+/dev/vda15: LABEL_FATBOOT="UEFI" LABEL="UEFI" UUID="B792-27AD" BLOCK_SIZE="512" TYPE="vfat" PARTUUID="9606bc98-2904-4577-9584-a8310313a04c"
+/dev/vda16: LABEL="BOOT" UUID="a5eecc38-8587-4601-9295-c92dabc20612" BLOCK_SIZE="4096" TYPE="ext4" PARTUUID="ce13a6f1-b3f2-4c7a-b3db-6d75505ad739"
+
+$ sudo cat /boot/efi/EFI/ubuntu/grub.cfg
+search.fs_uuid a5eecc38-8587-4601-9295-c92dabc20612 root 
+set prefix=($root)'/grub'
+configfile $prefix/grub.cfg
+
+$ sudo iconv -f UTF-16 -t UTF-8 /boot/efi/EFI/ubuntu/BOOTX64.CSV
+shimx64.efi,Ubuntu,,This is the boot entry for Ubuntu
+
+$ sudo cp /etc/fstab /etc/fstab.bak
+
+$ sudo sed -i 's|^LABEL=UEFI|#&|' /etc/fstab
+
+$ grep UEFI /etc/fstab
+#LABEL=UEFI	/boot/efi	vfat	umask=0077	0 1
+
+$ sudo reboot
+
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 11:42:17 JST):
+
+The system will reboot now!
+
+
+$ vm start
+練習機はもう動いています
+  起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+練習機が起動しました（20秒）
+  入るには:  ssh linuc   （抜けるときは exit）
+
+$ findmnt -o TARGET,SOURCE,FSTYPE /boot/efi
+
+$ ls -la /boot/efi
+total 8
+drwxr-xr-x 2 root root 4096 Sep  5 20:22 .
+drwxr-xr-x 5 root root 4096 Oct 13 10:06 ..
+
+$ systemctl is-system-running
+running
+
+$ sudo efibootmgr | head -3
+BootCurrent: 0002
+Timeout: 0 seconds
+BootOrder: 0002,0001,0000
+
+$ sudo cp /etc/fstab.bak /etc/fstab
+
+$ sudo systemctl daemon-reload
+
+$ sudo mount /boot/efi
+
+$ findmnt -o TARGET,SOURCE,FSTYPE /boot/efi
+TARGET    SOURCE     FSTYPE
+/boot/efi /dev/vda15 vfat
+
+$ sudo gdisk /dev/vdb
+GPT fdisk (gdisk) version 1.0.10
+
+Partition table scan:
+  MBR: MBR only
+  BSD: not present
+  APM: not present
+  GPT: not present
+
+
+***************************************************************
+Found invalid GPT and valid MBR; converting MBR to GPT format
+in memory. THIS OPERATION IS POTENTIALLY DESTRUCTIVE! Exit by
+typing 'q' if you don't want to convert your MBR partitions
+to GPT format!
+***************************************************************
+
+
+Command (? for help): o
+This option deletes all partitions and creates a new protective MBR.
+Proceed? (Y/N): Y
+
+Command (? for help): n
+Partition number (1-128, default 1): 
+First sector (34-4194270, default = 2048) or {+-}size{KMGTP}: 
+Last sector (2048-4194270, default = 4192255) or {+-}size{KMGTP}: +100M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): ef00
+Changed type of partition to 'EFI system partition'
+
+Command (? for help): n
+Partition number (2-128, default 2): 
+First sector (34-4194270, default = 206848) or {+-}size{KMGTP}: 
+Last sector (206848-4194270, default = 4192255) or {+-}size{KMGTP}: +300M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (3-128, default 3): 
+First sector (34-4194270, default = 821248) or {+-}size{KMGTP}: 
+Last sector (821248-4194270, default = 4192255) or {+-}size{KMGTP}: +256M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8200
+Changed type of partition to 'Linux swap'
+
+Command (? for help): n
+Partition number (4-128, default 4): 
+First sector (34-4194270, default = 1345536) or {+-}size{KMGTP}: 
+Last sector (1345536-4194270, default = 4192255) or {+-}size{KMGTP}: +600M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (5-128, default 5): 
+First sector (34-4194270, default = 2574336) or {+-}size{KMGTP}: 
+Last sector (2574336-4194270, default = 4192255) or {+-}size{KMGTP}: +400M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (6-128, default 6): 
+First sector (34-4194270, default = 3393536) or {+-}size{KMGTP}: 
+Last sector (3393536-4194270, default = 4192255) or {+-}size{KMGTP}: 
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): p
+Disk /dev/vdb: 4194304 sectors, 2.0 GiB
+Sector size (logical/physical): 512/512 bytes
+Disk identifier (GUID): 052C472B-056E-4DE7-9804-E7C2FC9B4B57
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 4194270
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 4029 sectors (2.0 MiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048          206847   100.0 MiB   EF00  EFI system partition
+   2          206848          821247   300.0 MiB   8300  Linux filesystem
+   3          821248         1345535   256.0 MiB   8200  Linux swap
+   4         1345536         2574335   600.0 MiB   8300  Linux filesystem
+   5         2574336         3393535   400.0 MiB   8300  Linux filesystem
+   6         3393536         4192255   390.0 MiB   8300  Linux filesystem
+
+Command (? for help): w
+
+Final checks complete. About to write GPT data. THIS WILL OVERWRITE EXISTING
+PARTITIONS!!
+
+Do you want to proceed? (Y/N): Y
+OK; writing new GUID partition table (GPT) to /dev/vdb.
+The operation has completed successfully.
+
+$ lsblk -o NAME,SIZE,FSTYPE,PARTTYPENAME /dev/vdb
+NAME    SIZE FSTYPE PARTTYPENAME
+vdb       2G        
+├─vdb1  100M ext4   EFI System
+├─vdb2  300M        Linux filesystem
+├─vdb3  256M        Linux swap
+├─vdb4  600M        Linux filesystem
+├─vdb5  400M        Linux filesystem
+└─vdb6  390M        Linux filesystem
+
+$ sudo parted /dev/vdb print
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdb: 2147MB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start   End     Size   File system  Name                  Flags
+ 1      1049kB  106MB   105MB  ext4         EFI system partition  boot, esp
+ 2      106MB   420MB   315MB               Linux filesystem
+ 3      420MB   689MB   268MB               Linux swap            swap
+ 4      689MB   1318MB  629MB               Linux filesystem
+ 5      1318MB  1737MB  419MB               Linux filesystem
+ 6      1737MB  2146MB  409MB               Linux filesystem
+
+
+
+========== 第5章 LV を広げても、ファイルシステムは広がらない（1.05.2） ==========
+
+$ lsblk -o NAME,SIZE,TYPE,TRAN /dev/vdc /dev/sda
+NAME
+    SIZE TYPE TRAN
+sda   1G disk sata
+vdc   1G disk virtio
+
+$ sudo pvcreate /dev/vdc /dev/sda
+  Physical volume "/dev/vdc" successfully created.
+  Physical volume "/dev/sda" successfully created.
+
+$ sudo pvs
+  PV         VG Fmt  Attr PSize PFree
+  /dev/sda      lvm2 ---  1.00g 1.00g
+  /dev/vdc      lvm2 ---  1.00g 1.00g
+
+$ sudo vgcreate vg0 /dev/vdc /dev/sda
+  Volume group "vg0" successfully created
+
+$ sudo vgs
+  VG  #PV #LV #SN Attr   VSize VFree
+  vg0   2   0   0 wz--n- 1.99g 1.99g
+
+$ sudo vgdisplay vg0
+  --- Volume group ---
+  VG Name               vg0
+  System ID             
+  Format                lvm2
+  Metadata Areas        2
+  Metadata Sequence No  1
+  VG Access             read/write
+  VG Status             resizable
+  MAX LV                0
+  Cur LV                0
+  Open LV               0
+  Max PV                0
+  Cur PV                2
+  Act PV                2
+  VG Size               1.99 GiB
+  PE Size               4.00 MiB
+  Total PE              510
+  Alloc PE / Size       0 / 0   
+  Free  PE / Size       510 / 1.99 GiB
+  VG UUID               VuLyMM-4bAu-wA0z-P5pH-zH8a-IgRh-6DGlIb
+   
+
+$ sudo lvcreate -L 600M -n data vg0
+  Logical volume "data" created.
+
+$ sudo lvs
+  LV   VG  Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  data vg0 -wi-a----- 600.00m                                                    
+
+$ ls -l /dev/vg0/data /dev/mapper/vg0-data
+lrwxrwxrwx 1 root root 7 Oct 13 11:44 /dev/mapper/vg0-data -> ../dm-0
+lrwxrwxrwx 1 root root 7 Oct 13 11:44 /dev/vg0/data -> ../dm-0
+
+$ sudo mkfs.ext4 -q /dev/vg0/data
+
+$ sudo mkdir -p /srv/data
+
+$ sudo mount /dev/vg0/data /srv/data
+
+$ df -h /srv/data
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/vg0-data  574M   24K  532M   1% /srv/data
+
+$ sudo lvextend -L +800M vg0/data
+  Size of logical volume vg0/data changed from 600.00 MiB (150 extents) to <1.37 GiB (350 extents).
+  Logical volume vg0/data successfully resized.
+
+$ sudo lvs vg0/data
+  LV   VG  Attr       LSize  Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  data vg0 -wi-ao---- <1.37g                                                    
+
+$ df -h /srv/data
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/vg0-data  574M   24K  532M   1% /srv/data
+
+$ sudo resize2fs /dev/vg0/data
+resize2fs 1.47.0 (5-Feb-2023)
+Filesystem at /dev/vg0/data is mounted on /srv/data; on-line resizing required
+old_desc_blocks = 1, new_desc_blocks = 1
+The filesystem on /dev/vg0/data is now 358400 (4k) blocks long.
+
+
+$ df -h /srv/data
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/vg0-data  1.4G   24K  1.3G   1% /srv/data
+
+$ sudo lvs -o lv_name,lv_size,devices vg0
+  LV   LSize  Devices    
+  data <1.37g /dev/vdc(0)
+  data <1.37g /dev/sda(0)
+
+$ sudo lvextend -r -L +200M vg0/data
+  Size of logical volume vg0/data changed from <1.37 GiB (350 extents) to 1.56 GiB (400 extents).
+  Logical volume vg0/data successfully resized.
+resize2fs 1.47.0 (5-Feb-2023)
+Filesystem at /dev/mapper/vg0-data is mounted on /srv/data; on-line resizing required
+old_desc_blocks = 1, new_desc_blocks = 1
+The filesystem on /dev/mapper/vg0-data is now 409600 (4k) blocks long.
+
+
+$ df -h /srv/data
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/vg0-data  1.6G   24K  1.5G   1% /srv/data
+
+$ sudo umount /srv/data
+
+$ sudo lvreduce -r -L 1.2G vg0/data
+  Rounding size to boundary between physical extents: 1.20 GiB.
+fsck from util-linux 2.39.3
+/dev/mapper/vg0-data: 11/99840 files (0.0% non-contiguous), 10824/409600 blocks
+resize2fs 1.47.0 (5-Feb-2023)
+Resizing the filesystem on /dev/mapper/vg0-data to 315392 (4k) blocks.
+The filesystem on /dev/mapper/vg0-data is now 315392 (4k) blocks long.
+
+  Size of logical volume vg0/data changed from 1.56 GiB (400 extents) to 1.20 GiB (308 extents).
+  Logical volume vg0/data successfully resized.
+
+$ sudo mount /dev/vg0/data /srv/data
+
+$ df -h /srv/data
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/vg0-data  1.2G   24K  1.2G   1% /srv/data
+
+$ sudo lvcreate -L 300M -n logs vg0
+  Logical volume "logs" created.
+
+$ sudo mkfs.xfs -q /dev/vg0/logs
+
+$ sudo mkdir -p /srv/logs
+
+$ sudo mount /dev/vg0/logs /srv/logs
+
+$ sudo lvreduce -r -L 200M vg0/logs
+fsadm: Xfs filesystem shrinking is unsupported.
+  /usr/sbin/fsadm failed: 1
+  Filesystem resize failed.
+
+$ sudo umount /srv/logs
+
+$ sudo lvremove -y vg0/logs
+  Logical volume "logs" successfully removed.
+
+$ echo "スナップショットの前" | sudo tee /srv/data/note.txt
+スナップショットの前
+
+$ sudo lvcreate -s -L 100M -n snap vg0/data
+  Logical volume "snap" created.
+
+$ sudo lvs vg0
+  LV   VG  Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  data vg0 owi-aos---   1.20g                                                    
+  snap vg0 swi-a-s--- 100.00m      data   0.01                                   
+
+$ sudo rm /srv/data/note.txt
+
+$ sudo dd if=/dev/urandom of=/srv/data/big bs=1M count=40 status=none; sync
+
+$ sudo lvs vg0
+  LV   VG  Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  data vg0 owi-aos---   1.20g                                                    
+  snap vg0 swi-a-s--- 100.00m      data   40.22                                  
+
+$ sudo mkdir -p /mnt/snap
+
+$ sudo mount -o ro /dev/vg0/snap /mnt/snap
+
+$ ls /srv/data /mnt/snap
+/mnt/snap:
+lost+found  note.txt
+
+/srv/data:
+big  lost+found
+
+$ cat /mnt/snap/note.txt
+スナップショットの前
+
+$ sudo cp /mnt/snap/note.txt /srv/data/
+
+$ sudo umount /mnt/snap
+
+$ sudo lvremove -y vg0/snap
+  Logical volume "snap" successfully removed.
+
+$ sudo rm /srv/data/big
+
+$ sudo pvs
+  PV         VG  Fmt  Attr PSize    PFree  
+  /dev/sda   vg0 lvm2 a--  1020.00m 808.00m
+  /dev/vdc   vg0 lvm2 a--  1020.00m      0 
+
+$ sudo lvs -o lv_name,lv_size,devices vg0
+  LV   LSize Devices    
+  data 1.20g /dev/vdc(0)
+  data 1.20g /dev/sda(0)
+
+
+========== 第6章 ファイルシステムは、作った大きさより小さく見える（1.05.3） ==========
+
+$ ls /sbin/mkfs*
+/sbin/mkfs        /sbin/mkfs.cramfs  /sbin/mkfs.ext4   /sbin/mkfs.msdos
+/sbin/mkfs.bfs    /sbin/mkfs.ext2    /sbin/mkfs.fat    /sbin/mkfs.vfat
+/sbin/mkfs.btrfs  /sbin/mkfs.ext3    /sbin/mkfs.minix  /sbin/mkfs.xfs
+
+$ sudo wipefs /dev/vdb1
+DEVICE OFFSET TYPE UUID                                 LABEL
+vdb1   0x438  ext4 a8de5231-01ff-4280-9c3c-ee8a1fc7c48f 
+
+$ sudo mkfs.vfat -F 32 -n ESP /dev/vdb1
+mkfs.fat 4.2 (2021-01-31)
+
+$ sudo wipefs /dev/vdb1
+DEVICE OFFSET TYPE UUID      LABEL
+vdb1   0x52   vfat B4B6-B341 ESP
+vdb1   0x0    vfat B4B6-B341 ESP
+vdb1   0x1fe  vfat B4B6-B341 ESP
+
+$ sudo mkfs -t ext3 -L BOOT /dev/vdb2
+mke2fs 1.47.0 (5-Feb-2023)
+Discarding device blocks: done                            
+Creating filesystem with 76800 4k blocks and 76800 inodes
+Filesystem UUID: 74c6caf1-aba6-4c82-8dbd-44a78984fc01
+Superblock backups stored on blocks: 
+	32768
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (4096 blocks): done
+Writing superblocks and filesystem accounting information: done
+
+
+$ sudo mkfs.xfs -L ROOT /dev/vdb4
+meta-data=/dev/vdb4              isize=512    agcount=4, agsize=38400 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=1
+         =                       reflink=1    bigtime=1 inobtcount=1 nrext64=0
+data     =                       bsize=4096   blocks=153600, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=16384, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+Discarding blocks...Done.
+
+$ sudo mkfs.btrfs -L VAR /dev/vdb5
+btrfs-progs v6.6.3
+See https://btrfs.readthedocs.io for more information.
+
+Performing full device TRIM /dev/vdb5 (400.00MiB) ...
+NOTE: several default settings have changed in version 5.15, please make sure
+      this does not affect your deployments:
+      - DUP for metadata (-m dup)
+      - enabled no-holes (-O no-holes)
+      - enabled free-space-tree (-R free-space-tree)
+
+Label:              VAR
+UUID:               6082e166-6679-4353-877b-6670c224ff0a
+Node size:          16384
+Sector size:        4096
+Filesystem size:    400.00MiB
+Block group profiles:
+  Data:             single            8.00MiB
+  Metadata:         DUP              32.00MiB
+  System:           DUP               8.00MiB
+SSD detected:       no
+Zoned device:       no
+Incompat features:  extref, skinny-metadata, no-holes, free-space-tree
+Runtime features:   free-space-tree
+Checksum:           crc32c
+Number of devices:  1
+Devices:
+   ID        SIZE  PATH     
+    1   400.00MiB  /dev/vdb5
+
+
+$ sudo mkfs.ext4 -L HOME /dev/vdb6
+mke2fs 1.47.0 (5-Feb-2023)
+Discarding device blocks: done                            
+Creating filesystem with 99840 4k blocks and 99840 inodes
+Filesystem UUID: 6eb166fa-bfb8-44d5-aac4-8712be4be5df
+Superblock backups stored on blocks: 
+	32720, 98160
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (4096 blocks): done
+Writing superblocks and filesystem accounting information: done
+
+
+$ lsblk -o NAME,FSTYPE,LABEL,UUID /dev/vdb
+NAME   FSTYPE LABEL UUID
+vdb                 
+├─vdb1 vfat   ESP   B4B6-B341
+├─vdb2 ext3   BOOT  74c6caf1-aba6-4c82-8dbd-44a78984fc01
+├─vdb3              
+├─vdb4 xfs    ROOT  86222446-c3ab-455d-a1f4-f79cdf37961b
+├─vdb5 btrfs  VAR   6082e166-6679-4353-877b-6670c224ff0a
+└─vdb6 ext4   HOME  6eb166fa-bfb8-44d5-aac4-8712be4be5df
+
+$ sudo mount /dev/vdb6 /mnt
+
+$ df -h /mnt
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vdb6       350M   24K  323M   1% /mnt
+
+$ df -m /mnt
+Filesystem     1M-blocks  Used Available Use% Mounted on
+/dev/vdb6            350     1       323   1% /mnt
+
+$ sudo tune2fs -l /dev/vdb6 | grep -E "^(Block count|Reserved block count|Block size|Reserved blocks uid)"
+Block count:              99840
+Reserved block count:     4909
+Block size:               4096
+Reserved blocks uid:      0 (user root)
+
+$ sudo tune2fs -m 1 /dev/vdb6
+tune2fs 1.47.0 (5-Feb-2023)
+Setting reserved blocks percentage to 1% (998 blocks)
+
+$ df -m /mnt
+Filesystem     1M-blocks  Used Available Use% Mounted on
+/dev/vdb6            350     1       338   1% /mnt
+
+$ sudo umount /mnt
+
+$ for p in 1 2 4 5 6; do sudo mount /dev/vdb$p /mnt && df -h --output=source,fstype,size,used,avail /mnt | tail -1; sudo umount /mnt; done
+/dev/vdb1      vfat   99M   512   99M
+/dev/vdb2      ext3  266M   44K  251M
+/dev/vdb4      xfs   536M   41M  496M
+/dev/vdb5      btrfs  400M  5.8M  319M
+/dev/vdb6      ext4  350M   24K  338M
+
+$ sudo dumpe2fs -h /dev/vdb2 2>/dev/null | grep -i features
+Filesystem features:      has_journal ext_attr resize_inode dir_index filetype sparse_super large_file
+Journal features:         (none)
+
+$ sudo dumpe2fs -h /dev/vdb6 2>/dev/null | grep -i features
+Filesystem features:      has_journal ext_attr resize_inode dir_index filetype extent 64bit flex_bg sparse_super large_file huge_file dir_nlink extra_isize metadata_csum
+Journal features:         journal_64bit journal_checksum_v3
+
+$ sudo fsck /dev/vdb6
+fsck from util-linux 2.39.3
+e2fsck 1.47.0 (5-Feb-2023)
+HOME: clean, 11/99840 files, 10500/99840 blocks
+
+$ sudo fsck -f /dev/vdb6
+fsck from util-linux 2.39.3
+e2fsck 1.47.0 (5-Feb-2023)
+Pass 1: Checking inodes, blocks, and sizes
+Pass 2: Checking directory structure
+Pass 3: Checking directory connectivity
+Pass 4: Checking reference counts
+Pass 5: Checking group summary information
+HOME: 11/99840 files (0.0% non-contiguous), 10500/99840 blocks
+
+$ sudo fsck /dev/vdb4
+fsck from util-linux 2.39.3
+If you wish to check the consistency of an XFS filesystem or
+repair a damaged filesystem, see xfs_repair(8).
+
+$ sudo xfs_repair -n /dev/vdb4 2>&1 | tail -3
+        - moving disconnected inodes to lost+found ...
+Phase 7 - verify link counts...
+No modify flag set, skipping filesystem flush and exiting.
+
+$ sudo fsck /dev/vdb5
+fsck from util-linux 2.39.3
+If you wish to check the consistency of a BTRFS filesystem or
+repair a damaged filesystem, see btrfs(8) subcommand 'check'.
+
+
+========== 第7章 tmpfs は、メモリを先に取らない（1.05.3） ==========
+
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           1.4Gi       254Mi       1.1Gi       804Ki       202Mi       1.1Gi
+Swap:             0B          0B          0B
+
+$ sudo mkswap -L SWAP /dev/vdb3
+Setting up swapspace version 1, size = 256 MiB (268431360 bytes)
+LABEL=SWAP, UUID=0c9279db-9da9-402f-afe7-2fcb3eeef276
+
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           1.4Gi       256Mi       1.1Gi       804Ki       202Mi       1.1Gi
+Swap:             0B          0B          0B
+
+$ sudo swapon /dev/vdb3
+
+$ swapon --show
+NAME      TYPE      SIZE USED PRIO
+/dev/vdb3 partition 256M   0B   -2
+
+$ cat /proc/swaps
+Filename				Type		Size		Used		Priority
+/dev/vdb3                               partition	262140		0		-2
+
+$ swapon -s
+Filename				Type		Size		Used		Priority
+/dev/vdb3                               partition	262140		0		-2
+
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           1.4Gi       252Mi       1.1Gi       804Ki       202Mi       1.1Gi
+Swap:          255Mi          0B       255Mi
+
+$ sudo dd if=/dev/zero of=/swapfile bs=1M count=128 status=none
+
+$ ls -l /swapfile
+-rw-r--r-- 1 root root 134217728 Oct 13 11:46 /swapfile
+
+$ sudo mkswap /swapfile
+mkswap: /swapfile: insecure permissions 0644, fix with: chmod 0600 /swapfile
+Setting up swapspace version 1, size = 128 MiB (134213632 bytes)
+no label, UUID=205fce88-8104-48d8-af8c-a43bd76ae187
+
+$ sudo chmod 600 /swapfile
+
+$ sudo swapon -p 10 /swapfile
+
+$ swapon --show
+NAME      TYPE      SIZE USED PRIO
+/dev/vdb3 partition 256M   0B   -2
+/swapfile file      128M   0B   10
+
+$ sudo swapoff /swapfile
+
+$ sudo rm /swapfile
+
+$ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb3)  none  swap  sw  0  0" | sudo tee -a /etc/fstab
+UUID=0c9279db-9da9-402f-afe7-2fcb3eeef276  none  swap  sw  0  0
+
+$ sudo systemctl daemon-reload
+
+$ sudo swapoff /dev/vdb3
+
+$ swapon --show
+
+$ sudo swapon -a
+
+$ swapon --show
+NAME      TYPE      SIZE USED PRIO
+/dev/vdb3 partition 256M   0B   -2
+
+$ findmnt -t tmpfs -o TARGET,FSTYPE,SIZE
+TARGET           FSTYPE   SIZE
+/dev/shm         tmpfs  712.5M
+/run             tmpfs    285M
+├─/run/lock      tmpfs      5M
+└─/run/user/1000 tmpfs  142.5M
+
+$ free -m
+               total        used        free      shared  buff/cache   available
+Mem:            1424         252        1118           0         202        1172
+Swap:            255           0         255
+
+$ sudo mkdir -p /mnt/ram
+
+$ sudo mount -t tmpfs -o size=4G tmpfs /mnt/ram
+
+$ df -h /mnt/ram
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           4.0G     0  4.0G   0% /mnt/ram
+
+$ free -m
+               total        used        free      shared  buff/cache   available
+Mem:            1424         252        1118           0         202        1172
+Swap:            255           0         255
+
+$ sudo dd if=/dev/zero of=/mnt/ram/fill bs=1M count=300 status=none
+
+$ free -m
+               total        used        free      shared  buff/cache   available
+Mem:            1424         552         817         300         503         872
+Swap:            255           0         255
+
+$ df -h /mnt/ram
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           4.0G  300M  3.8G   8% /mnt/ram
+
+$ sudo umount /mnt/ram
+
+$ free -m
+               total        used        free      shared  buff/cache   available
+Mem:            1424         254        1116           0         203        1170
+Swap:            255           0         255
+
+
+========== 第8章 マウントは、名前ではなく中身の印で指す（1.05.3） ==========
+
+$ sudo mount /dev/vdb4 /mnt/newroot
+mount: /mnt/newroot: mount point does not exist.
+       dmesg(1) may have more information after failed mount system call.
+
+$ sudo mkdir -p /mnt/newroot
+
+$ sudo touch /mnt/newroot/HIDDEN
+
+$ ls /mnt/newroot
+HIDDEN
+
+$ sudo mount /dev/vdb4 /mnt/newroot
+
+$ ls -a /mnt/newroot
+.  ..
+
+$ findmnt -o TARGET,SOURCE,FSTYPE /mnt/newroot
+TARGET       SOURCE    FSTYPE
+/mnt/newroot /dev/vdb4 xfs
+
+$ cd /mnt/newroot && sudo umount /mnt/newroot
+umount: /mnt/newroot: target is busy.
+
+$ sudo umount /mnt/newroot
+
+$ ls /mnt/newroot
+HIDDEN
+
+$ sudo rm /mnt/newroot/HIDDEN
+
+$ sudo rm /etc/modprobe.d/lab-usb.conf
+
+$ sudo systemctl restart systemd-udevd
+
+$ virsh attach-device linuc ~/vm/extra/usb-a.xml
+Device attached successfully
+
+
+$ lsblk -d -o NAME,TRAN,SIZE,SERIAL /dev/sdb
+NAME
+    TRAN SIZE SERIAL
+sdb usb   64M LAB-USB-A
+
+$ sudo mkfs.vfat -n STICK_A /dev/sdb
+mkfs.fat 4.2 (2021-01-31)
+
+$ sudo mkdir -p /media/stick
+
+$ sudo mount /dev/sdb /media/stick
+
+$ echo "これは A" | sudo tee /media/stick/who.txt
+これは A
+
+$ sudo umount /media/stick
+
+$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+Device detached successfully
+
+
+$ virsh attach-device linuc ~/vm/extra/usb-b.xml
+Device attached successfully
+
+
+$ lsblk -d -o NAME,TRAN,SIZE,SERIAL /dev/sdb
+NAME
+    TRAN SIZE SERIAL
+sdb usb   64M LAB-USB-B
+
+$ sudo mkfs.ext4 -q -L STICK_B /dev/sdb
+
+$ virsh attach-device linuc ~/vm/extra/usb-a.xml
+Device attached successfully
+
+
+$ lsblk -o NAME,TRAN,FSTYPE,LABEL,SERIAL /dev/sdb /dev/sdc
+NAME
+    TRAN FSTYPE LABEL   SERIAL
+sdb usb  ext4   STICK_B LAB-USB-B
+sdc usb  vfat   STICK_A LAB-USB-A
+
+$ sudo mount /dev/sdb /media/stick
+
+$ cat /media/stick/who.txt
+cat: /media/stick/who.txt: No such file or directory
+
+$ findmnt -o TARGET,SOURCE,FSTYPE /media/stick
+TARGET       SOURCE   FSTYPE
+/media/stick /dev/sdb ext4
+
+$ sudo umount /media/stick
+
+$ sudo blkid /dev/sdb /dev/sdc
+/dev/sdb: LABEL="STICK_B" UUID="8aed2560-5886-49a8-99cd-70276d07e13e" BLOCK_SIZE="4096" TYPE="ext4"
+/dev/sdc: SEC_TYPE="msdos" LABEL_FATBOOT="STICK_A" LABEL="STICK_A" UUID="BC85-F592" BLOCK_SIZE="512" TYPE="vfat"
+
+$ ls -l /dev/disk/by-label/
+total 0
+lrwxrwxrwx 1 root root 10 Oct 13 11:45 BOOT -> ../../vdb2
+lrwxrwxrwx 1 root root 10 Oct 13 11:45 ESP -> ../../vdb1
+lrwxrwxrwx 1 root root 10 Oct 13 11:45 HOME -> ../../vdb6
+lrwxrwxrwx 1 root root 10 Oct 13 11:42 KEEP -> ../../vdd2
+lrwxrwxrwx 1 root root  9 Oct 13 11:42 LINUC_MEDIA -> ../../sr0
+lrwxrwxrwx 1 root root 10 Oct 13 11:45 ROOT -> ../../vdb4
+lrwxrwxrwx 1 root root  9 Oct 13 11:48 STICK_A -> ../../sdc
+lrwxrwxrwx 1 root root  9 Oct 13 11:48 STICK_B -> ../../sdb
+lrwxrwxrwx 1 root root 10 Oct 13 11:46 SWAP -> ../../vdb3
+lrwxrwxrwx 1 root root 11 Oct 13 11:42 UEFI -> ../../vda15
+lrwxrwxrwx 1 root root 10 Oct 13 11:45 VAR -> ../../vdb5
+lrwxrwxrwx 1 root root 10 Oct 13 11:42 cloudimg-rootfs -> ../../vda1
+
+$ sudo mount LABEL=STICK_A /media/stick
+
+$ cat /media/stick/who.txt
+これは A
+
+$ sudo umount /media/stick
+
+$ sudo findmnt --verify
+/boot
+   [W] ext4 does not match with on-disk ext3
+
+0 parse errors, 0 errors, 1 warning
+
+$ sudo blkid -t LABEL=BOOT
+/dev/vda16: LABEL="BOOT" UUID="a5eecc38-8587-4601-9295-c92dabc20612" BLOCK_SIZE="4096" TYPE="ext4" PARTUUID="ce13a6f1-b3f2-4c7a-b3db-6d75505ad739"
+/dev/vdb2: LABEL="BOOT" UUID="74c6caf1-aba6-4c82-8dbd-44a78984fc01" SEC_TYPE="ext2" BLOCK_SIZE="4096" TYPE="ext3" PARTLABEL="Linux filesystem" PARTUUID="5deb915b-df21-474b-8c75-62ec2696b68a"
+
+$ sudo blkid -L BOOT
+/dev/vdb2
+
+$ sudo e2label /dev/vdb2 NEWBOOT
+
+$ sudo e2label /dev/vdb2
+NEWBOOT
+
+$ sudo xfs_admin -l /dev/vdb4
+label = "ROOT"
+
+$ sudo findmnt --verify
+Success, no errors or warnings detected
+
+$ cat /etc/fstab
+LABEL=cloudimg-rootfs	/	 ext4	discard,commit=30,errors=remount-ro	0 1
+LABEL=BOOT	/boot	ext4	defaults	0 2
+LABEL=UEFI	/boot/efi	vfat	umask=0077	0 1
+UUID=0c9279db-9da9-402f-afe7-2fcb3eeef276  none  swap  sw  0  0
+
+$ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb6)  /srv/home  ext4  defaults,nofail  0  2" | sudo tee -a /etc/fstab
+UUID=6eb166fa-bfb8-44d5-aac4-8712be4be5df  /srv/home  ext4  defaults,nofail  0  2
+
+$ sudo mkdir -p /srv/home
+
+$ sudo mount -a
+mount: (hint) your fstab has been modified, but systemd still uses
+       the old version; use 'systemctl daemon-reload' to reload.
+
+$ findmnt -o TARGET,SOURCE,FSTYPE /srv/home
+TARGET    SOURCE    FSTYPE
+/srv/home /dev/vdb6 ext4
+
+$ sudo systemctl daemon-reload
+
+$ sudo mount -o remount,ro /srv/home
+
+$ sudo touch /srv/home/test
+touch: cannot touch '/srv/home/test': Read-only file system
+
+$ sudo mount -o remount,rw /srv/home
+
+$ sudo touch /srv/home/test
+
+$ ls -l /dev/disk/by-uuid/ | grep vdb
+lrwxrwxrwx 1 root root 10 Oct 13 11:46 0c9279db-9da9-402f-afe7-2fcb3eeef276 -> ../../vdb3
+lrwxrwxrwx 1 root root 10 Oct 13 11:45 6082e166-6679-4353-877b-6670c224ff0a -> ../../vdb5
+lrwxrwxrwx 1 root root 10 Oct 13 11:45 6eb166fa-bfb8-44d5-aac4-8712be4be5df -> ../../vdb6
+lrwxrwxrwx 1 root root 10 Oct 13 11:45 74c6caf1-aba6-4c82-8dbd-44a78984fc01 -> ../../vdb2
+lrwxrwxrwx 1 root root 10 Oct 13 11:45 86222446-c3ab-455d-a1f4-f79cdf37961b -> ../../vdb4
+lrwxrwxrwx 1 root root 10 Oct 13 11:45 B4B6-B341 -> ../../vdb1
+
+$ mount /media/cdrom
+mount: /media/cdrom: can't find in /etc/fstab.
+
+$ sudo mkdir -p /media/cdrom
+
+$ echo "/dev/sr0  /media/cdrom  iso9660  ro,user,noauto  0  0" | sudo tee -a /etc/fstab
+/dev/sr0  /media/cdrom  iso9660  ro,user,noauto  0  0
+
+$ sudo systemctl daemon-reload
+
+$ mount /media/cdrom
+
+$ mount | grep /media/cdrom
+/dev/sr0 on /media/cdrom type iso9660 (ro,nosuid,nodev,noexec,relatime,nojoliet,check=s,map=n,blocksize=2048,iocharset=utf8,user=student)
+
+$ lsmod | grep isofs
+isofs                  61440  1
+
+$ ls -l /media/cdrom
+total 1
+-r--r--r-- 1 root root 227 Oct 13 09:00 README.TXT
+
+$ umount /media/cdrom
+
+$ echo "LABEL=STICK_A  /media/stick  vfat  user,noauto  0  0" | sudo tee -a /etc/fstab
+LABEL=STICK_A  /media/stick  vfat  user,noauto  0  0
+
+$ sudo systemctl daemon-reload
+
+$ mount /media/stick
+
+$ ls -l /media/stick
+total 2
+-rwxrwxr-x 1 student student 12 Oct 13 11:47 who.txt
+
+$ touch /media/stick/mine.txt
+
+$ umount /media/stick
+
+$ sudo mount /media/stick
+
+$ ls -l /media/stick
+total 2
+-rwxr-xr-x 1 root root  0 Oct 13 11:49 mine.txt
+-rwxr-xr-x 1 root root 12 Oct 13 11:47 who.txt
+
+$ sudo umount /media/stick
+
+$ sudo findmnt --verify
+Success, no errors or warnings detected
+
+$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+Device detached successfully
+
+
+$ virsh detach-device linuc ~/vm/extra/usb-b.xml
+Device detached successfully
+
+
+$ sudo reboot
+
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 11:49:33 JST):
+
+The system will reboot now!
+
+
+$ vm start
+練習機はもう動いています
+  起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+練習機が起動しました（22秒）
+  入るには:  ssh linuc   （抜けるときは exit）
+
+$ findmnt -o TARGET,SOURCE,FSTYPE /srv/home
+TARGET    SOURCE    FSTYPE
+/srv/home /dev/vdb6 ext4
+
+$ swapon --show
+NAME      TYPE      SIZE USED PRIO
+/dev/vdb3 partition 256M   0B   -2
+
+$ findmnt -o TARGET,SOURCE,FSTYPE /media/cdrom
+
+$ lsblk -o NAME,FSTYPE,LABEL,MOUNTPOINTS /dev/vdb
+NAME   FSTYPE LABEL   MOUNTPOINTS
+vdb                   
+├─vdb1 vfat   ESP     
+├─vdb2 ext3   NEWBOOT 
+├─vdb3 swap   SWAP    [SWAP]
+├─vdb4 xfs    ROOT    
+├─vdb5 btrfs  VAR     
+└─vdb6 ext4   HOME    /srv/home
+
+$ df -h /boot
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda16      881M  181M  639M  23% /boot
+
+
+========== おわり ==========
+
+$ lab env
+テーマ    : lab-linuc-disks 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:disks-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+練習機    : running
+ゲスト    : Ubuntu 24.04.5 LTS / カーネル 6.8.0-142-generic / 仮想化 qemu
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb

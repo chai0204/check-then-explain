@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. 起動の入口は、マウントしなくても見つかる — 確かめて説明する LinuC 主題1.05</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="linuc-disks">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-disks/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+</div>
+<h1>4. 起動の入口は、マウントしなくても見つかる</h1>
+<p class="lead">練習機の <code>/etc/fstab</code> から <code>/boot/efi</code> の行を消して再起動しても、練習機はふつうに起動する。UEFI のファームウェアは Linux より先に動き、ESP をパーティションの<b>種類</b>で見つけて、自分で中の FAT を読むからだ。マウントは、Linux が中身を書き換えるときの都合にすぎない。</p>
+<div class="badges"><span>前提: 第3章まで読了</span><span>前提: 練習機が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>UEFI が起動のときに何をどの順に読むか（NVRAM → GPT → ESP）を言える</li><li><code>/</code>・<code>/boot</code>・<code>/var</code>・<code>/home</code>・スワップを別々のパーティションにする理由を、用途で説明できる</li><li>gdisk で GPT の表を作り、種類（EF00・8200・8300）を割り当てられる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: Secure Boot と shim の署名の検証、GRUB の設定ファイルの書き方、BIOS（レガシー）での起動の流れの細部は扱わない。起動の流れそのものは主題1.01 のコースで扱う。ここで要るのは「ファームウェアは何を手がかりに ESP を見つけるか」だけである。</div></div>
+
+<h2 id="layout">練習機のディスクは、どう切られているか</h2>
+<div class="sgoal"><b>この節で分かること</b>: 実際に動いている Ubuntu が、ディスクをどう割り当てているか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -o NAME,SIZE,FSTYPE,PARTTYPENAME,MOUNTPOINTS /dev/vda
+NAME     SIZE FSTYPE PARTTYPENAME        MOUNTPOINTS
+vda       20G                            
+├─vda1    19G ext4   Linux filesystem    /
+├─vda14    4M        BIOS boot           
+├─vda15  106M vfat   EFI System          /boot/efi
+└─vda16  913M ext4   Linux extended boot /boot
+$ cat /etc/fstab
+LABEL=cloudimg-rootfs	/	 ext4	discard,commit=30,errors=remount-ro	0 1
+LABEL=BOOT	/boot	ext4	defaults	0 2
+LABEL=UEFI	/boot/efi	vfat	umask=0077	0 1
+$ df -h / /boot /boot/efi
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root        19G  863M   18G   5% /
+/dev/vda16      881M  181M  639M  23% /boot
+/dev/vda15      105M  6.2M   99M   6% /boot/efi
+$ swapon --show
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           1.4Gi       238Mi       1.1Gi       784Ki       195Mi       1.2Gi
+Swap:             0B          0B          0B</code></pre>
+<p>練習機（Ubuntu 24.04 のクラウドイメージ）は、ディスクを4つに分けている。</p>
+<div class="scroll"><table>
+<tr><th>区画</th><th>種類（PARTTYPENAME）</th><th>中身・マウント先</th><th>役目</th></tr>
+<tr><td>vda15</td><td>EFI System</td><td>vfat → <code>/boot/efi</code></td><td>ESP。UEFI が最初に読むブートローダの置き場所</td></tr>
+<tr><td>vda16</td><td>Linux extended boot</td><td>ext4 → <code>/boot</code></td><td>カーネルと initramfs と GRUB の設定</td></tr>
+<tr><td>vda1</td><td>Linux filesystem</td><td>ext4 → <code>/</code></td><td>それ以外の全部</td></tr>
+<tr><td>vda14</td><td>BIOS boot</td><td>（ファイルシステム無し）</td><td>BIOS で GPT のディスクから起動するときに GRUB が使う小さな区画。UEFI では使わない</td></tr>
+</table></div>
+<p><code>/var</code> と <code>/home</code> は分けていない。スワップも無い（<code>Swap: 0B</code>）。クラウドのサーバは1台を1つの用途に使い捨てることが多く、小さく作っておいて足りなくなれば作り直すからである。分ける理由は、この章の後半で表にする。</p>
+
+<h2 id="esp">ESP の中身と、ファームウェアの名簿</h2>
+<div class="sgoal"><b>この節で分かること</b>: ファームウェアが「どこの何を」起動するかを、何で指しているか。</div>
+<p>ESP の中を見る。<code>/boot/efi</code> は <code>umask=0077</code> でマウントされているので、root でないと中が読めない。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ls /boot/efi
+ls: cannot open directory '/boot/efi': Permission denied
+$ sudo ls -R /boot/efi/EFI
+/boot/efi/EFI:
+BOOT  ubuntu
+
+/boot/efi/EFI/BOOT:
+BOOTX64.EFI  fbx64.efi	mmx64.efi
+
+/boot/efi/EFI/ubuntu:
+BOOTX64.CSV  grub.cfg  grubx64.efi  mmx64.efi  shimx64.efi</code></pre>
+<p>次に、ファームウェア（UEFI）が覚えている起動の候補を見る。これはディスクではなく、マザーボードの不揮発メモリ（NVRAM）にある。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo efibootmgr
+BootCurrent: 0001   ← 今回はどの候補で起動したか
+Timeout: 0 seconds
+BootOrder: 0002,0001,0000   ← 試す順番
+Boot0000* UiApp	FvVol(7cb8bdc9-f8eb-4f34-aaea-3ee4af6516a1)/FvFile(462caa21-7614-4503-836e-8ab6f4662331)
+Boot0001* UEFI Misc Device	PciRoot(0x0)/Pci(0x1,0x2)/Pci(0x0,0x0){auto_created_boot_option}
+Boot0002* Ubuntu	HD(15,GPT,9606bc98-2904-4577-9584-a8310313a04c,0x2800,0x35000)/File(\EFI\ubuntu\shimx64.efi)   ← Ubuntu の候補
+$ sudo blkid /dev/vda15 /dev/vda16
+/dev/vda15: LABEL_FATBOOT="UEFI" LABEL="UEFI" UUID="B792-27AD" BLOCK_SIZE="512" TYPE="vfat" PARTUUID="9606bc98-2904-4577-9584-a8310313a04c"
+/dev/vda16: LABEL="BOOT" UUID="a5eecc38-8587-4601-9295-c92dabc20612" BLOCK_SIZE="4096" TYPE="ext4" PARTUUID="ce13a6f1-b3f2-4c7a-b3db-6d75505ad739"</code></pre>
+<p><code>Boot0002</code> の中身は <code>HD(15,GPT,9606bc98-…,…)/File(\EFI\ubuntu\shimx64.efi)</code> で、「GPT の 15 番目、固有の番号（PARTUUID）が <code>9606bc98-…</code> の区画の中の、このファイル」と読む。<code>blkid</code> の <code>vda15</code> の PARTUUID と一致している。<b>ファームウェアの名簿は、<code>/dev/vda15</code> という名前も <code>/boot/efi</code> というマウント先も知らない</b>。知っているのは表の上の位置と番号だけである。</p>
+<p>ESP の中の GRUB の設定は、さらに <code>/boot</code> の区画を UUID で探しに行く。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo cat /boot/efi/EFI/ubuntu/grub.cfg
+search.fs_uuid a5eecc38-8587-4601-9295-c92dabc20612 root 
+set prefix=($root)'/grub'
+configfile $prefix/grub.cfg
+$ sudo iconv -f UTF-16 -t UTF-8 /boot/efi/EFI/ubuntu/BOOTX64.CSV
+shimx64.efi,Ubuntu,,This is the boot entry for Ubuntu</code></pre>
+<p><code>search.fs_uuid a5eecc38-…</code> は <code>vda16</code>（<code>/boot</code>）の UUID である。起動の流れは、ファームウェア → ESP の shim → GRUB → <code>/boot</code> のカーネル、となる。どの段も、次の段を<b>番号（GUID・UUID）で</b>探している。</p>
+<p>もう1つ、<code>efibootmgr</code> の1行目に注目する。<code>BootCurrent: 0001</code>、つまり今回の起動は <code>Ubuntu</code>（0002）ではなく、ファームウェアがディスクを見て自分で作った候補 <code>UEFI Misc Device</code> から始まっている。練習機の NVRAM は最初の起動のときに空の雛形から作られるので、Ubuntu の候補はまだ無かった。ファームウェアは ESP の決まった場所（<code>\EFI\BOOT\BOOTX64.EFI</code>）を自分で探して起動し、その途中で shim の fallback が <code>BOOTX64.CSV</code>（「shimx64.efi を Ubuntu という名前で登録せよ」）を読んで <code>Boot0002</code> を足した。次の起動からは 0002 になるはずで、この章の再起動のあとで確かめる（ここまでにコンテナを止めて起動し直した人は、この時点ですでに 0002 になっている）。</p>
+<div class="analogy"><b>たとえ</b>: 建物の<b>守衛と来客名簿</b>に近い。守衛（ファームウェア）は名簿（NVRAM）を見て、図面の記号（GPT の種類と番号）で玄関（ESP）を探し、担当者（ブートローダ）を呼び出す。名簿に無ければ、決まった受付（<code>\EFI\BOOT\</code>）に行く。
+<br>ただし<b>崩れる点</b>: 守衛なら建物の中の事情（どの部屋を誰が使っているか）も聞けるが、ファームウェアは Linux の設定（<code>/etc/fstab</code> やマウント）を一切読まない。読むのは NVRAM と、表と、ESP の中身だけである。</div>
+
+<h2 id="naive">マウントを外すと、起動できなくなる？</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/boot/efi</code> のマウントが起動のどこで使われているか。</div>
+<p><code>/etc/fstab</code> の ESP の行を、先頭に <code>#</code> を付けて止める。元に戻せるように控えを取っておく。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo cp /etc/fstab /etc/fstab.bak
+$ sudo sed -i 's|^LABEL=UEFI|#&amp;|' /etc/fstab
+$ grep UEFI /etc/fstab
+#LABEL=UEFI	/boot/efi	vfat	umask=0077	0 1</code></pre>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>ESP は起動に使う区画で、Linux はそれを <code>/boot/efi</code> にマウントしている。
+起動するときにマウントされていなければ、ブートローダが読めず、練習機は起動できなくなるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo reboot
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 11:42:17 JST):
+
+The system will reboot now!</code></pre>
+<p>ssh が切れて外に戻る。少し待ってから、外で起動を待つ（<code>vm start</code> は、動いている練習機なら起動し終わるまで待つだけ）。</p>
+<pre data-where="外（lab@host）"><code>$ vm start
+練習機はもう動いています
+  起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+練習機が起動しました（20秒）
+  入るには:  ssh linuc   （抜けるときは exit）</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ findmnt -o TARGET,SOURCE,FSTYPE /boot/efi
+$ ls -la /boot/efi
+total 8
+drwxr-xr-x 2 root root 4096 Sep  5 20:22 .
+drwxr-xr-x 5 root root 4096 Oct 13 10:06 ..
+$ systemctl is-system-running
+running
+$ sudo efibootmgr | head -3
+BootCurrent: 0002   ← Ubuntu の候補（0002）で起動した
+Timeout: 0 seconds
+BootOrder: 0002,0001,0000</code></pre>
+<div class="then"><b>だめな理由</b>: ふつうに起動し、<code>running</code>（不具合なし）になった。<code>/boot/efi</code> は空のディレクトリのままである。
+ファームウェアは Linux が動き出す<b>前</b>に、GPT の表から種類が EFI System の区画を見つけ、中の FAT を自分で読んで shim を起動している。
+<code>/etc/fstab</code> とマウントは、そのあとで Linux が使うものなので、起動には関わらない。
+<code>/boot/efi</code> にマウントするのは、パッケージの更新で GRUB や shim を<b>書き換える</b>ときのためである。
+そして今回の起動は <code>BootCurrent: 0002</code>、前の起動で shim が登録した Ubuntu の候補からだった。</div></div>
+<p>戻しておく。<code>/etc/fstab</code> を書き換えたら、起動時のマウントを受け持つ systemd に読み直させる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo cp /etc/fstab.bak /etc/fstab
+$ sudo systemctl daemon-reload
+$ sudo mount /boot/efi
+$ findmnt -o TARGET,SOURCE,FSTYPE /boot/efi
+TARGET    SOURCE     FSTYPE
+/boot/efi /dev/vda15 vfat</code></pre>
+<div class="analogy"><b>たとえ</b>: 店の<b>搬入口</b>に近い。棚の商品（ブートローダ）を入れ替えるときは搬入口（マウント）を使うが、客（ファームウェア）は正面玄関から入ってきて棚の商品を手に取る。搬入口を閉めても、店は開いている。
+<br>ただし<b>崩れる点</b>: 搬入口を閉めたままだと、商品の入れ替え（GRUB や shim の更新）が失敗する。起動には要らないが、外したまま運用してよいわけではない。</div>
+
+<h2 id="allocate">/・/boot・/var・/home・スワップを分ける理由</h2>
+<div class="sgoal"><b>この節で分かること</b>: 用途に合わせてパーティションを割り当てる考え方と、gdisk での作り方。</div>
+<p>新しいサーバのディスクを設計するとき、区画をどう分けるかは「いっぱいになったら何が困るか」「作り直すとき何を残したいか」で決める。</p>
+<div class="scroll"><table>
+<tr><th>区画</th><th>入るもの</th><th>分ける理由</th></tr>
+<tr><td>ESP</td><td>ブートローダ（FAT）</td><td>UEFI で起動するなら必須。ファームウェアが種類で探す</td></tr>
+<tr><td><code>/boot</code></td><td>カーネル・initramfs・GRUB の設定</td><td><code>/</code> を LVM や暗号化にしたとき、GRUB が読める単純な形で残すため</td></tr>
+<tr><td>スワップ</td><td>メモリから追い出したページ</td><td>メモリが足りないときの逃げ場。休止（ハイバネート）にはメモリと同じくらい要る（第7章）</td></tr>
+<tr><td><code>/</code></td><td>OS とプログラム</td><td>ほかが溢れても、これが溢れなければシステムは動く</td></tr>
+<tr><td><code>/var</code></td><td>ログ・メールの待ち行列・データベースなど、増え続けるもの</td><td>ログが溢れても <code>/</code> を道連れにしない</td></tr>
+<tr><td><code>/home</code></td><td>利用者のファイル</td><td>OS を入れ直しても残す。利用者が溢れさせても OS に響かない</td></tr>
+</table></div>
+<p>この割り当てを、第3章で使った <code>vdb</code> に作る。GPT は <code>gdisk</code> で切る。まず <code>o</code> で空の GPT にし直し、<code>n</code> で6つ作る。種類は4文字のコードで答える（<code>ef00</code> = EFI System、<code>8200</code> = Linux swap、<code>8300</code> = Linux filesystem。<code>L</code> で一覧）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo gdisk /dev/vdb
+GPT fdisk (gdisk) version 1.0.10
+
+Partition table scan:
+  MBR: MBR only
+  BSD: not present
+  APM: not present
+  GPT: not present
+
+
+***************************************************************
+Found invalid GPT and valid MBR; converting MBR to GPT format   ← 第3章の MBR を見つけて、メモリの上で GPT に変換した
+in memory. THIS OPERATION IS POTENTIALLY DESTRUCTIVE! Exit by
+typing 'q' if you don't want to convert your MBR partitions
+to GPT format!
+***************************************************************
+
+
+Command (? for help): o   ← o: 空の GPT にし直す
+This option deletes all partitions and creates a new protective MBR.
+Proceed? (Y/N): Y
+
+Command (? for help): n
+Partition number (1-128, default 1): 
+First sector (34-4194270, default = 2048) or {+-}size{KMGTP}: 
+Last sector (2048-4194270, default = 4192255) or {+-}size{KMGTP}: +100M   ← +100M: ESP の大きさ
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): ef00   ← ef00: 種類を ESP にする（これが目印になる）
+Changed type of partition to 'EFI system partition'
+
+...
+Command (? for help): n
+Partition number (6-128, default 6): 
+First sector (34-4194270, default = 3393536) or {+-}size{KMGTP}: 
+Last sector (3393536-4194270, default = 4192255) or {+-}size{KMGTP}:   ← Enter: 残り全部
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): p
+Disk /dev/vdb: 4194304 sectors, 2.0 GiB
+Sector size (logical/physical): 512/512 bytes
+Disk identifier (GUID): 052C472B-056E-4DE7-9804-E7C2FC9B4B57
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 4194270
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 4029 sectors (2.0 MiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048          206847   100.0 MiB   EF00  EFI system partition
+   2          206848          821247   300.0 MiB   8300  Linux filesystem
+   3          821248         1345535   256.0 MiB   8200  Linux swap
+   4         1345536         2574335   600.0 MiB   8300  Linux filesystem
+   5         2574336         3393535   400.0 MiB   8300  Linux filesystem
+   6         3393536         4192255   390.0 MiB   8300  Linux filesystem
+
+Command (? for help): w   ← w: ここで初めて書く
+
+Final checks complete. About to write GPT data. THIS WILL OVERWRITE EXISTING
+PARTITIONS!!
+
+Do you want to proceed? (Y/N): Y
+OK; writing new GUID partition table (GPT) to /dev/vdb.
+The operation has completed successfully.</code></pre>
+<p>2〜5番目も同じように作った（<code>+300M 8300</code>・<code>+256M 8200</code>・<code>+600M 8300</code>・<code>+400M 8300</code>）。できた表を2つの道具で見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -o NAME,SIZE,FSTYPE,PARTTYPENAME /dev/vdb
+NAME    SIZE FSTYPE PARTTYPENAME
+vdb       2G        
+├─vdb1  100M ext4   EFI System   ← 種類は EFI System、中身は ext4（第3章の残り）
+├─vdb2  300M        Linux filesystem
+├─vdb3  256M        Linux swap
+├─vdb4  600M        Linux filesystem
+├─vdb5  400M        Linux filesystem
+└─vdb6  390M        Linux filesystem
+$ sudo parted /dev/vdb print
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdb: 2147MB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start   End     Size   File system  Name                  Flags
+ 1      1049kB  106MB   105MB  ext4         EFI system partition  boot, esp
+ 2      106MB   420MB   315MB               Linux filesystem
+ 3      420MB   689MB   268MB               Linux swap            swap
+ 4      689MB   1318MB  629MB               Linux filesystem
+ 5      1318MB  1737MB  419MB               Linux filesystem
+ 6      1737MB  2146MB  409MB               Linux filesystem</code></pre>
+<p><code>vdb1</code> の FSTYPE が <code>ext4</code> になっている。種類は EFI System なのに、中身は第3章で作った ext4 のままである。<b>表を作り直しても、中身には触れていない</b>（第3章と同じ）。ESP の中身（FAT）は第6章で作る。<code>parted</code> は、種類を <code>boot, esp</code> や <code>swap</code> という旗（Flags）で表示する。</p>
+<div class="analogy"><b>たとえ</b>: 引っ越し先の<b>部屋割り</b>に近い。台所（<code>/var</code>）が散らかっても寝室（<code>/</code>）に物が溢れないよう、壁で仕切っておく。
+<br>ただし<b>崩れる点</b>: 部屋の壁は後から動かしにくいが、ディスクの仕切りも同じで、一度データを入れると広げ直すのが大変である。後から広げたい区画は、第5章の LVM に載せておくのが今のふつうのやり方である。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-disks/">演習04</a>は、この6つの区画を GPT に作る課題である（道具は gdisk・parted・fdisk のどれでもよい）。
+判定は表を読み、種類と大きさを1行ずつ比べる。この章のとおりに打った人は、もう達成している。</div>
+
+<div class="quiz"><b>確認</b>
+<p>UEFI のファームウェアが起動のときに ESP を見つける手がかりは何か。ESP の中のファイルシステムは何か。</p>
+<details><summary>答え</summary>
+<p>GPT の表に書かれたパーティションの種類（EFI System。gdisk のコードで EF00、GUID は C12A7328-…）。中は FAT（ふつう FAT32）。<code>/etc/fstab</code> やマウント先（<code>/boot/efi</code>）は手がかりにならない。ファームウェアは Linux より先に動くので、それらを読めない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/var</code> を <code>/</code> と別のパーティションにすると、どんな事故を防げるか。</p>
+<details><summary>答え</summary>
+<p>ログやメールの待ち行列などが増え続けて区画がいっぱいになっても、<code>/</code> まではいっぱいにならない。<code>/</code> が溢れると、ほかのプログラムが一時ファイルを書けなくなったり、ログインに必要なファイルが書けなくなったりする。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>efibootmgr</code> の出力の BootOrder と BootCurrent は何を表すか。</p>
+<details><summary>答え</summary>
+<p>BootOrder は、ファームウェアが起動の候補を試す順番。BootCurrent は、今回の起動で実際に使われた候補。どちらもディスクではなく NVRAM にある。練習機の最初の起動では、BootOrder の先頭は 0002 なのに BootCurrent は 0001 だった（起動の途中で 0002 が登録されたため）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>UEFI のファームウェアは NVRAM の候補（<code>efibootmgr</code>）を見て、GPT の表から種類が EFI System の区画（ESP）を探し、中の FAT を自分で読んでブートローダを起動する</li><li>候補は区画を「GPT の何番目・PARTUUID」で指す。<code>/dev/vda15</code> という名前も <code>/boot/efi</code> というマウント先も知らない</li><li><code>/boot/efi</code> のマウントを外しても起動する。マウントは、Linux がブートローダを<b>書き換える</b>ときのため</li><li><code>/</code>・<code>/boot</code>・<code>/var</code>・<code>/home</code>・スワップは「溢れたら困るもの」「残したいもの」で分ける</li><li>GPT は gdisk で切り、種類を4文字のコードで付ける（EF00・8200・8300）。表を作り直しても、中身は前のまま残る</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション、UEFI は OVMF）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・efibootmgr 18・gdisk 1.0.10・parted 3.6 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-disks/theory/03-partition">← 3. パーティションの表は、目次にすぎない</a><a href="/linuc-disks/theory/05-lvm">次: 5. LV を広げても、ファイルシステムは広がらない →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-disks/chapters.js"></script>
+<script src="/linuc-disks/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>
