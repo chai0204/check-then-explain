@@ -64,12 +64,16 @@ for (const theme of themes) {
     const first = where[0];
     console.log(`  章リンクの例: "${first?.textContent}" → ${first?.getAttribute("href")}`);
 
+    // 語が0なら（制作中のコースなど）上で失敗を記録したので、検索の試験は飛ばして次のコースへ進む。
+    // 以前は items[0] を参照して TypeError になり、以降の全コースの確認が止まっていた（2026-10-13）。
     const q = doc.getElementById("q");
-    q.value = items[0].querySelector("h3").textContent.slice(0, 3);
-    q.dispatchEvent(new w.Event("input"));
-    const shown = [...doc.querySelectorAll(".gitem")].filter((e) => e.style.display !== "none").length;
-    console.log(`  検索 "${q.value}" → ${shown}語（表示"${doc.getElementById("gcount").textContent}"）`);
-    if (shown === 0 || shown === items.length) fail("検索が絞り込めていない");
+    if (items.length && q) {
+      q.value = items[0].querySelector("h3").textContent.slice(0, 3);
+      q.dispatchEvent(new w.Event("input"));
+      const shown = [...doc.querySelectorAll(".gitem")].filter((e) => e.style.display !== "none").length;
+      console.log(`  検索 "${q.value}" → ${shown}語（表示"${doc.getElementById("gcount")?.textContent}"）`);
+      if (shown === 0 || shown === items.length) fail("検索が絞り込めていない");
+    }
   }
 
   // ---- 2. 理論編の各章（進捗バーと用語の自動リンク） ----
