@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6. スクリプトが返せるのは、0〜255 の数1つ — 確かめて説明する LinuC 主題1.06</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="6" data-theme="linuc-shell">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-shell/theory/">理論編</a> › 第6章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+</div>
+<h1>6. スクリプトが返せるのは、0〜255 の数1つ</h1>
+<p class="lead">スクリプトの最後に <code>exit 256</code> と書くと、呼んだ側の <code>$?</code> は <code>0</code>、つまり「成功」になる。終了ステータスは 0〜255 の数で、それより大きい値は 256 で割った余りしか残らない。子のプロセスが親に返せるものは、この小さな数1つしかない。だから <code>if</code> も <code>test</code> も、この数だけを見て動く。</p>
+<div class="badges"><span>前提: 第5章まで読了</span><span>所要 18分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.06.2（重要度6）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>$?</code> が何をいつまで持っているかを説明できる。0・1・2・126・127 の意味を言える</li><li><code>exit</code> の値と、<code>exit</code> を書かないスクリプトの終了ステータスを言える</li><li><code>test</code> と <code>[ ]</code> でファイル・文字列・数を比べられ、よくある書き間違い（空白・引用符）を見分けられる</li><li><code>if</code>・<code>elif</code>・<code>else</code> が、条件の<b>コマンドの終了ステータス</b>で分かれることを説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>[[ ]]</code> の詳しい文法（正規表現の <code>=~</code> など）、<code>(( ))</code> による数の比較、<code>set -e</code>・<code>trap</code>、シグナルで終わったときの 128+n の値。<code>test</code> の演算子は下の表にあるものだけで足りる。</div></div>
+
+<h2 id="status">$? は、直前の1つしか覚えていない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 終了ステータスの値の意味と、<code>$?</code> の寿命。</div>
+<pre><code>$ mkdir -p ~/try &amp;&amp; cd ~/try
+$ ls /nonexistent; echo $?
+ls: cannot access '/nonexistent': No such file or directory
+2
+$ echo $?
+0
+$ grep -q lab /etc/passwd; echo $?
+0
+$ grep -q nosuchuser /etc/passwd; echo $?
+1
+$ grep -q lab /nonexistent; echo $?
+grep: /nonexistent: No such file or directory
+2
+$ nosuchcommand; echo $?
+bash: nosuchcommand: command not found
+127</code></pre>
+<p><code>ls</code> の失敗で <code>2</code> だった <code>$?</code> が、次の行では <code>0</code> になった。<code>$?</code> が持っているのは<b>直前に終わったコマンドの値1つ</b>だけで、1行前の <code>echo $?</code> が成功した時点で上書きされている。値を後で使うなら、すぐ <code>rc=$?</code> のように変数へ移す。</p>
+<div class="scroll"><table>
+<tr><th>値</th><th>意味</th><th>この教材の記録</th></tr>
+<tr><td>0</td><td>成功</td><td><code>grep -q lab /etc/passwd</code></td></tr>
+<tr><td>1</td><td>失敗（何が「失敗」かはコマンドが決める）</td><td><code>grep</code> の「見つからない」</td></tr>
+<tr><td>2</td><td>使い方の誤り・ファイルが無いなど（<code>grep</code>・<code>ls</code> の場合）</td><td><code>grep … /nonexistent</code>・<code>ls /nonexistent</code></td></tr>
+<tr><td>126</td><td>見つかったが実行できない</td><td>第4章の <code>Permission denied</code></td></tr>
+<tr><td>127</td><td>コマンドが見つからない</td><td><code>nosuchcommand</code>・第2章のスクリプトの中の alias</td></tr>
+</table></div>
+
+<h2 id="exit">exit は 0〜255。それより大きい数は丸められる</h2>
+<div class="sgoal"><b>この節で分かること</b>: スクリプトが親に返す値の決まり方。</div>
+<p><code>exit 数</code> はスクリプトを終わらせ、その数を終了ステータスとして親に返す。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>0 以外は失敗なのだから、大きな数を返せば確実に失敗として伝わるはずだ。<code>exit 256</code> と書けば、呼んだ側の <code>$?</code> は 256 になり、<code>&amp;&amp;</code> の先は動かない。</p>
+<pre><code>$ printf '#!/bin/bash\nexit 3\n' &gt; ret.sh; bash ret.sh; echo $?
+3
+$ sed -i 's/exit 3/exit 255/' ret.sh; bash ret.sh; echo $?
+255
+$ sed -i 's/exit 255/exit 256/' ret.sh; cat ret.sh; bash ret.sh; echo $?
+#!/bin/bash
+exit 256
+0
+$ sed -i 's/exit 256/exit 257/' ret.sh; bash ret.sh; echo $?
+1
+$ bash -c 'exit -1'; echo $?
+255</code></pre>
+<div class="then"><b>だめな理由</b>: <code>exit 256</code> の結果は <code>0</code>、つまり<b>成功</b>として伝わった。<code>exit 257</code> は <code>1</code>、<code>exit -1</code> は <code>255</code> になった。
+終了ステータスは 0〜255 の範囲（8ビット）しか運べず、それを超えた値は 256 で割った余りになる。
+親が受け取れるのはこの小さな数1つだけで、文字列も変数も、大きな数も返せない。
+失敗を返したいなら 1〜255 の中で決める（慣習では 1 か 2）。</div></div>
+<p><code>exit</code> を書かないスクリプトは、<b>最後に実行したコマンドの値</b>で終わる。</p>
+<pre><code>$ printf '#!/bin/bash\nls /nonexistent\necho おわり\n' &gt; last.sh; bash last.sh; echo "終了ステータス $?"
+ls: cannot access '/nonexistent': No such file or directory
+おわり
+終了ステータス 0</code></pre>
+<p><code>ls</code> は失敗したが、最後の <code>echo</code> が成功したので、スクリプト全体は 0（成功）を返した。途中の失敗を伝えたいなら、自分で <code>exit</code> する。</p>
+<div class="analogy"><b>たとえ</b>: 終了ステータスは、子が帰るときに親へ渡す<b>0〜255 の番号が書ける札1枚</b>に近い。札に書けるのは3桁までで、256 と書こうとすると桁があふれて 0 になる。
+<br>ただし<b>崩れる点</b>: 札なら「あふれました」と気づけるが、bash は何も言わずに余りを渡す。<code>exit 256</code> は警告もなく「成功」として届く。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-shell/">演習05</a>は、最後が <code>echo</code> で終わっているせいで常に 0 を返すスクリプトを直す課題である。
+判定は 4 通りの引数で実際に実行し、毎回の <code>$?</code> を読む。</div>
+
+<h2 id="test">test と [ ] も、終了ステータスを返すコマンドである</h2>
+<div class="sgoal"><b>この節で分かること</b>: 条件の書き方と、よくある書き間違い。</div>
+<p><code>test 式</code> と <code>[ 式 ]</code> は同じもので、中に書いた<b>条件式</b>が正しければ 0、正しくなければ 1 を返す。</p>
+<pre><code>$ test -f /etc/passwd; echo $?
+0
+$ [ -f /etc/passwd ]; echo $?
+0
+$ [ -d /etc/passwd ]; echo $?
+1
+$ [ -e /nonexistent ]; echo $?
+1
+$ [ ! -e /nonexistent ]; echo $?
+0
+$ [ -r /etc/shadow ]; echo $?
+1
+$ [ -x /usr/bin/ls ]; echo $?
+0
+$ [ -s /etc/passwd ]; echo $?
+0
+$ [ -z "" ]; echo $?; [ -n "" ]; echo $?
+0
+1
+$ [ 1 -eq 01 ]; echo $?; [ 1 = 01 ]; echo $?
+0
+1
+$ [ 10 -gt 9 ]; echo $?; [ 10 \&gt; 9 ]; echo $?
+0
+1
+$ [ "abc" != "abd" ]; echo $?
+0</code></pre>
+<div class="scroll"><table>
+<tr><th>式</th><th>0（真）になる条件</th></tr>
+<tr><td><code>-e ファイル</code> / <code>-f</code> / <code>-d</code></td><td>在る / ふつうのファイル / ディレクトリ</td></tr>
+<tr><td><code>-r</code> / <code>-w</code> / <code>-x</code> / <code>-s</code></td><td>読める / 書ける / 実行できる / 大きさが 0 でない</td></tr>
+<tr><td><code>-z 文字列</code> / <code>-n 文字列</code></td><td>空 / 空でない</td></tr>
+<tr><td><code>文字列1 = 文字列2</code> / <code>!=</code></td><td>文字列として同じ / 違う</td></tr>
+<tr><td><code>数1 -eq 数2</code> / <code>-ne</code> <code>-lt</code> <code>-le</code> <code>-gt</code> <code>-ge</code></td><td>数として = ≠ &lt; ≤ &gt; ≥</td></tr>
+<tr><td><code>! 式</code> / <code>式1 -a 式2</code> / <code>式1 -o 式2</code></td><td>否定 / かつ / または</td></tr>
+</table></div>
+<p><code>1 -eq 01</code> は数として同じなので 0、<code>1 = 01</code> は文字列として違うので 1 になった。<code>10 \&gt; 9</code> は文字列の比較（辞書順で <code>1</code> は <code>9</code> より前）なので 1 になる。数を比べるときは <code>-gt</code> などを使う。<code>/etc/shadow</code> は lab に読めないので <code>-r</code> は 1 だった。</p>
+<p>書き間違いは2つが定番である。</p>
+<pre><code>$ x=; [ $x = yes ]; echo $?
+bash: [: =: unary operator expected
+2
+$ [ "$x" = yes ]; echo $?
+1
+$ [1 -eq 1]; echo $?
+bash: [1: command not found
+127</code></pre>
+<p>変数が空のとき、<code>[ $x = yes ]</code> は <code>[ = yes ]</code> になり、<code>[</code> が文法の誤りを報告して 2 を返した。<code>"$x"</code> と引用符で囲めば、空でも1つの語として残る。<code>[1 -eq 1]</code> は <code>[1</code> という名前のコマンドを探して 127 になった。<code>[</code> は記号ではなく<b>コマンドの名前</b>なので、前後に空白が要る。</p>
+<pre><code>$ type [ test [[
+[ is a shell builtin
+test is a shell builtin
+[[ is a shell keyword
+$ ls -l /usr/bin/[ /usr/bin/test
+-rwxr-xr-x 1 root root 55744 Aug 26 00:09 '/usr/bin/['
+-rwxr-xr-x 1 root root 47552 Aug 26 00:09  /usr/bin/test</code></pre>
+<p><code>[</code> と <code>test</code> は bash の組み込みコマンドで、同じものが <code>/usr/bin/[</code> という実行ファイルとしても在る。<code>[[</code> は bash のキーワードで、別の文法を持つ（ここでは扱わない）。</p>
+<div class="analogy"><b>たとえ</b>: <code>[</code> は<b>はい・いいえだけで答える係員</b>に近い。<code>[ -f /etc/passwd ]</code> と聞くと、係員は札（終了ステータス）を上げるだけで何も話さない。
+<br>ただし<b>崩れる点</b>: 係員なら聞き取れなかった質問を聞き返すが、<code>[</code> は空の変数で質問の形が崩れると「文法がおかしい（2）」と返すだけで、<code>if</code> から見るとそれも「いいえ」と同じ扱いになる。</div>
+
+<h2 id="if">if は、コマンドの終了ステータスで分かれる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>if</code>・<code>elif</code>・<code>else</code> の形と、条件に何でも置ける理由。</div>
+<pre><code>$ cat &gt; kind.sh &lt;&lt;'END'
+&gt; #!/bin/bash
+&gt; if [ -d "$1" ]; then
+&gt;     echo "$1 はディレクトリ"
+&gt; elif [ -f "$1" ]; then
+&gt;     echo "$1 はふつうのファイル"
+&gt; else
+&gt;     echo "$1 は見つからない"
+&gt;     exit 1
+&gt; fi
+&gt; END
+$ bash kind.sh /etc; bash kind.sh /etc/passwd; bash kind.sh /nonexistent; echo "終了ステータス $?"
+/etc はディレクトリ
+/etc/passwd はふつうのファイル
+/nonexistent は見つからない
+終了ステータス 1</code></pre>
+<p><code>if</code> の後ろに置くのは「式」ではなく<b>コマンド</b>である。そのコマンドが 0 を返せば <code>then</code> へ、そうでなければ <code>elif</code> か <code>else</code> へ進む。<code>[ ]</code> もコマンドの1つにすぎないので、<code>grep -q</code> のような普通のコマンドもそのまま置ける。</p>
+<pre><code>$ if grep -q '^alice:' /etc/passwd; then echo "alice は居る"; fi
+alice は居る
+$ [ -f /etc/passwd ] &amp;&amp; [ -r /etc/passwd ] &amp;&amp; echo "読める"
+読める
+$ [ -f /etc/passwd -a -r /etc/shadow ]; echo $?
+1</code></pre>
+<pre><code>if コマンド1; then      ← コマンド1 が 0 なら
+    …
+elif コマンド2; then    ← そうでなく、コマンド2 が 0 なら
+    …
+else                    ← どれも 0 でなければ
+    …
+fi                      ← if を逆から綴って閉じる</code></pre>
+<p><code>&amp;&amp;</code> で <code>[ ]</code> を2つつなぐ書き方と、1つの <code>[ ]</code> の中で <code>-a</code> を使う書き方は、どちらも「かつ」になる。</p>
+<div class="analogy"><b>たとえ</b>: <code>if</code> は<b>前の係員が上げた札の色だけを見て、右か左の通路へ案内する</b>誘導係に近い。札を上げたのが「はい・いいえ」係（<code>[</code>）でも、検索係（<code>grep</code>）でも、見るのは色だけである。
+<br>ただし<b>崩れる点</b>: 札の色は 0 か「それ以外」の2通りしか見ない。<code>grep</code> の 1（見つからない）と 2（ファイルが無い）は、<code>if</code> からは区別できない。分けたいなら <code>$?</code> を変数に取って比べる。</div>
+<div class="quiz"><b>確認</b>
+<p>直前に実行したコマンドの終了ステータスを表示するコマンドはどれか。また、そのコマンドを2回続けて打つと、2回目は何を表示するか。</p>
+<details><summary>答え</summary>
+<p><code>echo $?</code>。2回目は 1回目の <code>echo</code> 自身の終了ステータス（ふつうは 0）を表示する。<code>$?</code> は直前の1つしか持たない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>スクリプトの最後の行が <code>exit 300</code> だった。呼んだ側で <code>echo $?</code> と打つと何が出るか。</p>
+<details><summary>答え</summary>
+<p><code>44</code>（300 を 256 で割った余り）。終了ステータスは 0〜255 しか運べない。記録では <code>exit 256</code> が 0、<code>exit 257</code> が 1 になった。</p>
+<pre><code>$ bash -c 'exit 300'; echo $?
+44</code></pre></details></div>
+<div class="quiz"><b>確認</b>
+<p>変数 <code>ans</code> が空のとき、<code>if [ $ans = yes ]; then …</code> はどうなるか。直し方も答えよ。</p>
+<details><summary>答え</summary>
+<p><code>[ = yes ]</code> と解釈されて <code>[: =: unary operator expected</code> というエラーになり、<code>[</code> は 2 を返すので <code>then</code> には進まない。
+<code>[ "$ans" = yes ]</code> と引用符で囲めば、空でも1つの語として比べられる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>ファイル <code>/etc/hosts</code> が在り、かつ読めるときだけ <code>OK</code> と出す1行を書け。</p>
+<details><summary>答え</summary>
+<p><code>[ -f /etc/hosts ] &amp;&amp; [ -r /etc/hosts ] &amp;&amp; echo OK</code>、または <code>[ -f /etc/hosts -a -r /etc/hosts ] &amp;&amp; echo OK</code>、または
+<code>if [ -f /etc/hosts ] &amp;&amp; [ -r /etc/hosts ]; then echo OK; fi</code>。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>$?</code> は直前に終わったコマンドの終了ステータスを1つだけ持つ。<code>echo $?</code> 自身が次の値で上書きする</li><li>0 が成功。1・2 はコマンドごとの失敗、126 は実行できない、127 は見つからない</li><li><code>exit</code> で返せるのは 0〜255。<code>exit 256</code> は 0（成功）になる。<code>exit</code> を書かなければ最後のコマンドの値</li><li><code>test</code> と <code>[ ]</code> は同じコマンド。<code>[</code> の前後には空白、変数は <code>"$x"</code> と囲む。数は <code>-eq</code> <code>-gt</code>、文字列は <code>=</code> <code>!=</code></li><li><code>if</code> の後ろはコマンド。0 なら <code>then</code>、それ以外は <code>elif</code>・<code>else</code>。閉じるのは <code>fi</code></li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-shell/theory/05-args">← 5. 引数は、渡す側のシェルが切ってから渡す</a><a href="/linuc-shell/theory/07-loops">次: 7. パイプの先で数えた数は、持ち帰れない →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-shell/chapters.js"></script>
+<script src="/linuc-shell/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

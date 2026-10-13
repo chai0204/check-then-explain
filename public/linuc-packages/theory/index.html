@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理論編 — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <strong>理論編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文に載せた出力はすべて実機の記録で、演習6本は模範解答どおりに通ることを確認してあります
+   （未達のときに判定が鳴ることも、途中まで進めた状態で鳴ることも、6本すべてで確認済み）。
+   それでも <b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、著者が読者として通した段階で
+   <b>4回に分けて不備が出ました</b>（説明の順序・リンク切れ・前提の省略・判定の誤り）。
+   同じ種類のものが残っていると考えてください。</p>
+<p>詰まったところ・本文と違う出力が出たところは、
+   <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   各ページ下のコメントに書いてください。それが直す順番になります。</p>
+</div>
+
+<h1>理論編 — リポジトリとパッケージ管理</h1>
+<p class="lead">LinuC レベル1 <strong>101 試験・主題1.04</strong>（apt・dpkg・yum・rpm）を、
+Debian 系と RPM 系の<strong>2つの檻</strong>の中で実際に打って確かめる7章。
+1章ごとに「ふつうはこう考える」を先に置き、実際に打った結果がそれを裏切るところから説明しています。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<h2 id="spine">この7章を貫いている1つの事実</h2>
+<div class="goal">
+<p><b>パッケージのコマンドは、どれも帳簿を読んでいるだけである。
+手元に入ったものの「台帳」（dpkg・rpm）か、リポジトリにあるものの「目録」（apt・yum）か。
+答えが食い違ったら、どちらの帳簿を読んだかを先に疑う。</b></p>
+<p>中身を手で置いても <code>dpkg -l</code> は「入っていない」と言う（台帳に無いから）。
+リポジトリを書き足しても <code>apt install</code> は「見つからない」と言う（目録の写しを取り直していないから）。
+<code>dpkg -S</code> は入っていないパッケージのファイルを知らず、<code>apt-file</code> と <code>yum provides</code> は知っている（読む帳簿が違うから）。
+主題1.04 のオプションが多いのに整理できるのは、<b>どの帳簿を、どちら向きに引くか</b>で全部が分けられるからです。</p>
+<div class="skip"><b>ここで覚えなくていいこと</b>:
+パッケージの作り方（<code>dpkg-deb --build</code>・<code>rpmbuild</code>）、リポジトリや パッケージへの署名のしかた、
+pinning（優先度の書き換え）、モジュールとグループ（<code>dnf module</code>・<code>yum groupinstall</code>）、aptitude、dnf5。
+どれもレベル1の範囲の外で、この7章には手順としては出てきません。</div>
+</div>
+
+<h2 id="range">LinuC 出題範囲との対応</h2>
+<p>公式の出題範囲（<a href="https://linuc.org/linuc1/range/101.html">LinuC-1 Version 10.0 / 101 試験</a>）の
+主題1.04 を、章に割り当てたものです。「詳細」欄に挙げられている語が、どの章で実際に手を動かす対象になるかを並べてあります。</p>
+<div class="scroll"><table>
+<tr><th>副題</th><th>重要度</th><th>章</th><th>この教材で実際に打つもの</th></tr>
+<tr><td rowspan="3">1.04.1 apt コマンドによるパッケージ管理</td><td rowspan="3">3</td>
+    <td><a href="/linuc-packages/theory/01-package">1</a></td>
+    <td>リポジトリの中身（<code>pool/</code> と <code>dists/…/Packages</code>）、<code>apt-cache policy</code> と <code>dpkg -l</code> の食い違い</td></tr>
+<tr><td><a href="/linuc-packages/theory/02-apt">2</a></td>
+    <td><code>apt</code> <code>apt-get</code> <code>apt-cache</code>（<code>search</code> <code>show</code> <code>depends</code> <code>rdepends</code> <code>policy</code>）、<code>install</code> <code>remove</code> <code>purge</code> <code>autoremove</code> <code>upgrade</code>、<code>apt-mark</code>、<code>apt-get download</code></td></tr>
+<tr><td><a href="/linuc-packages/theory/03-sources">3</a></td>
+    <td><code>/etc/apt/sources.list</code> <code>/etc/apt/sources.list.d/</code>（deb822）、<code>apt update</code>、<code>apt-file search</code> <code>list</code> <code>update</code>、<code>[trusted=yes]</code> と <code>Signed-By</code></td></tr>
+<tr><td>1.04.2 Debianパッケージ管理</td><td>1</td>
+    <td><a href="/linuc-packages/theory/04-dpkg">4</a></td>
+    <td><code>dpkg -i -r -P -l -L -S -s -c -I -V</code>、<code>--configure</code>、<code>apt --fix-broken install</code>、<code>dpkg-reconfigure</code> <code>debconf-show</code></td></tr>
+<tr><td>1.04.3 yumコマンドによるパッケージ管理</td><td>3</td>
+    <td><a href="/linuc-packages/theory/05-yum">5</a></td>
+    <td><code>yum</code>（= <code>dnf</code>）の <code>list</code> <code>info</code> <code>search</code> <code>provides</code> <code>deplist</code> <code>install</code> <code>remove</code> <code>update</code> <code>check-update</code> <code>repolist</code>、<code>/etc/yum.repos.d/</code> <code>/etc/yum.conf</code>、<code>yumdownloader</code></td></tr>
+<tr><td rowspan="2">1.04.4 RPMパッケージ管理</td><td rowspan="2">1</td>
+    <td><a href="/linuc-packages/theory/06-rpm-query">6</a></td>
+    <td><code>rpm -qa -qi -ql -qf -qc -qd -qR -qp</code> <code>--provides</code> <code>--whatrequires</code>、<code>rpm -V</code> <code>-Va</code>、<code>rpm2cpio</code></td></tr>
+<tr><td><a href="/linuc-packages/theory/07-rpm-install">7</a></td>
+    <td><code>rpm -i -U -F -e</code> <code>--nodeps</code>、<code>rpm -K</code>（<code>--checksig</code>）<code>-Kv</code>、<code>rpm --import</code> <code>rpm -q gpg-pubkey</code>、署名</td></tr>
+</table></div>
+<p class="detail">檻で<b>そのままでは再現できないもの</b>が3つあり、本文にその理由ごと書いてあります。
+(1) 本物の Ubuntu のパッケージに対する <code>apt-file search</code>: Ubuntu の Contents 目録は3スイートで約 195MB あり、
+<code>apt update</code> のたびに読者に取らせるのは重すぎるので、この檻では取らない設定にした（設定を消せば同じように引ける）。
+(2) <code>dpkg-reconfigure</code> の質問の画面: 矢印キーで選ぶ画面は記録に残せないので、同じ質問を文字だけの形（<code>-f teletype</code>）で出させて記録した。
+(3) 本物のリポジトリの「今の最新」: 出力が日ごとに変わるので、Ubuntu は snapshot（2026-09-29 で固定）、AlmaLinux は更新の止まった 9.7 の保存庫（vault）に向けた。
+<b>打てないことを黙って飛ばしてはいません。</b></p>
+<p>他の主題の対応は <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。</p>
+
+<h2 id="crib">試験の直前に見る表</h2>
+<p>出題範囲の「詳細」欄に並ぶ語を、一行の意味と、説明している章に並べました。</p>
+<div class="scroll"><table>
+<tr><th>出題範囲の語</th><th>一行の意味</th><th>章</th></tr>
+<tr><td><code>apt</code></td><td>人が画面で打つための入口。<code>install</code> <code>remove</code> <code>purge</code> <code>update</code> <code>upgrade</code> <code>search</code> <code>show</code> <code>list</code> をまとめて持つ（スクリプトには向かない）</td><td><a href="/linuc-packages/theory/02-apt#family">2</a></td></tr>
+<tr><td><code>apt-get</code></td><td>目録を読んで入れる・消す・上げる道具。<code>update</code> は目録を取り直すだけ、<code>upgrade</code> は入っているものを上げる、<code>dist-upgrade</code> は入れ替えも伴う、<code>clean</code> は取ってきた .deb を消す</td><td><a href="/linuc-packages/theory/02-apt#upgrade">2</a></td></tr>
+<tr><td><code>apt-cache</code></td><td>目録を読むだけ。<code>search</code> 名前と説明、<code>show</code> 詳細、<code>depends</code> / <code>rdepends</code> 依存、<code>policy</code> 台帳と目録の版の比較</td><td><a href="/linuc-packages/theory/02-apt#read">2</a></td></tr>
+<tr><td><code>apt-file</code></td><td>Contents 目録を引き、入っていないパッケージも含めて「このファイルはどのパッケージか」（<code>search</code>）・「中身は何か」（<code>list</code>）に答える。索引は <code>apt-file update</code></td><td><a href="/linuc-packages/theory/03-sources#aptfile">3</a></td></tr>
+<tr><td><code>/etc/apt/sources.list</code></td><td>どこから取るかの表。<code>deb URI ディストリビューション コンポーネント</code> の1行形式。<code>/etc/apt/sources.list.d/</code> の <code>*.list</code> と <code>*.sources</code>（deb822）も同じ扱い。書いたら <code>apt update</code></td><td><a href="/linuc-packages/theory/03-sources#table">3</a></td></tr>
+<tr><td>依存関係</td><td>先に入っていなければならない別のパッケージ（.deb の <code>Depends:</code>、.rpm の <code>Requires</code>）。dpkg と rpm は読むが取りに行かない。取りに行くのは apt と yum</td><td><a href="/linuc-packages/theory/04-dpkg#install">4</a>・<a href="/linuc-packages/theory/07-rpm-install#deps">7</a></td></tr>
+<tr><td><code>dpkg</code></td><td>Debian 系の台帳を読み書きする道具。<code>-i</code> 入れる・<code>-r</code> 消す（設定は残す）・<code>-P</code> 全部消す・<code>-l</code> 一覧・<code>-L</code> ファイル一覧・<code>-S</code> ファイル→パッケージ・<code>-s</code> 状態・<code>-c</code> / <code>-I</code> .deb の中身と情報</td><td><a href="/linuc-packages/theory/04-dpkg#query">4</a></td></tr>
+<tr><td><code>dpkg-reconfigure</code></td><td>入れたときの質問（debconf）をもう一度出し、その答えで設定し直す。例: <code>dpkg-reconfigure tzdata</code></td><td><a href="/linuc-packages/theory/04-dpkg#reconfigure">4</a></td></tr>
+<tr><td>リポジトリ</td><td>中身（.deb / .rpm）の置き場と、目録（<code>dists/…/Packages</code> / <code>repodata/</code>）をまとめた配布元</td><td><a href="/linuc-packages/theory/01-package#repo">1</a></td></tr>
+<tr><td><code>yum</code></td><td>RPM 系の、目録を読んで入れる道具。RHEL 8 以降は <code>dnf</code> へのリンク。<code>provides</code> で入っていないパッケージのファイルも探せる。目録は期限切れなら自分で取り直す</td><td><a href="/linuc-packages/theory/05-yum#whois">5</a></td></tr>
+<tr><td><code>/etc/yum.repos.d/</code></td><td>リポジトリを1つずつ書く <code>.repo</code> ファイルの置き場。<code>[repo id]</code> <code>name=</code> <code>baseurl=</code> <code>enabled=</code> <code>gpgcheck=</code> <code>gpgkey=</code></td><td><a href="/linuc-packages/theory/05-yum#repos">5</a></td></tr>
+<tr><td><code>/etc/yum.conf</code></td><td>yum 全体の設定（<code>[main]</code>）。RHEL 8 以降は <code>/etc/dnf/dnf.conf</code> へのリンク。<code>gpgcheck=1</code> <code>installonly_limit</code> <code>clean_requirements_on_remove</code></td><td><a href="/linuc-packages/theory/05-yum#whois">5</a></td></tr>
+<tr><td><code>yumdownloader</code></td><td>入れずに .rpm を取ってくる（<code>--resolve</code> で依存も、<code>--destdir</code> で置き場所を指定）。yum-utils に入っていて、実体は <code>dnf download</code></td><td><a href="/linuc-packages/theory/05-yum#download">5</a></td></tr>
+<tr><td><code>rpm</code></td><td>RPM 系の台帳を読み書きする道具。<code>-q</code> 系で引き、<code>-V</code> で照らし合わせ、<code>-i</code> / <code>-U</code> / <code>-F</code> / <code>-e</code> で入れて消す。<code>-p</code> を付けると .rpm ファイルに聞く</td><td><a href="/linuc-packages/theory/06-rpm-query#query">6</a>・<a href="/linuc-packages/theory/07-rpm-install#iuf">7</a></td></tr>
+<tr><td>署名</td><td>作った人が鍵で付ける印。<code>rpm -K</code> で確かめ、<code>digests signatures OK</code> のときだけ確かめられている（署名が無いと <code>digests OK</code>）。鍵は <code>rpm --import</code> で台帳へ</td><td><a href="/linuc-packages/theory/07-rpm-install#sign">7</a></td></tr>
+</table></div>
+<p>取り違えやすい組み合わせも並べておきます。どれも本文で両方を実際に打っています。</p>
+<div class="scroll"><table>
+<tr><th>組み合わせ</th><th>違い</th><th>章</th></tr>
+<tr><td><code>apt remove</code> と <code>apt purge</code></td><td>remove は設定ファイルを残して台帳に <code>rc</code>、purge は全部消す</td><td><a href="/linuc-packages/theory/02-apt#remove">2</a></td></tr>
+<tr><td><code>apt update</code> と <code>apt upgrade</code></td><td>update は目録を取り直すだけ、upgrade は入っているものを上げる</td><td><a href="/linuc-packages/theory/02-apt#upgrade">2</a></td></tr>
+<tr><td><code>dpkg -S</code> と <code>apt-file search</code></td><td>どちらもファイル→パッケージ。<code>-S</code> は入っているものだけ、apt-file は入っていなくてよい</td><td><a href="/linuc-packages/theory/03-sources#aptfile">3</a></td></tr>
+<tr><td><code>dpkg -l</code> と <code>dpkg -L</code></td><td>小文字は台帳の一覧、大文字は1つのパッケージのファイル一覧</td><td><a href="/linuc-packages/theory/04-dpkg#query">4</a></td></tr>
+<tr><td><code>rpm -qf</code> と <code>rpm -ql</code></td><td>-qf はファイル→パッケージ、-ql はパッケージ→ファイル</td><td><a href="/linuc-packages/theory/06-rpm-query#query">6</a></td></tr>
+<tr><td><code>rpm -qf</code> と <code>yum provides</code></td><td>rpm は入っているものだけ、yum は入っていなくてよい</td><td><a href="/linuc-packages/theory/05-yum#query">5</a></td></tr>
+<tr><td><code>rpm -i</code> と <code>-U</code> と <code>-F</code></td><td>-i は新しく入れる（古い版があると衝突）、-U は上げるか入れる、-F は入っているものだけ上げる</td><td><a href="/linuc-packages/theory/07-rpm-install#iuf">7</a></td></tr>
+<tr><td><code>dpkg -V</code> と <code>rpm -V</code></td><td>どちらも違うファイルだけを出す。dpkg は中身の要約しか持たず、違っても終了コード 0。rpm は欄が埋まり、終了コードも 0 以外</td><td><a href="/linuc-packages/theory/04-dpkg#verify">4</a>・<a href="/linuc-packages/theory/06-rpm-query#verify">6</a></td></tr>
+</table></div>
+
+<h2 id="chapters">章</h2>
+<div class="toc">
+<ol>
+<li><a href="/linuc-packages/theory/01-package">入っているかどうかは台帳が決める</a> —
+    <span class="detail">中身を手で置いてコマンドも動くのに、<code>dpkg -l</code> は「そんなパッケージは無い」（15分）</span></li>
+<li><a href="/linuc-packages/theory/02-apt">apt は目録を読んで台帳に書く</a> —
+    <span class="detail"><code>apt remove</code> しても台帳に <code>rc</code>、設定ファイルも依存も残る（20分）</span></li>
+<li><a href="/linuc-packages/theory/03-sources">目録は取りに行くまで古いまま</a> —
+    <span class="detail">1行足しても <code>Unable to locate</code>。取りに行っても署名が無ければ受け取らない（20分）</span></li>
+<li><a href="/linuc-packages/theory/04-dpkg">dpkg は依存を読めるが取りに行かない</a> —
+    <span class="detail"><code>iU</code> で止まり、関係ない <code>apt install</code> まで断られる（20分）</span></li>
+<li><a href="/linuc-packages/theory/05-yum">yum は目録を自分で取りに行く</a> —
+    <span class="detail">yum は dnf へのリンク。リポジトリを足したら、更新コマンド無しで入る（22分）</span></li>
+<li><a href="/linuc-packages/theory/06-rpm-query">rpm -V が黙るのは台帳どおりだから</a> —
+    <span class="detail">何も出ず終了コード 0 が正常。書き換えた設定ファイルは入れ直しても戻らない（20分）</span></li>
+<li><a href="/linuc-packages/theory/07-rpm-install">OK は確かめた範囲の OK</a> —
+    <span class="detail">署名の無いものが OK、鍵の無いものが NOT OK。ここで7章が1本になる（22分）</span></li>
+</ol>
+</div>
+<p><a href="/linuc-packages/theory/glossary">用語辞書</a> —
+   本文の点線付きの語をクリックすると引けます。20語。</p>
+
+<h2 id="cages">檻が2つある理由</h2>
+<p>主題1.04 は Debian 系（apt・dpkg）と RPM 系（yum・rpm）の両方を問います。1つのディストリビューションには片方しか無いので、
+<b>Debian 系の檻（Ubuntu 24.04）</b>で第1〜4章を、<b>RPM 系の檻（AlmaLinux 9.7）</b>で第5〜7章を確かめます（第1章の後半だけ RPM 系の檻も使います）。
+どちらの檻にも、練習用の小さなパッケージ（依存関係つき・署名つき・署名なし）とリポジトリが入っていて、<b>ネットにつながっていなくても本文と同じ結果になります</b>。
+本物の Ubuntu / AlmaLinux のパッケージを入れる操作だけは、ネットが要ります。</p>
+<p>各章の出力は、檻を<b>起動し直した直後</b>から打ったものです。前の章で入れたものが残っていると出力が変わるので、章が変わるたびに檻を起動し直してください（<code>exit</code> して、もう一度 <code>docker run</code>）。</p>
+
+<h2 id="use">実務のどこで効くか</h2>
+<p>資格の勉強として読んでも、使う場面はこの4つに集まります。</p>
+<div class="scroll"><table>
+<tr><th>場面</th><th>ここで効く理由</th><th>見落としやすい点</th><th>関連する章</th></tr>
+<tr><td>「コマンドが無い」と言われた</td>
+    <td>どのパッケージに入っているかは、入っていない以上、台帳ではなく目録に聞く</td>
+    <td>Debian 系は apt-file を別に入れて Contents を取る必要がある。RPM 系は <code>yum provides</code> だけで足りる</td><td>3・5</td></tr>
+<tr><td>ベンダーが配る単体の .deb / .rpm を入れる</td>
+    <td>依存関係を解決できるのは目録を持つ apt / yum だけ</td>
+    <td><code>dpkg -i</code> は <code>iU</code> で止まり、ほかの操作まで止める。<code>apt install ./x.deb</code> や <code>yum install ./x.rpm</code> なら1回で済む</td><td>4・7</td></tr>
+<tr><td>サーバの設定が勝手に変わっていないか確かめる</td>
+    <td>台帳は入れたときのファイルの姿を持っている</td>
+    <td><code>rpm -Va</code> は実機でも何十行も出る。設定ファイル（<code>c</code>）以外の 5 と M から見る。<code>dpkg -V</code> は終了コードで判定できない</td><td>4・6</td></tr>
+<tr><td>新しいリポジトリを足す</td>
+    <td>足しただけでは目録は変わらない（apt）／勝手に取りに行く（yum）</td>
+    <td>署名の確認を外す（<code>[trusted=yes]</code>・<code>gpgcheck=0</code>）のは最後の手段。鍵の出どころを確かめて <code>Signed-By</code> / <code>gpgkey=</code> で指定する</td><td>3・5・7</td></tr>
+</table></div>
+<p><b>この主題を使わない方がよい場面</b>も1つあります。コンテナのイメージの中で、動いているコンテナに <code>apt install</code> や <code>yum install</code> で後から足していくことです。
+コンテナは作り直すと元に戻るので、足したものは Dockerfile に書いてイメージを作り直します
+（この教材の檻が起動し直すたびに初期状態へ戻るのも、そのためです）。</p>
+
+<h2 id="next">手を動かす</h2>
+<p>読んだあと、同じ操作を自分でやる演習が6本あります（Debian 系の檻で3本、RPM 系の檻で3本）。判定は<b>観測できる結果だけ</b>で行い、
+コマンドの打ち方は見ません。</p>
+<p><a href="/linuc-packages/">実践編（檻の入り方と演習6本）→</a></p>
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-packages/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,1077 @@
+
+
+========== 0. 環境（Debian 系の檻・起動直後） ==========
+
+$ lab env
+テーマ    : lab-linuc-packages-deb 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+dpkg      : 1.22.6ubuntu6.6
+apt       : 2.8.3
+apt-file  : 3.3
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+$ id
+uid=1000(lab) gid=1000(lab) groups=1000(lab)
+
+$ hostname
+linuc
+
+$ lab
+lab-linuc-packages-deb  進捗 0/3
+  次 → 01 「labsvc を、跡形なく消す」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-packages-deb-state）
+
+$ lab ls
+演習一覧
+  · 01  labsvc を、跡形なく消す              10分 / 影響度 B
+  · 02  labcalc コマンドを使えるようにする 15分 / 影響度 B
+  · 03  配られた .deb を、動く状態まで入れる 12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+
+========== ch1. パッケージは中身と、台帳への届け出でできている（Debian 系） ==========
+
+$ ls -l /srv/lab-repo/pool/main/l/labapp/
+total 4
+-rw-r--r-- 1 root root 1076 Oct 13 09:57 labapp_1.0_all.deb
+
+$ file /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb
+/srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb: Debian binary package (format 2.0), with control.tar.zst, data compression zst
+
+$ dpkg-deb -I /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb
+ new Debian package, version 2.0.
+ size 1076 bytes: control archive=347 bytes.
+      17 bytes,     1 lines      conffiles
+     292 bytes,    10 lines      control
+ Package: labapp
+ Version: 1.0
+ Section: utils
+ Priority: optional
+ Architecture: all
+ Depends: liblab (>= 1.0)
+ Installed-Size: 68
+ Maintainer: check-then-explain <lab@example.invalid>
+ Description: sample application that needs liblab
+  Prints a greeting. The greeting is read from /etc/labapp.conf.
+
+$ dpkg-deb -c /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./etc/
+-rw-r--r-- root/root        93 2026-10-01 09:00 ./etc/labapp.conf
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/bin/
+-rwxr-xr-x root/root       188 2026-10-01 09:00 ./usr/bin/labapp
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/share/
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/share/doc/
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/share/doc/labapp/
+-rw-r--r-- root/root       128 2026-10-01 09:00 ./usr/share/doc/labapp/README
+
+$ dpkg-deb -f /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb Package Version Depends
+Package: labapp
+Version: 1.0
+Depends: liblab (>= 1.0)
+
+---- 中身だけ置く（ふつうこう考える） ----
+
+$ sudo dpkg-deb -x /srv/lab-repo/pool/main/libl/liblab/liblab_1.0_all.deb /
+
+$ ls -l /usr/lib/liblab/liblab.sh
+-rw-r--r-- 1 root root 106 Oct  1 09:00 /usr/lib/liblab/liblab.sh
+
+$ . /usr/lib/liblab/liblab.sh; lab_greet "ファイルは置けた"
+liblab: ファイルは置けた
+
+$ dpkg -l liblab; echo "exit=$?"
+dpkg-query: no packages found matching liblab
+exit=1
+
+$ dpkg -S /usr/lib/liblab/liblab.sh; echo "exit=$?"
+dpkg-query: no path found matching pattern /usr/lib/liblab/liblab.sh
+exit=1
+
+---- dpkg で入れる ----
+
+$ sudo dpkg -i /srv/lab-repo/pool/main/libl/liblab/liblab_1.0_all.deb
+Selecting previously unselected package liblab.
+(Reading database ... 12824 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Setting up liblab (1.0) ...
+
+$ dpkg -l liblab
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-====================================
+ii  liblab         1.0          all          small shell library for lab programs
+
+$ dpkg -S /usr/lib/liblab/liblab.sh
+liblab: /usr/lib/liblab/liblab.sh
+
+$ ls /var/lib/dpkg/info/liblab.*
+/var/lib/dpkg/info/liblab.list
+/var/lib/dpkg/info/liblab.md5sums
+
+$ cat /var/lib/dpkg/info/liblab.list
+/.
+/usr
+/usr/lib
+/usr/lib/liblab
+/usr/lib/liblab/liblab.sh
+
+$ cat /var/lib/dpkg/info/liblab.md5sums
+edf88576797eb2b33ac55dfd8c17cbe2  usr/lib/liblab/liblab.sh
+
+$ grep -A10 '^Package: liblab$' /var/lib/dpkg/status
+Package: liblab
+Status: install ok installed
+Priority: optional
+Section: libs
+Installed-Size: 36
+Maintainer: check-then-explain <lab@example.invalid>
+Architecture: all
+Version: 1.0
+Description: small shell library for lab programs
+ labapp reads this file. It provides one shell function, lab_greet.
+
+
+$ grep -c '^Package: ' /var/lib/dpkg/status
+166
+
+---- リポジトリ = 中身（pool）と目録（dists） ----
+
+$ find /srv/lab-repo -type f | sort
+/srv/lab-repo/dists/lab/Release
+/srv/lab-repo/dists/lab/main/Contents-amd64
+/srv/lab-repo/dists/lab/main/Contents-amd64.gz
+/srv/lab-repo/dists/lab/main/binary-amd64/Packages
+/srv/lab-repo/dists/lab/main/binary-amd64/Packages.gz
+/srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb
+/srv/lab-repo/pool/main/l/labhello/labhello_1.0_all.deb
+/srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
+/srv/lab-repo/pool/main/l/labnote-data/labnote-data_1.0_all.deb
+/srv/lab-repo/pool/main/l/labsvc-common/labsvc-common_1.0_all.deb
+/srv/lab-repo/pool/main/l/labsvc/labsvc_1.0_all.deb
+/srv/lab-repo/pool/main/libl/liblab/liblab_1.0_all.deb
+
+$ zcat /srv/lab-repo/dists/lab/main/binary-amd64/Packages.gz | grep -A16 '^Package: labapp$'
+Package: labapp
+Architecture: all
+Version: 1.0
+Priority: optional
+Section: utils
+Maintainer: check-then-explain <lab@example.invalid>
+Installed-Size: 68
+Depends: liblab (>= 1.0)
+Filename: pool/main/l/labapp/labapp_1.0_all.deb
+Size: 1076
+MD5sum: 6259815bebeec6475753bd94b2b2a880
+SHA1: d00f28878845e983014107666c5bcf0231a9b656
+SHA256: 0e71be90d76bc38588f1e740e536994ebf1f90abcb32297b30d96ac860a6f96e
+SHA512: 8059ff71459d2d9e14459f6e9cb1f8a3acf2124b84eaaef8de860389ecb3d9de92ec3987dae89e41b4de9e21573ae239bda1667acf2b036102135e6877245ea7
+Description: sample application that needs liblab
+ Prints a greeting. The greeting is read from /etc/labapp.conf.
+
+
+$ ls -1 /var/lib/apt/lists/ | grep lab-repo
+_srv_lab-repo_dists_lab_Release
+_srv_lab-repo_dists_lab_main_Contents-amd64.lz4
+_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4
+
+$ apt-cache policy labapp
+labapp:
+  Installed: (none)
+  Candidate: 1.0
+  Version table:
+     1.0 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+
+$ dpkg -l labapp; echo "exit=$?"
+dpkg-query: no packages found matching labapp
+exit=1
+
+
+========== ch2. apt は目録を読み、台帳に書く ==========
+
+$ apt-cache search liblab
+labapp - sample application that needs liblab
+liblab - small shell library for lab programs
+liblab-gamut1 - rich set of graph drawing tools - liblab_gamut library
+liblablgl-ocaml - Runtime libraries for lablgl
+liblablgl-ocaml-dev - OpenGL interface for Objective Caml
+liblablgtk3-ocaml - OCaml bindings to Gtk+ version 3 (runtime)
+liblablgtk3-ocaml-dev - OCaml bindings to Gtk+ version 3 (development files)
+liblablgtk3-ocaml-doc - OCaml bindings to Gtk+ version 3 (documentation)
+liblablgtksourceview3-ocaml - OCaml bindings for libgtksourceview3 (runtime)
+liblablgtksourceview3-ocaml-dev - OCaml bindings for libgtksourceview3 (development files)
+liblablgtkspell3-ocaml - OCaml bindings for libgtkspell3 (runtime)
+liblablgtkspell3-ocaml-dev - OCaml bindings for libgtkspell3 (development files)
+liblabltk-ocaml - OCaml bindings to Tcl/Tk (runtime libraries)
+liblabltk-ocaml-dev - OCaml bindings to Tcl/Tk (dev. libraries)
+
+$ apt-cache show labapp
+Package: labapp
+Architecture: all
+Version: 1.0
+Priority: optional
+Section: utils
+Maintainer: check-then-explain <lab@example.invalid>
+Installed-Size: 68
+Depends: liblab (>= 1.0)
+Filename: pool/main/l/labapp/labapp_1.0_all.deb
+Size: 1076
+MD5sum: 6259815bebeec6475753bd94b2b2a880
+SHA1: d00f28878845e983014107666c5bcf0231a9b656
+SHA256: 0e71be90d76bc38588f1e740e536994ebf1f90abcb32297b30d96ac860a6f96e
+SHA512: 8059ff71459d2d9e14459f6e9cb1f8a3acf2124b84eaaef8de860389ecb3d9de92ec3987dae89e41b4de9e21573ae239bda1667acf2b036102135e6877245ea7
+Description: sample application that needs liblab
+ Prints a greeting. The greeting is read from /etc/labapp.conf.
+Description-md5: 
+
+
+$ apt-cache depends labapp
+labapp
+  Depends: liblab
+
+$ apt-cache rdepends liblab
+liblab
+Reverse Depends:
+  labapp
+
+$ apt-cache policy labhello
+labhello:
+  Installed: 1.0
+  Candidate: 1.1
+  Version table:
+     1.1 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+ *** 1.0 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+        100 /var/lib/dpkg/status
+
+$ apt-cache policy tree
+tree:
+  Installed: 2.1.1-2ubuntu3.24.04.2
+  Candidate: 2.1.1-2ubuntu3.24.04.2
+  Version table:
+ *** 2.1.1-2ubuntu3.24.04.2 500
+        500 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates/universe amd64 Packages
+        100 /var/lib/dpkg/status
+     2.1.1-2ubuntu3 500
+        500 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble/universe amd64 Packages
+
+$ apt-cache depends tree
+tree
+  Depends: libc6
+
+$ apt show labapp
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Package: labapp
+Version: 1.0
+Priority: optional
+Section: utils
+Maintainer: check-then-explain <lab@example.invalid>
+Installed-Size: 69.6 kB
+Depends: liblab (>= 1.0)
+Download-Size: 1076 B
+APT-Sources: file:/srv/lab-repo lab/main amd64 Packages
+Description: sample application that needs liblab
+ Prints a greeting. The greeting is read from /etc/labapp.conf.
+
+
+---- 入れる ----
+
+$ sudo apt install -y labapp
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following additional packages will be installed:
+  liblab
+The following NEW packages will be installed:
+  labapp liblab
+0 upgraded, 2 newly installed, 0 to remove and 3 not upgraded.
+Need to get 0 B/1822 B of archives.
+After this operation, 106 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+Get:2 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+dpkg-preconfigure: unable to re-open stdin: 
+Selecting previously unselected package liblab.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12824 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Selecting previously unselected package labapp.
+Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
+Unpacking labapp (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labapp (1.0) ...
+
+$ labapp
+liblab: hello from labapp 1.0
+
+$ apt-mark showauto | grep lab
+labsvc-common
+liblab
+
+$ apt-mark showmanual | grep lab
+labapp
+labhello
+labsvc
+
+---- 消す（ふつうこう考える） ----
+
+$ sudo apt remove -y labapp
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following package was automatically installed and is no longer required:
+  liblab
+Use 'sudo apt autoremove' to remove it.
+The following packages will be REMOVED:
+  labapp
+0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
+After this operation, 69.6 kB disk space will be freed.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12830 files and directories currently installed.)
+Removing labapp (1.0) ...
+
+$ dpkg -l labapp
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-====================================
+rc  labapp         1.0          all          sample application that needs liblab
+
+$ ls -l /etc/labapp.conf
+-rw-r--r-- 1 root root 93 Oct  1 09:00 /etc/labapp.conf
+
+$ cat /etc/labapp.conf
+# labapp の設定ファイル（dpkg が conffile として管理する）
+greeting="hello"
+
+$ dpkg -s labapp | head -2
+Package: labapp
+Status: deinstall ok config-files
+
+$ sudo apt purge -y labapp
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following package was automatically installed and is no longer required:
+  liblab
+Use 'sudo apt autoremove' to remove it.
+The following packages will be REMOVED:
+  labapp*
+0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
+After this operation, 0 B of additional disk space will be used.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12827 files and directories currently installed.)
+Purging configuration files for labapp (1.0) ...
+
+$ dpkg -l labapp; echo "exit=$?"
+dpkg-query: no packages found matching labapp
+exit=1
+
+$ ls -l /etc/labapp.conf; echo "exit=$?"
+ls: cannot access '/etc/labapp.conf': No such file or directory
+exit=2
+
+$ dpkg -l liblab
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-====================================
+ii  liblab         1.0          all          small shell library for lab programs
+
+$ sudo apt autoremove -y
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following packages will be REMOVED:
+  liblab
+0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
+After this operation, 36.9 kB disk space will be freed.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12826 files and directories currently installed.)
+Removing liblab (1.0) ...
+
+$ dpkg -l liblab; echo "exit=$?"
+dpkg-query: no packages found matching liblab
+exit=1
+
+---- 更新 ----
+
+$ apt list --upgradable
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Listing...
+labhello/lab 1.1 all [upgradable from: 1.0]
+libaudit-common/noble-updates 1:3.1.2-2.1ubuntu0.1 all [upgradable from: 1:3.1.2-2.1build1.1]
+libaudit1/noble-updates 1:3.1.2-2.1ubuntu0.1 amd64 [upgradable from: 1:3.1.2-2.1build1.1]
+
+$ sudo apt-get -s upgrade
+Reading package lists...
+Building dependency tree...
+Reading state information...
+Calculating upgrade...
+The following packages will be upgraded:
+  labhello libaudit-common libaudit1
+3 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+Inst libaudit-common [1:3.1.2-2.1build1.1] (1:3.1.2-2.1ubuntu0.1 Ubuntu:24.04/noble-updates [all])
+Conf libaudit-common (1:3.1.2-2.1ubuntu0.1 Ubuntu:24.04/noble-updates [all])
+Inst libaudit1 [1:3.1.2-2.1build1.1] (1:3.1.2-2.1ubuntu0.1 Ubuntu:24.04/noble-updates [amd64])
+Conf libaudit1 (1:3.1.2-2.1ubuntu0.1 Ubuntu:24.04/noble-updates [amd64])
+Inst labhello [1.0] (1.1 lab lab:lab [all])
+Conf labhello (1.1 lab lab:lab [all])
+
+$ labhello
+labhello 1.0
+
+$ sudo apt install -y labhello
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following packages will be upgraded:
+  labhello
+1 upgraded, 0 newly installed, 0 to remove and 2 not upgraded.
+Need to get 0 B/620 B of archives.
+After this operation, 0 B of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.1 [620 B]
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+dpkg-preconfigure: unable to re-open stdin: 
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12824 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.1_all.deb ...
+Unpacking labhello (1.1) over (1.0) ...
+Setting up labhello (1.1) ...
+
+$ labhello
+labhello 1.1
+
+$ apt-cache policy labhello
+labhello:
+  Installed: 1.1
+  Candidate: 1.1
+  Version table:
+ *** 1.1 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+        100 /var/lib/dpkg/status
+     1.0 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+
+---- apt と apt-get / apt-cache ----
+
+$ apt-cache show labhello | grep -E "^(Package|Version):"
+Package: labhello
+Version: 1.1
+Package: labhello
+Version: 1.0
+
+$ apt show labhello 2>/dev/null | grep -E "^(Package|Version):"
+Package: labhello
+Version: 1.1
+
+$ apt-get download liblab
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+
+$ ls -l *.deb
+-rw-r--r-- 1 lab lab 746 Oct 13 10:36 liblab_1.0_all.deb
+
+$ dpkg -l liblab; echo "exit=$?"
+dpkg-query: no packages found matching liblab
+exit=1
+
+$ ls /var/cache/apt/archives/
+lock
+partial
+
+
+========== ch3. 目録は、自分で取りに行くまで古いまま ==========
+
+$ cat /etc/apt/sources.list
+# Ubuntu sources have moved to the /etc/apt/sources.list.d/ubuntu.sources
+# file, which uses the deb822 format. Use deb822-formatted .sources files
+# to manage package sources in the /etc/apt/sources.list.d/ directory.
+# See the sources.list(5) manual page for details.
+
+# 檻の中の練習用リポジトリ（確かめて説明する LinuC 主題1.04）。
+# 署名していないので [trusted=yes] で署名の確認を外している。本物のリポジトリでは外さない。
+deb [trusted=yes] file:/srv/lab-repo lab main
+
+$ ls -l /etc/apt/sources.list.d/
+total 4
+-rw-r--r-- 1 root root 196 Sep 30 19:04 ubuntu.sources
+
+$ cat /etc/apt/sources.list.d/ubuntu.sources
+Types: deb
+URIs: https://snapshot.ubuntu.com/ubuntu/20260929T000000Z
+Suites: noble noble-updates noble-security
+Components: main universe
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+$ find /srv/lab-repo/dists -type f | sort
+/srv/lab-repo/dists/lab/Release
+/srv/lab-repo/dists/lab/main/Contents-amd64
+/srv/lab-repo/dists/lab/main/Contents-amd64.gz
+/srv/lab-repo/dists/lab/main/binary-amd64/Packages
+/srv/lab-repo/dists/lab/main/binary-amd64/Packages.gz
+
+$ head -9 /srv/lab-repo/dists/lab/Release
+Architectures: amd64
+Codename: lab
+Components: main
+Date: Tue, 13 Oct 2026 00:57:22 +0000
+Description: LinuC 1.04 practice repository (lab)
+Label: lab lab
+Origin: check-then-explain
+Suite: lab
+MD5Sum:
+
+$ ls -1 /var/lib/apt/lists/ | grep -v -e lock -e partial -e auxfiles
+_srv_lab-repo_dists_lab_Release
+_srv_lab-repo_dists_lab_main_Contents-amd64.lz4
+_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-security_InRelease
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-security_main_binary-amd64_Packages.lz4
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-security_universe_binary-amd64_Packages.lz4
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-updates_InRelease
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-updates_main_binary-amd64_Packages.lz4
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-updates_universe_binary-amd64_Packages.lz4
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_InRelease
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_main_binary-amd64_Packages.lz4
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_universe_binary-amd64_Packages.lz4
+
+---- 1行足す（ふつうこう考える） ----
+
+$ find /srv/lab-extra -type f | sort
+/srv/lab-extra/dists/extra/Release
+/srv/lab-extra/dists/extra/main/Contents-amd64
+/srv/lab-extra/dists/extra/main/Contents-amd64.gz
+/srv/lab-extra/dists/extra/main/binary-amd64/Packages
+/srv/lab-extra/dists/extra/main/binary-amd64/Packages.gz
+/srv/lab-extra/pool/main/l/labextra/labextra_1.0_all.deb
+
+$ echo 'deb file:/srv/lab-extra extra main' | sudo tee /etc/apt/sources.list.d/lab-extra.list
+deb file:/srv/lab-extra extra main
+
+$ apt-cache policy labextra
+
+$ sudo apt install -y labextra; echo "exit=$?"
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+E: Unable to locate package labextra
+exit=100
+
+---- 取りに行く。が、署名が無いと受け取らない ----
+
+$ sudo apt update; echo "exit=$?"
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Get:1 file:/srv/lab-repo lab InRelease
+Ign:1 file:/srv/lab-repo lab InRelease
+Get:2 file:/srv/lab-extra extra InRelease
+Ign:2 file:/srv/lab-extra extra InRelease
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-extra extra Release [1991 B]
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-extra extra Release [1991 B]
+Get:5 file:/srv/lab-repo lab Release.gpg
+Ign:5 file:/srv/lab-repo lab Release.gpg
+Get:6 file:/srv/lab-extra extra Release.gpg
+Ign:6 file:/srv/lab-extra extra Release.gpg
+Hit:7 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Hit:8 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Reading package lists...
+E: The repository 'file:/srv/lab-extra extra Release' is not signed.
+exit=100
+
+$ ls -1 /var/lib/apt/lists/ | grep lab-extra; echo "exit=$?"
+exit=1
+
+$ echo 'deb [trusted=yes] file:/srv/lab-extra extra main' | sudo tee /etc/apt/sources.list.d/lab-extra.list
+deb [trusted=yes] file:/srv/lab-extra extra main
+
+$ sudo apt update
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Get:1 file:/srv/lab-repo lab InRelease
+Ign:1 file:/srv/lab-repo lab InRelease
+Get:2 file:/srv/lab-extra extra InRelease
+Ign:2 file:/srv/lab-extra extra InRelease
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-extra extra Release [1991 B]
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-extra extra Release [1991 B]
+Get:5 file:/srv/lab-repo lab Release.gpg
+Ign:5 file:/srv/lab-repo lab Release.gpg
+Get:6 file:/srv/lab-extra extra Release.gpg
+Ign:6 file:/srv/lab-extra extra Release.gpg
+Get:7 file:/srv/lab-extra extra/main amd64 Packages [448 B]
+Get:8 file:/srv/lab-extra extra/main amd64 Contents (deb) [44 B]
+Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Hit:10 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Hit:11 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Reading package lists...
+Building dependency tree...
+Reading state information...
+3 packages can be upgraded. Run 'apt list --upgradable' to see them.
+
+$ ls -1 /var/lib/apt/lists/ | grep lab-extra
+_srv_lab-extra_dists_extra_Release
+_srv_lab-extra_dists_extra_main_Contents-amd64.lz4
+_srv_lab-extra_dists_extra_main_binary-amd64_Packages.lz4
+
+$ apt-cache policy labextra
+labextra:
+  Installed: (none)
+  Candidate: 1.0
+  Version table:
+     1.0 500
+        500 file:/srv/lab-extra extra/main amd64 Packages
+
+$ sudo apt install -y labextra
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following NEW packages will be installed:
+  labextra
+0 upgraded, 1 newly installed, 0 to remove and 3 not upgraded.
+Need to get 0 B/668 B of archives.
+After this operation, 28.7 kB of additional disk space will be used.
+Get:1 file:/srv/lab-extra extra/main amd64 labextra all 1.0 [668 B]
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+dpkg-preconfigure: unable to re-open stdin: 
+Selecting previously unselected package labextra.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12824 files and directories currently installed.)
+Preparing to unpack .../labextra/labextra_1.0_all.deb ...
+Unpacking labextra (1.0) ...
+Setting up labextra (1.0) ...
+
+$ labextra
+labextra 1.0 (/srv/lab-extra から入った)
+
+---- apt-file ----
+
+$ dpkg -S liblab.sh; echo "exit=$?"
+dpkg-query: no path found matching pattern *liblab.sh*
+exit=1
+
+$ apt-file search liblab.sh
+liblab: /usr/lib/liblab/liblab.sh
+
+$ apt-file search bin/labapp
+labapp: /usr/bin/labapp
+
+$ apt-file list labapp
+labapp: /etc/labapp.conf
+labapp: /usr/bin/labapp
+labapp: /usr/share/doc/labapp/README
+
+$ apt-file search labextra
+labextra: /usr/bin/labextra
+
+$ apt-file search bin/dig; echo "exit=$?"
+exit=1
+
+$ ls -1 /var/lib/apt/lists/ | grep Contents
+_srv_lab-extra_dists_extra_main_Contents-amd64.lz4
+_srv_lab-repo_dists_lab_main_Contents-amd64.lz4
+
+$ grep -v "^//" /etc/apt/apt.conf.d/60lab-apt-file
+Acquire::IndexTargets::deb::Contents-deb-legacy::DefaultEnabled "false";
+
+$ sudo apt-file update
+Get:1 file:/srv/lab-repo lab InRelease
+Ign:1 file:/srv/lab-repo lab InRelease
+Get:2 file:/srv/lab-extra extra InRelease
+Ign:2 file:/srv/lab-extra extra InRelease
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-extra extra Release [1991 B]
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-extra extra Release [1991 B]
+Get:5 file:/srv/lab-repo lab Release.gpg
+Ign:5 file:/srv/lab-repo lab Release.gpg
+Get:6 file:/srv/lab-extra extra Release.gpg
+Ign:6 file:/srv/lab-extra extra Release.gpg
+Hit:7 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Hit:8 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Reading package lists...
+
+
+========== ch4. dpkg は台帳しか見ない ==========
+
+$ sudo dpkg -i /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb; echo "exit=$?"
+Selecting previously unselected package labapp.
+(Reading database ... 12824 files and directories currently installed.)
+Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
+Unpacking labapp (1.0) ...
+dpkg: dependency problems prevent configuration of labapp:
+ labapp depends on liblab (>= 1.0); however:
+  Package liblab is not installed.
+
+dpkg: error processing package labapp (--install):
+ dependency problems - leaving unconfigured
+Errors were encountered while processing:
+ labapp
+exit=1
+
+$ dpkg -l labapp liblab
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-====================================
+iU  labapp         1.0          all          sample application that needs liblab
+un  liblab         <none>       <none>       (no description available)
+
+$ labapp; echo "exit=$?"
+/usr/bin/labapp: 3: .: cannot open /usr/lib/liblab/liblab.sh: No such file
+exit=2
+
+$ sudo apt install -y labhello; echo "exit=$?"
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+You might want to run 'apt --fix-broken install' to correct these.
+The following packages have unmet dependencies:
+ labapp : Depends: liblab (>= 1.0) but it is not going to be installed
+E: Unmet dependencies. Try 'apt --fix-broken install' with no packages (or specify a solution).
+exit=100
+
+$ sudo apt --fix-broken install -y
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+Correcting dependencies... Done
+The following additional packages will be installed:
+  liblab
+The following NEW packages will be installed:
+  liblab
+0 upgraded, 1 newly installed, 0 to remove and 3 not upgraded.
+1 not fully installed or removed.
+Need to get 0 B/746 B of archives.
+After this operation, 36.9 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+dpkg-preconfigure: unable to re-open stdin: 
+Selecting previously unselected package liblab.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12828 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labapp (1.0) ...
+
+$ dpkg -l labapp liblab
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-====================================
+ii  labapp         1.0          all          sample application that needs liblab
+ii  liblab         1.0          all          small shell library for lab programs
+
+$ labapp
+liblab: hello from labapp 1.0
+
+---- 台帳を引く ----
+
+$ dpkg -l | head -8
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name                        Version                           Architecture Description
++++-===========================-=================================-============-================================================================================
+ii  apt                         2.8.3                             amd64        commandline package manager
+ii  apt-file                    3.3                               all          search for files within Debian packages (command-line interface)
+ii  apt-utils                   2.8.3                             amd64        package management related utility programs
+
+$ dpkg -l 'lab*'
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-======================================
+ii  labapp         1.0          all          sample application that needs liblab
+ii  labhello       1.0          all          prints its own version
+ii  labsvc         1.0          all          sample service tool with a config file
+ii  labsvc-common  1.0          all          data files for labsvc
+
+$ dpkg -L labapp
+/.
+/etc
+/etc/labapp.conf
+/usr
+/usr/bin
+/usr/bin/labapp
+/usr/share
+/usr/share/doc
+/usr/share/doc/labapp
+/usr/share/doc/labapp/README
+
+$ dpkg -S /usr/bin/labapp
+labapp: /usr/bin/labapp
+
+$ dpkg -S labapp.conf
+labapp: /etc/labapp.conf
+
+$ dpkg -s labapp
+Package: labapp
+Status: install ok installed
+Priority: optional
+Section: utils
+Installed-Size: 68
+Maintainer: check-then-explain <lab@example.invalid>
+Architecture: all
+Version: 1.0
+Depends: liblab (>= 1.0)
+Conffiles:
+ /etc/labapp.conf dfe81d66c11f9fc2a4cfd67014f23bad
+Description: sample application that needs liblab
+ Prints a greeting. The greeting is read from /etc/labapp.conf.
+
+$ dpkg -c /srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/bin/
+-rwxr-xr-x root/root        30 2026-10-01 09:00 ./usr/bin/labhello
+
+$ dpkg -I /srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
+ new Debian package, version 2.0.
+ size 620 bytes: control archive=284 bytes.
+     234 bytes,     9 lines      control
+ Package: labhello
+ Version: 1.1
+ Section: utils
+ Priority: optional
+ Architecture: all
+ Installed-Size: 28
+ Maintainer: check-then-explain <lab@example.invalid>
+ Description: prints its own version
+  A tiny package used to practice upgrades.
+
+---- 台帳と照らし合わせる（dpkg -V） ----
+
+$ dpkg -V labapp; echo "exit=$?"
+exit=0
+
+$ echo 'greeting="こんにちは"' | sudo tee -a /etc/labapp.conf
+greeting="こんにちは"
+
+$ echo '# 書き足した' | sudo tee -a /usr/bin/labapp
+# 書き足した
+
+$ dpkg -V labapp; echo "exit=$?"
+??5?????? c /etc/labapp.conf
+??5??????   /usr/bin/labapp
+exit=0
+
+$ sudo apt install -y --reinstall labapp
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+0 upgraded, 0 newly installed, 1 reinstalled, 0 to remove and 3 not upgraded.
+Need to get 0 B/1076 B of archives.
+After this operation, 0 B of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+dpkg-preconfigure: unable to re-open stdin: 
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12830 files and directories currently installed.)
+Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
+Unpacking labapp (1.0) over (1.0) ...
+Setting up labapp (1.0) ...
+
+$ dpkg -V labapp; echo "exit=$?"
+??5?????? c /etc/labapp.conf
+exit=0
+
+---- 消す ----
+
+$ sudo dpkg -r liblab; echo "exit=$?"
+dpkg: dependency problems prevent removal of liblab:
+ labapp depends on liblab (>= 1.0).
+
+dpkg: error processing package liblab (--remove):
+ dependency problems - not removing
+Errors were encountered while processing:
+ liblab
+exit=1
+
+$ sudo dpkg -r labapp
+(Reading database ... 12830 files and directories currently installed.)
+Removing labapp (1.0) ...
+
+$ dpkg -l labapp | tail -1
+rc  labapp         1.0          all          sample application that needs liblab
+
+$ ls -l /etc/labapp.conf
+-rw-r--r-- 1 root root 120 Oct 13 10:36 /etc/labapp.conf
+
+$ sudo dpkg -P labapp
+(Reading database ... 12827 files and directories currently installed.)
+Purging configuration files for labapp (1.0) ...
+
+$ dpkg -l labapp; echo "exit=$?"
+dpkg-query: no packages found matching labapp
+exit=1
+
+$ sudo dpkg -P liblab
+(Reading database ... 12826 files and directories currently installed.)
+Removing liblab (1.0) ...
+
+---- dpkg-reconfigure ----
+
+$ cat /etc/timezone; ls -l /etc/localtime
+Etc/UTC
+lrwxrwxrwx 1 root root 27 Sep 30 19:32 /etc/localtime -> /usr/share/zoneinfo/Etc/UTC
+
+$ env -u TZ date -d @1790812800
+Thu Oct  1 00:00:00 UTC 2026
+
+$ sudo debconf-show tzdata
+  tzdata/Zones/Atlantic:
+  tzdata/Zones/Indian:
+  tzdata/Zones/Legacy:
+  tzdata/Zones/Arctic:
+  tzdata/Zones/America:
+  tzdata/Zones/Australia:
+  tzdata/Zones/Etc: UTC
+  tzdata/Zones/Antarctica:
+  tzdata/Zones/Asia:
+  tzdata/Zones/Pacific:
+  tzdata/Zones/Europe:
+  tzdata/Zones/Africa:
+  tzdata/Areas: Etc
+
+$ printf '5\n78\n' | sudo dpkg-reconfigure -f teletype tzdata
+Configuring tzdata
+------------------
+
+Please select the geographic area in which you live. Subsequent configuration
+questions will narrow this down by presenting a list of cities, representing
+the time zones in which they are located.
+
+  1. Africa      4. Arctic    7. Australia  10. Pacific
+  2. America     5. Asia      8. Europe     11. Etc
+  3. Antarctica  6. Atlantic  9. Indian     12. Legacy
+Geographic area: 
+Please select the city or region corresponding to your time zone.
+
+  1. Aden         23. Dili         45. Krasnoyarsk   67. Samarkand
+  2. Almaty       24. Dubai        46. Kuala_Lumpur  68. Seoul
+  3. Amman        25. Dushanbe     47. Kuching       69. Shanghai
+  4. Anadyr       26. Famagusta    48. Kuwait        70. Singapore
+  5. Aqtau        27. Gaza         49. Macau         71. Srednekolymsk
+  6. Aqtobe       28. Harbin       50. Magadan       72. Taipei
+  7. Ashgabat     29. Hebron       51. Makassar      73. Tashkent
+  8. Atyrau       30. Ho_Chi_Minh  52. Manila        74. Tbilisi
+  9. Baghdad      31. Hong_Kong    53. Muscat        75. Tehran
+  10. Bahrain     32. Hovd         54. Nicosia       76. Tel_Aviv
+  11. Baku        33. Irkutsk      55. Novokuznetsk  77. Thimphu
+  12. Bangkok     34. Istanbul     56. Novosibirsk   78. Tokyo
+  13. Barnaul     35. Jakarta      57. Omsk          79. Tomsk
+  14. Beirut      36. Jayapura     58. Oral          80. Ulaanbaatar
+  15. Bishkek     37. Jerusalem    59. Phnom_Penh    81. Urumqi
+  16. Brunei      38. Kabul        60. Pontianak     82. Ust-Nera
+  17. Chita       39. Kamchatka    61. Pyongyang     83. Vientiane
+  18. Choibalsan  40. Karachi      62. Qatar         84. Vladivostok
+  19. Chongqing   41. Kashgar      63. Qostanay      85. Yakutsk
+  20. Colombo     42. Kathmandu    64. Qyzylorda     86. Yangon
+  21. Damascus    43. Khandyga     65. Riyadh        87. Yekaterinburg
+  22. Dhaka       44. Kolkata      66. Sakhalin      88. Yerevan
+Time zone: 
+
+Current default time zone: 'Asia/Tokyo'
+Local time is now:      Tue Oct 13 10:36:17 JST 2026.
+Universal Time is now:  Tue Oct 13 01:36:17 UTC 2026.
+
+
+$ cat /etc/timezone; ls -l /etc/localtime
+Asia/Tokyo
+lrwxrwxrwx 1 root root 30 Oct 13 10:36 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
+
+$ env -u TZ date -d @1790812800
+Thu Oct  1 09:00:00 JST 2026
+
+$ sudo debconf-show tzdata
+  tzdata/Zones/Pacific:
+  tzdata/Zones/Australia:
+  tzdata/Zones/Indian:
+  tzdata/Zones/Antarctica:
+  tzdata/Zones/Atlantic:
+  tzdata/Zones/Arctic:
+  tzdata/Zones/Etc: UTC
+  tzdata/Zones/Africa:
+* tzdata/Zones/Asia: Tokyo
+  tzdata/Zones/America:
+  tzdata/Zones/Legacy:
+  tzdata/Zones/Europe:
+* tzdata/Areas: Asia

@@ -1,0 +1,11 @@
+// apt-file の索引（Contents）を、Ubuntu の公式リポジトリからは取らない（確かめて説明する LinuC 主題1.04）。
+//
+// Ubuntu の Contents はスイートごとに1つで、noble が 51MB・noble-updates が 75MB・
+// noble-security が 69MB ある（gzip 圧縮後。snapshot 20260929T000000Z の InRelease で実測）。
+// apt-file を入れたままにすると、apt update のたびに合計約 195MB を取りに行く。
+//
+// Ubuntu の Contents はスイート直下に置く古い形（Contents-deb-legacy）だけなので、
+// それを止めると Ubuntu の分だけが止まる。檻の中の lab リポジトリは
+// コンポーネントごとの形（main/Contents-amd64）なので、apt-file はそちらを読み続ける。
+// 実機と同じように Ubuntu の分も引きたいときは、このファイルを消して apt update する。
+Acquire::IndexTargets::deb::Contents-deb-legacy::DefaultEnabled "false";

@@ -1,0 +1,571 @@
+
+
+########## 0. ログインしたときの表示（bash -l） ##########
+
+$ bash -lic true
+bash: cannot set terminal process group (6): Inappropriate ioctl for device
+bash: no job control in this shell
+
+── lab-linuc-packages-deb 1.0.0 ────────────────────────────────────────
+lab-linuc-packages-deb  進捗 0/3
+  次 → 01 「labsvc を、跡形なく消す」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-packages-deb-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+########## A. 何もしていない状態で lab check（全部 ✗ になるはず） ##########
+
+$ lab check; echo "exit=$?"
+✗ 01 未達
+  判定 : 観測型（dpkg の台帳の状態と、設定ファイルの有無を見た）
+  観測 : labsvc        の台帳 = ii
+         labsvc-common の台帳 = ii
+         /etc/labsvc.conf     = 在る
+         → labsvc がまだ台帳にある（ii）
+         → /etc/labsvc.conf が残っている
+         → labsvc-common が残っている（ii）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+✗ 02 未達
+  判定 : 観測型（labcalc を動かし、dpkg の台帳と apt の目録を見た）
+  観測 : labcalc = コマンドとして見つからない
+         apt の目録に /srv/lab-tools の中身が載っていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+✗ 03 未達
+  判定 : 観測型（dpkg の台帳の状態と、labnote を動かした結果を見た）
+  観測 : labnote      の台帳 = 行が無い
+         labnote-data の台帳 = 行が無い
+         labnote = コマンドとして見つからない
+         → labnote が台帳に無い
+         → labnote-data が ii になっていない（台帳に無い）
+         → labnote が終了コード 127 で終わった
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+exit=1
+
+$ lab ls
+演習一覧
+  · 01  labsvc を、跡形なく消す              10分 / 影響度 B
+  · 02  labcalc コマンドを使えるようにする 15分 / 影響度 B
+  · 03  配られた .deb を、動く状態まで入れる 12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+
+########## B. 演習01 — labsvc を、跡形なく消す ##########
+
+$ lab start 01
+
+演習 01 — labsvc を、跡形なく消す                                   影響度 B / 目安 10分
+
+  この演習はシステム全体を触ります（dpkg の台帳と /etc）。作業ディレクトリは使いません。
+
+【いまの状態を見てください】
+
+    dpkg -l 'labsvc*'
+    labsvc
+    cat /etc/labsvc.conf
+
+  labsvc と labsvc-common の2つが入っています。
+  自分で入れたのは labsvc だけで、labsvc-common は labsvc を入れたときに
+  「必要だから」と一緒に入ってきたものです。
+
+【やること】
+
+  labsvc を、このシステムから跡形なく消してください。
+  判定では次の3つを確かめます。
+
+      labsvc が dpkg の台帳に残っていない（rc の行も残っていない）
+      /etc/labsvc.conf が無い
+      labsvc のために入ってきた labsvc-common も消えている
+
+  labsvc-common は名前を打たずに消してください。
+  「もう誰にも必要とされていない」ことを apt に判断させるのが、この演習の半分です。
+
+【できたら】
+
+    lab check 01
+
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+
+
+$ dpkg -l 'labsvc*'
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-======================================
+ii  labsvc         1.0          all          sample service tool with a config file
+ii  labsvc-common  1.0          all          data files for labsvc
+
+$ labsvc
+labsvc: 動いています
+port=8080
+
+$ sudo apt remove -y labsvc
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following package was automatically installed and is no longer required:
+  labsvc-common
+Use 'sudo apt autoremove' to remove it.
+The following packages will be REMOVED:
+  labsvc
+0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
+After this operation, 41.0 kB disk space will be freed.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12824 files and directories currently installed.)
+Removing labsvc (1.0) ...
+
+$ echo "--- remove だけ（rc と設定ファイルと依存が残る） ---"; lab check 01; echo "exit=$?"
+--- remove だけ（rc と設定ファイルと依存が残る） ---
+✗ 01 未達
+  判定 : 観測型（dpkg の台帳の状態と、設定ファイルの有無を見た）
+  観測 : labsvc        の台帳 = rc
+         labsvc-common の台帳 = ii
+         /etc/labsvc.conf     = 在る
+         → labsvc の行が rc（設定ファイルだけ残っている）で台帳に残っている
+         → /etc/labsvc.conf が残っている
+         → labsvc-common が残っている（ii）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+exit=1
+
+$ sudo apt purge -y labsvc
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following package was automatically installed and is no longer required:
+  labsvc-common
+Use 'sudo apt autoremove' to remove it.
+The following packages will be REMOVED:
+  labsvc*
+0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
+After this operation, 0 B of additional disk space will be used.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12823 files and directories currently installed.)
+Purging configuration files for labsvc (1.0) ...
+
+$ echo "--- purge まで（依存がまだ残る） ---"; lab check 01; echo "exit=$?"
+--- purge まで（依存がまだ残る） ---
+✗ 01 未達
+  判定 : 観測型（dpkg の台帳の状態と、設定ファイルの有無を見た）
+  観測 : labsvc        の台帳 = 行が無い
+         labsvc-common の台帳 = ii
+         /etc/labsvc.conf     = 無い
+         → labsvc-common が残っている（ii）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+exit=1
+
+$ sudo apt autoremove -y
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following packages will be REMOVED:
+  labsvc-common
+0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
+After this operation, 36.9 kB disk space will be freed.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12822 files and directories currently installed.)
+Removing labsvc-common (1.0) ...
+
+$ dpkg -l 'labsvc*'; echo "exit=$?"
+dpkg-query: no packages found matching labsvc*
+exit=1
+
+$ lab check 01; echo "exit=$?"
+✔ 01 達成
+  判定 : 観測型（dpkg の台帳の状態と、設定ファイルの有無を見た）
+  観測 : labsvc        の台帳 = 行が無い
+         labsvc-common の台帳 = 行が無い
+         /etc/labsvc.conf     = 無い
+         labsvc は台帳にも /etc にも残っておらず、一緒に入った labsvc-common も消えている
+exit=0
+
+
+########## C. 演習02 — labcalc コマンドを使えるようにする ##########
+
+$ lab start 02
+
+演習 02 — labcalc コマンドを使えるようにする（パッケージ名は教えない）  影響度 B / 目安 15分
+
+  この演習はシステム全体を触ります（apt のソースと dpkg の台帳）。作業ディレクトリは使いません。
+
+【状況】
+
+  /srv/lab-tools に、apt のリポジトリが1つ置いてあります。
+  まだ apt のソースには入っていません。
+
+    find /srv/lab-tools -maxdepth 3
+
+  この中のどれかのパッケージに、labcalc というコマンドが入っています。
+  パッケージの名前は教えません。説明文にも labcalc という語は出てきません
+  （つまり apt search では見つかりません）。
+
+【やること】
+
+  labcalc コマンドを使えるようにしてください。
+
+      labcalc 2 3     →   5 と出れば使えている
+
+  判定では次の3つを確かめます。
+
+      labcalc がコマンドとして見つかり、2 と 3 を渡すと 5 を返す
+      labcalc が dpkg の台帳にあるパッケージから入っている（手で置いたファイルではない）
+      そのパッケージを、apt が /srv/lab-tools から入れられる状態になっている
+
+【できたら】
+
+    lab check 02
+
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+
+
+$ apt search labcalc
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Sorting...
+Full Text Search...
+
+$ echo 'deb [trusted=yes] file:/srv/lab-tools tools main' | sudo tee /etc/apt/sources.list.d/lab-tools.list
+deb [trusted=yes] file:/srv/lab-tools tools main
+
+$ echo "--- ソースに書いただけ（apt update 前） ---"; lab check 02; echo "exit=$?"
+--- ソースに書いただけ（apt update 前） ---
+✗ 02 未達
+  判定 : 観測型（labcalc を動かし、dpkg の台帳と apt の目録を見た）
+  観測 : labcalc = コマンドとして見つからない
+         apt の目録に /srv/lab-tools の中身が載っていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+exit=1
+
+$ sudo apt update
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Get:1 file:/srv/lab-repo lab InRelease
+Ign:1 file:/srv/lab-repo lab InRelease
+Get:2 file:/srv/lab-tools tools InRelease
+Ign:2 file:/srv/lab-tools tools InRelease
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-tools tools Release [1991 B]
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-tools tools Release [1991 B]
+Get:5 file:/srv/lab-repo lab Release.gpg
+Ign:5 file:/srv/lab-repo lab Release.gpg
+Get:6 file:/srv/lab-tools tools Release.gpg
+Ign:6 file:/srv/lab-tools tools Release.gpg
+Get:7 file:/srv/lab-tools tools/main amd64 Packages [445 B]
+Get:8 file:/srv/lab-tools tools/main amd64 Contents (deb) [53 B]
+Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Hit:10 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Hit:11 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Reading package lists...
+Building dependency tree...
+Reading state information...
+3 packages can be upgraded. Run 'apt list --upgradable' to see them.
+
+$ apt-file search labcalc
+lab-mathtools: /usr/bin/labcalc
+
+$ sudo apt install -y lab-mathtools
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following NEW packages will be installed:
+  lab-mathtools
+0 upgraded, 1 newly installed, 0 to remove and 3 not upgraded.
+Need to get 0 B/804 B of archives.
+After this operation, 28.7 kB of additional disk space will be used.
+Get:1 file:/srv/lab-tools tools/main amd64 lab-mathtools all 1.0 [804 B]
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+dpkg-preconfigure: unable to re-open stdin: 
+Selecting previously unselected package lab-mathtools.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12820 files and directories currently installed.)
+Preparing to unpack .../lab-mathtools_1.0_all.deb ...
+Unpacking lab-mathtools (1.0) ...
+Setting up lab-mathtools (1.0) ...
+
+$ labcalc 2 3
+5
+
+$ lab check 02; echo "exit=$?"
+✔ 02 達成
+  判定 : 観測型（labcalc を動かし、dpkg の台帳と apt の目録を見た）
+  観測 : labcalc = /usr/bin/labcalc
+         labcalc 2 3 の出力 = 5
+         dpkg の台帳 = lab-mathtools（ii）
+         apt の目録 = lab-mathtools を file:/srv/lab-tools から取れる
+         labcalc は lab-mathtools が入れたもので、apt はそれを /srv/lab-tools から取れる
+exit=0
+
+
+########## D. 演習03 — 配られた .deb を、動く状態まで入れる ##########
+
+$ lab start 03
+作業ファイルを ~/work/03 に展開しました（labnote_1.0_all.deb ）
+
+演習 03 — 配られた .deb を、動く状態まで入れる                       影響度 B / 目安 12分
+
+  作業ファイルは ~/work/03 にあります。
+
+    ls -l
+
+  labnote_1.0_all.deb は、リポジトリには無い「単体で配られた .deb」です
+  （どこかのサイトから落としてきた、という想定です）。
+
+【いまの状態を見てください】
+
+    dpkg -I labnote_1.0_all.deb      # 中の control（名前・版・依存）
+    dpkg -c labnote_1.0_all.deb      # 中のファイル一覧
+
+【やること】
+
+  labnote を入れて、labnote コマンドが動く状態にしてください。
+
+      labnote   →   1行のメッセージが出れば動いている
+
+  判定では、dpkg の台帳で labnote と、labnote が必要とするパッケージの両方が
+  ii（入っていて、設定も済んでいる）になっていて、labnote が実際に動くかを確かめます。
+
+【できたら】
+
+    lab check 03
+
+▶ 次はこれを打ってください
+    cd ~/work/03
+
+
+$ cd ~/work/03 && ls -l
+total 4
+-rw-r--r-- 1 lab lab 708 Oct 13 10:22 labnote_1.0_all.deb
+
+$ cd ~/work/03 && dpkg -I labnote_1.0_all.deb | grep Depends
+ Depends: labnote-data (>= 1.0)
+
+$ cd ~/work/03 && sudo dpkg -i labnote_1.0_all.deb; echo "exit=$?"
+Selecting previously unselected package labnote.
+(Reading database ... 12821 files and directories currently installed.)
+Preparing to unpack labnote_1.0_all.deb ...
+Unpacking labnote (1.0) ...
+dpkg: dependency problems prevent configuration of labnote:
+ labnote depends on labnote-data (>= 1.0); however:
+  Package labnote-data is not installed.
+
+dpkg: error processing package labnote (--install):
+ dependency problems - leaving unconfigured
+Errors were encountered while processing:
+ labnote
+exit=1
+
+$ echo "--- dpkg -i だけ（iU で止まっている） ---"; lab check 03; echo "exit=$?"
+--- dpkg -i だけ（iU で止まっている） ---
+✗ 03 未達
+  判定 : 観測型（dpkg の台帳の状態と、labnote を動かした結果を見た）
+  観測 : labnote      の台帳 = iU
+         labnote-data の台帳 = un
+         labnote の出力 = cat: /usr/share/labnote/note.txt: No such file or directory（終了コード 1）
+         → labnote が iU（展開済み・設定前）で止まっている
+         → labnote-data が ii になっていない（un）
+         → labnote が終了コード 1 で終わった
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+exit=1
+
+$ sudo apt --fix-broken install -y
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+Correcting dependencies... Done
+The following additional packages will be installed:
+  labnote-data
+The following NEW packages will be installed:
+  labnote-data
+0 upgraded, 1 newly installed, 0 to remove and 3 not upgraded.
+1 not fully installed or removed.
+Need to get 0 B/640 B of archives.
+After this operation, 36.9 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labnote-data all 1.0 [640 B]
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+dpkg-preconfigure: unable to re-open stdin: 
+Selecting previously unselected package labnote-data.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12822 files and directories currently installed.)
+Preparing to unpack .../labnote-data_1.0_all.deb ...
+Unpacking labnote-data (1.0) ...
+Setting up labnote-data (1.0) ...
+Setting up labnote (1.0) ...
+
+$ labnote
+labnote: labnote-data から読んだ1行です
+
+$ lab check 03; echo "exit=$?"
+✔ 03 達成
+  判定 : 観測型（dpkg の台帳の状態と、labnote を動かした結果を見た）
+  観測 : labnote      の台帳 = ii
+         labnote-data の台帳 = ii
+         labnote の出力 = labnote: labnote-data から読んだ1行です（終了コード 0）
+         labnote と labnote-data がどちらも ii で、labnote が動いた
+
+  ════════════════════════════════════════
+   確かめて説明する LinuC 主題1.04（Debian 系） — 全3演習クリア
+  ════════════════════════════════════════
+
+  自分の手で確かめたこと
+
+   ✔ 01  apt remove は設定ファイルを残し（rc）、一緒に入った依存は autoremove まで残ること
+   ✔ 02  ソースに書いても apt update するまで目録は変わらず、ファイル名からは apt-file で探すこと
+   ✔ 03  dpkg -i は依存が足りないと iU で止まり、apt --fix-broken install が目録から補うこと
+
+  この3つは全部、1つの事実から出ていました。
+
+      パッケージのコマンドは、どれも帳簿を読んでいるだけである。
+      手元に入ったものの「台帳」（dpkg・rpm）か、リポジトリにあるものの「目録」（apt・yum）か。
+      答えが食い違ったら、どちらの帳簿を読んだかを先に疑う。
+
+  理論編の最終章に、それぞれがどう繋がるかを書いてあります → /linuc-packages/theory/07-rpm-install
+
+exit=0
+
+
+########## E. 全問通した状態で lab check と lab ls ##########
+
+$ lab check; echo "exit=$?"
+✔ 01 達成
+  判定 : 観測型（dpkg の台帳の状態と、設定ファイルの有無を見た）
+  観測 : labsvc        の台帳 = 行が無い
+         labsvc-common の台帳 = 行が無い
+         /etc/labsvc.conf     = 無い
+         labsvc は台帳にも /etc にも残っておらず、一緒に入った labsvc-common も消えている
+✔ 02 達成
+  判定 : 観測型（labcalc を動かし、dpkg の台帳と apt の目録を見た）
+  観測 : labcalc = /usr/bin/labcalc
+         labcalc 2 3 の出力 = 5
+         dpkg の台帳 = lab-mathtools（ii）
+         apt の目録 = lab-mathtools を file:/srv/lab-tools から取れる
+         labcalc は lab-mathtools が入れたもので、apt はそれを /srv/lab-tools から取れる
+✔ 03 達成
+  判定 : 観測型（dpkg の台帳の状態と、labnote を動かした結果を見た）
+  観測 : labnote      の台帳 = ii
+         labnote-data の台帳 = ii
+         labnote の出力 = labnote: labnote-data から読んだ1行です（終了コード 0）
+         labnote と labnote-data がどちらも ii で、labnote が動いた
+exit=0
+
+$ lab ls
+演習一覧
+  ✔ 01  labsvc を、跡形なく消す              10分 / 影響度 B
+  ✔ 02  labcalc コマンドを使えるようにする 15分 / 影響度 B
+  ✔ 03  配られた .deb を、動く状態まで入れる 12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+
+########## F. lab の残りの機能（hint / solve / reset） ##########
+
+$ cd
+
+$ lab hint 02
+
+ヒント 1 段目
+
+まず apt のソースに足します。リポジトリの中を見てください。
+
+    find /srv/lab-tools -maxdepth 3
+
+dists/ の下の2段が「ディストリビューション」と「コンポーネント」です。
+sources.list の1行は、この3つを並べたものです。
+
+    deb  <URI>  <ディストリビューション>  <コンポーネント>
+
+すでに入っている行が手本になります。
+
+    grep -v '^#' /etc/apt/sources.list
+
+足すときは /etc/apt/sources.list.d/ に、名前が .list で終わるファイルを1つ置きます。
+
+まだ足りなければ lab hint 02（次の段）
+
+$ lab hint 02
+
+ヒント 2 段目
+
+行を書いただけでは、apt はまだ何も知りません。目録を取りに行かせます。
+
+    sudo apt update
+
+ここで「is not signed」と言われたら、手本の行に付いている [trusted=yes] を見てください。
+（この練習用リポジトリには署名が無いので、確認を外す印が要ります）
+
+パッケージの名前が分からないので、apt search では探せません。
+「このファイルを含むパッケージはどれか」を、まだ入っていないパッケージについて答えられる道具を使います。
+dpkg -S は入っているものしか知りません。
+
+まだ足りなければ lab hint 02（次の段）
+
+$ lab solve 01 | head -6
+
+模範解答 01
+
+消すには3段あります。
+
+    sudo apt remove labsvc        # 中身を消す。設定ファイルと、自動で入った依存は残る
+
+$ lab reset 03
+演習 03 を初期状態に戻しました（~/work/03）
+
+$ lab ls
+演習一覧
+  ✔ 01  labsvc を、跡形なく消す              10分 / 影響度 B
+  ✔ 02  labcalc コマンドを使えるようにする 15分 / 影響度 B
+  · 03  配られた .deb を、動く状態まで入れる 12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+$ lab check 03; echo "exit=$?"
+✔ 03 達成
+  判定 : 観測型（dpkg の台帳の状態と、labnote を動かした結果を見た）
+  観測 : labnote      の台帳 = ii
+         labnote-data の台帳 = ii
+         labnote の出力 = labnote: labnote-data から読んだ1行です（終了コード 0）
+         labnote と labnote-data がどちらも ii で、labnote が動いた
+exit=0
+
+
+########## G. 最終環境 ##########
+
+$ lab env
+テーマ    : lab-linuc-packages-deb 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+dpkg      : 1.22.6ubuntu6.6
+apt       : 2.8.3
+apt-file  : 3.3
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb

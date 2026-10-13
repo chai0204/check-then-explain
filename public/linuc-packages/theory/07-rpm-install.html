@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>7. OK は、確かめられた範囲の OK — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="7" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-packages/theory/">理論編</a> › 第7章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>7. OK は、確かめられた範囲の OK</h1>
+<p class="lead"><code>rpm -K</code> で署名を確かめると、<b>誰も署名していないパッケージが「OK」</b>と出て、正しく署名されたパッケージが「NOT OK」と出る。OK は「確かめられたものは正しかった」という意味で、「署名が確かめられた」という意味ではない。確かめるには鍵が要り、鍵もまた台帳に載っていなければならない。</p>
+<div class="badges"><span>前提: 第6章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.4（重要度1）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>rpm -i</code> / <code>-U</code> / <code>-F</code> / <code>-e</code> の違いを、入っている・いないの組み合わせで言える</li><li>rpm が依存関係で何を拒み、<code>--nodeps</code> で何が壊れるかを示せる</li><li><code>rpm -K</code> の出力（<code>digests</code> / <code>signatures</code> / <code>NOKEY</code>）を読み、署名が確かめられたかを判断できる</li><li>公開鍵を台帳に取り込む（<code>rpm --import</code>）と何が変わるかを言える</li><li>7章で使ったコマンドを、どの帳簿を読むかで分けられる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: パッケージに署名する手順（<code>rpm --addsign</code>、<code>gpg</code> での鍵の作り方）、鍵の失効と差し替え、<code>--force</code> の細かい挙動、署名をどこまで強制するかの設定（<code>%_pkgverify_level</code>）。</div></div>
+
+<h2 id="deps">rpm も依存を取りに行かない。ただし1つも入れずに止まる</h2>
+<div class="sgoal"><b>この節で分かること</b>: rpm が依存関係をどこまで扱うか。dpkg との違い。</div>
+<pre><code>$ sudo rpm -ivh /srv/lab-rpm/labapp-1.0-1.noarch.rpm; echo "exit=$?"
+error: Failed dependencies:
+	liblab &gt;= 1.0 is needed by labapp-1.0-1.noarch
+exit=1
+$ sudo rpm -ivh /srv/lab-rpm/liblab-1.0-1.noarch.rpm /srv/lab-rpm/labapp-1.0-1.noarch.rpm
+Verifying...                          ########################################
+Preparing...                          ########################################
+Updating / installing...
+liblab-1.0-1                          ########################################
+labapp-1.0-1                          ########################################</code></pre>
+<p><code>-i</code> は install、<code>v</code> は経過を表示、<code>h</code> は進み具合を <code>#</code> で表示する。rpm も依存関係を読めるが、取りに行かない。第4章の <code>dpkg -i</code> と違うのは、<b>足りないと分かった時点で1つも入れずに止まる</b>ことである（dpkg は展開まで進めて <code>iU</code> を残した）。必要なファイルを全部並べて渡せば、rpm が順番（liblab が先）を決めて1回で入れる。</p>
+<p>消すときも依存関係を守る。</p>
+<pre><code>$ sudo rpm -e liblab; echo "exit=$?"
+error: Failed dependencies:
+	liblab &gt;= 1.0 is needed by (installed) labapp-1.0-1.noarch
+exit=1
+$ sudo rpm -e --nodeps liblab
+$ labapp; echo "exit=$?"
+/usr/bin/labapp: line 3: /usr/lib/liblab/liblab.sh: No such file or directory
+exit=1
+$ rpm -V labapp; echo "exit=$?"
+Unsatisfied dependencies for labapp-1.0-1.noarch:
+	liblab &gt;= 1.0 is needed by (installed) labapp-1.0-1.noarch
+exit=1</code></pre>
+<p><code>-e</code>（erase）は、ほかのパッケージが必要としているものを消すのを拒む。<code>--nodeps</code> を付けると依存関係を確かめずに消し、黙って成功する。そして labapp は動かなくなった。<code>rpm -V</code> は、ファイルだけでなく<b>依存関係が台帳の上で満たされているか</b>も確かめていて、壊れた組み合わせを報告した。<code>--nodeps</code> は台帳の整合を自分で崩すオプションで、使ったら後始末も自分でする。</p>
+<pre><code>$ sudo rpm -ivh /srv/lab-rpm/liblab-1.0-1.noarch.rpm
+Verifying...                          ########################################
+Preparing...                          ########################################
+Updating / installing...
+liblab-1.0-1                          ########################################
+$ sudo rpm -e labapp liblab
+$ rpm -q labapp liblab; echo "exit=$?"
+package labapp is not installed
+package liblab is not installed
+exit=2</code></pre>
+<p>並べて渡せば、消すときも順番を rpm が決める。<code>rpm -e</code> は成功すると何も出さない。</p>
+<div class="analogy"><b>たとえ</b>: 部品表を見て「この部品が無いと組めない」と言う検品係に近い。
+足りなければ、作業台に何も載せずに作業票ごと突き返す。部品を取りに倉庫へ行くのは別の係（yum）の仕事である。
+<br>ただし<b>崩れる点</b>: 人の検品係なら「急ぎなので部品なしで組んで」と言われても事情を聞き返すが、
+<code>--nodeps</code> を付けられた rpm は聞き返さない。組めないものを組んだまま、台帳の上は「入っている」にする。</div>
+
+<h2 id="iuf">-i・-U・-F は、入っているかどうかで動きが変わる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 入れる・上げるの3つのオプションの違い。</div>
+<p>いま labhello は 1.0 が入っていて、labtool-data は入っていない。</p>
+<pre><code>$ rpm -q labhello labtool-data; echo "exit=$?"
+labhello-1.0-1.noarch
+package labtool-data is not installed
+exit=1
+$ sudo rpm -ivh /srv/lab-rpm/labhello-1.1-1.noarch.rpm; echo "exit=$?"
+Verifying...                          ########################################
+Preparing...                          ########################################
+	file /usr/bin/labhello from install of labhello-1.1-1.noarch conflicts with file from package labhello-1.0-1.noarch
+exit=1
+$ sudo rpm -Fvh /srv/lab-rpm/labtool-data-1.0-1.noarch.rpm; echo "exit=$?"
+exit=0
+$ rpm -q labtool-data; echo "exit=$?"
+package labtool-data is not installed
+exit=1
+$ sudo rpm -Fvh /srv/lab-rpm/labhello-1.1-1.noarch.rpm
+Verifying...                          ########################################
+Preparing...                          ########################################
+Updating / installing...
+labhello-1.1-1                        ########################################
+Cleaning up / removing...
+labhello-1.0-1                        ########################################
+$ sudo rpm -Uvh /srv/lab-rpm/labtool-data-1.0-1.noarch.rpm
+Verifying...                          ########################################
+Preparing...                          ########################################
+Updating / installing...
+labtool-data-1.0-1                    ########################################
+$ rpm -q labhello labtool-data
+labhello-1.1-1.noarch
+labtool-data-1.0-1.noarch</code></pre>
+<p><code>-i</code> は「新しく入れる」で、古い版が入っていても上書きしない。同じファイルを2つの版が持つことになるので、衝突（<code>conflicts</code>）で止まった。<code>-F</code>（freshen）は「入っているものだけを新しくする」で、入っていない labtool-data には何もせず、終了コード 0 で黙って終わった。入っていた labhello は 1.1 に上がり、1.0 は片付けられた。<code>-U</code>（upgrade）は「入っていれば上げ、無ければ入れる」で、labtool-data を新しく入れた。</p>
+<div class="scroll"><table>
+<tr><th>オプション</th><th>入っていない</th><th>古い版が入っている</th></tr>
+<tr><td><code>-i</code>（install）</td><td>入れる</td><td><b>止まる</b>（衝突。古い版を残したまま並べて入れようとする）</td></tr>
+<tr><td><code>-U</code>（upgrade）</td><td>入れる</td><td>上げる（古い版を消す）</td></tr>
+<tr><td><code>-F</code>（freshen）</td><td><b>何もしない</b>（終了コード 0）</td><td>上げる（古い版を消す）</td></tr>
+</table></div>
+<p>カーネルのように複数の版を並べて残すものは、あえて <code>-i</code> で入れる（第5章の <code>installonly_limit</code> はその世代数だった）。</p>
+<pre><code>$ yum list installed labhello labtool-data
+Installed Packages
+labhello.noarch                            1.1-1                         @System
+labtool-data.noarch                        1.0-1                         @System</code></pre>
+<p>rpm で直接入れたものは、yum から見ると <code>@System</code> になる。どのリポジトリから来たかの記録が無いからである（yum で入れれば <code>@lab</code> だった）。</p>
+<div class="analogy"><b>たとえ</b>: 名簿の更新の指示に近い。<code>-i</code> は「新しく名前を書け」、
+<code>-U</code> は「名前があれば書き換え、無ければ足せ」、<code>-F</code> は「名前があるときだけ書き換えよ」である。
+<br>ただし<b>崩れる点</b>: 名簿なら同じ人の名前を2行書いても困るだけだが、rpm の <code>-i</code> は
+同じファイルを持つ2つの版を見つけると、書く前に止まる。</div>
+
+<h2 id="sign">rpm -K の OK は、何を確かめた OK か</h2>
+<div class="sgoal"><b>この節で分かること</b>: 署名を確かめる出力の読み方と、確かめるのに要るもの。</div>
+<p>檻の <code>/srv/lab-files/</code> には、リポジトリに属さない .rpm が2つ置いてある。labnosig は誰も署名していないもの、tree は AlmaLinux が署名した本物のパッケージである。もう1つ、演習04 で使う <code>/srv/lab-tools-rpm</code> のパッケージには「lab tools」という鍵で署名がしてある。3つを <code>rpm -K</code>（<code>--checksig</code>）で確かめる。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>rpm -K</code> で OK と出れば、署名は確かめられた。NOT OK と出たら、壊れているか偽物だ。
+署名の無いパッケージなら、少なくとも OK にはならないはずだ。</p>
+<pre><code>$ ls -l /srv/lab-files/
+total 64
+-rw-r--r-- 1 root root  6879 Oct 13 10:08 labnosig-1.0-1.noarch.rpm
+-rw-r--r-- 1 root root 55988 Oct 13 10:08 tree-1.8.0-10.el9.x86_64.rpm
+$ rpm -K /srv/lab-files/labnosig-1.0-1.noarch.rpm; echo "exit=$?"
+/srv/lab-files/labnosig-1.0-1.noarch.rpm: digests OK
+exit=0
+$ rpm -K /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm; echo "exit=$?"
+/srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm: digests SIGNATURES NOT OK
+exit=1
+$ rpm -K /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm; echo "exit=$?"
+/srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm: digests signatures OK
+exit=0</code></pre>
+<div class="then"><b>だめな理由</b>: <b>署名の無い labnosig が OK</b> で、署名のある lab-mathtools が NOT OK だった。
+行の中の語を読むと理由が分かる。<code>digests</code> は「中身の要約（ダイジェスト）が一致した＝壊れていない」、
+<code>signatures</code> は「署名を鍵で確かめた」である。labnosig には署名が無いので <code>signatures</code> という語自体が出ず、
+確かめられた <code>digests</code> だけが OK になった。lab-mathtools は署名を持っているが、
+それを確かめる鍵が手元に無いので、<code>SIGNATURES</code> が大文字（だめだったもの）で出た。
+OK は「確かめられたものは全部正しかった」であって、「作った人が確かめられた」ではない。</div></div>
+<p><code>-v</code> を足すと、何をどう確かめたかが1行ずつ出る。</p>
+<pre><code>$ rpm -Kv /srv/lab-files/labnosig-1.0-1.noarch.rpm
+/srv/lab-files/labnosig-1.0-1.noarch.rpm:
+    Header SHA256 digest: OK
+    Header SHA1 digest: OK
+    Payload SHA256 digest: OK
+    MD5 digest: OK
+$ rpm -Kv /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm
+/srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm:
+    Header V4 RSA/SHA256 Signature, key ID 484bd981: NOKEY
+    Header SHA256 digest: OK
+    Header SHA1 digest: OK
+    Payload SHA256 digest: OK
+    MD5 digest: OK
+$ rpm -Kv /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm
+/srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm:
+    Header V4 RSA/SHA256 Signature, key ID b86b3716: OK
+    Header SHA256 digest: OK
+    Header SHA1 digest: OK
+    Payload SHA256 digest: OK
+    V4 RSA/SHA256 Signature, key ID b86b3716: OK
+    MD5 digest: OK</code></pre>
+<p>labnosig には <code>Signature</code> の行が1つも無い。lab-mathtools の <code>NOKEY</code> は「鍵 484bd981 の署名があるが、その鍵を持っていない」で、改ざんを見つけたという意味ではない（改ざんなら <code>BAD</code> と出る。すぐ後で確かめる）。tree は AlmaLinux の鍵 b86b3716 で確かめられた。</p>
+<p>rpm が「持っている鍵」は、台帳に入っている。鍵は <code>gpg-pubkey</code> という名前の、ファイルを持たないパッケージとして記録される。</p>
+<pre><code>$ rpm -q gpg-pubkey --qf '%{NAME}-%{VERSION}-%{RELEASE}\t%{SUMMARY}\n'
+gpg-pubkey-b86b3716-61e69f29	AlmaLinux OS 9 &lt;packager@almalinux.org&gt; public key
+gpg-pubkey-93f77b82-6acd849f	lab packages &lt;lab@example.invalid&gt; public key
+$ head -3 /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mQGNBGrNhJ8BDACs4CZvLuZBw9OXnQ8OZ7QlK2pVIlW1nNDyBJD8XBlDHAEU6M7G
+$ sudo rpm --import /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+$ rpm -q gpg-pubkey --qf '%{NAME}-%{VERSION}-%{RELEASE}\t%{SUMMARY}\n'
+gpg-pubkey-b86b3716-61e69f29	AlmaLinux OS 9 &lt;packager@almalinux.org&gt; public key
+gpg-pubkey-93f77b82-6acd849f	lab packages &lt;lab@example.invalid&gt; public key
+gpg-pubkey-484bd981-6acd849f	lab tools &lt;tools@example.invalid&gt; public key
+$ rpm -K /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm; echo "exit=$?"
+/srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm: digests signatures OK
+exit=0</code></pre>
+<p><code>gpg-pubkey-</code> の後ろの8桁が鍵の ID で、<code>NOKEY</code> に出た <code>484bd981</code> と同じである。<code>rpm --import</code> で公開鍵のファイルを台帳に取り込むと、同じパッケージが <code>signatures OK</code> になった。パッケージは1バイトも変わっていない。変わったのは台帳のほうである。</p>
+<p>逆に、パッケージのほうを1バイト変えるとどうなるか。tree を写して、末尾近くの1バイトを書き換える。</p>
+<pre><code>$ cp /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm ~/work/tree-copy.rpm
+$ printf 'A' | dd of=$HOME/work/tree-copy.rpm bs=1 seek=55888 conv=notrunc status=none
+$ rpm -K ~/work/tree-copy.rpm; echo "exit=$?"
+/home/lab/work/tree-copy.rpm: DIGESTS SIGNATURES NOT OK
+exit=1
+$ rpm -Kv ~/work/tree-copy.rpm
+/home/lab/work/tree-copy.rpm:
+    Header V4 RSA/SHA256 Signature, key ID b86b3716: OK
+    Header SHA256 digest: OK
+    Header SHA1 digest: OK
+    Payload SHA256 ALT digest: BAD (Expected f9d0fd749e84ee900257bc2a5622ebabd2b70753d2b9b6543236323569482623 != b919680458a5815223df9b6d15131bfd94ed1a796c6534314382155994bed20e)
+    Payload SHA256 digest: BAD (Expected 995477b62f2b6338425309a804cc5bc146eda7820c74494e50a5f49f12fc3e25 != b919680458a5815223df9b6d15131bfd94ed1a796c6534314382155994bed20e)
+    V4 RSA/SHA256 Signature, key ID b86b3716: BAD
+    MD5 digest: BAD (Expected 02e31b29f7f0057ef4433a66aa68821b != 35e582b31f509ef95879bf04663e60c6)</code></pre>
+<p>今度は <code>DIGESTS</code> まで大文字になった。中身（Payload）の要約が合わず <code>BAD</code>、中身にかかる署名も <code>BAD</code> である。鍵が無いときの <code>NOKEY</code> とは別の答えで、こちらが「壊れている・書き換えられている」の印になる。</p>
+<div class="scroll"><table>
+<tr><th><code>rpm -K</code> の出力</th><th>意味</th><th>入れてよいか</th></tr>
+<tr><td><code>digests signatures OK</code></td><td>壊れておらず、持っている鍵で署名を確かめられた</td><td>鍵を信じるなら、よい</td></tr>
+<tr><td><code>digests OK</code></td><td>壊れていない。<b>署名は無い</b>（誰が作ったかは分からない）</td><td>出どころを別の手段で確かめてから</td></tr>
+<tr><td><code>digests SIGNATURES NOT OK</code></td><td>署名はあるが確かめられなかった（<code>-Kv</code> で NOKEY なら鍵が無い）</td><td>正しい鍵を <code>--import</code> してから確かめ直す</td></tr>
+<tr><td><code>DIGESTS SIGNATURES NOT OK</code></td><td>中身が壊れているか、書き換えられている（<code>-Kv</code> に BAD）</td><td>入れない</td></tr>
+</table></div>
+<p>そして rpm は、署名が無くても入れる。</p>
+<pre><code>$ sudo rpm -ivh /srv/lab-files/labnosig-1.0-1.noarch.rpm
+Verifying...                          ########################################
+Preparing...                          ########################################
+Updating / installing...
+labnosig-1.0-1                        ########################################
+$ rpm -q --qf '%{NAME}: %{RSAHEADER:pgpsig}\n' labnosig labhello
+labnosig: (none)
+labhello: RSA/SHA256, Tue Oct 13 10:08:48 2026, Key ID 0ba6fe4393f77b82</code></pre>
+<p>入ったあとでも、どのパッケージに署名があったかは台帳で分かる（<code>rpm -qi</code> の <code>Signature</code> 欄も同じもの）。署名の確認を<b>強制</b>しているのは rpm ではなく yum のほうで、<code>/etc/yum.conf</code> と <code>.repo</code> の <code>gpgcheck=1</code> がそれだった（第5章）。リポジトリから入れるとき、yum は鍵が台帳に無い署名を「確かめられない」として、入れるのを断る。<code>.repo</code> の <code>gpgkey=</code> に鍵の場所を書いておくと、yum は入れる前に「この鍵を取り込んでよいか」を尋ね、取り込んでから確かめる（演習04 で確かめる）。</p>
+<div class="analogy"><b>たとえ</b>: 書類の印鑑を、登録済みの印影の帳簿と照合する窓口に近い。
+印鑑の無い書類は照合のしようが無いので、「照合で問題は見つからなかった」と言われる。
+登録の無い印鑑の書類は「照合できない」と言われる。照合できるようになるには、印影を帳簿に登録する（<code>--import</code>）。
+<br>ただし<b>崩れる点</b>: 役所なら印鑑の無い書類はそもそも受け付けないが、rpm は受け付けて入れてしまう。
+「印鑑の無いものは断る」は、窓口の規則（yum の <code>gpgcheck=1</code>）として別に決めてある。</div>
+
+<h2 id="spine">7章が1つの事実から出ていた</h2>
+<div class="sgoal"><b>この節で分かること</b>: 主題1.04 のコマンドが多いのに覚えられる理由。</div>
+<p>この教材で驚いた結果を並べる。</p>
+<div class="scroll"><table>
+<tr><th>章</th><th>驚いたこと</th><th>読んでいた帳簿</th></tr>
+<tr><td>1</td><td>中身を置いても、dpkg も rpm も「入っていない」と言う</td><td>台帳（<code>/var/lib/dpkg</code>・<code>/var/lib/rpm</code>）</td></tr>
+<tr><td>2</td><td><code>apt remove</code> しても台帳に <code>rc</code> が残り、設定ファイルも残る</td><td>台帳（と、apt の「自動で入った」の記録）</td></tr>
+<tr><td>3</td><td>ソースを書いても <code>Unable to locate</code>。<code>dpkg -S</code> は入っていないものを知らない</td><td>目録の写し（<code>/var/lib/apt/lists</code>）／ Contents</td></tr>
+<tr><td>4</td><td><code>dpkg -i</code> は依存を読めるのに取りに行かず、<code>iU</code> で止まる</td><td>dpkg は台帳しか持たない。目録は apt のもの</td></tr>
+<tr><td>5</td><td>yum はリポジトリを足すと、そのまま入れられる</td><td>目録の写し（<code>/var/cache/dnf</code>）を自分で取り直す</td></tr>
+<tr><td>6</td><td><code>rpm -V</code> が黙るのは、台帳どおりだから</td><td>台帳（入れたときの大きさ・権限・要約）</td></tr>
+<tr><td>7</td><td>署名の無いものが OK、鍵の無いものが NOT OK</td><td>鍵の台帳（<code>gpg-pubkey</code>）</td></tr>
+</table></div>
+<p>7つとも同じ形をしている。</p>
+<pre><code>パッケージのコマンドは、どれも帳簿を読んでいるだけである。
+手元に入ったものの「台帳」（dpkg・rpm）か、リポジトリにあるものの「目録」（apt・yum）か。
+答えが食い違ったら、どちらの帳簿を読んだかを先に疑う。</code></pre>
+<p>だから試験に並ぶ大量のオプションは、「どの帳簿を、どちら向きに引くか」で整理できる。</p>
+<div class="scroll"><table>
+<tr><th>聞きたいこと</th><th>台帳を引く（入っているものだけ）</th><th>目録を引く（入っていなくてよい）</th></tr>
+<tr><td>あるか・どの版か</td><td><code>dpkg -l</code> ／ <code>rpm -q</code> <code>rpm -qa</code></td><td><code>apt-cache policy</code> ／ <code>yum list</code></td></tr>
+<tr><td>詳しい情報</td><td><code>dpkg -s</code> ／ <code>rpm -qi</code></td><td><code>apt-cache show</code> ／ <code>yum info</code></td></tr>
+<tr><td>ファイル → パッケージ</td><td><code>dpkg -S</code> ／ <code>rpm -qf</code></td><td><code>apt-file search</code> ／ <code>yum provides</code></td></tr>
+<tr><td>パッケージ → ファイル</td><td><code>dpkg -L</code> ／ <code>rpm -ql</code></td><td><code>apt-file list</code> ／ （<code>yumdownloader</code> で取って <code>rpm -qpl</code>）</td></tr>
+<tr><td>依存関係</td><td><code>rpm -qR</code> ／ <code>rpm -q --whatrequires</code></td><td><code>apt-cache depends</code> <code>rdepends</code> ／ <code>yum deplist</code></td></tr>
+<tr><td>台帳とディスクを比べる</td><td><code>dpkg -V</code> ／ <code>rpm -V</code></td><td>—</td></tr>
+<tr><td>目録を取り直す</td><td>—</td><td><code>apt update</code> ／ <code>yum makecache</code>（yum は自動でも取る）</td></tr>
+</table></div>
+<p>ファイルそのもの（.deb / .rpm）に聞くのが3つ目の向きで、<code>dpkg -I</code> <code>-c</code> と <code>rpm -qp…</code> がそれにあたる。迷ったら、そのコマンドが「台帳・目録・ファイルのどれを開いているか」を先に考える。それが分かれば、入っていないパッケージに答えられるかどうか、root が要るかどうか（台帳を書き換えるときだけ要る）まで決まる。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/">演習06</a>は、yumdownloader で取ってきた .rpm を rpm だけで入れる課題で、この章の「rpm は依存を取りに行かない」をそのまま踏む。
+<a href="/linuc-packages/">演習04</a>は、署名の確認（<code>gpgcheck=1</code>）を切らずに、別の鍵で署名されたリポジトリから入れる。判定は鍵が台帳に入ったかまで見る。</div>
+<div class="quiz"><b>確認</b>
+<p>インストールされているパッケージだけを新しい版に更新し、インストールされていなければ何もしない rpm のオプションはどれか。<br>
+(a) <code>-i</code>　(b) <code>-U</code>　(c) <code>-F</code>　(d) <code>-e</code></p>
+<details><summary>答え</summary>
+<p>(c) <code>-F</code>（freshen）。実測では、入っていない labtool-data には何もせず終了コード 0、入っていた labhello は 1.1 に上げた。
+(b) の <code>-U</code> は入っていなければ新しく入れる。(a) の <code>-i</code> は古い版が入っているとファイルの衝突で止まる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>rpm -K foo.rpm</code> の結果が <code>digests SIGNATURES NOT OK</code> だった。考えられる原因と、確かめ方を答えよ。</p>
+<details><summary>答え</summary>
+<p>署名はあるが、確かめられなかった（<code>digests</code> は小文字なので、中身の要約は合っている）。
+<code>rpm -Kv foo.rpm</code> で <code>NOKEY</code> と出れば、その鍵が rpm の台帳に無いだけで、
+正しい公開鍵を <code>rpm --import</code> で取り込めば確かめられる。取り込んである鍵の一覧は <code>rpm -q gpg-pubkey</code> で見られる。
+中身が書き換えられていれば、実測のように <code>DIGESTS</code> まで大文字になり、<code>-Kv</code> に <code>BAD</code> が出る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>依存関係を無視してパッケージを削除する rpm のコマンドを答えよ。また、そのあと何が起きうるか。</p>
+<details><summary>答え</summary>
+<p><code>rpm -e --nodeps パッケージ名</code>。それを必要としていたパッケージが動かなくなる
+（実測: liblab を消すと labapp が <code>No such file or directory</code> で失敗し、<code>rpm -V labapp</code> が
+<code>Unsatisfied dependencies</code> を報告した）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>署名の無い RPM パッケージを <code>rpm -ivh</code> で入れようとした。どうなるか。また、署名を確かめてから入れる仕組みはどこで有効にするか。</p>
+<details><summary>答え</summary>
+<p>入る（実測で labnosig が入った）。rpm 自身は署名の無いパッケージを拒まない。
+署名の確認を強制するのは yum（dnf）で、<code>/etc/yum.conf</code> や <code>.repo</code> の <code>gpgcheck=1</code> と、
+鍵の場所を示す <code>gpgkey=</code> で設定する。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>rpm -ivh</code> は依存関係が足りないと1つも入れずに止まる。必要なファイルを並べて渡せば順番は rpm が決める</li><li><code>rpm -e</code> は依存されているものを消さない。<code>--nodeps</code> は台帳の整合を崩し、<code>rpm -V</code> が <code>Unsatisfied dependencies</code> を報告する</li><li><code>-i</code> は新しく入れる（古い版があれば衝突）、<code>-U</code> は上げるか入れる、<code>-F</code> は入っているものだけ上げる</li><li><code>rpm -K</code> の <code>digests OK</code> は「署名が無い」。<code>signatures</code> の語が出て OK のときだけ、署名が確かめられている</li><li>確かめる鍵は台帳（<code>gpg-pubkey</code>）に入っている。<code>rpm --import</code> で取り込む</li><li>署名の確認を強制するのは yum の <code>gpgcheck=1</code>。rpm は署名が無くても入れる</li><li>主題1.04 のコマンドは「台帳・目録・ファイルのどれを、どちら向きに引くか」で整理できる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.0@sha256:__DIGEST__ / AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / リポジトリ vault.almalinux.org 9.7（2026-05-20 で凍結）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-packages/theory/06-rpm-query">← 6. rpm -V が黙っているのは、台帳どおりだから</a><a href="/linuc-packages/">次: 実践編（演習6本）→</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

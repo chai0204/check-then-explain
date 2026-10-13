@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5. yum は、目録を自分で取りに行く — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="5" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-packages/theory/">理論編</a> › 第5章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>5. yum は、目録を自分で取りに行く</h1>
+<p class="lead">いまの RHEL 系で <code>yum</code> と打つと、動いているのは <code>dnf</code> である。<code>/etc/yum.conf</code> も dnf の設定ファイルを指すリンクにすぎない。そして apt と違い、リポジトリを足したら<b>更新のコマンドを打たずに</b>そのまま入れられる。目録が無い・古いと気づくと、自分で取りに行くからだ。</p>
+<div class="badges"><span>前提: 第4章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.3（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>yum</code> と <code>dnf</code>、<code>/etc/yum.conf</code> と <code>/etc/dnf/dnf.conf</code> の関係を <code>ls -l</code> で示せる</li><li><code>/etc/yum.repos.d/</code> の .repo ファイルの主な項目（<code>[repo id]</code> <code>name</code> <code>baseurl</code> <code>enabled</code> <code>gpgcheck</code> <code>gpgkey</code>）を読み書きできる</li><li>yum の <code>list</code> / <code>info</code> / <code>search</code> / <code>provides</code> / <code>deplist</code> / <code>install</code> / <code>remove</code> / <code>update</code> / <code>check-update</code> を使い分けられる</li><li><code>yumdownloader</code> でパッケージを入れずに取ってこられる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: モジュール（<code>dnf module</code>）、グループ（<code>yum groupinstall</code>）の中身、<code>yum history undo</code>、次の世代の dnf5、RHEL のサブスクリプション登録。<code>Last metadata expiration check</code> の行は「目録を最後に確かめた時刻」とだけ読めれば足りる（時刻は読者ごとに違う）。</div></div>
+<p>この章からは RPM 系の檻を使う。出力は、<b>RPM 系の檻を起動し直した直後</b>から打ったものである（起動のしかたは<a href="/linuc-packages/">実践編</a>）。</p>
+
+<h2 id="whois">yum と打つと、dnf が動く</h2>
+<div class="sgoal"><b>この節で分かること</b>: 試験に出る yum と、いまの RHEL 系の実物との関係。</div>
+<pre><code>$ ls -l /usr/bin/yum /usr/bin/dnf
+lrwxrwxrwx 1 root root 5 Sep 22  2025 /usr/bin/dnf -&gt; dnf-3
+lrwxrwxrwx 1 root root 5 Sep 22  2025 /usr/bin/yum -&gt; dnf-3
+$ ls -l /etc/yum.conf
+lrwxrwxrwx 1 root root 12 Sep 22  2025 /etc/yum.conf -&gt; dnf/dnf.conf
+$ cat /etc/yum.conf
+[main]
+gpgcheck=1
+installonly_limit=3
+clean_requirements_on_remove=True
+best=True
+skip_if_unavailable=False
+$ rpm -qf /etc/yum.conf /etc/dnf/dnf.conf /usr/bin/yum
+yum-4.14.0-31.el9.alma.1.noarch
+dnf-data-4.14.0-31.el9.alma.1.noarch
+yum-4.14.0-31.el9.alma.1.noarch
+$ yum --version | head -1
+4.14.0</code></pre>
+<p><code>yum</code> も <code>dnf</code> も、同じ <code>dnf-3</code> を指すシンボリックリンクである。<code>yum --version</code> が返す 4.14.0 は dnf の版だ。RHEL 8 から、yum の中身は dnf に置き換わった。<code>yum</code> という名前は、古い手順や試験問題がそのまま使えるように、yum というパッケージがリンクとして残している（<code>rpm -qf</code> で持ち主が分かる）。</p>
+<p><code>/etc/yum.conf</code> も <code>dnf/dnf.conf</code> へのリンクで、どちらを編集しても同じファイルが変わる。<code>[main]</code> の5行の意味を押さえる。</p>
+<div class="scroll"><table>
+<tr><th>項目</th><th>意味</th></tr>
+<tr><td><code>gpgcheck=1</code></td><td>入れるパッケージの署名を確かめる（第7章）</td></tr>
+<tr><td><code>installonly_limit=3</code></td><td>カーネルのように「上書きせず並べて入れる」ものを、3世代まで残す</td></tr>
+<tr><td><code>clean_requirements_on_remove=True</code></td><td>消すとき、依存のために入ったもので不要になったものも消す（この章で実測）</td></tr>
+<tr><td><code>best=True</code></td><td>いちばん新しい版を入れられないなら、失敗にする</td></tr>
+<tr><td><code>skip_if_unavailable=False</code></td><td>目録を取れないリポジトリがあれば、止まる</td></tr>
+</table></div>
+<p>CentOS 7 までの <code>/etc/yum.conf</code> には <code>cachedir=</code>（目録の置き場）や <code>keepcache=</code>（取ってきた .rpm を残すか）も書かれていた。どちらも dnf でも使える項目で、書いていなければ既定値になる。</p>
+<div class="analogy"><b>たとえ</b>: 屋号を変えずに店主が代わった店に近い。看板（<code>yum</code>）も、注文の仕方（<code>install</code> / <code>remove</code> / <code>list</code>）も前のままで、奥で働いているのは新しい店主（dnf）である。
+<br>ただし<b>崩れる点</b>: 看板が同じでも、細かい道具は入れ替わっている。たとえば <code>yumdownloader</code> は dnf の <code>download</code> へのリンクになっている（この章の最後）。古い資料のオプションが、そのまま通らないこともある。</div>
+
+<h2 id="repos">リポジトリの表 — /etc/yum.repos.d/</h2>
+<div class="sgoal"><b>この節で分かること</b>: yum が「どこへ取りに行くか」を書いたファイルの形。</div>
+<pre><code>$ ls -1 /etc/yum.repos.d/
+almalinux-appstream.repo
+almalinux-baseos.repo
+...
+almalinux-saphana.repo
+lab.repo
+$ cat /etc/yum.repos.d/lab.repo
+# 檻の中の練習用リポジトリ（確かめて説明する LinuC 主題1.04）。
+# 中身はイメージを作ったときから変わらないので、目録を期限切れにしない（metadata_expire=-1）。
+[lab]
+name=lab packages (LinuC 1.04)
+baseurl=file:///srv/lab-rpm
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab
+metadata_expire=-1
+$ grep -A10 '^\[baseos\]' /etc/yum.repos.d/almalinux-baseos.repo
+[baseos]
+name=AlmaLinux $releasever - BaseOS
+#mirrorlist=https://mirrors.almalinux.org/mirrorlist/$releasever/baseos
+baseurl=https://vault.almalinux.org/9.7/BaseOS/$basearch/os/
+enabled=1
+gpgcheck=1
+countme=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-AlmaLinux-9
+metadata_expire=-1
+enabled_metadata=1</code></pre>
+<p>1つのリポジトリは <code>[ ]</code> で始まる1節で、<code>[ ]</code> の中が <b>repo id</b>（そのリポジトリを指す名前）である。1つのファイルに何節でも書け、ファイル名は <code>.repo</code> で終わっていれば自由である。</p>
+<div class="scroll"><table>
+<tr><th>項目</th><th>意味</th></tr>
+<tr><td><code>[lab]</code></td><td>repo id。<code>yum repolist</code> に出て、<code>--enablerepo=lab</code> のように指定するときにも使う</td></tr>
+<tr><td><code>name=</code></td><td>人が読むための説明</td></tr>
+<tr><td><code>baseurl=</code></td><td>リポジトリの場所（<code>http://</code> <code>https://</code> <code>file://</code>）。<code>$basearch</code> は CPU（x86_64）、<code>$releasever</code> は版に置き換わる</td></tr>
+<tr><td><code>mirrorlist=</code></td><td>「場所の候補の一覧」を返す URL。baseurl の代わりに使う</td></tr>
+<tr><td><code>enabled=1</code></td><td>使う（<code>0</code> なら書いてあっても使わない）</td></tr>
+<tr><td><code>gpgcheck=1</code></td><td>パッケージの署名を確かめる</td></tr>
+<tr><td><code>gpgkey=</code></td><td>署名を確かめる公開鍵の場所</td></tr>
+<tr><td><code>metadata_expire=</code></td><td>目録の有効期限（秒）。過ぎると次のコマンドで取り直す。<code>-1</code> は期限なし</td></tr>
+</table></div>
+<p><b>この檻だけの書き換えが2つある</b>。AlmaLinux の本来の設定は <code>mirrorlist=</code> で、その日いちばん近いミラーから最新の目録を取る。それでは読者ごと・日ごとに出力が変わるので、<code>baseurl=</code> を、更新が止まっている 9.7 の保存庫（vault）に向け、目録の期限も <code>-1</code>（無期限。本来は <code>86400</code> 秒 = 1日）にした。</p>
+<pre><code>$ yum repolist
+repo id                         repo name
+appstream                       AlmaLinux 9 - AppStream
+baseos                          AlmaLinux 9 - BaseOS
+extras                          AlmaLinux 9 - Extras
+lab                             lab packages (LinuC 1.04)
+$ yum repolist all
+repo id                      repo name                                  status
+appstream                    AlmaLinux 9 - AppStream                    enabled
+appstream-debuginfo          AlmaLinux 9 - AppStream - Debug            disabled
+appstream-source             AlmaLinux 9 - AppStream - Source           disabled
+baseos                       AlmaLinux 9 - BaseOS                       enabled
+...
+crb                          AlmaLinux 9 - CRB                          disabled
+...</code></pre>
+<p><code>repolist</code> は有効なものだけ、<code>repolist all</code> は <code>enabled=0</code> のものも出す。</p>
+
+<h2 id="query">目録を引く — list・info・search・provides</h2>
+<div class="sgoal"><b>この節で分かること</b>: 入れる前に、yum に何を聞けるか。台帳と目録のどちらから来た答えか。</div>
+<pre><code>$ yum list installed 'lab*'
+Installed Packages
+labhello.noarch                            1.0-1                            @lab
+labmotd.noarch                             1.0-1                            @lab
+$ yum list available 'lab*'
+Last metadata expiration check: 0:38:23 ago on Tue Oct 13 10:08:56 2026.
+Available Packages
+labapp.noarch                                1.0-1                           lab
+labhello.noarch                              1.1-1                           lab
+labtool.noarch                               1.0-1                           lab
+labtool-data.noarch                          1.0-1                           lab
+$ yum list labhello
+...
+Installed Packages
+labhello.noarch                            1.0-1                            @lab
+Available Packages
+labhello.noarch                            1.1-1                            lab</code></pre>
+<p>右端の欄に2冊の帳簿が見える。<code>@lab</code> と <code>@</code> が付いているのは<b>台帳</b>の行で、「lab から入った」という意味である。<code>@</code> の無い <code>lab</code> は<b>目録</b>の行で、「lab から入れられる」という意味である。<code>list installed</code> だけは目録を読まないので、<code>Last metadata expiration check</code>（目録を最後に確かめた時刻）の行が出ない。</p>
+<pre><code>$ yum info labapp
+...
+Available Packages
+Name         : labapp
+Version      : 1.0
+Release      : 1
+Architecture : noarch
+Size         : 7.3 k
+Source       : labapp-1.0-1.src.rpm
+Repository   : lab
+Summary      : sample application that needs liblab
+...
+$ yum search liblab
+...
+========================= Name Exactly Matched: liblab =========================
+liblab.noarch : small shell library for lab programs
+=========================== Summary Matched: liblab ============================
+labapp.noarch : sample application that needs liblab
+$ yum deplist labapp
+...
+package: labapp-1.0-1.noarch
+  dependency: /usr/bin/sh
+   provider: bash-5.1.8-9.el9.x86_64
+  dependency: liblab &gt;= 1.0
+   provider: liblab-1.0-1.noarch</code></pre>
+<p><code>search</code> は名前と要約から探す。<code>deplist</code> は依存関係と、それを満たすパッケージ（provider）の組である。どれも入っていないパッケージに答えている。目録を読んでいるからだ。</p>
+<p>ファイル名からパッケージを探すのが <code>provides</code>（別名 <code>whatprovides</code>）である。</p>
+<pre><code>$ yum provides /usr/bin/labapp
+...
+labapp-1.0-1.noarch : sample application that needs liblab
+Repo        : lab
+Matched from:
+Filename    : /usr/bin/labapp
+$ yum provides '*/liblab.sh'
+...
+liblab-1.0-1.noarch : small shell library for lab programs
+Repo        : lab
+Matched from:
+Filename    : /usr/lib/liblab/liblab.sh
+$ rpm -qf /usr/bin/dig; echo "exit=$?"
+error: file /usr/bin/dig: No such file or directory
+exit=1
+$ yum provides /usr/bin/dig
+...
+bind-utils-32:9.16.23-34.el9_7.1.x86_64 : Utilities for querying DNS name servers
+Repo        : appstream
+Matched from:
+Filename    : /usr/bin/dig
+...
+bind9.18-utils-32:9.18.29-5.el9_7.4.x86_64 : Utilities for querying DNS name servers
+...</code></pre>
+<p>台帳しか読まない <code>rpm -qf</code> は、入っていないファイルに答えられない。<code>yum provides</code> は入っていないパッケージのファイルまで答える。<b>Debian 系の apt-file にあたることを、yum は追加の道具なしでできる</b>。dnf の目録には最初からファイルの一覧（filelists）が入っているからである。パスの一部しか分からなければ <code>'*/liblab.sh'</code> のようにワイルドカードを使う（シェルに展開されないよう引用符で囲む）。</p>
+<div class="scroll"><table>
+<tr><th>聞きたいこと</th><th>yum（目録も読む）</th><th>Debian 系</th></tr>
+<tr><td>入れられるもの・入っているもの</td><td><code>yum list</code>（<code>installed</code> / <code>available</code> / <code>updates</code>）</td><td><code>apt list</code></td></tr>
+<tr><td>詳しい情報</td><td><code>yum info 名前</code></td><td><code>apt-cache show</code></td></tr>
+<tr><td>名前と説明で探す</td><td><code>yum search 語</code></td><td><code>apt-cache search</code></td></tr>
+<tr><td>ファイル名からパッケージ（入っていなくてよい）</td><td><code>yum provides パス</code></td><td><code>apt-file search</code></td></tr>
+<tr><td>依存関係</td><td><code>yum deplist 名前</code></td><td><code>apt-cache depends</code></td></tr>
+<tr><td>リポジトリの一覧</td><td><code>yum repolist</code></td><td><code>apt-cache policy</code>（引数なし）</td></tr>
+</table></div>
+
+<h2 id="install">入れる・消す — 依存は、消すときにも片付く</h2>
+<div class="sgoal"><b>この節で分かること</b>: yum の install と remove が、依存関係をどう扱うか。</div>
+<pre><code>$ sudo yum install -y labapp
+...
+Dependencies resolved.
+================================================================================
+ Package            Architecture       Version            Repository       Size
+================================================================================
+Installing:
+ labapp             noarch             1.0-1              lab             7.3 k
+Installing dependencies:
+ liblab             noarch             1.0-1              lab             6.7 k
+...
+Complete!
+$ yum list installed labapp liblab
+Installed Packages
+labapp.noarch                             1.0-1                             @lab
+liblab.noarch                             1.0-1                             @lab
+$ sudo yum remove -y labapp
+Dependencies resolved.
+================================================================================
+ Package            Architecture       Version           Repository        Size
+================================================================================
+Removing:
+ labapp             noarch             1.0-1             @lab             409
+Removing unused dependencies:
+ liblab             noarch             1.0-1             @lab             106
+...
+Complete!
+$ rpm -q labapp liblab; echo "exit=$?"
+package labapp is not installed
+package liblab is not installed
+exit=2
+$ grep clean_requirements_on_remove /etc/yum.conf
+clean_requirements_on_remove=True</code></pre>
+<p>入れるときに依存（<code>Installing dependencies</code>）を足すのは apt と同じだが、<b>消すときに依存も一緒に消した</b>（<code>Removing unused dependencies</code>）。<code>/etc/yum.conf</code> の <code>clean_requirements_on_remove=True</code> がそれを指示している。apt では <code>remove</code> のあとに <code>autoremove</code> を別に打った（第2章）。dnf も「どれを依存のために入れたか」を自分の記録に持っていて、それを見て判断している。</p>
+<p>yum の <code>remove</code> は <code>erase</code> とも書ける。RPM 系には Debian 系の <code>rc</code>（設定ファイルだけ残る）にあたる状態は無く、消せば台帳から消える。書き換えた設定ファイルは <code>.rpmsave</code> という名前で残される。</p>
+
+<h2 id="addrepo">リポジトリを足したら、そのまま入れられる</h2>
+<div class="sgoal"><b>この節で分かること</b>: yum の目録が「いつ」取り直されるか。apt との違い。</div>
+<p>檻にはまだ使っていないリポジトリ <code>/srv/lab-extra-rpm</code> がある。</p>
+<pre><code>$ find /srv/lab-extra-rpm -type f | sort
+/srv/lab-extra-rpm/labextra-1.0-1.noarch.rpm
+/srv/lab-extra-rpm/repodata/5dd2854da38fd1c14d69ca9c2976e3db924c8dd2e356e9f356a6793537a199a9-filelists.xml.gz
+...
+/srv/lab-extra-rpm/repodata/repomd.xml
+$ yum list labextra; echo "exit=$?"
+...
+Error: No matching Packages to list
+exit=1</code></pre>
+<p><code>repodata/</code> が目録で、<code>repomd.xml</code> がその目録の目録（第3章の Release にあたる）である。まだ登録していないので、yum は labextra を知らない。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>第3章の apt と同じで、リポジトリを書き足したら、まず目録を取り直すコマンドが要るはずだ。
+それを打たずに <code>yum install</code> すれば「見つからない」と言われるだろう。</p>
+<pre><code>$ printf '%s\n' '[lab-extra]' 'name=lab extra (LinuC 1.04)' 'baseurl=file:///srv/lab-extra-rpm' 'gpgcheck=1' 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab' | sudo tee /etc/yum.repos.d/lab-extra.repo
+[lab-extra]
+name=lab extra (LinuC 1.04)
+baseurl=file:///srv/lab-extra-rpm
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab
+$ sudo yum install -y labextra
+lab extra (LinuC 1.04)                          150 kB/s | 935  B     00:00
+Dependencies resolved.
+...
+Installing:
+ labextra           noarch           1.0-1            lab-extra           6.7 k
+...
+Complete!
+$ labextra
+labextra 1.0 (/srv/lab-extra-rpm から入った)</code></pre>
+<div class="then"><b>だめな理由</b>: 入ってしまった。<code>yum install</code> の出力の1行目
+（<code>lab extra (LinuC 1.04) … 935 B</code>）が、目録を取りに行った記録である。
+dnf はコマンドを打たれるたびに、有効なリポジトリの目録が手元にあるか、期限（<code>metadata_expire</code>）が切れていないかを確かめ、
+無いか古ければ<b>その場で自分で取りに行く</b>。新しく足したリポジトリには目録の写しが無いので、必ず取りに行く。
+apt は <code>apt update</code> と言われるまで決して取りに行かなかった。同じ「目録の写し」を持つ道具でも、取り直す時機の決め方が違う。</div></div>
+<pre><code>$ yum repolist
+repo id                         repo name
+appstream                       AlmaLinux 9 - AppStream
+baseos                          AlmaLinux 9 - BaseOS
+extras                          AlmaLinux 9 - Extras
+lab                             lab packages (LinuC 1.04)
+lab-extra                       lab extra (LinuC 1.04)</code></pre>
+<p>手で取り直させたいときのコマンドもある。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>すること</th><th>apt でいえば</th></tr>
+<tr><td><code>yum makecache</code></td><td>目録を取ってきて写しを作る</td><td><code>apt update</code></td></tr>
+<tr><td><code>yum clean all</code></td><td>手元の目録の写しと、取ってきた .rpm を捨てる</td><td><code>apt-get clean</code> と、lists を消すことを合わせたもの</td></tr>
+<tr><td><code>yum --refresh コマンド</code></td><td>期限に関係なく、取り直してから実行する</td><td>—</td></tr>
+</table></div>
+<p>写しの置き場は <code>/var/cache/dnf/</code> である（この檻では、一般ユーザと root が同じ写しを読むように、そこから <code>/var/tmp/dnf-lab-cache</code> へリンクしてある。dnf は root 以外で動くと利用者ごとの別の置き場を使い、写しを一から取り直すため）。</p>
+<pre><code>$ ls -ld /var/cache/dnf
+lrwxrwxrwx 1 root root 22 Oct 13 10:08 /var/cache/dnf -&gt; /var/tmp/dnf-lab-cache
+$ ls /var/cache/dnf/
+appstream-69125d5665712457
+...
+lab-extra-87753e023cd3c28c
+lab-extra-filenames.solvx
+lab-extra.solv
+...</code></pre>
+<p>さっき取りに行った lab-extra の写し（<code>lab-extra-…</code>）が増えている。</p>
+<div class="analogy"><b>たとえ</b>: 取引先の住所を住所録に書き足すと、次に注文するとき、店員が気を利かせて先にカタログを取りに行ってくれる店に近い。
+カタログに「有効期限」が書いてあり、期限が過ぎていても取り直してくる。
+<br>ただし<b>崩れる点</b>: 気を利かせる時機は「コマンドを打ったとき」だけである。
+期限の内側でリポジトリの中身が変わっても、dnf は気づかずに古い写しを使う。そのときは <code>yum makecache</code> か <code>--refresh</code> で取り直させる。</div>
+
+<h2 id="update">更新する — check-update は終了コードでも答える</h2>
+<div class="sgoal"><b>この節で分かること</b>: 更新の有無を調べるコマンドと、その答え方。</div>
+<pre><code>$ yum check-update; echo "exit=$?"
+
+labhello.noarch                            1.1-1                             lab
+exit=100
+$ sudo yum update -y labhello
+...
+Dependencies resolved.
+...
+Upgrading:
+ labhello            noarch            1.1-1               lab            6.6 k
+...
+Complete!
+$ labhello
+labhello 1.1
+$ yum check-update; echo "exit=$?"
+...
+exit=0</code></pre>
+<p><code>check-update</code> は「台帳の版より新しい版が目録にあるもの」を並べ、<b>あれば終了コード 100、無ければ 0</b> を返す（失敗なら 1）。スクリプトで「更新があるか」を判定するのに使われる。<code>yum update</code> は名前を付ければそれだけ、付けなければ全部を上げる。dnf では <code>update</code> と <code>upgrade</code> は同じものである。AlmaLinux 本体のパッケージが1つも出ないのは、vault の 9.7 が凍結されていて、檻がその最終の状態で作られているからだ。</p>
+
+<h2 id="download">入れずに取ってくる — yumdownloader</h2>
+<div class="sgoal"><b>この節で分かること</b>: .rpm ファイルだけを手に入れる方法と、その道具の正体。</div>
+<pre><code>$ ls -l /usr/bin/yumdownloader
+lrwxrwxrwx 1 root root 22 Nov 12  2025 /usr/bin/yumdownloader -&gt; /usr/libexec/dnf-utils
+$ cd ~/work
+$ yumdownloader labtool
+...
+$ ls -l
+total 8
+-rw-r--r-- 1 lab lab 6859 Oct 13 10:47 labtool-1.0-1.noarch.rpm
+$ rpm -q labtool; echo "exit=$?"
+package labtool is not installed
+exit=1
+$ rpm -qpl labtool-1.0-1.noarch.rpm
+/usr/bin/labtool
+$ rpm -qpR labtool-1.0-1.noarch.rpm
+/usr/bin/sh
+labtool-data &gt;= 1.0
+...
+$ yumdownloader --resolve --destdir dl labtool
+...
+$ ls -l dl/
+total 16
+-rw-r--r-- 1 lab lab 6859 Oct 13 10:47 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6729 Oct 13 10:47 labtool-data-1.0-1.noarch.rpm</code></pre>
+<p><code>yumdownloader</code> は目録を読んで .rpm を取ってくるだけで、台帳には書かない（<code>rpm -q</code> は「入っていない」）。だから root でなくても打てる。取ったファイルは、第1章の <code>rpm -qpl</code> / <code>-qpR</code> で中身と依存を確かめられる。<code>--resolve</code> は依存するものも一緒に取り、<code>--destdir</code> は置き場所を指定する。実体は yum-utils パッケージの <code>/usr/libexec/dnf-utils</code> で、<code>dnf download</code> を呼んでいる。Debian 系なら <code>apt-get download</code>（第2章）がこれにあたる。</p>
+<div class="scroll"><table>
+<tr><th>オプション</th><th>意味</th></tr>
+<tr><td>（なし）</td><td>カレントディレクトリに取る</td></tr>
+<tr><td><code>--destdir 場所</code></td><td>指定した場所に取る</td></tr>
+<tr><td><code>--resolve</code></td><td>入っていない依存も一緒に取る</td></tr>
+<tr><td><code>--source</code></td><td>ソース RPM（<code>.src.rpm</code>）を取る</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 通販で「取り置き」だけ頼んで、受け取った箱を開けずに置いておく使い方に近い。
+箱（.rpm）は手元にあるが、家の持ち物の記録（台帳）には載っていない。
+<br>ただし<b>崩れる点</b>: 通販の取り置きは1点ずつだが、<code>--resolve</code> を付けると、
+その品に要る別売りの部品まで目録で調べて一緒に取ってくる。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/">演習04</a>は、まだ登録されていない別のリポジトリから、名前の分からないパッケージに入っている <code>labcalc</code> を入れる課題である（<code>.repo</code> を書く・<code>yum provides</code> で探す・署名を確かめて入れる）。
+<a href="/linuc-packages/">演習06</a>は yumdownloader で取ってきた .rpm を、yum を使わずに入れる。</div>
+<div class="quiz"><b>確認</b>
+<p>独自のリポジトリを yum に登録したい。どのディレクトリに、どんな名前のファイルを置き、リポジトリの場所はどの項目に書くか。</p>
+<details><summary>答え</summary>
+<p><code>/etc/yum.repos.d/</code> に、名前が <code>.repo</code> で終わるファイルを置く。中は <code>[repo id]</code> で始まる節にし、
+場所を <code>baseurl=</code>（または <code>mirrorlist=</code>）に書く。<code>enabled=1</code> で有効、
+<code>gpgcheck=1</code> と <code>gpgkey=</code> で署名の確認を指定する。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>インストールされていないパッケージも含めて、<code>/usr/bin/dig</code> を含むパッケージを調べる yum のサブコマンドはどれか。<br>
+(a) <code>yum search</code>　(b) <code>yum info</code>　(c) <code>yum provides</code>　(d) <code>yum list</code></p>
+<details><summary>答え</summary>
+<p>(c)（別名 <code>whatprovides</code>）。実測では bind-utils などが答えとして出た。(a) は名前と要約しか見ない。
+入っているファイルなら <code>rpm -qf /usr/bin/dig</code> でも分かるが、入っていなければ <code>No such file or directory</code> になる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>パッケージをインストールせずに、.rpm ファイルとしてカレントディレクトリに取得するコマンドはどれか。<br>
+(a) <code>yum install --downloadonly</code>　(b) <code>yumdownloader</code>　(c) <code>rpm -qp</code>　(d) <code>yum makecache</code></p>
+<details><summary>答え</summary>
+<p>(b)。依存するものも取るなら <code>--resolve</code>、置き場所を変えるなら <code>--destdir</code>。
+(a) も入れずに取るが、置き場所はカレントディレクトリではなく dnf のキャッシュの中になる。
+(d) は目録を取ってくるだけで、パッケージは取らない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>yum check-update</code> の終了コードが 100 だった。何を意味するか。</p>
+<details><summary>答え</summary>
+<p>更新できるパッケージがある（目録に、台帳の版より新しい版がある）。0 なら無い、1 ならエラー。実測でも、labhello 1.1 があるときは 100、上げた後は 0 だった。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>RHEL 8 以降の <code>yum</code> は <code>dnf</code> へのリンク。<code>/etc/yum.conf</code> も <code>/etc/dnf/dnf.conf</code> へのリンク</li><li>リポジトリは <code>/etc/yum.repos.d/*.repo</code> に、<code>[repo id]</code>・<code>baseurl=</code>・<code>enabled=</code>・<code>gpgcheck=</code>・<code>gpgkey=</code> で書く</li><li><code>yum list</code> の右端の <code>@lab</code> は台帳（そこから入った）、<code>lab</code> は目録（そこから入れられる）</li><li><code>yum provides</code> は入っていないパッケージのファイルまで答える（apt-file が要らない）</li><li>dnf は目録が無い・期限切れだと、コマンドを打った時点で自分で取りに行く。apt は <code>apt update</code> まで取りに行かない</li><li><code>yum remove</code> は依存のために入った不要なものも消す（<code>clean_requirements_on_remove=True</code>）</li><li><code>yumdownloader</code>（実体は <code>dnf download</code>）は入れずに .rpm を取る。<code>--resolve</code> で依存も</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.0@sha256:__DIGEST__ / AlmaLinux 9.7 / dnf 4.14.0 / rpm 4.16.1.3 / yum-utils 4.3.0 / リポジトリ vault.almalinux.org 9.7（2026-05-20 で凍結）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-packages/theory/04-dpkg">← 4. dpkg は依存を読めるが、取りに行かない</a><a href="/linuc-packages/theory/06-rpm-query">次: 6. rpm -V が黙っているのは、台帳どおりだから →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

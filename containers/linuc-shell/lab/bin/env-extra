@@ -1,0 +1,10 @@
+#!/bin/bash
+# lab env の追加行。このテーマでは、次の3つが本文と違う出力の原因になりやすい。
+#   bash の版   : 文法やメッセージの文言が版で変わる
+#   /bin/sh     : Ubuntu では dash。sh x.sh と bash x.sh で結果が変わる理由（第4章）
+#   umask       : docker run で入った端末は 0022、docker exec で入った端末は 0000 になる
+#                 （実測 2026-10-13・docker 29.8.0）。作ったファイルの権限が本文とずれる。
+#                 この値は lab env を打ったシェルから受け継いだもの。
+printf 'bash      : %s\n' "$(bash -c 'echo $BASH_VERSION')"
+printf '/bin/sh   : %s\n' "$(readlink -f /bin/sh)"
+printf 'umask     : %s\n' "$(umask)"

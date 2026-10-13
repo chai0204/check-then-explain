@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5. 引数は、渡す側のシェルが切ってから渡す — 確かめて説明する LinuC 主題1.06</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="5" data-theme="linuc-shell">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-shell/theory/">理論編</a> › 第5章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+</div>
+<h1>5. 引数は、渡す側のシェルが切ってから渡す</h1>
+<p class="lead">スクリプトが受け取る引数は、あなたが打った1行の文字列ではない。呼んだ側のシェルが空白で切り、引用符を外したあとの「語の並び」である。スクリプトの中でそれを <code>"$@"</code> と書けば区切りが保たれ、<code>$*</code> と書くともう一度切り直される。<code>"my file.txt"</code> が <code>my</code> と <code>file.txt</code> に割れるのは、この切り直しのときである。</p>
+<div class="badges"><span>前提: 第4章まで読了</span><span>所要 15分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.06.2（重要度6）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>$0</code>・<code>$1</code>〜<code>$n</code>・<code>$#</code>・<code>$@</code>・<code>$*</code> が何を表すかを、実際の出力で説明できる</li><li><code>"$@"</code>・<code>"$*"</code>・<code>$*</code> の違いを言い、受け取った引数を別のコマンドへ渡すときに <code>"$@"</code> を使う理由を言える</li><li><code>shift</code> と <code>$#</code> で引数を1つずつ処理でき、10個目以降の書き方（<code>${10}</code>）を知っている</li><li>引数の数を確かめて、使い方を標準エラーに出して終われる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>getopts</code> によるオプションの解析、<code>$$</code>・<code>$!</code>・<code>$-</code> など他の特殊パラメータ（<code>$-</code> は第1章で使った）、<code>IFS</code> の細かい規則、配列。</div></div>
+
+<h2 id="split">my file.txt が、2つに割れる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>$*</code> で引数を渡すと何が起きるか。</div>
+<p>この章も <code>~/try</code> で作業する。名前に空白を含むファイルを1つ作り、渡されたファイルを全部 <code>/tmp</code> へコピーするスクリプトを書く。</p>
+<pre><code>$ mkdir -p ~/try &amp;&amp; cd ~/try
+$ touch "my file.txt"</code></pre>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>$*</code> は「渡された引数ぜんぶ」である。<code>"my file.txt"</code> と引用符で囲んで渡したのだから、<code>cp $* /tmp/</code> は1つのファイルとしてコピーするはずだ。</p>
+<pre><code>$ cat &gt; cpall.sh &lt;&lt;'END'
+&gt; #!/bin/bash
+&gt; cp $* /tmp/
+&gt; END
+$ bash cpall.sh "my file.txt"; echo "終了ステータス $?"
+cp: cannot stat 'my': No such file or directory
+cp: cannot stat 'file.txt': No such file or directory
+終了ステータス 1</code></pre>
+<div class="then"><b>だめな理由</b>: 引用符はあなたのシェルが外し、スクリプトは <code>my file.txt</code> を<b>1つの引数</b>として受け取っている。
+ところがスクリプトの中で、引用符で囲まない <code>$*</code> は、展開した後にもう一度空白で語に切られる（<b>ワード分割</b>）。
+<code>cp</code> に届いたのは <code>my</code> と <code>file.txt</code> の2つで、どちらも存在しない。
+引数を受け取ったとおりの区切りで渡すには <code>"$@"</code> と書く。</div></div>
+<pre><code>$ sed -i 's/\$\*/"$@"/' cpall.sh; cat cpall.sh
+#!/bin/bash
+cp "$@" /tmp/
+$ bash cpall.sh "my file.txt"; ls -l "/tmp/my file.txt"
+-rw-r--r-- 1 lab lab 0 Oct 13 10:46 '/tmp/my file.txt'</code></pre>
+<div class="analogy"><b>たとえ</b>: 引数は、呼ぶ側が<b>箱詰めして渡した荷物</b>に近い。<code>"$@"</code> は箱のまま次へ回す。<code>$*</code> は箱を全部開けて中身を床に並べ、空白のところで改めて箱に詰め直す。<code>"$*"</code> は全部を1つの大箱にまとめる。
+<br>ただし<b>崩れる点</b>: 荷物なら詰め直しても中身は変わらないが、引数は詰め直すと区切りの位置が変わる。<code>my file.txt</code> は2つの別の名前になり、どちらも存在しないファイルを指す。</div>
+
+<h2 id="params">$0・$1・$#・$@・$*</h2>
+<div class="sgoal"><b>この節で分かること</b>: スクリプトの中で引数を表す変数と、誰が引数を切っているか。</div>
+<p>受け取った引数を全部見せるスクリプトで確かめる。</p>
+<pre><code>$ cat &gt; args.sh &lt;&lt;'END'
+&gt; #!/bin/bash
+&gt; echo "\$0 = $0"
+&gt; echo "\$# = $#"
+&gt; echo "\$1 = $1"
+&gt; echo "\$2 = $2"
+&gt; echo '--- for a in "$@"'
+&gt; for a in "$@"; do echo "[$a]"; done
+&gt; echo '--- for a in "$*"'
+&gt; for a in "$*"; do echo "[$a]"; done
+&gt; echo '--- for a in $*'
+&gt; for a in $*; do echo "[$a]"; done
+&gt; END
+$ chmod +x args.sh
+$ ./args.sh "my file.txt" b
+$0 = ./args.sh
+$# = 2
+$1 = my file.txt
+$2 = b
+--- for a in "$@"
+[my file.txt]
+[b]
+--- for a in "$*"
+[my file.txt b]
+--- for a in $*
+[my]
+[file.txt]
+[b]</code></pre>
+<p>同じスクリプトを、引用符を付けずに呼ぶ。</p>
+<pre><code>$ ./args.sh my file.txt b
+$0 = ./args.sh
+$# = 3
+$1 = my
+$2 = file.txt
+--- for a in "$@"
+[my]
+[file.txt]
+[b]
+--- for a in "$*"
+[my file.txt b]
+--- for a in $*
+[my]
+[file.txt]
+[b]</code></pre>
+<p><code>$#</code> が 2 から 3 に変わった。スクリプトの中身は同じで、変わったのは<b>呼んだ側のシェルの切り方</b>だけである。引用符で囲めば1つの引数、囲まなければ空白で別々の引数になる。</p>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>意味</th><th>記録（<code>./args.sh "my file.txt" b</code>）</th></tr>
+<tr><td><code>$0</code></td><td>スクリプト自身の名前（呼ばれたときの書き方のまま）</td><td><code>./args.sh</code></td></tr>
+<tr><td><code>$1</code>・<code>$2</code> …</td><td>1つ目・2つ目の引数（<b>位置パラメータ</b>）</td><td><code>my file.txt</code>・<code>b</code></td></tr>
+<tr><td><code>$#</code></td><td>引数の数</td><td><code>2</code></td></tr>
+<tr><td><code>"$@"</code></td><td>全部の引数を、受け取った区切りのまま並べる</td><td><code>[my file.txt]</code> <code>[b]</code></td></tr>
+<tr><td><code>"$*"</code></td><td>全部の引数を空白でつないだ<b>1つ</b>の文字列</td><td><code>[my file.txt b]</code></td></tr>
+<tr><td><code>$*</code>・<code>$@</code>（引用符なし）</td><td>全部を並べてから、空白でもう一度切り直す</td><td><code>[my]</code> <code>[file.txt]</code> <code>[b]</code></td></tr>
+</table></div>
+<p><code>$#</code>・<code>$@</code>・<code>$*</code>・<code>$0</code>・<code>$?</code> のように、記号1文字の名前を持つものは<b>特殊パラメータ</b>と呼ばれる。<code>$0</code> は呼ばれ方で変わる（第4章の記録では <code>./hello.sh</code>・<code>hello.sh</code>・<code>/usr/local/bin/hello</code> だった）。</p>
+<div class="analogy"><b>たとえ</b>: <code>$0</code> は<b>呼び出しのときに呼ばれた名前</b>、<code>$1</code> 以降は<b>受付の番号札</b>に近い。同じ人でも「おーい」と呼ばれるか、フルネームで呼ばれるかで <code>$0</code> は変わる。
+<br>ただし<b>崩れる点</b>: 番号札は配った後で数字が変わらないが、位置パラメータは <code>shift</code> で全員の番号が1つずつ繰り上がる（次の節）。</div>
+
+<h2 id="ten">10個目は ${10}</h2>
+<div class="sgoal"><b>この節で分かること</b>: 2桁の位置パラメータの書き方。</div>
+<pre><code>$ cat &gt; ten.sh &lt;&lt;'END'
+&gt; #!/bin/bash
+&gt; echo "\$# = $#"
+&gt; echo "\$10 = $10"
+&gt; echo "\${10} = ${10}"
+&gt; END
+$ bash ten.sh a b c d e f g h i j
+$# = 10
+$10 = a0
+${10} = j</code></pre>
+<p><code>$10</code> は「<code>$1</code> の後ろに文字 <code>0</code>」と読まれ、<code>a0</code> になった。10個目以降は <code>${10}</code> のように波かっこで囲む。</p>
+
+<h2 id="shift">shift で、引数を前に詰める</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>shift</code> の働きと、それを使った引数の処理のしかた。</div>
+<pre><code>$ cat &gt; sh.sh &lt;&lt;'END'
+&gt; #!/bin/bash
+&gt; echo "はじめ:     \$# = $#  \$1 = $1  \$@ = $@"
+&gt; shift
+&gt; echo "shift 後:   \$# = $#  \$1 = $1  \$@ = $@"
+&gt; shift 2
+&gt; echo "shift 2 後: \$# = $#  \$1 = $1"
+&gt; shift 5
+&gt; echo "shift 5 の終了ステータス = $?  \$# = $#"
+&gt; END
+$ bash sh.sh a b c d
+はじめ:     $# = 4  $1 = a  $@ = a b c d
+shift 後:   $# = 3  $1 = b  $@ = b c d
+shift 2 後: $# = 1  $1 = d
+shift 5 の終了ステータス = 1  $# = 1</code></pre>
+<p><code>shift</code> は <code>$1</code> を捨てて全員を1つずつ前に詰め、<code>$#</code> を1減らす。<code>shift 2</code> なら2つ詰める。残っている数より多く詰めようとすると、何も変えずに終了ステータス 1 を返した。</p>
+<p><code>$#</code> が 0 になるまで <code>shift</code> を繰り返すと、引数を1つずつ処理できる。</p>
+<pre><code>$ cat &gt; each.sh &lt;&lt;'END'
+&gt; #!/bin/bash
+&gt; while [ $# -gt 0 ]; do
+&gt;     echo "残り $# 個: [$1]"
+&gt;     shift
+&gt; done
+&gt; END
+$ bash each.sh one "two three" four
+残り 3 個: [one]
+残り 2 個: [two three]
+残り 1 個: [four]</code></pre>
+<p>対話シェルでは <code>set --</code> で位置パラメータを自分で入れて試せる。</p>
+<pre><code>$ set -- x "y z"; echo $#; echo "$2"
+2
+y z</code></pre>
+<div class="analogy"><b>たとえ</b>: <code>shift</code> は<b>行列の先頭の人が抜けて、全員が一歩前に詰める</b>動きである。いつでも先頭（<code>$1</code>）だけを見ていれば、順番に全員を案内できる。
+<br>ただし<b>崩れる点</b>: 行列から抜けた人はまだどこかにいるが、<code>shift</code> で捨てた引数はもう取り出せない。後で使うなら、詰める前に変数に移しておく。</div>
+
+<h2 id="usage">引数の数を確かめて、使い方を出す</h2>
+<div class="sgoal"><b>この節で分かること</b>: 引数が足りないときの、行儀のよい終わり方。</div>
+<pre><code>$ cat &gt; need.sh &lt;&lt;'END'
+&gt; #!/bin/bash
+&gt; if [ $# -ne 1 ]; then
+&gt;     echo "使い方: $(basename "$0") 名前" &gt;&amp;2
+&gt;     exit 1
+&gt; fi
+&gt; echo "こんにちは、$1"
+&gt; END
+$ bash need.sh; echo "終了ステータス $?"
+使い方: need.sh 名前
+終了ステータス 1
+$ bash need.sh alice
+こんにちは、alice
+$ bash need.sh alice bob 2&gt; /dev/null; echo "終了ステータス $?"
+終了ステータス 1</code></pre>
+<p>引数がちょうど1つでなければ、使い方を出して終了ステータス 1 で終わる。使い方は <code>&gt;&amp;2</code> で<b>標準エラー出力</b>に出す。<code>2&gt; /dev/null</code> で標準エラーを捨てると、使い方は表示されず、終了ステータスだけが残った。結果を保存したりパイプでつないだりするときに、使い方の文がデータに混ざらないようにするためである。<code>$(basename "$0")</code> は <code>$0</code> からディレクトリ部分を除いた名前で、どう呼ばれても <code>need.sh</code> と出る。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-shell/">演習04</a>は、引数のファイルそれぞれの <code>.bak</code> を作り、引数が無ければ使い方を出して 1 で終わるスクリプトを書く課題である。
+判定は空のディレクトリに <code>a.txt</code> と「<code>my notes.txt</code>」を用意して実際に実行し、できたファイルと終了ステータスを見る。<code>$*</code> で書くと、この章の <code>cpall.sh</code> と同じ割れ方をする。</div>
+<div class="quiz"><b>確認</b>
+<p><code>./s.sh a "b c" d</code> と実行した。スクリプトの中での <code>$#</code> と <code>$2</code> の値を答えよ。</p>
+<details><summary>答え</summary>
+<p><code>$#</code> は 3、<code>$2</code> は <code>b c</code>。引用符は呼んだ側のシェルが外し、<code>b c</code> は1つの引数として渡る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>スクリプトが受け取った引数を、区切りを変えずにそのまま <code>ls -l</code> に渡したい。正しい書き方はどれか。<br>
+(A) <code>ls -l $*</code>　(B) <code>ls -l "$*"</code>　(C) <code>ls -l "$@"</code>　(D) <code>ls -l $@</code></p>
+<details><summary>答え</summary>
+<p>(C)。(A) と (D) は空白を含む引数を切り直す。(B) は全部を1つの文字列にまとめるので、引数が2つ以上あると1つの存在しないファイル名になる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>引数が <code>a b c d e</code> のスクリプトで <code>shift 2</code> を実行した。その直後の <code>$1</code> と <code>$#</code> を答えよ。</p>
+<details><summary>答え</summary>
+<p><code>$1</code> は <code>c</code>、<code>$#</code> は 3。<code>shift 2</code> は先頭の2つを捨てて全員を2つ前に詰める。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>スクリプトの中で <code>echo $10</code> と書いたら、10個目の引数ではなく別の文字が出た。何が出たのか、正しくはどう書くか。</p>
+<details><summary>答え</summary>
+<p><code>$1</code> の値の後ろに <code>0</code> を付けたもの（記録では <code>a0</code>）。正しくは <code>${10}</code>。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>引数を空白で切り、引用符を外すのは<b>呼んだ側</b>のシェル。スクリプトは切られた後の語の並びを受け取る</li><li><code>$0</code> は呼ばれた名前、<code>$1</code>〜<code>$9</code> と <code>${10}</code> 以降が位置パラメータ、<code>$#</code> が数</li><li><code>"$@"</code> は受け取った区切りのまま、<code>"$*"</code> は1つにまとめ、引用符なしの <code>$*</code>・<code>$@</code> は切り直す。渡すなら <code>"$@"</code></li><li><code>shift</code> は先頭を捨てて詰め、<code>$#</code> を減らす。詰めすぎると何もせず 1 を返す</li><li>引数の数は <code>[ $# -ne 1 ]</code> などで確かめ、使い方は <code>&gt;&amp;2</code>、終了は <code>exit 1</code></li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-shell/theory/04-script">← 4. 先頭行を読むのはカーネルで、bash ではない</a><a href="/linuc-shell/theory/06-status">次: 6. スクリプトが返せるのは、0〜255 の数1つ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-shell/chapters.js"></script>
+<script src="/linuc-shell/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. 子のシェルは、親を書き換えられない — 確かめて説明する LinuC 主題1.06</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="2" data-theme="linuc-shell">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-shell/theory/">理論編</a> › 第2章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+</div>
+<h1>2. 子のシェルは、親を書き換えられない</h1>
+<p class="lead"><code>~/.bashrc</code> に alias を1行足し、<code>bash ~/.bashrc</code> で読み直そうとした。エラーが出て、alias も増えない。<code>bash ファイル</code> は「新しい bash を起動してファイルを読ませ、終わらせる」コマンドだからである。新しい bash は親の環境変数の<b>コピー</b>を受け取って始まり、終わるときに何も書き戻さない。いまのシェル自身に読ませるのが <code>source</code>（<code>.</code>）である。</p>
+<div class="badges"><span>前提: 第1章まで読了</span><span>所要 18分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.06.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>source ファイル</code>・<code>. ファイル</code>・<code>bash ファイル</code> の違いを、どのシェルが読むかで説明できる</li><li>シェル変数と環境変数を <code>export</code> で作り分け、どちらが子に渡るかを言える</li><li>PATH の足し方と、足した PATH が効く範囲を言える</li><li>alias が子のシェルにもスクリプトにも効かない理由と、だから <code>~/.bashrc</code> に書くことを説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>declare</code> の全オプション、<code>set</code> と <code>env</code> が出す一覧の中身、<code>hash</code>（コマンドの在りかの記憶）、<code>readonly</code>、<code>export -f</code>（関数を子に渡す bash 独自の機能）。覚えるのは <code>source</code>・<code>.</code>・<code>export</code>・<code>alias</code>・<code>unalias</code>・<code>PATH</code> の6つでよい。</div></div>
+
+<h2 id="reload">~/.bashrc を直しても、いまのシェルは変わらない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 設定ファイルを書き換えたあと、なぜ読み直しが要り、なぜ <code>bash</code> では読み直せないのか。</div>
+<p>この章は <code>~/try</code> で作業する。</p>
+<pre><code>$ mkdir -p ~/try &amp;&amp; cd ~/try</code></pre>
+<p>alias を1つ <code>~/.bashrc</code> の末尾に足す。<code>alias 名前='コマンド'</code> は「この名前を打ったら、このコマンドに置き換える」という定義である。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>ファイルに書いただけではまだ効かない。<code>~/.bashrc</code> はシェルが起動するときに読むファイルなのだから、bash にもう一度読ませれば効くはずだ。</p>
+<pre><code>$ echo "alias hi='echo やあ'" &gt;&gt; ~/.bashrc
+$ tail -1 ~/.bashrc
+alias hi='echo やあ'
+$ hi
+bash: hi: command not found
+$ bash ~/.bashrc
+/home/lab/.bashrc: line 8: return: can only `return' from a function or sourced script
+$ hi
+bash: hi: command not found</code></pre>
+<div class="then"><b>だめな理由</b>: <code>bash ~/.bashrc</code> は「新しい bash（子のプロセス）を起動し、そのファイルを読ませる」コマンドである。
+いまのシェルは何も読んでいない。読んだのは子で、子は読み終わるとすぐ終わる。仮に alias が定義されたとしても、それは子の中だけの話で、子と一緒に消える。
+しかもこの子は対話シェルではないので、<code>~/.bashrc</code> の8行目（第1章で見た「対話でなければ戻る」の <code>return</code>）で止まり、
+関数の外での <code>return</code> だとエラーを出した。<b>読み直しは、いまのシェル自身にさせる必要がある</b>。</div></div>
+<p>いまのシェルに読ませるのが <code>source</code> である。</p>
+<pre><code>$ source ~/.bashrc
+$ hi
+やあ
+$ type hi
+hi is aliased to `echo やあ'</code></pre>
+<div class="analogy"><b>たとえ</b>: 料理の手順書を書き直したあと、<b>新人に読ませて帰らせる</b>のが <code>bash ~/.bashrc</code>、<b>自分で読む</b>のが <code>source ~/.bashrc</code> である。
+新人がどれだけ正しく覚えても、帰った時点でその記憶は店に残らない。
+<br>ただし<b>崩れる点</b>: 新人なら帰る前に口頭で伝えてくれるかもしれないが、子のシェルが親に返せるのは終了ステータスという数1つだけで、覚えた alias や変数を伝える手段そのものが無い。</div>
+
+<h2 id="copy">子が受け取るのはコピー。それも export したものだけ</h2>
+<div class="sgoal"><b>この節で分かること</b>: シェル変数と環境変数の違いと、子に渡る範囲。</div>
+<p>変数で確かめる。<code>bash -c '…'</code> は、引用符の中を新しい bash（子）に実行させる。</p>
+<pre><code>$ x=1
+$ bash -c 'echo "子から見た x=[$x]"'
+子から見た x=[]
+$ export x
+$ bash -c 'echo "子から見た x=[$x]"'
+子から見た x=[1]
+$ bash -c 'x=2; echo "子の中で x=$x"'; echo "親の x=$x"
+子の中で x=2
+親の x=1
+$ declare -p x PATH
+declare -x x="1"
+declare -x PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+$ y=2; declare -p y
+declare -- y="2"
+$ env | grep -E '^(x|y)='
+x=1</code></pre>
+<p><code>x=1</code> と書いただけの変数は、子からは見えない。<code>export x</code> したあとは見える。子の中で <code>x=2</code> にしても、親の <code>x</code> は 1 のままである。</p>
+<p><code>declare -p</code> は変数の性質を見せる。<code>-x</code> が付いていれば<b>環境変数</b>（子にコピーが渡る）、<code>--</code> なら<b>シェル変数</b>（このシェルの中だけ）である。<code>env</code> は環境変数だけを一覧するので、<code>y</code> は出てこない。</p>
+<div class="scroll"><table>
+<tr><th></th><th>作り方</th><th>子のシェル・スクリプトから</th><th>確かめ方</th></tr>
+<tr><td>シェル変数</td><td><code>y=2</code></td><td>見えない</td><td><code>declare -p y</code> が <code>declare --</code></td></tr>
+<tr><td>環境変数</td><td><code>export x</code>（<code>export x=1</code> でもよい）</td><td><b>コピー</b>が見える。子が変えても親は変わらない</td><td><code>declare -p x</code> が <code>declare -x</code>・<code>env</code> に出る</td></tr>
+</table></div>
+<p><code>export 名前=値</code> と書けば、作るのと印を付けるのを一度にできる。</p>
+<pre><code>$ export z=3; bash -c 'echo "z=[$z]"'
+z=[3]</code></pre>
+<p><code>PATH</code> は最初から <code>declare -x</code>、つまり環境変数である。だから <code>PATH=…</code> と値を変えるだけで子に渡り、改めて <code>export</code> する必要はない。</p>
+<p>スクリプトの中でディレクトリを移ったり環境変数を作ったりしても、同じことが起きる。</p>
+<pre><code>$ cat &gt; go.sh &lt;&lt;'END'
+&gt; cd /tmp
+&gt; export GREETING=やあ
+&gt; END
+$ bash go.sh; pwd; echo "GREETING=[$GREETING]"
+/home/lab/try
+GREETING=[]
+$ . ./go.sh; pwd; echo "GREETING=[$GREETING]"
+/tmp
+GREETING=[やあ]
+$ cd ~/try</code></pre>
+<p><code>bash go.sh</code> では、<code>cd</code> も <code>export</code> も子の中で起きて消えた。<code>. ./go.sh</code> では、いまのシェルが読んだので両方が残った。<b>第1章で <code>~/.bash_profile</code> の中に <code>. ~/.profile</code> と書いたのは、このため</b>である。読み込まれたファイルが作った PATH を、ログインシェル自身に残す必要があった。</p>
+<p>そして、ログインシェルで一度作った環境変数は、そこから起動されるすべての子にコピーされていく。PATH を <code>~/.profile</code>（ログインのときに1回だけ読まれる）に書けば足りるのはこのためである。第1章で <code>sudo -iu alice</code> の案内に <code>lab-base</code> と出たのは逆の例で、<code>sudo -i</code> はコピーを渡す前に環境変数をほぼ空にするので、あなたの <code>LAB_THEME</code> が alice に届かなかった。</p>
+<div class="analogy"><b>たとえ</b>: 親が子に<b>書類のコピー</b>を持たせて送り出すのに近い。
+<code>export</code> は「この書類はコピーして持たせる」という印で、印の無い書類（シェル変数）は親の机に残る。子はコピーに書き込めるが、親の原本は変わらない。
+<br>ただし<b>崩れる点</b>: 書類なら後から追加で送れるが、環境変数のコピーは子が起動する瞬間に1回作られるだけである。子が動き出した後に親が <code>export</code> しても、その子には届かない。</div>
+
+<h2 id="dot">source と . は同じもの。sh で使えるのは . だけ</h2>
+<div class="sgoal"><b>この節で分かること</b>: 2つの書き方の違い。</div>
+<pre><code>$ type source .
+source is a shell builtin
+. is a shell builtin
+$ sh -c '. ./go.sh; pwd'
+/tmp
+$ sh -c 'source ./go.sh'
+sh: 1: source: not found</code></pre>
+<p><code>source</code> と <code>.</code> は、どちらも<b>組み込みコマンド</b>（bash 自身が持っている命令）で、bash では同じ働きをする。ただし <code>.</code> は sh の規格にある書き方で、<code>source</code> は bash が足した別名である。Ubuntu の <code>sh</code>（dash）は <code>.</code> しか知らない。<code>#!/bin/sh</code> で書くスクリプトの中では <code>.</code> を使う。</p>
+
+<h2 id="alias">alias は、コピーすらされない</h2>
+<div class="sgoal"><b>この節で分かること</b>: alias を <code>~/.bashrc</code> に書く理由。</div>
+<pre><code>$ alias yo='echo よう'
+$ yo
+よう
+$ bash -ic yo
+bash: yo: command not found
+$ bash -ic hi
+やあ
+$ printf '#!/bin/bash\nhi\n' &gt; usehi.sh
+$ bash usehi.sh; echo "終了ステータス $?"
+usehi.sh: line 2: hi: command not found
+終了ステータス 127
+$ alias ll
+alias ll='ls -alF'
+$ type ll
+ll is aliased to `ls -alF'
+$ unalias yo
+$ yo
+bash: yo: command not found</code></pre>
+<p>プロンプトで定義した <code>yo</code> は、<code>bash -ic</code>（対話シェルとして子を起動する）からは見えない。<b>エイリアスは環境変数ではないので、子にコピーされない</b>。一方 <code>hi</code> は見えている。子が自分で <code>~/.bashrc</code> を読み直して、自分で定義したからである。</p>
+<p>スクリプトの中では、<code>~/.bashrc</code> に書いた <code>hi</code> すら使えない。スクリプトを読む bash は対話シェルではないので <code>~/.bashrc</code> を読まず、そもそも alias の置き換えをしない。終了ステータス 127 は「コマンドが見つからない」である（第6章）。置き換えをするかどうかは <code>shopt</code> の <code>expand_aliases</code> が決めていて、対話シェルのときだけ <code>on</code> になっている。</p>
+<pre><code>$ bash -c 'shopt expand_aliases'
+expand_aliases 	off
+$ bash -ic 'shopt expand_aliases'
+expand_aliases 	on</code></pre>
+<p>ここで第1章の2つのファイルの役割がつながる。</p>
+<div class="scroll"><table>
+<tr><th>書くもの</th><th>子に渡るか</th><th>書く場所</th><th>理由</th></tr>
+<tr><td>環境変数（<code>PATH</code>・<code>EDITOR</code> など）</td><td>コピーが渡る</td><td><code>~/.profile</code>（ログイン時に1回）</td><td>1回作れば、以後のすべての子に渡る</td></tr>
+<tr><td>alias・シェル変数・シェルの設定</td><td>渡らない</td><td><code>~/.bashrc</code>（対話シェルごと）</td><td>渡らないので、対話シェルが起動するたびに作り直す</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: alias は自分の<b>手帳に書いた略語表</b>に近い。「ll と書いたら ls -alF のこと」と自分だけが知っている。
+同じ部屋の別の人（子のシェル）は、同じ手帳を自分で持ってこない限り読めない。
+<br>ただし<b>崩れる点</b>: 人なら略語を見て意味を推測できるが、bash は手帳に無い略語を一切推測しない。<code>command not found</code> で止まる。</div>
+
+<h2 id="path">PATH は、左から順に探す棚の並び</h2>
+<div class="sgoal"><b>この節で分かること</b>: コマンドサーチパスの足し方と、足した PATH が効く範囲。</div>
+<pre><code>$ echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+$ type ls cd
+ls is aliased to `ls --color=auto'
+cd is a shell builtin</code></pre>
+<p>名前だけで打ったコマンドは、まず alias と組み込みコマンドが調べられ、どちらでもなければ <code>PATH</code> に <code>:</code> 区切りで並んだディレクトリを<b>左から順に</b>探す。これがコマンドサーチパスで、最初に見つかったものが実行される。<code>type</code> を使うと、どれに当たったかが分かる（<code>ls</code> は Ubuntu の <code>~/.bashrc</code> が作った alias だった）。</p>
+<p>カレントディレクトリは PATH に入っていない。</p>
+<pre><code>$ cat &gt; here.sh &lt;&lt;'END'
+&gt; #!/bin/bash
+&gt; echo "ここにいる"
+&gt; END
+$ chmod +x here.sh
+$ here.sh
+bash: here.sh: command not found
+$ ./here.sh
+ここにいる</code></pre>
+<p>自分のコマンド置き場を作る。Ubuntu の <code>~/.profile</code> は「<code>~/bin</code> があれば PATH の先頭に足す」処理を最初から持っている。</p>
+<pre><code>$ mkdir -p ~/bin &amp;&amp; cp here.sh ~/bin/here
+$ here
+bash: here: command not found
+$ grep -n -A2 'HOME/bin' ~/.profile
+20:if [ -d "$HOME/bin" ] ; then
+21:    PATH="$HOME/bin:$PATH"
+22-fi
+23-
+$ . ~/.profile
+$ echo $PATH
+/home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+$ here
+ここにいる</code></pre>
+<p><code>~/bin</code> を作っただけでは見つからない。<code>~/.profile</code> の判定は<b>ログインしたその瞬間</b>に1回行われただけで、そのとき <code>~/bin</code> はまだ無かった。<code>. ~/.profile</code> で読み直させると、先頭に <code>/home/lab/bin</code> が付いた。</p>
+<p>手で足すなら、こう書く。</p>
+<pre><code>$ PATH="$PATH:$HOME/try"; echo $PATH
+/home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/lab/try</code></pre>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>意味</th></tr>
+<tr><td><code>PATH="$HOME/bin:$PATH"</code></td><td>先頭に足す。同じ名前のコマンドがあれば、こちらが優先される</td></tr>
+<tr><td><code>PATH="$PATH:$HOME/try"</code></td><td>末尾に足す。既存のコマンドが優先される</td></tr>
+<tr><td><code>export PATH=…</code></td><td>同じ意味（PATH は最初から環境変数なので、<code>export</code> は付けても付けなくてもよい）</td></tr>
+</table></div>
+<p>こうして手で足した PATH は、<b>このシェルと、ここから起動する子</b>にしか効かない。次のログインでは消える。ずっと効かせるには、ログインのときに読まれるファイル（Ubuntu なら <code>~/.profile</code>）に書く。第1章のとおり、<code>~/.bash_profile</code> を新しく作ると <code>~/.profile</code> が読まれなくなる点に注意する。</p>
+<div class="analogy"><b>たとえ</b>: 倉庫の<b>棚を端から順に見ていく</b>係に近い。棚の並び順（PATH）が係に渡された唯一の地図で、同じ名前の箱が2つの棚にあれば、先に見た棚のものを持ってくる。
+<br>ただし<b>崩れる点</b>: 人の係は「この棚、さっき増えたよね」と気づくことがあるが、シェルは地図を書き換えてもらわない限り、新しく作った棚（<code>~/bin</code>）を見に行かない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-shell/">演習02</a>は、自作のコマンド <code>today</code> を <code>~/bin</code> に置いて名前だけで呼べるようにする課題である。
+判定は <code>lab check</code> が子のプロセスとして受け取った PATH（あなたのシェルのコピー）と、新しく起動したログインシェルの PATH の両方で <code>today</code> を探して実行する。</div>
+<div class="quiz"><b>確認</b>
+<p><code>~/.bashrc</code> に alias を追加した。いま開いているシェルに反映させるコマンドを2つ挙げよ。</p>
+<details><summary>答え</summary>
+<p><code>source ~/.bashrc</code> と <code>. ~/.bashrc</code>。
+<code>bash ~/.bashrc</code> は子のプロセスが読んで終わるだけで、いまのシェルには何も残らない（記録では8行目の <code>return</code> でエラーにもなった）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>set.sh</code> の中身は <code>export GREETING=hello</code> の1行だけである。<code>bash set.sh</code> を実行した直後に、元のシェルで <code>echo "[$GREETING]"</code> と打つと何が出るか。</p>
+<details><summary>答え</summary>
+<p><code>[]</code>（空）。<code>export</code> は子のシェルの中で起き、子が終わると消えた。<code>export</code> は「自分の子へコピーを渡す」印であって、親へ送り返す手段ではない。
+<code>. set.sh</code> か <code>source set.sh</code> で実行すれば <code>[hello]</code> になる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>コマンドサーチパスの末尾に <code>/opt/tools/bin</code> を追加する書き方として正しいものはどれか。<br>
+(A) <code>PATH=/opt/tools/bin</code>　(B) <code>PATH="$PATH:/opt/tools/bin"</code>　(C) <code>PATH="$PATH;/opt/tools/bin"</code>　(D) <code>$PATH=$PATH:/opt/tools/bin</code></p>
+<details><summary>答え</summary>
+<p>(B)。<code>export PATH="$PATH:/opt/tools/bin"</code> と書いても同じ意味になる。
+(A) は既存のディレクトリを全部消してしまう。(C) は区切りが <code>;</code> なので、最後の要素が <code>/bin;/opt/tools/bin</code> という1つの（存在しない）ディレクトリ名になる。
+(D) は左辺の <code>$PATH</code> が先に展開されて、代入ではなく長い名前のコマンドを実行しようとする。</p>
+<pre><code>$ (PATH="/usr/bin;/opt/tools/bin"; echo "$PATH"; ls /)
+/usr/bin;/opt/tools/bin
+bash: ls: command not found
+$ $PATH=$PATH:/opt/tools/bin
+bash: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/tools/bin: No such file or directory</code></pre></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>#!/bin/sh</code> で始まるスクリプトの中で、別のファイル <code>conf.sh</code> の変数定義を読み込みたい。Ubuntu で確実に動く書き方はどれか。<br>
+(A) <code>source conf.sh</code>　(B) <code>. ./conf.sh</code>　(C) <code>bash conf.sh</code></p>
+<details><summary>答え</summary>
+<p>(B)。Ubuntu の <code>/bin/sh</code> は dash で、<code>source</code> を持たない（記録: <code>sh: 1: source: not found</code>）。
+(C) は子のプロセスが読むだけなので、変数は呼んだ側に残らない。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>bash ファイル</code> は子のプロセスに読ませる。<code>source ファイル</code>・<code>. ファイル</code> はいまのシェルに読ませる。設定の読み直しは後者</li><li>子に渡るのは <code>export</code> した環境変数の<b>コピー</b>だけ。子が変えても親は変わらない</li><li><code>declare -p 名前</code> の <code>-x</code> が環境変数の印。<code>env</code> は環境変数だけを出す</li><li>alias は子に渡らず、スクリプトの中では使えない。だから対話シェルごとに読まれる <code>~/.bashrc</code> に書く</li><li>PATH は <code>:</code> 区切りで左から探す。先頭に足すと優先、末尾に足すと後回し。手で足した PATH は次のログインで消える</li><li><code>source</code> は bash の別名。sh（dash）で使えるのは <code>.</code> だけ</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-shell/theory/01-startup">← 1. 読まれる起動ファイルは、シェルの生まれ方で決まる</a><a href="/linuc-shell/theory/03-lists">次: 3. &amp;&amp; と || は、直前の数だけを見ている →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-shell/chapters.js"></script>
+<script src="/linuc-shell/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

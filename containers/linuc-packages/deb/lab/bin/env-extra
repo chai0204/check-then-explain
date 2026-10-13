@@ -1,0 +1,6 @@
+#!/bin/bash
+# lab env の追加行。不具合の切り分けに要る、パッケージ管理の道具の版。
+v() { dpkg-query -W -f='${Version}' "$1" 2>/dev/null || printf '無し'; }
+printf 'dpkg      : %s\n' "$(v dpkg)"
+printf 'apt       : %s\n' "$(v apt)"
+printf 'apt-file  : %s\n' "$(v apt-file)"

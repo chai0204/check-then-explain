@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>8. 関数は、子ではない — 確かめて説明する LinuC 主題1.06</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="8" data-theme="linuc-shell">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-shell/theory/">理論編</a> › 第8章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+</div>
+<h1>8. 関数は、子ではない</h1>
+<p class="lead">名前に番号を振るスクリプトで、番号が 1 の次に 21 へ飛んだ。区切り線を引く関数が、中の <code>for</code> で同じ名前の変数 <code>i</code> を使っていたからである。スクリプトは子のプロセスで動くが、関数は呼んだシェルの<b>中で</b>動く。だから変数を共有し、<code>exit</code> すれば全体が終わる。<code>bash -x</code> は、その書き換わりを1行ずつ見せる道具である。最後に、8章が1つの事実から出ていたことをまとめる。</p>
+<div class="badges"><span>前提: 第7章まで読了</span><span>所要 20分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.06.2（重要度6）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>名前() { … }</code> と <code>function 名前 { … }</code> で関数を作れ、その違い（dash で使えるか）を言える</li><li><code>local</code>・<code>return</code>・<code>exit</code> が関数の中で何をするかを、記録で説明できる</li><li><code>bash -x</code> と <code>bash -v</code> の出力の違いを言い、原因の見当を付けるのに使える</li><li>8章の結果を「子が受け取ったもの・親に返せたもの」の表で説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>export -f</code>（関数を子に渡す bash 独自の機能）、<code>FUNCNAME</code>・<code>BASH_SOURCE</code>、<code>PS4</code> による <code>-x</code> の表示の変更、再帰。デバッグは <code>bash -x</code>・<code>bash -v</code>・<code>set -x</code>・<code>set +x</code> の4つで足りる。</div></div>
+
+<h2 id="same">関数は、いまのシェルの中で動く</h2>
+<div class="sgoal"><b>この節で分かること</b>: 関数の2つの書き方と、子に渡らないこと。</div>
+<p>この章も <code>~/try</code> で作業する。何度も使う一連のコマンドに名前を付けたものが<b>関数</b>である。</p>
+<pre><code>$ mkdir -p ~/try &amp;&amp; cd ~/try
+$ wave() { echo "やあ、$1"; }
+$ wave alice
+やあ、alice
+$ type wave
+wave is a function
+wave () 
+{ 
+    echo "やあ、$1"
+}
+$ function bye { echo "またね、$1"; }
+$ bye bob
+またね、bob
+$ bash -c 'wave alice'; echo "終了ステータス $?"
+bash: line 1: wave: command not found
+終了ステータス 127</code></pre>
+<p>書き方は2つある。<code>名前() { …; }</code> は sh の規格にある書き方で、dash でも動く。<code>function 名前 { …; }</code> は bash の書き方で、第4章のとおり dash では動かない。<code>type</code> は、その名前が関数であることと中身を見せた。</p>
+<p>関数は子のシェルに渡らない。<code>bash -c</code> で起動した子からは <code>wave</code> が見えず、127（見つからない）になった。第2章の alias と同じで、関数は環境変数ではないからである。</p>
+<div class="analogy"><b>たとえ</b>: 関数は、自分の手帳に書いた<b>「いつもの手順」の名前</b>に近い。「朝の点検」と書けば、自分がその場で手順を順にこなす。誰かに頼む（子のプロセスを起動する）わけではない。
+<br>ただし<b>崩れる点</b>: 手帳の手順は他人に見せれば使ってもらえるが、関数は子のシェルには見えない。使わせたいなら、子の側で定義し直すか、スクリプトにして置く（第4章）。</div>
+
+<h2 id="local">local・return・exit</h2>
+<div class="sgoal"><b>この節で分かること</b>: 関数の中の変数・戻り値・終わり方。</div>
+<pre><code>$ cat &gt; fn.sh &lt;&lt;'END'
+&gt; #!/bin/bash
+&gt; greet() {
+&gt;     local who=$1
+&gt;     echo "こんにちは、$who（関数の中で \$0 = $0、\$# = $#）"
+&gt;     return 3
+&gt; }
+&gt; greet alice bob
+&gt; echo "greet の終了ステータス = $?"
+&gt; echo "関数の外で who = [$who]"
+&gt; END
+$ bash fn.sh
+こんにちは、alice（関数の中で $0 = fn.sh、$# = 2）
+greet の終了ステータス = 3
+関数の外で who = []</code></pre>
+<p>関数の中の <code>$1</code>・<code>$#</code> は、関数に渡した引数のものになる（スクリプトの引数とは別）。<code>$0</code> だけはスクリプトの名前のままである。<code>local who</code> と書いた変数は関数の中だけのもの（<b>ローカル変数</b>）で、外からは空に見えた。<code>return 3</code> は関数を終わらせ、3 を終了ステータスとして呼んだ側の <code>$?</code> に渡した。</p>
+<pre><code>$ cat &gt; ex.sh &lt;&lt;'END'
+&gt; #!/bin/bash
+&gt; stop() { echo "関数の中で exit します"; exit 5; }
+&gt; stop
+&gt; echo "ここは表示されない"
+&gt; END
+$ bash ex.sh; echo "終了ステータス $?"
+関数の中で exit します
+終了ステータス 5</code></pre>
+<p>関数の中の <code>exit</code> は、関数ではなく<b>スクリプト全体</b>を終わらせた。関数は別のプロセスではないので、「関数だけを終わらせる」には <code>return</code> を使う。</p>
+<div class="scroll"><table>
+<tr><th></th><th>関数の中で書くと</th><th>呼んだ側から見ると</th></tr>
+<tr><td><code>return 数</code></td><td>関数だけを終わらせる</td><td>その数が <code>$?</code> になる（0〜255）</td></tr>
+<tr><td><code>exit 数</code></td><td>スクリプト全体を終わらせる</td><td>スクリプトの終了ステータスになる</td></tr>
+<tr><td><code>local 変数</code></td><td>関数の中だけの変数を作る</td><td>見えない・変わらない</td></tr>
+<tr><td>（<code>local</code> なしの代入）</td><td>呼んだ側の同じ名前の変数を書き換える</td><td>書き換わる（次の節）</td></tr>
+</table></div>
+
+<h2 id="leak">local を付けない変数は、呼んだ側と同じもの</h2>
+<div class="sgoal"><b>この節で分かること</b>: 関数が子ではないことの、いちばん困る帰結。</div>
+<p>名前に番号を振り、名前ごとに区切り線を引くスクリプトを書く。区切り線は関数 <code>line</code> に任せる。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>関数 <code>line</code> の中の <code>for</code> で使う <code>i</code> は、関数の中の作業用の数である。外のループの <code>i</code> とは別の場所にあり、<code>i=$((i + 1))</code> で 1 ずつ増える番号には影響しないはずだ。</p>
+<pre><code>$ cat &gt; number.sh &lt;&lt;'END'
+&gt; #!/bin/bash
+&gt; line() {
+&gt;     for ((i = 0; i &lt; 20; i++)); do printf '-'; done
+&gt;     printf '\n'
+&gt; }
+&gt; i=1
+&gt; for name in "$@"; do
+&gt;     echo "$i: $name"
+&gt;     line
+&gt;     i=$((i + 1))
+&gt; done
+&gt; END
+$ bash number.sh alice bob carol
+1: alice
+--------------------
+21: bob
+--------------------
+21: carol
+--------------------</code></pre>
+<div class="then"><b>だめな理由</b>: 番号が 1 の次に 21 へ飛んだ。関数は呼んだシェルの中で動き、<code>local</code> を付けない変数は<b>呼んだ側の同じ名前の変数そのもの</b>である。
+<code>line</code> の <code>for</code> が <code>i</code> を 0 から 20 まで進め、戻ったところで <code>i=$((i + 1))</code> が 21 にした。
+スクリプト（子のプロセス）なら親の変数を書き換えられないが、関数は子ではないので書き換えられる。第2章〜第7章で見てきた「コピーだから戻らない」が、関数には当てはまらない。</div></div>
+<div class="analogy"><b>たとえ</b>: スクリプトを呼ぶのは<b>コピーした書類を別の人に渡す</b>こと、関数を呼ぶのは<b>同じ机の上で、自分がもう1つの作業を始める</b>ことに近い。同じ机なので、メモ用紙（変数）も同じものを使う。
+<br>ただし<b>崩れる点</b>: 人なら「このメモは作業用」と区別して使うが、bash は名前が同じなら同じメモ用紙に書く。作業用だと宣言する（<code>local</code>）まで区別しない。</div>
+
+<h2 id="debug">bash -x は、展開した後の形を1行ずつ見せる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>bash -x</code>・<code>bash -v</code>・<code>set -x</code> の違いと使いどころ。</div>
+<p><code>bash -x</code> は、実行する直前のコマンドを、変数を展開した後の形で <code>+</code> を付けて出す。この出力を<b>トレース</b>と呼ぶ。出力は標準エラーに出るので、<code>2&gt;&amp;1</code> で標準出力にまとめてから読む。</p>
+<pre><code>$ bash -x number.sh alice bob 2&gt;&amp;1 | head -12
++ i=1
++ for name in "$@"
++ echo '1: alice'
+1: alice
++ line
++ (( i = 0 ))
++ (( i &lt; 20 ))
++ printf -
+-+ (( i++ ))
++ (( i &lt; 20 ))
++ printf -
+-+ (( i++ ))</code></pre>
+<p><code>(( i = 0 ))</code>・<code>(( i &lt; 20 ))</code> と、関数の中で <code>i</code> が動いているのが見える（<code>printf -</code> の出力の <code>-</code> が、次の <code>+</code> の行の頭にくっついている）。長いので、<code>i</code> への代入と <code>echo</code> だけを抜き出す。</p>
+<pre><code>$ bash -x number.sh alice bob 2&gt;&amp;1 | grep -E '^\+ (i=|echo)'
++ i=1
++ echo '1: alice'
++ i=21
++ echo '21: bob'
++ i=21</code></pre>
+<p><code>+ i=1</code> の次の代入が <code>+ i=21</code> である。原因の行がここで分かる。<code>bash -v</code> は、展開する前の行を<b>読んだとおり</b>に出す。</p>
+<pre><code>$ bash -v number.sh alice 2&gt;&amp;1 | head -14
+#!/bin/bash
+line() {
+    for ((i = 0; i &lt; 20; i++)); do printf '-'; done
+    printf '\n'
+}
+i=1
+for name in "$@"; do
+    echo "$i: $name"
+    line
+    i=$((i + 1))
+done
+1: alice
+--------------------</code></pre>
+<p><code>-v</code> では変数は <code>$i</code> のままで、値は分からない。ここまで読まれた、ということを確かめるのに向く。関数の中の <code>i</code> を <code>local</code> にすると直る。</p>
+<pre><code>$ sed -i '/^line() {/a\    local i' number.sh; sed -n '2,6p' number.sh
+line() {
+    local i
+    for ((i = 0; i &lt; 20; i++)); do printf '-'; done
+    printf '\n'
+}
+$ bash number.sh alice bob carol
+1: alice
+--------------------
+2: bob
+--------------------
+3: carol
+--------------------</code></pre>
+<p>スクリプト全体ではなく一部だけを見たいときは、その範囲を <code>set -x</code> と <code>set +x</code> で挟む。対話シェルでもそのまま使える。</p>
+<pre><code>$ set -x; echo "$HOME"; set +x
++ echo /home/lab
+/home/lab
++ set +x</code></pre>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>出すもの</th><th>向いている場面</th></tr>
+<tr><td><code>bash -x x.sh</code></td><td>実行する直前の行。変数は展開した後の値で、行頭に <code>+</code></td><td>どこで値がおかしくなったか</td></tr>
+<tr><td><code>bash -v x.sh</code></td><td>読み込んだ行をそのまま（展開する前）</td><td>どこまで読まれたか・文法エラーの位置</td></tr>
+<tr><td><code>set -x</code> … <code>set +x</code></td><td>挟んだ範囲だけ <code>-x</code> と同じもの</td><td>長いスクリプトの一部だけ見る</td></tr>
+</table></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-shell/">演習08</a>は、この章と同じ症状のスクリプトを <code>bash -x</code> で調べて直す課題である。
+判定は <code>bash number.sh alice bob carol</code> を実行し、番号と区切り線の6行を期待の出力と比べる。</div>
+
+<h2 id="spine">8章が1つの事実から出ていた</h2>
+<div class="sgoal"><b>この節で分かること</b>: 主題1.06 の出題範囲が、なぜこの並びになっているのか。</div>
+<p>この教材で記録したことを並べる。</p>
+<div class="scroll"><table>
+<tr><th>章</th><th>起動されたもの</th><th>受け取ったもの</th><th>親に返せたもの</th><th>記録で見たこと</th></tr>
+<tr><td>1</td><td>ログインシェル・子のシェル</td><td>起動のしかた（ログインか・対話か）</td><td>—</td><td>読むファイルが変わる。<code>~/.bash_profile</code> を作ると <code>~/.profile</code> と <code>~/.bashrc</code> が読まれない</td></tr>
+<tr><td>2</td><td><code>bash ファイル</code></td><td><code>export</code> した環境変数のコピー</td><td>終了ステータスだけ</td><td><code>bash ~/.bashrc</code> では alias が残らない。<code>source</code> が要る</td></tr>
+<tr><td>3</td><td><code>$( )</code>・<code>( )</code></td><td>同上</td><td>標準出力の文字と終了ステータス</td><td>中で <code>x=2</code> にしても外は 1。<code>||</code> は直前の数しか見ない</td></tr>
+<tr><td>4</td><td>スクリプト（<code>./x.sh</code>）</td><td>実行した人の PATH のコピー</td><td>終了ステータス</td><td>alice の <code>~/bin/date</code> が動いた。先頭で PATH を決めると止まる</td></tr>
+<tr><td>5</td><td>スクリプト</td><td>呼んだ側が切った引数の並び</td><td>—</td><td><code>"my file.txt"</code> は1つで届き、<code>$*</code> で割れる</td></tr>
+<tr><td>6</td><td>スクリプト</td><td>—</td><td>0〜255 の数1つ</td><td><code>exit 256</code> が 0 になる</td></tr>
+<tr><td>7</td><td>パイプの右側の <code>while</code></td><td>変数のコピー</td><td>終了ステータス</td><td>中で数えた合計が 0 になる</td></tr>
+<tr><td>8</td><td>関数</td><td>（子ではない）同じ変数そのもの</td><td><code>return</code> の数。変数は共有</td><td><code>i</code> が 21 になる</td></tr>
+</table></div>
+<p>1〜7章は同じ形をしている。</p>
+<pre><code>新しく起動したシェルやスクリプトは、親の環境変数のコピーを受け取って始まる。
+終わるときに親へ返せるのは、0〜255 の終了ステータス1つだけである。</code></pre>
+<p>そして8章の関数だけが、この形の<b>外</b>にある（子ではないので、コピーではなく本物を触る）。だから <code>local</code> という言葉が要る。</p>
+<p>出題範囲 1.06 の「詳細」欄に並ぶ語は、ほとんどがこの事実の言い換えである。<code>source</code> と <code>.</code> は「子を作らずに読む」ため、<code>~/.profile</code> と <code>~/.bashrc</code> の書き分けは「環境変数は子に渡り、alias は渡らない」ため、<code>$?</code> と <code>exit</code> は「返せる唯一のもの」、<code>"$@"</code> は「受け取った区切りを保つ」ため、スクリプトの中の <code>PATH</code> は「受け取ったコピーを信用しない」ためにある。</p>
+<p>だから、シェルで何かが思いどおりに動かないときに確かめる順番は決まる。</p>
+<pre><code>1. いま、どのシェルの中か      echo $0 / shopt login_shell / echo $-
+2. 何を受け取ったか            declare -p 変数 / echo "$PATH" / for a in "$@"
+3. 何を返したか                echo $?
+4. どこで値が変わったか        bash -x / set -x … set +x</code></pre>
+<div class="analogy"><b>たとえ</b>: 8章はどれも、<b>出張に出る部下</b>の話だった。出発のときに書類のコピー（環境変数）と指示（引数）を持たされ、帰ってきて報告できるのは「うまくいったか」の番号札1枚（終了ステータス）だけ。出張先で何を書き込んでも、本社の原本は変わらない。関数だけは出張ではなく、本社の中で別の机に移るだけだった。
+<br>ただし<b>崩れる点</b>: 人の部下なら帰ってから口頭で補足できるが、シェルの子には札1枚以外の帰り道が無い。伝えたいことがあるなら、ファイルに書くか、標準出力に出してコマンド置換で受け取るしかない。</div>
+<div class="quiz"><b>確認</b>
+<p>関数の中で使う変数を、その関数の中だけのものにするには、何というキーワードで宣言するか。</p>
+<details><summary>答え</summary>
+<p><code>local</code>。付けないと、呼んだ側の同じ名前の変数を書き換える（記録では番号が 21 に飛んだ）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>関数の中に <code>exit 5</code> と書いた。その関数を呼んだスクリプトはどうなるか。<code>return 5</code> と書いた場合はどうか。</p>
+<details><summary>答え</summary>
+<p><code>exit 5</code> ではスクリプト全体がそこで終わり、終了ステータスは 5 になる（記録では「ここは表示されない」が出なかった）。
+<code>return 5</code> では関数だけが終わり、呼んだ直後の <code>$?</code> が 5 になって、スクリプトは続く。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>シェルスクリプトを、実行するコマンドを1行ずつ（変数を展開した後の形で）表示しながら実行するオプションはどれか。<br>
+(A) <code>bash -v</code>　(B) <code>bash -x</code>　(C) <code>bash -n</code>　(D) <code>bash -e</code></p>
+<details><summary>答え</summary>
+<p>(B)。(A) <code>bash -v</code> は読み込んだ行を展開する前のまま表示する（変数は <code>$i</code> のまま）。
+<code>-n</code> と <code>-e</code> はこの章では扱っていない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>#!/bin/sh</code> で始まるスクリプトで関数を定義したい。Ubuntu で動く書き方はどちらか。<br>
+(A) <code>function backup { …; }</code>　(B) <code>backup() { …; }</code></p>
+<details><summary>答え</summary>
+<p>(B)。<code>/bin/sh</code> は dash で、<code>function</code> キーワードを知らない（第4章の記録: <code>function: not found</code> のあと文法エラー）。
+bash で動かすなら（先頭行が <code>#!/bin/bash</code>）どちらでもよい。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>関数は <code>名前() { …; }</code> か <code>function 名前 { …; }</code>（bash のみ）。子のシェルには渡らない</li><li>関数は呼んだシェルの中で動く。<code>local</code> を付けない変数は共有され、<code>exit</code> はスクリプト全体を終わらせる。関数だけ終えるのは <code>return</code></li><li><code>bash -x</code> は展開後の形に <code>+</code> を付けて、<code>bash -v</code> は読んだままを出す。一部だけなら <code>set -x</code> … <code>set +x</code></li><li>子は親の環境変数のコピーを受け取り、返せるのは 0〜255 の終了ステータス1つだけ。主題1.06 の語はほとんどがこの言い換え</li><li>動かないときは「どのシェルか → 何を受け取ったか → 何を返したか → どこで変わったか」の順に確かめる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-shell/theory/07-loops">← 7. パイプの先で数えた数は、持ち帰れない</a><a href="/linuc-shell/">実践編（演習8本）→</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-shell/chapters.js"></script>
+<script src="/linuc-shell/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

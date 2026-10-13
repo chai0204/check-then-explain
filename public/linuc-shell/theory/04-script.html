@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. 先頭行を読むのはカーネルで、bash ではない — 確かめて説明する LinuC 主題1.06</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="linuc-shell">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-shell/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+</div>
+<h1>4. 先頭行を読むのはカーネルで、bash ではない</h1>
+<p class="lead"><code>#!/bin/sh</code> で始まるスクリプトを <code>bash hello.sh</code> で動かすと動く。<code>chmod +x</code> して <code>./hello.sh</code> で動かすと、同じファイルが文法エラーになる。先頭行の <code>#!</code> を読むのは「直接実行された」ときのカーネルだけで、<code>bash hello.sh</code> のときはただのコメントだからである。スクリプトを他の人に使わせるときは、この先頭行に、権限・所有者・置き場所・PATH の4つが加わる。</p>
+<div class="badges"><span>前提: 第3章まで読了</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.06.2（重要度6）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>./x.sh</code>・<code>bash x.sh</code>・<code>. x.sh</code> のそれぞれで、何がファイルを読むのか、どんな権限が要るのかを言える</li><li>先頭行 <code>#!</code> が何を決めるか、Ubuntu の <code>/bin/sh</code> が dash であることが何を引き起こすかを説明できる</li><li><code>chmod</code> と <code>chown</code> でスクリプトを全員が使える形にでき、スクリプトには r と x の両方が要る理由を言える</li><li>使う人の PATH に左右されないスクリプトの書き方を言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: SUID・SGID・スティッキービット（主題1.02 で扱う）、ACL、<code>install</code> コマンド、<code>#!/usr/bin/env bash</code> と <code>#!/bin/bash</code> の使い分けの細部。<code>chmod</code> の数字は 755・644・700・711 が読めれば足りる。</div></div>
+
+<h2 id="three">同じファイルを、3つの書き方で動かす</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>./x.sh</code> と <code>bash x.sh</code> の違い。先頭行がいつ使われるか。</div>
+<p><code>~/try</code> に、関数を1つ持つ小さなスクリプトを書く。先頭行は <code>#!/bin/sh</code> にしておく。</p>
+<pre><code>$ mkdir -p ~/try &amp;&amp; cd ~/try
+$ cat &gt; hello.sh &lt;&lt;'END'
+&gt; #!/bin/sh
+&gt; function say {
+&gt;     echo "こんにちは、$1"
+&gt; }
+&gt; say "$(id -un)"
+&gt; echo "\$0 は $0"
+&gt; END
+$ ls -l hello.sh
+-rw-r--r-- 1 lab lab 93 Oct 13 10:45 hello.sh
+$ ./hello.sh; echo "終了ステータス $?"
+bash: ./hello.sh: Permission denied
+終了ステータス 126
+$ bash hello.sh; echo "終了ステータス $?"
+こんにちは、lab
+$0 は hello.sh
+終了ステータス 0</code></pre>
+<p>作ったばかりのファイルは <code>-rw-r--r--</code> で、x（実行権）が無い。<code>./hello.sh</code> は「このファイルを実行せよ」とカーネルに頼むので、x が無いと <code>Permission denied</code>（終了ステータス 126）になる。<code>bash hello.sh</code> は動いた。実行されたのは <code>bash</code> という実行ファイルのほうで、<code>hello.sh</code> は bash に<b>読まれた</b>だけだからである。読むのに要るのは r（読み）だけでよい。</p>
+<p>では x を付けて、直接実行する。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>bash hello.sh</code> で正しく動くことは確かめた。足りなかったのは実行権だけなのだから、<code>chmod +x</code> すれば <code>./hello.sh</code> でも同じように動くはずだ。</p>
+<pre><code>$ chmod +x hello.sh; ls -l hello.sh
+-rwxr-xr-x 1 lab lab 93 Oct 13 10:45 hello.sh
+$ ./hello.sh; echo "終了ステータス $?"
+./hello.sh: 2: function: not found
+こんにちは、
+./hello.sh: 4: Syntax error: "}" unexpected
+終了ステータス 2</code></pre>
+<div class="then"><b>だめな理由</b>: 直接実行すると、カーネルはファイルの先頭2文字が <code>#!</code>（<b>シバン</b>、shebang とも呼ぶ）かを見て、その行に書かれたプログラム（ここでは <code>/bin/sh</code>）を起動し、ファイルを読ませる。
+Ubuntu の <code>/bin/sh</code> は bash ではなく <b>dash</b> である。dash は <code>function</code> というキーワードを知らない。
+<code>function</code> をコマンド名だと思って探し（<code>function: not found</code>）、次の <code>{ … }</code> をただのまとまりとして<b>その場で実行</b>し（だから引数の無い「こんにちは、」が出た）、最後に残った <code>}</code> で文法エラーになった。
+<code>bash hello.sh</code> のときは、先頭行は <code>#</code> で始まるただのコメントとして読み飛ばされていた。<b>先頭行を読むのは bash ではなく、直接実行されたときのカーネル</b>である。</div></div>
+<pre><code>$ head -1 hello.sh; ls -l /bin/sh
+#!/bin/sh
+lrwxrwxrwx 1 root root 4 Mar 31  2024 /bin/sh -&gt; dash
+$ sh hello.sh; echo "終了ステータス $?"
+hello.sh: 2: function: not found
+こんにちは、
+hello.sh: 4: Syntax error: "}" unexpected
+終了ステータス 2</code></pre>
+<p><code>sh hello.sh</code> も同じ結果になる。こちらは「dash に読ませる」なので、先頭行はやはりコメントである。先頭行を bash に直す。</p>
+<pre><code>$ sed -i '1s|.*|#!/bin/bash|' hello.sh; head -1 hello.sh
+#!/bin/bash
+$ ./hello.sh
+こんにちは、lab
+$0 は ./hello.sh
+$ sh hello.sh; echo "終了ステータス $?"
+hello.sh: 2: function: not found
+こんにちは、
+hello.sh: 4: Syntax error: "}" unexpected
+終了ステータス 2</code></pre>
+<p><code>./hello.sh</code> は動くようになり、<code>sh hello.sh</code> は相変わらず失敗する。先頭行を直しても、読ませるプログラムを自分で指定した起動のしかたには効かない。</p>
+<p>3つ目の書き方は第2章の <code>.</code>（<code>source</code>）で、子を作らず、いまのシェルに読ませる。</p>
+<pre><code>$ . ./hello.sh
+こんにちは、lab
+$0 は /bin/bash
+$ type say
+say is a function
+say () 
+{ 
+    echo "こんにちは、$1"
+}</code></pre>
+<p><code>$0</code> がスクリプトの名前ではなく、いまのシェル自身の <code>$0</code>（<code>/bin/bash</code>）になった。スクリプトの中で定義した関数 <code>say</code> も、いまのシェルに残っている。</p>
+<p>先頭行が無いスクリプトを直接実行すると、起動した側のシェルが自分で読む。</p>
+<pre><code>$ printf 'echo "BASH_VERSION=[$BASH_VERSION]"\n' &gt; noshebang.sh; chmod +x noshebang.sh
+$ ./noshebang.sh
+BASH_VERSION=[5.2.21(1)-release]
+$ sh noshebang.sh
+BASH_VERSION=[]</code></pre>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>読むプログラム</th><th>先頭行</th><th>要る権限</th><th><code>$0</code></th><th>どこで動くか</th></tr>
+<tr><td><code>./hello.sh</code></td><td><code>#!</code> の行のプログラム（無ければ起動した側のシェル）</td><td>使われる</td><td>r と x</td><td><code>./hello.sh</code></td><td>子のプロセス</td></tr>
+<tr><td><code>bash hello.sh</code></td><td>bash</td><td>コメント</td><td>r</td><td><code>hello.sh</code></td><td>子のプロセス</td></tr>
+<tr><td><code>sh hello.sh</code></td><td>dash（Ubuntu の <code>/bin/sh</code>）</td><td>コメント</td><td>r</td><td><code>hello.sh</code></td><td>子のプロセス</td></tr>
+<tr><td><code>. ./hello.sh</code> / <code>source ./hello.sh</code></td><td>いまのシェル</td><td>コメント</td><td>r</td><td>シェル自身の <code>$0</code></td><td>いまのシェル</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 先頭行は<b>封筒に書いた「担当: ○○課」</b>に近い。郵便受け（カーネル）に投げ込めば、封筒の指定どおりの課に回る。
+自分で「この書類を△△課に読んでもらって」と手渡せば（<code>bash hello.sh</code>・<code>sh hello.sh</code>）、封筒の指定は見られない。
+<br>ただし<b>崩れる点</b>: 人の課なら指定違いに気づいて回し直してくれるが、dash は自分宛てでない書類も黙って読み始め、読めないところで止まる。しかも止まる前に、読めた部分（「こんにちは、」）は実行してしまう。</div>
+
+<h2 id="perm">chmod: スクリプトには r と x の両方が要る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 権限の書き方と、スクリプトと実行ファイルの違い。</div>
+<pre><code>$ chmod 700 hello.sh; ls -l hello.sh
+-rwx------ 1 lab lab 95 Oct 13 10:45 hello.sh
+$ chmod u=rwx,go=rx hello.sh; ls -l hello.sh
+-rwxr-xr-x 1 lab lab 95 Oct 13 10:45 hello.sh
+$ chmod go-x hello.sh; ls -l hello.sh
+-rwxr--r-- 1 lab lab 95 Oct 13 10:45 hello.sh
+$ chmod 755 hello.sh</code></pre>
+<p><code>chmod</code> は数字でも記号でも書ける。数字は r=4・w=2・x=1 の足し算を、所有者・グループ・その他の順に3桁並べたものである。</p>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>結果</th><th>意味</th></tr>
+<tr><td><code>chmod 755</code> / <code>chmod u=rwx,go=rx</code></td><td><code>rwxr-xr-x</code></td><td>所有者は全部、他の人は読んで実行できる（全員が使うスクリプトの形）</td></tr>
+<tr><td><code>chmod 700</code></td><td><code>rwx------</code></td><td>所有者だけ</td></tr>
+<tr><td><code>chmod 644</code></td><td><code>rw-r--r--</code></td><td>実行権なし（作ったばかりのファイルの形）</td></tr>
+<tr><td><code>chmod +x</code> / <code>chmod go-x</code></td><td>—</td><td>今の権限に足す・から引く。<code>+x</code> は全員に x を足す</td></tr>
+</table></div>
+<p>次に、全員が使える場所へ置く。カレントディレクトリは PATH に入っていないので、名前だけでは動かない（第2章）。<code>/usr/local/bin</code> は管理者が自分でコマンドを置くための場所で、全員の PATH に最初から入っている。</p>
+<pre><code>$ hello.sh
+bash: hello.sh: command not found
+$ sudo cp hello.sh /usr/local/bin/hello
+$ ls -l /usr/local/bin/hello
+-rwxr-xr-x 1 root root 95 Oct 13 10:45 /usr/local/bin/hello
+$ hello
+こんにちは、lab
+$0 は /usr/local/bin/hello
+$ sudo -u alice hello
+こんにちは、alice
+$0 は /usr/local/bin/hello</code></pre>
+<p>alice も名前だけで使えた。ここで、その他（alice）から r を外して x だけにしてみる。比べるために、機械語の実行ファイル（<code>id</code> のコピー）も同じ 711 にする。</p>
+<pre><code>$ sudo chmod 711 /usr/local/bin/hello; ls -l /usr/local/bin/hello
+-rwx--x--x 1 root root 95 Oct 13 10:45 /usr/local/bin/hello
+$ sudo -u alice hello; echo "終了ステータス $?"
+/bin/bash: /usr/local/bin/hello: Permission denied
+終了ステータス 126
+$ sudo cp /usr/bin/id /usr/local/bin/myid; sudo chmod 711 /usr/local/bin/myid; ls -l /usr/local/bin/myid
+-rwx--x--x 1 root root 39432 Oct 13 10:45 /usr/local/bin/myid
+$ sudo -u alice myid -un
+alice</code></pre>
+<p>機械語の <code>myid</code> は x だけで動き、スクリプトの <code>hello</code> は <code>/bin/bash: … Permission denied</code> になった。エラーを出したのが <code>/bin/bash</code> であることに注目する。カーネルは x を見て <code>/bin/bash</code> を起動するところまではやった。そこから先、<b>alice の権限で動く bash が、スクリプトを読めなかった</b>。スクリプトは読まれてはじめて動くので、使う人に r が要る。</p>
+<div class="analogy"><b>たとえ</b>: 機械語の実行ファイルは<b>オルゴール</b>、スクリプトは<b>楽譜</b>に近い。オルゴールはゼンマイを巻く権利（x）さえあれば鳴る。楽譜は演奏者（bash）が読めなければ1音も出ない。
+<br>ただし<b>崩れる点</b>: 楽譜なら誰か別の人に読んでもらえばよいが、演奏者はスクリプトを実行した本人の権限で動く。alice が読めないものは、alice の演奏者にも読めない。</div>
+
+<h2 id="owner">chown: 置いたファイルを、誰のものにするか</h2>
+<div class="sgoal"><b>この節で分かること</b>: 所有者を変えるコマンドと、全員が使うものを root の持ち物にする理由。</div>
+<pre><code>$ sudo chmod 755 /usr/local/bin/hello
+$ chown lab /usr/local/bin/hello
+chown: changing ownership of '/usr/local/bin/hello': Operation not permitted
+$ sudo chown alice:alice /usr/local/bin/hello; ls -l /usr/local/bin/hello
+-rwxr-xr-x 1 alice alice 95 Oct 13 10:45 /usr/local/bin/hello
+$ sudo chown root:root /usr/local/bin/hello; ls -l /usr/local/bin/hello
+-rwxr-xr-x 1 root root 95 Oct 13 10:45 /usr/local/bin/hello</code></pre>
+<p>所有者を変えられるのは root だけで、lab が自分に変えようとすると <code>Operation not permitted</code> になった。<code>chown 所有者:グループ ファイル</code> の形で、両方を一度に変えられる。</p>
+<p>全員が使うスクリプトの<b>所有者</b>を root にするのは、書き換えられる人を減らすためである。alice の持ち物のままだと、alice はいつでも中身を書き換えられ、次に lab が <code>hello</code> と打ったときには alice が書いたものが <b>lab の権限で</b>動く。<code>rwxr-xr-x root root</code> なら、書き換えられるのは root だけになる。</p>
+
+<h2 id="path">使う人の PATH に、左右されない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じスクリプトが、実行した人によって違う動きをする理由と、その止め方。</div>
+<p>今日の日付を出すだけのスクリプトを全員用に置く。一方で alice は、自分用の <code>date</code> を <code>~/bin</code> に作っていた（ここでは、いつも同じ日付を出す偽物にしておく）。</p>
+<pre><code>$ cat &gt; report.sh &lt;&lt;'END'
+&gt; #!/bin/bash
+&gt; echo "作成日: $(date +%F)"
+&gt; END
+$ sudo cp report.sh /usr/local/bin/report; sudo chmod 755 /usr/local/bin/report
+$ sudo -u alice mkdir /home/alice/bin
+$ printf '#!/bin/sh\necho "1999-12-31"\n' | sudo -u alice tee /home/alice/bin/date
+#!/bin/sh
+echo "1999-12-31"
+$ sudo chmod 755 /home/alice/bin/date
+$ report
+作成日: 2026-10-13
+$ sudo -u alice report
+作成日: 2026-10-13
+$ sudo -iu alice report
+作成日: 1999-12-31
+$ sudo -iu alice bash -c 'echo $PATH'
+/home/alice/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin</code></pre>
+<p>同じ <code>/usr/local/bin/report</code> なのに、alice がログインして使うと別の日付が出た。スクリプトは<b>起動した人の環境変数のコピー</b>を受け取って動き、PATH もその1つである。alice のログインシェルでは、Ubuntu の <code>~/.profile</code> が <code>~/bin</code> を PATH の先頭に足すので（第2章）、スクリプトの中の <code>date</code> は alice の <code>~/bin/date</code> になる。ログインしない <code>sudo -u alice</code> では <code>~/.profile</code> が読まれず、本物が動いた。</p>
+<p>同じ alice でも、入り方で PATH そのものが違う。</p>
+<pre><code>$ su - alice
+Password: 
+（略）   ← 入口の案内
+alice@linuc:~$ echo $PATH
+/home/alice/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+alice@linuc:~$ type date
+date is /home/alice/bin/date
+alice@linuc:~$ report
+作成日: 1999-12-31
+alice@linuc:~$ exit
+logout</code></pre>
+<p><code>su -</code> の PATH には <code>/usr/games</code> などが入っていて、<code>sudo -i</code> のときと並びが違う（入り方ごとに別の仕組みが PATH を作っている）。スクリプトの書き手は、使う人がどの入り方をしたかを選べない。だから<b>スクリプトの先頭で PATH を決めてしまう</b>。</p>
+<pre><code>$ sed -i '1a PATH=/usr/bin:/bin' report.sh; head -2 report.sh
+#!/bin/bash
+PATH=/usr/bin:/bin
+$ sudo cp report.sh /usr/local/bin/report
+$ sudo -iu alice report
+作成日: 2026-10-13</code></pre>
+<p>先頭で <code>PATH=/usr/bin:/bin</code> と代入すると、このスクリプトの中のコマンドは、使う人の PATH ではなくこの並びで探される。代入はスクリプト（子のプロセス）の中だけで効き、使う人の PATH は変わらない。<code>/usr/bin/date</code> のように1つずつ絶対パスで書いても同じ効果になる。</p>
+<div class="analogy"><b>たとえ</b>: 出張先で「<b>近くの文房具屋</b>で買ってきて」と頼むのに近い。どの店に行くかは、頼まれた人がいる場所（PATH）で決まる。同じ指示でも、行く人によって違う店の違う品が届く。
+<br>ただし<b>崩れる点</b>: 人なら店の違いに気づいて確かめるが、スクリプトは見つかった最初の <code>date</code> を黙って使う。<b>店の住所（PATH）を指示書の側に書いておく</b>しかない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-shell/">演習03</a>は、<code>#!/bin/sh</code> のまま <code>function</code> を使っているスクリプトを直して <code>/usr/local/bin</code> に置き、alice が名前だけで使えるようにする課題である。
+判定は所有者と権限を読み、alice として2回実行する。2回目は <code>date</code> と <code>id</code> の偽物を PATH の先頭に置いた状態で動かす。</div>
+<div class="quiz"><b>確認</b>
+<p>権限が <code>rw-r--r--</code> のスクリプト <code>x.sh</code> がある。<code>chmod</code> を使わずに実行できる方法をすべて選べ。<br>
+(A) <code>./x.sh</code>　(B) <code>bash x.sh</code>　(C) <code>source x.sh</code>　(D) <code>. x.sh</code></p>
+<details><summary>答え</summary>
+<p>(B)・(C)・(D)。どれも、実行されるのは bash（またはいまのシェル）で、<code>x.sh</code> は読まれるだけなので r があれば足りる。
+(A) はファイルそのものを実行するので x が要る（記録では <code>Permission denied</code>・終了ステータス 126）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>スクリプトの1行目 <code>#!/bin/bash</code> が使われるのは、次のうちどの起動のしかたか。<br>
+(A) <code>./x.sh</code>　(B) <code>bash x.sh</code>　(C) <code>sh x.sh</code>　(D) <code>. x.sh</code></p>
+<details><summary>答え</summary>
+<p>(A) だけ。直接実行されたときに、カーネルが <code>#!</code> を見て <code>/bin/bash</code> を起動する。
+(B)(C)(D) では、読むプログラムが先に決まっているので、1行目は <code>#</code> で始まるコメントとして読み飛ばされる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>全員が使うスクリプトを <code>/usr/local/bin/tool</code> に置いた。所有者を root、グループを root にし、所有者だけが書き換えられ、全員が実行できる状態にするコマンドを2つ書け。</p>
+<details><summary>答え</summary>
+<p><code>chown root:root /usr/local/bin/tool</code> と <code>chmod 755 /usr/local/bin/tool</code>（どちらも root で実行する。一般ユーザの <code>chown</code> は <code>Operation not permitted</code>）。
+<code>chmod 711</code> にするとスクリプトは他のユーザから読めなくなり、<code>Permission denied</code> で動かない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>スクリプトの2行目に <code>PATH=/usr/bin:/bin</code> と書く理由を説明せよ。</p>
+<details><summary>答え</summary>
+<p>スクリプトは実行した人の環境変数のコピーを受け取るので、中のコマンドは実行した人の PATH で探される。
+使う人が PATH の先頭に同じ名前の別物を置いていれば、そちらが動く。先頭で PATH を決めれば、誰がどの入り方で実行しても同じコマンドが使われる。
+代入はスクリプトの中だけで効き、実行した人の PATH は変わらない。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>./x.sh</code> はカーネルが <code>#!</code> の行のプログラムを起動する。<code>bash x.sh</code>・<code>sh x.sh</code> は読むプログラムを自分で決めるので、先頭行はただのコメント</li><li>Ubuntu の <code>/bin/sh</code> は dash。<code>function</code> などの bash の書き方は <code>#!/bin/sh</code> では動かない</li><li><code>./x.sh</code> には r と x、<code>bash x.sh</code> と <code>. x.sh</code> には r だけが要る。他人に使わせるスクリプトには、その人に r と x の両方が要る</li><li>全員用のスクリプトは <code>/usr/local/bin</code> に置き、<code>chown root:root</code>・<code>chmod 755</code></li><li>スクリプトは実行した人の PATH のコピーで動く。先頭で <code>PATH=/usr/bin:/bin</code> と決めると、使う人に左右されない</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-shell/theory/03-lists">← 3. &amp;&amp; と || は、直前の数だけを見ている</a><a href="/linuc-shell/theory/05-args">次: 5. 引数は、渡す側のシェルが切ってから渡す →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-shell/chapters.js"></script>
+<script src="/linuc-shell/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

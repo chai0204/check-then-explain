@@ -1,0 +1,544 @@
+
+
+########## 0. ログインしたときの表示（bash -l） ##########
+
+$ bash -lic true
+bash: cannot set terminal process group (7): Inappropriate ioctl for device
+bash: no job control in this shell
+
+── lab-linuc-packages-rpm 1.0.0 ────────────────────────────────────────
+lab-linuc-packages-rpm  進捗 0/3
+  次 → 04 「labcalc を、署名の確認を切らずに入れる」 (目安 15分 / 影響度 B)
+  lab start 04 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-packages-rpm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+########## A. 何もしていない状態で lab check（全部 ✗ になるはず） ##########
+
+$ lab check; echo "exit=$?"
+✗ 04 未達
+  判定 : 観測型（labcalc を動かし、rpm の台帳と dnf の記録と鍵の台帳を見た）
+  観測 : labcalc = コマンドとして見つからない
+         lab tools の鍵 = rpm の台帳に無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+✗ 05 未達
+  判定 : 観測型（rpm -V labmotd の結果と、labmotd を動かした結果を見た）
+  観測 : rpm -V labmotd の終了コード = 1
+         │ .M.......    /usr/bin/labmotd
+         │ S.5....T.    /usr/share/labmotd/motd.txt
+         labmotd = 実行できない（/usr/bin/labmotd の権限 644）
+         → 台帳と違うファイルが残っている
+         → labmotd が動かない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+✗ 06 未達
+  判定 : 観測型（~/work/06 の .rpm の中身、rpm の台帳、dnf が記録した経路を見た）
+  観測 : ~/work/06 の .rpm = 無い
+         labtool = rpm の台帳に無い
+         labtool-data = rpm の台帳に無い
+         labtool = コマンドとして見つからない
+         → labtool が rpm の台帳に無い
+         → ~/work/06 に labtool の .rpm が無い
+         → labtool-data が rpm の台帳に無い
+         → ~/work/06 に labtool-data の .rpm が無い
+         → labtool が動かない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+exit=1
+
+$ lab ls
+演習一覧
+  · 04  labcalc を、署名の確認を切らずに入れる 15分 / 影響度 B
+  · 05  書き換えられた labmotd を、入れた直後に戻す 10分 / 影響度 B
+  · 06  labtool を yumdownloader で取り、rpm で入れる 12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+
+########## B. 演習04 — labcalc を、署名の確認を切らずに入れる ##########
+
+$ lab start 04
+
+演習 04 — labcalc を、署名の確認を切らずに入れる                    影響度 B / 目安 15分
+
+  この演習はシステム全体を触ります（/etc/yum.repos.d と rpm の台帳）。作業ディレクトリは使いません。
+
+【状況】
+
+  /srv/lab-tools-rpm に、yum のリポジトリが1つ置いてあります。
+  まだ /etc/yum.repos.d/ には登録されていません。
+
+    ls /srv/lab-tools-rpm
+
+  この中のどれかのパッケージに、labcalc というコマンドが入っています。
+  パッケージの名前は教えません。
+
+  パッケージには「lab tools」という鍵で署名がしてあり、
+  その公開鍵もリポジトリの中に置いてあります（RPM-GPG-KEY-lab-tools）。
+
+【やること】
+
+  labcalc コマンドを使えるようにしてください。
+
+      labcalc 2 3     →   5 と出れば使えている
+
+  条件が1つあります。**署名の確認（gpgcheck=1）は切らないでください。**
+  判定では次の3つを確かめます。
+
+      labcalc が動き、rpm の台帳にあるパッケージから入っている
+      そのパッケージが、/srv/lab-tools-rpm を指すリポジトリから yum で入っている
+      lab tools の公開鍵が rpm の台帳に入っている（= 署名を確かめてから入れた）
+
+【できたら】
+
+    lab check 04
+
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+
+
+$ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' 'gpgcheck=1' | sudo tee /etc/yum.repos.d/lab-tools.repo
+[lab-tools]
+name=lab tools
+baseurl=file:///srv/lab-tools-rpm
+gpgcheck=1
+
+$ yum repolist
+repo id                         repo name
+appstream                       AlmaLinux 9 - AppStream
+baseos                          AlmaLinux 9 - BaseOS
+extras                          AlmaLinux 9 - Extras
+lab                             lab packages (LinuC 1.04)
+lab-tools                       lab tools
+
+$ yum provides '*/labcalc'
+lab tools                                       107 kB/s | 941  B     00:00    
+lab-mathtools-1.0-1.noarch : small number utilities for the lab
+Repo        : lab-tools
+Matched from:
+Filename    : /usr/bin/labcalc
+
+
+$ echo "--- gpgkey を書かずに入れようとする ---"; sudo yum install -y lab-mathtools; echo "exit=$?"
+--- gpgkey を書かずに入れようとする ---
+Last metadata expiration check: 0:00:01 ago on Tue Oct 13 10:47:29 2026.
+Dependencies resolved.
+================================================================================
+ Package                Architecture    Version        Repository          Size
+================================================================================
+Installing:
+ lab-mathtools          noarch          1.0-1          lab-tools          6.8 k
+
+Transaction Summary
+================================================================================
+Install  1 Package
+
+Total size: 6.8 k
+Installed size: 217  
+Downloading Packages:
+Public key for lab-mathtools-1.0-1.noarch.rpm is not installed
+Error: GPG check FAILED
+exit=1
+
+$ lab check 04; echo "exit=$?"
+✗ 04 未達
+  判定 : 観測型（labcalc を動かし、rpm の台帳と dnf の記録と鍵の台帳を見た）
+  観測 : labcalc = コマンドとして見つからない
+         lab tools の鍵 = rpm の台帳に無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+exit=1
+
+$ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' 'gpgcheck=1' 'gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools' | sudo tee /etc/yum.repos.d/lab-tools.repo
+[lab-tools]
+name=lab tools
+baseurl=file:///srv/lab-tools-rpm
+gpgcheck=1
+gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+
+$ sudo yum install -y lab-mathtools
+lab tools                                       2.9 MB/s | 3.0 kB     00:00    
+Dependencies resolved.
+================================================================================
+ Package                Architecture    Version        Repository          Size
+================================================================================
+Installing:
+ lab-mathtools          noarch          1.0-1          lab-tools          6.8 k
+
+Transaction Summary
+================================================================================
+Install  1 Package
+
+Total size: 6.8 k
+Installed size: 217  
+Downloading Packages:
+lab tools                                       1.2 MB/s | 1.3 kB     00:00    
+Importing GPG key 0x484BD981:
+ Userid     : "lab tools <tools@example.invalid>"
+ Fingerprint: 228B 3CD1 95FA 44FE E0C4 CBBC 4BF9 44D6 484B D981
+ From       : /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+Key imported successfully
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : lab-mathtools-1.0-1.noarch                             1/1 
+  Verifying        : lab-mathtools-1.0-1.noarch                             1/1 
+
+Installed:
+  lab-mathtools-1.0-1.noarch                                                    
+
+Complete!
+
+$ labcalc 2 3
+5
+
+$ yum list installed lab-mathtools
+Installed Packages
+lab-mathtools.noarch                      1.0-1                       @lab-tools
+
+$ lab check 04; echo "exit=$?"
+✔ 04 達成
+  判定 : 観測型（labcalc を動かし、rpm の台帳と dnf の記録と鍵の台帳を見た）
+  観測 : labcalc = /usr/bin/labcalc
+         labcalc 2 3 の出力 = 5
+         rpm の台帳 = lab-mathtools-1.0-1.noarch
+         入った経路 = @lab-tools（file:///srv/lab-tools-rpm）
+         lab tools の鍵 = gpg-pubkey-484bd981-6acd849f lab tools <tools@example.invalid> public key
+         labcalc は lab-mathtools のもので、@lab-tools から署名を確かめて入っている
+exit=0
+
+
+########## C. 演習05 — 書き換えられた labmotd を、入れた直後の状態に戻す ##########
+
+$ lab start 05
+
+演習 05 — 書き換えられた labmotd を、入れた直後の状態に戻す           影響度 B / 目安 10分
+
+  この演習はシステム全体を触ります（rpm の台帳と /usr）。作業ディレクトリは使いません。
+
+【いまの状態を見てください】
+
+    labmotd
+
+  Permission denied で動きません。このパッケージは、入れたあとで
+  誰かに2か所いじられています。
+
+【やること】
+
+  1. どのファイルが、パッケージから入れたときとどう違うのかを、
+     rpm の台帳と照らし合わせて突き止める
+  2. labmotd を、パッケージから入れた直後の状態に戻す
+
+  判定では、rpm の台帳との照らし合わせ（rpm -V labmotd）が
+  何も出さずに終わること（終了コード 0）と、labmotd が実際に動いて
+  パッケージに入っていた1行を出すことを確かめます。
+
+【できたら】
+
+    lab check 05
+
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+
+
+$ labmotd; echo "exit=$?"
+/tmp/probe.sh: line 11: /usr/bin/labmotd: Permission denied
+exit=126
+
+$ rpm -qf /usr/bin/labmotd
+labmotd-1.0-1.noarch
+
+$ rpm -V labmotd; echo "exit=$?"
+.M.......    /usr/bin/labmotd
+S.5....T.    /usr/share/labmotd/motd.txt
+exit=1
+
+$ sudo rpm --setperms labmotd
+
+$ echo "--- 権限だけ戻した（中身は違うまま） ---"; lab check 05; echo "exit=$?"
+--- 権限だけ戻した（中身は違うまま） ---
+✗ 05 未達
+  判定 : 観測型（rpm -V labmotd の結果と、labmotd を動かした結果を見た）
+  観測 : rpm -V labmotd の終了コード = 1
+         │ S.5....T.    /usr/share/labmotd/motd.txt
+         labmotd = 今日のひとこと: このファイルは、パッケージから入れたあとで書き換えられた。（終了コード 0）
+         → 台帳と違うファイルが残っている
+         → 出力がパッケージに入っていた1行と違う
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+exit=1
+
+$ sudo yum reinstall -y labmotd
+Last metadata expiration check: 0:00:01 ago on Tue Oct 13 10:47:30 2026.
+Dependencies resolved.
+================================================================================
+ Package             Architecture       Version           Repository       Size
+================================================================================
+Reinstalling:
+ labmotd             noarch             1.0-1             lab             6.9 k
+
+Transaction Summary
+================================================================================
+
+Total size: 6.9 k
+Installed size: 145  
+Downloading Packages:
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Reinstalling     : labmotd-1.0-1.noarch                                   1/2 
+  Cleanup          : labmotd-1.0-1.noarch                                   2/2 
+  Verifying        : labmotd-1.0-1.noarch                                   1/2 
+  Verifying        : labmotd-1.0-1.noarch                                   2/2 
+
+Reinstalled:
+  labmotd-1.0-1.noarch                                                          
+
+Complete!
+
+$ rpm -V labmotd; echo "exit=$?"
+exit=0
+
+$ labmotd
+今日のひとこと: 台帳と照らし合わせれば、変わったファイルが分かる。
+
+$ lab check 05; echo "exit=$?"
+✔ 05 達成
+  判定 : 観測型（rpm -V labmotd の結果と、labmotd を動かした結果を見た）
+  観測 : rpm -V labmotd の終了コード = 0
+         （台帳と違うファイルは無い）
+         labmotd = 今日のひとこと: 台帳と照らし合わせれば、変わったファイルが分かる。（終了コード 0）
+         labmotd のファイルはすべて台帳どおりで、パッケージの1行を出した
+exit=0
+
+
+########## D. 演習06 — labtool を yumdownloader で取ってきて、rpm で入れる ##########
+
+$ lab start 06
+
+演習 06 — labtool を yumdownloader で取ってきて、rpm で入れる          影響度 B / 目安 12分
+
+  作業ディレクトリは ~/work/06 です。
+
+【状況】
+
+  インターネットにつながらないサーバに入れる、という想定です。
+  つながっている側で .rpm ファイルを取ってきて、運び込んでから rpm で入れます。
+  （ここでは同じ檻の中で、取る作業と入れる作業の両方をします）
+
+【やること】
+
+  1. labtool の .rpm を ~/work/06 に取ってくる（yum install は使わない）
+  2. それを rpm コマンドで入れて、labtool コマンドが動く状態にする
+
+  判定では次の3つを確かめます。
+
+      ~/work/06 に labtool と、labtool が必要とするパッケージの .rpm がある
+      （ファイルの中身を rpm -qp で確かめます）
+      labtool と、labtool が必要とするパッケージが、rpm の台帳にある
+      どちらも yum のリポジトリからではなく、rpm で入っている（@System）
+
+【できたら】
+
+    lab check 06
+
+▶ 次はこれを打ってください
+    cd ~/work/06
+
+
+$ cd ~/work/06 && yumdownloader labtool && ls -l
+Last metadata expiration check: 0:00:02 ago on Tue Oct 13 10:47:30 2026.
+total 8
+-rw-r--r-- 1 lab lab 6859 Oct 13 10:47 labtool-1.0-1.noarch.rpm
+
+$ cd ~/work/06 && sudo rpm -ivh labtool-1.0-1.noarch.rpm; echo "exit=$?"
+error: Failed dependencies:
+	labtool-data >= 1.0 is needed by labtool-1.0-1.noarch
+exit=1
+
+$ echo "--- labtool だけ取って rpm -ivh した（依存で止まった） ---"; lab check 06; echo "exit=$?"
+--- labtool だけ取って rpm -ivh した（依存で止まった） ---
+✗ 06 未達
+  判定 : 観測型（~/work/06 の .rpm の中身、rpm の台帳、dnf が記録した経路を見た）
+  観測 : ~/work/06 の .rpm = labtool
+         labtool = rpm の台帳に無い
+         labtool-data = rpm の台帳に無い
+         labtool = コマンドとして見つからない
+         → labtool が rpm の台帳に無い
+         → labtool-data が rpm の台帳に無い
+         → ~/work/06 に labtool-data の .rpm が無い
+         → labtool が動かない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+exit=1
+
+$ cd ~/work/06 && yumdownloader --resolve labtool && ls -l
+Last metadata expiration check: 0:00:02 ago on Tue Oct 13 10:47:30 2026.
+total 16
+-rw-r--r-- 1 lab lab 6859 Oct 13 10:47 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6729 Oct 13 10:47 labtool-data-1.0-1.noarch.rpm
+
+$ cd ~/work/06 && sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
+Verifying...                          ########################################
+Preparing...                          ########################################
+Updating / installing...
+labtool-data-1.0-1                    ########################################
+labtool-1.0-1                         ########################################
+
+$ labtool
+labtool: labtool-data から読んだ1行です
+
+$ yum list installed labtool labtool-data
+Installed Packages
+labtool.noarch                             1.0-1                         @System
+labtool-data.noarch                        1.0-1                         @System
+
+$ lab check 06; echo "exit=$?"
+✔ 06 達成
+  判定 : 観測型（~/work/06 の .rpm の中身、rpm の台帳、dnf が記録した経路を見た）
+  観測 : ~/work/06 の .rpm = labtool labtool-data
+         labtool = labtool-1.0-1.noarch（経路 @System）
+         labtool-data = labtool-data-1.0-1.noarch（経路 @System）
+         labtool = labtool: labtool-data から読んだ1行です（終了コード 0）
+         取ってきた2つの .rpm から rpm で入り（@System）、labtool が動いた
+
+  ════════════════════════════════════════
+   確かめて説明する LinuC 主題1.04（RPM 系） — 全3演習クリア
+  ════════════════════════════════════════
+
+  自分の手で確かめたこと
+
+   ✔ 04  .repo を置けば yum は目録を自分で取りに行き、署名の鍵は gpgkey= から台帳に取り込まれること
+   ✔ 05  rpm -V は台帳と違うファイルだけを出し、何も出ないのが「台帳どおり」であること
+   ✔ 06  yumdownloader --resolve で依存ごと取り、rpm -ivh に全部並べれば rpm だけで入ること
+
+  この3つは全部、1つの事実から出ていました。
+
+      パッケージのコマンドは、どれも帳簿を読んでいるだけである。
+      手元に入ったものの「台帳」（dpkg・rpm）か、リポジトリにあるものの「目録」（apt・yum）か。
+      答えが食い違ったら、どちらの帳簿を読んだかを先に疑う。
+
+  理論編の最終章に、それぞれがどう繋がるかを書いてあります → /linuc-packages/theory/07-rpm-install
+
+exit=0
+
+
+########## E. 全問通した状態で lab check と lab ls ##########
+
+$ lab check; echo "exit=$?"
+✔ 04 達成
+  判定 : 観測型（labcalc を動かし、rpm の台帳と dnf の記録と鍵の台帳を見た）
+  観測 : labcalc = /usr/bin/labcalc
+         labcalc 2 3 の出力 = 5
+         rpm の台帳 = lab-mathtools-1.0-1.noarch
+         入った経路 = @lab-tools（file:///srv/lab-tools-rpm）
+         lab tools の鍵 = gpg-pubkey-484bd981-6acd849f lab tools <tools@example.invalid> public key
+         labcalc は lab-mathtools のもので、@lab-tools から署名を確かめて入っている
+✔ 05 達成
+  判定 : 観測型（rpm -V labmotd の結果と、labmotd を動かした結果を見た）
+  観測 : rpm -V labmotd の終了コード = 0
+         （台帳と違うファイルは無い）
+         labmotd = 今日のひとこと: 台帳と照らし合わせれば、変わったファイルが分かる。（終了コード 0）
+         labmotd のファイルはすべて台帳どおりで、パッケージの1行を出した
+✔ 06 達成
+  判定 : 観測型（~/work/06 の .rpm の中身、rpm の台帳、dnf が記録した経路を見た）
+  観測 : ~/work/06 の .rpm = labtool labtool-data
+         labtool = labtool-1.0-1.noarch（経路 @System）
+         labtool-data = labtool-data-1.0-1.noarch（経路 @System）
+         labtool = labtool: labtool-data から読んだ1行です（終了コード 0）
+         取ってきた2つの .rpm から rpm で入り（@System）、labtool が動いた
+exit=0
+
+$ lab ls
+演習一覧
+  ✔ 04  labcalc を、署名の確認を切らずに入れる 15分 / 影響度 B
+  ✔ 05  書き換えられた labmotd を、入れた直後に戻す 10分 / 影響度 B
+  ✔ 06  labtool を yumdownloader で取り、rpm で入れる 12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+
+########## F. lab の残りの機能（hint / solve / reset） ##########
+
+$ cd
+
+$ lab hint 05
+
+ヒント 1 段目
+
+まず、そのコマンドがどのパッケージから来たのかを台帳に聞きます。
+
+    command -v labmotd
+    rpm -qf /usr/bin/labmotd
+
+台帳には、入れたときのファイルの大きさ・権限・中身の要約（ダイジェスト）・時刻が
+記録されています。いまのファイルと照らし合わせるオプションがあります（rpm -V）。
+
+まだ足りなければ lab hint 05（次の段）
+
+$ lab hint 05
+
+ヒント 2 段目
+
+rpm -V の出力は、違いのあるファイルだけが1行ずつ出ます。左の9文字の欄が「何が違うか」です。
+
+    S  大きさ（Size）           M  権限と種類（Mode）
+    5  中身の要約（digest）     T  更新時刻（mTime）
+    U  所有者（User）           G  グループ（Group）
+    .  一致した                 ?  調べられなかった（読めない等）
+
+2つの行が出たら、片方は権限、片方は中身の違いのはずです。
+直すには、パッケージをもう一度入れ直します。同じ版を入れ直すサブコマンドがあります。
+
+まだ足りなければ lab hint 05（次の段）
+
+$ lab solve 04 | head -6
+
+模範解答 04
+
+リポジトリの登録 → ファイル名から探す → 署名を確かめて入れる、の3段です。
+
+    printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' \
+
+$ lab reset 06
+演習 06 を初期状態に戻しました（~/work/06）
+
+$ lab ls
+演習一覧
+  ✔ 04  labcalc を、署名の確認を切らずに入れる 15分 / 影響度 B
+  ✔ 05  書き換えられた labmotd を、入れた直後に戻す 10分 / 影響度 B
+  · 06  labtool を yumdownloader で取り、rpm で入れる 12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+$ lab check 06; echo "exit=$?"
+✗ 06 未達
+  判定 : 観測型（~/work/06 の .rpm の中身、rpm の台帳、dnf が記録した経路を見た）
+  観測 : ~/work/06 の .rpm = 無い
+         labtool = labtool-1.0-1.noarch（経路 @System）
+         labtool-data = labtool-data-1.0-1.noarch（経路 @System）
+         labtool = labtool: labtool-data から読んだ1行です（終了コード 0）
+         → ~/work/06 に labtool の .rpm が無い
+         → ~/work/06 に labtool-data の .rpm が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+exit=1
+
+
+########## G. 最終環境 ##########
+
+$ lab env
+テーマ    : lab-linuc-packages-rpm 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.0
+ベース    : AlmaLinux 9.7 (Moss Jungle Cat)
+apt 固定  : なし（RPM 系。下の dnf 固定の行を見る）
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+dnf 固定  : https://vault.almalinux.org/9.7/（baseos / appstream / extras）
+rpm       : 4.16.1.3-39.el9
+dnf       : 4.14.0-31.el9.alma.1
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb

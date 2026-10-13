@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. 目録は、取りに行くまで古いまま — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-packages/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>3. 目録は、取りに行くまで古いまま</h1>
+<p class="lead">リポジトリを1行書き足して <code>apt install</code> と打つと、<code>Unable to locate package</code>（見つからない）と言われる。パッケージのファイルはすぐそこにあるのに。apt が見ているのは書いた1行ではなく、<b>手元に取ってきた目録の写し</b>だからだ。</p>
+<div class="badges"><span>前提: 第2章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>/etc/apt/sources.list</code> の1行（種類・URI・ディストリビューション・コンポーネント）を読み書きできる</li><li><code>apt update</code> が何をどこへ取ってくるかを、<code>/var/lib/apt/lists/</code> で示せる</li><li>入っていないパッケージも含めて「このファイルはどのパッケージにあるか」を <code>apt-file</code> で調べられ、<code>dpkg -S</code> との違いを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: リポジトリに署名する手順（<code>gpg</code> で Release に署名する作業）、鍵の配り方（<code>/etc/apt/keyrings/</code> の運用）、ミラーの選び方、<code>deb-src</code> を使ったソースパッケージの取得。<code>Signed-By:</code> と <code>[trusted=yes]</code> は「署名を確かめる鍵を指定する／確かめない」とだけ分かれば足りる。</div></div>
+
+<h2 id="table">どこから取るかの表</h2>
+<div class="sgoal"><b>この節で分かること</b>: apt が「どこへ取りに行くか」を書いた2つの形式。</div>
+<pre><code>$ cat /etc/apt/sources.list
+# Ubuntu sources have moved to the /etc/apt/sources.list.d/ubuntu.sources
+# file, which uses the deb822 format. Use deb822-formatted .sources files
+# to manage package sources in the /etc/apt/sources.list.d/ directory.
+# See the sources.list(5) manual page for details.
+
+# 檻の中の練習用リポジトリ（確かめて説明する LinuC 主題1.04）。
+# 署名していないので [trusted=yes] で署名の確認を外している。本物のリポジトリでは外さない。
+deb [trusted=yes] file:/srv/lab-repo lab main</code></pre>
+<p>試験が問うのはこの最後の1行の形式である。空白で区切って4つ（<code>[ ]</code> は任意）。</p>
+<pre><code>deb  [trusted=yes]  file:/srv/lab-repo  lab                    main
+^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^  ^^^                    ^^^^
+種類  オプション      URI（どこ）          ディストリビューション   コンポーネント（複数並べられる）
+
+種類: deb = バイナリパッケージ / deb-src = ソースパッケージ</code></pre>
+<p>Ubuntu 本体の分は、コメントにあるとおり別のファイルに移っている。</p>
+<pre><code>$ ls -l /etc/apt/sources.list.d/
+total 4
+-rw-r--r-- 1 root root 196 Sep 30 19:04 ubuntu.sources
+$ cat /etc/apt/sources.list.d/ubuntu.sources
+Types: deb
+URIs: https://snapshot.ubuntu.com/ubuntu/20260929T000000Z
+Suites: noble noble-updates noble-security
+Components: main universe
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg</code></pre>
+<p>これは <b>deb822 形式</b>という書き方で、Ubuntu 24.04 からの既定である。中身は同じ4つで、欄の名前が付いている。</p>
+<div class="scroll"><table>
+<tr><th>1行形式（<code>sources.list</code>・<code>*.list</code>）</th><th>deb822 形式（<code>*.sources</code>）</th></tr>
+<tr><td><code>deb</code></td><td><code>Types: deb</code></td></tr>
+<tr><td>URI</td><td><code>URIs:</code></td></tr>
+<tr><td>ディストリビューション（1つ）</td><td><code>Suites:</code>（複数並べられる）</td></tr>
+<tr><td>コンポーネント</td><td><code>Components:</code></td></tr>
+<tr><td><code>[signed-by=鍵のファイル]</code></td><td><code>Signed-By:</code></td></tr>
+<tr><td><code>[trusted=yes]</code></td><td><code>Trusted: yes</code></td></tr>
+</table></div>
+<p>上の ubuntu.sources を1行形式で書くと、<code>Suites:</code> の数だけ3行になる（<code>deb [signed-by=…] https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble main universe</code> と、<code>noble-updates</code>・<code>noble-security</code> の行）。<code>/etc/apt/sources.list.d/</code> には、名前が <code>.list</code>（1行形式）か <code>.sources</code>（deb822 形式）で終わるファイルを何個でも置ける。どちらも <code>/etc/apt/sources.list</code> と同じ扱いで読まれる。</p>
+<p>4つの欄は、リポジトリのディレクトリにそのまま対応している。</p>
+<pre><code>$ find /srv/lab-repo/dists -type f | sort
+/srv/lab-repo/dists/lab/Release
+/srv/lab-repo/dists/lab/main/Contents-amd64
+/srv/lab-repo/dists/lab/main/Contents-amd64.gz
+/srv/lab-repo/dists/lab/main/binary-amd64/Packages
+/srv/lab-repo/dists/lab/main/binary-amd64/Packages.gz</code></pre>
+<pre><code>file:/srv/lab-repo  /dists/  lab  /  main  /binary-amd64/Packages
+URI                          ディストリ  コンポーネント  CPU（自分のアーキテクチャ）</code></pre>
+<p>apt は1行を読むと、このパスを組み立てて取りに行く。<code>Release</code> は「このディストリビューションにどの目録があり、それぞれの中身の要約（ダイジェスト）がいくつか」を書いた、<b>目録の目録</b>である。</p>
+<pre><code>$ head -9 /srv/lab-repo/dists/lab/Release
+Architectures: amd64
+Codename: lab
+Components: main
+Date: Tue, 13 Oct 2026 00:57:22 +0000
+Description: LinuC 1.04 practice repository (lab)
+Label: lab lab
+Origin: check-then-explain
+Suite: lab
+MD5Sum:</code></pre>
+<div class="analogy"><b>たとえ</b>: 取引先の住所録に近い。住所録には「どこの会社の、どの部署の、どの棚に、カタログがあるか」が書いてある。
+<br>ただし<b>崩れる点</b>: 住所録に書き足しても、カタログは向こうから送られてこない。
+apt は、利用者が「取りに行け」と言うまで、書き足した住所へ一度も行かない。次の節はそれを確かめる。</div>
+
+<h2 id="stale">1行足しても、まだ何も知らない</h2>
+<div class="sgoal"><b>この節で分かること</b>: リポジトリを足したあと、入れられるようになるまでに要ること。</div>
+<p>檻の中にはまだ使っていないリポジトリ <code>/srv/lab-extra</code> がある。labextra というパッケージが1つ入っている。</p>
+<pre><code>$ find /srv/lab-extra -type f | sort
+/srv/lab-extra/dists/extra/Release
+/srv/lab-extra/dists/extra/main/Contents-amd64
+/srv/lab-extra/dists/extra/main/Contents-amd64.gz
+/srv/lab-extra/dists/extra/main/binary-amd64/Packages
+/srv/lab-extra/dists/extra/main/binary-amd64/Packages.gz
+/srv/lab-extra/pool/main/l/labextra/labextra_1.0_all.deb</code></pre>
+<p>ディストリビューションは <code>extra</code>、コンポーネントは <code>main</code> である。1行書く。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>どこにあるかを apt のソースに書いたのだから、もう <code>apt install labextra</code> で入れられるはずだ。
+パッケージのファイルは、すぐそこにある。</p>
+<pre><code>$ echo 'deb file:/srv/lab-extra extra main' | sudo tee /etc/apt/sources.list.d/lab-extra.list
+deb file:/srv/lab-extra extra main
+$ apt-cache policy labextra
+$ sudo apt install -y labextra; echo "exit=$?"
+...
+E: Unable to locate package labextra
+exit=100</code></pre>
+<div class="then"><b>だめな理由</b>: <code>apt-cache policy</code> は1行も返さず、<code>apt install</code> は
+「そんなパッケージは見つからない」で止まった。apt が引くのは <code>sources.list</code> ではなく、
+<code>/var/lib/apt/lists/</code> に置いた<b>目録の写し</b>である。<code>sources.list</code> は
+「どこへ取りに行くか」の表にすぎず、書いただけでは何も取りに行かない。
+写しを作り直すのが <code>apt update</code> で、それまで apt は新しいリポジトリの中身を1つも知らない。</div></div>
+<p>写しの置き場を見ておく。いまある目録の写しはこれだけである。</p>
+<pre><code>$ ls -1 /var/lib/apt/lists/ | grep -v -e lock -e partial -e auxfiles
+_srv_lab-repo_dists_lab_Release
+_srv_lab-repo_dists_lab_main_Contents-amd64.lz4
+_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-security_InRelease
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-security_main_binary-amd64_Packages.lz4
+...
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_universe_binary-amd64_Packages.lz4</code></pre>
+<p>ファイル名は、取りに行った場所のパスの <code>/</code> を <code>_</code> に置き換えたものである。<code>lab-extra</code> の分はまだ無い。</p>
+
+<h2 id="update">取りに行く。ただし、署名の無い目録は受け取らない</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>apt update</code> の出力の読み方と、<code>[trusted=yes]</code> が何をしているか。</div>
+<pre><code>$ sudo apt update; echo "exit=$?"
+...
+Get:1 file:/srv/lab-repo lab InRelease
+Ign:1 file:/srv/lab-repo lab InRelease
+Get:2 file:/srv/lab-extra extra InRelease
+Ign:2 file:/srv/lab-extra extra InRelease
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-extra extra Release [1991 B]
+...
+Get:6 file:/srv/lab-extra extra Release.gpg
+Ign:6 file:/srv/lab-extra extra Release.gpg
+Hit:7 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Hit:8 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Reading package lists...
+E: The repository 'file:/srv/lab-extra extra Release' is not signed.
+exit=100
+$ ls -1 /var/lib/apt/lists/ | grep lab-extra; echo "exit=$?"
+exit=1</code></pre>
+<p>取りには行ったが、受け取らなかった。<code>Release.gpg</code>（Release への署名）が無く、<code>is not signed</code>（署名されていない）として捨てている。写しは1つも増えていない。apt は「誰が作った目録か確かめられないもの」を既定では信用しない。Ubuntu 本体の行にある <code>Signed-By:</code> は、その確かめに使う鍵を指定している。</p>
+<p>この練習用リポジトリには署名をしていないので、確認を外す印 <code>[trusted=yes]</code> を付ける。<b>本物のリポジトリではこれを付けない</b>。偽物の目録を区別する手段を自分で捨てることになるからだ。</p>
+<pre><code>$ echo 'deb [trusted=yes] file:/srv/lab-extra extra main' | sudo tee /etc/apt/sources.list.d/lab-extra.list
+deb [trusted=yes] file:/srv/lab-extra extra main
+$ sudo apt update
+...
+Get:6 file:/srv/lab-extra extra Release.gpg
+Ign:6 file:/srv/lab-extra extra Release.gpg
+Get:7 file:/srv/lab-extra extra/main amd64 Packages [448 B]
+Get:8 file:/srv/lab-extra extra/main amd64 Contents (deb) [44 B]
+Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Hit:10 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Hit:11 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Reading package lists...
+Building dependency tree...
+Reading state information...
+3 packages can be upgraded. Run 'apt list --upgradable' to see them.
+$ ls -1 /var/lib/apt/lists/ | grep lab-extra
+_srv_lab-extra_dists_extra_Release
+_srv_lab-extra_dists_extra_main_Contents-amd64.lz4
+_srv_lab-extra_dists_extra_main_binary-amd64_Packages.lz4
+$ apt-cache policy labextra
+labextra:
+  Installed: (none)
+  Candidate: 1.0
+  Version table:
+     1.0 500
+        500 file:/srv/lab-extra extra/main amd64 Packages
+$ sudo apt install -y labextra
+...
+The following NEW packages will be installed:
+  labextra
+...
+Setting up labextra (1.0) ...
+$ labextra
+labextra 1.0 (/srv/lab-extra から入った)</code></pre>
+<p>今度は <code>Packages</code> と <code>Contents</code> を取ってきて（<code>Get:7</code>・<code>Get:8</code>）、写しが3つ増えた。そこで初めて <code>Candidate: 1.0</code> が出て、入れられた。<code>apt update</code> の行頭の印はこう読む。</p>
+<div class="scroll"><table>
+<tr><th>印</th><th>意味</th></tr>
+<tr><td><code>Hit</code></td><td>前回取ったものから変わっていなかった（取り直さなかった）</td></tr>
+<tr><td><code>Get</code></td><td>取った</td></tr>
+<tr><td><code>Ign</code></td><td>無かったが、無くてもよいものなので無視した（ここでは署名ファイル）</td></tr>
+<tr><td><code>Err</code></td><td>取れなかった（ネットにつながらない等）</td></tr>
+</table></div>
+<p>Ubuntu 本体の3行が <code>Hit</code> なのは、この檻が最初から目録の写しを持っていて、snapshot（2026-09-29 で止めた Ubuntu の写し）がそれから変わっていないからである。<b>ネットにつながっていない環境では、この3行が <code>Err</code> や <code>Ign</code> になり、警告が出る</b>。それでも手元の古い写しが残るので、檻の中の練習用リポジトリは同じように使える。</p>
+<p>リポジトリの1行を書き換えたら、<code>apt update</code> までが1組の作業である。<code>apt edit-sources</code> と打つと <code>sources.list</code> をエディタで開けるが、これも書き換えるだけで、取りには行かない。</p>
+<div class="analogy"><b>たとえ</b>: 差出人の印が押された封書だけを受け取る受付に近い。
+印の無い封書は、中身を読む前に送り返す。<code>Signed-By:</code> は「この印鑑なら本物」という見本の登録で、
+<code>[trusted=yes]</code> は「この差出人からは印が無くても受け取る」という例外の指示である。
+<br>ただし<b>崩れる点</b>: 受付の人は封書の見た目の怪しさにも気づけるが、apt は署名の有無しか見ない。
+例外を指示した差出人から偽物が届いても、そのまま受け取る。</div>
+
+<h2 id="aptfile">ファイル名から探す — apt-file</h2>
+<div class="sgoal"><b>この節で分かること</b>: 入っていないパッケージの中のファイルを、どの目録で引くか。</div>
+<p>「このファイルはどのパッケージにあるか」を答えるコマンドは、第1章で <code>dpkg -S</code> を見た。いまの檻には liblab が入っていない（起動し直した直後なので）。</p>
+<pre><code>$ dpkg -S liblab.sh; echo "exit=$?"
+dpkg-query: no path found matching pattern *liblab.sh*
+exit=1
+$ apt-file search liblab.sh
+liblab: /usr/lib/liblab/liblab.sh
+$ apt-file search bin/labapp
+labapp: /usr/bin/labapp
+$ apt-file list labapp
+labapp: /etc/labapp.conf
+labapp: /usr/bin/labapp
+labapp: /usr/share/doc/labapp/README
+$ apt-file search labextra
+labextra: /usr/bin/labextra</code></pre>
+<p><code>dpkg -S</code> は台帳（入っているパッケージのファイル一覧）しか引けない。<code>apt-file</code> は目録のほうを引く。ただし <code>Packages</code> ではない。<code>Packages</code> にあるのは名前と説明文と依存関係だけで、中のファイルの一覧は無いからだ。<code>apt-file</code> が読むのは <b>Contents</b> という別の目録で、さっきの <code>apt update</code> で <code>Contents (deb)</code> として取ってきたものである。</p>
+<pre><code>$ ls -1 /var/lib/apt/lists/ | grep Contents
+_srv_lab-extra_dists_extra_main_Contents-amd64.lz4
+_srv_lab-repo_dists_lab_main_Contents-amd64.lz4</code></pre>
+<div class="scroll"><table>
+<tr><th>聞きたいこと</th><th>入っているものだけ（台帳）</th><th>入っていなくてよい（目録の Contents）</th></tr>
+<tr><td>このファイルはどのパッケージにあるか</td><td><code>dpkg -S パス</code></td><td><code>apt-file search パス</code></td></tr>
+<tr><td>このパッケージにはどのファイルがあるか</td><td><code>dpkg -L 名前</code></td><td><code>apt-file list 名前</code></td></tr>
+<tr><td>索引を新しくする</td><td>（要らない。入れたときに書かれる）</td><td><code>apt-file update</code>（= Contents だけの <code>apt update</code>）</td></tr>
+</table></div>
+<p>この檻では、apt-file の目録を練習用リポジトリの分だけに絞ってある。だから本物のコマンドを探しても見つからない。</p>
+<pre><code>$ apt-file search bin/dig; echo "exit=$?"
+exit=1
+$ grep -v "^//" /etc/apt/apt.conf.d/60lab-apt-file
+Acquire::IndexTargets::deb::Contents-deb-legacy::DefaultEnabled "false";</code></pre>
+<p>Ubuntu の Contents は1スイートにつき 51〜75MB（gzip 圧縮後）あり、noble・noble-updates・noble-security の3つで約 195MB になる。apt-file を入れたままだと <code>apt update</code> のたびにそれを取りに行くので、この檻では止めた（設定ファイルのコメントに理由を書いてある）。実機で <code>apt-file search bin/dig</code> と打てば、<code>bind9-dnsutils: /usr/bin/dig</code> のように答えが出る。止めた設定を消して <code>apt update</code> すれば、この檻でも同じになる。</p>
+<pre><code>$ sudo apt-file update
+Get:1 file:/srv/lab-repo lab InRelease
+Ign:1 file:/srv/lab-repo lab InRelease
+...
+Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Reading package lists...</code></pre>
+<p><code>apt-file update</code> の中身は <code>apt update</code> と同じ処理である（今の apt-file は、目録を取ることを apt に任せている）。</p>
+<div class="analogy"><b>たとえ</b>: 本の目次と巻末の索引に近い。目次（Packages）では章の題名（パッケージ名と説明）しか分からないが、
+巻末の索引（Contents）を引けば、ある言葉（ファイル名）がどの章にあるかが分かる。
+<br>ただし<b>崩れる点</b>: 本の索引は本と一緒に手元に来るが、Contents は別に取りに行く目録で、
+しかも目次よりずっと大きい。だから取らない設定にもできるし、取っていなければ引けない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/">演習02</a>は、まだソースに入っていないリポジトリから、名前の分からないパッケージに入っている <code>labcalc</code> コマンドを使えるようにする課題である。
+1行書く・目録を取りに行く・Contents を引く、の3つが要る。判定は labcalc を実際に動かし、dpkg の台帳と apt の目録を見る。</div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/apt/sources.list</code> の次の1行について、各欄の意味を答えよ。<br>
+<code>deb http://jp.archive.ubuntu.com/ubuntu noble main restricted</code></p>
+<details><summary>答え</summary>
+<p><code>deb</code> がバイナリパッケージの取得先であること（ソースパッケージなら <code>deb-src</code>）、
+<code>http://jp.archive.ubuntu.com/ubuntu</code> がリポジトリの URI、
+<code>noble</code> がディストリビューション（スイート）、<code>main restricted</code> がコンポーネント（2つ並べてある）。
+apt はこれを <code>…/ubuntu/dists/noble/main/binary-amd64/Packages</code> のようなパスに組み立てて取りに行く。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/apt/sources.list.d/</code> に新しいリポジトリの行を足した。続けて <code>apt install</code> したところ
+<code>E: Unable to locate package</code> になった。まず実行すべきコマンドは何か。</p>
+<details><summary>答え</summary>
+<p><code>apt update</code>（または <code>apt-get update</code>）。apt が引くのは <code>/var/lib/apt/lists/</code> の目録の写しで、
+行を足しただけでは写しは作られない。実測では、署名の無いリポジトリだと <code>apt update</code> も
+<code>is not signed</code> で受け取りを断った。その場合は鍵（<code>signed-by</code>）を指定する。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>インストールされていないパッケージも含めて、<code>/usr/bin/xyz</code> というファイルを含むパッケージを探すコマンドはどれか。<br>
+(a) <code>dpkg -S /usr/bin/xyz</code>　(b) <code>dpkg -L xyz</code>　(c) <code>apt-file search /usr/bin/xyz</code>　(d) <code>apt-cache search xyz</code></p>
+<details><summary>答え</summary>
+<p>(c)。(a) は入っているパッケージしか引けない（台帳を読むため）。(b) はパッケージ名からファイルの一覧を出すもので向きが逆。
+(d) は名前と説明文の検索で、ファイル名は見ない。apt-file が引く Contents の目録は、
+先に <code>apt-file update</code>（または <code>apt update</code>）で取ってきておく必要がある。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>apt update</code> の出力に <code>Hit:</code> と <code>Get:</code> の行がある。それぞれ何を表すか。</p>
+<details><summary>答え</summary>
+<p><code>Hit</code> は前回取った目録から変わっていなかったので取り直さなかったこと、<code>Get</code> は取ってきたことを表す。
+<code>Ign</code> は無くてもよいもの（署名ファイルなど）が無かったので無視したこと、<code>Err</code> は取れなかったこと。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/etc/apt/sources.list</code> の1行は「種類（<code>deb</code> / <code>deb-src</code>）・URI・ディストリビューション・コンポーネント」。Ubuntu 24.04 は <code>/etc/apt/sources.list.d/*.sources</code> の deb822 形式が既定</li><li>apt が引くのは <code>/var/lib/apt/lists/</code> の目録の写し。ソースを書いただけでは写しは変わらず、<code>apt update</code> で初めて取りに行く</li><li>署名の無い目録は <code>is not signed</code> で受け取らない。<code>Signed-By</code> で鍵を指定するのが本来の形で、<code>[trusted=yes]</code> は確かめるのをやめる指示</li><li>ファイル名からパッケージを引くとき、入っているものなら <code>dpkg -S</code>（台帳）、入っていなくてよいなら <code>apt-file search</code>（目録の Contents）</li><li>Contents は Packages とは別の、大きな目録。<code>apt-file update</code> か <code>apt update</code> で取る</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt-file 3.3 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（ネットにつながった状態） / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-packages/theory/02-apt">← 2. apt は目録を読んで、台帳に書く</a><a href="/linuc-packages/theory/04-dpkg">次: 4. dpkg は依存を読めるが、取りに行かない →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

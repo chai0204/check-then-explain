@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. &amp;&amp; と || は、直前の数だけを見ている — 確かめて説明する LinuC 主題1.06</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="linuc-shell">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-shell/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+</div>
+<h1>3. &amp;&amp; と || は、直前の数だけを見ている</h1>
+<p class="lead"><code>mkdir newdir &amp;&amp; cp … newdir/ || echo "mkdir に失敗した"</code> と打った。<code>mkdir</code> は成功してディレクトリができているのに、「mkdir に失敗した」と出る。<code>||</code> は <code>mkdir</code> の結果を見ていない。<b>直前のコマンドが返した数（終了ステータス）</b>だけを見ている。コマンド置換 <code>$( )</code> も同じ形をしていて、中のコマンドから受け取れるのは、標準出力の文字とその数だけである。</p>
+<div class="badges"><span>前提: 第2章まで読了</span><span>所要 15分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.06.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>リストの <code>;</code>・<code>&amp;&amp;</code>・<code>||</code> がそれぞれ何を見て次へ進むかを、終了ステータスで説明できる</li><li><code>A &amp;&amp; B || C</code> が「A が成功なら B、失敗なら C」と同じにならない場合を挙げられる</li><li><code>$( )</code> と <code>` `</code> でコマンドの出力を文字列や変数に入れられ、引用符の有無で改行がどう変わるかを言える</li><li><code>( )</code> と <code>{ }</code> の違いを、カレントディレクトリが残るかで説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: パイプ <code>|</code> とリダイレクトの細部（主題1.03）、<code>&amp;</code> による後回し実行とジョブ制御、プロセス置換 <code>&lt;( )</code>、<code>$(( ))</code> の算術展開（第7章で使う分だけ触れる）。<code>$?</code> の詳しい値は第6章で扱う。ここでは「0 が成功、それ以外が失敗」だけ分かればよい。</div></div>
+
+<h2 id="status">どのコマンドも、終わるときに数を1つ返す</h2>
+<div class="sgoal"><b>この節で分かること</b>: リストが判断に使っているもの。</div>
+<p>この章も <code>~/try</code> で作業する。コマンドは終わるときに 0〜255 の数を1つ返す。これを<b>終了ステータス</b>と呼び、直前の値は <code>$?</code> で読める。0 が成功、それ以外が失敗である。</p>
+<pre><code>$ mkdir -p ~/try &amp;&amp; cd ~/try
+$ true; echo $?
+0
+$ false; echo $?
+1</code></pre>
+<p><code>true</code> は何もせず 0 を、<code>false</code> は何もせず 1 を返すコマンドである。次のリストは、この数だけを見て進む。</p>
+
+<h2 id="lists">; は続け、&amp;&amp; は成功なら続け、|| は失敗なら続ける</h2>
+<div class="sgoal"><b>この節で分かること</b>: 3つのつなぎ方の違いと、組み合わせたときの落とし穴。</div>
+<p>コマンドを <code>;</code>・<code>&amp;&amp;</code>・<code>||</code> でつないだものを<b>リスト</b>と呼ぶ。存在しないディレクトリに移ろうとして、続けて <code>pwd</code> を打つ。</p>
+<pre><code>$ cd /nonexistent; pwd
+bash: cd: /nonexistent: No such file or directory
+/home/lab/try
+$ cd /nonexistent &amp;&amp; pwd
+bash: cd: /nonexistent: No such file or directory</code></pre>
+<p><code>;</code> は前の結果を見ずに続ける。<code>cd</code> は失敗したのに <code>pwd</code> が動き、元の場所が出た。もしこれが <code>cd</code> の後に「中身を消す」コマンドだったら、<b>元の場所で</b>実行される。<code>&amp;&amp;</code> は前が成功（0）したときだけ続けるので、<code>pwd</code> は動かなかった。</p>
+<pre><code>$ mkdir /forbidden || echo "作れなかった"
+mkdir: cannot create directory ‘/forbidden’: Permission denied
+作れなかった
+$ grep -q '^alice:' /etc/passwd &amp;&amp; echo いる || echo いない
+いる</code></pre>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>B が実行される条件</th><th>使いどころ</th></tr>
+<tr><td><code>A ; B</code></td><td>いつでも（A の結果を見ない）</td><td>関係の無いコマンドを1行に並べる</td></tr>
+<tr><td><code>A &amp;&amp; B</code></td><td>A の終了ステータスが 0（成功）</td><td>前の準備が済んだときだけ進む</td></tr>
+<tr><td><code>A || B</code></td><td>A の終了ステータスが 0 以外（失敗）</td><td>失敗したときだけ知らせる・代わりをする</td></tr>
+</table></div>
+<p>では <code>&amp;&amp;</code> と <code>||</code> を並べて、「成功なら次へ、失敗なら知らせる」を1行で書く。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>A &amp;&amp; B || C</code> は「A が成功したら B、A が失敗したら C」と読める。<code>mkdir</code> が成功してディレクトリができたなら、「mkdir に失敗した」とは出ないはずだ。</p>
+<pre><code>$ mkdir newdir &amp;&amp; cp /nonexistent newdir/ || echo "mkdir に失敗した"
+cp: cannot stat '/nonexistent': No such file or directory
+mkdir に失敗した
+$ ls -d newdir
+newdir</code></pre>
+<div class="then"><b>だめな理由</b>: <code>ls -d newdir</code> が示すとおり、<code>mkdir</code> は成功している。それでも「mkdir に失敗した」と出た。
+リストは左から順に評価され、<code>||</code> が見るのは<b>すぐ左までをまとめた結果、つまり最後に実行された <code>cp</code> の終了ステータス</b>である。
+<code>mkdir</code> 成功 → <code>&amp;&amp;</code> なので <code>cp</code> を実行 → <code>cp</code> 失敗 → <code>||</code> なので <code>echo</code> を実行、という流れで、
+メッセージの文言が <code>mkdir</code> の話をしているのは書いた人の思い込みにすぎない。<code>A &amp;&amp; B || C</code> は if 文ではない。</div></div>
+<p>「B の失敗だけを C で拾う」と書きたいなら、<code>{ }</code> で範囲をはっきりさせる。</p>
+<pre><code>$ mkdir newdir2 &amp;&amp; { cp /nonexistent newdir2/ || echo "cp に失敗した"; }
+cp: cannot stat '/nonexistent': No such file or directory
+cp に失敗した</code></pre>
+<p>A の成否で分けたいなら <code>if</code> を使う（第6章）。</p>
+<pre><code>if mkdir newdir; then
+    cp /nonexistent newdir/ || echo "cp に失敗した"
+else
+    echo "mkdir に失敗した"
+fi</code></pre>
+<div class="analogy"><b>たとえ</b>: リレーのバトンに<b>旗が1本だけ</b>付いているのに近い。各走者は走り終わると旗を「成功（0）」か「失敗」に立てて渡す。<code>&amp;&amp;</code> と <code>||</code> の係は、いま手元に来た旗しか見ない。
+<br>ただし<b>崩れる点</b>: リレーなら誰が転んだかは見ていれば分かるが、ここでは前の走者の旗は次の走者に上書きされて残らない。どこで失敗したかを知りたければ、走者ごとに分けて確かめるしかない。</div>
+
+<h2 id="subst">コマンド置換は、子の出力を文字として受け取る</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>$( )</code> と <code>` `</code> が返すものと、返さないもの。</div>
+<p><code>$(コマンド)</code> と書くと、そこがコマンドの標準出力に置き換わる。これを<b>コマンド置換</b>と呼ぶ。古い書き方の <code>`コマンド`</code>（バッククォート）も同じ意味である。</p>
+<pre><code>$ echo "今日は $(date +%F)"
+今日は 2026-10-13
+$ echo "わたしは `id -un`"
+わたしは lab
+$ echo "外 $(echo "内 $(id -un)")"
+外 内 lab
+$ n=$(wc -l &lt; /etc/passwd); echo "passwd は $n 行"
+passwd は 21 行</code></pre>
+<p><code>$( )</code> は中に <code>$( )</code> をそのまま書ける（入れ子）。バッククォートは入れ子にするとき内側を <code>\`</code> とエスケープする必要があり、読みにくいので、いまは <code>$( )</code> が勧められている。</p>
+<pre><code>$ echo "外 `echo \`id -un\``"
+外 lab</code></pre>
+<p>出力に改行があるときは、引用符の有無で結果が変わる。</p>
+<pre><code>$ ls -A1 /etc/skel
+.bash_logout
+.bashrc
+.profile
+$ files=$(ls -A1 /etc/skel); echo $files
+.bash_logout .bashrc .profile
+$ echo "$files"
+.bash_logout
+.bashrc
+.profile</code></pre>
+<p>変数の中身は3行のままである。引用符で囲まずに <code>echo $files</code> と書くと、展開された後に空白や改行で単語に切り分けられ（第5章の「ワード分割」）、1行にまとまった。<code>"$files"</code> と囲めば改行が残る。</p>
+<p>そしてコマンド置換の中は、子のシェル（サブシェル）で動く。</p>
+<pre><code>$ x=1; y=$(x=2; echo $x); echo "x=$x y=$y"
+x=1 y=2
+$ v=$(false); echo "終了ステータス $?"
+終了ステータス 1
+$ echo "[$(printf 'a\n\n\n')]"
+[a]</code></pre>
+<div class="scroll"><table>
+<tr><th>コマンド置換から受け取れるもの</th><th>受け取れないもの</th></tr>
+<tr><td>標準出力の文字（末尾の改行はすべて削られる）</td><td>中で作った・変えた変数（<code>x</code> は 1 のまま）</td></tr>
+<tr><td>終了ステータス（<code>v=$(false)</code> の直後の <code>$?</code> は 1）</td><td>中で移ったディレクトリ</td></tr>
+</table></div>
+<p>第2章の「子は親を書き換えられない」が、ここでも成り立っている。</p>
+<div class="analogy"><b>たとえ</b>: 別室の担当者に<b>メモ用紙を渡して答えを書いてもらう</b>のに近い。戻ってくるのは紙に書かれた文字だけで、担当者が別室で何を広げて片づけたか（変数）は持ち帰れない。
+<br>ただし<b>崩れる点</b>: メモ用紙なら末尾の空行もそのまま戻るが、コマンド置換は末尾の改行をすべて削って返す。<code>printf 'a\n\n\n'</code> の答えは <code>a</code> だけになった。</div>
+
+<h2 id="group">( ) は子のシェル、{ } はいまのシェル</h2>
+<div class="sgoal"><b>この節で分かること</b>: 2種類のかっこの違い。</div>
+<pre><code>$ (cd /tmp; pwd); pwd
+/tmp
+/home/lab/try
+$ { cd /tmp; pwd; }; pwd
+/tmp
+/tmp</code></pre>
+<p><code>( )</code> の中は子のシェルで動くので、<code>cd /tmp</code> は外に残らない。<code>{ }</code> はいまのシェルでまとめて実行するだけなので、外に出ても <code>/tmp</code> のままである。<code>{</code> の後には空白が、<code>}</code> の前には <code>;</code> か改行が要る。</p>
+<div class="analogy"><b>たとえ</b>: <code>( )</code> は<b>別の部屋</b>で作業してもらうこと、<code>{ }</code> は自分の机の上で<b>作業をひとまとめにする</b>付箋である。別の部屋で模様替えをしても自分の部屋は変わらないが、付箋でまとめた作業は自分の机の上で起きる。
+<br>ただし<b>崩れる点</b>: どちらも終了ステータスは外に返ってくる。別の部屋でも、成功したか失敗したかだけは伝わる。</div>
+<div class="note try"><b>手を動かす</b>:
+この章には専用の演習が無い。<code>&amp;&amp;</code> と <code>||</code> と <code>$( )</code> は、実践編の<a href="/linuc-shell/">演習04・05</a>（引数の検査と終了ステータス）でそのまま使う。
+<code>bash mkbak.sh &amp;&amp; echo ok || echo ng</code> のように、自分のスクリプトの終了ステータスをリストで確かめてみること。</div>
+<div class="quiz"><b>確認</b>
+<p><code>date +%F</code> の出力を変数 <code>d</code> に入れる書き方を2つ挙げよ。</p>
+<details><summary>答え</summary>
+<p><code>d=$(date +%F)</code> と <code>d=`date +%F`</code>。どちらもコマンド置換で、出力の末尾の改行は削られる。
+入れ子にするなら <code>$( )</code> のほうが書きやすい。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>cmd1 || cmd2</code> で <code>cmd2</code> が実行されるのはどんなときか。</p>
+<details><summary>答え</summary>
+<p><code>cmd1</code> の終了ステータスが 0 以外（失敗）のとき。<code>cmd1 &amp;&amp; cmd2</code> は 0 のとき。<code>cmd1 ; cmd2</code> は結果に関係なく常に実行する。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>mkdir a &amp;&amp; cp x a/ || echo NG</code> を実行したら <code>NG</code> と出た。考えられる原因を2つ挙げよ。</p>
+<details><summary>答え</summary>
+<p>(1) <code>mkdir a</code> が失敗した（<code>cp</code> は実行されず、<code>||</code> へ進んだ）。(2) <code>mkdir a</code> は成功したが <code>cp x a/</code> が失敗した。
+<code>||</code> は直前に実行されたコマンドの終了ステータスしか見ないので、出力の <code>NG</code> だけでは区別できない。<code>ls -d a</code> で確かめる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>(cd /tmp; ls)</code> を実行した後と、<code>{ cd /tmp; ls; }</code> を実行した後で、<code>pwd</code> の結果はどう違うか。</p>
+<details><summary>答え</summary>
+<p><code>( )</code> の後は元のディレクトリのまま、<code>{ }</code> の後は <code>/tmp</code> になる。<code>( )</code> は子のシェルで動き、子が移ったディレクトリは親に残らない。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>コマンドは終わるときに 0〜255 の数（終了ステータス）を1つ返す。0 が成功。直前の値は <code>$?</code></li><li><code>;</code> は常に続け、<code>&amp;&amp;</code> は 0 なら続け、<code>||</code> は 0 以外なら続ける。見るのは直前に実行されたコマンドの数だけ</li><li><code>A &amp;&amp; B || C</code> は if 文ではない。B が失敗しても C が動く。分けたいなら <code>if</code> か <code>{ }</code></li><li><code>$(コマンド)</code> と <code>`コマンド`</code> はコマンド置換。返るのは標準出力の文字（末尾の改行は削られる）と終了ステータスだけ</li><li><code>echo $var</code> は改行と空白で切り直され、<code>echo "$var"</code> はそのまま出る</li><li><code>( )</code> とコマンド置換の中は子のシェル。変数もディレクトリも外に残らない。<code>{ }</code> はいまのシェル</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-shell/theory/02-source">← 2. 子のシェルは、親を書き換えられない</a><a href="/linuc-shell/theory/04-script">次: 4. 先頭行を読むのはカーネルで、bash ではない →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-shell/chapters.js"></script>
+<script src="/linuc-shell/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

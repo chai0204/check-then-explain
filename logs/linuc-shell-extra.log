@@ -1,0 +1,109 @@
+
+
+========== man bash が書いている起動ファイルの規則（第1章） ==========
+$ MANWIDTH=80 man bash | grep -A6 'invoked as an interactive login shell'
+       When bash is invoked as an interactive login shell, or as a  non-inter‐
+       active  shell with the --login option, it first reads and executes com‐
+       mands from the file /etc/profile, if that file exists.   After  reading
+       that file, it looks for ~/.bash_profile, ~/.bash_login, and ~/.profile,
+       in  that order, and reads and executes commands from the first one that
+       exists and is readable.  The --noprofile option may be  used  when  the
+       shell is started to inhibit this behavior.
+$ MANWIDTH=80 man bash | grep -B2 -A2 'bash.bashrc'
+       --rcfile file
+              Execute  commands  from file instead of the system wide initial‐
+              ization file /etc/bash.bashrc and the standard personal initial‐
+              ization file ~/.bashrc if the shell is interactive (see  INVOCA‐
+              TION below).
+--
+
+       --norc Do not read and execute  the  system  wide  initialization  file
+              /etc/bash.bashrc  and the personal initialization file ~/.bashrc
+              if the shell is interactive.  This option is on  by  default  if
+              the shell is invoked as sh.
+--
+
+       When an interactive shell that is not a login shell  is  started,  bash
+       reads  and  executes  commands  from /etc/bash.bashrc and ~/.bashrc, if
+       these files exist.  This may be inhibited by using the  --norc  option.
+       The  --rcfile  file option will force bash to read and execute commands
+       from file instead of /etc/bash.bashrc and ~/.bashrc.
+
+       When bash is started non-interactively, to run a shell script, for  ex‐
+--
+       remote shell daemon, usually rshd, or the secure shell daemon sshd.  If
+       bash determines it is being run non-interactively in this  fashion,  it
+       reads  and  executes  commands  from /etc/bash.bashrc and ~/.bashrc, if
+       these files exist and are readable.  It will not do this if invoked  as
+       sh.   The  --norc  option may be used to inhibit this behavior, and the
+--
+       /etc/profile
+              The systemwide initialization file, executed for login shells
+       /etc/bash.bashrc
+              The systemwide per-interactive-shell startup file
+       /etc/bash.bash.logout
+$ MANWIDTH=80 man bash | grep -A2 'When an interactive login shell exits'
+       When an interactive login shell exits, or a non-interactive login shell
+       executes  the  exit  builtin  command, bash reads and executes commands
+       from the file ~/.bash_logout, if it exists.
+$ bash --login -c 'shopt login_shell'
+login_shell    	on
+$ exit
+logout
+
+
+========== PATH の書き間違い・alias の置き換え・export の書き方（第2章） ==========
+$ (PATH="/usr/bin;/opt/tools/bin"; echo "$PATH"; ls /)
+/usr/bin;/opt/tools/bin
+bash: ls: command not found
+$ $PATH=$PATH:/opt/tools/bin
+bash: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/tools/bin: No such file or directory
+$ bash -c 'shopt expand_aliases'
+expand_aliases 	off
+$ bash -ic 'shopt expand_aliases'
+expand_aliases 	on
+$ export z=3; bash -c 'echo "z=[$z]"'
+z=[3]
+$ exit
+logout
+
+
+========== 本文の説明の裏付け（第3・6・7章） ==========
+$ mkdir -p ~/try && cd ~/try
+$ echo "外 `echo \`id -un\``"
+外 lab
+$ bash -c 'exit 300'; echo $?
+44
+$ seq 1 2 10
+1
+3
+5
+7
+9
+$ printf '1\n2\n' > list.txt; for x in $(cat list.txt); do echo "$x"; echo 9 >> list.txt; done; cat list.txt
+1
+2
+1
+2
+9
+9
+$ case restart in start) echo "start に当たった" ;; *) echo "その他に入った" ;; esac
+その他に入った
+$ printf '%s\n' 'C:\temp' | { read p; echo "$p"; }
+C:temp
+$ printf '%s\n' 'C:\temp' | { read -r p; echo "$p"; }
+C:\temp
+$ exit
+logout
+
+
+========== 用語辞書の説明の裏付け ==========
+$ y=2; (echo "( ) の中: y=$y"); bash -c 'echo "bash -c の中: y=[$y]"'
+( ) の中: y=2
+bash -c の中: y=[]
+$ sh -c '[[ 1 = 1 ]] && echo ok'
+sh: 1: [[: not found
+$ bash -x -c 'echo トレースは標準エラーに出る' 2>/dev/null
+トレースは標準エラーに出る
+$ exit
+logout
