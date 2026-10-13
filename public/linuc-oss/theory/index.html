@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理論編 — 確かめて説明する LinuC 主題1.11</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="linuc-oss">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <strong>理論編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文に載せた端末の出力はすべて実機の記録で、どれも Docker Hub の素の Ubuntu イメージ（ダイジェスト固定）で打ったものです。
+   このコースには演習がありません（理由は下に書きました）。
+   それでも <b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、著者が読者として通した段階で
+   <b>4回に分けて不備が出ました</b>（説明の順序・リンク切れ・前提の省略・判定の誤り）。
+   同じ種類のものが残っていると考えてください。</p>
+<p>詰まったところ・本文と違う出力が出たところは、
+   <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   各ページ下のコメントに書いてください。それが直す順番になります。</p>
+</div>
+
+<h1>理論編 — オープンソースの文化</h1>
+<p class="lead">LinuC レベル1 <strong>102 試験・主題1.11</strong>（オープンソースの概念とライセンス / コミュニティとエコシステム）を、
+<strong>どの Ubuntu にも入っているライセンスの実物を読んで</strong>確かめる4章。
+知識問題の主題ですが、条文を覚える前に、条文がどこにあるかを先に手元で見ます。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<h2 id="spine">この4章を貫いている1つの事実</h2>
+<div class="goal">
+<p><b>オープンソースは、権利を手放したソフトではない。持ち主が条件を書いて出した許可で、その条件と連絡先はソフトと一緒に配られている。</b></p>
+<p><code>ls --version</code> には持ち主の名前と <code>NO WARRANTY</code> が出る。マニュアルを全部捨てた最小構成の Ubuntu でも、
+<code>/usr/share/doc/*/copyright</code> だけは 92 個残っている。GPL の条件は「配るとき」に効き、MIT の条件は「表示を残すこと」で、
+条件の無いパブリックドメインは「持ち主がいない」状態だった。不具合の報告先も <code>--help</code> と <code>/etc/os-release</code> に書いてある。
+だから主題1.11 は知識問題でありながら、<b>答えの根拠が手元の1台に全部入っています</b>。</p>
+<div class="skip"><b>ここで覚えなくていいこと</b>:
+ライセンス同士の互換性の一覧、「リンクすると派生物になるか」の法的な議論、国ごとの著作権法の違い、
+GPL-2 と GPL-3 の細かい差（機器への組み込み・特許の報復）、各プロジェクトの投稿の作法。
+どれもレベル1の範囲外で、この4章では深入りしません。</div>
+</div>
+
+<h2 id="nolab">このコースに演習が無い理由</h2>
+<p>主題1.11 は<b>知識問題</b>で、出題範囲の「詳細」欄に打つコマンドが1つもありません。
+このシリーズの演習は、<code>lab check</code> が<b>状態を実際に観測して</b>合否を出す形で作っています
+（ファイルの中の文字列を探すだけの判定は、挙動で確かめられないときの最後の手段です）。
+ライセンスを理解したかどうかは、コンテナの中の状態として観測できません。
+檻を作っても、観測型の判定を持つ演習が作れないので、<b>演習と専用の檻は作りませんでした</b>。</p>
+<p>そのかわり、本文の端末表示は<b>すべて</b>、Docker Hub の公式の素の Ubuntu イメージ
+（<code>ubuntu:24.04@sha256:008173c2…</code>、シリーズの他のコースの土台と同じもの）で記録してあります。
+同じイメージを起動すれば同じ画面が出ます。打つのは <code>grep</code>・<code>sed</code>・<code>ls</code>・<code>dpkg</code> など、
+<b>読むだけのコマンド</b>です（影響度 A）。起動のしかたは<a href="/linuc-oss/">入口</a>にあります。</p>
+
+<h2 id="range">LinuC 出題範囲との対応</h2>
+<p>公式の出題範囲（<a href="https://linuc.org/linuc1/range/102.html">LinuC-1 Version 10.0 / 102 試験</a>）の
+主題1.11 を、章に割り当てたものです。「この教材で実際に打つもの」は、本文に記録を載せたコマンドとファイルです。</p>
+<div class="scroll"><table>
+<tr><th>副題</th><th>重要度</th><th>章</th><th>この教材で実際に打つもの・読むもの</th></tr>
+<tr><td rowspan="3">1.11.1 オープンソースの概念とライセンス</td><td rowspan="3">2</td>
+    <td><a href="/linuc-oss/theory/01-owner">1</a></td>
+    <td><code>ls --version</code> <code>bash --version</code> <code>/usr/share/doc/*/copyright</code> <code>/usr/share/common-licenses/</code> <code>/etc/dpkg/dpkg.cfg.d/excludes</code> <code>zcat changelog.Debian.gz</code></td></tr>
+<tr><td><a href="/linuc-oss/theory/02-copyleft">2</a></td>
+    <td><code>GPL-3</code>（convey の定義・第2条・第5条・第6条・第13条）<code>GPL-2</code> <code>LGPL-3</code>（第4条）<code>MPL-2.0</code>（1.10・3.3）<code>/usr/share/doc/libc6/copyright</code></td></tr>
+<tr><td><a href="/linuc-oss/theory/03-permissive">3</a></td>
+    <td>Expat（MIT）の許諾文 <code>BSD</code> <code>Apache-2.0</code>（第3条・第4条）<code>CC0-1.0</code> <code>grep -ic patent</code> <code>ldd /bin/ls</code> <code>dpkg -S</code></td></tr>
+<tr><td>1.11.2 オープンソースのコミュニティとエコシステム</td><td>1</td>
+    <td><a href="/linuc-oss/theory/04-community">4</a></td>
+    <td><code>bash --help</code> <code>/etc/os-release</code> <code>dpkg -s</code> <code>dpkg-query -W</code> <code>Upstream-Contact:</code> <code>grep --help</code> <code>bashbug</code></td></tr>
+</table></div>
+<p class="detail">出題範囲の語のうち、手元の素の Ubuntu に<b>実物が無いもの</b>は3つあります。
+<b>AGPL</b> は全文が <code>/usr/share/common-licenses/</code> に無く、AGPL のパッケージも0件でした（本文では GPL-3 第13条の言及と、この0件で扱います）。
+<b>掲示板</b>（Web のフォーラム）は端末の外にあるので、<code>/etc/os-release</code> の <code>SUPPORT_URL</code> と <code>BUG_REPORT&#95;URL</code> が別の欄であることを足がかりに理論で扱います。
+<b>オープンソースの定義</b>（OSI）と<b>4つの自由</b>（FSF）の原文も手元に無いので、表にまとめ、GPL の前文（<code>freedom, not price</code>）を記録から引いています。
+<b>無いことを黙って飛ばしてはいません。</b></p>
+<p>他の主題（1.01〜1.10）の対応は
+<a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。</p>
+
+<h2 id="cram">試験の直前に見る表</h2>
+<p>出題範囲の「詳細」欄に並ぶ語を、一行の意味と説明している章に対応させたものです。
+選択肢を見て迷ったら、章へ戻って条文の記録を読み直してください。</p>
+<div class="scroll"><table>
+<tr><th>語</th><th>一行の意味</th><th>章</th></tr>
+<tr><td colspan="3"><b>1.11.1 オープンソースの概念とライセンス</b></td></tr>
+<tr><td>オープンソースの定義</td><td>OSI が定めた、オープンソースと名乗れるライセンスの10項目の条件。「無料」は条件に入っていない</td><td><a href="/linuc-oss/theory/01-owner#definition">1</a></td></tr>
+<tr><td>自由</td><td>free は freedom, not price。FSF の4つの自由は、実行する・調べて変える・写しを配る・改変版を配る</td><td><a href="/linuc-oss/theory/01-owner#definition">1</a></td></tr>
+<tr><td>ソースコード</td><td>改変するときに好んで使われる形（GPL-3 第1条）。わざと読みにくくしたものは当たらない</td><td><a href="/linuc-oss/theory/01-owner#definition">1</a></td></tr>
+<tr><td>著作物</td><td>作った時点で著作権が自動的に生まれる。オープンソースにも持ち主（<code>Copyright</code> の行）がいる</td><td><a href="/linuc-oss/theory/01-owner#owner">1</a></td></tr>
+<tr><td>無保証</td><td>条文に書かれた条件（GPL-3 第15条 <code>NO WARRANTY</code>）。保証やサポートを別に有料で付けるのは許される</td><td><a href="/linuc-oss/theory/01-owner#warranty">1</a></td></tr>
+<tr><td>継続した開発</td><td>最小構成のイメージにも changelog が残り、2026年5月にも修正が入っていた</td><td><a href="/linuc-oss/theory/01-owner#travel">1</a>・<a href="/linuc-oss/theory/04-community#governance">4</a></td></tr>
+<tr><td>多くのライセンスが存在</td><td>素の Ubuntu 1台に copyright が 92 個、<code>License:</code> の書き方が 155 通り</td><td><a href="/linuc-oss/theory/01-owner#many">1</a></td></tr>
+<tr><td>GPL</td><td>コピーレフト。配るときは作品全体を同じライセンスで出し、ソースも渡す。配らなければ条件なし</td><td><a href="/linuc-oss/theory/02-copyleft#trigger">2</a></td></tr>
+<tr><td>AGPL</td><td>GPL に「改変版をネットワーク越しに使わせるときも、利用者にソースを入手する機会を与える」を足したもの</td><td><a href="/linuc-oss/theory/02-copyleft#agpl">2</a></td></tr>
+<tr><td>LGPL</td><td>ライブラリ向け。ライブラリと組み合わせた作品は自分の選んだ条件で配ってよい</td><td><a href="/linuc-oss/theory/02-copyleft#lgpl">2</a></td></tr>
+<tr><td>MPL</td><td>ファイル単位のコピーレフト。改変した MPL のファイルだけが同じ条件</td><td><a href="/linuc-oss/theory/02-copyleft#mpl">2</a></td></tr>
+<tr><td>BSD</td><td>許可型。表示を残す・バイナリなら文書に載せる・名前を宣伝に使わない（3条項版）</td><td><a href="/linuc-oss/theory/03-permissive#bsd">3</a></td></tr>
+<tr><td>MIT</td><td>許可型。条件は「著作権表示と許諾文を含める」の1つ。Debian では Expat と書かれることが多い</td><td><a href="/linuc-oss/theory/03-permissive#mit">3</a></td></tr>
+<tr><td>Apache（V2）</td><td>許可型。改変したファイルに明記・NOTICE・特許の許可（特許で訴えると許可が終わる）</td><td><a href="/linuc-oss/theory/03-permissive#bsd">3</a></td></tr>
+<tr><td>パブリックドメイン</td><td>著作権が無い状態。持ち主がいないので条件も無い（それでも無保証の文は付く）</td><td><a href="/linuc-oss/theory/03-permissive#pd">3</a></td></tr>
+<tr><td>改変と再配布</td><td>コピーレフトは改変版の配布に条件（同じライセンス・ソース・改変の明記）、許可型は表示を残せば条件は自由</td><td><a href="/linuc-oss/theory/02-copyleft#conditions">2</a>・<a href="/linuc-oss/theory/03-permissive#mit">3</a></td></tr>
+<tr><td colspan="3"><b>1.11.2 オープンソースのコミュニティとエコシステム</b></td></tr>
+<tr><td>コミュニティ</td><td>開発者・メンテナ・利用者の集まり。1つのソフトに上流・Debian・Ubuntu の層がある</td><td><a href="/linuc-oss/theory/04-community#layers">4</a></td></tr>
+<tr><td>メーリングリスト</td><td>1つのアドレスに送ると購読者全員に届く。議論・告知・バグ報告の場</td><td><a href="/linuc-oss/theory/04-community#places">4</a></td></tr>
+<tr><td>掲示板</td><td>Web のフォーラム。利用者どうしの質問と回答の場</td><td><a href="/linuc-oss/theory/04-community#places">4</a></td></tr>
+<tr><td>開発サイト</td><td>ソースの保管・課題管理・変更の提案をまとめた場（GitHub、kernel.org、SourceForge など）</td><td><a href="/linuc-oss/theory/04-community#places">4</a></td></tr>
+<tr><td>開発体制</td><td>個人中心・チーム・財団・企業。役割はメンテナ・コミッタ・コントリビュータ。合わなければフォークできる</td><td><a href="/linuc-oss/theory/04-community#governance">4</a></td></tr>
+<tr><td>使用・紹介</td><td>使うことと広めることも、エコシステムへの参加に数えられる</td><td><a href="/linuc-oss/theory/04-community#join">4</a></td></tr>
+<tr><td>バグ報告</td><td>具体的な件名・版・環境・再現の手順・期待と実際の結果を、決められた場へ</td><td><a href="/linuc-oss/theory/04-community#report">4</a></td></tr>
+</table></div>
+<p>ライセンスを、条件の重い順に1枚にまとめるとこうなります。</p>
+<div class="scroll"><table>
+<tr><th>ライセンス</th><th>種類</th><th>改変版を配るときの条件</th><th>ソースを出す範囲</th><th>条件が生まれるとき</th></tr>
+<tr><td>AGPL</td><td>コピーレフト</td><td>同じライセンス・ソースを渡す</td><td>作品全体</td><td>配布、<b>改変版をネットワーク越しに使わせるとき</b></td></tr>
+<tr><td>GPL</td><td>コピーレフト</td><td>同じライセンス・ソースを渡す・改変を明記</td><td>作品全体</td><td>配布</td></tr>
+<tr><td>LGPL</td><td>コピーレフト（ライブラリ）</td><td>ライブラリ部分は同じライセンス。組み合わせた作品は自由</td><td>ライブラリ部分</td><td>配布</td></tr>
+<tr><td>MPL</td><td>コピーレフト（ファイル単位）</td><td>改変した MPL のファイルは同じライセンス</td><td>改変したファイル</td><td>配布</td></tr>
+<tr><td>Apache 2.0</td><td>許可型</td><td>写し・改変の明記・表示・NOTICE。特許の許可あり</td><td>出さなくてよい</td><td>配布</td></tr>
+<tr><td>BSD（3条項）</td><td>許可型</td><td>表示を残す（バイナリでも）・名前を宣伝に使わない</td><td>出さなくてよい</td><td>配布</td></tr>
+<tr><td>MIT（Expat）</td><td>許可型</td><td>著作権表示と許諾文を含める</td><td>出さなくてよい</td><td>配布</td></tr>
+<tr><td>パブリックドメイン</td><td>権利なし</td><td>なし</td><td>出さなくてよい</td><td>—</td></tr>
+</table></div>
+<p class="detail">特許について条文で触れているかは、<code>grep -ic patent</code> で数えた行数で見分けられました（BSD 0・MIT 0・Apache-2.0 6・GPL-3 26）。
+コピーレフトの条件が生まれるのは<b>配るとき</b>（AGPL は、改変した版をネットワーク越しに使わせるときも）で、許可型の条件は<b>写しに表示を含めること</b>です。</p>
+
+<h2 id="chapters">章</h2>
+<div class="toc">
+<ol>
+<li><a href="/linuc-oss/theory/01-owner">オープンソースには、持ち主がいる</a> —
+    <span class="detail"><code>ls --version</code> に Copyright の行。最小構成のイメージがマニュアルを捨てて、copyright だけは 92 個残していた（16分）</span></li>
+<li><a href="/linuc-oss/theory/02-copyleft">コピーレフトは、配るときに効く</a> —
+    <span class="detail">GPL は「配らないなら条件なし」と書いている。ネットワーク越しにも効かせるのが AGPL（18分）</span></li>
+<li><a href="/linuc-oss/theory/03-permissive">「何をしてもいい」は、パブリックドメインだけ</a> —
+    <span class="detail">MIT にも Beerware にも条件がある。同じ許諾文に名前が5つ。<code>ls</code> 1つに4つのライセンス（16分）</span></li>
+<li><a href="/linuc-oss/theory/04-community">報告先は、ソフトの中に書いてある</a> —
+    <span class="detail">bash の報告先は2つ。版番号 <code>5.2.21-2ubuntu4</code> に3つの層。ここで4章が1本になる（15分）</span></li>
+</ol>
+</div>
+<p><a href="/linuc-oss/theory/glossary">用語辞書</a> —
+   本文の点線付きの語をクリックすると引けます。24語。</p>
+
+<h2 id="use">実務のどこで効くか</h2>
+<p>資格の勉強として読んでも、使う場面はこの4つに集まります。</p>
+<div class="scroll"><table>
+<tr><th>場面</th><th>ここで効く理由</th><th>見落としやすい点</th><th>関連する章</th></tr>
+<tr><td>オープンソースを改変して社内で使う</td>
+    <td>GPL の義務は配布（convey）で生まれる。社内で使うだけなら条件はない</td>
+    <td>グループ会社や取引先に写しを渡すと、それは配布になる</td><td>2</td></tr>
+<tr><td>製品に組み込んで出荷する</td>
+    <td>許可型でも、表示とライセンスの写しを付ける条件がある</td>
+    <td>バイナリだけの出荷でも、表示を文書などに載せる（BSD の条件2・GPL の第6条）</td><td>1・3</td></tr>
+<tr><td>Web サービスを作る</td>
+    <td>GPL は写しを渡さない利用を配布と見なさない</td>
+    <td>AGPL のソフトを改変して動かしていると、使わせるだけで条件が生まれる</td><td>2</td></tr>
+<tr><td>不具合を見つけた</td>
+    <td>窓口は層ごとにあり、連絡先はソフトの中に書いてある</td>
+    <td>上流か配布元かを切り分け、版・環境・再現の手順を添える</td><td>4</td></tr>
+</table></div>
+<p><b>この教材でしないこと</b>も1つあります。個別の製品についてのライセンスの判断
+（ライセンス同士を組み合わせてよいか、リンクの仕方で条件が変わるか）です。
+この教材が教えるのは条文の読み方と試験の範囲までで、製品の判断は組織の法務の仕事になります。</p>
+
+<h2 id="next">手を動かす</h2>
+<p>演習はありませんが、本文のコマンドはすべて素の Ubuntu で同じ画面が出ます。
+起動のしかた（1行）と、本文と違う出力が出たときの報告のしかたは入口にあります。</p>
+<p><a href="/linuc-oss/">入口（起動のしかた）→</a></p>
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-oss/">入口</a> · <a href="/linuc-oss/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

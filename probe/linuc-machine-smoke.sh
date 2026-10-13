@@ -21,6 +21,8 @@ echo "練習機が ssh を受け付けるまで: $((SECONDS - t0)) 秒（KVM な
 
 H "docker exec $C vm status"
 H "docker exec $C virsh list --all"
+echo; echo "== 読者のログインシェル（docker exec -it … bash -l と同じ読み込み）でも session を見るか"
+H "docker exec $C bash -lc 'echo \$LIBVIRT_DEFAULT_URI; virsh list --all; ls /etc/profile.d/'"
 H "docker exec $C ssh linuc 'hostname; whoami; uname -r; systemctl is-system-running; ip -br a show enp0s16; ip r'"
 H "docker exec $C ssh linuc 'systemctl --failed --no-legend --plain | wc -l'"
 H "docker exec $C lab-guest 'id; cat /etc/hostname'; echo rc=\$?"

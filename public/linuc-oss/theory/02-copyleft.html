@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. コピーレフトは、配るときに効く — 確かめて説明する LinuC 主題1.11</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="2" data-theme="linuc-oss">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-oss/theory/">理論編</a> › 第2章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-oss/theory/">詳しく</a></p>
+</div>
+<h1>2. コピーレフトは、配るときに効く</h1>
+<p class="lead">GPL のソフトを改変して社内で使っても、ソースコードを公開する義務は生まれない。条文に「配らない（convey しない）なら、作るのも動かすのも条件なし」と書いてある。義務の引き金は、使うことでも改変することでもなく、配ること。例外が1つあり、AGPL は改変した版をネットワーク越しに使わせることにも条件を付ける。</p>
+<div class="badges"><span>前提: 第1章まで読了</span><span>前提: 素の Ubuntu を起動できる（任意）</span><span>所要 18分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.11.1（重要度2）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>GPL の義務がいつ生まれるかを、条文の convey の定義から説明できる</li><li>改変して再配布するとき GPL が求めるもの（同じライセンス・ソースの提供・改変の表示）を言える</li><li>AGPL・GPL・LGPL・MPL を、コピーレフトが及ぶ範囲の広い順に並べられる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: GPL-2 と GPL-3 の細かい違い（特許の扱い、機器への組み込み）、ライセンス同士の互換性、「リンクすると派生物になるか」の法的な議論、例外付きの GPL（Bison exception など）は扱わない。試験で問われるのは、義務が生まれるきっかけと、コピーレフトが及ぶ範囲の並びである。</div></div>
+
+<h2 id="trigger">義務は、配るときに生まれる</h2>
+<div class="sgoal"><b>この節で分かること</b>: GPL の義務の引き金が、改変ではなく配布であること。</div>
+<p>GPL は、自分のことを「コピーレフト」のライセンスだと名乗っている。</p>
+<pre><code>$ grep -A1 "is a free, copyleft license" /usr/share/common-licenses/GPL-3
+  The GNU General Public License is a free, copyleft license for
+software and other kinds of works.
+$ grep -rl copyleft /usr/share/common-licenses/ | sort
+/usr/share/common-licenses/GFDL-1.2
+/usr/share/common-licenses/GFDL-1.3
+/usr/share/common-licenses/GPL-3</code></pre>
+<p>17 のライセンス文書のうち、この語を使っているのは GNU の文書（GPL-3 と、文書向けの GFDL）だけである。<b>コピーレフト</b>は、著作権（copyright）を逆向きに使う仕組みを指す。持ち主の権利を使って、受け取った人が改変版を配るときにも同じ自由を引き継がせる。</p>
+<p>ここから「引き継がせる」の範囲を誤解しやすい。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>GPL は自由を引き継がせるライセンスなのだから、GPL のソフトを改変したら、たとえ社内で使うだけでも、改変したソースコードを公開しなければならない。</p>
+<pre><code>$ grep -A2 "You may make, run and propagate" /usr/share/common-licenses/GPL-3
+  You may make, run and propagate covered works that you do not
+convey, without conditions so long as your license otherwise remains
+in force.  You may convey covered works to others for the sole purpose</code></pre>
+<div class="then"><b>だめな理由</b>: 条文は逆のことを書いている。<code>covered works that you do not convey</code>（convey しない作品）は、作る（make）のも、動かす（run）のも、手元で複製する（propagate）のも <code>without conditions</code>（条件なし）。
+改変して社内で使うだけなら、公開の義務は無い。<b>義務の引き金は改変ではなく、convey（配布）である。</b>
+「GPL は改変したら公開」と覚えていると、試験の選択肢で引っかかる。</div></div>
+<p>では convey とは何か。条文の定義を引く。</p>
+<pre><code>$ grep -A2 'To "convey"' /usr/share/common-licenses/GPL-3
+  To "convey" a work means any kind of propagation that enables other
+parties to make or receive copies.  Mere interaction with a user through
+a computer network, with no transfer of a copy, is not conveying.</code></pre>
+<p>「他者（other parties）が写しを作ったり受け取ったりできるようにすること」。そして2文目が大事で、<b>写しを渡さずに、ネットワーク越しに利用者とやりとりするだけなら convey ではない</b>。改変版を Web サービスとして動かし、外の人に使わせても、写しを渡していなければ GPL の条件は生まれない。</p>
+<p>反対に、別の会社は「他者」なので、グループ会社や取引先に写しを渡せば convey に当たる。「社内」かどうかの境目は、組織の呼び方ではなく、写しが他者の手に渡るかどうかで決まる。</p>
+<p>GPL-2 の書き方はもっと直接的である。</p>
+<pre><code>$ grep -A2 "^Activities other than" /usr/share/common-licenses/GPL-2
+Activities other than copying, distribution and modification are not
+covered by this License; they are outside its scope.  The act of
+running the Program is not restricted, and the output from the Program</code></pre>
+<p>実行することは、そもそもライセンスの範囲外（<code>outside its scope</code>）で、制限されない。</p>
+<div class="scroll"><table>
+<tr><th>やること</th><th>GPL の条件</th><th>根拠</th></tr>
+<tr><td>受け取ったものを、自分（自社）で動かす</td><td>なし</td><td>GPL-2「実行は制限されない」</td></tr>
+<tr><td>改変して、自分（自社）の中だけで使う</td><td>なし</td><td>GPL-3 第2条「convey しない作品は条件なし」</td></tr>
+<tr><td>改変版を Web サービスとして動かし、外の人に使わせる</td><td>なし（AGPL なら<b>あり</b>）</td><td>GPL-3 第0条「ネットワーク越しのやりとりは convey ではない」</td></tr>
+<tr><td>写し（ソースでもバイナリでも）を他者に渡す・売る・公開する</td><td><b>あり</b>（次の節）</td><td>GPL-3 第4〜6条</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 合唱団の編曲譜に「この楽譜から編曲した楽譜を配るときは、同じ条件で配ること」と書いてある状態に近い。
+自分たちで歌って練習するだけなら、何をどう書き換えても誰にも知らせなくてよい。条件が効くのは、楽譜を人に渡すときだけである。
+<br>ただし<b>崩れる点</b>: 音楽なら録音した CD を配っても、楽譜まで付ける義務は無い。GPL では、バイナリ（録音にあたる）を配るなら、ソースコード（楽譜にあたる）も手に入るようにしなければならない。</div>
+
+<h2 id="conditions">配るときに求められること</h2>
+<div class="sgoal"><b>この節で分かること</b>: 改変して再配布するとき、GPL が何を求めるか。</div>
+<p>GPL-3 の全体像は、条の見出しを抜き出すと1画面に収まる。</p>
+<pre><code>$ grep -n "^  [0-9]*\. [A-Z]" /usr/share/common-licenses/GPL-3
+73:  0. Definitions.
+112:  1. Source Code.
+154:  2. Basic Permissions.
+179:  3. Protecting Users' Legal Rights From Anti-Circumvention Law.
+195:  4. Conveying Verbatim Copies.
+208:  5. Conveying Modified Source Versions.
+245:  6. Conveying Non-Source Forms.
+343:  7. Additional Terms.
+407:  8. Termination.
+435:  9. Acceptance Not Required for Having Copies.
+446:  10. Automatic Licensing of Downstream Recipients.
+471:  11. Patents.
+540:  12. No Surrender of Others' Freedom.
+552:  13. Use with the GNU Affero General Public License.
+563:  14. Revised Versions of this License.
+589:  15. Disclaimer of Warranty.
+600:  16. Limitation of Liability.
+612:  17. Interpretation of Sections 15 and 16.</code></pre>
+<p>見出しに <code>Conveying</code> が付いた条が3つ並んでいる。第4条（そのまま配る）は第1章で読んだ。ここでは第5条（改変して配る）と第6条（ソース以外の形で配る）を読む。</p>
+<pre><code>$ grep -A1 "a) The work must carry prominent notices" /usr/share/common-licenses/GPL-3
+    a) The work must carry prominent notices stating that you modified
+    it, and giving a relevant date.
+$ grep -A4 "c) You must license the entire work" /usr/share/common-licenses/GPL-3
+    c) You must license the entire work, as a whole, under this
+    License to anyone who comes into possession of a copy.  This
+    License will therefore apply, along with any applicable section 7
+    additional terms, to the whole of the work, and all its parts,
+    regardless of how they are packaged.  This License gives no</code></pre>
+<p>a) 改変したことと日付を目立つように書く。c) 作品<b>全体</b>を、写しを手にした全員に対してこのライセンスで出す。自分で書き足した部分も含めて、<code>the whole of the work, and all its parts</code>（作品の全体とそのすべての部分）に及ぶ。改変版を独自の条件に変えて配ることはできない。これがコピーレフトの中身である。</p>
+<pre><code>$ grep -A4 "6. Conveying Non-Source Forms." /usr/share/common-licenses/GPL-3
+  6. Conveying Non-Source Forms.
+
+  You may convey a covered work in object code form under the terms
+of sections 4 and 5, provided that you also convey the
+machine-readable Corresponding Source under the terms of this License,</code></pre>
+<p>実行できる形（object code）で配るなら、<b>対応するソースコード（Corresponding Source）も</b>このライセンスで渡すこと。渡し方の選択肢は、この条の続きに並んでいる。</p>
+<div class="scroll"><table>
+<tr><th>改変して再配布するとき GPL-3 が求めるもの</th><th>条</th></tr>
+<tr><td>改変したことと、その日付を目立つように書く</td><td>第5条 a)</td></tr>
+<tr><td>作品全体を、同じライセンスで出す</td><td>第5条 c)</td></tr>
+<tr><td>バイナリで配るなら、対応するソースコードも手に入るようにする</td><td>第6条</td></tr>
+<tr><td>著作権表示と無保証の表示を残し、ライセンスの写しを渡す</td><td>第4条（第1章）</td></tr>
+</table></div>
+<p>copyright ファイルで <code>GPL-3+</code> と書かれていた <code>+</code> も読んでおく。</p>
+<pre><code>$ grep -hE '^License: GPL-[23]\+?$' /usr/share/doc/*/copyright | sort | uniq -c
+    195 License: GPL-2
+    149 License: GPL-2+
+      6 License: GPL-3
+     85 License: GPL-3+
+$ grep -B1 -A3 'or any later version" applies' /usr/share/common-licenses/GPL-3
+Program specifies that a certain numbered version of the GNU General
+Public License "or any later version" applies to it, you have the
+option of following the terms and conditions either of that numbered
+version or of any later version published by the Free Software
+Foundation.  If the Program does not specify a version number of the</code></pre>
+<p><code>+</code> は <code>or any later version</code>（またはそれ以降の版）の略記で、受け取った人は指定の版か、それより新しい版のどちらの条件に従ってもよい。<code>GPL-2+</code> のコードは GPL-3 の条件で使うこともできる。<code>+</code> の無い <code>GPL-2</code> は、版2だけである。</p>
+<div class="analogy"><b>たとえ</b>: 建築協定のある分譲地に近い。家を建て替えるのは自由だが、土地を売るときは、高さ制限などの協定を次の買い主にも引き継がせなければならない。
+条件が、所有者が替わるたびに付いて回る。
+<br>ただし<b>崩れる点</b>: 建築協定は住んでいる間も守る必要があるが、GPL の条件は配らない限り何も求めない。また土地は1つしか無いので売れば手元から無くなるが、ソフトは配っても手元に残り、受け取った全員がまた次に配れる。</div>
+<div class="note try"><b>手を動かす</b>:
+このコースには演習がない。かわりに素の Ubuntu で、上の <code>grep -n "^  [0-9]*\. [A-Z]" /usr/share/common-licenses/GPL-3</code> を打って目次を出し、気になった条の見出しで <code>grep -A</code> して本文を自分で読む。
+条文は英語だが、<code>convey</code>・<code>Corresponding Source</code>・<code>Combined Work</code> の3語の定義が分かれば、試験に要る部分は読める。起動のしかたは<a href="/linuc-oss/">入口</a>にある。</div>
+
+<h2 id="agpl">AGPL — ネットワーク越しにも条件を付ける</h2>
+<div class="sgoal"><b>この節で分かること</b>: GPL が届かない場所と、そこを埋めた AGPL。</div>
+<p>前の節の表の3行目、「改変版を Web サービスとして動かす」は GPL では条件なしだった。利用者の手元に写しが渡らないからである。ここに条件を付けたのが <b>AGPL</b>（GNU Affero General Public License）で、GPL-3 の条文がそれを紹介している。</p>
+<pre><code>$ grep -A8 "13. Use with the GNU Affero" /usr/share/common-licenses/GPL-3
+  13. Use with the GNU Affero General Public License.
+
+  Notwithstanding any other provision of this License, you have
+permission to link or combine any covered work with a work licensed
+under version 3 of the GNU Affero General Public License into a single
+combined work, and to convey the resulting work.  The terms of this
+License will continue to apply to the part which is the covered work,
+but the special requirements of the GNU Affero General Public License,
+section 13, concerning interaction through a network will apply to the</code></pre>
+<p>GPL-3 のコードと AGPL-3 のコードは組み合わせてよい。ただしその組み合わせには、AGPL の第13条にある<b>ネットワーク越しのやりとりについての特別な要件</b>が適用される、と書いてある。その要件とは、<b>改変した版をネットワーク越しに利用者に使わせるなら、その利用者に対応するソースコードを手に入れる機会を与えること</b>である。写しを渡していなくても、使わせた時点で条件が生まれる。</p>
+<p>AGPL の全文は、素の Ubuntu には入っていない。AGPL のパッケージも1つも無い。</p>
+<pre><code>$ ls /usr/share/common-licenses/ | grep -ic agpl
+0
+$ grep -il affero /usr/share/doc/*/copyright | wc -l
+0</code></pre>
+<p>92 パッケージはどれも、手元で動かすコマンドやライブラリである。AGPL は、Web アプリのように「写しを渡さずに使わせる」形のソフトのためにあるので、ここには出てこない。</p>
+<div class="analogy"><b>たとえ</b>: 第1章のレシピのたとえを続けると、GPL は「料理を持ち帰りで売るなら、レシピも渡すこと」で、店の中で食べさせるだけならレシピは見せなくてよい。
+AGPL は「店の中で食べさせるだけでも、客が求めたらレシピを渡すこと」である。
+<br>ただし<b>崩れる点</b>: 店で出した料理は客が食べるので、何かを渡したとも言える。Web サービスの利用者の手元には、プログラムの写しは1つも残らない。だから GPL の「写しを渡す」という引き金が引かれず、別の条文が要った。</div>
+
+<h2 id="lgpl">LGPL — ライブラリを使う側には及ばない</h2>
+<div class="sgoal"><b>この節で分かること</b>: LGPL が GPL とどこで違うか。</div>
+<pre><code>$ wc -l /usr/share/common-licenses/GPL-3 /usr/share/common-licenses/LGPL-3
+  674 /usr/share/common-licenses/GPL-3
+  165 /usr/share/common-licenses/LGPL-3
+  839 total
+$ grep -A2 "This version of the GNU Lesser" /usr/share/common-licenses/LGPL-3
+  This version of the GNU Lesser General Public License incorporates
+the terms and conditions of version 3 of the GNU General Public
+License, supplemented by the additional permissions listed below.</code></pre>
+<p><b>LGPL</b>（GNU Lesser General Public License）-3 は 165 行しかない。GPL-3 の条件を<b>丸ごと取り込んだうえで</b>、許可を足した差分だからである。第1章で <code>grep -iL warrant</code> を打ったとき、保証に触れていないのが LGPL-3 だけだったのはこのためで、無保証の条文は GPL-3 の第15条をそのまま使っている。</p>
+<p>足された許可の中心が、ライブラリと組み合わせた作品の扱いである。</p>
+<pre><code>$ grep -A13 "4. Combined Works." /usr/share/common-licenses/LGPL-3
+  4. Combined Works.
+
+  You may convey a Combined Work under terms of your choice that,
+taken together, effectively do not restrict modification of the
+portions of the Library contained in the Combined Work and reverse
+engineering for debugging such modifications, if you also do each of
+the following:
+
+   a) Give prominent notice with each copy of the Combined Work that
+   the Library is used in it and that the Library and its use are
+   covered by this License.
+
+   b) Accompany the Combined Work with a copy of the GNU GPL and this license
+   document.</code></pre>
+<p>ライブラリと組み合わせた作品（<code>Combined Work</code>）は、<code>under terms of your choice</code>、つまり<b>自分の選んだ条件で</b>配ってよい。ライブラリを使う側のプログラムを GPL にする必要も、そのソースコードを公開する必要もない。条件は、作品の中のライブラリ部分を改変することと、そのためのデバッグ（リバースエンジニアリング）を妨げないこと。そして a) ライブラリを使っていてこのライセンスが及ぶことを目立つように示し、b) GPL と LGPL の文書を添えること。ここでも、条件の文書がソフトと一緒に渡る。</p>
+<pre><code>$ grep -A3 "GNU C Library is free software" /usr/share/doc/libc6/copyright
+    The GNU C Library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.</code></pre>
+<p>C の標準ライブラリ（glibc）は LGPL 2.1 以降で配られている。Linux のプログラムの多くがこれを使って動く。もし GPL だったら、使うプログラムすべてに GPL の条件が及ぶ。LGPL なので、どんな条件のプログラムからでも使える。</p>
+<div class="analogy"><b>たとえ</b>: 貸し出し用の工具に「この工具を改造したら、改造した工具は同じ条件で貸すこと」と書いてある工具店に近い。
+工具を使って作った家具は、自分の好きな値段と条件で売ってよい。
+<br>ただし<b>崩れる点</b>: 工具と家具ははっきり分かれているが、ソフトでは「どこまでがライブラリで、どこからが使う側か」が組み合わせ方で決まる。だから条文は <code>Combined Work</code> という語を定義し直して、その境目を書いている。</div>
+
+<h2 id="mpl">MPL — ファイルの単位で効く</h2>
+<div class="sgoal"><b>この節で分かること</b>: MPL のコピーレフトがファイルの単位で効くこと。</div>
+<pre><code>$ grep -A8 '^1.10. "Modifications"' /usr/share/common-licenses/MPL-2.0
+1.10. "Modifications"
+    means any of the following:
+
+    (a) any file in Source Code Form that results from an addition to,
+        deletion from, or modification of the contents of Covered
+        Software; or
+
+    (b) any new file in Source Code Form that contains any Covered
+        Software.
+$ grep -A4 "^3.3. Distribution of a Larger Work" /usr/share/common-licenses/MPL-2.0
+3.3. Distribution of a Larger Work
+
+You may create and distribute a Larger Work under terms of Your choice,
+provided that You also comply with the requirements of this License for
+the Covered Software. If the Larger Work is a combination of Covered</code></pre>
+<p><b>MPL</b>（Mozilla Public License）は、改変（Modifications）を<b>ファイルで</b>定義している。MPL のファイルに手を入れたら、そのファイルは MPL のまま、ソースコードを出す。一方、MPL のファイルを含む大きな作品（<code>Larger Work</code>）は自分の選んだ条件で配ってよい。自分で新しく書いた別のファイルは、自分の条件のままにできる。</p>
+<p>MPL は、他のライセンスと並べて使われることもある。</p>
+<pre><code>$ grep -B7 '^License: MPL' /usr/share/doc/libffi8/copyright
+Files: msvcc.sh
+Copyright:
+ The Initial Developer of the Original Code is
+ Timothy Wall &lt;twalljava@dev.java.net&gt;.
+ Portions created by the Initial Developer are Copyright (C) 2009
+ the Initial Developer. All Rights Reserved.
+Comment: Contributor(s): Daniel Witte &lt;dwitte@mozilla.com&gt;
+License: MPL-1.1 or GPL-2+ or LGPL-2.1+</code></pre>
+<p><code>msvcc.sh</code> という1つのファイルに、3つのライセンスが <code>or</code> で並んでいる。受け取った側が、3つのうち都合のよい1つを選べるという意味である（2つなら<b>デュアルライセンス</b>と呼ぶ）。その2行上には第1章で見たのと同じ <code>All Rights Reserved.</code> がある。持ち主は権利を全部持ったままなので、許可の出し方を何通りでも用意できる。</p>
+<p>ここまでの4つを、コピーレフトが及ぶ範囲の広い順に並べる。</p>
+<div class="scroll"><table>
+<tr><th>ライセンス</th><th>条件が及ぶ範囲</th><th>条件が生まれるとき</th><th>素の Ubuntu での例</th></tr>
+<tr><td>AGPL</td><td>作品全体</td><td>配布するとき、<b>改変版をネットワーク越しに使わせるとき</b></td><td>なし（0件）</td></tr>
+<tr><td>GPL</td><td>作品全体（組み合わせた全体）</td><td>配布するとき</td><td>bash、coreutils（<code>GPL-3+</code>）</td></tr>
+<tr><td>LGPL</td><td>ライブラリの部分だけ</td><td>配布するとき</td><td>libc6（LGPL 2.1 以降）</td></tr>
+<tr><td>MPL</td><td>改変したファイルだけ</td><td>配布するとき</td><td>libffi8（3つから選ぶ1つ）</td></tr>
+<tr><td>BSD・MIT・Apache</td><td>及ばない</td><td>—</td><td>第3章</td></tr>
+</table></div>
+<div class="quiz"><b>確認</b>
+<p>GPL v3 のソフトウェアを改変し、自社の社内システムでのみ利用している。正しいものはどれか。</p>
+<ol type="A"><li>改変したソースコードを一般に公開しなければならない</li><li>改変したソースコードを元の著作権者に送らなければならない</li><li>外部に配布していないので、ソースコードを公開する義務はない</li><li>社内で使う人数に応じて利用料を払わなければならない</li></ol>
+<details><summary>答え</summary>
+<p>C。GPL-3 第2条は <code>You may make, run and propagate covered works that you do not convey, without conditions</code>
+（convey しない作品は、作るのも動かすのも条件なし）と書いている。義務の引き金は配布（convey）である。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>改変したソフトウェアをネットワーク越しのサービスとして利用させる場合にも、利用者がソースコードを入手できるようにすることを求めるライセンスはどれか。</p>
+<ol type="A"><li>GPLv2</li><li>LGPLv3</li><li>AGPLv3</li><li>MPL 2.0</li></ol>
+<details><summary>答え</summary>
+<p>C。GPL-3 は <code>Mere interaction with a user through a computer network, with no transfer of a copy, is not conveying.</code>
+と定義していて、写しを渡さないサービスには条件が生まれない。そこに条件を付けるのが AGPL の第13条（ネットワーク越しのやりとり）である。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>改変したファイルのソースコードは公開が必要だが、新たに追加した別のファイルは独自のライセンスで配布できる。このようにファイル単位でコピーレフトが効くライセンスはどれか。</p>
+<ol type="A"><li>GPL</li><li>LGPL</li><li>AGPL</li><li>MPL</li></ol>
+<details><summary>答え</summary>
+<p>D。MPL-2.0 は改変（<code>Modifications</code>）を <code>any file in Source Code Form that results from an addition to, deletion from, or modification</code> とファイル単位で定義し、それを含む大きな作品（<code>Larger Work</code>）は <code>under terms of Your choice</code> で配ってよいとしている。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>LGPL のライブラリを利用したプログラムを、プログラム本体のソースコードを公開せずに配布できるか。</p>
+<details><summary>答え</summary>
+<p>できる。LGPL-3 第4条は、ライブラリと組み合わせた作品（<code>Combined Work</code>）を <code>under terms of your choice</code> で配ってよいとしている。
+ただし、ライブラリ部分の改変とそのためのデバッグを妨げないこと、ライブラリを使っている旨の表示、GPL と LGPL の文書の添付などの条件は守る。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>GPL の義務は配布（convey＝他者が写しを受け取れるようにすること）で生まれる。作る・動かす・自社の中で改変して使うだけなら条件はない</li><li>写しを渡さずにネットワーク越しに使わせるだけなら、GPL では convey ではない。改変した版のその使い方にも条件を付けるのが AGPL</li><li>改変して配るときは、改変した旨と日付を書く・作品全体を同じライセンスで出す・バイナリならソースも渡す・表示を残してライセンスの写しを渡す</li><li>コピーレフトが及ぶ範囲は AGPL（改変版のネットワーク越しの利用も）＞ GPL（作品全体）＞ LGPL（ライブラリ部分）＞ MPL（改変したファイル）＞ BSD・MIT・Apache（及ばない）</li><li>LGPL-3 は GPL-3 に許可を足した差分。だから 165 行しかなく、無保証の条文も GPL-3 から取り込んでいる</li><li><code>GPL-3+</code> の <code>+</code> は「またはそれ以降の版」。1つのコードに複数のライセンスを並べて選ばせることもできる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3（Docker Hub 公式の素のイメージ。このコースは専用イメージを作らない）/ Ubuntu 24.04.5 LTS / base-files 13ubuntu10.5 / bash 5.2.21-2ubuntu4 / coreutils 9.4-3ubuntu6.3 / dpkg 1.22.6ubuntu6.6 / libc6 2.39-0ubuntu8.9 / apt は使わない（イメージに入っているファイルを読むだけ）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-oss/theory/01-owner">← 1. オープンソースには、持ち主がいる</a><a href="/linuc-oss/theory/03-permissive">次: 3. 「何をしてもいい」は、パブリックドメインだけ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-oss/theory/">理論編 目次</a> · <a href="/linuc-oss/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-oss/chapters.js"></script>
+<script src="/linuc-oss/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

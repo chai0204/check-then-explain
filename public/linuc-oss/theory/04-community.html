@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. 報告先は、ソフトの中に書いてある — 確かめて説明する LinuC 主題1.11</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="linuc-oss">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-oss/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-oss/theory/">詳しく</a></p>
+</div>
+<h1>4. 報告先は、ソフトの中に書いてある</h1>
+<p class="lead"><code>bash --help</code> の最後は「バグは bashbug で報告して」と言い、<code>/etc/os-release</code> は Launchpad の URL を指す。同じ bash に報告先が2つある。どちらに出すかは、壊れているのが誰の作った部分かで決まる。そして報告先も、許可の条件と同じく、ソフトと一緒に配られている。</p>
+<div class="badges"><span>前提: 第3章まで読了</span><span>前提: 素の Ubuntu を起動できる（任意）</span><span>所要 15分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.11.2（重要度1）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>1つのパッケージに関わる層（上流・Debian・Ubuntu）を、手元の情報から読み取れる</li><li>コミュニティの場（メーリングリスト・掲示板・開発サイト）と開発体制を説明できる</li><li>良いバグ報告に要る情報を挙げられ、エコシステムへの参加の形を言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: 各プロジェクトの投稿の作法（英語の書き方、パッチの送り方）、Git や GitHub の操作、Launchpad や Debian のバグ管理システムの使い方、財団や団体の名前の一覧は扱わない。試験で問われるのは、どんな場があり、どう参加するかである。</div></div>
+
+<h2 id="layers">報告先が、2つある</h2>
+<div class="sgoal"><b>この節で分かること</b>: 1つのソフトに、作った人と配った人が別にいること。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>Ubuntu に入っている bash の不具合を見つけたら、Ubuntu に報告すればよい。bash を配っているのは Ubuntu なのだから、窓口は1つのはずだ。</p>
+<pre><code>$ bash --help | tail -4
+Use the `bashbug' command to report bugs.
+
+bash home page: &lt;http://www.gnu.org/software/bash&gt;
+General help using GNU software: &lt;http://www.gnu.org/gethelp/&gt;
+$ grep URL /etc/os-release
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"</code></pre>
+<div class="then"><b>だめな理由</b>: bash 自身は「<code>bashbug</code> コマンドで報告して」と言い、ホームページとして GNU のサイトを挙げる。
+OS のほうは <code>BUG_REPORT_URL</code> として Launchpad（Ubuntu のバグ管理の場）を指している。<b>窓口は1つではない</b>。
+bash を作っているのは GNU プロジェクトで、Ubuntu はそれを受け取って配っている。どちらの窓口が正しいかは、不具合が<b>どちらの手で入ったか</b>で決まる。</div></div>
+<p>1つのパッケージに関わる人は、パッケージの情報に並んでいる。</p>
+<pre><code>$ dpkg -s bash | grep -E '^(Version|Maintainer|Original-Maintainer|Homepage):'
+Maintainer: Ubuntu Developers &lt;ubuntu-devel-discuss@lists.ubuntu.com&gt;
+Version: 5.2.21-2ubuntu4
+Homepage: http://tiswww.case.edu/php/chet/bash/bashtop.html
+Original-Maintainer: Matthias Klose &lt;doko@debian.org&gt;
+$ grep '^Upstream-Contact' /usr/share/doc/bash/copyright
+Upstream-Contact: chet@po.cwru.edu</code></pre>
+<p>3つの層が見える。版番号 <code>5.2.21-2ubuntu4</code> も、同じ3層を順に書いている。</p>
+<pre><code>上流（upstream）  5.2.21            作った人。Upstream-Contact: chet@po.cwru.edu
+   ↓ 受け取って Debian 向けに整える
+Debian           5.2.21-2          Original-Maintainer: Matthias Klose
+   ↓ 受け取って Ubuntu 向けに整える
+Ubuntu           5.2.21-2ubuntu4   Maintainer: Ubuntu Developers（メーリングリスト）</code></pre>
+<p><code>5.2.21</code> が<b>上流</b>（開発元）の版、<code>-2</code> が Debian の付けた改訂番号（その上流版を Debian 向けにまとめた2回目）、<code>ubuntu4</code> が Ubuntu での4回目の変更である。下流の層は、上流のソースに自分たちの修正（パッチ）を足して配ることがある。</p>
+<p>だから不具合の出どころで窓口が変わる。上流の版でも起きる不具合なら上流へ、Ubuntu が足した部分や配り方の不具合なら Launchpad へ。どちらか分からないときは、OS が <code>BUG_REPORT_URL</code> で示す窓口から始めればよい。そこには配布元（Ubuntu）の担当者がいて、上流の問題であれば上流へつなげられる。</p>
+<div class="analogy"><b>たとえ</b>: 輸入食品の問い合わせ先に近い。中身の製法の問題は海外の製造元、ラベルや国内向けの包装の問題は輸入元、買った店にも窓口がある。
+商品の裏を見ると、それぞれの連絡先が書いてある。
+<br>ただし<b>崩れる点</b>: 輸入元は製造元に代わって責任を負うことがあるが、オープンソースは無保証で（第1章）、どの層も直す義務を負わない。直すかどうかは、それぞれの層の判断である。</div>
+
+<h2 id="places">コミュニティの場 — メーリングリスト・掲示板・開発サイト</h2>
+<div class="sgoal"><b>この節で分かること</b>: オープンソースの開発が、どんな場で行われているか。</div>
+<p>上流の連絡先は、copyright ファイルの <code>Upstream-Contact:</code> 欄に書かれていることがある。素の Ubuntu 1台ぶんを数えて、並べる。</p>
+<pre><code>$ grep -l '^Upstream-Contact:' /usr/share/doc/*/copyright | wc -l
+43
+$ grep -h '^Upstream-Contact:' /usr/share/doc/*/copyright | sort | uniq -c | sort -rn
+      7 Upstream-Contact: util-linux@vger.kernel.org
+      5 Upstream-Contact: Theodore Ts'o &lt;tytso@mit.edu&gt;
+      4 Upstream-Contact: bug-ncurses@gnu.org
+      2 Upstream-Contact: systemd-devel@lists.freedesktop.org
+      2 Upstream-Contact: Werner Koch &lt;wk@gnupg.org&gt;
+      2 Upstream-Contact: Niels Möller &lt;nisse@lysator.liu.se&gt;
+      2 Upstream-Contact: APT Development Team &lt;deity@lists.debian.org&gt;
+      2 Upstream-Contact:
+      1 Upstream-Contact: zlib@gzip.org
+      1 Upstream-Contact: sysvinit-devel@nongnu.org
+      1 Upstream-Contact: http://www.gnu.org/software/gzip/
+      1 Upstream-Contact: gnupg-devel@gnupg.org
+      1 Upstream-Contact: dash@vger.kernel.org
+      1 Upstream-Contact: chet@po.cwru.edu
+      1 Upstream-Contact: bug-tar@gnu.org
+      1 Upstream-Contact: bug-grep@gnu.org
+      1 Upstream-Contact: bug-diffutils@gnu.org
+      1 Upstream-Contact: berkeleydb-info_us@oracle.com
+      1 Upstream-Contact: Steve Grubb &lt;sgrubb@redhat.com&gt;
+      1 Upstream-Contact: Simon Josefsson &lt;simon@josefsson.org&gt;
+      1 Upstream-Contact: Mike Brennan &lt;brennan@whidbey.com&gt;
+      1 Upstream-Contact: GnuPG development mailing list &lt;gnupg-devel@gnupg.org&gt;
+      1 Upstream-Contact: Colin Watson &lt;cjwatson@debian.org&gt;
+      1 Upstream-Contact: Bruno Haible &lt;bruno@clisp.org&gt;
+      1 Upstream-Contact: Andrew G. Morgan &lt;morgan@kernel.org&gt;</code></pre>
+<p>92 個のうち 43 個に連絡先があった。人の名前と並んで、<code>util-linux@vger.kernel.org</code>・<code>systemd-devel@lists.freedesktop.org</code>・<code>bug-grep@gnu.org</code> のようなアドレスが多い。これらは個人ではなく<b>メーリングリスト</b>（ML）である。1つのアドレスに送ったメールが、購読している全員に届き、多くは過去のやりとりも公開の保管庫（アーカイブ）に残る。議論・告知・バグ報告・修正の提案が、メールの形で行われる。</p>
+<p>コマンド自身も、報告先のメーリングリストを名乗っている。</p>
+<pre><code>$ grep --help | tail -3
+Report bugs to: bug-grep@gnu.org
+GNU grep home page: &lt;https://www.gnu.org/software/grep/&gt;
+General help using GNU software: &lt;https://www.gnu.org/gethelp/&gt;
+$ sed --help | tail -1
+E-mail bug reports to: &lt;bug-sed@gnu.org&gt;.</code></pre>
+<p>ソースコードを置いて共同で手を入れる場が<b>開発サイト</b>である。copyright の <code>Source:</code> 欄から、ソースの置き場所の名前を数える。</p>
+<pre><code>$ grep -h -A3 '^Source:' /usr/share/doc/*/copyright | grep -oE 'https?://[^/ ]+' | sort | uniq -c | sort -rn | head -8
+     17 https://github.com
+      8 https://www.kernel.org
+      5 http://sourceforge.net
+      4 https://invisible-mirror.net
+      3 https://salsa.debian.org
+      3 https://gnupg.org
+      3 https://ftp.gnu.org
+      2 https://www.freedesktop.org</code></pre>
+<p>GitHub が最も多いが、Linux カーネルの kernel.org、古くからある SourceForge、Debian が自前で動かす salsa.debian.org、プロジェクトが自分で持つサイト（gnupg.org）と、場はばらばらである。開発サイトには、ソースの保管（リポジトリ）、バグや要望の管理（課題管理・バグトラッカー）、変更の提案と審査の仕組みがまとまっていることが多い。</p>
+<p><b>掲示板</b>（Web のフォーラム）は、利用者どうしが質問し、答え合う場である。開発者へ直接届くメーリングリストやバグトラッカーと違い、「使い方が分からない」「自分の設定がおかしいのか」を確かめる段階で使う。<code>/etc/os-release</code> でも、利用者の手助け（<code>SUPPORT_URL</code>）とバグ報告（<code>BUG_REPORT_URL</code>）は別の欄になっていた。</p>
+<div class="scroll"><table>
+<tr><th>場</th><th>何をする所か</th><th>素の Ubuntu で見えた例</th></tr>
+<tr><td>メーリングリスト</td><td>メールで議論・告知・報告。購読者全員に届き、記録が残る</td><td><code>util-linux@vger.kernel.org</code>、<code>bug-grep@gnu.org</code></td></tr>
+<tr><td>掲示板（フォーラム）</td><td>利用者どうしの質問と回答</td><td><code>SUPPORT_URL</code> は利用者向けの手引きの入口として別に置かれている</td></tr>
+<tr><td>開発サイト</td><td>ソースの保管、課題管理、変更の提案と審査</td><td>github.com、kernel.org、sourceforge.net</td></tr>
+<tr><td>バグ管理の場</td><td>不具合の登録と追跡</td><td><code>BUG_REPORT_URL</code>（Launchpad）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: メーリングリストは、宛先が1つの<b>回覧板</b>に近い。1通出すと、名簿に載った全員のところへ届く。済んだ回覧は綴じて保管される。
+<br>ただし<b>崩れる点</b>: 回覧板は1軒ずつ順に回るが、メーリングリストは全員に同時に届く。また回覧板は町内の人しか読めないが、オープンソースのメーリングリストの多くは、誰でも購読でき、保管庫も誰でも読める。</div>
+
+<h2 id="governance">開発体制 — 誰が決めて、誰が直すか</h2>
+<div class="sgoal"><b>この節で分かること</b>: プロジェクトによって決め方の形が違うこと、そして上流の出来事が下流まで流れること。</div>
+<p>上の <code>Upstream-Contact:</code> の一覧には、決め方の違いがそのまま出ている。</p>
+<div class="scroll"><table>
+<tr><th>形</th><th>一覧に見えたもの</th></tr>
+<tr><td>個人が中心（作者や1人のメンテナが決める）</td><td><code>chet@po.cwru.edu</code>（bash）、<code>Theodore Ts'o</code>（e2fsprogs など5パッケージ）</td></tr>
+<tr><td>チームで運営する</td><td><code>APT Development Team</code>、<code>util-linux@vger.kernel.org</code></td></tr>
+<tr><td>財団・団体が支える</td><td>coreutils と bash の著作権者は <code>Free Software Foundation</code>（第1章）</td></tr>
+<tr><td>企業が開発する</td><td><code>berkeleydb-info_us@oracle.com</code>、<code>sgrubb@redhat.com</code></td></tr>
+</table></div>
+<p>多くのプロジェクトには役割の区別がある。<b>メンテナ</b>はそのソフト（またはパッケージ）に責任を持つ人、<b>コミッタ</b>は本体に変更を取り込む権限を持つ人、<b>コントリビュータ</b>は報告・修正・翻訳などで貢献する人である。誰がどの役割かを決めるのも、そのプロジェクト自身である。</p>
+<p>Ubuntu の側の体制も、パッケージ情報に出ている。</p>
+<pre><code>$ dpkg-query -W -f='${Maintainer}\n' | sort | uniq -c | sort -rn
+     87 Ubuntu Developers &lt;ubuntu-devel-discuss@lists.ubuntu.com&gt;
+      3 Ubuntu Core developers &lt;ubuntu-devel-discuss@lists.ubuntu.com&gt;
+      1 Utkarsh Gupta &lt;utkarsh@ubuntu.com&gt;
+      1 Dimitri John Ledkov &lt;dimitri.ledkov@canonical.com&gt;
+$ dpkg-query -W -f='${Original-Maintainer}\n' | sort | uniq -c | sort -rn | head -6
+      7 util-linux packagers &lt;util-linux@packages.debian.org&gt;
+      5 Theodore Y. Ts'o &lt;tytso@mit.edu&gt;
+      4 Sam Hartman &lt;hartmans@debian.org&gt;
+      4 Ncurses Maintainers &lt;ncurses@packages.debian.org&gt;
+      4 Debian SELinux maintainers &lt;selinux-devel@lists.alioth.debian.org&gt;
+      4 Debian GnuTLS Maintainers &lt;pkg-gnutls-maint@lists.alioth.debian.org&gt;</code></pre>
+<p>92 パッケージのうち 90 の責任者は、1人ではなく「Ubuntu Developers」というメーリングリスト（チーム）である。一方、元の Debian 側（<code>Original-Maintainer</code>）にはチームと個人が混ざっている。</p>
+<p>この層の連なりが働いた記録が、手元に残っている。</p>
+<pre><code>$ dpkg -s liblzma5 | grep -E '^(Version|Maintainer|Original-Maintainer):'
+Maintainer: Ubuntu Developers &lt;ubuntu-devel-discuss@lists.ubuntu.com&gt;
+Version: 5.6.1+really5.4.5-1ubuntu0.3
+Original-Maintainer: Jonathan Nieder &lt;jrnieder@gmail.com&gt;
+$ zcat /usr/share/doc/liblzma5/changelog.Debian.gz | grep -A5 'really5.4.5-1) unstable'
+xz-utils (5.6.1+really5.4.5-1) unstable; urgency=critical
+
+  * Non-maintainer upload by the Security Team.
+  * Revert back to the 5.4.5-0.2 version
+
+ -- Salvatore Bonaccorso &lt;carnil@debian.org&gt;  Thu, 28 Mar 2024 15:59:38 +0100
+$ zcat /usr/share/doc/bash/changelog.Debian.gz | head -3
+bash (5.2.21-2ubuntu4) noble; urgency=medium
+
+  * No-change rebuild for CVE-2024-3094</code></pre>
+<p>版番号 <code>5.6.1+really5.4.5</code> は「番号は 5.6.1 より新しく、中身は本当は（really）5.4.5」という意味で、中身を前の版へ戻したことを示す。changelog には <code>urgency=critical</code>（緊急）と <code>Non-maintainer upload by the Security Team</code>（担当のメンテナではなく、セキュリティチームが出した）とある。CVE-2024-3094 は、xz の上流が配った 5.6.0 と 5.6.1 に不正なコードが仕込まれていた件の番号で、Ubuntu では bash も中身を変えずに作り直されていた（<code>No-change rebuild</code>）。</p>
+<p>上流で起きたことが Debian のチームの判断で差し戻され、Ubuntu の作り直しまで流れていく。第1章で見た<b>継続した開発</b>は、この連なりが動き続けていることを指している。</p>
+<div class="analogy"><b>たとえ</b>: 開発体制は、楽団の形に近い。指揮者1人がすべて決める楽団もあれば、団員の合議で決める楽団も、企業が支える楽団もある。
+<br>ただし<b>崩れる点</b>: 楽団を抜けた人は、その楽団の楽譜を持ち出せない。オープンソースでは、方針に賛成できなければ、ソースコードごと持ち出して別のプロジェクトを始めてよい（<b>フォーク</b>）。それを許しているのが、第1章の「改変した版を配る自由」である。</div>
+
+<h2 id="report">良いバグ報告に要るもの</h2>
+<div class="sgoal"><b>この節で分かること</b>: バグ報告に何を書けば、開発者が動けるか。</div>
+<p>bash の報告手段 <code>bashbug</code> が、答えを用意している。</p>
+<pre><code>$ bashbug --help
+GNU bashbug, version 5.2.21-release
+Usage: /usr/bin/bashbug [--help] [--version] [bug-report-email-address]
+
+Bashbug is used to send mail to the Bash maintainers
+for when Bash doesn't behave like you'd like, or expect.
+
+Bashbug will start up your editor (as defined by the shell's
+EDITOR environment variable) with a preformatted bug report
+template for you to fill in. The report will be mailed to the
+bug-bash mailing list by default. See the manual for details.
+
+If you invoke bashbug by accident, just quit your editor without
+saving any changes to the template, and no bug report will be sent.</code></pre>
+<p>エディタで報告の下書き（テンプレート）を開き、書き終えると <code>bug-bash</code> メーリングリストへメールで送る。ここではエディタの代わりに <code>cat</code> を渡して、下書きを画面に出すだけにする。件名を書き換えていないので bashbug は送る前に止まり、<code>y</code>（あきらめる）で終わる。<b>何も送信されない</b>。</p>
+<pre><code>$ echo y | EDITOR=cat bashbug
+From: root
+To: bug-bash@gnu.org
+Subject: [50 character or so descriptive subject here (for reference)]
+
+Configuration Information [Automatically generated, do not change]:
+Machine: x86_64
+OS: linux-gnu
+Compiler: gcc
+Compilation CFLAGS: -g -O2 -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -flto=auto -ffat-lto-objects -fstack-protector-strong -fstack-clash-protection -Wformat -Werror=format-security -fcf-protection -Wall
+uname output: Linux linuc 7.2.6 #1-NixOS SMP PREEMPT_DYNAMIC Mon Sep 14 11:41:11 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux   ← この行だけは手元のカーネルの情報になる
+Machine Type: x86_64-pc-linux-gnu
+
+Bash Version: 5.2
+Patch Level: 21
+Release Status: release
+
+Description:
+	[Detailed description of the problem, suggestion, or complaint.]
+
+Repeat-By:
+	[Describe the sequence of events that causes the problem
+	to occur.]
+
+Fix:
+	[Description of how to fix the problem.  If you don't know a
+	fix for the problem, don't include this section.]
+
+/usr/bin/bashbug: You have not changed the subject from the default.
+/usr/bin/bashbug: Please use a more descriptive subject header.
+/usr/bin/bashbug: Type `y' to give up, and lose your bug report;
+/usr/bin/bashbug: type `n' to re-enter the editor.
+/usr/bin/bashbug: Do you want to give up?</code></pre>
+<p>下書きの欄が、そのまま良いバグ報告の部品になっている。</p>
+<div class="scroll"><table>
+<tr><th>要るもの</th><th>bashbug の欄</th><th>無いと何が起きるか</th></tr>
+<tr><td>具体的な件名</td><td><code>Subject</code>（50字ほど。書き換えないと bashbug が送らない）</td><td>似た報告と区別できず、後から探せない</td></tr>
+<tr><td>環境</td><td><code>Configuration Information</code>（自動で集める。変えない）</td><td>開発者の手元で再現できない</td></tr>
+<tr><td>版</td><td><code>Bash Version</code> / <code>Patch Level</code></td><td>すでに直っている版の話かどうか判断できない</td></tr>
+<tr><td>何が起きたか（期待した結果と実際の結果）</td><td><code>Description</code></td><td>不具合なのか仕様どおりなのか判断できない</td></tr>
+<tr><td>再現の手順</td><td><code>Repeat-By</code></td><td>開発者が同じ現象を見られない</td></tr>
+<tr><td>直し方（分かれば）</td><td><code>Fix</code>（分からなければ書かない）</td><td>—</td></tr>
+</table></div>
+<p>これに加えて、出す前に同じ報告が既に無いかを探す、1件の報告には1つの問題だけを書く、そのプロジェクトが決めた場（メーリングリストか、バグトラッカーか）に出す、の3つを守ると、報告が埋もれにくい。このサイトの「本文と違う出力が出たら」の手順（打ったコマンド・本文の出力・あなたの出力・環境）も、同じ形をしている。</p>
+<div class="analogy"><b>たとえ</b>: 病院の<b>問診票</b>に近い。いつから・どこが・どうなったか・飲んでいる薬は何かを、医師が聞く前に書かせる。
+<br>ただし<b>崩れる点</b>: 医師は目の前で診察できるが、開発者はあなたのマシンを見られない。報告に書かれたことだけが手がかりなので、問診票よりずっと細かく、手順を再現できる形で書く必要がある。</div>
+<div class="note try"><b>手を動かす</b>:
+このコースには演習がない。素の Ubuntu で <code>bash --help | tail -4</code> と <code>grep URL /etc/os-release</code> を打ち、報告先が2つあることを自分の画面で確かめる。
+<code>echo y | EDITOR=cat bashbug</code> は下書きを表示するだけで、何も送信しない。起動のしかたは<a href="/linuc-oss/">入口</a>にある。</div>
+
+<h2 id="join">参加は、使うことから始まる</h2>
+<div class="sgoal"><b>この節で分かること</b>: オープンソースのエコシステムに、どういう形で加われるか。</div>
+<p>出題範囲は、エコシステムへの参加として「使用、紹介、バグ報告」の3つを挙げている。</p>
+<div class="scroll"><table>
+<tr><th>参加の形</th><th>中身</th></tr>
+<tr><td>使用</td><td>使うこと自体が参加になる。使う人が多いほど不具合が見つかり、改善の理由になる</td></tr>
+<tr><td>紹介</td><td>ブログ・勉強会・職場などで広める。利用者と貢献者が増える</td></tr>
+<tr><td>バグ報告</td><td>前の節の形で、決められた場に報告する</td></tr>
+<tr><td>そのほか</td><td>翻訳、文書の改善、修正（パッチ）の提案、寄付</td></tr>
+</table></div>
+<p>翻訳の窓口も、コマンドの中に書いてある。</p>
+<pre><code>$ ls --help | tail -3
+Report any translation bugs to &lt;https://translationproject.org/team/&gt;
+Full documentation &lt;https://www.gnu.org/software/coreutils/ls&gt;
+or available locally via: info '(coreutils) ls invocation'</code></pre>
+<p>「翻訳の誤りは translationproject.org の各言語のチームへ」。コードを書かなくても、日本語のメッセージを直すことで上流に加われる。</p>
+
+<h2 id="spine">4章が1つの事実から出ていた</h2>
+<div class="sgoal"><b>この節で分かること</b>: 主題1.11 の4章が、同じ1つの形をしていること。</div>
+<div class="scroll"><table>
+<tr><th>章</th><th>誰が（持ち主）</th><th>何を書いたか</th><th>どこに一緒に入っていたか</th></tr>
+<tr><td>1</td><td>FSF などの著作権者</td><td>使ってよいという許可、無保証、写しを渡すこと</td><td><code>--version</code>、<code>/usr/share/doc/*/copyright</code></td></tr>
+<tr><td>2</td><td>GPL のソフトの著作権者</td><td>配るなら同じ条件で、ソースも渡すこと</td><td><code>/usr/share/common-licenses/GPL-3</code></td></tr>
+<tr><td>3</td><td>MIT・BSD・Apache の著作権者（パブリックドメインは持ち主なし）</td><td>表示を残すこと（パブリックドメインは条件なし）</td><td>copyright の許諾文</td></tr>
+<tr><td>4</td><td>上流・Debian・Ubuntu の各層</td><td>報告先と連絡先</td><td><code>--help</code>、<code>/etc/os-release</code>、<code>Upstream-Contact:</code></td></tr>
+</table></div>
+<p>4つとも同じ形をしている。</p>
+<pre><code>オープンソースは、権利を手放したソフトではない。
+持ち主が条件を書いて出した許可で、その条件と連絡先はソフトと一緒に配られている。</code></pre>
+<p>だから主題1.11 は知識問題でありながら、答えの根拠が手元の1台に全部入っている。マニュアルを捨てた最小のイメージでさえ、copyright と changelog は捨てていなかった。試験の前に <code>ls /usr/share/common-licenses/</code> を1回打っておくと、選択肢に並ぶ GPL・LGPL・MPL・BSD・Apache の名前が、実物のファイルと結びつく。</p>
+<div class="quiz"><b>確認</b>
+<p>オープンソースのコミュニティで、電子メールで議論や告知を行い、購読者全員に配信される仕組みはどれか。</p>
+<ol type="A"><li>バグトラッカー</li><li>メーリングリスト</li><li>掲示板</li><li>リポジトリ</li></ol>
+<details><summary>答え</summary>
+<p>B。copyright の <code>Upstream-Contact:</code> には <code>util-linux@vger.kernel.org</code> や <code>bug-grep@gnu.org</code> のようなメーリングリストのアドレスが並んでいた。
+<code>bashbug --help</code> も、報告を <code>bug-bash mailing list</code> へ送ると書いている。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>バグ報告の書き方として、最も適切なものはどれか。</p>
+<ol type="A"><li>「動きません」とだけ書いて、できるだけ早く出す</li><li>版と環境、再現の手順、期待した結果と実際の結果を書く</li><li>関係のない複数の不具合を1件の報告にまとめる</li><li>既存の報告を確かめず、同じ内容を何度も出す</li></ol>
+<details><summary>答え</summary>
+<p>B。bashbug の下書きも、環境（<code>Configuration Information</code>）、版（<code>Bash Version</code> / <code>Patch Level</code>）、
+何が起きたか（<code>Description</code>）、再現の手順（<code>Repeat-By</code>）の欄を持っていた。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>Ubuntu のパッケージの版 <code>5.2.21-2ubuntu4</code> のうち、上流（開発元）の版を表しているのはどの部分か。</p>
+<details><summary>答え</summary>
+<p><code>5.2.21</code>。<code>-2</code> は Debian の付けた改訂番号、<code>ubuntu4</code> は Ubuntu での4回目の変更である。
+<code>dpkg -s bash</code> でも、<code>Original-Maintainer</code>（Debian）と <code>Maintainer</code>（Ubuntu）が別に書かれていた。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>LinuC の出題範囲が「オープンソースエコシステムへの参加」として挙げているものを3つ答えよ。</p>
+<details><summary>答え</summary>
+<p>使用・紹介・バグ報告。使うこと自体も参加に数えられる。ほかに翻訳（<code>ls --help</code> が窓口を書いている）、文書の改善、修正の提案、寄付などの形もある。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>1つのパッケージには、上流（作った人）・Debian・Ubuntu の層がある。版番号 <code>5.2.21-2ubuntu4</code> がその順に並んでいる</li><li>報告先は1つではない。<code>bash --help</code> は上流（bashbug → <code>bug-bash@gnu.org</code>）を、<code>/etc/os-release</code> は Ubuntu（Launchpad）を指す。不具合の出どころで窓口を選ぶ</li><li>コミュニティの場は、メーリングリスト（メールで議論・報告）、掲示板（利用者どうしの質問と回答）、開発サイト（ソースの保管・課題管理・変更の提案）</li><li>開発体制は、個人中心・チーム・財団・企業とプロジェクトごとに違う。役割としてメンテナ・コミッタ・コントリビュータがある。方針が合わなければフォークできる</li><li>良いバグ報告は、具体的な件名・版・環境・再現の手順・期待と実際の結果。bashbug の下書きがその形をしている</li><li>エコシステムへの参加は、使用・紹介・バグ報告から。翻訳や文書、修正の提案もある</li><li>4章すべてが「持ち主が条件を書いて出した許可で、その条件と連絡先はソフトと一緒に配られている」という1つの形だった</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3（Docker Hub 公式の素のイメージ。このコースは専用イメージを作らない）/ Ubuntu 24.04.5 LTS / base-files 13ubuntu10.5 / bash 5.2.21-2ubuntu4 / coreutils 9.4-3ubuntu6.3 / dpkg 1.22.6ubuntu6.6 / libc6 2.39-0ubuntu8.9 / apt は使わない（イメージに入っているファイルを読むだけ）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-oss/theory/03-permissive">← 3. 「何をしてもいい」は、パブリックドメインだけ</a><a href="/linuc-oss/">入口（起動のしかた）へ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-oss/theory/">理論編 目次</a> · <a href="/linuc-oss/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-oss/chapters.js"></script>
+<script src="/linuc-oss/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -6,6 +6,6 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 BUILD=$(cd "$HERE/.." && pwd)/build
 KVM=()
 [ -r /dev/kvm ] && [ -w /dev/kvm ] && KVM=(--device /dev/kvm)
-docker run --rm --user root "${KVM[@]}" \
+docker run --rm --user root "${KVM[@]}" -e INSPECT="${INSPECT:-}" \
   -v "$BUILD":/build -v "$HERE":/guest:ro \
   --entrypoint bash lab-linuc-vmhost:1.0.0 /guest/inside-keyscan.sh 2>&1 | tee "$BUILD/keyscan.log"

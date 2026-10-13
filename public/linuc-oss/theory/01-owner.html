@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. オープンソースには、持ち主がいる — 確かめて説明する LinuC 主題1.11</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="1" data-theme="linuc-oss">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-oss/theory/">理論編</a> › 第1章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-oss/theory/">詳しく</a></p>
+</div>
+<h1>1. オープンソースには、持ち主がいる</h1>
+<p class="lead">素の Ubuntu で <code>ls --version</code> と打つと、2行目に <code>Copyright (C) 2023 Free Software Foundation, Inc.</code> と出る。誰でも使えて、中身を読めて、改変して配ってもよいソフトに、持ち主の名前が書いてある。オープンソースは、権利を手放したソフトではない。</p>
+<div class="badges"><span>前提: コマンドを打てる</span><span>前提: 素の Ubuntu を起動できる（任意）</span><span>所要 16分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.11.1（重要度2）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>オープンソースのソフトに持ち主（著作権者）がいることを、手元のファイルで示せる</li><li>「オープンソースの定義」と「フリーソフトウェアの4つの自由」が何を求め、何を求めていないかを言える</li><li>無保証・継続した開発・多くのライセンスという特徴を、それぞれ実物で指し示せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: オープンソースの定義10項目の原文の言い回し、FSF と OSI の考え方の違いの歴史、国ごとの著作権法の違い。各ライセンスが具体的に何を求めるかは第2章・第3章で見るので、ここでは「持ち主がいて、条件付きで許可している」と分かれば足りる。</div></div>
+
+<h2 id="owner">自由に使えるのに、持ち主の名前がある</h2>
+<div class="sgoal"><b>この節で分かること</b>: オープンソースが、権利を放棄したソフトではないこと。</div>
+<p>このコースには専用の檻がない。どの Ubuntu にも入っている「ライセンスの実物」を読む。<a href="/linuc-oss/">入口</a>の起動コマンドで素の Ubuntu を立ち上げると、本文と同じ画面が出る。最初は、いちばんよく打つコマンドの版を聞く。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>誰でも無料で使えて、ソースコードも読めて、改変して配ってもよい。そこまで開放しているのだから、作った人は権利を手放しているはずだ。オープンソースのソフトは「誰のものでもない」。</p>
+<pre><code>$ ls --version
+ls (GNU coreutils) 9.4
+Copyright (C) 2023 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later &lt;https://gnu.org/licenses/gpl.html&gt;.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Written by Richard M. Stallman and David MacKenzie.</code></pre>
+<div class="then"><b>だめな理由</b>: 2行目に <code>Copyright (C) 2023 Free Software Foundation, Inc.</code> とある。
+持ち主（著作権者）は Free Software Foundation（FSF）で、権利を手放していない。
+3行目は「その持ち主が、GPL バージョン3以降という条件で使うことを許している」という意味である。
+4行目の <code>free</code> は「自由に変更し、再配布してよい」の自由で、5行目は「保証は無い」。
+<b>オープンソースは放棄ではなく、持ち主が条件を書いて出した許可である。</b>
+許可なので、条件を守らずに使えば、ただの無断利用になる。</div></div>
+<p>同じことが、パッケージごとにファイルで残っている。<code>/usr/share/doc/&lt;パッケージ名&gt;/copyright</code> である。</p>
+<pre><code>$ grep -A2 '^Files: \*$' /usr/share/doc/bash/copyright
+Files: *
+Copyright: (C) 1987-2022 Free Software Foundation, Inc.
+License: GPL-3+</code></pre>
+<p>3行で1組になっている。<code>Files:</code> がどのファイルの話か（<code>*</code> は全部）、<code>Copyright:</code> が誰の著作物か、<code>License:</code> がどの条件で許可しているか。この書式は Debian が決めた<b>機械可読形式</b>で、Ubuntu はそれを引き継いでいる。</p>
+<p>同じファイルの中に、もっとはっきりした組もある。</p>
+<pre><code>$ grep -B1 -A1 'Michael Wood' /usr/share/doc/bash/copyright
+Files: examples/shellmath/*
+Copyright: (c) 2020 by Michael Wood. All rights reserved.
+License: GPL-3+</code></pre>
+<p><code>All rights reserved</code>（すべての権利を留保する）と書いたまま、GPL-3+ で配られている。矛盾ではない。<b>権利は全部持ったまま、そのうえで許可を出している</b>。GPL 自身が、この2段構えを前文に書いている。</p>
+<pre><code>$ grep -A2 "two steps" /usr/share/common-licenses/GPL-2
+  We protect your rights with two steps: (1) copyright the software, and
+(2) offer you this license which gives you legal permission to copy,
+distribute and/or modify the software.</code></pre>
+<p>手順の1つ目が「ソフトウェアに著作権を持つ」、2つ目が「コピー・配布・改変を法的に許すライセンスを渡す」。権利を手放してしまうと、2つ目の許可を出す主体がいなくなる。</p>
+<p>では、なぜ許可の文書がわざわざ要るのか。作品をパブリックドメインに差し出すための文書（CC0）の冒頭に、理由が書いてある。</p>
+<pre><code>$ grep -A3 "^The laws of most" /usr/share/common-licenses/CC0-1.0
+The laws of most jurisdictions throughout the world automatically confer
+exclusive Copyright and Related Rights (defined below) upon the creator
+and subsequent owner(s) (each and all, an "owner") of an original work of
+authorship and/or a database (each, a "Work").</code></pre>
+<p>世界のほとんどの法律は、作品を作った人に著作権を<b>自動的に</b>与える。プログラムも作品、つまり<b>著作物</b>で、書いた瞬間に持ち主が決まる。何も書かずに公開したコードは「読めるが、使ってよいとは言われていない」状態になる。だから使わせたい人は、ライセンスという許可の文書を付ける。</p>
+<p>ライセンスの文書そのものも著作物である。</p>
+<pre><code>$ head -6 /usr/share/common-licenses/GPL-3
+                    GNU GENERAL PUBLIC LICENSE
+                       Version 3, 29 June 2007
+
+ Copyright (C) 2007 Free Software Foundation, Inc. &lt;https://fsf.org/&gt;
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.</code></pre>
+<p>GPL の文書は「そのままの写しなら配ってよいが、変えてはいけない」。ソフトに改変の自由を与える文書が、自分自身の改変は許していない。持ち主が条件を決めている、ということがここでも分かる。</p>
+<div class="analogy"><b>たとえ</b>: 「私有地につき通り抜け可。自転車は降りて押してください」という看板が立った道に近い。
+土地には持ち主がいて、手放していない。そのうえで、条件付きで通ってよいと看板（ライセンス）で知らせている。看板が無ければ、通ってよいかどうかは分からない。
+<br>ただし<b>崩れる点</b>: 通り抜けの許可は持ち主の都合で明日にも取り消せるが、オープンソースのライセンスの多くは、条件を守っている限り取り消さない形で許可を出している。また道は1本しかないが、ソフトは何人が写しても減らない。</div>
+
+<h2 id="definition">定義は2つある — 4つの自由と、オープンソースの定義</h2>
+<div class="sgoal"><b>この節で分かること</b>: 「自由」と「ソースコード」が、それぞれ何を指しているか。</div>
+<p>「どういうソフトなら、自由に使えるソフトと呼べるか」は、2つの団体がそれぞれ文書にしている。1つは GNU プロジェクトを始めた <b>FSF</b>（Free Software Foundation）の「フリーソフトウェア」の定義、もう1つは <b>OSI</b>（Open Source Initiative）の「<b>オープンソースの定義</b>」（The Open Source Definition、略して OSD）である。呼び名と力点は違うが、求めている自由はほとんど重なる。上の <code>ls --version</code> の最後の行にある Richard M. Stallman は、FSF を創設した人である。</p>
+<p>GPL の前文に、「free」がどちらの意味かが書いてある。</p>
+<pre><code>$ grep -A5 "When we speak of free software" /usr/share/common-licenses/GPL-3
+  When we speak of free software, we are referring to freedom, not
+price.  Our General Public Licenses are designed to make sure that you
+have the freedom to distribute copies of free software (and charge for
+them if you wish), that you receive source code or can get it if you
+want it, that you can change the software or use pieces of it in new
+free programs, and that you know you can do these things.</code></pre>
+<p><code>freedom, not price</code> — 値段ではなく<b>自由</b>のこと。しかも「（望むなら）料金を取って配る自由」まで書いている。無料かどうかは、どちらの定義にも入っていない。FSF はこの自由を4つに分けて、0 から番号を振っている。</p>
+<div class="scroll"><table>
+<tr><th>番号</th><th>フリーソフトウェアの4つの自由</th><th>前提になるもの</th></tr>
+<tr><td>0</td><td>目的を問わず、プログラムを実行する自由</td><td>—</td></tr>
+<tr><td>1</td><td>どう動くかを調べ、望みどおりに変える自由</td><td>ソースコードが手に入ること</td></tr>
+<tr><td>2</td><td>写しを配って、他の人を助ける自由</td><td>—</td></tr>
+<tr><td>3</td><td>改変した版を配って、全体に役立てる自由</td><td>ソースコードが手に入ること</td></tr>
+</table></div>
+<p>OSI のオープンソースの定義は、ライセンスが満たすべき条件を10項目で書いている。試験では「定義に含まれないものはどれか」の形で問われる。</p>
+<div class="scroll"><table>
+<tr><th>項目</th><th>名前</th><th>求めていること</th></tr>
+<tr><td>1</td><td>自由な再頒布</td><td>他のソフトと一緒に配ったり売ったりすることを禁じない。そのとき使用料を求めない</td></tr>
+<tr><td>2</td><td>ソースコード</td><td>ソースコードを含めるか、入手方法を示す。わざと読みにくくしたものは認めない</td></tr>
+<tr><td>3</td><td>派生ソフトウェア</td><td>改変と派生物を認め、それを元と同じ条件で配ることを認める</td></tr>
+<tr><td>4</td><td>作者のソースコードの完全性</td><td>改変版を「元のソース＋差分（パッチ）」の形に限ることは認められる。別の名前や版番号を求めてもよい</td></tr>
+<tr><td>5</td><td>個人やグループに対する差別の禁止</td><td>誰に対しても同じ条件</td></tr>
+<tr><td>6</td><td>利用する分野に対する差別の禁止</td><td>「商用には使えない」「研究用のみ」のような制限を付けない</td></tr>
+<tr><td>7</td><td>ライセンスの分配</td><td>受け取った人全員に、追加の契約を結ばせずに同じ権利が及ぶ</td></tr>
+<tr><td>8</td><td>特定製品に限定しない</td><td>「このディストリビューションの一部である間だけ」のような条件を付けない</td></tr>
+<tr><td>9</td><td>他のソフトウェアを制限しない</td><td>一緒に配る他のソフトにまで条件を課さない</td></tr>
+<tr><td>10</td><td>技術的な中立</td><td>特定の技術や操作（クリックして同意する等）を前提にしない</td></tr>
+</table></div>
+<p>2つの定義に共通する前提が<b>ソースコード</b>である。ソースコードが無ければ、調べることも直すこともできない。GPL はソースコードを次のように定義している。</p>
+<pre><code>$ grep -A4 "1. Source Code." /usr/share/common-licenses/GPL-3
+  1. Source Code.
+
+  The "source code" for a work means the preferred form of the work
+for making modifications to it.  "Object code" means any non-source
+form of a work.</code></pre>
+<p>「改変するときに好んで使われる形」。人の目で読める形をしていても、わざと読みにくくしたものや、機械が途中で生成したものは当たらない。オープンソースの定義の2項目めも同じことを求めている。ソースコードの置き場所も、copyright ファイルに書いてある。</p>
+<pre><code>$ grep -A1 '^Source:' /usr/share/doc/bash/copyright
+Source:
+ ftp.gnu.org:/pub/gnu/bash</code></pre>
+<div class="analogy"><b>たとえ</b>: ソースコードは、料理人が次に作るときに手を入れる<b>レシピ</b>で、実行できるプログラム（バイナリ）は出来上がった料理に近い。
+料理だけ渡されても、塩を控えた版は作れない。レシピがあれば作れる。
+<br>ただし<b>崩れる点</b>: 料理は食べればなくなるが、プログラムは何度でも写せる。だから「写して配ってよいか」を決める文書が、料理には要らないのにソフトには要る。</div>
+
+<h2 id="warranty">保証は、条文で外してある</h2>
+<div class="sgoal"><b>この節で分かること</b>: 無保証が「たまたま」ではなく、許可に付いた条件の1つであること。</div>
+<pre><code>$ bash --version
+GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu)
+Copyright (C) 2022 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later &lt;http://gnu.org/licenses/gpl.html&gt;
+
+This is free software; you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.</code></pre>
+<p><code>ls</code> と同じく、最後の行は <code>There is NO WARRANTY</code>。画面に出すだけでなく、ライセンスの本文に条文として書いてある。</p>
+<pre><code>$ grep -A9 "15. Disclaimer of Warranty" /usr/share/common-licenses/GPL-3
+  15. Disclaimer of Warranty.
+
+  THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY
+APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
+HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY
+OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM
+IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF
+ALL NECESSARY SERVICING, REPAIR OR CORRECTION.</code></pre>
+<p><code>"AS IS"</code>（あるがまま）で提供する。<code>THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU</code> — 品質と性能についての危険は、すべて使う側が負う。壊れたときの修理の費用も使う側が持つ。これが<b>無保証</b>の中身である。</p>
+<p>GPL だけではない。<code>/usr/share/common-licenses/</code> の全文を、保証（warranty）に触れていないものを探す形で調べる。</p>
+<pre><code>$ grep -iL warrant /usr/share/common-licenses/*
+/usr/share/common-licenses/LGPL
+/usr/share/common-licenses/LGPL-3</code></pre>
+<p><code>-L</code> は「一致する行が<b>無い</b>ファイルの名前」を出す。<code>-i</code> は大文字と小文字を区別しない。17 のうち、保証に触れていないのは LGPL-3（と、それを指すリンクの LGPL）だけで、残りはすべて保証を否定している。LGPL-3 だけが例外になる理由は、第2章で条文から分かる。</p>
+<p>ただし、保証を<b>売る</b>ことは禁じられていない。</p>
+<pre><code>$ grep -A1 "You may charge any price" /usr/share/common-licenses/GPL-3
+  You may charge any price or no price for each copy that you convey,
+and you may offer support or warranty protection for a fee.</code></pre>
+<p>「配る写しには、いくらの値段を付けても、付けなくてもよい。サポートや保証を有料で提供してもよい」。ソフトそのものは無保証のまま、保証やサポートを別の契約として売る。企業向けのディストリビューションのサポート契約は、この形をしている。</p>
+<div class="analogy"><b>たとえ</b>: フリーマーケットの「<b>現状渡し・ノークレーム</b>」の札が付いた品に近い。
+受け取ったあとで壊れても、出品者は責任を負わない。それが最初から札に書いてある。
+<br>ただし<b>崩れる点</b>: フリマの出品者は売ったらそれきりだが、オープンソースは無保証のまま、持ち主が直した版を出し続けることが多い。保証が無いことと、放っておかれていることは別である（次の節で見る）。</div>
+
+<h2 id="travel">削った後にも、残っているもの</h2>
+<div class="sgoal"><b>この節で分かること</b>: 許可の条件と開発の記録が、ソフトと一緒に配られていること。</div>
+<p>本文で使っている素の Ubuntu イメージは、容量を削った<b>最小構成</b>である。<code>man</code> を打つと分かる。</p>
+<pre><code>$ man ls
+This system has been minimized by removing packages and content that are
+not required on a system that users do not log into.
+
+To restore this content, including manpages, you can run the 'unminimize'
+command. You will still need to ensure the 'man-db' package is installed.
+$ find /usr/share/man -type f | wc -l
+0</code></pre>
+<p>マニュアルのファイルは1つも無い。ところが copyright は残っている。</p>
+<pre><code>$ ls -1 /usr/share/doc/bash/
+changelog.Debian.gz
+copyright
+$ ls -1 /usr/share/doc/*/copyright | wc -l
+92
+$ cat /usr/share/doc/*/copyright | wc -l
+27911</code></pre>
+<p>何を捨てて何を残すかは、dpkg の設定に書いてある。</p>
+<pre><code>$ grep -v '^$' /etc/dpkg/dpkg.cfg.d/excludes
+# Drop all man pages
+path-exclude=/usr/share/man/*
+# Drop all translations
+path-exclude=/usr/share/locale/*/LC_MESSAGES/*.mo
+# Drop all documentation ...
+path-exclude=/usr/share/doc/*
+# ... except copyright files ...
+path-include=/usr/share/doc/*/copyright
+# ... and Debian changelogs for native &amp; non-native packages
+path-include=/usr/share/doc/*/changelog.*</code></pre>
+<p>「文書はすべて捨てる……<b>ただし copyright ファイルは除く</b>」。マニュアルも翻訳も捨てたイメージが、92 個・27911 行の著作権表示だけは残している。消せない理由は、ライセンスの条文を読むと分かる。</p>
+<pre><code>$ grep -A8 "4. Conveying Verbatim Copies." /usr/share/common-licenses/GPL-3
+  4. Conveying Verbatim Copies.
+
+  You may convey verbatim copies of the Program's source code as you
+receive it, in any medium, provided that you conspicuously and
+appropriately publish on each copy an appropriate copyright notice;
+keep intact all notices stating that this License and any
+non-permissive terms added in accord with section 7 apply to the code;
+keep intact all notices of the absence of any warranty; and give all
+recipients a copy of this License along with the Program.</code></pre>
+<p>配るなら、著作権の表示を載せ、このライセンスが適用されるという表示と、無保証の表示を<b>そのまま残し</b>、<b>受け取る全員にライセンスの写しを渡す</b>こと。イメージを配る側は、ソフトだけを配ることができない。<b>許可の条件は、ソフトと一緒に配られる。</b></p>
+<p>もう1つ残されているのが changelog（変更履歴）である。</p>
+<pre><code>$ zcat /usr/share/doc/bash/changelog.Debian.gz | head -5
+bash (5.2.21-2ubuntu4) noble; urgency=medium
+
+  * No-change rebuild for CVE-2024-3094
+
+ -- Steve Langasek &lt;steve.langasek@ubuntu.com&gt;  Sun, 31 Mar 2024 08:41:03 +0000
+$ zcat /usr/share/doc/bash/changelog.Debian.gz | grep -c '^bash ('
+44
+$ zcat /usr/share/doc/bash/changelog.Debian.gz | grep '^bash (' | tail -1
+bash (5.0-5) unstable; urgency=medium</code></pre>
+<p>この履歴には 44 回分の版が並び、いちばん古い行は 5.0-5 である。圧縮ライブラリ xz（パッケージ名 liblzma5）の履歴の先頭は、もっと新しい。</p>
+<pre><code>$ zcat /usr/share/doc/liblzma5/changelog.Debian.gz | head -9
+xz-utils (5.6.1+really5.4.5-1ubuntu0.3) noble-security; urgency=medium
+
+  * SECURITY UPDATE: heap buffer overflow
+    - debian/patches/CVE-2026-34743.patch: adds a check to
+      lzma_index_prealloc() to default to a safe size when decoding empty
+      indexes in src/liblzma/common/index.c.
+    - CVE-2026-34743
+
+ -- Ian Constantin &lt;ian.constantin@canonical.com&gt;  Thu, 28 May 2026 19:06:47 +0300</code></pre>
+<p>2026年5月にも脆弱性の修正が入っている。出題範囲がオープンソースの特徴として挙げる<b>継続した開発</b>は、こういう記録として手元に残っている。無保証であることと、放っておかれていることは別である。誰がどうやって直し続けているのかは第4章で見る。</p>
+<div class="analogy"><b>たとえ</b>: 雑誌に借りた写真を載せるときの「写真提供: ○○」というクレジットに近い。
+雑誌を刷り直しても、別の号に再録しても、クレジットは写真と一緒に付いて回る。
+<br>ただし<b>崩れる点</b>: 写真のクレジットは1行で済むが、素の Ubuntu 1台でも 92 個・27911 行になる。部品の数だけ持ち主がいて、それぞれの条件を全部一緒に運んでいる。</div>
+<div class="note try"><b>手を動かす</b>:
+このコースには演習がない（理由は<a href="/linuc-oss/">入口</a>に書いた）。かわりに入口の起動コマンドで素の Ubuntu を立ち上げ、
+<code>ls --version</code> と <code>grep -A2 '^Files: \*$' /usr/share/doc/bash/copyright</code> を打つと、この章と同じ画面が出る。
+<code>bash</code> の部分を <code>coreutils</code> や <code>tar</code> に変えて、持ち主を見比べるとよい。どれも読むだけのコマンドである。</div>
+
+<h2 id="many">1台に、155 通りのライセンス表記</h2>
+<div class="sgoal"><b>この節で分かること</b>: 「多くのライセンスが存在する」が、どのくらいの多さなのか。</div>
+<pre><code>$ ls -1 /usr/share/common-licenses/
+Apache-2.0
+Artistic
+BSD
+CC0-1.0
+GFDL
+GFDL-1.2
+GFDL-1.3
+GPL
+GPL-1
+GPL-2
+GPL-3
+LGPL
+LGPL-2
+LGPL-2.1
+LGPL-3
+MPL-1.1
+MPL-2.0
+$ ls -l /usr/share/common-licenses/GPL /usr/share/common-licenses/LGPL
+lrwxrwxrwx 1 root root 5 Sep  6 14:29 /usr/share/common-licenses/GPL -&gt; GPL-3
+lrwxrwxrwx 1 root root 6 Sep  6 14:29 /usr/share/common-licenses/LGPL -&gt; LGPL-3
+$ dpkg -S /usr/share/common-licenses
+base-files: /usr/share/common-licenses
+$ grep -l /usr/share/common-licenses /usr/share/doc/*/copyright | wc -l
+84</code></pre>
+<p>よく使われるライセンスの全文は、<code>base-files</code> パッケージがここに1部ずつ置いている。92 個の copyright のうち 84 個がこの場所を指していて、全文を繰り返さずに済ませている。版違いも別のファイルで並ぶ（GPL は 1・2・3、LGPL は 2・2.1・3）。名前だけの <code>GPL</code> は <code>GPL-3</code> へのリンクである。</p>
+<p>では、copyright にはどれだけの種類のライセンスが書かれているか。</p>
+<pre><code>$ grep -l '^Format: .*copyright-format' /usr/share/doc/*/copyright | wc -l
+81
+$ grep -h '^License:' /usr/share/doc/*/copyright | sort -u | wc -l
+155
+$ grep -h '^License:' /usr/share/doc/*/copyright | sort | uniq -c | sort -rn | head -10
+    195 License: GPL-2
+    166 License: GPL-1+ or Artistic
+    155 License: LGPL-3+ or GPL-2+
+    149 License: GPL-2+
+    121 License: BSD-3-clause
+    110 License: LGPL-2.1+
+     85 License: GPL-3+
+     39 License: LGPL-2+
+     37 License: public-domain
+     31 License: LGPL-3+</code></pre>
+<p>92 個のうち 81 個が機械可読形式で、<code>License:</code> の行は 155 通りの書き方に分かれた。<code>GPL-1+ or Artistic</code> のように「どちらか好きな方で」と選ばせるもの、<code>public-domain</code> のように持ち主を置かないものまである。いちばん小さな Ubuntu 1台の中に、これだけの条件が同居している。</p>
+<p>155 は「ライセンスの種類」ではなく「書き方の種類」である。同じものが別の名前で書かれている例は第3章で数える。それでも、<b>オープンソースのライセンスは1つではない</b>ことに変わりはない。何をしてよいかは、ライセンスごとに読むしかない。</p>
+<div class="analogy"><b>たとえ</b>: 1棟のマンションで、部屋ごとに大家が違う状態に近い。
+建物（ディストリビューション）は1つでも、部屋（パッケージ）ごとに契約書（ライセンス）が違う。
+<br>ただし<b>崩れる点</b>: 部屋の契約は借りる人と1人ずつ結ぶが、ライセンスは受け取った全員に同じ条件で自動的に及ぶ。1人ずつ交渉はしない（オープンソースの定義の7項目め）。</div>
+<div class="quiz"><b>確認</b>
+<p>オープンソースソフトウェアの特徴の説明として、<b>誤っている</b>ものはどれか。</p>
+<ol type="A"><li>著作物であり、著作権者がいる</li><li>無保証で提供される</li><li>著作権が放棄されているので、誰の許可もなく使える</li><li>多くの種類のライセンスが存在する</li></ol>
+<details><summary>答え</summary>
+<p>C。<code>ls --version</code> の2行目に <code>Copyright (C) 2023 Free Software Foundation, Inc.</code> があり、
+<code>/usr/share/doc/bash/copyright</code> には <code>All rights reserved.</code> と <code>License: GPL-3+</code> が並んでいた。
+権利は持ったまま、ライセンスで許可を出している。使ってよいのは、その許可があるからである。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>オープンソースの定義（OSD）が、ライセンスに<b>求めていない</b>ものはどれか。</p>
+<ol type="A"><li>ソースコードを入手できること</li><li>改変と派生物の配布を認めること</li><li>無償で配布すること</li><li>特定の利用分野（商用など）を差別しないこと</li></ol>
+<details><summary>答え</summary>
+<p>C。定義は値段を条件にしていない。GPL-3 の条文も
+<code>You may charge any price or no price for each copy that you convey</code>
+（写しにいくらの値段を付けても、付けなくてもよい）と書いている。
+<code>free</code> は <code>freedom, not price</code>、つまり自由のことである。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>GPL-3 の条文は「ソースコード」をどう定義しているか。また、それに照らすと、
+わざと読みにくく変換したコードを渡すことはソースコードの提供と言えるか。</p>
+<details><summary>答え</summary>
+<p><code>the preferred form of the work for making modifications to it</code>
+（改変するときに好んで使われる形）。わざと読みにくくしたものは、改変に使われる形ではないので当たらない。
+オープンソースの定義の2項目めも、難読化したソースコードを認めていない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>GPL-3 のソフトウェアに保証を付けて、有料で提供してよいか。</p>
+<details><summary>答え</summary>
+<p>よい。ソフトそのものは第15条で無保証だが、第4条に
+<code>you may offer support or warranty protection for a fee</code>
+（サポートや保証を有料で提供してよい）とある。保証は、ソフトとは別の契約として付けられる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>オープンソースは権利の放棄ではなく、持ち主（著作権者）が条件を書いて出した許可。<code>ls --version</code> の <code>Copyright</code> 行がその持ち主</li><li>作品は作った時点で著作物になる。許可の文書（ライセンス）が無ければ、読めても使ってよいことにはならない</li><li>定義は2つ。FSF の4つの自由（実行・調べて変える・写しを配る・改変版を配る）と、OSI のオープンソースの定義（10項目）。どちらも「無料」は求めていない</li><li>ソースコードは「改変するときに好んで使われる形」。読めるだけのものは当たらない</li><li>無保証は条文に書いてある（GPL-3 第15条）。保証やサポートを有料で別に付けることは許されている</li><li>最小のイメージでも copyright と changelog は残っている。許可の条件はソフトと一緒に配られ、開発は今も続いている</li><li>素の Ubuntu 1台に、92 個の copyright と 155 通りのライセンス表記がある</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3（Docker Hub 公式の素のイメージ。このコースは専用イメージを作らない）/ Ubuntu 24.04.5 LTS / base-files 13ubuntu10.5 / bash 5.2.21-2ubuntu4 / coreutils 9.4-3ubuntu6.3 / dpkg 1.22.6ubuntu6.6 / libc6 2.39-0ubuntu8.9 / apt は使わない（イメージに入っているファイルを読むだけ）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-oss/theory/">← 理論編 目次</a><a href="/linuc-oss/theory/02-copyleft">次: 2. コピーレフトは、配るときに効く →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-oss/theory/">理論編 目次</a> · <a href="/linuc-oss/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-oss/chapters.js"></script>
+<script src="/linuc-oss/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -5,7 +5,9 @@
 # 読者がネットワークや sshd を壊していても判定できる。実行は root。-u で別ユーザにできる。
 # 終了コード: 練習機の中のコマンドの終了コード。エージェントに届かないときは 125。
 set -uo pipefail
-export LIBVIRT_DEFAULT_URI=${LIBVIRT_DEFAULT_URI:-qemu:///session}
+# 環境から引き継がず、常に session を使う。この檻に system 側の libvirtd は無い。
+# 読者のシェルの設定（例: Ubuntu の /etc/profile.d/libvirt-uri.sh は system にする）で判定が変わらないように。
+export LIBVIRT_DEFAULT_URI=qemu:///session
 DOM=${LAB_VM_NAME:-linuc}
 
 user=""

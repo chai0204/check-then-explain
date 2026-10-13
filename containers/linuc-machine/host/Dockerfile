@@ -29,9 +29,19 @@ RUN apt-get update \
       libvirt-daemon libvirt-daemon-driver-qemu libvirt-clients \
       openssh-client socat tini \
  && mandb -q \
- && rm -rf /var/lib/apt/lists/* /var/cache/apt/*.bin /var/cache/apt/archives/*.deb
+ && rm -rf /var/lib/apt/lists/* /var/cache/apt/*.bin /var/cache/apt/archives/*.deb \
+ && rm -f /etc/profile.d/libvirt-uri.sh
+
+#   libvirt-clients は /etc/profile.d/libvirt-uri.sh で全ユーザの LIBVIRT_DEFAULT_URI を qemu:///system にする。
+#   この檻に system 側の libvirtd は無いので、ログインシェルの virsh・vm・判定が何も見えなくなった
+#   （ファイル名の順で 98-lab-vm.sh の後に読まれ、session の設定を上書きする。実測 2026-10-13、linuc-boot の制作中に発見）。
 
 # ---- 2) 道具 ---------------------------------------------------------------
+#   置き場所のディレクトリは先に 0755 で作る。COPY --chmod は、その場で作った**親ディレクトリにも同じモードを付ける**。
+#   `COPY --chmod=0644 … /etc/lab-vm/domain.xml.in` で /etc/lab-vm が 0644（中に入れない）になり、
+#   lab ユーザが定義を読めず練習機が定義されなかった（実測 2026-10-13: /etc/lab-vm 644、/var/lib/lab-vm 444）。
+#   既にあるディレクトリのモードは変わらないので、コースの層が同じ場所へ COPY しても壊れない。
+RUN install -d -o root -g root -m 0755 /etc/lab-vm /var/lib/lab-vm /usr/local/libexec
 COPY --chown=root:root --chmod=0755 bin/vm         /usr/local/bin/vm
 COPY --chown=root:root --chmod=0755 bin/lab-guest  /usr/local/bin/lab-guest
 COPY --chown=root:root --chmod=0755 sbin/lab-vm-init /usr/local/sbin/lab-vm-init

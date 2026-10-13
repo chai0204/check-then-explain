@@ -115,8 +115,10 @@ for (const f of htmls) {
     if (n < lo) err(f, `${name} が ${n} 個（${lo} 以上が必要）`);
     else if (n > hi) warn(f, `${name} が ${n} 個（${hi} 以下を想定）`);
   }
-  // h2 の数と sgoal の数（まとめの h2 は sgoal を持たないので -1 まで許容）
-  const h2 = count(html, /<h2\b/g), sgoal = count(html, /class="sgoal"/g);
+  // h2 の数と sgoal の数（まとめの h2 は sgoal を持たないので -1 まで許容）。
+  // コメント欄（section#comments）の h2 は本文の節ではないので数えない。数えていたため全章で warn が出ていた（2026-10-13）。
+  const body = html.replace(/<section id="comments">[\s\S]*?<\/section>/, "");
+  const h2 = count(body, /<h2\b/g), sgoal = count(body, /class="sgoal"/g);
   if (sgoal < h2 - 1) warn(f, `h2 が ${h2} 個に対し sgoal が ${sgoal} 個`);
   // たとえに崩れる点があるか
   const analogies = [...html.matchAll(/class="analogy"[\s\S]*?<\/div>/g)].map((m) => m[0]);
@@ -175,12 +177,18 @@ const phTargets = [...htmls, ...files.filter((f) => f.endsWith(".js"))];
 for (const f of phTargets) {
   let rest = readFileSync(f, "utf8");
   for (const ph of PLACEHOLDERS) {
-    const n = rest.split(ph).length - 1;
+    // 英大文字と _ だけの名前（REPORT_URL など）は、前後が識別子の文字でないときだけ数える。
+    // /etc/os-release の BUG_REPORT_URL のような実在の語の一部に当たって誤報したため（2026-10-13）。
+    const word = /^[A-Z_]+$/.test(ph);
+    const re = word
+      ? new RegExp(`(?<![A-Za-z0-9_])${ph}(?![A-Za-z0-9_])`, "g")
+      : new RegExp(ph.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
+    const n = (rest.match(re) || []).length;
     if (n > 0) {
       phTotal += n;
       (PUBLISH ? err : warn)(f, `プレースホルダが残っている: ${ph} ×${n}`);
       // 数えた箇所を潰してから次へ進む（接頭辞の二重カウントを防ぐ）
-      rest = rest.split(ph).join("\u0000".repeat(ph.length));
+      rest = rest.replace(re, (m) => "\u0000".repeat(m.length));
     }
   }
 }

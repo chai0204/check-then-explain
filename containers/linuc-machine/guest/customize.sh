@@ -50,6 +50,15 @@ apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold \
   xinetd iptables firewalld gnupg pinentry-curses sudo
 #   openbsd-inetd は入れない。xinetd と同じ inet-superserver を提供し、互いに Conflicts で同時に入らない
 #   （実測 2026-10-13: `xinetd : Conflicts: inet-superserver`）。1.09 の chrony と ntpsec と同じ型。
+#   minimal イメージは man を2重に殺している。ページ（path-exclude）を戻しても、/usr/bin/man 自体が
+#   dpkg-divert で「This system has been minimized」と出すだけのスタブに差し替えられている（実測 2026-10-13）。
+#   lab-base（コンテナ）と同じ手当てをする。
+#   判定にパイプを使わない。`set -o pipefail` の下で `dpkg-divert --list | grep -q …` と書くと、grep -q が
+#   一致した瞬間に終わり、dpkg-divert が SIGPIPE で落ちてパイプ全体が失敗になる。一致したのに if が偽になり、
+#   この手当てが黙って飛ばされた（実測 2026-10-13）。--truename なら1コマンドで分かる。
+if [ "$(dpkg-divert --truename /usr/bin/man)" != /usr/bin/man ]; then
+  rm -f /usr/bin/man && dpkg-divert --quiet --remove --rename /usr/bin/man
+fi
 mandb -q
 
 # ---- 4) デーモンは止めておく（教えるコースが自分で起動する） -----------------
@@ -95,7 +104,20 @@ update-grub
 
 # ---- 7) 名前・時刻・ログイン -------------------------------------------------
 hostnamectl set-hostname linuc
-grep -q '127.0.1.1' /etc/hosts && sed -i 's/^127\.0\.1\.1.*/127.0.1.1 linuc/' /etc/hosts || echo '127.0.1.1 linuc' >> /etc/hosts
+#   /etc/hosts は追記せず丸ごと書く。`>>` で1行足した版では、行の前に NUL が 16 個入っていた
+#   （cat で見えない文字が出て、記録にも混ざる。実測 2026-10-13、linuc-network の制作中に発見）。
+cat > /etc/hosts <<'EOF2'
+127.0.0.1 localhost
+127.0.1.1 linuc
+
+# The following lines are desirable for IPv6 capable hosts
+::1 ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+ff02::3 ip6-allhosts
+EOF2
 timedatectl set-timezone Asia/Tokyo
 #   コンソール（virsh console）から入れるようにパスワードを付ける。学習用の固定値で、外からは届かない
 echo 'student:student' | chpasswd

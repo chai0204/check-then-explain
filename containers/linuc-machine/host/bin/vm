@@ -4,7 +4,9 @@
 # 中身は virsh と ssh だけで、打つたびに実際のコマンドを ▶ で表示する。
 # 読者がこのラッパに慣れたら、表示されたコマンドを自分で打てばよい（1.01.2 は virsh を名指ししている）。
 set -uo pipefail
-export LIBVIRT_DEFAULT_URI=${LIBVIRT_DEFAULT_URI:-qemu:///session}
+# 環境から引き継がず、常に session を使う。この檻に system 側の libvirtd は無い。
+# 読者のシェルの設定（例: Ubuntu の /etc/profile.d/libvirt-uri.sh は system にする）で判定が変わらないように。
+export LIBVIRT_DEFAULT_URI=qemu:///session
 DOM=${LAB_VM_NAME:-linuc}
 VMDIR=${LAB_VM_DIR:-$HOME/vm}
 BASE=/var/lib/lab-vm/linuc-guest.qcow2
@@ -140,7 +142,8 @@ case "${1:-status}" in
   start)   shift; cmd_start "$@" ;;
   stop)    cmd_stop ;;
   ssh)     shift; show "ssh linuc $*"; exec ssh linuc "$@" ;;
-  console) show "virsh console $DOM"; echo "（抜けるときは Ctrl+] ）"; exec virsh console "$DOM" ;;
+  # --force: 端末ごと閉じた古いコンソールが残っていると「Active console session exists」で入れない（実測）。奪って入る
+  console) show "virsh console --force $DOM"; echo "（抜けるときは Ctrl+] ）"; exec virsh console --force "$DOM" ;;
   status)  shift; cmd_status "$@" ;;
   reset)   shift; cmd_reset "$@" ;;
   wait)    wait_ready ;;

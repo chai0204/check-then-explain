@@ -28,6 +28,7 @@ echo "== known_hosts"; cut -c1-60 $B/known_hosts
 SSH=(ssh -i $B/lab_ed25519 -o UserKnownHostsFile=$B/known_hosts -o StrictHostKeyChecking=yes -p 2222 student@127.0.0.1)
 echo "== 健全性（鍵とホスト鍵の両方を厳密に照合して入る）"
 "${SSH[@]}" 'hostname; grep PRETTY_NAME /etc/os-release; uname -r; systemctl is-system-running --wait; systemctl --failed --no-legend --plain; ip -br a; man -w ls grep mount fdisk 2>&1; command -v nmcli ifup ifconfig dig nmap gpg xinetd firewalld at anacron lvcreate mkfs.xfs mkfs.btrfs gdisk parted efibootmgr lsusb lspci tmux screen; systemctl is-enabled NetworkManager firewalld xinetd qemu-guest-agent 2>&1; df -h / | tail -1'
+if [ -n "${INSPECT:-}" ]; then echo "== 点検"; "${SSH[@]}" "$INSPECT"; fi
 "${SSH[@]}" 'sudo systemctl poweroff' 2>/dev/null || true
 pid=$(cat /tmp/ks.pid)
 for _ in $(seq 1 60); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done

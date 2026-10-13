@@ -86,7 +86,8 @@ sed 's/^/  | /' $B/work/customize.log
 grep -q '^CUSTOMIZE_OK$' $B/work/customize.log || { echo "✗ customize.sh が最後まで走らなかった"; exit 1; }
 
 echo "== 4b. 取得した .deb を回収（次のビルドで再利用する）"
-"${SSH[@]}" 'sudo tar -C /var/cache/apt/archives -cf - --wildcards "*.deb"' | tar -C $B/cache/debs -xf -
+# 作成時の tar に --wildcards は効かない（"*.deb" をファイル名として探して失敗した。実測 2026-10-13）。シェルで展開する
+"${SSH[@]}" "sudo sh -c 'cd /var/cache/apt/archives && tar -cf - *.deb'" | tar -C $B/cache/debs -xf -
 echo "  回収: $(find $B/cache/debs -name '*.deb' | wc -l) 個 / $(du -sh $B/cache/debs | cut -f1)"
 
 echo "== 5. 片付けて停止（finalize.sh）"
