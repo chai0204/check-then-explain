@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# LinuC のコースのイメージを GHCR に push し、本文の __DIGEST__ を実際のダイジェストに置き換える。
+# 記事のイメージを GHCR に push し、本文の __DIGEST__ を実際のダイジェストに置き換える（LinuC のコースと道具の記事）。
 #
 #   bash tools/linuc-publish-images.sh [slug ...]            push して置き換える（slug を指定すればそれだけ）
 #   bash tools/linuc-publish-images.sh --dry-run [slug ...]  何をするかだけ出す
@@ -8,7 +8,10 @@
 # GHCR の可視性はパッケージ単位で、API で切り替えられない（publish.md §6）。コースごとに
 # パッケージを分けると、オーナーが Web UI で切り替える回数がコースの数だけ増えるため（2026-10-13）。
 #
-# 置き換えるのは public/<slug>/ の中の「<公開名>@sha256:__DIGEST__」だけ。
+# 道具の記事（kvm・qemu・docker・podman …）は、もう1つのパッケージ ghcr.io/chai0204/lab にタグで分ける（<slug>-1.0.0）。
+#
+# 置き換えるのは public/<slug>/ と、章のひな形 probe/<slug>-tpl/（あれば）の中の「<公開名>@sha256:__DIGEST__」だけ。
+# ひな形も置き換えるのは、記録から章を作り直したときにダイジェストが __DIGEST__ に戻らないようにするため。
 # ダイジェストは push の出力からではなく、レジストリに問い合わせて確かめる（push 後に実物を見る）。
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -16,6 +19,7 @@ DRY=0; [ "${1:-}" = "--dry-run" ] && { DRY=1; shift; }
 # 残りの引数でコース（slug）を絞る。指定が無ければ全部。制作中のコースを誤って push しないため。
 ONLY=" $* "
 REPO=ghcr.io/chai0204/lab-linuc
+TOOLS=ghcr.io/chai0204/lab
 
 # slug  ローカルイメージ  公開名（リポジトリ:タグ）
 # 主題1.09 だけは最初に公開した別パッケージ（lab-linuc-services、public 済み）に版を足す。
@@ -43,6 +47,7 @@ PAIRS=(
   "linuc-network   lab-linuc-network:1.0.1       $REPO:network-1.0.1"
   "linuc-admin     lab-linuc-admin:1.0.1         $REPO:admin-1.0.1"
   "linuc-security  lab-linuc-security:1.0.1      $REPO:security-1.0.1"
+  "kvm             lab-kvm:1.0.0                 $TOOLS:kvm-1.0.0"
 )
 
 for line in "${PAIRS[@]}"; do
@@ -56,8 +61,9 @@ for line in "${PAIRS[@]}"; do
   docker push -q "$ref" >/dev/null
   dg=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r '.digest')
   [[ "$dg" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "✗ $ref のダイジェストが取れない: $dg"; exit 1; }
-  n=$(grep -rl "$ref@sha256:__DIGEST__" "public/$slug" | wc -l)
-  grep -rl "$ref@sha256:__DIGEST__" "public/$slug" | xargs -r sed -i "s#$ref@sha256:__DIGEST__#$ref@$dg#g"
+  dirs=("public/$slug"); [ -d "probe/$slug-tpl" ] && dirs+=("probe/$slug-tpl")
+  n=$(grep -rl "$ref@sha256:__DIGEST__" "${dirs[@]}" | wc -l)
+  grep -rl "$ref@sha256:__DIGEST__" "${dirs[@]}" | xargs -r sed -i "s#$ref@sha256:__DIGEST__#$ref@$dg#g"
   echo "✔ $ref@$dg（$n ファイルを置き換え）"
 done
 left=$(grep -rl '__DIGEST__' public | wc -l)

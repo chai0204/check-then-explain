@@ -25,9 +25,13 @@ const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").
 // ---- 台帳を読む ----
 const db = new DatabaseSync(":memory:");
 db.exec("PRAGMA foreign_keys = ON");
-db.exec(readFileSync(join(repo, "catalog", "schema.sql"), "utf8"));
+const schemaSql = readFileSync(join(repo, "catalog", "schema.sql"), "utf8");
+db.exec(schemaSql);
 db.exec(readFileSync(join(repo, "catalog", "articles.sql"), "utf8"));
-const DOMAINS = ["サーバー", "ネットワーク", "セキュリティ", "DB", "ウェブ", "OSS"];
+// 関連領域の並び（絞り込みの選択肢と、行の中の順）は schema.sql の CHECK の一覧から取る（二重に書くとずれるため）
+const domainCheck = schemaSql.match(/CHECK \(domain IN \(([^)]*)\)\)/);
+if (!domainCheck) throw new Error("schema.sql に article_domain.domain の CHECK (domain IN (…)) が見つからない");
+const DOMAINS = [...domainCheck[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
 const arts = db.prepare("SELECT * FROM article").all();
 const bySlug = Object.fromEntries(arts.map((a) => [a.slug, a]));
 for (const a of arts) {
