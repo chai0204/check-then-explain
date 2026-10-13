@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6. 止めたサービスは、次の起動でも止まっているか — 確かめて説明する LinuC 主題1.10</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="6" data-theme="linuc-security">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-security/theory/">理論編</a> › 第6章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
+</div>
+<h1>6. シャドウと、使っていないサービスを止める</h1>
+<p class="lead">「メンテナンス中はログインを止めたい」。<code>/etc/nologin</code> にメッセージを置けばよい——と思うと、<b>自分（管理者）も次から入れなくなる</b>。<code>nologin</code> は root 以外のすべてのログインを止めるからだ。いま開いているセッションだけが生き残る。締め出されたときにどう戻すかを、先に知っておく必要がある。</p>
+<div class="badges"><span>前提: 第5章まで読了</span><span>前提: 練習機が起動している</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.10.2（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>シャドウパスワード（<code>/etc/passwd</code> の <code>x</code> と <code>/etc/shadow</code> の分離）を説明できる</li><li><code>/etc/nologin</code> の効き方と、締め出されたときの戻し方を言える</li><li>使っていないサービスの止め方（<code>systemctl</code>・<code>service</code>・<code>/etc/init.d</code>・<code>xinetd</code>）を説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>systemd</code> のユニットファイルの細かい書き方、<code>xinetd</code> の各設定項目、SysV 初期化スクリプトの中身はレベル1では深追いしない。ここでは「どこを見れば有効/無効が分かり、どう止めるか」だけを扱う。</div></div>
+
+<h2 id="shadow">パスワードは passwd に無い</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>x</code> が指す先と、分離の理由。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ grep "^student" /etc/passwd
+student:x:1000:1000:LinuC student:/home/student:/bin/bash
+$ sudo grep "^student" /etc/shadow | cut -c1-30
+student:$y$j9T$zeB7kAA87DbMW.l
+$ ls -l /etc/passwd /etc/shadow
+-rw-r--r-- 1 root root   1580 Oct 13 10:56 /etc/passwd
+-rw-r----- 1 root shadow 1026 Oct 13 10:57 /etc/shadow</code></pre>
+<p><code>/etc/passwd</code> の2列目は <code>x</code> で、パスワードそのものは入っていない。実体のハッシュ（<code>$y$...</code> は yescrypt）は <code>/etc/shadow</code> にある。これが<b>シャドウパスワード</b>である。なぜ分けるか——権限を見れば分かる。<code>/etc/passwd</code> は <code>644</code>（誰でも読める。<code>id</code> やファイル所有者の表示に名前⇔UID の対応が要る）。<code>/etc/shadow</code> は <code>640</code> で <code>root</code> と <code>shadow</code> グループしか読めない。<b>ハッシュを誰でも読める表から追い出し、総当たり攻撃の材料を渡さないため</b>に分離した。</p>
+<div class="analogy"><b>たとえ</b>: <code>/etc/passwd</code> は会社の<b>内線電話帳</b>（誰でも見られる名前と番号）、<code>/etc/shadow</code> は人事だけが持つ<b>給与・パスワード台帳</b>に近い。電話帳の各行には「詳細は人事へ」（<code>x</code>）とだけ書いてある。
+<br>ただし<b>崩れる点</b>: 電話帳と台帳は別の棚だが、両方とも1つの建物（サーバ）の中にある。読めるかどうかは鍵（ファイル権限）が分けているだけで、物理的に離れてはいない。</div>
+
+<h2 id="nologin">nologin は、自分も締め出す</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/etc/nologin</code> の効く範囲と戻し方。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>メンテナンス中に一般ユーザのログインを止めたい。<code>/etc/nologin</code> にメッセージを置けばよい。管理者の自分は、これまでどおり <code>ssh</code> で入れるだろう。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo "メンテナンス中です" | sudo tee /etc/nologin
+メンテナンス中です</code></pre>
+<pre data-where="外（lab@host）"><code>$ vm ssh echo hello
+▶ ssh linuc echo hello
+メンテナンス中です
+
+Connection closed by 127.0.0.1 port 2222</code></pre>
+<div class="then"><b>だめな理由</b>: <code>vm ssh</code>（＝新しい <code>ssh</code> ログイン）が、<code>/etc/nologin</code> の中身を表示して<b>接続を閉じられた</b>。
+<code>/etc/nologin</code> は<b>root 以外のすべてのログインを止める</b>。student で入ろうとした自分も弾かれる。
+救いは、<b>すでに開いているセッションは生き残る</b>ことと、root は例外で入れること。
+だから「置いた瞬間に全ロックアウト」ではないが、いま開いている窓を閉じたら、もう新しくは入れない。</div></div>
+<p>締め出されたときの戻し方を知っておく。この教材の練習機では、外側のコンテナから3通りある。</p>
+<pre data-where="外（lab@host）"><code>$ lab-guest 'rm -f /etc/nologin &amp;&amp; echo removed_by_root'
+removed_by_root</code></pre>
+<div class="scroll"><table>
+<tr><th>戻し方</th><th>どういう経路か</th><th>いつ使うか</th></tr>
+<tr><td><code>vm ssh</code></td><td>まだ <code>ssh</code> で入れるか試す</td><td>締め出しが本当か確認する</td></tr>
+<tr><td><code>vm console</code></td><td>シリアルコンソール（画面）から直接ログイン</td><td><code>ssh</code> が塞がれたとき</td></tr>
+<tr><td><code>lab-guest '…'</code></td><td>ゲストエージェント経由で root としてコマンド実行</td><td>ネットワークも <code>ssh</code> も壊れたとき</td></tr>
+<tr><td><code>vm reset --yes</code></td><td>練習機を工場出荷時に戻す</td><td>最後の手段</td></tr>
+</table></div>
+<p><code>lab-guest</code> は <code>ssh</code> を通らない（仮想マシンのエージェント経由）ので、ネットワークや <code>sshd</code> を壊しても root として直せる。実践編の判定（<code>lab check</code>）もこの経路を使うので、<b>読者が自分を締め出しても採点は止まらない</b>。</p>
+<div class="analogy"><b>たとえ</b>: <code>/etc/nologin</code> は、店の入口に貼る「本日休業」の札に近い。来た客（新しいログイン）は札を見て帰る。だが<b>すでに店内にいる人</b>は追い出されない。
+<br>ただし<b>崩れる点</b>: 店主は裏口の鍵を持っているが、<code>nologin</code> で「本日休業」を貼った管理者も、いったん外に出たら正面（<code>ssh</code>）からは入れない。裏口（<code>vm console</code> / <code>lab-guest</code>）を覚えておかないと自分が締め出される。</div>
+
+<h2 id="unused">使っていないサービスを止める</h2>
+<div class="sgoal"><b>この節で分かること</b>: 待ち受けを止める複数の道具と、その関係。</div>
+<p>第4章で見つけた余計な待ち受けのように、<b>使っていないネットワークサービスは止める</b>のがホストの基本である。いまの Ubuntu では <code>systemctl</code> が中心で、古い <code>service</code> コマンドもラッパとして残っている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ command -v update-rc.d service
+/usr/sbin/update-rc.d
+/usr/sbin/service
+$ ls /etc/init.d/ | head -6
+anacron
+apparmor
+apport
+atd
+console-setup.sh
+cron
+$ service --status-all 2>&1 | head -4
+ [ + ]  anacron
+ [ + ]  apparmor
+ [ + ]  apport
+ [ + ]  atd</code></pre>
+<div class="scroll"><table>
+<tr><th>道具</th><th>何をする</th><th>系統</th></tr>
+<tr><td><code>systemctl start/stop</code></td><td>いま起動/停止</td><td>systemd（現行）</td></tr>
+<tr><td><code>systemctl enable/disable</code></td><td>次の起動で上がる/上がらない</td><td>systemd（現行）</td></tr>
+<tr><td><code>service NAME start</code></td><td><code>systemctl</code> へのラッパ（<code>/etc/init.d</code> も見る）</td><td>互換</td></tr>
+<tr><td><code>update-rc.d</code></td><td>SysV 初期化スクリプトの自動起動を登録/解除</td><td>Debian 系</td></tr>
+<tr><td><code>chkconfig</code></td><td>同じことを RHEL 系で行う</td><td>RHEL 系</td></tr>
+</table></div>
+<p>試験範囲には <code>chkconfig</code> も出るが、これは<b>RHEL 系の道具</b>で Ubuntu には無い。確かめられる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ command -v chkconfig || echo "chkconfig: なし（RHEL 系の道具）"
+chkconfig: なし（RHEL 系の道具）</code></pre>
+<p>Debian 系で SysV スクリプトの自動起動を変えるのは <code>update-rc.d</code> である（<code>chkconfig</code> に相当）。いまは <code>systemctl</code> が <code>/etc/init.d</code> の古いスクリプトも面倒を見るので、ほとんどは <code>systemctl</code> で済む。</p>
+
+<h2 id="xinetd">xinetd と inetd は、同時には入らない</h2>
+<div class="sgoal"><b>この節で分かること</b>: スーパーサーバの設定場所と、2実装の排他。</div>
+<p><code>xinetd</code> は<b>スーパーサーバ</b>——自分は待ち受けだけして、接続が来たら対応するサービスを起動する仕組みである。設定は <code>/etc/xinetd.conf</code> と <code>/etc/xinetd.d/</code> にある。この練習機では<b>入っているが止めてある</b>。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ls /etc/xinetd.d/
+chargen
+chargen-udp
+daytime
+daytime-udp
+discard
+discard-udp
+echo
+echo-udp
+servers
+services
+time
+time-udp
+$ systemctl is-enabled xinetd; systemctl is-active xinetd
+disabled
+inactive</code></pre>
+<p>試験範囲には、もう1つのスーパーサーバ <code>inetd</code>（設定は <code>/etc/inetd.conf</code>・<code>/etc/inetd.d/</code>）も並ぶ。だが探しても無い。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ls /etc/inetd.conf 2>&1
+ls: cannot access '/etc/inetd.conf': No such file or directory</code></pre>
+<p>無いのには理由がある。<code>xinetd</code> と <code>openbsd-inetd</code> は<b>どちらも同じ役割（<code>inet-superserver</code>）を提供し、互いに衝突する</b>ので、同時には入らない。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ dpkg -s xinetd | grep -E "^(Package|Status|Provides|Conflicts):"
+Package: xinetd
+Status: install ok installed
+Provides: inet-superserver
+Conflicts: inet-superserver</code></pre>
+<p><code>Provides: inet-superserver</code> と <code>Conflicts: inet-superserver</code> が同居している。「自分はスーパーサーバを提供する／スーパーサーバを名乗る別物とは共存しない」という宣言である。だから <code>openbsd-inetd</code> を入れようとすると、<code>xinetd</code> が<b>消される</b>（<code>-s</code> は実際には入れずに計画だけ出す）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ apt-get -s install openbsd-inetd 2>&1 | grep -A2 "REMOVED"
+The following packages will be REMOVED:
+  xinetd</code></pre>
+<p>第3章で見た主題1.09 の <code>chrony</code> と <code>ntpsec</code>（どちらも <code>time-daemon</code> を提供して衝突）と<b>まったく同じ型</b>である。試験には両方の名前が並ぶが、実機には片方しか入れられない。だから <code>inetd.conf</code> の書式は<b>知識として</b>覚え、手で触るのは入っている <code>xinetd</code> のほうで行う。</p>
+<div class="analogy"><b>たとえ</b>: <code>xinetd</code> と <code>inetd</code> は、同じ部署に2人は要らない<b>受付係</b>に近い。どちらも「来客を取り次ぐ」役なので、新しい受付（<code>openbsd-inetd</code>）を雇うと前任（<code>xinetd</code>）は解雇される。
+<br>ただし<b>崩れる点</b>: 人なら引き継ぎ期間を置けるが、パッケージの衝突は一瞬で、入れ替えると前任の設定（<code>/etc/xinetd.d/</code>）ごと消える。</div>
+<div class="analogy"><b>たとえ</b>: スーパーサーバ自体は、各店舗に店員を常駐させず、呼ばれたら駆けつける<b>派遣の受付</b>に近い。使う分だけメモリを食わない。
+<br>ただし<b>崩れる点</b>: 駆けつけに一瞬の遅れが出るので、常時高負荷のサービスには向かない。いまは各サービスが <code>systemd</code> のソケット起動（第4章の 22 番）で同じことをするので、<code>xinetd</code> の出番は減っている。</div>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/linuc-security/">演習03</a>で、使っていないサービス（<code>lab-echo</code>）を <code>systemctl disable --now</code> で止め、次の起動でも上がらないことを確かめる。<code>stop</code> だけだと <code>enabled</code> のまま次回また上がることも、判定で分かる。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>/etc/nologin</code> にメッセージを置いた。誰がログインできなくなるか。すでに入っている自分のセッションはどうなるか。</p>
+<details><summary>答え</summary>
+<p>root 以外の<b>すべての新規ログイン</b>が止まる（メッセージを表示して接続が閉じる）。
+<b>すでに開いているセッションは生き残り</b>、root は例外で入れる。自分も次からは入れないので、戻し方（<code>vm console</code> / <code>lab-guest</code> / <code>vm reset</code>）を用意しておく。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>いま <code>xinetd</code> が入っている。<code>openbsd-inetd</code>（<code>inetd</code>）を <code>apt install</code> するとどうなるか。</p>
+<details><summary>答え</summary>
+<p><code>xinetd</code> が<b>削除される</b>。両方とも同じ <code>inet-superserver</code> を提供して衝突するので同時に入らない
+（主題1.09 の <code>chrony</code> と <code>ntpsec</code> が <code>time-daemon</code> で衝突するのと同じ型）。
+<code>dpkg -s xinetd</code> の <code>Provides</code>/<code>Conflicts</code> と <code>apt-get -s install</code> で確かめられる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>SysV サービスの自動起動を切り替えたい。RHEL 系の <code>chkconfig</code> が Ubuntu に無いとき、相当するコマンドは。</p>
+<details><summary>答え</summary>
+<p><code>update-rc.d</code>（Debian 系）。ただし現行の Ubuntu では <code>systemctl enable</code>/<code>disable</code> が <code>/etc/init.d</code> の古いスクリプトも面倒を見るので、たいていは <code>systemctl</code> で済む。</p></details></div>
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li><code>/etc/passwd</code> の <code>x</code> は「パスワードは <code>/etc/shadow</code> にある」印。<code>passwd</code> は <code>644</code>、<code>shadow</code> は <code>640</code>（root と shadow グループだけ）</li>
+<li><code>/etc/nologin</code> は root 以外の全ログインを止める。自分も次から入れない。既存セッションと root は例外。戻し方（<code>vm console</code> / <code>lab-guest</code> / <code>vm reset</code>）を先に用意する</li>
+<li>サービスは <code>systemctl</code> が中心。<code>service</code> はラッパ、<code>update-rc.d</code> は Debian 系、<code>chkconfig</code> は RHEL 系で Ubuntu には無い</li>
+<li><code>xinetd</code> と <code>openbsd-inetd</code> は同じ <code>inet-superserver</code> を提供して衝突し、同時に入らない（chrony と ntpsec と同じ型）</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.0@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / systemd 255.4 / xinetd 1:2.3.15.4 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-security/theory/05-sudo">← 5. sudo は、許したものだけに絞る</a><a href="/linuc-security/theory/07-firewall">次: 7. ファイアウォールは、自分を締め出せる →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-security/chapters.js"></script>
+<script src="/linuc-security/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

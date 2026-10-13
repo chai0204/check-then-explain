@@ -1,0 +1,345 @@
+
+
+########## A. 何もしていない状態で全部 ✗ になるか ##########
+
+$ lab check; echo "exit=$?"
+✗ 01 未達
+  判定 : 観測型（練習機の中で /usr/local/bin/catfile の SUID を見た）
+  観測 : -rwsr-xr-x 1 root root 39384 Oct 13 11:37 /usr/local/bin/catfile
+         → まだ SUID が立っている（find -perm -4000 が当たった）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+✗ 02 未達
+  判定 : 観測型（getent shadow olduser の有効期限フィールドを見た）
+  観測 : パスワードのロック = いいえ
+         アカウント有効期限 = 未設定（never）
+         → 期限切れになっていない。パスワードをロックしても鍵では入れてしまう
+           （本当に止めるには有効期限を切る: usermod -e / chage -E）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+✗ 03 未達
+  判定 : 観測型（ss で 2323 の待ち受けと、lab-echo の有効/無効を見た）
+  観測 : 2323 の待ち受け = あり
+         lab-echo: is-active = active / is-enabled = enabled
+         → まだ 2323 で待ち受けている（サービスが動いている）
+         → lab-echo がまだ active
+         → lab-echo が enabled のまま。次の起動でまた上がる（disable が要る）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+✗ 04 未達
+  判定 : 観測型（deploy として sudo journalctl と sudo id を実際に打った）
+  観測 : sudoers 構文 = OK
+         deploy に許された行 : （なし）
+         sudo -n journalctl -n1 の終了コード = 1（0 なら許可）
+         sudo -n id          の終了コード = 1（0 以外なら拒否）
+         → journalctl を sudo で実行できない（まだ許せていない／権限で無視された）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+✗ 05 未達
+  判定 : 観測型（iptables -S INPUT を読み、外側から ssh linuc を試した）
+  観測 : 2323 を落とすルール = （無い）
+         22 を落とすルール   = （無い＝良い）
+         外側からの ssh linuc = 通る
+         → 2323 を落とすルールが無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+✗ 06 未達
+  判定 : 観測型（authorized_keys の鍵数と、ホーム・.ssh・鍵ファイルの権限を見た）
+  観測 : /home/deploy      = 750 deploy
+         /home/deploy/.ssh = ===KEYS===
+         authorized_keys   = 無い（公開鍵 0 本）
+         → authorized_keys に鍵が無い
+  /lab/verify/06.sh: line 29: 8#: invalid integer constant (error token is "8#")
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+✗ 07 未達
+  判定 : 観測型（deploy の秘密鍵で暗号文を実際に復号してみた）
+  観測 : 秘密鍵の本数 = 0
+         暗号文ファイル = （見つからない）
+         → deploy の鍵束に秘密鍵が無い
+         → 暗号文が無い、または deploy の秘密鍵で復号できない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+exit=1
+
+
+########## B. 演習01 — SUID の棚卸し（catfile の SUID を外す） ##########
+
+$ lab check 01; echo "exit=$?"
+✗ 01 未達
+  判定 : 観測型（練習機の中で /usr/local/bin/catfile の SUID を見た）
+  観測 : -rwsr-xr-x 1 root root 39384 Oct 13 11:37 /usr/local/bin/catfile
+         → まだ SUID が立っている（find -perm -4000 が当たった）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+exit=1
+
+$ ssh linuc sudo\ chmod\ u-s\ /usr/local/bin/catfile\;\ ls\ -l\ /usr/local/bin/catfile
+-rwxr-xr-x 1 root root 39384 Oct 13 11:37 /usr/local/bin/catfile
+
+$ lab check 01; echo "exit=$?"
+✔ 01 達成
+  判定 : 観測型（練習機の中で /usr/local/bin/catfile の SUID を見た）
+  観測 : -rwxr-xr-x 1 root root 39384 Oct 13 11:37 /usr/local/bin/catfile
+         SUID ビットは立っていない（find -perm -4000 が当たらなかった）
+         → 一般ユーザは catfile 経由で /etc/shadow を読めない
+exit=0
+
+
+########## C. 演習02 — 退職者アカウントを無効化（有効期限を過去に） ##########
+
+$ lab check 02; echo "exit=$?"
+✗ 02 未達
+  判定 : 観測型（getent shadow olduser の有効期限フィールドを見た）
+  観測 : パスワードのロック = いいえ
+         アカウント有効期限 = 未設定（never）
+         → 期限切れになっていない。パスワードをロックしても鍵では入れてしまう
+           （本当に止めるには有効期限を切る: usermod -e / chage -E）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+exit=1
+
+$ ssh linuc sudo\ passwd\ -l\ olduser\ \>/dev/null\;\ echo\ \"---\ ロックだけでは判定は通らない\ ---\"
+--- ロックだけでは判定は通らない ---
+
+$ lab check 02; echo "exit=$?"
+✗ 02 未達
+  判定 : 観測型（getent shadow olduser の有効期限フィールドを見た）
+  観測 : パスワードのロック = はい（! か *）
+         アカウント有効期限 = 未設定（never）
+         → 期限切れになっていない。パスワードをロックしても鍵では入れてしまう
+           （本当に止めるには有効期限を切る: usermod -e / chage -E）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+exit=1
+
+$ ssh linuc sudo\ usermod\ -e\ 1\ olduser\;\ sudo\ chage\ -l\ olduser\ \|\ grep\ -i\ \"Account\ expires\"
+Account expires						: Jan 02, 1970
+
+$ lab check 02; echo "exit=$?"
+✔ 02 達成
+  判定 : 観測型（getent shadow olduser の有効期限フィールドを見た）
+  観測 : パスワードのロック = はい（! か *）
+         アカウント有効期限 = 1970 から 1 日目（今日 = 20739 日目）
+         有効期限が今日以前 → sshd はこのアカウントのログインを拒否する
+exit=0
+
+
+########## D. 演習03 — 使っていない待ち受け(2323)を止める ##########
+
+$ lab check 03; echo "exit=$?"
+✗ 03 未達
+  判定 : 観測型（ss で 2323 の待ち受けと、lab-echo の有効/無効を見た）
+  観測 : 2323 の待ち受け = あり
+         lab-echo: is-active = active / is-enabled = enabled
+         → まだ 2323 で待ち受けている（サービスが動いている）
+         → lab-echo がまだ active
+         → lab-echo が enabled のまま。次の起動でまた上がる（disable が要る）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+exit=1
+
+$ ssh linuc sudo\ systemctl\ disable\ --now\ lab-echo.service\;\ systemctl\ is-active\ lab-echo\;\ systemctl\ is-enabled\ lab-echo
+Removed "/etc/systemd/system/multi-user.target.wants/lab-echo.service".
+inactive
+disabled
+
+$ ssh linuc ss\ -ltn\ \|\ grep\ 2323\ \|\|\ echo\ \"\(2323\ は閉じた\)\"
+(2323 は閉じた)
+
+$ lab check 03; echo "exit=$?"
+✔ 03 達成
+  判定 : 観測型（ss で 2323 の待ち受けと、lab-echo の有効/無効を見た）
+  観測 : 2323 の待ち受け = なし
+         lab-echo: is-active = inactive / is-enabled = disabled
+         2323 は閉じ、lab-echo は停止・無効（次の起動でも上がらない）
+exit=0
+
+
+########## E. 演習04 — sudo を journalctl だけに絞る ##########
+
+$ lab check 04; echo "exit=$?"
+✗ 04 未達
+  判定 : 観測型（deploy として sudo journalctl と sudo id を実際に打った）
+  観測 : sudoers 構文 = OK
+         deploy に許された行 : （なし）
+         sudo -n journalctl -n1 の終了コード = 1（0 なら許可）
+         sudo -n id          の終了コード = 1（0 以外なら拒否）
+         → journalctl を sudo で実行できない（まだ許せていない／権限で無視された）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+exit=1
+
+$ ssh linuc echo\ \"deploy\ ALL=\(root\)\ NOPASSWD:\ /usr/bin/journalctl\"\ \|\ sudo\ tee\ /etc/sudoers.d/deploy\ \>/dev/null\;\ sudo\ chmod\ 440\ /etc/sudoers.d/deploy\;\ sudo\ visudo\ -c
+/etc/sudoers: parsed OK
+/etc/sudoers.d/90-cloud-init-users: parsed OK
+/etc/sudoers.d/README: parsed OK
+/etc/sudoers.d/deploy: parsed OK
+
+$ lab check 04; echo "exit=$?"
+✔ 04 達成
+  判定 : 観測型（deploy として sudo journalctl と sudo id を実際に打った）
+  観測 : sudoers 構文 = OK
+         deploy に許された行 : env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin, use_pty
+  (root) NOPASSWD: /usr/bin/journalctl
+         sudo -n journalctl -n1 の終了コード = 0（0 なら許可）
+         sudo -n id          の終了コード = 1（0 以外なら拒否）
+         journalctl だけが sudo で通り、ほかは拒否される
+exit=0
+
+
+########## F. 演習05 — ファイアウォールで 2323 を落とし、22 は残す ##########
+
+$ lab check 05; echo "exit=$?"
+✗ 05 未達
+  判定 : 観測型（iptables -S INPUT を読み、外側から ssh linuc を試した）
+  観測 : 2323 を落とすルール = （無い）
+         22 を落とすルール   = （無い＝良い）
+         外側からの ssh linuc = 通る
+         → 2323 を落とすルールが無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+exit=1
+
+$ ssh linuc sudo\ iptables\ -A\ INPUT\ -p\ tcp\ --dport\ 2323\ -j\ DROP\;\ sudo\ iptables\ -L\ INPUT\ -n\ --line-numbers
+Chain INPUT (policy ACCEPT)
+num  target     prot opt source               destination         
+1    DROP       6    --  0.0.0.0/0            0.0.0.0/0            tcp dpt:2323
+
+$ lab check 05; echo "exit=$?"
+✔ 05 達成
+  判定 : 観測型（iptables -S INPUT を読み、外側から ssh linuc を試した）
+  観測 : 2323 を落とすルール = -A INPUT -p tcp -m tcp --dport 2323 -j DROP
+         22 を落とすルール   = （無い＝良い）
+         外側からの ssh linuc = 通る
+         2323 は落とし、22 は残している（自分は締め出されていない）
+exit=0
+
+
+########## G. 演習06 — deploy の SSH 鍵ログインを用意する ##########
+
+$ lab check 06; echo "exit=$?"
+✗ 06 未達
+  判定 : 観測型（authorized_keys の鍵数と、ホーム・.ssh・鍵ファイルの権限を見た）
+  観測 : /home/deploy      = 750 deploy
+         /home/deploy/.ssh = ===KEYS===
+         authorized_keys   = 無い（公開鍵 0 本）
+         → authorized_keys に鍵が無い
+  /lab/verify/06.sh: line 29: 8#: invalid integer constant (error token is "8#")
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+exit=1
+
+$ ssh linuc ssh-keygen\ -t\ ed25519\ -f\ /tmp/deploy_key\ -N\ \"\"\ \<\<\<y\ \>/dev/null\;\ sudo\ install\ -d\ -m700\ -o\ deploy\ -g\ deploy\ /home/deploy/.ssh\;\ sudo\ tee\ /home/deploy/.ssh/authorized_keys\ \<\ /tmp/deploy_key.pub\ \>/dev/null\;\ sudo\ chown\ deploy:deploy\ /home/deploy/.ssh/authorized_keys\;\ sudo\ chmod\ 600\ /home/deploy/.ssh/authorized_keys\;\ echo\ done
+done
+
+$ ssh linuc ssh\ -i\ /tmp/deploy_key\ -o\ StrictHostKeyChecking=no\ -o\ BatchMode=yes\ deploy@localhost\ id
+Warning: Permanently added 'localhost' (ED25519) to the list of known hosts.
+uid=1002(deploy) gid=1002(deploy) groups=1002(deploy)
+
+$ lab check 06; echo "exit=$?"
+✔ 06 達成
+  判定 : 観測型（authorized_keys の鍵数と、ホーム・.ssh・鍵ファイルの権限を見た）
+  観測 : /home/deploy      = 750 deploy
+         /home/deploy/.ssh = 700 deploy
+         authorized_keys   = 600 deploy（公開鍵 1 本）
+         鍵が登録され、権限も StrictModes に適合（sshd はこの鍵を使う）
+exit=0
+
+
+########## H. 演習07 — GnuPG でファイルを暗号化する（deploy） ##########
+
+$ lab check 07; echo "exit=$?"
+✗ 07 未達
+  判定 : 観測型（deploy の秘密鍵で暗号文を実際に復号してみた）
+  観測 : 秘密鍵の本数 = 0
+         暗号文ファイル = （見つからない）
+         → deploy の鍵束に秘密鍵が無い
+         → 暗号文が無い、または deploy の秘密鍵で復号できない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+exit=1
+
+$ (deploy) gpg --batch --pinentry-mode loopback --passphrase "" --quick-gen-key "Deploy <deploy@linuc.example>" >/dev/null 2>&1; echo keygen_done
+keygen_done
+
+$ (deploy) echo 社外秘のメモ > ~/secret.txt; gpg --batch --yes --encrypt -r deploy@linuc.example ~/secret.txt; ls -l ~/secret.txt.gpg
+gpg: checking the trustdb
+gpg: marginals needed: 3  completes needed: 1  trust model: pgp
+gpg: depth: 0  valid:   1  signed:   0  trust: 0-, 0q, 0n, 0m, 0f, 1u
+gpg: next trustdb check due at 2029-10-12
+-rw-r--r-- 1 deploy deploy 199 Oct 13 11:38 /home/deploy/secret.txt.gpg
+
+$ lab check 07; echo "exit=$?"
+✔ 07 達成
+  判定 : 観測型（deploy の秘密鍵で暗号文を実際に復号してみた）
+  観測 : 秘密鍵の本数 = 1
+         暗号文ファイル = /home/deploy/secret.txt.gpg
+         復号できた（公開鍵で暗号化 → 秘密鍵で復号の一往復が成立）
+
+  ════════════════════════════════════════
+   確かめて説明する LinuC 主題1.10 — 全7演習クリア
+  ════════════════════════════════════════
+
+  自分の手で確かめたこと
+
+   ✔ 01  find -perm 4000 と -4000 の違い、SUID は「実行する人」ではなく「ファイルの持ち主」で動くこと
+   ✔ 02  passwd -l は鍵ログインを止めない。usermod -e / chage -E の期限切れが本当の無効化
+   ✔ 03  ポート番号→プロセス→サービスの辿り方。停止と無効化（二度と上がらない）の違い
+   ✔ 04  sudoers.d の権限が緩いと丸ごと無視される。visudo -c で構文を確かめる
+   ✔ 05  既定 ACCEPT のチェインに DROP を足す。22 を巻き込むと自分が締め出される
+   ✔ 06  ~/.ssh と authorized_keys の権限が緩いと sshd は鍵を黙って無視する（StrictModes）
+   ✔ 07  公開鍵で暗号化し秘密鍵で復号する。鍵束と設定は ~/.gnupg にある
+
+  この7つは全部、1つの事実から出ていました。
+
+      「止めたつもり」は、たいてい止まっていない。
+      Linux の制限は、正しい対象に・信用できる持ち主の設定で書けたときだけ効く。
+      だから監査は、意図ではなく「いま実際に効いているもの」を数えることから始まる。
+
+  理論編の最終章に、それぞれがどう繋がるかを書いてあります → /linuc-security/theory/09-cloud
+
+exit=0
+
+
+########## I. 全問 ✔ になった状態で lab check（完走メッセージ） ##########
+
+$ lab check; echo "exit=$?"
+✔ 01 達成
+  判定 : 観測型（練習機の中で /usr/local/bin/catfile の SUID を見た）
+  観測 : -rwxr-xr-x 1 root root 39384 Oct 13 11:37 /usr/local/bin/catfile
+         SUID ビットは立っていない（find -perm -4000 が当たらなかった）
+         → 一般ユーザは catfile 経由で /etc/shadow を読めない
+✔ 02 達成
+  判定 : 観測型（getent shadow olduser の有効期限フィールドを見た）
+  観測 : パスワードのロック = はい（! か *）
+         アカウント有効期限 = 1970 から 1 日目（今日 = 20739 日目）
+         有効期限が今日以前 → sshd はこのアカウントのログインを拒否する
+✔ 03 達成
+  判定 : 観測型（ss で 2323 の待ち受けと、lab-echo の有効/無効を見た）
+  観測 : 2323 の待ち受け = なし
+         lab-echo: is-active = inactive / is-enabled = disabled
+         2323 は閉じ、lab-echo は停止・無効（次の起動でも上がらない）
+✔ 04 達成
+  判定 : 観測型（deploy として sudo journalctl と sudo id を実際に打った）
+  観測 : sudoers 構文 = OK
+         deploy に許された行 : env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin, use_pty
+  (root) NOPASSWD: /usr/bin/journalctl
+         sudo -n journalctl -n1 の終了コード = 0（0 なら許可）
+         sudo -n id          の終了コード = 1（0 以外なら拒否）
+         journalctl だけが sudo で通り、ほかは拒否される
+✔ 05 達成
+  判定 : 観測型（iptables -S INPUT を読み、外側から ssh linuc を試した）
+  観測 : 2323 を落とすルール = -A INPUT -p tcp -m tcp --dport 2323 -j DROP
+         22 を落とすルール   = （無い＝良い）
+         外側からの ssh linuc = 通る
+         2323 は落とし、22 は残している（自分は締め出されていない）
+✔ 06 達成
+  判定 : 観測型（authorized_keys の鍵数と、ホーム・.ssh・鍵ファイルの権限を見た）
+  観測 : /home/deploy      = 750 deploy
+         /home/deploy/.ssh = 700 deploy
+         authorized_keys   = 600 deploy（公開鍵 1 本）
+         鍵が登録され、権限も StrictModes に適合（sshd はこの鍵を使う）
+✔ 07 達成
+  判定 : 観測型（deploy の秘密鍵で暗号文を実際に復号してみた）
+  観測 : 秘密鍵の本数 = 1
+         暗号文ファイル = /home/deploy/secret.txt.gpg
+         復号できた（公開鍵で暗号化 → 秘密鍵で復号の一往復が成立）
+exit=0
+
+$ lab ls
+演習一覧
+  ✔ 01  SUID の棚卸しをする                   12分 / 影響度 B
+  ✔ 02  退職者のアカウントを本当に無効化する 12分 / 影響度 B
+  ✔ 03  使っていない待ち受けを止める   10分 / 影響度 B
+  ✔ 04  sudo を1コマンドだけに絞る         12分 / 影響度 B
+  ✔ 05  ファイアウォールで塞ぐ（管理の ssh は残す） 12分 / 影響度 B
+  ✔ 06  SSH 鍵でパスワードなしログインを用意する 12分 / 影響度 B
+  ✔ 07  GnuPG でファイルを暗号化する      12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手

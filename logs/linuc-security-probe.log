@@ -1,0 +1,513 @@
+
+
+========== 0. 環境（検証環境ブロックの版の出どころ） ==========
+
+$ lab env
+テーマ    : lab-linuc-security 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:security-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+$ hostname
+linuc
+
+$ cat /etc/os-release | grep PRETTY_NAME
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+
+
+========== 0b. コンテナと練習機は別のカーネルで動いている（1.01 との地続き） ==========
+
+$ uname -r
+7.2.6
+
+$ systemd-detect-virt 2>/dev/null || true
+
+$ uname -r
+6.8.0-142-generic
+
+$ systemd-detect-virt
+qemu
+
+
+========== 第1章 SUID（1.10.1） ==========
+
+$ sudo find / -xdev -perm 4000 -type f 2>/dev/null | wc -l
+0
+
+$ sudo find / -xdev -perm -4000 -type f 2>/dev/null
+/usr/bin/umount
+/usr/bin/newgrp
+/usr/bin/sudo
+/usr/bin/gpasswd
+/usr/bin/passwd
+/usr/bin/su
+/usr/bin/mount
+/usr/bin/at
+/usr/bin/fusermount3
+/usr/bin/chsh
+/usr/bin/chfn
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/openssh/ssh-keysign
+/usr/lib/polkit-1/polkit-agent-helper-1
+/usr/local/bin/catfile
+
+$ sudo find / -xdev -perm -4000 -type f 2>/dev/null | wc -l
+15
+
+$ ls -l /usr/local/bin/catfile
+-rwsr-xr-x 1 root root 39384 Oct 13 10:56 /usr/local/bin/catfile
+
+$ id
+uid=1000(student) gid=1000(student) groups=1000(student),4(adm),27(sudo)
+
+$ /usr/local/bin/catfile /etc/shadow | head -2
+root:*:20701:0:99999:7:::
+daemon:*:20701:0:99999:7:::
+
+$ printf "#!/bin/bash\nid\n" | sudo tee /usr/local/bin/wrap.sh >/dev/null; sudo chmod 4755 /usr/local/bin/wrap.sh; ls -l /usr/local/bin/wrap.sh
+-rwsr-xr-x 1 root root 15 Oct 13 10:57 /usr/local/bin/wrap.sh
+
+$ /usr/local/bin/wrap.sh
+uid=1000(student) gid=1000(student) groups=1000(student),4(adm),27(sudo)
+
+$ sudo chmod 4644 /usr/local/bin/wrap.sh; ls -l /usr/local/bin/wrap.sh
+-rwSr--r-- 1 root root 15 Oct 13 10:57 /usr/local/bin/wrap.sh
+
+$ sudo chmod 2755 /usr/local/bin/wrap.sh; ls -l /usr/local/bin/wrap.sh
+-rwxr-sr-x 1 root root 15 Oct 13 10:57 /usr/local/bin/wrap.sh
+
+$ sudo rm -f /usr/local/bin/wrap.sh
+
+$ ls -ld /tmp
+drwxrwxrwt 10 root root 4096 Oct 13 10:56 /tmp
+
+$ ls -ld /var/mail
+drwxrwsr-x 2 root mail 4096 Sep  5 20:14 /var/mail
+
+$ sudo find / -xdev -perm -2000 -type f 2>/dev/null | head -5
+/usr/bin/ssh-agent
+/usr/bin/at
+/usr/bin/crontab
+/usr/bin/chage
+/usr/bin/expiry
+
+$ sudo chmod u-s /usr/local/bin/catfile; ls -l /usr/local/bin/catfile
+-rwxr-xr-x 1 root root 39384 Oct 13 10:56 /usr/local/bin/catfile
+
+$ /usr/local/bin/catfile /etc/shadow
+/usr/local/bin/catfile: /etc/shadow: Permission denied
+
+$ sudo chmod 4755 /usr/local/bin/catfile
+
+
+========== 第2章 パスワードエージングとアカウントの無効化（1.10.1） ==========
+
+$ sudo passwd -S olduser
+olduser P 2026-10-13 0 99999 7 -1
+
+$ sudo chage -l olduser
+Last password change					: Oct 13, 2026
+Password expires					: never
+Password inactive					: never
+Account expires						: never
+Minimum number of days between password change		: 0
+Maximum number of days between password change		: 99999
+Number of days of warning before password expires	: 7
+
+$ sudo grep -E "^(root|olduser):" /etc/shadow | cut -c1-30
+root:*:20701:0:99999:7:::
+olduser:$y$j9T$U8mvgo0rhrEdHwN
+
+$ ssh-keygen -q -t ed25519 -N "" -f ~/.ssh/id_demo <<<y >/dev/null; sudo install -d -m700 -o olduser -g olduser /home/olduser/.ssh; sudo cp ~/.ssh/id_demo.pub /home/olduser/.ssh/authorized_keys; sudo chown olduser:olduser /home/olduser/.ssh/authorized_keys; sudo chmod 600 /home/olduser/.ssh/authorized_keys; echo set
+set
+
+$ ssh -i ~/.ssh/id_demo -o BatchMode=yes -o StrictHostKeyChecking=no -o LogLevel=ERROR olduser@localhost id
+uid=1001(olduser) gid=1001(olduser) groups=1001(olduser)
+
+$ sudo passwd -l olduser
+passwd: password changed.
+
+$ sudo passwd -S olduser
+olduser L 2026-10-13 0 99999 7 -1
+
+$ sudo grep "^olduser" /etc/shadow | cut -c1-20
+olduser:!$y$j9T$U8mv
+
+$ ssh -i ~/.ssh/id_demo -o BatchMode=yes -o StrictHostKeyChecking=no -o LogLevel=ERROR olduser@localhost id
+uid=1001(olduser) gid=1001(olduser) groups=1001(olduser)
+
+$ sudo usermod -e 1 olduser
+
+$ sudo chage -l olduser | grep -iE "アカウント有効期限|Account expires"
+Account expires						: Jan 02, 1970
+
+$ ssh -i ~/.ssh/id_demo -o BatchMode=yes -o StrictHostKeyChecking=no -o LogLevel=ERROR olduser@localhost id; echo rc=$?
+rc=255
+
+$ sudo usermod -e "" olduser; sudo passwd -u olduser >/dev/null; sudo rm -rf /home/olduser/.ssh ~/.ssh/id_demo ~/.ssh/id_demo.pub; echo restored
+restored
+
+
+========== 第3章 ログイン履歴・セッション・制限（1.10.1） ==========
+
+$ who
+student  pts/0        2026-10-13 10:57 (10.0.2.2)
+Connection to 127.0.0.1 closed.
+
+$ w
+ 10:57:39 up 1 min,  1 user,  load average: 1.76, 0.70, 0.26
+USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU  WHAT
+student           10.0.2.2         10:57    1:03   0.00s  0.30s sshd: student [priv]
+Connection to 127.0.0.1 closed.
+
+$ last -a | head -5
+student  pts/0        Tue Oct 13 10:57   still logged in    10.0.2.2
+student  pts/0        Tue Oct 13 10:57 - 10:57  (00:00)     10.0.2.2
+student  pts/0        Tue Oct 13 10:57 - 10:57  (00:00)     10.0.2.2
+reboot   system boot  Tue Oct 13 10:56   still running      6.8.0-142-generic
+
+Connection to 127.0.0.1 closed.
+
+$ ulimit -n
+1024
+
+$ ulimit -u
+5504
+
+$ ulimit -n 512; ulimit -n
+512
+
+$ ulimit -n 4096; echo rc=$?
+rc=0
+
+$ echo "deploy hard nproc 30" | sudo tee -a /etc/security/limits.conf >/dev/null; echo added
+added
+
+$ sudo runuser -l deploy -c "ulimit -u"
+30
+
+$ sudo sed -i "/deploy hard nproc 30/d" /etc/security/limits.conf; echo cleaned
+cleaned
+
+$ grep -n TMOUT /etc/profile.d/*.sh 2>/dev/null; echo "（既定では未設定）"
+（既定では未設定）
+
+
+========== 第4章 開いているポートを見つける（1.10.1） ==========
+
+$ ss -ltn
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+LISTEN 0      4096      127.0.0.54:53        0.0.0.0:*          
+LISTEN 0      10           0.0.0.0:2323      0.0.0.0:*          
+LISTEN 0      4096         0.0.0.0:22        0.0.0.0:*          
+LISTEN 0      4096   127.0.0.53%lo:53        0.0.0.0:*          
+LISTEN 0      10              [::]:2323         [::]:*          
+LISTEN 0      4096            [::]:22           [::]:*          
+
+$ sudo ss -ltnp | grep 2323
+LISTEN 0      10           0.0.0.0:2323      0.0.0.0:*    users:(("ncat",pid=676,fd=4))                        
+LISTEN 0      10              [::]:2323         [::]:*    users:(("ncat",pid=676,fd=3))                        
+
+$ sudo netstat -ltnp | grep -E ":22 |:2323 "
+tcp        0      0 0.0.0.0:2323            0.0.0.0:*               LISTEN      676/ncat            
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      1/init              
+tcp6       0      0 :::2323                 :::*                    LISTEN      676/ncat            
+tcp6       0      0 :::22                   :::*                    LISTEN      1/init              
+
+$ nmap 127.0.0.1
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-10-13 10:57 JST
+Nmap scan report for localhost (127.0.0.1)
+Host is up (0.00071s latency).
+Not shown: 998 closed tcp ports (conn-refused)
+PORT     STATE SERVICE
+22/tcp   open  ssh
+2323/tcp open  3d-nfsd
+
+Nmap done: 1 IP address (1 host up) scanned in 0.34 seconds
+
+$ sudo lsof -iTCP:2323 -sTCP:LISTEN -P -n
+COMMAND PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+ncat    676 root    3u  IPv6   5728      0t0  TCP *:2323 (LISTEN)
+ncat    676 root    4u  IPv4   5729      0t0  TCP *:2323 (LISTEN)
+
+$ sudo fuser 2323/tcp
+2323/tcp:              676
+
+
+========== 第5章 su と sudo（1.10.1） ==========
+
+$ sudo -l -U deploy 2>&1 | tail -2
+User deploy is not allowed to run sudo on linuc.
+
+$ echo "deploy ALL=(root) NOPASSWD: /usr/bin/journalctl" | sudo tee /etc/sudoers.d/deploy >/dev/null
+
+$ sudo chmod 440 /etc/sudoers.d/deploy
+
+$ sudo visudo -c
+/etc/sudoers: parsed OK
+/etc/sudoers.d/90-cloud-init-users: parsed OK
+/etc/sudoers.d/README: parsed OK
+/etc/sudoers.d/deploy: parsed OK
+
+$ sudo -l -U deploy 2>&1 | tail -2
+User deploy may run the following commands on linuc:
+    (root) NOPASSWD: /usr/bin/journalctl
+
+$ sudo -n journalctl -n 1 >/dev/null 2>&1; echo allowed_rc=$?
+allowed_rc=0
+
+$ sudo -n id; echo denied_rc=$?
+sudo: a password is required
+denied_rc=1
+
+$ sudo chmod 646 /etc/sudoers.d/deploy; ls -l /etc/sudoers.d/deploy
+ls: cannot access '/etc/sudoers.d/deploy': Permission denied
+
+$ sudo -n journalctl -n 1; echo rc=$?
+sudo: /etc/sudoers.d/deploy is world writable
+sudo: /etc/sudoers.d/deploy is world writable
+sudo: a password is required
+rc=1
+
+$ sudo chmod 440 /etc/sudoers.d/deploy
+sudo: /etc/sudoers.d/deploy is world writable
+
+$ echo "deploy ALL=(root) NOPASS: ALL" | sudo tee /etc/sudoers.d/deploy >/dev/null
+
+$ sudo visudo -c
+/etc/sudoers.d/deploy:1:30: syntax error
+deploy ALL=(root) NOPASS: ALL
+                             ^
+/etc/sudoers.d/deploy:1:30: syntax error
+deploy ALL=(root) NOPASS: ALL
+                             ^
+
+$ sudo rm -f /etc/sudoers.d/deploy; echo removed
+/etc/sudoers.d/deploy:1:30: syntax error
+deploy ALL=(root) NOPASS: ALL
+                             ^
+removed
+
+
+========== 第6章 シャドウと、使っていないサービス（1.10.2） ==========
+
+$ grep "^student" /etc/passwd
+student:x:1000:1000:LinuC student:/home/student:/bin/bash
+
+$ sudo grep "^student" /etc/shadow | cut -c1-30
+student:$y$j9T$zeB7kAA87DbMW.l
+
+$ ls -l /etc/passwd /etc/shadow
+-rw-r--r-- 1 root root   1580 Oct 13 10:56 /etc/passwd
+-rw-r----- 1 root shadow 1026 Oct 13 10:57 /etc/shadow
+
+$ echo "メンテナンス中（戻し方は本文）" | sudo tee /etc/nologin >/dev/null; ls -l /etc/nologin
+-rw-r--r-- 1 root root 46 Oct 13 10:58 /etc/nologin
+
+$ lab-guest 'cat /etc/nologin'
+メンテナンス中（戻し方は本文）
+
+$ lab-guest 'rm -f /etc/nologin && echo removed_by_root'
+removed_by_root
+
+$ dpkg -s xinetd | grep -E "^(Package|Status|Provides|Conflicts):"
+Package: xinetd
+Status: install ok installed
+Provides: inet-superserver
+Conflicts: inet-superserver
+
+$ ls /etc/xinetd.d/
+chargen
+chargen-udp
+daytime
+daytime-udp
+discard
+discard-udp
+echo
+echo-udp
+servers
+services
+time
+time-udp
+
+$ systemctl is-enabled xinetd; systemctl is-active xinetd
+disabled
+inactive
+
+$ ls /etc/inetd.conf 2>&1
+ls: cannot access '/etc/inetd.conf': No such file or directory
+
+$ sudo apt-get update -qq; apt-get -s install openbsd-inetd 2>&1 | grep -A2 "REMOVED"
+The following packages will be REMOVED:
+  xinetd
+The following NEW packages will be installed:
+
+$ command -v chkconfig || echo "chkconfig: なし（RHEL 系の道具）"
+chkconfig: なし（RHEL 系の道具）
+
+$ command -v update-rc.d service
+/usr/sbin/update-rc.d
+/usr/sbin/service
+
+$ ls /etc/init.d/ | head -6
+anacron
+apparmor
+apport
+atd
+console-setup.sh
+cron
+
+$ service --status-all 2>&1 | head -4
+ [ + ]  anacron
+ [ + ]  apparmor
+ [ + ]  apport
+ [ + ]  atd
+
+
+========== 第7章 ファイアウォール（1.10.2） ==========
+
+$ sudo iptables --version
+iptables v1.8.10 (nf_tables)
+
+$ sudo iptables -L INPUT -n
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+$ sudo iptables -A INPUT -p tcp --dport 2323 -j DROP
+
+$ sudo iptables -L INPUT -n --line-numbers
+Chain INPUT (policy ACCEPT)
+num  target     prot opt source               destination         
+1    DROP       6    --  0.0.0.0/0            0.0.0.0/0            tcp dpt:2323
+
+$ timeout 3 bash -c "</dev/tcp/127.0.0.1/2323"; echo rc=$?
+rc=124
+
+$ vm ssh echo ssh_is_alive
+▶ ssh linuc echo ssh_is_alive
+ssh_is_alive
+
+$ sudo iptables -D INPUT -p tcp --dport 2323 -j DROP; sudo iptables -L INPUT -n
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+$ sudo iptables-save | grep -c INPUT
+1
+
+$ systemctl is-enabled firewalld; systemctl is-active firewalld
+disabled
+inactive
+
+$ sudo systemctl start firewalld; sleep 2; sudo firewall-cmd --state
+running
+
+$ sudo firewall-cmd --get-default-zone
+public
+
+$ sudo firewall-cmd --list-all
+public (default, active)
+  target: default
+  ingress-priority: 0
+  egress-priority: 0
+  icmp-block-inversion: no
+  interfaces: 
+  sources: 
+  services: dhcpv6-client ssh
+  ports: 
+  protocols: 
+  forward: yes
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: 
+  rich rules: 
+
+$ sudo systemctl stop firewalld; echo stopped
+stopped
+
+
+========== 第8章 暗号化 — SSH と GPG（1.10.3） ==========
+
+$ rm -f /tmp/k_*; ssh-keygen -q -t rsa     -b 4096 -N "" -f /tmp/k_rsa   -C demo; echo rsa_done
+rsa_done
+
+$ ssh-keygen -q -t ecdsa   -b 521  -N "" -f /tmp/k_ecdsa -C demo; echo ecdsa_done
+ecdsa_done
+
+$ ssh-keygen -q -t ed25519         -N "" -f /tmp/k_ed    -C demo; echo ed_done
+ed_done
+
+$ ssh-keygen -lf /tmp/k_rsa.pub; ssh-keygen -lf /tmp/k_ecdsa.pub; ssh-keygen -lf /tmp/k_ed.pub
+4096 SHA256:7vtM3wdcZ86nUWadpt/pZdcZtSv89CvOgdP90Lppv7g demo (RSA)
+521 SHA256:PHw19GNHZSq5kdxYOsUzbVYoTqK+lE/5CfQtnPWsdNM demo (ECDSA)
+256 SHA256:NctpsLC9wKiK838DBSjg7ZFXCifDtDx/Pxdx058uRGY demo (ED25519)
+
+$ rm -f /tmp/k_*
+
+$ eval $(ssh-agent -s) >/dev/null; ssh-keygen -q -t ed25519 -N "" -f /tmp/ak -C agentdemo >/dev/null; ssh-add /tmp/ak 2>&1; ssh-add -l; eval $(ssh-agent -k) >/dev/null; rm -f /tmp/ak*
+Identity added: /tmp/ak (agentdemo)
+256 SHA256:NVgrh+TOk5+R8AIrK2I6vbs4Gx5bG7AkTPBR44SF2Lk agentdemo (ED25519)
+
+$ sudo systemctl start lab-echo; sleep 1; echo echo_up
+echo_up
+
+$ timeout 2 bash -c "exec 3<>/dev/tcp/127.0.0.1/2323 && head -1 <&3" 2>&1; echo rc=$?
+bash: connect: Connection refused
+bash: line 1: /dev/tcp/127.0.0.1/2323: Connection refused
+rc=1
+
+$ ssh -f -N -L 19999:127.0.0.1:2323 linuc; sleep 1; echo tunnel_up
+tunnel_up
+
+$ timeout 3 bash -c "exec 3<>/dev/tcp/127.0.0.1/19999 && head -1 <&3"
+linuc-echo
+
+$ pkill -f "19999:127.0.0.1:2323"; echo tunnel_down
+tunnel_down
+
+$ gpg --batch --pinentry-mode loopback --passphrase "" --quick-gen-key "Deploy <deploy@linuc.example>" >/dev/null 2>&1; gpg -k 2>/dev/null
+/home/deploy/.gnupg/pubring.kbx
+-------------------------------
+pub   ed25519 2026-10-13 [SC] [expires: 2029-10-12]
+      91C5B102883949DA1D75A9A4B31EB119C180387B
+uid           [ultimate] Deploy <deploy@linuc.example>
+sub   cv25519 2026-10-13 [E]
+
+
+$ echo 社外秘のメモ > ~/secret.txt; gpg --batch --yes --encrypt -r deploy@linuc.example ~/secret.txt; ls -l ~/secret.txt.gpg
+-rw-r--r-- 1 deploy deploy 199 Oct 13 10:59 /home/deploy/secret.txt.gpg
+
+$ gpg --decrypt ~/secret.txt.gpg 2>/dev/null
+社外秘のメモ
+
+$ ls ~/.gnupg
+S.gpg-agent
+S.gpg-agent.browser
+S.gpg-agent.extra
+S.gpg-agent.ssh
+openpgp-revocs.d
+private-keys-v1.d
+pubring.kbx
+pubring.kbx~
+random_seed
+trustdb.gpg
+
+
+========== 第9章 クラウドセキュリティ（1.10.4・理論のみ） ==========
+
+
+========== 末尾 最終環境 ==========
+
+$ lab env
+テーマ    : lab-linuc-security 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:security-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb

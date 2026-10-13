@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. 入っている人と、入れる上限 — 確かめて説明する LinuC 主題1.10</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="linuc-security">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-security/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
+</div>
+<h1>3. 入っている人と、入れる上限</h1>
+<p class="lead">セキュリティ管理には「いま誰が入っているか」を見る道具（<code>who</code>・<code>w</code>・<code>last</code>）と、「1人がどこまで使えるか」を絞る道具（<code>ulimit</code>・<code>TMOUT</code>）がある。後者で油断しやすいのが、<code>ulimit</code> で<b>下げた上限は、同じシェルでは元に戻せない</b>ことだ。下げるのは一方通行である。</p>
+<div class="badges"><span>前提: 第2章まで読了</span><span>前提: 練習機が起動している</span><span>所要 14分</span><span class="impact-c">影響度 C</span><span>出題範囲 1.10.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>who</code>・<code>w</code>・<code>last</code> が何を見ているか（utmp と wtmp）を言える</li><li><code>ulimit</code> のソフトとハードの違い、ハードが一方通行であることを説明できる</li><li><code>TMOUT</code> と <code>/etc/security/limits.conf</code> がいつ効くかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: cgroup による資源制限（<code>systemd</code> の <code>MemoryMax=</code> など）はレベル1の範囲外である。ここでは1ログインあたりの <code>ulimit</code> と、設定ファイル <code>/etc/security/limits.conf</code> だけを扱う。</div></div>
+
+<h2 id="ulimit">下げるのは一方通行</h2>
+<div class="sgoal"><b>この節で分かること</b>: ソフトリミットとハードリミットの違い。</div>
+<p>いまの上限を見る。<code>-n</code> が開けるファイル数、<code>-u</code> がプロセス数である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ulimit -n
+1024
+$ ulimit -u
+5504</code></pre>
+<p>ソフトリミットは自分で下げられる。下げてみる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ulimit -n 512; ulimit -n
+512
+$ ulimit -n 4096; echo rc=$?
+rc=0</code></pre>
+<p>512 に下げ、また 4096 に戻せた（<code>rc=0</code>）。ソフトは<b>ハードリミットの範囲内で</b>上げ下げ自由である。ではハードリミット自体を下げてみる。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>ソフトと同じく、ハードリミットも下げたあとで必要になれば戻せるはずだ。一時的に絞って、あとで緩めればよい。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ulimit -Hn 2048; ulimit -Hn; ulimit -Hn 4096
+2048
+bash: line 1: ulimit: open files: cannot modify limit: Operation not permitted</code></pre>
+<div class="then"><b>だめな理由</b>: ハードを 2048 に下げるのは通ったが、4096 に戻そうとすると
+<code>Operation not permitted</code> で拒否された。<b>ハードリミットは、一般ユーザにとって一方通行</b>である。
+下げることはできるが、上げられるのは root だけ。
+だから「一時的に絞って、あとで戻す」は、ハードに対しては（root でない限り）効かない。
+ソフトは天井（ハード）の下で自由、ハードはその天井そのものを下げる操作で、下げたら戻せない。</div></div>
+<div class="scroll"><table>
+<tr><th>種類</th><th>読む／下げる</th><th>上げる</th></tr>
+<tr><td>ソフト（<code>-S</code>・既定）</td><td>誰でも</td><td>ハードの範囲内なら誰でも</td></tr>
+<tr><td>ハード（<code>-H</code>）</td><td>誰でも読める・下げられる</td><td><b>root だけ</b></td></tr>
+</table></div>
+<p>恒久的に効かせるには、ログインのたびに適用される <code>/etc/security/limits.conf</code> に書く。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo "deploy hard nproc 30" | sudo tee -a /etc/security/limits.conf &gt;/dev/null; echo added
+added
+$ sudo runuser -l deploy -c "ulimit -u"
+30</code></pre>
+<p><code>deploy</code> のプロセス数の上限が 30 になった。<b><code>limits.conf</code> は PAM がログインのときに読む</b>ので、<b>いま開いているシェルには効かない</b>。新しくログインし直して初めて効く。設定を書いても現在のセッションで変わらないのはこのためである。</p>
+<div class="analogy"><b>たとえ</b>: ハードリミットは、ダムの<b>最高水位</b>に近い。日々の水位（ソフト）はその下で自由に動かせるが、最高水位そのものを下げたら、権限のない現場では二度と上げ直せない。
+<br>ただし<b>崩れる点</b>: ダムは物理的に作り直せば上げられるが、ハードリミットは「root だけ」という権限の壁で、物理ではなく制度の問題である。</div>
+
+<h2 id="who">who・w・last は、端末の記録を読む</h2>
+<div class="sgoal"><b>この節で分かること</b>: ログイン状況と履歴がどこに記録されているか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ who
+student  pts/0        2026-10-13 10:57 (10.0.2.2)
+$ last -a | head -5
+student  pts/0        Tue Oct 13 10:57   still logged in    10.0.2.2
+reboot   system boot  Tue Oct 13 10:56   still running      6.8.0-142-generic</code></pre>
+<p><code>who</code> は<b>いま</b>ログインしている端末を <code>/var/run/utmp</code> から読む。<code>pts/0</code> は疑似端末（SSH 接続）、<code>(10.0.2.2)</code> は接続元である。<code>w</code> は <code>who</code> に加えて負荷や各セッションの処理内容も出す。<code>last</code> は<b>過去</b>の記録を <code>/var/log/wtmp</code> から読み、ログインだけでなく <code>reboot</code>（起動）も並ぶ。失敗したログインは <code>lastb</code>（<code>/var/log/btmp</code>）にある。</p>
+<p>ここに落とし穴がある。これらが読むのは<b>端末（tty）を伴うログイン</b>の記録である。<code>ssh host コマンド</code> のように端末を持たずにコマンドだけ実行した場合や、<code>cron</code> のジョブは <code>utmp</code> に載らないので、<code>who</code> に出てこない。「<code>who</code> が空だから誰もいない」とは限らない。</p>
+<div class="analogy"><b>たとえ</b>: <code>utmp</code>／<code>wtmp</code> は、建物の<b>入館ゲートの記録</b>に近い。ゲートを通った人（端末ログイン）は残るが、窓から荷物だけ受け渡した人（端末なしのコマンド実行）は記録に出ない。
+<br>ただし<b>崩れる点</b>: 実際の建物なら窓の出入りも監視カメラで追えるが、<code>who</code>／<code>last</code> はゲートの記録しか見ない。プロセス側（<code>ps</code>・<code>ss</code>）と併せて見る必要がある。</div>
+
+<h2 id="tmout">TMOUT は、放置したシェルを自分で閉じる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 自動ログアウトの仕組みと、それがいつ効くか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ grep -n TMOUT /etc/profile.d/*.sh 2>/dev/null; echo "（既定では未設定）"
+（既定では未設定）</code></pre>
+<p><code>TMOUT</code> は bash の環境変数で、<b>無操作が続くと自動でログアウト</b>する秒数である。<code>export TMOUT=600</code> とすれば、10 分放置したシェルは勝手に閉じる。席を離れた端末が乗っ取られるのを防ぐための仕組みで、全員に効かせるなら <code>/etc/profile.d/</code> に置く。</p>
+<p>ただし <code>TMOUT</code> は<b>対話的な bash の変数</b>にすぎないので、ユーザが <code>unset TMOUT</code> すれば外せる。強制力のある制御ではなく、「うっかり放置」への保険だと理解しておく。</p>
+<div class="analogy"><b>たとえ</b>: <code>TMOUT</code> は、一定時間でロックがかかる<b>画面のスクリーンセーバー</b>に近い。席を立ったときの保険になる。
+<br>ただし<b>崩れる点</b>: スクリーンセーバーは OS が強制するが、<code>TMOUT</code> は本人のシェルの設定なので、本人が外せてしまう。悪意ある相手には効かない。</div>
+
+<div class="note try"><b>手を動かす</b>: この章には専用の演習はない。練習機に入って（外の端末で <code>vm ssh</code>）、<code>who</code> / <code>w</code> / <code>last -a</code> / <code>ulimit -a</code> を自分で打つと、この章と同じ種類の出力が出る。<code>ulimit -Hn</code> を下げてから上げられないことも確かめられる。</div>
+
+<div class="quiz"><b>確認</b>
+<p>一般ユーザが <code>ulimit -Hn 1024</code> でハードリミットを下げた。あとで <code>ulimit -Hn 4096</code> と戻せるか。</p>
+<details><summary>答え</summary>
+<p>戻せない（<code>Operation not permitted</code>）。ハードリミットを<b>上げられるのは root だけ</b>で、
+一般ユーザにとって引き下げは一方通行。ソフトリミットはハードの範囲内なら自由に上げ下げできる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/security/limits.conf</code> に <code>deploy hard nproc 30</code> を書き足した。いま開いている <code>deploy</code> のシェルに効くか。</p>
+<details><summary>答え</summary>
+<p>効かない。<code>limits.conf</code> は PAM が<b>ログイン時</b>に読むので、適用されるのは次に <code>deploy</code> がログインしてから。
+現在のセッションは変わらない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>who</code> と <code>last</code> は、それぞれどのファイルを読むか。</p>
+<details><summary>答え</summary>
+<p><code>who</code>（と <code>w</code>）は<b>いま</b>のログインを <code>utmp</code>（<code>/var/run/utmp</code>）から、
+<code>last</code> は<b>過去</b>のログインと再起動を <code>wtmp</code>（<code>/var/log/wtmp</code>）から読む。失敗は <code>btmp</code>（<code>lastb</code>）。
+端末を持たないログインは記録されない。</p></details></div>
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li><code>ulimit</code> のソフトはハードの範囲内で自由。ハードは一般ユーザには一方通行（下げられるが上げられない。上げられるのは root）</li>
+<li><code>/etc/security/limits.conf</code> は PAM がログイン時に読む。いま開いているシェルには効かない</li>
+<li><code>who</code>・<code>w</code> は <code>utmp</code>（いま）、<code>last</code> は <code>wtmp</code>（過去）、<code>lastb</code> は <code>btmp</code>（失敗）を読む</li>
+<li>端末を持たないログイン（<code>ssh host コマンド</code>・cron）は <code>utmp</code> に載らず <code>who</code> に出ない</li>
+<li><code>TMOUT</code> は無操作時間での自動ログアウト。本人が外せる「保険」であって強制ではない</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.0@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / bash 5.2.21 / util-linux（last）2.39.3 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-security/theory/02-accounts">← 2. 「ロックした」は「無効化した」ではない</a><a href="/linuc-security/theory/04-ports">次: 4. 開いているポートは、数えないと見えない →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-security/chapters.js"></script>
+<script src="/linuc-security/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>
