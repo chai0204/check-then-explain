@@ -200,7 +200,7 @@ traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>traceroute は UDP（33434 番〜）を TTL 1, 2, 3… で送り、途中の time exceeded と、相手の port unreachable で道順を知る</li><li><code>-I</code> は ICMP echo で調べる。Ubuntu の既定では root が要る（<code>ping_group_range</code> が空。RHEL 9 などの既定なら一般ユーザでも通る）。<code>-n</code> は名前を引かない</li><li>tracepath は root なしで使え、道順に加えて経路の MTU（pmtu）を出す</li><li><code>ping -t N</code> で TTL を決めて送れる。返事の <code>ttl=63</code> は、64 から1つのルータで1減ったことを示す</li><li><code>*</code> は返事を受け取れなかっただけ。止まっている印ではない。<code>!N</code> / <code>!H</code> は途中の機械が届かないことを知らせてきた印</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ traceroute 2.1.5 / iputils 20240117 / iproute2 6.1.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.1@sha256:f35f4e774ff26c799660fd6a108900565c9913e56d33ef7ca2f8fd081fbf035b / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ traceroute 2.1.5 / iputils 20240117 / iproute2 6.1.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-network/theory/04-route">← 4. 返事をしたのは、相手ではなかった</a><a href="/linuc-network/theory/06-ipv6">次: 6. IPv6 のアドレスは、頼まなくても付いている →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
