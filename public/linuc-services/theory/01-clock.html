@@ -12,7 +12,7 @@
 </div>
 <h1>1. 時計は2つある</h1>
 <p class="lead">この檻で <code>hwclock</code> を打つと、時刻は1行も返らない。ところが <code>/proc/driver/rtc</code> には時刻が入っていて、しかも <code>date</code> が返す時刻と32秒ずれている。片方だけ見ていると気づかないが、1台のマシンの中で別々に進む時計が2つある。</p>
-<div class="badges"><span>前提: コマンドを打てる</span><span>前提: 檻が起動している</span><span>所要 12分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.1（重要度2）</span><span>最終検証 2026-10-12</span></div>
+<div class="badges"><span>前提: コマンドを打てる</span><span>前提: 檻が起動している</span><span>所要 12分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.1（重要度2）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>date</code> と <code>timedatectl</code> と <code>hwclock</code> が、それぞれ何を読んでいるかを区別して言える</li><li>ハードウェアクロック（RTC）とシステムクロックの役割を分けて説明できる</li><li>コンテナで <code>hwclock</code> が失敗する理由を、コマンドの有無ではなくデバイスの有無から説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: NTP による時刻合わせは第3章で扱う。うるう秒、<code>tzdata</code> の更新手順、<code>hwclock --systohc</code> で RTC に書き戻す操作はここでは扱わない（書き戻しには RTC デバイスが要るので、この檻では試せない。出る出力は後で示す）。<code>clock_gettime</code> の精度やクロックソースの選択も、合格に要らないので外す。</div></div>
@@ -20,12 +20,12 @@
 <div class="sgoal"><b>この節で分かること</b>: 同じマシンの中に、別々に進む時計が2つあること。</div>
 <p>まず2つ並べて打つ。どちらも時刻を出すコマンドだが、出てくる内容が違う。</p>
 <pre><code>$ date
-Mon Oct 12 21:46:12 JST 2026
+Tue Oct 13 10:30:59 JST 2026
 $ date -u
-Mon Oct 12 12:46:12 UTC 2026
+Tue Oct 13 01:30:59 UTC 2026
 $ timedatectl
-               Local time: Mon 2026-10-12 12:46:12 UTC
-           Universal time: Mon 2026-10-12 12:46:12 UTC
+               Local time: Tue 2026-10-13 01:30:59 UTC
+           Universal time: Tue 2026-10-13 01:30:59 UTC
                  RTC time: n/a
                 Time zone: Etc/UTC (UTC, +0000)
 System clock synchronized: yes
@@ -48,8 +48,8 @@ hwclock: Use the --verbose option to see the details of our search for an access
 そして「読む先が無い」ことは「RTC が存在しない」ことと同じではない。次でそれを確かめる。</div></div>
 <p>RTC が本当に存在しないのかを、別の経路から見る。カーネルは <code>/proc</code> の下に、自分が把握しているデバイスの状態をテキストで出している。</p>
 <pre><code>$ cat /proc/driver/rtc
-rtc_time	: 12:45:40
-rtc_date	: 2026-10-12
+rtc_time	: 01:30:27
+rtc_date	: 2026-10-13
 alrm_time	: 13:32:01
 alrm_date	: 2026-10-11
 alarm_IRQ	: no
@@ -60,8 +60,8 @@ periodic IRQ frequency	: 1
 max user IRQ frequency	: 64
 24hr		: yes</code></pre>
 <p>RTC は在る。時刻も入っている。ここで2つの数字を並べる。</p>
-<pre><code>date -u            → 12:46:12   ← システムクロック
-/proc/driver/rtc   → 12:45:40   ← RTC
+<pre><code>date -u            → 01:30:59   ← システムクロック
+/proc/driver/rtc   → 01:30:27   ← RTC
                      差 32秒</code></pre>
 <p>同じマシンの、同じ瞬間に読んだ2つの時計が32秒ずれている。どちらかが壊れているのではない。<b>2つは別々に進んでいて、合わせる仕組みが別にある</b>。その仕組みが第3章の NTP である。</p>
 <p class='detail'>（秒数と日付はあなたの環境で変わる。見るのは「2つの値が一致しない」ことだけ。一致していたら、直前に合わせた直後だったということになる。）</p>
@@ -101,8 +101,8 @@ LocalRTC=no
 CanNTP=yes
 NTP=yes
 NTPSynchronized=yes
-TimeUSec=Mon 2026-10-12 21:46:12 JST</code></pre>
-<p><code>NTPSynchronized=yes</code> と出ている。RTC は読めないままである。つまり「同期している」という判断は RTC とは無関係に下されている。判断しているのは systemd で、根拠にしているのは時刻合わせのデーモンからの報告である（第3章でその報告を直接読む）。</p>
+TimeUSec=Tue 2026-10-13 10:30:59 JST</code></pre>
+<p><code>NTPSynchronized=yes</code> と出ている。RTC は読めないままである。つまり「同期している」という判断は RTC とは無関係に下されている。判断の材料は、カーネルが持っている時計の状態である（<code>timedatectl</code> は systemd を通してカーネルに問い合わせている）。そしてコンテナはホストのカーネルをそのまま使うので、ここに出ているのは<b>ホスト側の時刻合わせの結果</b>である。第3章で見るとおり、檻の中の時刻合わせのデーモンは、この時点ではまだ何とも同期していない。</p>
 <p>整理すると、時刻に関わる登場人物はこうなる。</p>
 <div class="scroll"><table>
 <tr><th>名前</th><th>何か</th><th>電源を切ると</th><th>読むコマンド</th></tr>
@@ -133,8 +133,8 @@ TimeUSec=Mon 2026-10-12 21:46:12 JST</code></pre>
 RTC にシステムクロックを書き戻すのは別の操作（<code>hwclock --systohc</code>、
 あるいは <code>chrony.conf</code> の <code>rtcsync</code>）である。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>1台のマシンに時計は2つある。RTC は電池で動き続け、システムクロックはカーネルが持ち、電源で消える</li><li>システムクロックは起動時に RTC から値を受け取り、そのあとは独立して進む。だからずれる（実測32秒）</li><li><code>hwclock</code> の失敗は「コマンドが無い」ではなく「<code>/dev/rtc*</code> が無い」。同じ RTC は <code>/proc/driver/rtc</code> から読めた</li><li>コンテナにデバイスを渡さないのは設計どおり。だからこの章の失敗は読者の操作ミスではない</li><li><code>System clock synchronized</code> はシステムクロックの話であって、RTC が合っているとは言っていない</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.0@sha256:85ce572926e60b1811fdd2bf04246eb249c4da18fb89b2d66993119d9d6cf3c6 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless でも同じ出力を確認）/ 検証日 2026-10-12</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>1台のマシンに時計は2つある。RTC は電池で動き続け、システムクロックはカーネルが持ち、電源で消える</li><li>システムクロックは起動時に RTC から値を受け取り、そのあとは独立して進む。だからずれる（実測32秒）</li><li><code>hwclock</code> の失敗は「コマンドが無い」ではなく「<code>/dev/rtc*</code> が無い」。同じ RTC は <code>/proc/driver/rtc</code> から読めた</li><li>コンテナにデバイスを渡さないのは設計どおり。だからこの章の失敗は読者の操作ミスではない</li><li><code>System clock synchronized</code> はシステムクロックの話であって、RTC が合っているとは言っていない。しかもこの檻では、その判断もホストのカーネルの状態から来ている</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/">← 理論編 目次</a><a href="/linuc-services/theory/02-timezone">次: 2. タイムゾーンは表示の都合だけ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

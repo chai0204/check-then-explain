@@ -1,0 +1,101 @@
+== 起動（読者と同じ: --hostname host、練習機の自動起動あり）
+練習機が ssh を受け付けるまで: 29 秒（KVM なし）
+
+$ docker exec linuc-machine-smoke vm status
+練習機     : linuc
+状態       : running
+エージェント: 応答あり
+ssh        : 待ち受け中（127.0.0.1:2222 → 練習機の 22）
+ディスク   : /home/lab/vm/linuc.qcow2（土台 /var/lib/lab-vm/linuc-guest.qcow2）
+
+$ docker exec linuc-machine-smoke virsh list --all
+ Id   Name    State
+-----------------------
+ 1    linuc   running
+
+
+== 読者のログインシェル（docker exec -it … bash -l と同じ読み込み）でも session を見るか
+
+$ docker exec linuc-machine-smoke bash -lc 'echo $LIBVIRT_DEFAULT_URI; virsh list --all; ls /etc/profile.d/'
+qemu:///session
+ Id   Name    State
+-----------------------
+ 1    linuc   running
+
+01-locale-fix.sh
+98-lab-vm.sh
+99-lab.sh
+bash_completion.sh
+gawk.csh
+gawk.sh
+
+$ docker exec linuc-machine-smoke ssh linuc 'hostname; whoami; uname -r; systemctl is-system-running; ip -br a show enp0s16; ip r'
+linuc
+student
+6.8.0-142-generic
+running
+enp0s16          UP             10.0.2.15/24 metric 100 fec0::5054:ff:fe12:3456/64 fe80::5054:ff:fe12:3456/64 
+default via 10.0.2.2 dev enp0s16 proto dhcp src 10.0.2.15 metric 100 
+10.0.2.0/24 dev enp0s16 proto kernel scope link src 10.0.2.15 metric 100 
+10.0.2.2 dev enp0s16 proto dhcp scope link src 10.0.2.15 metric 100 
+10.0.2.3 dev enp0s16 proto dhcp scope link src 10.0.2.15 metric 100 
+
+$ docker exec linuc-machine-smoke ssh linuc 'systemctl --failed --no-legend --plain | wc -l'
+0
+
+$ docker exec linuc-machine-smoke lab-guest 'id; cat /etc/hostname'; echo rc=$?
+uid=0(root) gid=0(root) groups=0(root)
+linuc
+rc=0
+
+$ docker exec linuc-machine-smoke lab-guest -u student 'id -un; pwd'; echo rc=$?
+student
+/home/student
+rc=0
+
+$ docker exec linuc-machine-smoke lab-guest 'exit 7'; echo rc=$?
+rc=7
+
+$ docker exec linuc-machine-smoke ssh linuc 'lab env'
+テーマ    : lab-linuc-base ?
+イメージ  : 未設定
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+$ docker exec linuc-machine-smoke ssh linuc 'systemd-detect-virt; grep -m1 "model name" /proc/cpuinfo; lscpu | grep -E "^(Model name|Hypervisor|Virtualization)"'
+qemu
+model name	: QEMU TCG CPU version 2.5+
+Model name:                              QEMU TCG CPU version 2.5+
+Virtualization:                          AMD-V
+
+$ docker exec linuc-machine-smoke bash -c 'systemd-detect-virt 2>/dev/null || echo "(systemd-detect-virt 無し)"; uname -r'
+(systemd-detect-virt 無し)
+7.2.6
+
+$ docker exec linuc-machine-smoke ssh linuc 'echo 残るか > ~/persist.txt; sync'
+
+== 停止と再起動（練習機の状態がボリュームに残るか）
+docker stop: 3 秒
+再開後、ssh を受け付けるまで: 29 秒
+
+$ docker exec linuc-machine-smoke ssh linuc 'cat ~/persist.txt'
+残るか
+
+== 練習機を止めたときの判定（125 が返り、読者の失敗にしない）
+
+$ docker exec linuc-machine-smoke vm stop
+▶ virsh shutdown linuc
+止まりました（6秒）
+
+$ docker exec linuc-machine-smoke lab-guest true; echo rc=$?
+lab-guest: 練習機のエージェントに届きません（練習機が止まっていませんか: vm status）
+rc=125
+
+$ docker exec linuc-machine-smoke vm status --short
+練習機 linuc: shut off（エージェント — / ssh —）
+
+== 終了

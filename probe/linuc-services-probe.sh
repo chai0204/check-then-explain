@@ -1,157 +1,261 @@
 #!/bin/bash
-# LinuC 主題1.09（重要なシステムサービス）の本文に載せる全コマンドを、檻の中で実際に通す。
-# ここに出ない出力は本文に書かない（憲章 §3）。
-# 実行: docker cp してコンテナ内で bash /tmp/probe.sh
+# LinuC 主題1.09（重要なシステムサービス）理論編 第1〜7章の端末表示の出どころ。
+#
+# 章本文の `$ ` 行を、本文と同じ順序で、本文と同じ文字のまま1行ずつ打つ。
+# 読者は第1章から順に同じ檻の中で打っていくので、状態（設定ファイル・ログ・メールボックス）は
+# 章をまたいで持ち越される。ここでもそれをそのまま再現する。ここに出ない出力は本文に書かない。
+#
+# 2026-10-13 に全面改訂: 旧版は本文と順序が違い、本文の一部は別の場で打った結果だった
+# （照合ツール tools/logcheck.mjs で、ログに無いコマンド27行・出力30行が見つかった）。
+#
+# 走らせ方（読者の起動コマンドと同じオプション。名前とボリューム名だけ probe 用）:
+#   docker run -d -t --name linuc-services-probe --hostname linuc --cap-add SYS_ADMIN \
+#     -v <新しい名前のボリューム>:/root/.lab \
+#     lab-linuc-services:1.0.1   # 公開名 ghcr.io/chai0204/lab-linuc-services:1.0.1。記録は push 前のローカルの同じイメージで取った
+#   docker exec linuc-services-probe systemctl is-system-running --wait   # running が返るまで繰り返す（起動直後は D-Bus が無い）
+#   docker cp probe/linuc-services-probe.sh linuc-services-probe:/tmp/probe.sh
+#   docker exec linuc-services-probe bash -l /tmp/probe.sh > logs/linuc-services-probe.log 2>&1
+#   docker rm -f linuc-services-probe
+# 読者と同じ root の login シェル（bash -l）で打つ。tty は付けない（付けると色や列揃えが混ざる）。
+#
+# 記録の約束:
+#   R  … コマンド行を `$ ` 付きで書いてから実行する。複数行のコマンドは2行目以降を `> ` 付きで書く。
+#        直前のコマンドの終了コードを引き継ぐので、本文の `echo $?` はそのまま意味を持つ。
+#   W  … 読者が次の行を打つまでの間（秒）。記録には出さない。
+#        logger・mail の結果はデーモンが非同期に書くので、間を置かずに次の行を打つと間に合わない。
+#        人の手で打てば必ず数秒空くので、その間だけを置いている。コマンドは足していない。
+#   S  … 章の区切り。記録の見出しで、本文には出ない。
+#
+# 同じ檻の記録はほかに3本ある（logs/ の同名ファイルに出る）:
+#   probe/linuc-services-solve-all.sh … 演習6本を ✗ → ✔ の両方向で通す
+#   probe/linuc-services-extra.sh     … 地の文の裏取りのうち、この流れに混ぜると状態が変わるもの
+#   probe/linuc-services-podman.sh    … podman（rootless）の読者で出力が変わる箇所（umask が 0022）
 set -u
-R() { printf '\n$ %s\n' "$*"; eval "$@" 2>&1; }
+LAST=0
+R() {
+  local cmd="$1" first=1 line
+  while IFS= read -r line; do
+    if [ "$first" = 1 ]; then printf '\n$ %s\n' "$line"; first=0
+    else printf '> %s\n' "$line"; fi
+  done <<< "$cmd"
+  (exit "$LAST"); eval "$cmd" 2>&1
+  LAST=$?
+}
+W() { sleep "$1"; }
 S() { printf '\n\n========== %s ==========\n' "$*"; }
 
-S "0. 環境"
-R lab env
+S "0. 環境（検証環境ブロックの版の出どころ）"
+R 'lab env'
 R 'systemctl is-system-running'
-R 'systemctl list-units --state=failed --no-legend --no-pager; echo "(failed: $(systemctl list-units --state=failed --no-legend --no-pager | wc -l) 件)"'
+R 'systemctl list-units --state=failed --no-legend --no-pager | wc -l'
+R "dpkg-query -W -f '\${Package} \${Version}\n' systemd rsyslog chrony postfix logrotate"
+S "0b. ログインしたときに出る表示（実践編の入口に載せる）"
+R 'bash -lic exit 2>/dev/null'
 
-S "1. 時計は2つある（1.09.1）"
-R date
+S "第1章 時計は2つある（1.09.1）"
+R 'date'
 R 'date -u'
-R 'date +%s'
-R 'date -d @0'
-R "date '+%Y-%m-%d %H:%M:%S %Z %z'"
-R timedatectl
+R 'timedatectl'
 R 'hwclock'
 R 'hwclock --show'
-R 'ls -l /dev/rtc* 2>&1'
-R 'cat /proc/driver/rtc 2>&1'
+R 'cat /proc/driver/rtc'
+R 'ls -l /dev/rtc*'
 R 'timedatectl show'
 
-S "2. タイムゾーンは表示の都合（1.09.1）"
+S "第2章 タイムゾーンは表示の都合だけ（1.09.1）"
+R 'date +%Z'
+R 'timedatectl show -p Timezone --value'
 R 'cat /etc/timezone'
+R 'timedatectl set-timezone Asia/Tokyo'
+R 'ls -l /etc/localtime'
+R 'cat /etc/timezone'
+R 'date'
+R 'date -u'
+R "env | grep '^TZ='"
+R 'date +%s; TZ=UTC date; TZ=Asia/Tokyo date; TZ=America/New_York date; date +%s'
+R 'date -d @0'
+R 'TZ=UTC date -d @0'
+R "date '+%Y-%m-%d %H:%M:%S %Z %z'"
 R 'ls -l /etc/localtime'
 R 'ls /usr/share/zoneinfo | head -20'
-R 'ls /usr/share/zoneinfo/Asia | head -8'
 R 'file /usr/share/zoneinfo/Asia/Tokyo'
-R 'echo "同じ瞬間を3つのゾーンで表示する（エポック秒は動かない）"'
-R 'date +%s; TZ=UTC date; TZ=Asia/Tokyo date; TZ=America/New_York date; date +%s'
 R 'timedatectl list-timezones | grep -c .'
 R 'timedatectl list-timezones | grep Tokyo'
-R 'timedatectl set-timezone America/New_York'
-R 'ls -l /etc/localtime; cat /etc/timezone; date; date -u'
-R 'timedatectl set-timezone Asia/Tokyo'
-R 'ls -l /etc/localtime; cat /etc/timezone; date; date -u'
 
-S "3. 時刻合わせ（1.09.1）"
-R 'grep -vE "^\s*#|^\s*$" /etc/chrony/chrony.conf'
+S "第3章 時刻合わせは、基準を渡されるまで始まらない（1.09.1）"
 R 'systemctl is-active chrony'
-R 'cat /etc/default/chrony'
 R 'chronyc sources'
 R 'chronyc tracking'
+R 'systemctl is-active chrony'
 R 'chronyc activity'
-R 'echo "--- 檻の中の基準サーバ（lab-ntp-server）の設定 ---"'
-R 'grep -vE "^\s*#|^\s*$" /etc/chrony/lab-ntp-server.conf'
+R "grep -vE '^\s*#|^\s*\$' /etc/chrony/chrony.conf"
 R 'systemctl is-active lab-ntp-server'
-R 'ss -lun | grep -E ":(123|323)"'
-R 'echo "--- クライアントに1行足す ---"'
-R 'printf "server 127.0.0.1 iburst\n" >> /etc/chrony/chrony.conf; tail -2 /etc/chrony/chrony.conf'
-R 'systemctl restart chrony; sleep 8; chronyc sources -v'
+R "grep -vE '^\s*#|^\s*\$' /etc/chrony/lab-ntp-server.conf"
+R "ss -lun | grep -E ':(123|323)'"
+R "echo 'server 127.0.0.1 iburst' >> /etc/chrony/chrony.conf"
+R 'systemctl restart chrony'
+R 'sleep 8'
+R 'chronyc sources -v'
 R 'chronyc tracking'
-R 'chronyc sourcestats'
 R 'timedatectl | tail -3'
-R 'echo "--- 時刻を動かそうとすると（CAP_SYS_TIME が無い檻） ---"'
-R 'chronyc makestep'
-R 'date -s "2020-01-01 00:00:00"'
 R 'ntpdate -q 127.0.0.1'
+R 'chronyc makestep'
+W 1
+R 'date -s "2020-01-01 00:00:00"'
+R 'cat /etc/default/chrony'
+R 'tail -3 /var/log/syslog'
+R "apt-cache show chrony | grep -E '^(Provides|Conflicts):'"
+R "apt-cache show ntpsec | grep -E '^(Provides|Conflicts):'"
+R 'apt-get update'
+R "apt-cache show ntpsec | grep -E '^(Provides|Conflicts):'"
 
-S "4. ログの宛先は facility と priority で決まる（1.09.2）"
-R 'grep -vE "^\s*#|^\s*$" /etc/rsyslog.conf'
-R 'ls /etc/rsyslog.d/'
-R 'grep -vE "^\s*#|^\s*$" /etc/rsyslog.d/50-default.conf'
+S "第4章 ログの宛先は、受け手の表が決める（1.09.2）"
 R 'logger "はじめての logger"'
-R 'sleep 1; tail -3 /var/log/syslog'
+W 1
+R 'tail -3 /var/log/syslog'
 R 'logger -p local3.info "local3 に投げる"'
-R 'sleep 1; grep -c local3 /var/log/syslog; echo "(0 なら /var/log/syslog には入っていない)"'
-R 'grep "local3" /var/log/syslog; echo "exit=$?"'
-R 'echo "--- local3 の受け皿を作る ---"'
-R 'printf "local3.*  /var/log/lab-app.log\n" > /etc/rsyslog.d/60-lab.conf; cat /etc/rsyslog.d/60-lab.conf'
-R 'systemctl restart rsyslog; sleep 1'
-R 'logger -p local3.info "受け皿ができた後"'
-R 'sleep 1; cat /var/log/lab-app.log'
-R 'echo "--- priority で絞ると下は捨てられる ---"'
-R 'printf "local4.warning  /var/log/lab-warn.log\n" > /etc/rsyslog.d/61-lab.conf; systemctl restart rsyslog; sleep 1'
-R 'logger -p local4.debug "debug なので入らない"; logger -p local4.info "info なので入らない"; logger -p local4.warning "warning だから入る"; logger -p local4.err "err だから入る"; sleep 1'
+W 1
+R 'grep local3 /var/log/syslog'
+R 'grep IncludeConfig /etc/rsyslog.conf'
+R 'ls /etc/rsyslog.d/'
+R "grep -vE '^\s*#|^\s*\$' /etc/rsyslog.d/50-default.conf"
+R "echo 'local4.warning  /var/log/lab-warn.log' > /etc/rsyslog.d/61-lab.conf"
+R 'systemctl restart rsyslog'
+W 1
+R 'logger -p local4.debug   "debug なので入らない"'
+R 'logger -p local4.info    "info なので入らない"'
+R 'logger -p local4.warning "warning だから入る"'
+R 'logger -p local4.err     "err だから入る"'
+W 1
 R 'cat /var/log/lab-warn.log'
-R 'echo "--- = を付けるとその段だけになる ---"'
-R 'printf "local5.=notice  /var/log/lab-notice.log\n" > /etc/rsyslog.d/62-lab.conf; systemctl restart rsyslog; sleep 1'
-R 'logger -p local5.notice "notice"; logger -p local5.err "err"; sleep 1; cat /var/log/lab-notice.log'
-R 'echo "--- logger が渡しているラベルは2つだけ ---"'
-R 'logger -p local3.err -t myapp "タグも付けられる"; sleep 1; tail -1 /var/log/lab-app.log'
-R 'man 1 logger | sed -n "/facility/,+12p" | head -20'
+R "echo 'local5.=notice  /var/log/lab-notice.log' > /etc/rsyslog.d/62-lab.conf"
+R 'systemctl restart rsyslog'
+W 1
+R 'logger -p local5.notice "notice"'
+R 'logger -p local5.err    "err"'
+W 1
+R 'cat /var/log/lab-notice.log'
+R "echo 'local3.*  /var/log/lab-app.log' > /etc/rsyslog.d/60-lab.conf"
+R 'systemctl restart rsyslog'
+W 1
+R 'logger -p local3.info "受け皿ができた後"'
+W 1
+R 'cat /var/log/lab-app.log'
+R 'grep "受け皿ができた後" /var/log/syslog'
+R 'logger -p local3.err -t myapp "タグも付けられる"'
+W 1
+R 'tail -1 /var/log/lab-app.log'
 
-S "5. journald は別の箱（1.09.2）"
-R 'journalctl --no-pager -n 3'
+S "第5章 journald は隣にある別の箱（1.09.2）"
+R 'logger -p local3.info "二重に入るか"'
+W 1
+R 'grep -c "二重に入るか" /var/log/lab-app.log'
+R 'journalctl | grep -c "二重に入るか"'
 R 'journalctl --disk-usage'
+R 'journalctl --no-pager -t myapp -o verbose'
+R "grep -vE '^\s*#|^\s*\$' /etc/systemd/journald.conf"
+R 'ls -d /var/log/journal'
 R 'ls -d /run/log/journal/* 2>&1'
-R 'ls -d /var/log/journal 2>&1'
-R 'grep -vE "^\s*#|^\s*$" /etc/systemd/journald.conf; echo "(空なら全部既定値)"'
-R 'systemd-cat -t lab-cat echo "systemd-cat から1行"'
-R 'sleep 1; journalctl --no-pager -t lab-cat'
-R 'journalctl --no-pager -t lab-cat -o json | head -1 | cut -c1-400'
-R 'journalctl --no-pager -u rsyslog -n 3'
-R 'journalctl --no-pager -p err -n 3; echo "exit=$?"'
-R 'journalctl --no-pager --since "5 min ago" | wc -l'
-R 'journalctl --list-boots'
-R 'echo "--- logger の1行は rsyslog と journald の両方に入る ---"'
-R 'logger -p local3.info "二重に入るか"; sleep 1; grep -c "二重に入るか" /var/log/lab-app.log; journalctl --no-pager | grep -c "二重に入るか"'
-R 'echo "--- 永続化する ---"'
-R 'mkdir -p /var/log/journal; systemd-tmpfiles --create --prefix /var/log/journal; systemctl restart systemd-journald; sleep 2'
-R 'ls -d /var/log/journal/*; journalctl --disk-usage'
+R 'journalctl --disk-usage'
+R 'mkdir -p /var/log/journal'
+R 'systemd-tmpfiles --create --prefix /var/log/journal'
+R 'systemctl restart systemd-journald'
+W 1
+R 'ls -d /var/log/journal/*'
+R 'cat /etc/machine-id'
+R 'mkdir -p /etc/systemd/journald.conf.d'
+R "printf '[Journal]\nSystemMaxUse=8M\n' > /etc/systemd/journald.conf.d/10-lab.conf"
+R 'systemctl restart systemd-journald'
+W 1
+R 'journalctl -t systemd-journald --no-pager | tail -1'
 R 'journalctl --vacuum-size=1M'
-R 'echo "--- Storage= を明示する ---"'
-R 'printf "[Journal]\nStorage=persistent\nSystemMaxUse=16M\n" > /etc/systemd/journald.conf.d-test 2>/dev/null; mkdir -p /etc/systemd/journald.conf.d; printf "[Journal]\nStorage=persistent\nSystemMaxUse=16M\n" > /etc/systemd/journald.conf.d/10-lab.conf; cat /etc/systemd/journald.conf.d/10-lab.conf'
-R 'systemctl restart systemd-journald; sleep 1; journalctl --no-pager -n 1 -t systemd-journald'
+R 'journalctl --vacuum-time=2d'
+R 'journalctl --no-pager -u rsyslog -n 3'
+R 'journalctl --no-pager -p err -n 3'
+R 'journalctl --list-boots'
+R 'cat /proc/sys/kernel/random/boot_id'
+R 'systemd-cat -t lab-cat echo "systemd-cat から1行"'
+W 1
+R 'journalctl --no-pager -t lab-cat'
 
-S "6. ログを捨てる（1.09.2）"
-R 'grep -vE "^\s*#|^\s*$" /etc/logrotate.conf'
+S "第6章 捨てる判断も、受け手側にある（1.09.2）"
+R "grep -vE '^\s*#|^\s*\$' /etc/logrotate.conf"
 R 'ls /etc/logrotate.d/'
 R 'cat /etc/logrotate.d/rsyslog'
-R 'printf "/var/log/lab-app.log {\n    rotate 3\n    size 1k\n    missingok\n    notifempty\n    compress\n    create 0640 syslog adm\n    postrotate\n        systemctl kill -s HUP rsyslog.service\n    endscript\n}\n" > /etc/logrotate.d/lab-app; cat /etc/logrotate.d/lab-app'
-R 'logrotate -d /etc/logrotate.d/lab-app'
-R 'for i in $(seq 1 60); do logger -p local3.info "かさ増し $i"; done; sleep 1; ls -l /var/log/lab-app.log'
+R "printf '/var/log/lab-app.log {\n    size 1k\n    rotate 3\n    compress\n}\n' > /etc/logrotate.d/lab-app"
 R 'logrotate -v /etc/logrotate.d/lab-app'
+R 'echo $?'
+R 'chmod 644 /etc/logrotate.d/lab-app'
+R 'for i in $(seq 1 60); do logger -p local3.info "かさ増し $i"; done'
+W 2
+R 'ls -l /var/log/lab-app.log'
+R 'logrotate -v /etc/logrotate.d/lab-app'
+R 'echo $?'
+R 'ls -ld /var/log'
+R 'grep -n su /etc/logrotate.conf'
+R 'logrotate -v /etc/logrotate.conf'
 R 'ls -l /var/log/lab-app.log*'
-R 'logrotate -f -v /etc/logrotate.d/lab-app 2>&1 | tail -12'
+R 'cat /var/lib/logrotate/status'
+R 'logrotate -f /etc/logrotate.conf'
+W 1
+R $'for r in 1 2 3 4; do\n  for i in $(seq 1 60); do logger -p local3.info "回 $r 行 $i"; done\n  logrotate -f /etc/logrotate.conf\ndone'
+W 2
 R 'ls -l /var/log/lab-app.log*'
-R 'cat /var/lib/logrotate/status | head -8'
 R 'systemctl list-timers logrotate.timer --no-pager'
 R 'systemctl cat logrotate.timer | head -12'
 
-S "7. メールは宛先で曲がる（1.09.3）"
-R 'postconf -n'
-R 'cat /etc/aliases'
-R 'ls -l /etc/aliases.db'
-R 'useradd -m alice; useradd -m bob; id alice; id bob'
+S "第7章 宛先に書いた名前は、希望にすぎない（1.09.3）"
 R 'echo "本文です" | mail -s "最初の1通" alice'
-R 'sleep 2; ls -l /var/mail/'
-R 'cat /var/mail/alice'
-R 'mailq'
-R 'echo "--- /etc/aliases で宛先を曲げる ---"'
-R 'printf "alice: bob\n" >> /etc/aliases; cat /etc/aliases'
-R 'newaliases; ls -l /etc/aliases.db'
-R 'echo "曲がったか" | mail -s "aliases 経由" alice; sleep 2'
-R 'cat /var/mail/bob'
+W 3
 R 'ls -l /var/mail/'
-R 'echo "--- ~/.forward でさらに曲げる ---"'
-R 'printf "root\n" > /home/bob/.forward; chown bob:bob /home/bob/.forward; ls -l /home/bob/.forward; cat /home/bob/.forward'
-R 'echo "2回曲がる" | mail -s "forward 経由" alice; sleep 2'
-R 'grep -c "forward 経由" /var/mail/root; echo "(root に届いた数)"'
-R 'tail -12 /var/mail/root'
-R 'echo "--- 配送できないとキューに残る ---"'
-R 'echo x | mail -s "届かない宛先" nosuchuser@invalid.example; sleep 2; mailq'
-R 'postqueue -p; echo "exit=$?"'
-R 'journalctl --no-pager -t postfix/local -n 6'
-R 'journalctl --no-pager -u postfix -n 3'
-R 'echo "--- ログで配送を追う（主題1.09 の3つが1本に繋がる） ---"'
-R 'grep -c postfix /var/log/syslog'
-R 'grep "aliases 経由" /var/log/mail.log 2>/dev/null | head -3; ls -l /var/log/mail.log 2>&1'
+R 'cat /var/mail/alice'
+R 'postconf -n | grep alias'
+R 'cat /etc/aliases'
+R "echo 'alice: bob' >> /etc/aliases"
+R 'cat /etc/aliases'
+R 'echo "曲がったか" | mail -s "aliases 経由" alice'
+W 3
+R 'ls -l /var/mail/'
+R 'ls -l /etc/aliases /etc/aliases.db'
+R 'newaliases'
+R 'ls -l /etc/aliases.db'
+R 'echo "曲がったか" | mail -s "aliases 経由" alice'
+W 3
+R 'ls -l /var/mail/'
+R "printf 'root\n' > /home/bob/.forward"
+R 'chown bob:bob /home/bob/.forward'
+R 'ls -l /home/bob/.forward'
+R 'echo "2回曲がる" | mail -s "forward 経由" alice'
+W 3
+R 'grep -c "2回曲がる" /var/mail/root'
+R 'grep -c "2回曲がる" /var/mail/bob'
+R 'journalctl -t postfix/local --no-pager | tail -3'
+R 'chmod 644 /home/bob/.forward'
+R 'echo "2回曲がる" | mail -s "forward 経由" alice'
+W 3
+R 'grep -c "2回曲がる" /var/mail/root'
+R 'journalctl -t postfix/local --no-pager -n 2'
+R 'echo x | mail -s "届かない宛先" nosuchuser@invalid.example'
+W 5
+R 'mailq'
+R 'postqueue -p'
+R 'journalctl -t postfix/smtp -t postfix/bounce -t postfix/local --no-pager -n 3'
+R 'ls -l /var/mail/root'
+R 'head -1 /etc/aliases'
+
+S "裏取り（本文の地の文が言っていること。章の状態を乱さないよう最後にまとめて打つ）"
+R 'command -v hwclock ntpdate chronyd; command -v ntpq; echo "ntpq: exit=$?"'
+R 'dpkg -S /usr/sbin/ntpdate'
+R 'chronyd -Q "server 127.0.0.1 iburst"'
+R "man 8 chronyd 2>/dev/null | grep -A3 -E '^ +-[qQ]\$'"
+R "man 1 logger 2>/dev/null | sed -n '/FACILITIES AND LEVELS/,/^EXAMPLES/p'"
+R 'umask'
+R 'id alice; id bob'
+R 'getent group adm; getent passwd syslog'
+R 'ls /var/log/journal/*/'
+R 'journalctl -t myapp -o json | head -1'
+R "grep -E '^(From|To|Subject):' /var/mail/root"
+R 'ls -l /var/spool/postfix/etc/localtime /etc/localtime'
 
 S "完了"
 R 'lab env'

@@ -1,0 +1,74 @@
+
+
+========== 0. 環境 ==========
+
+$ lab env
+テーマ    : lab-linuc-services 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.1
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: podman
+PID1      : /sbin/init
+systemd   : running
+cgroup    : rw,relatime
+journal   : 8.0M in the file system.
+特権      : CapEff=00000000800405fb CapBnd=00000000800405fb
+
+$ umask
+0022
+
+
+========== 第6章の前提（第4章の受け皿を作ってから、同じ printf で設定を置く） ==========
+
+$ echo 'local3.*  /var/log/lab-app.log' > /etc/rsyslog.d/60-lab.conf
+
+$ systemctl restart rsyslog
+
+$ logger -p local3.info "受け皿ができた後"
+
+$ printf '/var/log/lab-app.log {\n    size 1k\n    rotate 3\n    compress\n}\n' > /etc/logrotate.d/lab-app
+
+$ ls -l /etc/logrotate.d/lab-app
+-rw-r--r-- 1 root root 63 Oct 13 10:34 /etc/logrotate.d/lab-app
+
+$ logrotate -v /etc/logrotate.d/lab-app
+reading config file /etc/logrotate.d/lab-app
+Creating stub state file: /var/lib/logrotate/status
+acquired lock on state file /var/lib/logrotate/statusReading state from file: /var/lib/logrotate/status
+Allocating hash table for state file, size 64 entries
+
+Handling 1 logs
+
+rotating pattern: /var/log/lab-app.log  1024 bytes (3 rotations)
+empty log files are rotated, old logs are removed
+considering log /var/log/lab-app.log
+error: skipping "/var/log/lab-app.log" because parent directory has insecure permissions (It's world writable or writable by group which is not "root") Set "su" directive in config file to tell logrotate which user/group should be used for rotation.
+Creating new state
+
+$ echo $?
+1
+
+
+========== 第7章の前提（alias を効かせてから、同じ printf で .forward を置く） ==========
+
+$ echo 'alice: bob' >> /etc/aliases
+
+$ newaliases
+
+$ printf 'root\n' > /home/bob/.forward
+
+$ chown bob:bob /home/bob/.forward
+
+$ ls -l /home/bob/.forward
+-rw-r--r-- 1 bob bob 5 Oct 13 10:34 /home/bob/.forward
+
+$ echo "2回曲がる" | mail -s "forward 経由" alice
+
+$ grep -c "2回曲がる" /var/mail/root
+1
+
+$ journalctl -t postfix/local --no-pager | tail -3
+Oct 13 10:34:14 linuc postfix/local[280]: B5F907838C5: to=<alice@lab.local>, orig_to=<alice>, relay=local, delay=0.02, delays=0.01/0/0/0.01, dsn=2.0.0, status=sent (forwarded as B7EF77838C7)
+Oct 13 10:34:14 linuc postfix/local[280]: B7EF77838C7: to=<root@lab.local>, orig_to=<alice>, relay=local, delay=0.02, delays=0.01/0/0/0.02, dsn=2.0.0, status=sent (delivered to mailbox)

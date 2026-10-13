@@ -54,10 +54,10 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 
 <h2 id="start">はじめる</h2>
 <p>Docker の場合。2行です。</p>
-<pre><code>docker run -d -t --name lab-linuc \
+<pre><code>docker run -d -t --name lab-linuc --hostname linuc \
   --cap-add SYS_ADMIN \
-  -v lab-linuc-state:/root/.lab \
-  ghcr.io/chai0204/lab-linuc-services:1.0.0@sha256:85ce572926e60b1811fdd2bf04246eb249c4da18fb89b2d66993119d9d6cf3c6
+  -v lab-linuc-services-state:/root/.lab \
+  ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:__DIGEST__
 
 docker exec -it lab-linuc bash -l</code></pre>
 
@@ -83,23 +83,25 @@ CapEff:	00000000a82425fb
           差は 0x00200000 = bit 21 = CAP_SYS_ADMIN だけ</code></pre>
 <p><b>Podman なら権限を1つも渡さずに済みます。</b>rootless の podman は systemd 用に
 cgroup を書き込み可でマウントするので、専用のオプション1つで足ります。</p>
-<pre><code>podman run -d -t --name lab-linuc \
+<pre><code>podman run -d -t --name lab-linuc --hostname linuc \
   --systemd=always \
-  -v lab-linuc-state:/root/.lab \
-  ghcr.io/chai0204/lab-linuc-services:1.0.0@sha256:85ce572926e60b1811fdd2bf04246eb249c4da18fb89b2d66993119d9d6cf3c6
+  -v lab-linuc-services-state:/root/.lab \
+  ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:__DIGEST__
 
 podman exec -it lab-linuc bash -l</code></pre>
-<p>podman 5.8.6（rootless・uid 1100）で起動を確認しました。
+<p>podman 5.8.6（rootless・uid 1100）で、起動と演習6本の完走を確認しました。
 <code>--cap-add</code> は要りません。この違いそのものが、出題範囲 1.01.2「仮想マシン・コンテナの概念」の実物です。</p>
+<p>もう1つ違いがあります。<code>podman exec</code> で入ったシェルは <code>umask</code> が <code>0022</code> で、<code>docker exec</code> の <code>0000</code> と違います（2026-10-13 実測）。そのため第6章の1つ目の拒否（設定ファイルの権限）と、第7章の <code>.forward</code> の拒否が、podman では起きません。該当する箇所に、podman で何が出るかを書いてあります。演習のヒントと模範解答も、どちらの入り方でも通るように書いてあります（どちらでも模範解答どおりに全問 ✔ になることを確認済み）。</p>
 </div>
 
 <p>入ると現在地が出ます。</p>
-<pre><code>── lab-linuc-services 1.0.0 ────────────────────────────
+<pre><code>── lab-linuc-services 1.0.1 ────────────────────────────────────────
 lab-linuc-services  進捗 0/6
   次 → 01 「時刻の表示を3箇所で揃える」 (目安 10分 / 影響度 B)
   lab start 01 で課題を開く
+  進捗の保存先: /root/.lab/progress.json（消すには docker volume rm lab-linuc-services-state）
   lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
-────────────────────────────────────────────────────────</code></pre>
+────────────────────────────────────────────────────────────</code></pre>
 
 <h2 id="ex">演習</h2>
 <p>6本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。
@@ -126,8 +128,8 @@ lab-linuc-services  進捗 0/6
 <li><code>lab env</code> の全文</li>
 </ol>
 <pre><code>$ lab env
-テーマ    : lab-linuc-services 1.0.0
-イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.0
+テーマ    : lab-linuc-services 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.1
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -144,11 +146,11 @@ journal   : 8.0M in the file system.
 
 <h2 id="end">終わったら</h2>
 <pre><code>docker rm -f lab-linuc
-docker volume rm lab-linuc-state     # 進捗も消す場合だけ</code></pre>
+docker volume rm lab-linuc-services-state     # 進捗も消す場合だけ</code></pre>
 <p>イメージは <code>docker rmi</code> で消せます。
 母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。</p>
 
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.0@sha256:85ce572926e60b1811fdd2bf04246eb249c4da18fb89b2d66993119d9d6cf3c6 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で演習6本を完走（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-12</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 と podman 5.8.6 rootless の両方で演習6本を完走 / 検証日 2026-10-13</div>
 
 <section id="comments">
 <h2>コメント</h2>

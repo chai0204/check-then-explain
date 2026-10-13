@@ -12,7 +12,7 @@
 </div>
 <h1>6. 捨てる判断も、受け手側にある</h1>
 <p class="lead">ログを書くプログラムは、自分のログを切らない。切るのは別のプログラムで、いつ切るかは設定ファイルが決める。そして <code>logrotate</code> は、設定ファイルの<b>権限</b>が気に入らないと、エラーを出しながら終了コード 0 で正常終了する。</p>
-<div class="badges"><span>前提: 第5章まで読了</span><span>前提: 演習03 を終えている</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.2（重要度5）</span><span>最終検証 2026-10-12</span></div>
+<div class="badges"><span>前提: 第5章まで読了</span><span>前提: 演習03 を終えている</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.2（重要度5）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>/etc/logrotate.conf</code> と <code>/etc/logrotate.d/</code> の関係を説明できる</li><li><code>logrotate</code> が設定を拒否する2つの条件を、出力から特定できる</li><li>ログを切る判断が「いつ」「何世代」「圧縮するか」のどこに書かれているかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>dateext</code> による命名、<code>sharedscripts</code> と <code>prerotate</code> の細かい使い分け、<code>mail</code> ディレクティブ、<code>copytruncate</code> が要る場面の見極めは扱わない。journald の捨て方は第5章で済んでいる（logrotate の対象外）。</div></div>
@@ -97,52 +97,74 @@ $ echo $?
 <code>printf &gt;</code> で作ったファイルが誰でも書ける状態になった。
 logrotate は設定に書かれたコマンドを root で実行するので、
 他人が書き換えられる設定ファイルを読まない。著者はこれで3回空振りした。</div></div>
+<p class='detail'>（podman で入った場合は、シェルの <code>umask</code> が <code>0022</code> なので、同じ <code>printf</code> でも <code>0644</code> のファイルになり、この1つ目の拒否は起きない。いきなり次の「親ディレクトリの権限」で止まる。podman 5.8.6 rootless で実測。）</p>
 <p>権限を直す。</p>
 <pre><code>$ chmod 644 /etc/logrotate.d/lab-app
 $ for i in $(seq 1 60); do logger -p local3.info "かさ増し $i"; done
 $ ls -l /var/log/lab-app.log
--rw-r----- 1 syslog adm 4210 Oct 12 22:00 /var/log/lab-app.log</code></pre>
-<p>4210 バイトで、<code>size 1k</code> の条件は満たしている。もう一度打つ。</p>
+-rw-r----- 1 syslog adm 3856 Oct 13 10:31 /var/log/lab-app.log</code></pre>
+<p>3856 バイトで、<code>size 1k</code> の条件は満たしている。もう一度打つ。</p>
 <pre><code>$ logrotate -v /etc/logrotate.d/lab-app
+reading config file /etc/logrotate.d/lab-app
+acquired lock on state file /var/lib/logrotate/statusReading state from file: /var/lib/logrotate/status
+Allocating hash table for state file, size 64 entries
+
 Handling 1 logs
 
 rotating pattern: /var/log/lab-app.log  1024 bytes (3 rotations)
-empty log files are not rotated, old logs are removed
+empty log files are rotated, old logs are removed
 considering log /var/log/lab-app.log
 error: skipping "/var/log/lab-app.log" because parent directory has insecure permissions (It's world writable or writable by group which is not "root") Set "su" directive in config file to tell logrotate which user/group should be used for rotation.
-Creating new state</code></pre>
-<p>まだ切れない。<b>2段目の条件は、ログの親ディレクトリの権限である。</b></p>
+Creating new state
+$ echo $?
+1</code></pre>
+<p>まだ切れない。ただし今度は終了コードが <code>1</code> になった。1つ目の拒否（設定ファイルの権限）は 0、2つ目は 1 である。<b>2段目の条件は、ログの親ディレクトリの権限である。</b></p>
 <pre><code>$ ls -ld /var/log
-drwxrwxr-x 1 root syslog 4096 Oct 12 22:00 /var/log</code></pre>
+drwxrwxr-x 1 root syslog 4096 Oct 13 10:31 /var/log</code></pre>
 <p><code>/var/log</code> は <code>syslog</code> グループが書ける。rsyslog が自分でログファイルを作れるようにそうなっている。logrotate はこれを危険と見て飛ばす。メッセージが解決策を名指ししている — <code>Set &quot;su&quot; directive</code>。この su ディレクティブは、<b>すでにどこかに書かれている</b>。</p>
 <pre><code>$ grep -n su /etc/logrotate.conf
-2:su root adm</code></pre>
-<p>全体設定の2行目にある。つまり渡すべきファイルが違った。</p>
+10:su root adm
+18:# use date as a suffix of the rotated file</code></pre>
+<p>全体設定の10行目にある（18行目は <code>suffix</code> の綴りに当たっただけ）。つまり渡すべきファイルが違った。</p>
 <pre><code>$ logrotate -v /etc/logrotate.conf
+reading config file /etc/logrotate.conf
+including /etc/logrotate.d
 ...
-rotating log /var/log/lab-app.log, log->rotateCount is 3
+Handling 9 logs
+...
+rotating pattern: /var/log/lab-app.log  1024 bytes (3 rotations)
+empty log files are rotated, old logs are removed
+switching euid from 0 to 0 and egid from 0 to 4 (pid 767)
+considering log /var/log/lab-app.log
+  Now: 2026-10-13 10:31
+  Last rotated at 2026-10-13 10:00
+  log needs rotating
+rotating log /var/log/lab-app.log, log-&gt;rotateCount is 3
+...
 renaming /var/log/lab-app.log to /var/log/lab-app.log.1
 creating new /var/log/lab-app.log mode = 0640 uid = 101 gid = 4
-running postrotate script
 compressing log with: /bin/gzip
+...
 $ ls -l /var/log/lab-app.log*
--rw-r----- 1 syslog adm   0 Oct 12 22:01 /var/log/lab-app.log
--rw-r----- 1 syslog adm 513 Oct 12 22:01 /var/log/lab-app.log.1.gz</code></pre>
-<p>切れた。<code>.log</code> が 0 バイトで作り直され、前の内容は <code>.log.1.gz</code> になっている。</p>
+-rw-r----- 1 syslog adm   0 Oct 13 10:31 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 596 Oct 13 10:31 /var/log/lab-app.log.1.gz</code></pre>
+<p>切れた。<code>.log</code> が 0 バイトで作り直され、前の内容は <code>.log.1.gz</code> になっている。途中の <code>switching euid from 0 to 0 and egid from 0 to 4</code> が、<code>su root adm</code> が効いた跡である（グループ ID 4 は <code>adm</code>）。</p>
+<p class='detail'>（この設定には <code>postrotate</code> が無いので、rsyslog はこの時点ではまだ、名前を変えられて（圧縮のあとに）消えた古いファイルを開いたままである。次の節の <code>logrotate -f</code> で、rsyslog 側の設定（<code>/etc/logrotate.d/rsyslog</code>）の <code>postrotate</code> が HUP を送るまで、新しい <code>lab-app.log</code> には書かれない。）</p>
 <p><b>Ubuntu 標準の <code>/etc/logrotate.d/rsyslog</code> に <code>su</code> が書かれていないのに動くのは、単体で実行される前提になっていないから</b>である。<code>logrotate.conf</code> から <code>include</code> され、そこにある <code>su root adm</code> を受け継いで動いている。設定の階層は「どのファイルを渡して実行したか」で変わる。</p>
-<p>自分の設定に書いても通る。どちらでもよい。</p>
+<p>自分の設定のブロックの中に書いても、この拒否は通る。</p>
 <pre><code>/var/log/lab-app.log {
     su root adm          ← ブロックの中に書く
     size 1k
     ...
 }</code></pre>
+<p>ただしそれだけで単体で渡すと、<code>logrotate.conf</code> の既定（<code>create</code> など）は受け継がれない。別の新しい檻で試すと、切ったあとに新しい <code>.log</code> が作られず、続けて投げた1行もどこにも現れなかった。rsyslog に HUP を送って開き直させて、ようやく新しい <code>.log</code> ができた（その前の1行は失われていた）。<b>単体で渡すつもりなら、<code>create</code> と <code>postrotate</code> も自分のブロックに書くことになる。</b>渡すのは <code>logrotate.conf</code> にしておくのが素直である。</p>
 <div class="analogy"><b>たとえ</b>: 立ち入りの許可証を持たずに現場へ来た作業員に近い。
 現場（<code>/var/log</code>）は複数の業者が出入りできる場所なので、
 誰の権限で作業するかを明示した書類（<code>su</code>）が無いと作業を始めない。
 書類は事務所（<code>logrotate.conf</code>）に用意されているが、
 現場へ直行すると持っていない状態になる。
 <br>ただし<b>崩れる点</b>: 作業員は口頭で確認できるが、logrotate は尋ねない。
-メッセージを出して黙って飛ばし、終了コードは 0 を返す。</div>
+メッセージを1行出して、そのログを飛ばす（終了コードは 1）。</div>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-services/">演習05</a>が、この2つの罠をどちらも踏む構成になっている。
 <code>-d</code>（何もせずに判断だけ出す）と <code>-v</code>（やったことを出す）を使い分けること。</div>
@@ -150,8 +172,21 @@ $ ls -l /var/log/lab-app.log*
 <div class="sgoal"><b>この節で分かること</b>: logrotate が状態を持っていること、そして誰が呼ぶのか。</div>
 <pre><code>$ cat /var/lib/logrotate/status
 logrotate state -- version 2
-"/var/log/lab-app.log" 2026-10-12-22:0:0</code></pre>
-<p>対象ごとに「前回切った時刻」を持っている。だから <code>weekly</code> の設定で1日に何度打っても1回しか切らない。条件を無視させたいときだけ <code>-f</code> を使う。</p>
+"/var/log/syslog" 2026-10-13-10:0:0
+"/var/log/dpkg.log" 2026-10-13-10:0:0
+"/var/log/auth.log" 2026-10-13-10:0:0
+"/var/log/apt/term.log" 2026-10-13-10:0:0
+"/var/log/lab-app.log" 2026-10-13-10:31:31
+"/var/log/apt/history.log" 2026-10-13-10:0:0
+"/var/log/alternatives.log" 2026-10-13-10:0:0
+"/var/log/mail.log" 2026-10-13-10:0:0
+"/var/log/kern.log" 2026-10-13-10:0:0
+"/var/log/wtmp" 2026-10-13-10:0:0
+"/var/log/chrony/*.log" 2026-10-13-10:0:0
+"/var/log/btmp" 2026-10-13-10:0:0
+"/var/log/user.log" 2026-10-13-10:0:0
+"/var/log/cron.log" 2026-10-13-10:0:0</code></pre>
+<p>対象ごとに「前回切った時刻」を持っている。<code>lab-app.log</code> だけ分と秒まで入っているのは、実際に切った時刻だからである（ほかは初めて見たときに記録された時刻で、<code>-v</code> の出力の <code>Last rotated at 2026-10-13 10:00</code> と同じく時の単位に丸められている）。だから <code>weekly</code> の設定で1日に何度打っても1回しか切らない。条件を無視させたいときだけ <code>-f</code> を使う。</p>
 <pre><code>$ logrotate -f /etc/logrotate.conf</code></pre>
 <p>世代の上限が効いていることも確かめられる。4回切ると最古が消える。</p>
 <pre><code>$ for r in 1 2 3 4; do
@@ -159,17 +194,18 @@ logrotate state -- version 2
 &gt;   logrotate -f /etc/logrotate.conf
 &gt; done
 $ ls -l /var/log/lab-app.log*
--rw-r----- 1 syslog adm   0 Oct 12 22:01 /var/log/lab-app.log
--rw-r----- 1 syslog adm 473 Oct 12 22:01 /var/log/lab-app.log.1.gz
--rw-r----- 1 syslog adm 472 Oct 12 22:01 /var/log/lab-app.log.2.gz
--rw-r----- 1 syslog adm 476 Oct 12 22:01 /var/log/lab-app.log.3.gz</code></pre>
+-rw-r----- 1 syslog adm   0 Oct 13 10:31 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 479 Oct 13 10:31 /var/log/lab-app.log.1.gz
+-rw-r----- 1 syslog adm 479 Oct 13 10:31 /var/log/lab-app.log.2.gz
+-rw-r----- 1 syslog adm 466 Oct 13 10:31 /var/log/lab-app.log.3.gz</code></pre>
 <p><code>rotate 3</code> なので <code>.4.gz</code> は作られず、捨てられている。</p>
 <p>では誰が <code>logrotate</code> を呼ぶのか。常駐していない。</p>
 <pre><code>$ systemctl list-timers logrotate.timer --no-pager
-NEXT                            LEFT LAST PASSED UNIT            ACTIVATES
-Tue 2026-10-13 00:00:00 JST 2h 13min -         - logrotate.timer logrotate.service
+NEXT                        LEFT LAST PASSED UNIT            ACTIVATES
+Wed 2026-10-14 00:00:00 JST  13h -         - logrotate.timer logrotate.service
 
 1 timers listed.
+Pass --all to see loaded but inactive timers, too.
 $ systemctl cat logrotate.timer | head -12
 # /usr/lib/systemd/system/logrotate.timer
 [Unit]
@@ -195,11 +231,12 @@ logrotate は条件を満たさなければ何もせずに帰る。来たこと�
 <p><code>logrotate -v /etc/logrotate.d/myapp</code> を打ったら
 <code>Handling 0 logs</code> と出て終了コードは 0 だった。何を疑うか。</p>
 <details><summary>答え</summary>
-<p>設定ファイルが読まれていない。まず権限を見る
-（<code>ls -l</code>。group か other に書き込みがあると丸ごと無視される）。
-次に、対象ファイルの親ディレクトリの権限と <code>su</code> ディレクティブを見る。
-終了コードは両方の場合で 0 になるので、<code>$?</code> では判別できない。
-<code>-d</code> を付けて判断の過程を読む。</p></details></div>
+<p>設定ファイルが読まれていない。<code>Handling 0 logs</code> は対象が0件、つまり設定が1つも採用されなかったという意味なので、
+まず設定ファイルの権限を見る（<code>ls -l</code>。group か other に書き込みがあると丸ごと無視される）。
+このとき終了コードは 0 なので、<code>$?</code> では気づけない。
+権限を直したあとに出る2つ目の拒否（ログの親ディレクトリの権限と <code>su</code> ディレクティブ）は、
+<code>Handling 1 logs</code> のあとに <code>error: skipping</code> が出て、終了コードは 1 になる。
+どちらも <code>-v</code>（または何もしない <code>-d</code>）で判断の過程を読む。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>rotate 3</code> と <code>compress</code> を設定して4回切った。
 残っているファイルを列挙せよ。</p>
@@ -209,8 +246,8 @@ logrotate は条件を満たさなければ何もせずに帰る。来たこと�
 <code>delaycompress</code> を付けていれば <code>.1</code> が非圧縮のまま残り、
 <code>.2.gz</code> 以降が圧縮される。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>書く側（rsyslog）と捨てる側（logrotate）は別のプログラムで、設定ファイルも別</li><li><code>logrotate</code> は設定ファイルが group/other に書けると<b>丸ごと無視</b>する。しかも終了コードは 0</li><li>ログの親ディレクトリが group 書き込み可だと、<code>su</code> ディレクティブが無い限り飛ばす</li><li><code>/etc/logrotate.d/&lt;名前&gt;</code> を直接渡すと <code>/etc/logrotate.conf</code> の既定（<code>su root adm</code> など）が効かない。渡すのは <code>logrotate.conf</code></li><li>前回切った時刻は <code>/var/lib/logrotate/status</code> にある。無視させるのは <code>-f</code></li><li>logrotate は常駐しない。<code>logrotate.timer</code>（<code>OnCalendar=daily</code> / <code>Persistent=true</code>）が呼ぶ</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.0@sha256:85ce572926e60b1811fdd2bf04246eb249c4da18fb89b2d66993119d9d6cf3c6 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless でも同じ出力を確認）/ 検証日 2026-10-12</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>書く側（rsyslog）と捨てる側（logrotate）は別のプログラムで、設定ファイルも別</li><li><code>logrotate</code> は設定ファイルが group/other に書けると<b>丸ごと無視</b>する。しかも終了コードは 0</li><li>ログの親ディレクトリが group 書き込み可だと、<code>su</code> ディレクティブが無い限り飛ばす（こちらは終了コード 1）</li><li><code>/etc/logrotate.d/&lt;名前&gt;</code> を直接渡すと <code>/etc/logrotate.conf</code> の既定（<code>su root adm</code> など）が効かない。渡すのは <code>logrotate.conf</code></li><li>前回切った時刻は <code>/var/lib/logrotate/status</code> にある。無視させるのは <code>-f</code></li><li>logrotate は常駐しない。<code>logrotate.timer</code>（<code>OnCalendar=daily</code> / <code>Persistent=true</code>）が呼ぶ</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動と、umask の違いで1つ目の拒否が起きないことを確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/05-journald">← 5. journald は隣にある別の箱</a><a href="/linuc-services/theory/07-mail">次: 7. 宛先に書いた名前は、希望にすぎない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

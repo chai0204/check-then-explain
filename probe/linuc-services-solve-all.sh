@@ -2,6 +2,9 @@
 # 全演習を模範解答どおりに通す。目的は2つ。
 #   1) 未達のとき判定が ✗ を出すこと（鳴らない検査は無いより悪い）
 #   2) 解答どおりにやれば ✔ になること
+# docker exec（umask 0000）でも podman exec（umask 0022）でも、同じ手順のまま走らせる。
+# 模範解答（solutions/05.md・06.md）は両方の読者に向けて書いてあるので、どちらでも ✔ に届くことを確かめる。
+# 罠に当たるかどうかだけが入り方で変わる（区切りの echo に両方の場合を書いてある）。
 set -u
 H() { printf '\n\n########## %s ##########\n' "$*"; }
 R() { printf '\n$ %s\n' "$*"; eval "$@" 2>&1; }
@@ -42,7 +45,7 @@ H "F. 演習05 — ログを切って3世代だけ残す"
 R 'umask'
 R "printf '/var/log/lab-app.log {\n    size 1k\n    rotate 3\n    missingok\n    notifempty\n    compress\n    create 0640 syslog adm\n    postrotate\n        systemctl kill -s HUP rsyslog.service\n    endscript\n}\n' > /etc/logrotate.d/lab-app"
 R 'ls -l /etc/logrotate.d/lab-app'
-R 'echo "--- 権限を直す前はこうなる（これが罠） ---"; logrotate -v /etc/logrotate.d/lab-app; echo "exit=$?"'
+R 'echo "--- chmod の前（umask 0000 なら 0666 で丸ごと無視される＝罠その1。0022 なら 0644 で罠その2に進む） ---"; logrotate -v /etc/logrotate.d/lab-app; echo "exit=$?"'
 R 'lab check 05; echo "exit=$?"'
 R 'chmod 644 /etc/logrotate.d/lab-app; ls -l /etc/logrotate.d/lab-app'
 R 'for i in $(seq 1 60); do logger -p local3.info "かさ増し $i"; done; sleep 2; ls -l /var/log/lab-app.log'
@@ -64,7 +67,7 @@ R 'id alice; id bob'
 R "echo 'alice: bob' >> /etc/aliases; cat /etc/aliases"
 R 'newaliases'
 R "echo 'root' > /home/bob/.forward; chown bob:bob /home/bob/.forward; ls -l /home/bob/.forward"
-R 'echo "--- chmod を忘れた状態（0666）でどうなるか ---"'
+R 'echo "--- chmod の前（umask 0000 なら 0666 で読まれない。0022 なら 0644 で最初から読まれる） ---"'
 R 'echo "権限を直す前" | mail -s "before-chmod" alice; sleep 4'
 R 'grep -c "権限を直す前" /var/mail/bob 2>/dev/null; grep -c "権限を直す前" /var/mail/root 2>/dev/null; echo "(bob / root の順)"'
 R 'journalctl -t postfix/local --no-pager | grep -i forward | tail -2'

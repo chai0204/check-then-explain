@@ -12,7 +12,7 @@
 </div>
 <h1>4. ログの宛先は、受け手の表が決める</h1>
 <p class="lead"><code>logger -p local3.info</code> と打つと、行は <code>/var/log/syslog</code> に入る。<code>local3</code> という名前のファイルはどこにも無い。送り手は宛先を1文字も指定していない。決めたのは受け手の設定表である。</p>
-<div class="badges"><span>前提: 第3章まで読了</span><span>前提: 檻が起動している</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.2（重要度5）</span><span>最終検証 2026-10-12</span></div>
+<div class="badges"><span>前提: 第3章まで読了</span><span>前提: 檻が起動している</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.2（重要度5）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>facility.priority</code> のセレクタを読み書きできる</li><li>同じ1行が複数のファイルに同時に入る理由を、設定の構造から説明できる</li><li><code>logger</code> が何を渡し、何を渡していないかを列挙できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: rsyslog の RainerScript（<code>action()</code> 形式）、リモート転送（<code>@@host</code>）、テンプレートによる書式変更、キューの設計はここでは扱わない。<code>imklog</code> や <code>imfile</code> などの入力モジュールも、名前を見たとき「入力の口」と分かれば足りる。覚えるのはセレクタの文法と既定の宛先だけでよい。</div></div>
@@ -20,9 +20,9 @@
 <div class="sgoal"><b>この節で分かること</b>: ログの宛先を決めているのが送り手ではないこと。</div>
 <pre><code>$ logger "はじめての logger"
 $ tail -3 /var/log/syslog
-2026-10-12T12:46:16.625635+00:00 a7c1d43cae23 chronyd[327]: Selected source 127.0.0.1
-2026-10-12T12:46:20.383363+00:00 a7c1d43cae23 chronyd[327]: Could not step system clock
-2026-10-12T12:46:20.434153+00:00 a7c1d43cae23 root: はじめての logger</code></pre>
+2026-10-13T01:31:03.719446+00:00 linuc chronyd[405]: Selected source 127.0.0.1
+2026-10-13T01:31:07.495866+00:00 linuc chronyd[405]: Could not step system clock
+2026-10-13T01:31:16.130228+00:00 linuc root: はじめての logger</code></pre>
 <p>自分が投げた行が、第3章で見た <code>chronyd</code> の行の隣に並んだ。デーモンのログと、手で打った1行が同じファイルに入っている。</p>
 <p>では宛先を指定して投げてみる。<code>-p</code> で <code>facility.priority</code> を渡せる。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
@@ -30,7 +30,7 @@ $ tail -3 /var/log/syslog
 少なくとも、指定しなかったとき（<code>/var/log/syslog</code>）とは別の場所に行くだろう。</p>
 <pre><code>$ logger -p local3.info "local3 に投げる"
 $ grep local3 /var/log/syslog
-2026-10-12T12:46:21.437290+00:00 a7c1d43cae23 root: local3 に投げる</code></pre>
+2026-10-13T01:31:17.134136+00:00 linuc root: local3 に投げる</code></pre>
 <div class="then"><b>だめな理由</b>: 同じ <code>/var/log/syslog</code> に入っている。
 しかも行の中に <code>local3</code> という文字は残っていない（<code>grep</code> が当たったのは本文のほうである）。
 <code>local3</code> は宛先ではなく<b>ラベル</b>で、そのラベルをどう扱うかは受け手が決める。
@@ -60,14 +60,14 @@ mail.err			/var/log/mail.err
 <code>logger</code> が渡す情報には宛先が1つも無い。ラベルと本文だけである。</div>
 <h2 id="selector">セレクタは facility と priority の2語でできている</h2>
 <div class="sgoal"><b>この節で分かること</b>: 設定の1行がどう組み立てられていて、どこまで絞れるか。</div>
-<p>設定の1行は、左が<b>セレクタ</b>、右が<b>宛先</b>である。</p>
+<p>設定の1行は、左が<b>セレクタ</b>、右が<b>アクション</b>（当てはまった行をどうするか。ここでは書き込む先のファイル＝宛先）である。</p>
 <pre><code>local3.*          /var/log/lab-app.log
 ^^^^^^^^          ^^^^^^^^^^^^^^^^^^^^
-セレクタ           宛先
+セレクタ           アクション（宛先）
 
 local3  .  *
 facility   priority</code></pre>
-<p>facility は「どの種類の機能から出たか」を表す決まった名前の集合で、priority は「どれだけ重いか」の段である。どちらも <code>logger</code> の man に一覧がある。</p>
+<p>facility（ファシリティ）は「どの種類の機能から出たか」を表す決まった名前の集合で、priority（優先度。プライオリティとも呼ぶ）は「どれだけ重いか」の段である。出題範囲の詳細にも「標準的なファシリティ、優先度、およびアクションを理解する」とあり、試験ではこの日本語で出る。ファシリティと優先度は、どちらも <code>logger</code> の man に一覧がある。</p>
 <div class="scroll"><table>
 <tr><th>priority（重い順）</th><th>別名</th><th>意味の目安</th></tr>
 <tr><td><code>emerg</code></td><td><code>panic</code></td><td>システムが使えない</td></tr>
@@ -79,7 +79,7 @@ facility   priority</code></pre>
 <tr><td><code>info</code></td><td>—</td><td>情報</td></tr>
 <tr><td><code>debug</code></td><td>—</td><td>開発用</td></tr>
 </table></div>
-<p>facility は <code>auth</code>、<code>authpriv</code>、<code>cron</code>、<code>daemon</code>、<code>kern</code>、<code>lpr</code>、<code>mail</code>、<code>news</code>、<code>syslog</code>、<code>user</code>、<code>uucp</code>、そして <code>local0</code> から <code>local7</code> である。<b><code>local0</code>〜<code>local7</code> は用途が決まっていない</b>ので、自分のアプリに割り当てて使う。だから演習で使うのもここである。</p>
+<p>facility は <code>auth</code>、<code>authpriv</code>、<code>cron</code>、<code>daemon</code>、<code>ftp</code>、<code>kern</code>、<code>lpr</code>、<code>mail</code>、<code>news</code>、<code>syslog</code>、<code>user</code>、<code>uucp</code>、そして <code>local0</code> から <code>local7</code> である。<b><code>local0</code>〜<code>local7</code> は用途が決まっていない</b>ので、自分のアプリに割り当てて使う。だから演習で使うのもここである。</p>
 <p>priority の書き方は3通りあり、意味が違う。実際に投げて確かめる。</p>
 <pre><code>$ echo 'local4.warning  /var/log/lab-warn.log' &gt; /etc/rsyslog.d/61-lab.conf
 $ systemctl restart rsyslog
@@ -88,15 +88,16 @@ $ logger -p local4.info    "info なので入らない"
 $ logger -p local4.warning "warning だから入る"
 $ logger -p local4.err     "err だから入る"
 $ cat /var/log/lab-warn.log
-2026-10-12T21:46:25.560765+09:00 a7c1d43cae23 root: warning だから入る
-2026-10-12T21:46:25.561516+09:00 a7c1d43cae23 root: err だから入る</code></pre>
+2026-10-13T10:31:19.198498+09:00 linuc root: warning だから入る
+2026-10-13T10:31:19.199680+09:00 linuc root: err だから入る</code></pre>
 <p><code>local4.warning</code> と書くと <b><code>warning</code> 以上</b>が入る。4つ投げて2つしか入っていない。<code>=</code> を付けるとその段だけになる。</p>
+<p class='detail'>（行頭の時刻が、ここから <code>+09:00</code> になっている。それまでの行は <code>+00:00</code> だった。rsyslog は起動したときのタイムゾーンを使い続けるので、第2章で <code>/etc/localtime</code> を <code>Asia/Tokyo</code> に変えたあと、ここで再起動して初めて日本時間で書くようになった。）</p>
 <pre><code>$ echo 'local5.=notice  /var/log/lab-notice.log' &gt; /etc/rsyslog.d/62-lab.conf
 $ systemctl restart rsyslog
 $ logger -p local5.notice "notice"
 $ logger -p local5.err    "err"
 $ cat /var/log/lab-notice.log
-2026-10-12T21:46:27.613547+09:00 a7c1d43cae23 root: notice</code></pre>
+2026-10-13T10:31:21.258258+09:00 linuc root: notice</code></pre>
 <p><code>err</code> は <code>notice</code> より重いのに入らない。これが <code>=</code> の効果である。</p>
 <div class="scroll"><table>
 <tr><th>書き方</th><th>入るもの</th></tr>
@@ -119,16 +120,16 @@ $ cat /var/log/lab-notice.log
 $ systemctl restart rsyslog
 $ logger -p local3.info "受け皿ができた後"
 $ cat /var/log/lab-app.log
-2026-10-12T21:46:23.491996+09:00 a7c1d43cae23 root: 受け皿ができた後
+2026-10-13T10:31:23.314736+09:00 linuc root: 受け皿ができた後
 $ grep "受け皿ができた後" /var/log/syslog
-2026-10-12T21:46:23.491996+09:00 a7c1d43cae23 root: 受け皿ができた後</code></pre>
+2026-10-13T10:31:23.314736+09:00 linuc root: 受け皿ができた後</code></pre>
 <p>同じ行が両方にある。rsyslog はセレクタに当てはまった行を、<b>当てはまったすべての宛先に書く</b>。最初に見つかったところで止まらない。</p>
 <pre><code>*.*;auth,authpriv.none   -/var/log/syslog        ← 既定。ほぼ全部を拾う
 local3.*                  /var/log/lab-app.log   ← 足したもの
                           どちらも local3.info に当てはまる → 2回書かれる</code></pre>
 <p>ここが「移す」と「増やす」の違いである。<code>/var/log/lab-app.log</code> だけに入れたいなら、既定の行のほうに <code>local3.none</code> を足して除外する必要がある。<b>送り手側では何も変えられない。</b></p>
 <p>そして第3章で見た行をもう一度見る。</p>
-<pre><code>chronyd[327]: Could not step system clock</code></pre>
+<pre><code>chronyd[405]: Could not step system clock</code></pre>
 <p>この行も <code>chronyd</code> が facility と priority を付けて投げただけで、<code>/var/log/syslog</code> に入ったのは <code>*.*</code> の行があったからである。<b>第3章で「理由はログに書かれていた」と言ったのは、この設定表がそう決めていたから</b>に過ぎない。設定を変えれば、その理由は別の場所に行くか、消える。</p>
 <div class="analogy"><b>たとえ</b>: 回覧板を「関係する部署すべて」に同時に回す運用に近い。
 1枚の紙が複数の部署の棚に写しとして置かれる。どこか1つに届いたら終わりではない。
@@ -142,7 +143,7 @@ rsyslog は同じ内容をいくつでも複製する。コストはディスク
 <p><code>logger</code> が渡せるものは少ない。</p>
 <pre><code>$ logger -p local3.err -t myapp "タグも付けられる"
 $ tail -1 /var/log/lab-app.log
-2026-10-12T21:46:28.617594+09:00 a7c1d43cae23 myapp: タグも付けられる</code></pre>
+2026-10-13T10:31:24.319380+09:00 linuc myapp: タグも付けられる</code></pre>
 <div class="scroll"><table>
 <tr><th>渡すもの</th><th>指定</th><th>行のどこに出るか</th></tr>
 <tr><td>facility</td><td><code>-p local3.</code></td><td><b>出ない</b>（宛先の判断にだけ使われる）</td></tr>
@@ -151,7 +152,7 @@ $ tail -1 /var/log/lab-app.log
 <tr><td>本文</td><td>引数</td><td>末尾</td></tr>
 <tr><td>時刻・ホスト名</td><td>指定しない</td><td>受け手が付ける</td></tr>
 </table></div>
-<p>facility と priority は<b>行の中に残らない</b>。分類に使われて消える。タグを省略するとユーザ名（<code>root:</code>）が入る。時刻とホスト名は <code>logger</code> が書いたものではなく、rsyslog が付けたものである。</p>
+<p>facility と priority は<b>行の中に残らない</b>。分類に使われて消える。タグを省略するとユーザ名（<code>root:</code>）が入る。行の先頭の時刻とホスト名は rsyslog が付けたものである（時刻はマイクロ秒まである。<code>logger</code> も秒までの時刻を添えて送っているが、この行には使われていない。第5章で確かめる）。</p>
 <p>だから「このログの priority は何だったか」を後から <code>/var/log/syslog</code> から知ることはできない。知りたければ、priority ごとに別のファイルへ分けておくしかない。<b>ログ設計が設定ファイルの仕事になっているのはこのため</b>である。</p>
 <p>第5章で見る journald は、ここが違う。同じ1行を構造ごと保存している。</p>
 <div class="quiz"><b>確認</b>
@@ -170,8 +171,8 @@ $ tail -1 /var/log/lab-app.log
 自分が足したファイルを直しても <code>/var/log/syslog</code> への経路は消えない。
 別の行が独立して拾っているからである。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>logger</code> が渡すのは facility・priority・タグ・本文だけ。宛先は1文字も渡していない</li><li>宛先を決めるのは <code>/etc/rsyslog.conf</code> と <code>/etc/rsyslog.d/*.conf</code> のセレクタ表</li><li>Debian 系の既定は <code>*.*;auth,authpriv.none -/var/log/syslog</code> という catch-all。だから何を投げても <code>/var/log/syslog</code> に入る</li><li><code>local4.warning</code> は warning 以上、<code>local4.=warning</code> は warning だけ、<code>local4.none</code> は除外</li><li>当てはまった宛先すべてに書かれる。だから設定を足すと「移る」のではなく「増える」</li><li>facility と priority は行に残らない。後から知りたければ、分けて保存する設定を先に作る</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.0@sha256:85ce572926e60b1811fdd2bf04246eb249c4da18fb89b2d66993119d9d6cf3c6 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless でも同じ出力を確認）/ 検証日 2026-10-12</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>logger</code> が渡すのは facility・priority・タグ・本文（と秒までの時刻）だけ。宛先は1文字も渡していない</li><li>宛先を決めるのは <code>/etc/rsyslog.conf</code> と <code>/etc/rsyslog.d/*.conf</code> のセレクタ表</li><li>Debian 系の既定は <code>*.*;auth,authpriv.none -/var/log/syslog</code> という catch-all。だから何を投げても <code>/var/log/syslog</code> に入る</li><li><code>local4.warning</code> は warning 以上、<code>local4.=warning</code> は warning だけ、<code>local4.none</code> は除外</li><li>当てはまった宛先すべてに書かれる。だから設定を足すと「移る」のではなく「増える」</li><li>facility と priority は行に残らない。後から知りたければ、分けて保存する設定を先に作る</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/03-ntp">← 3. 時刻合わせは、基準を渡されるまで始まらない</a><a href="/linuc-services/theory/05-journald">次: 5. journald は隣にある別の箱 →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
