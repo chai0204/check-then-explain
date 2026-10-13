@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. ディスクは、書いたところだけを持つファイル — 確かめて説明する QEMU</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="qemu">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <a href="/qemu/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/">詳しく</a></p>
+</div>
+<h1>3. ディスクは、書いたところだけを持つファイル</h1>
+<p class="lead">練習機のディスクは 20GiB と名乗るのに、ファイルは 527MiB しかない。その上に重ねたあなたのディスクは、作った直後は 192KiB で、練習機を1回起動して止めると 18MiB 余りになった。
+QEMU のディスクはただのファイルで、qcow2 という形式は<b>書いたところだけを持ち、持っていないところは下に重ねた土台のファイルに聞きに行く</b>。
+だから土台を1バイトも汚さずに練習機を何台でも作れ、<code>-snapshot</code> は書き込みを捨て、<code>savevm</code> は動いている状態ごとファイルの中にしまう。</p>
+<div class="badges"><span>前提: 第2章までを同じ端末で終えている（<code>~/work</code> にいる）</span><span>所要 30分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>raw と qcow2 の違いを、<code>ls -l</code> と <code>du</code> と <code>qemu-img info</code> の数字で説明できる</li>
+<li><code>qemu-img create -b … -F qcow2</code> で、読み取り専用の土台を汚さない差分ディスク（backing chain）を作り、そこから練習機を起動できる</li>
+<li><code>-snapshot</code> が「何も書き戻さない」指定であることを、ファイルの大きさとモニタの <code>info block</code> で示せる</li>
+<li><code>savevm</code> / <code>loadvm</code> で動いている状態ごと保存して戻し、それが qcow2 のファイルの中に入ることを <code>qemu-img snapshot -l</code> で示せる</li>
+<li>練習機の電源の切り方（<code>system_powerdown</code> と <code>quit</code>）の違いを、中の OS がいるときの振る舞いで言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: qcow2 のファイルの中の表（L1・L2・refcount）の形、<code>qemu-img</code> のサブコマンドの全部（<code>convert</code> <code>rebase</code> <code>commit</code> <code>resize</code> は名前だけ）、
+キャッシュの指定（<code>cache=</code>）、外部スナップショット（libvirt の <code>virsh snapshot-create --disk-only</code>）。</div></div>
+
+<h2 id="base">練習機のディスクを見る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 練習機のディスクがどこにあり、何と名乗っているか。</div>
+<p>練習機のディスクは、この檻の <code>/var/lib/lab-vm/</code> にある。このサイトの仮想マシン型の檻も、同じファイルを使っている。</p>
+<pre data-where="外（lab@host）"><code>$ ls -l /var/lib/lab-vm/
+total 539400
+-r--r--r-- 1 root root 552337408 Oct 13 10:34 linuc-guest.qcow2
+-r--r--r-- 1 root root        91 Oct 13 10:34 linuc-guest.sha256
+$ qemu-img info /var/lib/lab-vm/linuc-guest.qcow2 | head -4
+image: /var/lib/lab-vm/linuc-guest.qcow2
+file format: qcow2
+virtual size: 20 GiB (21474836480 bytes)
+disk size: 527 MiB
+$ qemu-img check /var/lib/lab-vm/linuc-guest.qcow2
+No errors were found on the image.
+18878/327680 = 5.76% allocated, 90.38% fragmented, 88.07% compressed clusters
+Image end offset: 552337408</code></pre>
+<p>持ち主は root で、誰も書けない（<code>r--r--r--</code>）。<code>qemu-img info</code> は、このファイルを「練習機から見ると 20GiB のディスク（<code>virtual size</code>）、ファイルとしては 527MiB（<code>disk size</code>）」と読んだ。
+<code>qemu-img check</code> は、中身を 64KiB の塊に分けて数えた。20GiB は 327680 個の塊で、書かれているのはそのうち 18878 個（5.76%、約 1.15GiB）だけだった。
+<b>書かれていない残りの約 18.8GiB は、どこにも置かれていない</b>。書かれた約 1.15GiB が 527MiB に収まっているのは、塊の 88.07% が圧縮されているから（<code>compressed clusters</code>）で、この檻を作ったときに、配るために圧縮した。
+練習機が後から書く塊は、圧縮されない。</p>
+<p class="detail"><code>fragmented</code> は塊がファイルの中で番地の順に並んでいない割合で、ここでは気にしなくてよい。</p>
+
+<h2 id="size">20GiB のディスクを作る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 仮想マシンのディスクの大きさと、ファイルの大きさが別物であること。raw と qcow2 の違い。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>仮想マシンに 20GiB のディスクを持たせるには、20GiB のファイルが要る。作るのにも時間がかかり、その分だけ空き容量が減るはずだ。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-img create -f raw empty.raw 20G
+Formatting 'empty.raw', fmt=raw size=21474836480
+$ ls -l empty.raw
+-rw-r--r-- 1 lab lab 21474836480 Oct 14 02:50 empty.raw
+$ du -h empty.raw
+4.0K    empty.raw
+$ qemu-img create -f qcow2 empty.qcow2 20G
+Formatting 'empty.qcow2', fmt=qcow2 cluster_size=65536 extended_l2=off compression_type=zlib size=21474836480 lazy_refcounts=off refcount_bits=16
+$ ls -l empty.qcow2
+-rw-r--r-- 1 lab lab 196928 Oct 14 02:50 empty.qcow2
+$ head -c 4 empty.qcow2 | od -c
+0000000   Q   F   I 373
+0000004
+$ rm empty.raw empty.qcow2</code></pre>
+<div class="then"><b>だめな理由</b>: どちらも一瞬でできた。raw のほうは <code>ls -l</code> では 21474836480 バイト（20GiB）あるのに、実際に場所を取っているのは 4KiB（<code>du</code>）だけ。
+qcow2 のほうは、<code>ls -l</code> でも 196928 バイト（192KiB）しかない。どちらも、中の OS から見れば 20GiB のディスクになる。
+<b>ディスクの大きさは「どこまで番地があるか」で、ファイルが持っているのは「書かれたところ」だけ</b>だった。
+raw（raw 形式）は、ディスクの1バイト目から順にそのままファイルにした形式で、まだ書いていないところをファイルシステムの「穴」（スパースファイル）にしている。<code>ls -l</code> は最後の番地までの長さを、<code>du</code> は実際に割り当てた量を数えるので、2つが食い違う。
+qcow2 は、ディスクを 64KiB の塊（<code>cluster_size=65536</code>）に分け、書かれた塊だけを自分の中に置く形式で、ファイルの頭には <code>QFI</code> と 0xfb（<code>od</code> では 8 進の 373）の4バイトの印がある。
+最後の <code>rm</code> は片付けである。</div></div>
+<p class="detail"><code>du</code> の 4.0K は、ボリュームを置いたファイルシステムによって変わることがある（QEMU が作るときに先頭の1区画だけ書く。穴を持てないファイルシステムなら 20G になる）。</p>
+<div class="scroll"><table>
+<tr><th></th><th>raw</th><th>qcow2</th></tr>
+<tr><td>中身</td><td>ディスクの中身を先頭から並べただけ</td><td>書かれた 64KiB の塊と、どの塊がどこにあるかの表</td></tr>
+<tr><td>書いていないところ</td><td>ファイルシステムの穴（ファイルシステム任せ）</td><td>そもそも持たない（形式が自分で管理する）</td></tr>
+<tr><td>下に土台を重ねる</td><td>できない</td><td>できる（backing file）</td></tr>
+<tr><td>中に状態を保存する（savevm）</td><td>できない</td><td>できる</td></tr>
+<tr><td>他の道具で読む</td><td>そのまま読める（ディスクの中身そのもの）</td><td>qemu-img などで変換してから</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: raw は<b>ページ番号だけ振った白紙のノート</b>に近い。書いたページだけインクが要る。qcow2 は<b>書いたページだけを綴じたバインダー</b>で、目次に「何ページ目はここ」と書いてある。
+<br>ただし<b>崩れる点</b>: 白紙のノートは白紙でも紙の厚みがあるが、raw の穴は場所を取らない。その代わり、穴を知らない道具でコピーすると、穴が全部 0 で埋まって本当に 20GiB になる。
+バインダーは書いたページしか綴じていないので、写しても大きくならない。ただし、後でページを抜いた跡がファイルの穴として残っていることがあり（この章の最後）、穴を知らない道具で写すと、そこは埋まる。</div>
+
+<h2 id="overlay">土台を汚さずに、練習機を起動する</h2>
+<div class="sgoal"><b>この節で分かること</b>: 読み取り専用の土台の上に、差分のディスクを重ねる方法。重ねた差分に何が入るか。</div>
+<p>練習機のディスクを、そのまま QEMU に渡してみる。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -drive file=/var/lib/lab-vm/linuc-guest.qcow2,if=virtio -display none
+qemu-system-x86_64: -drive file=/var/lib/lab-vm/linuc-guest.qcow2,if=virtio: Could not open '/var/lib/lab-vm/linuc-guest.qcow2': Permission denied</code></pre>
+<p>QEMU は、渡されたディスクを書けるように開こうとして断られた。中の OS は起動のたびにログや時刻を書くので、ディスクは書ける必要がある。
+そこで、土台の上に<b>差分のディスク</b>を重ねる。<code>-b</code> が土台（backing file）、<code>-F</code> がその形式である。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-img create -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 linuc.qcow2
+Formatting 'linuc.qcow2', fmt=qcow2 cluster_size=65536 extended_l2=off compression_type=zlib size=21474836480 backing_file=/var/lib/lab-vm/linuc-guest.qcow2 backing_fmt=qcow2 lazy_refcounts=off refcount_bits=16
+$ ls -l linuc.qcow2
+-rw-r--r-- 1 lab lab 196928 Oct 14 02:50 linuc.qcow2
+$ qemu-img info --backing-chain linuc.qcow2 | grep -E '^(image|virtual size|disk size|backing file):'
+image: linuc.qcow2
+virtual size: 20 GiB (21474836480 bytes)
+disk size: 196 KiB
+backing file: /var/lib/lab-vm/linuc-guest.qcow2
+image: /var/lib/lab-vm/linuc-guest.qcow2
+virtual size: 20 GiB (21474836480 bytes)
+disk size: 527 MiB</code></pre>
+<p>できた <code>linuc.qcow2</code> は、空の qcow2 と同じ 196928 バイトで、土台の中身は1バイトも写していない。<code>--backing-chain</code> を付けると、重なりを上から順にたどって見せる（差分 → 土台）。
+差分のファイルの頭には土台のパスが書き込まれていて、QEMU は差分に無い塊を、そのパスのファイルから読む。</p>
+<p>この差分ディスクで練習機を起動する。<code>-m 1536</code> はメモリ（1.5GB）、<code>-smp 2</code> は CPU を2つにする指定で、<code>-drive</code> の <code>if=virtio</code> はディスクを virtio の部品としてつなぐ（第1章）。
+第2章のとおり、端末を壊さない <code>-display none -serial mon:stdio</code> にする。KVM を使わないので、ログインの案内が出るまで 30〜60 秒かかる。
+出たら <code>student</code> でログインし（パスワードも <code>student</code>。打っても表示されない）、ディスクを見て、ファイルを1つ作ってから、モニタで電源ボタンを押す。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -m 1536 -smp 2 -drive file=linuc.qcow2,if=virtio -display none -serial mon:stdio
+                             GNU GRUB  version 2.12
+（略）
+   The highlighted entry will be executed automatically in 0s.
+GRUB_FORCE_PARTUUID set, attempting initrdless boot.
+（略）
+[    0.000000] Linux version 6.8.0-142-generic (buildd@lcy02-amd64-049) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #142-Ubuntu SMP PREEMPT_DYNAMIC Wed Sep  2 14:24:27 UTC 2026 (Ubuntu 6.8.0-142.142-generic 6.8.12)
+（略）
+[    0.000000] DMI: QEMU Ubuntu 24.04 PC v2 (i440FX + PIIX, arch_caps fix, 1996), BIOS 1.16.3-debian-1.16.3-2 04/01/2014
+（略）
+[    1.513897]  vda: vda1 vda14 vda15 vda16
+（略）
+Welcome to Ubuntu 24.04.5 LTS!
+（略）
+[  OK  ] Reached target graphical.target - Graphical Interface.
+（略）
+Ubuntu 24.04.5 LTS linuc ttyS0
+linuc login: <kbd><b>student</b></kbd>
+Password:
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+<kbd><b>lsblk</b></kbd>
+NAME    MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+fd0       2:0    1    4K  0 disk
+sr0      11:0    1 1024M  1 rom
+vda     253:0    0   20G  0 disk
+├─vda1  253:1    0   19G  0 part /
+├─vda14 253:14   0    4M  0 part
+├─vda15 253:15   0  106M  0 part /boot/efi
+└─vda16 259:0    0  913M  0 part /boot
+student@linuc:~$ <kbd><b>echo hello &gt; hello.txt</b></kbd>
+（打鍵: Ctrl-a c）
+student@linuc:~$ QEMU 8.2.2 monitor - type 'help' for more information
+(qemu) <kbd><b>system_powerdown</b></kbd>
+（略）
+[  OK  ] Reached target poweroff.target - System Power Off.
+[   52.424274] reboot: Power down</code></pre>
+<p class="detail">行の頭の <code>[    1.513897]</code> は、カーネルが起動してからの秒数で、毎回違う。
+練習機の中の表示（「この中でも lab check NN で…」）は他の記事の檻の案内で、この檻では使えない。</p>
+<p>流れたのは、第1章の何も無い PC と同じ順番の続きである。GRUB（ディスクの中の起動のプログラム）が出て、Linux のカーネルが起動し、
+<code>DMI: QEMU Ubuntu 24.04 PC v2 (i440FX + PIIX, …)</code> と、自分が動いている PC が QEMU の既定のマシン型であることを書き、
+<code>vda: vda1 vda14 vda15 vda16</code> と virtio のディスク（vda）の中の4つの区画を見つけた。<code>lsblk</code> でも、20GiB の vda として見える。
+第1章の既定の部品のフロッピー（fd0）と CD-ROM（sr0）も、ここにいる。</p>
+<p>止めるときに <code>quit</code> ではなく <code>system_powerdown</code>（電源ボタン）を使った。第2章と違い、今度は中に OS がいるので、ボタンを受け取った systemd が後片付けをして電源を切り（<code>reboot: Power down</code>）、
+それを見た QEMU も終わった。<code>quit</code> だと、OS は後片付けをする暇が無い（次の節で、あえて使う）。</p>
+<div class="note"><b>ログインの前後で、プロンプトが消えることがある</b>: ログインの案内が出てしばらくすると（著者の記録では十数秒後）、練習機の中の systemd-fsckd（起動のときのファイルシステムの点検の進み具合をコンソールに出す係）が退場し、
+そのときコンソール、つまりあなたの端末の、カーソルのある1行を空白で上書きする（著者が測ると、空白 51 個を <code>\r</code> で挟んだ並びで、それが流れた時刻は、練習機の記録（journal）にある systemd-fsckd の退場（<code>Deactivated successfully</code>）と同じ秒だった）。
+当たった行が <code>linuc login:</code> や <code>student@linuc:~$</code> だと、その文字が画面から消え、次に打った文字が行の頭から出る。
+どの行に当たるかは、あなたの PC の速さと、打つまでの間で変わる。本文の記録では、ログインして最初に打った行が毎回これに当たり、プロンプトが消えている（記録はログインしてから 15 秒ほど待って打った）。消えて見えても、打ったものはそのまま届いている。</div>
+<p>止まった後の差分ディスクと土台を見る。</p>
+<pre data-where="外（lab@host）"><code>$ ls -l linuc.qcow2
+-rw-r--r-- 1 lab lab 19136512 Oct 14 02:51 linuc.qcow2
+$ sha256sum /var/lib/lab-vm/linuc-guest.qcow2
+698763d45569b666a7c8e41ea4b34eec86d86a803c6c0c562d18c28059234c8d  /var/lib/lab-vm/linuc-guest.qcow2
+$ cat /var/lib/lab-vm/linuc-guest.sha256
+698763d45569b666a7c8e41ea4b34eec86d86a803c6c0c562d18c28059234c8d  /build/linuc-guest.qcow2</code></pre>
+<p class="detail"><code>linuc.qcow2</code> の大きさは、起動のあいだに書かれた量で決まるので、毎回少し違う。</p>
+<p>差分は 192KiB から 18.3MiB に増えた。1回の起動で、OS はログ・時刻の記録・パッケージの状態などを書き、作った <code>hello.txt</code> もその中にある。
+土台の sha256 は、この檻を作ったときに記録した値（<code>linuc-guest.sha256</code>）と同じで、1バイトも変わっていない。
+<b>練習機が「書いた」ものは全部、土台の上に重ねた差分に入った</b>。このサイトの仮想マシン型の檻の <code>vm reset --yes</code> は、この差分（と、UEFI の設定のファイル <code>linuc_VARS.fd</code>。第6章）を消して作り直すことで、練習機を工場出荷時に戻している。</p>
+<div class="analogy"><b>たとえ</b>: 差分ディスクは、図書館の本に貼った<b>透明なシート</b>に近い。メモはシートに書き、本そのものは汚さない。シートを剥がせば、本は元のまま。
+<br>ただし<b>崩れる点</b>: シートなら剥がして別の本に貼れるが、差分ディスクは決まった土台の上でしか意味を持たない（ファイルの頭に土台のパスが書いてある）。
+土台を書き換えたり別のものに差し替えたりすると、差分は違う絵の上に重なった落書きになり、中の OS から見たディスクは壊れる。</div>
+
+<h2 id="snapshot">-snapshot は、何も書き戻さない</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>-snapshot</code> を付けた起動では、書き込みがどこへ行くか。</div>
+<p>名前から「スナップショットを取る」指定に見える <code>-snapshot</code> を付けて起動し、さっき作った <code>hello.txt</code> を消してから、今度はあえて <code>quit</code>（電源を抜く）で止める。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -m 1536 -smp 2 -drive file=linuc.qcow2,if=virtio -snapshot -display none -serial mon:stdio
+                             GNU GRUB  version 2.12
+（略）
+Ubuntu 24.04.5 LTS linuc ttyS0
+linuc login: <kbd><b>student</b></kbd>
+Password:
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+<kbd><b>rm hello.txt</b></kbd>
+student@linuc:~$ <kbd><b>ls</b></kbd>
+（打鍵: Ctrl-a c）
+student@linuc:~$ QEMU 8.2.2 monitor - type 'help' for more information
+(qemu) <kbd><b>info block</b></kbd>
+virtio0 (#block857): json:{"backing": {"driver": "qcow2", "file": {"driver": "file", "filename": "linuc.qcow2"}}, "driver": "qcow2", "file": {"driver": "file", "filename": "/var/tmp/vl.Q8H2W3"}} (qcow2)
+    Attached to:      /machine/peripheral-anon/device[0]/virtio-backend
+    Cache mode:       writeback, ignore flushes
+    Backing file:     linuc.qcow2 (chain depth: 2)
+ide1-cd0: [not inserted]
+    Attached to:      /machine/unattached/device[7]
+    Removable device: not locked, tray closed
+floppy0: [not inserted]
+    Attached to:      /machine/unattached/device[17]
+    Removable device: not locked, tray closed
+sd0: [not inserted]
+    Removable device: not locked, tray closed
+(qemu) <kbd><b>quit</b></kbd>
+$ ls -l linuc.qcow2
+-rw-r--r-- 1 lab lab 19136512 Oct 14 02:51 linuc.qcow2</code></pre>
+<p class="detail"><code>#block</code> の後ろの数字と、<code>/var/tmp/vl.</code> の後ろの名前は毎回違う。この記録では、ログインの後の最初の <code>rm hello.txt</code> の行で、プロンプトが消えている（上の注）。</p>
+<p>中の OS からは確かに消え（<code>ls</code> が何も出さない）、電源も抜いたのに、<code>linuc.qcow2</code> は大きさも時刻も起動の前のままだった。
+<code>info block</code> が理由を書いている。練習機のディスク（<code>virtio0</code>）の実体は <code>/var/tmp/vl.</code> で始まる名前の一時ファイルで、その土台が <code>linuc.qcow2</code>、さらにその土台が練習機の土台で、重なりは2段（<code>chain depth: 2</code>）になっていた。
+<b><code>-snapshot</code> は「スナップショットを取る」ではなく、「その場で作った一時の差分に書かせ、QEMU が終わったら捨てる」指定</b>である。
+書き込みは一時ファイルに入った。この一時ファイルは、QEMU が開いた直後に名前を消してあり（動いている間も <code>/var/tmp</code> の一覧には出ず、<code>/proc/PID/fd</code> に <code>(deleted)</code> と付いて見える）、QEMU が終わると中身ごと消える。だから電源を抜いても壊れるものが無い（第2章の <code>Ctrl-a s</code> は、この一時の差分を下へ書き戻す操作）。</p>
+<div class="analogy"><b>たとえ</b>: <code>-snapshot</code> は、試験の<b>下書き用紙</b>に近い。どれだけ書き込んでも、答案（<code>linuc.qcow2</code>）には何も写らず、終わったら回収されて捨てられる。
+<br>ただし<b>崩れる点</b>: 下書きなら清書で写せるが、<code>-snapshot</code> の書き込みを残したいなら、捨てられる前に <code>Ctrl-a s</code>（またはモニタの <code>commit</code>）で書き戻すしかない。名前とは逆に、何もしなければ何も残らない。</div>
+
+<h2 id="savevm">savevm は、動いている状態ごとしまう</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>savevm</code> と <code>loadvm</code> で何が保存され、何が戻るか。保存したものがどこに入るか。</div>
+<p>今度は <code>-snapshot</code> を付けずに起動する。消したはずの <code>hello.txt</code> があることを確かめてから、モニタで <code>savevm clean</code>（clean という名前で保存）。
+コンソールに戻って <code>hello.txt</code> を消し、モニタで <code>loadvm clean</code>（保存した状態に戻る）。モニタからコンソールに戻ったときは、プロンプトが出ていないので <code>Enter</code> を1回押す。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -m 1536 -smp 2 -drive file=linuc.qcow2,if=virtio -display none -serial mon:stdio
+                             GNU GRUB  version 2.12
+（略）
+Ubuntu 24.04.5 LTS linuc ttyS0
+linuc login: <kbd><b>student</b></kbd>
+Password:
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+<kbd><b>ls</b></kbd>
+hello.txt
+（打鍵: Ctrl-a c）
+student@linuc:~$ QEMU 8.2.2 monitor - type 'help' for more information
+(qemu) <kbd><b>savevm clean</b></kbd>
+(qemu)
+（打鍵: Ctrl-a c）
+（打鍵: Enter）
+student@linuc:~$ <kbd><b>rm hello.txt</b></kbd>
+student@linuc:~$ <kbd><b>ls</b></kbd>
+（打鍵: Ctrl-a c）
+student@linuc:~$ (qemu) <kbd><b>loadvm clean</b></kbd>
+(qemu)
+（打鍵: Ctrl-a c）
+（打鍵: Enter）
+student@linuc:~$ <kbd><b>ls</b></kbd>
+hello.txt
+（打鍵: Ctrl-a c）
+student@linuc:~$ (qemu) <kbd><b>info snapshots</b></kbd>
+List of snapshots present on all disks:
+ID        TAG               VM SIZE                DATE     VM CLOCK     ICOUNT
+--        clean             343 MiB 2026-10-14 02:53:47 00:00:53.829
+(qemu) <kbd><b>system_powerdown</b></kbd>
+（略）
+[   64.049083] reboot: Power down</code></pre>
+<p class="detail">モニタの <code>(qemu)</code> は、2回目からは練習機のプロンプトの後ろに続けて出る（切り替えたときにカーソルがあった場所に出るため）。
+<code>VM SIZE</code>・<code>DATE</code>・<code>VM CLOCK</code> は毎回違う。ここでも、ログインの後の最初の <code>ls</code> の行で、プロンプトが消えている。</p>
+<p><code>-snapshot</code> の起動で消した <code>hello.txt</code> は、残っていた（あの削除は一時ファイルごと捨てられた）。
+<code>savevm clean</code> の後に消した <code>hello.txt</code> は、<code>loadvm clean</code> で戻った。戻ったのはファイルだけではない。
+<code>loadvm</code> は、ディスクの中身と一緒に、メモリの中身・CPU のレジスタ・部品の状態を保存した瞬間に戻すので、練習機の中の OS は「ログインして <code>ls</code> を打った直後」の続きから動き出した。
+<code>info snapshots</code> の <code>VM SIZE</code>（343MiB）が、保存した<b>動いている状態</b>（主にメモリの中身）の大きさで、<code>VM CLOCK</code> は練習機の電源を入れてから保存までの時間（54 秒）である。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-img snapshot -l linuc.qcow2
+Snapshot list:
+ID        TAG               VM SIZE                DATE     VM CLOCK     ICOUNT
+1         clean             343 MiB 2026-10-14 02:53:47 00:00:53.829
+$ ls -l linuc.qcow2
+-rw-r--r-- 1 lab lab 394854400 Oct 14 02:54 linuc.qcow2
+$ qemu-img info linuc.qcow2 | grep '^disk size'
+disk size: 376 MiB
+$ qemu-img snapshot -d clean linuc.qcow2
+$ ls -l linuc.qcow2
+-rw-r--r-- 1 lab lab 394854400 Oct 14 02:54 linuc.qcow2
+$ qemu-img info linuc.qcow2 | grep '^disk size'
+disk size: 375 MiB</code></pre>
+<p>QEMU を止めた後でも、<code>qemu-img snapshot -l</code> で同じ一覧が読めた。保存したものは、どこか別の場所ではなく <b><code>linuc.qcow2</code> というファイルの中</b>にある（<b>内部スナップショット</b>）。
+そのぶん、ファイルは 18.3MiB から 377MiB（394854400 バイト）に増えた。
+<code>qemu-img snapshot -d</code> で消しても、<code>ls -l</code> の長さは変わらなかった。qcow2 は、ファイルを短くはしない。そのうえ、ここでは <code>disk size</code>（実際に場所を取っている量）も、376MiB が 375MiB になっただけだった。
+ふつうは、消したスナップショットだけが使っていた塊を、qcow2 がファイルの穴に戻す（下のファイルシステムに「ここはもう要らない」と伝える。discard）ので、<code>ls -l</code> の長さは同じでも <code>disk size</code> は減る。
+ここでほとんど減らなかったのは、<code>loadvm clean</code> で保存した瞬間に戻ったとき、保存した状態の塊を、いまのディスクも指すようになったからである（著者が <code>loadvm</code> をせずに消すと、353MiB が 7.57MiB に減った）。</p>
+<div class="analogy"><b>たとえ</b>: <code>savevm</code> はゲームの<b>セーブ</b>に近い。持ち物（ディスク）だけでなく、いる場所や体力（メモリ・CPU）まで戻る。
+<br>ただし<b>崩れる点</b>: ゲームのセーブは別のファイルになるが、内部スナップショットはディスクのファイルそのものに入る。消すと場所はふつう返るが、<code>loadvm</code> でそのセーブに戻った後は、いまのディスクも同じ場所を使っているので返らない。
+もう1つ、セーブはいつでもできるとは限らない。書き込める部品が全部 qcow2 でないと、<code>savevm</code> は断られる（第6章で、UEFI のファームウェアの設定のファイルがそれに当たる）。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/qemu/practice/">演習02</a>は、自分の差分ディスクを作って練習機を起動し、正しく止める課題で、判定はディスクのファイルを <code>qemu-img</code> で読んで、土台と書き込みと「いま使われていないか」を確かめ、正しく止めたかを、ディスクの中の / のファイルシステムに「回復が要る」の印が残っていないかで見る。
+<a href="/qemu/practice/">演習03</a>は、ログインした直後の練習機を <code>savevm</code> で保存する課題で、外から <code>qemu-img snapshot -c</code> で取ったもの（ディスクの中身だけ）と区別できるかを、判定が <code>VM SIZE</code> で見る。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>ls -l</code> では 21474836480 バイト、<code>du -h</code> では 4.0K のファイルがある。このファイルについて何が言えるか。</p>
+<details><summary>答え</summary>
+<p>最後の番地までの長さは 20GiB だが、実際に割り当てられているのは 4KiB だけで、残りはファイルシステムの穴（スパースファイル）になっている。
+読めば穴のところは 0 が返る。raw のディスクイメージを作った直後は、こうなる。穴を知らない道具でコピーすると、本当に 20GiB を使うファイルになる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>-snapshot</code> を付けて起動した練習機の中でファイルを消し、そのまま QEMU を終えた。次に <code>-snapshot</code> を付けずに同じディスクで起動すると、そのファイルはあるか。理由も。</p>
+<details><summary>答え</summary>
+<p>ある。<code>-snapshot</code> は、その場で作った一時の差分（<code>/var/tmp</code> に作って、すぐ名前を消した一時ファイル）に書き込みを流し、QEMU が終わるときに捨てる指定で、元のディスクには何も書かない。
+<code>info block</code> で <code>chain depth: 2</code>（一時ファイル → 元のディスク → 土台）になっていたのが、その印。残したいなら終わる前に <code>Ctrl-a s</code>（モニタなら <code>commit</code>）で書き戻す。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>差分ディスク <code>a.qcow2</code> の土台 <code>base.qcow2</code> を、別のイメージで上書きしてしまった。<code>a.qcow2</code> から起動するとどうなりうるか。</p>
+<details><summary>答え</summary>
+<p>壊れたディスクに見える。<code>a.qcow2</code> は「書いた塊」しか持たず、残りは <code>base.qcow2</code> の同じ番地を読む。土台の中身が別物になると、差分の塊と土台の塊が食い違い、ファイルシステムの表と中身が合わなくなる。
+土台は読み取り専用にしておく（この檻の土台が root の持ち物で <code>r--r--r--</code> なのはそのため）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>info snapshots</code> の <code>VM SIZE</code> が 343 MiB のスナップショットと、0 B のスナップショットがある。それぞれ、どうやって作られたものと考えられるか。</p>
+<details><summary>答え</summary>
+<p>343 MiB のほうは、動いている練習機のモニタで <code>savevm</code> したもので、メモリの中身などの動いている状態を持つ。<code>loadvm</code> すると保存した瞬間の続きに戻る。
+0 B のほうは、ふつうは止まっているディスクに外から <code>qemu-img snapshot -c</code> で取ったもので、ディスクの中身だけを持つ。戻すと「電源を入れる前」の状態に戻る（演習03 の判定はこの違いを見る）。
+ただし、<code>savevm</code> で取ったのに 0 B に見えることもある。<code>savevm</code> は動いている状態を、書き込める qcow2 のうち1つにだけ入れるので、ほかの qcow2（たとえば UEFI の NVRAM。第6章）も渡していると、状態はそちらに入っている。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>ディスクの大きさ（番地の数）と、ファイルの大きさ（書かれた量）は別物。raw はファイルシステムの穴で、qcow2 は自分の表で、書いていないところを持たない</li>
+<li><code>qemu-img create -f qcow2 -b 土台 -F qcow2 差分</code> の差分は、書いた塊だけを持ち、残りは土台を読む。土台は1バイトも変わらない（<code>sha256sum</code> で確かめた）</li>
+<li>QEMU はディスクを書ける形で開く。読み取り専用のファイルはそのまま渡せない</li>
+<li><code>-snapshot</code> は「一時の差分に書かせて、終わったら捨てる」。名前に反して何も保存しない</li>
+<li><code>savevm</code> はディスクと動いている状態（メモリ・CPU）を qcow2 の中にしまい、<code>loadvm</code> でその瞬間の続きに戻る。消しても <code>ls -l</code> の長さは縮まない（中身はふつう穴に戻るが、<code>loadvm</code> で戻った後は戻らない）</li>
+<li>中に OS がいれば <code>system_powerdown</code> で後片付けをしてから止まる。<code>quit</code> は電源を抜く</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:qemu-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / QEMU 8.2.2（Debian 1:8.2.2+ds-0ubuntu1.18、KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/qemu/theory/02-serial">← 前: 2. シリアルの先は、あなたの端末そのもの</a><a href="/qemu/theory/04-tcg">次: 4. CPU は、命令を翻訳して動いている →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/qemu/chapters.js"></script>
+<script src="/qemu/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

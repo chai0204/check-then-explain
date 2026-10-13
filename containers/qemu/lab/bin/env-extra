@@ -1,0 +1,11 @@
+#!/bin/bash
+# lab env の追加行。この記事は「QEMU がどう動いているか」が切り分けの中心。
+#   KVM を足して起動した読者は CPU まわりの画面と速さが本文と変わるので、それが分かる行を出す。
+printf 'QEMU      : %s\n' "$(qemu-system-x86_64 --version 2>/dev/null | head -1)"
+printf 'ファーム  : SeaBIOS %s / OVMF %s\n' \
+  "$(dpkg-query -W -f='${Version}' seabios 2>/dev/null)" "$(dpkg-query -W -f='${Version}' ovmf 2>/dev/null)"
+if [ -e /dev/kvm ]; then
+  printf '/dev/kvm  : あり（本文は KVM なし・TCG で取った。-accel kvm を付けると CPU まわりの画面と速さが変わる）\n'
+else
+  printf '/dev/kvm  : なし（TCG で動く。本文と同じ条件）\n'
+fi

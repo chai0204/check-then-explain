@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>確かめて説明する QEMU — 実践編</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="qemu">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <strong>実践編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文の出力はすべて実機の記録で、演習6本は模範解答どおりに通ること・未達のときに判定が鳴ることを
+   両方確認してあります。それでも<b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、読者として通した段階で4回に分けて不備が出ました。
+   詰まったら <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   ページ下のコメントへ。それが直す順番になります。</p>
+</div>
+
+<h1>確かめて説明する QEMU — 実践編</h1>
+<p class="lead">コンテナの中に QEMU と練習機のディスクが入っています。あなたは libvirt（<code>virsh</code>）を使わず、
+<code>qemu-system-x86_64</code> と <code>qemu-img</code> を自分で打って、仮想マシンを組み立て、起動し、止めます。
+理論編の7章と演習6本は、全部この檻の中で打てます。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<div class="notfor">
+<h4>この教材が向かない人</h4>
+<ul>
+<li>いま仮想マシンを作りたいだけの人 → virt-manager や公式ドキュメントのほうが速い</li>
+<li>答えだけ欲しい人 → AI に聞いたほうが速く、あなたの語彙に合う</li>
+</ul>
+<p>向く人: このサイトの実践編で <code>docker run</code> を打ち、練習機を起動したことはある。
+でも、そのとき裏で何が動いていて、<code>--stop-timeout 30</code> や <code>ssh linuc</code> が何をしているのかを人に説明できない人。</p>
+</div>
+
+<h2 id="cage">この教材の檻</h2>
+<div class="cages"><div class="scroll"><table>
+<tr><th>檻</th><th>準備</th><th>ここで触れる</th><th>ここでは触れない（逃がす先）</th></tr>
+<tr><td>コンテナ型（一般ユーザ lab。QEMU を直接打つ）</td><td>5分（イメージ約2GB）</td>
+    <td><code>qemu-system-x86_64</code>・<code>qemu-img</code>・SeaBIOS と OVMF・練習機（Ubuntu 24.04）・QEMU のモニタと QMP・libvirt が組み立てるコマンド行</td>
+    <td>KVM（<a href="/kvm/theory/">KVM の記事</a>）・画面の窓・tap やブリッジのネットワーク（<a href="/qemu/theory/#cage">理由</a>）</td></tr>
+</table></div></div>
+<p>影響度 <b>B</b>（変更はコンテナの中だけ。あなたの PC の設定もファイルも書き換えません）。
+<code>--privileged</code> も <code>--cap-add</code> も <code>--device /dev/kvm</code> も要りません。
+練習機の CPU は QEMU がソフトウェアで命令を翻訳して動かす（TCG）ので、あなたの PC の特権を1つも借りない代わりに、
+起動に 30〜60 秒かかります（著者の PC で約 30 秒）。本文の出力は、すべてこの条件で取ったものです。</p>
+<pre><code>あなたの PC（ホスト OS）
+└─ コンテナ                     lab@host       … qemu-system-x86_64 を打つ場所
+   └─ QEMU のプロセス           （ps で見える 1つのプロセス）
+      └─ 練習機（仮想マシン）   student@linuc  … Ubuntu 24.04 が自分のカーネルで動く</code></pre>
+
+<h2 id="start">はじめる</h2>
+<p>Docker の場合。1行です。</p>
+<pre><code>docker run --rm -it --name lab-qemu --hostname host \
+  -v lab-qemu-work:/home/lab/work \
+  -v lab-qemu-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab:qemu-1.0.0@sha256:__DIGEST__</code></pre>
+<div class="scroll"><table>
+<tr><th>書いてあるもの</th><th>なぜ書くか</th></tr>
+<tr><td><code>--rm -it</code></td><td>端末つきで入り、<code>exit</code> でコンテナごと消える。中で動かした QEMU も一緒に消える</td></tr>
+<tr><td><code>--hostname host</code></td><td>プロンプトを <code>lab@host</code> にする。練習機（<code>student@linuc</code>）と見分けるため。他の仮想マシン型の檻と同じ</td></tr>
+<tr><td><code>-v lab-qemu-work:/home/lab/work</code></td><td>本文と演習で作るディスク（qcow2）の置き場所。名前付きボリュームなので、<code>exit</code> しても次の起動で続きから使える</td></tr>
+<tr><td><code>-v lab-qemu-state:/home/lab/.lab</code></td><td>演習の進捗。省くと次の起動で進捗が消える</td></tr>
+<tr><td><code>@sha256:…</code></td><td>イメージを1つに固定する。中の QEMU・ファームウェア・練習機のディスクが本文と同じ版になる</td></tr>
+</table></div>
+<p>podman でも同じオプションで動きます（<code>docker</code> を <code>podman</code> に置き換える。著者が podman 5.8.6 の rootless で、第5章と演習 05 の流れが docker と同じに動くことを確かめた）。</p>
+
+<p>入ると現在地が出ます。</p>
+<!-- gen:BANNER -->
+<pre><code>── lab-qemu 1.0.0 ────────────────────────────────────────
+lab-qemu  進捗 0/6
+  次 → 01 「画面の無い PC を後ろで動かし、QMP で尋ねられるようにする」 (目安 12分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-qemu-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────</code></pre>
+<!-- /gen:BANNER -->
+<p><b>シェルは章をまたいで同じまま使う前提です。</b>理論編は、檻に入ったときのシェルで第1章から順に打っていく書き方にしてあります。
+前の章で作ったディスク（<code>~/work/linuc.qcow2</code>）を後の章でも使い、第1章で QEMU を抜けた端末の状態が第2章の最初の画面になります。
+本文の記録は、第1章から第7章までを1つのシェルで通して打ったものです。</p>
+<ul>
+<li>練習機にログインするときのユーザとパスワードは <code>student</code> / <code>student</code> です（パスワードは打っても表示されません）。</li>
+<li>練習機の中に表示される「この中でも lab check NN で答え合わせできます」は、他の仮想マシン型の檻の案内で、この檻では使えません（中から外の lab に頼む中継を動かしていないため）。<code>lab check</code> は外（<code>lab@host</code>）で打ってください。</li>
+<li>QEMU を前で動かしている間（<code>-nographic</code> や <code>-serial mon:stdio</code>）は、その端末は練習機の画面になります。抜けるのは <code>Ctrl-a x</code> です（<code>Ctrl-C</code> は練習機に届く）。演習で練習機を動かしたまま <code>lab check</code> を打ちたいときは、<code>-daemonize</code> で後ろに回すか、別の窓で <code>docker exec -it lab-qemu bash -l</code> と打って入ります。</li>
+<li>本文と演習の練習機には、1.5GB のメモリを割り当てます（<code>-m 1536</code>）。Docker Desktop のように docker が仮想マシンの中で動く環境では、その仮想マシンに割り当てたメモリから使われます。</li>
+</ul>
+
+<h2 id="ex">演習</h2>
+<p>6本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。
+判定は、あなたの QEMU に QMP で尋ねたり、ディスクのファイルを <code>qemu-img</code> で読んだり、<code>ssh linuc</code> で練習機に入ったりして確かめます。
+詰まったら <code>lab hint NN</code> を何度でも。使い切ったら <code>lab solve NN</code> で模範解答に必ず届きます
+（見ても構いません。進捗には「solve を見た」として残ります）。作業場所は <code>lab start NN</code> が作る <code>~/work/NN</code> です。</p>
+<div class="scroll"><table>
+<tr><th>No</th><th>やること</th><th>章</th><th>判定が見るもの</th><th>目安</th></tr>
+<tr><td>01</td><td>画面の無い PC を後ろで動かし、QMP で尋ねられるようにする</td><td><a href="/qemu/theory/02-serial">2</a></td><td>QMP の <code>query-status</code>・<code>/machine</code> の graphics・serial0 の行き先、そのソケットを待ち受けている QEMU（端末から切り離されているか、<code>serial.log</code> に書いているか）と、シリアルの記録の中の SeaBIOS</td><td>12分</td></tr>
+<tr><td>02</td><td>土台を汚さずに、自分の練習機のディスクを作って起動する</td><td><a href="/qemu/theory/03-disk">3</a></td><td><code>qemu-img info</code> の形式・土台・使っている量・使用中かどうか、ディスクの中の / の ext4 の「回復が要る」の印（正しく止めたか）と、土台の sha256</td><td>12分</td></tr>
+<tr><td>03</td><td>ログインした直後の練習機を、メモリごと保存する</td><td><a href="/qemu/theory/03-disk">3</a></td><td>qcow2 の中のスナップショットの名前と、動いている状態の大きさ（VM SIZE）、そのファイルを開いている QEMU がいないか</td><td>12分</td></tr>
+<tr><td>04</td><td>TCG が最初に翻訳した命令を、記録に残す</td><td><a href="/qemu/theory/04-tcg">4</a></td><td><code>-d in_asm</code> の記録の塊の数と、最初の塊の番地・命令のバイト列</td><td>8分</td></tr>
+<tr><td>05</td><td>外から ssh で練習機に入れるようにする</td><td><a href="/qemu/theory/05-network">5</a></td><td>127.0.0.1:2222 で待つプロセスと、それが開いているディスク（土台の上の差分か）、ssh で入った練習機の NIC</td><td>15分</td></tr>
+<tr><td>06</td><td>練習機を UEFI で起動し、ブートの項目を NVRAM のファイルに残す</td><td><a href="/qemu/theory/06-firmware">6</a></td><td>vars.fd を開いている QEMU（開いているディスクと 127.0.0.1:2222 の待ち受け）、練習機の <code>/sys/firmware/efi</code> と <code>efibootmgr</code>、vars.fd の中身</td><td>15分</td></tr>
+</table></div>
+<p>先に読む場合は <a href="/qemu/theory/">理論編（7章）</a>へ。
+演習は章の順に並んでいますが、どれも単体で始められます（どの演習も、自分のディスクを <code>~/work/NN</code> に作るところから始めます）。</p>
+<p class="detail">演習 05 と 06 は、どちらも練習機の ssh を 127.0.0.1:2222 で受けます。片方を動かしたままもう片方を起動すると、
+<code>Could not set up host forwarding rule</code> で断られます。先に動いている方を止めてください（止め方は各演習の解答にあります）。</p>
+
+<h2 id="report">本文と違う出力が出たら</h2>
+<p>教材のバグとして直します。次の4つを貼ってください。</p>
+<ol>
+<li>打ったコマンド（外か、練習機の中か、QEMU のモニタか）</li>
+<li>本文に書いてある出力</li>
+<li>あなたの画面に出た出力</li>
+<li><code>lab env</code> の全文（外で打つ）</li>
+</ol>
+<!-- gen:LAB_ENV -->
+<pre data-where="外（lab@host）"><code>$ lab env
+テーマ    : lab-qemu 1.0.0
+イメージ  : ghcr.io/chai0204/lab:qemu-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+QEMU      : QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+ファーム  : SeaBIOS 1.16.3-2 / OVMF 2024.02-2ubuntu0.9
+/dev/kvm  : なし（TCG で動く。本文と同じ条件）
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb</code></pre>
+<!-- /gen:LAB_ENV -->
+<p><a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。
+<code>カーネル</code> の行は、あなたの PC のカーネルなので本文と違って正常です。
+<code>/dev/kvm</code> の行が「あり」なら、起動のときに <code>--device /dev/kvm</code> を付けています。本文は /dev/kvm の無い檻で取った記録で、付けたままだと第4章の <code>-accel kvm</code> の行の結果が本文と変わります。外して起動し直してください。
+本文の時間を測る行（<code>time</code> の結果や <code>info jit</code> の数）は、あなたの CPU の速さで変わります。</p>
+
+<h2 id="end">終わったら</h2>
+<pre><code>exit                                              # --rm なのでコンテナは消える。中で動かしていた QEMU も止まる
+docker volume rm lab-qemu-work lab-qemu-state     # 作ったディスクと進捗も消す場合だけ</code></pre>
+<p>イメージは <code>docker rmi</code> で消せます。
+あなたの PC には何も残りません（名前付きボリューム以外のファイルを作っていないため）。
+続きをやる日は、同じ <code>docker run</code> を打てば、<code>~/work</code> のディスクと進捗はそのまま残っています。</p>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:qemu-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / QEMU 8.2.2（Debian 1:8.2.2+ds-0ubuntu1.18、KVM なし・TCG）/ SeaBIOS 1.16.3 / OVMF 2024.02 / libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で演習6本を完走 / podman 5.8.6（rootless）で第5章と演習 05 を確認 / 検証日 2026-10-14</div>
+
+<!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
+<nav class="pager"><a href="/qemu/theory/">← 理論編</a><a href="/">記事の一覧へ →</a></nav>
+<!-- /catalog:pager -->
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

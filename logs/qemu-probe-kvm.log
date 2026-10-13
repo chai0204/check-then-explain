@@ -1,0 +1,58 @@
+# QEMU の記事: KVM を使うと練習機から見える CPU と部品がどう変わるかを確かめた記録（probe/qemu-probe-kvm.sh）。2026-10-14。イメージ lab-qemu:1.0.0（docker 29.8.0）に --device /dev/kvm を足して起動
+
+
+========== 0. 環境 ==========
+
+$ ls -l /dev/kvm; grep -m1 "model name" /proc/cpuinfo
+crw-rw-rw- 1 root 302 10, 232 Oct 14 03:09 /dev/kvm
+model name	: Intel(R) Core(TM) Ultra 9 285H
+
+$ qemu-img create -q -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 d.qcow2
+
+$ try() {
+>   qemu-system-x86_64 "$@" -machine q35 -m 1536 -smp 2 -drive file=d.qcow2,if=virtio -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 -device virtio-net-pci,netdev=n0,addr=0x10 -display none -serial file:ser.log -monitor unix:m.sock,server=on,wait=off -daemonize 2>/dev/null
+>   until ssh -o ConnectTimeout=3 linuc true 2>/dev/null; do sleep 2; done
+>   ssh linuc "grep -m1 \"model name\" /proc/cpuinfo; grep -m1 vendor_id /proc/cpuinfo; echo \"flags の中の svm・vmx・hypervisor: \$(grep -m1 ^flags /proc/cpuinfo | grep -o -w -E \"svm|vmx|hypervisor\" | sort -u | tr \"\\n\" \" \")\""
+>   echo "info qtree の割り込み・タイマーの部品: $(echo "info qtree" | socat -t 3 - UNIX-CONNECT:m.sock 2>/dev/null | grep -o -E "dev: [a-z0-9-]*(i8259|ioapic|pit|kvmclock)[a-z0-9-]*" | sed "s/dev: //" | sort -u | tr "\n" " ")"
+>   ssh linuc "sudo poweroff" 2>/dev/null; while pgrep -x qemu-system-x86 > /dev/null; do sleep 0.5; done
+> }
+> echo "（try を定義した）"
+（try を定義した）
+
+
+========== 1. -accel tcg（-cpu なし。本文と同じ） ==========
+
+$ try -accel tcg
+model name	: QEMU Virtual CPU version 2.5+
+vendor_id	: AuthenticAMD
+flags の中の svm・vmx・hypervisor: hypervisor svm 
+info qtree の割り込み・タイマーの部品: ioapic isa-i8259 isa-pit 
+
+
+========== 2. -accel kvm（-cpu なし） ==========
+
+$ try -accel kvm
+model name	: QEMU Virtual CPU version 2.5+
+vendor_id	: GenuineIntel
+flags の中の svm・vmx・hypervisor: hypervisor 
+info qtree の割り込み・タイマーの部品: kvm-i8259 kvm-ioapic kvm-pit kvmclock 
+
+
+========== 3. -accel kvm -cpu host ==========
+
+$ try -accel kvm -cpu host
+model name	: Intel(R) Core(TM) Ultra 9 285H
+vendor_id	: GenuineIntel
+flags の中の svm・vmx・hypervisor: hypervisor vmx 
+info qtree の割り込み・タイマーの部品: kvm-i8259 kvm-ioapic kvm-pit kvmclock 
+
+
+========== 4. -accel tcg -cpu max ==========
+
+$ try -accel tcg -cpu max
+model name	: QEMU TCG CPU version 2.5+
+vendor_id	: AuthenticAMD
+flags の中の svm・vmx・hypervisor: hypervisor svm 
+info qtree の割り込み・タイマーの部品: ioapic isa-i8259 isa-pit 
+
+$ rm -f d.qcow2 ser.log m.sock; ls -A

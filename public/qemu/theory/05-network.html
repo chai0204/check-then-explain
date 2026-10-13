@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5. ネットワークも、QEMU のプロセスの中にある — 確かめて説明する QEMU</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="5" data-theme="qemu">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <a href="/qemu/theory/">理論編</a> › 第5章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/">詳しく</a></p>
+</div>
+<h1>5. ネットワークも、QEMU のプロセスの中にある</h1>
+<p class="lead">練習機に NIC を足して起動しても、<code>ip -br a</code> は「ens3 DOWN」で、IP アドレスが付かない。ネットワークが無いのではなく、練習機の設定が <code>enp0s16</code> という名前の NIC しか知らないからだった。
+NIC の名前は、QEMU がその NIC を<b>差した位置</b>で決まる。位置を合わせると、練習機は DHCP で 10.0.2.15 をもらう。
+そのアドレスを配ったのも、ゲートウェイの 10.0.2.2 を演じているのも、外から <code>ssh linuc</code> で入る入口（127.0.0.1:2222）で待っているのも、QEMU のプロセス自身である。</p>
+<div class="badges"><span>前提: 第4章までを同じ端末で終えている（<code>~/work/linuc.qcow2</code> がある）</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>練習機の NIC の名前（<code>ens3</code>・<code>enp0s16</code>）が、QEMU が差した位置とマシン型で決まることを説明できる</li>
+<li><code>-netdev user</code> と <code>-device virtio-net-pci,addr=…</code> で、練習機をネットワークにつなげられる</li>
+<li>ユーザモードネットワークの 10.0.2.15・10.0.2.2・10.0.2.3 が誰で、10.0.2.2 への接続が外のどこに届くかを、実際につないで示せる</li>
+<li><code>hostfwd</code> で外の 127.0.0.1:2222 を練習機の 22 番へつなぎ、そこで待っているのが QEMU のプロセスだと <code>ss -tlnp</code> で示せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: netplan の書き方、systemd-networkd の設定、NIC の名前の規則の細部（<code>enx…</code> や <code>eno1</code> など）、
+<code>-netdev user</code> のほかの指定（<code>guestfwd</code>・<code>smb</code>・<code>tftp</code>）、tap やブリッジのネットワーク。</div></div>
+
+<h2 id="name">NIC を足しても、つながらない</h2>
+<div class="sgoal"><b>この節で分かること</b>: NIC を足した練習機の中から、NIC がどう見えるか。練習機の設定が何を待っているか。</div>
+<p>第1章で見たとおり、何も指定しない PC にも NIC が付いていた。ここでは、その NIC を自分で指定する。
+<code>-netdev user,id=n0</code> が NIC の先のネットワーク（QEMU の中のネットワーク。名前を n0 にする）、<code>-device virtio-net-pci,netdev=n0</code> が NIC（virtio の NIC を、n0 につなぐ）である。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>NIC を1枚足して、その先をネットワークにつなげば、練習機は DHCP でアドレスをもらって、ネットワークにつながるはずだ。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -m 1536 -smp 2 -drive file=linuc.qcow2,if=virtio -netdev user,id=n0 -device virtio-net-pci,netdev=n0 -display none -serial mon:stdio
+                             GNU GRUB  version 2.12
+（略）
+Ubuntu 24.04.5 LTS linuc ttyS0
+linuc login: <kbd><b>student</b></kbd>
+Password:
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+<kbd><b>ip -br a</b></kbd>
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+ens3             DOWN
+student@linuc:~$ <kbd><b>sudo cat /etc/netplan/01-lab-mgmt.yaml</b></kbd>
+# 管理用の NIC。外（コンテナ）からの ssh と、練習機の中からの lab はここを通る。
+# この NIC を止めると ssh が切れる。そのときは外で vm console（シリアル）から入る。
+network:
+  version: 2
+  ethernets:
+    enp0s16:
+      dhcp4: true
+（打鍵: Ctrl-a c）
+student@linuc:~$ QEMU 8.2.2 monitor - type 'help' for more information
+(qemu) <kbd><b>info network</b></kbd>
+virtio-net-pci.0: index=0,type=nic,model=virtio-net-pci,macaddr=52:54:00:12:34:56
+ \ n0: index=0,type=user,net=10.0.2.0,restrict=off
+(qemu) <kbd><b>system_powerdown</b></kbd>
+（略）
+[   52.653821] reboot: Power down</code></pre>
+<p class="detail">この記録では、ログインの後の最初の <code>ip -br a</code> の行で、プロンプトが消えている（第3章の注）。</p>
+<div class="then"><b>だめな理由</b>: NIC はある（<code>ens3</code>）。QEMU の側でも、virtio の NIC（<code>virtio-net-pci.0</code>）がネットワーク n0（<code>type=user,net=10.0.2.0</code>）につながっている。
+それでも <code>ens3</code> は <code>DOWN</code> で、アドレスが無い。練習機の設定（netplan）を読むと、DHCP でアドレスをもらうのは <b><code>enp0s16</code> という名前の NIC だけ</b>だった。
+名前が違う NIC は、つながっていても誰も設定しない。<b>NIC の名前は、NIC の種類ではなく、QEMU がその NIC を差した位置で決まる</b>。この PC（既定の <code>pc</code>）では、3番目のスロットに差したので <code>ens3</code> になった。</div></div>
+
+<h2 id="slot">名前は、差した位置で決まる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>ens3</code> と <code>enp0s16</code> の読み方。練習機が <code>enp0s16</code> を待っている理由。</div>
+<p>Linux（systemd）は、NIC に「どこに差さっているか」から名前を付ける（予測可能なインターフェース名。起動のたびに eth0・eth1 の順番が入れ替わらないように、位置から名前を作る）。</p>
+<div class="scroll"><table>
+<tr><th>名前</th><th>読み方</th><th>こうなる条件</th></tr>
+<tr><td><code>ens3</code></td><td>en（Ethernet）＋ s3（スロット 3）</td><td>ファームウェアが、抜き差しできるスロットの番号を OS に伝えている（既定の <code>pc</code> の PCI のスロット）</td></tr>
+<tr><td><code>enp0s16</code></td><td>en ＋ p0（PCI のバス 0）＋ s16（スロット 16）</td><td>スロットの番号が伝わらないので、PCI の位置から名前を作る（<code>q35</code> の根っこの PCI Express のバス）</td></tr>
+</table></div>
+<p>QEMU は、部品を PCI の空いている位置に順に差していく。既定の <code>pc</code> では 0〜2 番がチップセットと VGA で埋まっているので、足した NIC は 3 番に入って <code>ens3</code> になった。
+練習機の設定が <code>enp0s16</code>（バス 0・スロット 16）を待っているのは、このサイトの仮想マシン型の檻（libvirt）の定義が、<b><code>q35</code> のマシン型で、NIC を位置 0x10（16）に差している</b>からである（第7章でその行を読む）。
+同じ位置に差せば、同じ名前になる。<code>-device</code> の <code>addr=0x10</code> が、差す位置の指定である。</p>
+<p class="detail">既定の <code>pc</code> のまま <code>addr=0x10</code> に差すと、スロットの番号が伝わるので名前は <code>ens16</code> になる。著者が試すと、それでもアドレスは付いた。
+Linux がこの NIC に別名（altname）として <code>enp0s16</code> も付け、設定がその別名に当たったためである（<code>ip link show ens16</code> に <code>altname enp0s16</code> と出た）。
+迷わないよう、この章では libvirt の定義と同じ q35 の系統にそろえる（<code>-machine q35</code>。版まで同じではないことを、次の節で確かめる）。</p>
+<div class="analogy"><b>たとえ</b>: NIC の名前は、郵便の<b>住所</b>に近い。同じ人（同じ NIC）でも、住む場所（差した位置）が変われば宛名が変わり、旧住所あての郵便（設定）は届かない。
+<br>ただし<b>崩れる点</b>: 住所は1人に1つだが、Linux は1つの NIC に別名を付けることがあり、設定がどちらの名前に当たるかで結果が変わる。名前を頼りにする設定は、マシン型や位置を変えたときにいちばん先に壊れる。</div>
+
+<h2 id="slirp">10.0.2.x は、QEMU が演じている</h2>
+<div class="sgoal"><b>この節で分かること</b>: ユーザモードネットワークで、誰が何を演じているか。外から練習機に入る入口が、どこにあるか。</div>
+<p>今度は、マシン型を <code>q35</code> にし、NIC を位置 0x10 に差して、外から ssh で入れるようにする。
+<code>hostfwd=tcp:127.0.0.1:2222-:22</code> は、「外（このコンテナ）の 127.0.0.1 の 2222 番に来た TCP の接続を、練習機の 22 番（ssh）へ渡す」という指定である。
+シリアルとモニタは第2章と同じくファイルとソケットにつなぎ、<code>-daemonize</code> で端末から切り離す（この端末で ssh を打つため）。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 -drive file=linuc.qcow2,if=virtio -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 -device virtio-net-pci,netdev=n0,addr=0x10 -display none -serial file:serial.log -qmp unix:qmp.sock,server=on,wait=off -daemonize
+$ ss -tlnp
+State    Recv-Q   Send-Q     Local Address:Port     Peer Address:Port  Process
+LISTEN   0        1              127.0.0.1:2222          0.0.0.0:*      users:(("qemu-system-x86",pid=279,fd=13))
+$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"qom-get","arguments":{"path":"/machine","property":"type"}}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"return": "pc-q35-8.2-machine"}</code></pre>
+<p class="detail"><code>pid=279</code> の数字は毎回違う。</p>
+<p>QMP の <code>qom-get</code> で、組み上がった PC のマシン型を尋ねた。<code>-machine q35</code> で選ばれたのは <code>pc-q35-8.2</code> で、第1章の一覧の q35 の2行のうち、QEMU 本来の版のほうだった。libvirt の練習機は、同じ q35 の系統の別の版（<code>pc-q35-noble</code>）で動いている（第7章）。版が違っても、NIC を差す位置の決まりは同じなので、名前は同じになる（この後の <code>ip -br a</code> で確かめる）。</p>
+<p>練習機はまだ起動の途中なのに、127.0.0.1:2222 ではもう誰かが待っている。待っているのは <b><code>qemu-system-x86</code> のプロセス</b>（QEMU）である。
+<code>ssh linuc</code> は、この檻の <code>~/.ssh/config</code> で 127.0.0.1 の 2222 番に行くよう決めてあるので、その接続はまず QEMU が受け取る。
+受け取った接続を QEMU は練習機の 22 番へ渡そうとするが、その先は練習機の様子で変わる。練習機の OS がまだネットワークを上げていなければ、QEMU は渡そうとし続け、<code>ssh</code> には何も返らない（<code>ConnectTimeout=3</code> で、3 秒であきらめる）。OS がネットワークを上げていて、ssh の待ち受けがまだなら、すぐ切られる。どちらにしても、入れるようになるまで 3 秒おきに試す。</p>
+<pre data-where="外（lab@host）"><code>$ until ssh -o ConnectTimeout=3 linuc true 2&gt;/dev/null; do sleep 3; done
+$ ssh linuc ip -br a
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+enp0s16          UP             10.0.2.15/24 metric 100 fec0::5054:ff:fe12:3456/64 fe80::5054:ff:fe12:3456/64
+$ ssh linuc ip route
+default via 10.0.2.2 dev enp0s16 proto dhcp src 10.0.2.15 metric 100
+10.0.2.0/24 dev enp0s16 proto kernel scope link src 10.0.2.15 metric 100
+10.0.2.2 dev enp0s16 proto dhcp scope link src 10.0.2.15 metric 100
+10.0.2.3 dev enp0s16 proto dhcp scope link src 10.0.2.15 metric 100
+$ ssh linuc ss -tn
+State Recv-Q Send-Q Local Address:Port Peer Address:Port Process
+ESTAB 0      0          10.0.2.15:22       10.0.2.2:41452</code></pre>
+<p class="detail"><code>10.0.2.2:41452</code> の番号は毎回違う。<code>ssh linuc コマンド</code> は、練習機の中でそのコマンドを1つ打って、出力を持ち帰る。</p>
+<p>名前は <code>enp0s16</code> になり、DHCP で 10.0.2.15/24 をもらい、ゲートウェイ（<code>default via</code>）は 10.0.2.2 になった。
+練習機の ssh から見ると、いまの ssh の接続（<code>ESTAB</code>）の相手は 10.0.2.2 から来ている。あなたは 127.0.0.1 につないだのに、練習機には 10.0.2.2 からの接続に見える。
+<b>この 10.0.2.x のネットワークは、外のどこにも無い</b>。QEMU のプロセスの中に小さな TCP/IP があり（ユーザモードネットワーク。中身は slirp という部品）、練習機に対して次の役を演じている。</p>
+<div class="scroll"><table>
+<tr><th>アドレス</th><th>演じている役</th><th>実体</th></tr>
+<tr><td>10.0.2.15</td><td>練習機に配るアドレス（DHCP）</td><td>QEMU が DHCP の返事を作る（第1章の iPXE がもらったのも同じ）</td></tr>
+<tr><td>10.0.2.2</td><td>ゲートウェイ（外への出口）</td><td>QEMU。外へ出る接続は、QEMU が自分のソケットでつなぎ直す。10.0.2.2 そのものへの接続は、QEMU が動いている側の 127.0.0.1 へ届く</td></tr>
+<tr><td>10.0.2.3</td><td>DNS サーバ</td><td>QEMU。問い合わせを、QEMU が動いている側の DNS に取り次ぐ</td></tr>
+</table></div>
+<p>「10.0.2.2 そのものへの接続は、外の 127.0.0.1 に届く」を確かめる。外（このコンテナ）の 127.0.0.1 の 8000 番で、1回だけ1行を返す小さなサーバを後ろで動かし、練習機の中から 10.0.2.2 の 8000 番につなぐ。</p>
+<pre data-where="外（lab@host）"><code>$ socat TCP-LISTEN:8000,bind=127.0.0.1,reuseaddr SYSTEM:'echo hello from the container' &amp;
+[1] 306
+$ ssh linuc nc -w 3 10.0.2.2 8000
+hello from the container
+[1]+  Done                    socat TCP-LISTEN:8000,bind=127.0.0.1,reuseaddr SYSTEM:'echo hello from the container'</code></pre>
+<p class="detail"><code>[1] 306</code> の番号は毎回違う。<code>Done</code> の行は、後ろで動かしたサーバ（ジョブ1）が1回答えて終わったという、シェルの知らせである。</p>
+<p>練習機の中で 10.0.2.2:8000 につないだら、外の 127.0.0.1:8000 で待っていたサーバの返事が来た。外の 127.0.0.1 は外のコンテナの中だけのアドレスで、本来は練習機から見えない。
+QEMU が、練習機からの接続を受け取り、自分の側の 127.0.0.1 につなぎ直したのである。
+<b>このサイトの仮想マシン型の檻では、練習機の中で打った <code>lab check</code> が、この道で外の <code>lab</code> に届いている</b>（練習機の中の <code>lab</code> は 10.0.2.2 の 7777 番につなぐ）。</p>
+<div class="analogy"><b>たとえ</b>: ユーザモードネットワークは、社員（練習機）の電話を全部取り次ぐ<b>代表電話の受付</b>に近い。社員が外へかけるときも、受付がかけ直す。外からかかってきた電話は、決めた内線（hostfwd）にだけ転送する。
+<br>ただし<b>崩れる点</b>: 本物の受付は1人の人だが、ここではルータも DHCP も DNS も、QEMU という1つのプロセスが演じている。プロセスが終われば、ネットワークごと消える。
+そして外から社員へ直接かける番号は無い。外から練習機に届くのは、<code>hostfwd</code> で決めた入口だけである。</div>
+<p>止める。後ろで動いている QEMU には端末が無いので、第2章の QMP で電源ボタンを押し、プロセスが消えるまで待つ。シリアルの最後の行が、練習機が電源を切った印である。</p>
+<pre data-where="外（lab@host）"><code>$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"system_powerdown"}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"timestamp": {"seconds": 1791914247, "microseconds": 299897}, "event": "POWERDOWN"}
+{"return": {}}
+$ while pgrep -x qemu-system-x86 &gt; /dev/null; do sleep 1; done
+$ tail -1 serial.log
+[   33.405186] reboot: Power down</code></pre>
+<div class="analogy"><b>たとえ</b>: <code>hostfwd</code> は、代表番号への電話を決まった<b>内線へ転送する設定</b>に近い。
+<br>ただし<b>崩れる点</b>: 電話の転送は相手がいなければすぐ分かるが、<code>hostfwd</code> は練習機が起動していなくても入口を開けて待ち、接続を受け取ってしまう。だから起動の途中の <code>ssh</code> は、つながったのに返事が来ないまま待たされるか、すぐ切られる。
+入口があることと、その先に相手がいることは別である（<code>until</code> で入れるまで試したのはそのため）。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/qemu/practice/">演習05</a>は、自分の差分ディスクから練習機を起動して、<code>ssh linuc</code> で入れるようにする課題である。
+判定は、127.0.0.1:2222 で待っているプロセスを <code>ss</code> で探し、それがあなたの QEMU か、どのディスクを開いているか（土台の上の差分か）を <code>/proc</code> と <code>qemu-img</code> で見てから、実際に ssh で入って練習機の NIC を読む。</div>
+
+<div class="quiz"><b>確認</b>
+<p>練習機に NIC を足したら、中で <code>ip -br a</code> が <code>ens3 DOWN</code> と出た。ネットワークが無いのか。そう判断する前に、何を確かめるか。</p>
+<details><summary>答え</summary>
+<p>QEMU の側で NIC が何につながっているか（モニタの <code>info network</code>）と、練習機の中の設定がどの名前の NIC を相手にしているか（この練習機なら <code>/etc/netplan/</code>）。
+この章では、NIC はユーザモードネットワークにつながっていたが、設定が <code>enp0s16</code> しか知らず、<code>ens3</code> は誰にも設定されていなかった。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>練習機の設定は <code>enp0s16</code> を待っている。<code>-machine q35</code> のとき、QEMU の <code>-device</code> に何を足せばその名前になるか。</p>
+<details><summary>答え</summary>
+<p><code>addr=0x10</code>（PCI のバス 0 の、スロット 16 に差す）。<code>-device virtio-net-pci,netdev=n0,addr=0x10</code> のように書く。
+名前は差した位置から作られるので、NIC の種類（e1000 か virtio か）を変えても、位置が同じなら名前は同じになる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>ss -tlnp</code> で、127.0.0.1:2222 を <code>qemu-system-x86</code> が待ち受けていた。練習機がまだ起動していないときに <code>ssh linuc</code> を打つと、どうなるか。</p>
+<details><summary>答え</summary>
+<p>TCP の接続そのものは、QEMU がすぐに受け取る。入口（hostfwd）は QEMU が開けているもので、練習機が起動しているかとは関係なく開いている。その先は練習機の様子で変わる。
+練習機の OS がまだネットワークを上げていなければ（ファームウェア・GRUB・カーネルの起動の途中）、QEMU は練習機につなごうとし続け、ssh には何も返らない。ssh は <code>ConnectTimeout</code> で決めた時間であきらめる（決めなければ、QEMU が接続を切るまで待つ。著者の記録では、つないでから 82 秒後に切れた）。
+OS がネットワークを上げていて ssh の待ち受けがまだなら、練習機が断るので、すぐに切られる（ssh は鍵の交換に入れずに失敗する）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>練習機の中の <code>ss -tn</code> で、ssh の接続の相手が <code>10.0.2.2</code> に見えた。外では 127.0.0.1 につないだのに、なぜか。</p>
+<details><summary>答え</summary>
+<p>接続は QEMU がいったん受け取り、練習機に対しては、QEMU が新しくつなぎ直しているから。外の 127.0.0.1 から来た接続は、QEMU が演じるゲートウェイ 10.0.2.2 から来たことにして渡す。
+ほかのアドレスから来た接続は、そのアドレスのまま練習機に見える（著者が、このコンテナの 172.17.0.x のアドレスから hostfwd でつなぐと、練習機には 172.17.0.x から来たように見えた）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>NIC の名前は、QEMU が差した位置で決まる（<code>pc</code> のスロット 3 なら <code>ens3</code>、<code>q35</code> のバス 0・スロット 16 なら <code>enp0s16</code>）。名前で当てる設定は、位置やマシン型を変えると当たらなくなる</li>
+<li><code>-netdev user</code>（ユーザモードネットワーク）は、QEMU のプロセスの中で、DHCP（10.0.2.15 を配る）・ゲートウェイ（10.0.2.2）・DNS（10.0.2.3）を演じる。特権は要らない</li>
+<li>10.0.2.2 そのものへの接続は、QEMU が動いている側の 127.0.0.1 に届く。このサイトの檻の、練習機の中の <code>lab check</code> はこの道を通る</li>
+<li><code>hostfwd=tcp:127.0.0.1:2222-:22</code> は、QEMU が外の 127.0.0.1:2222 で待ち受け、来た接続を練習機の 22 番に渡す。<code>ssh linuc</code> の相手は、まず QEMU</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:qemu-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / QEMU 8.2.2（Debian 1:8.2.2+ds-0ubuntu1.18、KVM なし・TCG、ユーザモードネットワークは libslirp）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・OpenSSH 9.6p1）/ socat 1.8.0.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/qemu/theory/04-tcg">← 前: 4. CPU は、命令を翻訳して動いている</a><a href="/qemu/theory/06-firmware">次: 6. ファームウェアは、差し替えられるファイル →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/qemu/chapters.js"></script>
+<script src="/qemu/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理論編 — 確かめて説明する QEMU</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="qemu">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <strong>理論編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文に載せた出力はすべて実機の記録で、第1章から第7章までを1つのシェルで通して打った記録とも突き合わせてあります。
+   演習6本は模範解答どおりに通ること・未達のときに判定が鳴ることを、6本すべてで確認済みです。
+   それでも <b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、著者が読者として通した段階で
+   <b>4回に分けて不備が出ました</b>（説明の順序・リンク切れ・前提の省略・判定の誤り）。
+   同じ種類のものが残っていると考えてください。</p>
+<p>詰まったところ・本文と違う出力が出たところは、
+   <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   各ページ下のコメントに書いてください。それが直す順番になります。</p>
+</div>
+
+<h1>理論編 — QEMU</h1>
+<p class="lead">このサイトの仮想マシン型の檻は、コンテナの中で QEMU が練習機を1台動かしている。
+その QEMU を、libvirt（<code>virsh</code>）を通さずに <code>qemu-system-x86_64</code> と <code>qemu-img</code> で直接打って、
+<b>仮想マシンが何でできているか</b>を確かめる7章。部品の組み立て・シリアルとモニタ・ディスク・CPU の翻訳・ネットワーク・ファームウェアを順に見て、
+最後に libvirt が組み立てているコマンド行を読む。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<h2 id="spine">この7章を貫いている1つの事実</h2>
+<div class="sgoal"><b>この節で分かること</b>: 7章の挙動が、どれも1つの事実から出てくること</div>
+<div class="goal">
+<p><b>仮想マシンは、QEMU という1つのプロセスである。CPU もディスクも NIC もシリアルポートも、そのプロセスの中のソフトウェアが演じていて、何を演じるかは起動のときのコマンド行が決める（動いている間も、QMP で部品を足せる）。</b></p>
+<p>何も渡さずに起動すると、既定値で PC が1台組み上がる（第1章）。シリアルポートの先は QEMU のプロセスの標準入出力、つまりあなたの端末で（第2章）、
+ディスクは QEMU が開いているファイル（第3章）、CPU は QEMU が命令を翻訳して動かすプログラム（第4章）、
+ネットワークのルータも DHCP も QEMU のプロセスの中にある（第5章）。ファームウェアも QEMU が読み込むファイルで（第6章）、
+libvirt は、そのコマンド行を組み立てて QEMU を起動し、モニタで話しかけているだけだった（第7章）。</p>
+<div class="skip"><b>ここで覚えなくていいこと</b>:
+QEMU のオプションの全部、マシン型の版の違い、QMP の命令の一覧、qcow2 のファイルの中の表の形、
+TCG が作る中間の命令（TCG ops）、UEFI の Secure Boot の鍵のしくみ。どれも本文では名前が出るだけです。</div>
+</div>
+
+<h2 id="scope">この記事で扱うこと・扱わないこと</h2>
+<div class="sgoal"><b>この節で分かること</b>: 7章の範囲と、ほかの記事に任せたもの</div>
+<div class="scroll"><table>
+<tr><th>扱うこと</th><th>章</th><th>この記事で実際に打つもの</th></tr>
+<tr><td>QEMU が組み立てるもの（マシン型・CPU の型・デバイス、virtio と昔ながらのデバイス）</td><td><a href="/qemu/theory/01-machine">1</a></td>
+    <td><code>qemu-system-x86_64</code>（何も渡さない）・<code>-nographic</code>・<code>-machine help</code>・<code>-cpu help</code>・<code>-device help</code>・モニタの <code>info block</code> <code>info network</code></td></tr>
+<tr><td>シリアルとコンソール、モニタ（HMP）と QMP</td><td><a href="/qemu/theory/02-serial">2</a></td>
+    <td><code>-nographic</code>・<code>-serial mon:stdio</code>・<code>-serial file:</code>・<code>Ctrl-a h</code> <code>Ctrl-a c</code> <code>Ctrl-a x</code>・<code>info chardev</code>・<code>system_powerdown</code> と <code>quit</code>・<code>-qmp unix:</code> と <code>socat</code>・<code>-daemonize</code>・<code>tput smam</code></td></tr>
+<tr><td>ディスクイメージ（raw と qcow2、backing chain、元のディスクを汚さない）とスナップショット</td><td><a href="/qemu/theory/03-disk">3</a></td>
+    <td><code>qemu-img create</code>（<code>-f raw</code> / <code>-f qcow2</code> / <code>-b … -F qcow2</code>）・<code>qemu-img info --backing-chain</code>・<code>-snapshot</code>・<code>savevm</code> <code>loadvm</code> <code>info snapshots</code>・<code>qemu-img snapshot -l</code> <code>-d</code></td></tr>
+<tr><td>TCG（命令の翻訳。遅い理由）</td><td><a href="/qemu/theory/04-tcg">4</a></td>
+    <td>同じループを外と練習機の中で時間を測る・<code>info jit</code>・<code>-d in_asm -D</code>・<code>-accel help</code>・<code>-accel kvm</code>（断られる）</td></tr>
+<tr><td>ユーザモードネットワーク（10.0.2.x・hostfwd で ssh）</td><td><a href="/qemu/theory/05-network">5</a></td>
+    <td><code>-netdev user</code>・<code>-device virtio-net-pci,addr=0x10</code>・<code>hostfwd=tcp:127.0.0.1:2222-:22</code>・<code>ss -tlnp</code>・<code>ssh linuc</code></td></tr>
+<tr><td>ファームウェア（SeaBIOS と OVMF、UEFI には ESP が要る）</td><td><a href="/qemu/theory/06-firmware">6</a></td>
+    <td><code>-drive if=pflash</code>（プログラムと NVRAM）・<code>efibootmgr</code>・<code>cmp</code> で NVRAM の書き込みを見る・ESP の無いディスクを OVMF に渡す</td></tr>
+<tr><td>libvirt は QEMU のコマンド行を組み立てているだけ</td><td><a href="/qemu/theory/07-libvirt">7</a></td>
+    <td><code>virsh define</code> <code>start</code>・<code>/proc/PID/cmdline</code> を読む・<code>virsh qemu-monitor-command</code>・libvirt のデーモンを止めても仮想マシンは止まらない</td></tr>
+</table></div>
+<div class="scroll"><table>
+<tr><th>扱わないこと</th><th>どこで / なぜ</th></tr>
+<tr><td>KVM による高速化（<code>-accel kvm</code>・<code>-cpu host</code>・<code>/dev/kvm</code>）</td><td><a href="/kvm/theory/">KVM の記事</a>。この記事の檻には <code>/dev/kvm</code> を渡さない。第4章では断られるところまで見る</td></tr>
+<tr><td>コンテナ（docker・podman）が何をしているか</td><td><a href="/docker/theory/">Docker の記事</a>・<a href="/podman/theory/">Podman の記事</a>。この記事の檻を動かしている側の話</td></tr>
+<tr><td>x86 以外の CPU の仮想マシン（<code>qemu-system-aarch64</code> など）と、1つのプログラムだけを翻訳して動かす <code>qemu-x86_64</code>（ユーザモードのエミュレーション）</td><td>この檻に入っていない。仕組み（TCG の翻訳）は第4章と同じで、翻訳元の CPU が違うだけ</td></tr>
+<tr><td>画面（VNC・SPICE・GTK の窓）</td><td>第1章で VNC が待ち受けるところまで見る。読者の手元に窓を出す経路が無いので、画面はシリアルで代える</td></tr>
+<tr><td>tap・ブリッジのネットワーク、PCI のパススルー</td><td>ホストの特権（<code>CAP_NET_ADMIN</code>・<code>/dev/net/tun</code>・IOMMU）が要る。この檻は特権を1つも渡さない</td></tr>
+<tr><td>ライブマイグレーション（動いている仮想マシンを、別の QEMU へ移す）</td><td>範囲外。QEMU 同士がソケットで状態を送るだけなので特権は要らず、この檻の中でも、QMP の <code>migrate</code> と、受け取る側の <code>-incoming</code> で試せる</td></tr>
+</table></div>
+
+<h2 id="cages">このサイトの他の記事の檻は、QEMU をどう使っているか</h2>
+<div class="sgoal"><b>この節で分かること</b>: 実践編で打っている <code>docker run</code> の各オプションが、QEMU の何に当たるか</div>
+<p>このサイトの LinuC の5つの記事（<a href="/linuc-boot/">起動・仮想化・プロセス</a>・<a href="/linuc-disks/">ハードウェアとディスク</a>・<a href="/linuc-network/">ネットワークの基礎</a>・<a href="/linuc-admin/">アカウント・ジョブ・ロケール</a>・<a href="/linuc-security/">セキュリティ</a>）は、
+仮想マシン型の檻で練習機を動かしています。読者が打つのは次の2行でした。</p>
+<pre><code>docker run -d --name lab-linuc-boot --hostname host --stop-timeout 30 \
+  -v lab-linuc-boot-vm:/home/lab/vm \
+  -v lab-linuc-boot-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab-linuc:boot-1.0.1@sha256:…
+
+docker exec -it lab-linuc-boot bash -l</code></pre>
+<p>コンテナの中では libvirt（session モード）が練習機の定義から QEMU を1つ起動していて、その QEMU に何を渡しているかは第7章で1行ずつ読みます。
+<code>docker run</code> の各オプションと、その先の QEMU の関係は次のとおりです。</p>
+<div class="scroll"><table>
+<tr><th>オプション</th><th>QEMU から見た意味</th><th>章</th></tr>
+<tr><td>（<code>--privileged</code> も <code>--device /dev/kvm</code> も無い）</td>
+    <td>QEMU は TCG で命令を翻訳して動くので、ホストの特権も <code>/dev/kvm</code> も要らない。その代わり起動に 30〜90 秒かかる</td><td><a href="/qemu/theory/04-tcg">4</a></td></tr>
+<tr><td><code>-v lab-…-vm:/home/lab/vm</code></td>
+    <td>練習機のディスク（読み取り専用の土台に重ねた qcow2 の差分 <code>linuc.qcow2</code>）と、UEFI の NVRAM（<code>linuc_VARS.fd</code>）の置き場所。ボリュームにあるので、コンテナを作り直しても練習機は続きから動き、<code>vm reset --yes</code> はこの2つを消して工場出荷時に戻す</td><td><a href="/qemu/theory/03-disk">3</a> <a href="/qemu/theory/06-firmware">6</a></td></tr>
+<tr><td><code>--stop-timeout 30</code></td>
+    <td><code>docker stop</code> を受けたコンテナは、libvirt を通して練習機に止まるよう頼み（中のゲストエージェントがつながっていればエージェントに、いなければ ACPI の電源ボタンで。電源ボタンは第2章の <code>system_powerdown</code> と同じもの）、練習機が自分で止まるのを待つ。かかる時間は練習機の中の様子で変わり（linuc-boot の記事の記録で 12.4 秒）、docker の既定の猶予 10 秒を超えると QEMU ごと終わらされる（<code>quit</code> と同じく電源を抜いたことになる）</td><td><a href="/qemu/theory/02-serial">2</a></td></tr>
+<tr><td><code>ssh linuc</code></td>
+    <td>コンテナの 127.0.0.1:2222 で待っているのは QEMU のプロセス（ユーザモードネットワークの hostfwd）。練習機の中では 10.0.2.15 の enp0s16 に届く</td><td><a href="/qemu/theory/05-network">5</a></td></tr>
+<tr><td>練習機の中の <code>lab check</code></td>
+    <td>練習機から 10.0.2.2:7777 へつなぐと、QEMU がコンテナの 127.0.0.1:7777 に渡す（ユーザモードネットワークは 10.0.2.2 を外のループバックにつなぐ）</td><td><a href="/qemu/theory/05-network">5</a></td></tr>
+<tr><td><code>vm console</code>（<code>virsh console</code>）</td>
+    <td>練習機のシリアルポートは疑似端末（pty）につながっていて、<code>virsh console</code> がその先にあなたの端末をつなぐ。抜けるのは <code>Ctrl+]</code>（libvirt の約束）で、<code>-nographic</code> の <code>Ctrl-a x</code>（QEMU の約束）とは別物</td><td><a href="/qemu/theory/02-serial">2</a> <a href="/qemu/theory/07-libvirt">7</a></td></tr>
+</table></div>
+<p>コンテナ型の檻（<a href="/linuc-files/">ファイルとパーミッション</a>や <a href="/sqlite/">SQLite</a> など）は QEMU を使いません。
+コンテナの中のプログラムはホストのカーネルの上で直接動くので、翻訳も起動の待ち時間もありません。
+仮想マシン型にしているのは、ブート・ディスクの分割・カーネルモジュール・NIC の設定のように、自分のカーネルが要る題材の記事だけです。
+この記事の檻は、その仮想マシン型の檻と同じ土台（同じ QEMU と同じ練習機のディスク）から、コンテナの起動のときに libvirt で練習機を用意する係を外したものです（練習機は、あなたが打つまで1台も動いていません）。</p>
+
+<h2 id="chapters">章</h2>
+<div class="toc">
+<ol>
+<li><a href="/qemu/theory/01-machine">何も渡さなくても、PC が1台組み上がる</a> —
+    <span class="detail">何も渡さずに起動すると、BIOS がディスク・フロッピー・CD を探し、最後はネットワークから起動しようとして DHCP で 10.0.2.15 をもらう（15分）</span></li>
+<li><a href="/qemu/theory/02-serial">シリアルの先は、あなたの端末そのもの</a> —
+    <span class="detail">QEMU を終えた後、端末の長い行が 80 桁で切れる。止めたのは仮想マシンの中の BIOS が送った数バイト（20分）</span></li>
+<li><a href="/qemu/theory/03-disk">ディスクは、書いたところだけを持つファイル</a> —
+    <span class="detail">20GiB のディスクのファイルが 192KiB。-snapshot は何も保存しない。savevm はメモリごと入れる（30分）</span></li>
+<li><a href="/qemu/theory/04-tcg">CPU は、命令を翻訳して動いている</a> —
+    <span class="detail">同じループが練習機の中では外の十数倍かかる。翻訳の跡を info jit と -d in_asm で見る（18分）</span></li>
+<li><a href="/qemu/theory/05-network">ネットワークも、QEMU のプロセスの中にある</a> —
+    <span class="detail">NIC を足してもアドレスが付かない。名前は差した位置で決まる。ssh の入口で待つのは QEMU（25分）</span></li>
+<li><a href="/qemu/theory/06-firmware">ファームウェアは、差し替えられるファイル</a> —
+    <span class="detail">UEFI 用に作った練習機が BIOS でも起動していた。NVRAM はファイルで、初回の起動で書き換わる（25分）</span></li>
+<li><a href="/qemu/theory/07-libvirt">libvirt は、コマンド行を組み立てているだけ</a> —
+    <span class="detail">virsh start が起動したのは同じ qemu-system-x86_64。デーモンを止めても練習機は止まらない。ここで7章が1本になる（20分）</span></li>
+</ol>
+</div>
+<p><a href="/qemu/theory/glossary">用語辞書</a> —
+   本文の点線付きの語をクリックすると引けます。</p>
+
+<h2 id="cage">檻で再現できないもの</h2>
+<div class="sgoal"><b>この節で分かること</b>: 打てないものと、その理由と、代わりにしたこと</div>
+<div class="scroll"><table>
+<tr><th>題材</th><th>なぜ再現できないか</th><th>代わりにしたこと</th></tr>
+<tr><td>KVM で動かす（<code>-accel kvm</code>）</td>
+    <td>檻に <code>/dev/kvm</code> を渡していない（読者に権限を求めない）。macOS や入れ子の仮想化が無い環境では、渡すことすらできない</td>
+    <td>第4章で、断られるときの出力と <code>/dev/kvm</code> が無いことを見る。続きは <a href="/kvm/theory/">KVM の記事</a></td></tr>
+<tr><td>仮想マシンの画面（VNC・GTK の窓）</td>
+    <td>VNC はコンテナの中の ::1:5900 で待ち受けるだけで、読者の手元から見る経路が無い。見る絵も読者ごとに違う</td>
+    <td>第1章で VNC の待ち受けまで見て、画面はシリアル（第2章）で代える</td></tr>
+<tr><td>tap・ブリッジのネットワーク</td>
+    <td><code>/dev/net/tun</code> と <code>CAP_NET_ADMIN</code> が要る</td>
+    <td>第5章のユーザモードネットワークで、特権の要らない作りを見る</td></tr>
+<tr><td>passt（libvirt 9.0 から選べる、ユーザモードネットワークのもう1つの仕組み。libvirt の XML でポート転送を書けるのは、こちらを選んだときだけ）</td>
+    <td>自分を閉じ込めるためにユーザ名前空間を作ろうとして、docker の既定の制限（seccomp）で起動できない（このサイトの土台を作ったときの実測）</td>
+    <td>仮想マシン型の檻は QEMU 内蔵の slirp を使っている。第7章で、その指定が libvirt の定義のどこにあるかを読む</td></tr>
+<tr><td>Secure Boot（鍵の入った NVRAM での起動）</td>
+    <td>題材が UEFI の鍵の管理に広がり、この記事の範囲を超える</td>
+    <td>第6章は鍵の入っていない OVMF で起動し、第7章で libvirt の檻が Secure Boot 用の組（<code>.ms.fd</code>。鍵は NVRAM のひな形のほうに入っている）を選んでいることだけを読む</td></tr>
+</table></div>
+
+<h2 id="use">実務のどこで効くか</h2>
+<div class="scroll"><table>
+<tr><th>場面</th><th>ここで効く理由</th><th>見落としやすい点</th><th>関連する章</th></tr>
+<tr><td>CI でクラウドイメージを起動して試す</td>
+    <td>差分ディスクと <code>-snapshot</code> で、元のイメージを汚さずに何度でも起動できる</td>
+    <td>差分ディスクは土台のパスを覚えている。土台を動かしたり書き換えたりすると壊れる</td><td>3</td></tr>
+<tr><td>仮想マシンが起動しない・応答しない</td>
+    <td>シリアルを端末かファイルにつなげば、ファームウェアからカーネルまでの記録が全部取れる。モニタで QEMU 自身の状態も読める</td>
+    <td>シリアルの先の端末はゲストの命令に従う。表示が壊れたら <code>tput smam</code> か <code>reset</code></td><td>2</td></tr>
+<tr><td>自作の管理ツールで仮想マシンを操作する</td>
+    <td>QMP は JSON の決まった形でやりとりできる。libvirt も同じ窓口を使っている</td>
+    <td><code>system_powerdown</code> の <code>{"return": {}}</code> は「ボタンを押した」まで。止まったかは event か状態で確かめる</td><td>2・7</td></tr>
+<tr><td>仮想マシンのネットワークがつながらない</td>
+    <td>中の OS は NIC の名前（差した位置）で設定を当てている</td>
+    <td>マシン型や PCI の位置を変えると名前が変わり、設定が当たらなくなる</td><td>5</td></tr>
+<tr><td>仮想マシンが遅い</td>
+    <td>TCG で動いているかどうかで、CPU の速さが十倍以上違う</td>
+    <td>コンテナの中や入れ子の仮想化では、気づかないうちに TCG になっていることがある</td><td>4</td></tr>
+</table></div>
+
+<h2 id="next">手を動かす</h2>
+<p>読んだあと、同じ操作を自分でやる演習が6本あります。判定は<b>観測できる結果だけ</b>で行い、
+コマンドの打ち方は見ません（判定は、あなたの QEMU に QMP で尋ねたり、ディスクのファイルを読んだり、ssh で入ったりします）。</p>
+<p><a href="/qemu/practice/">実践編（檻の入り方と演習6本）→</a></p>
+
+<!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
+<nav class="pager"><a href="/qemu/">← QEMU（記事のホーム）</a><a href="/qemu/theory/01-machine">第1章から読む →</a></nav>
+<!-- /catalog:pager -->
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/qemu/chapters.js"></script>
+<script src="/qemu/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

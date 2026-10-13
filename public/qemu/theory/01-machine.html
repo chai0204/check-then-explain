@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. 何も渡さなくても、PC が1台組み上がる — 確かめて説明する QEMU</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="1" data-theme="qemu">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <a href="/qemu/theory/">理論編</a> › 第1章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/">詳しく</a></p>
+</div>
+<h1>1. 何も渡さなくても、PC が1台組み上がる</h1>
+<p class="lead"><code>qemu-system-x86_64</code> とだけ打つ。ディスクも何も渡していないのに、QEMU は使い方もエラーも出さず、1行を出したまま戻ってこない。
+画面を端末に出してみると、BIOS が起動し、ハードディスク・フロッピー・CD を順に探し、最後にはネットワークから起動しようとして、
+DHCP で 10.0.2.15 という IP アドレスまでもらっていた。QEMU は「渡されたディスクを動かす」プログラムではなく、
+コマンド行に書かれなかった部品を既定値で補って、<b>PC を1台組み立てて電源を入れる</b>プログラムである。</p>
+<div class="badges"><span>前提: 檻が起動している</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>qemu-system-x86_64</code> が、PC を1台ソフトウェアで組み立てて動かすプログラムだと、何も渡さずに起動した画面で示せる</li>
+<li>マシン型（<code>pc</code> / <code>q35</code>）・CPU の型（<code>qemu64</code> / <code>max</code> / <code>host</code>）・デバイスの一覧を、<code>-machine help</code>・<code>-cpu help</code>・<code>-device help</code> で調べられる</li>
+<li>何も指定しないときに付いてくる部品（フロッピー・CD-ROM・NIC と、その先のネットワーク）を、QEMU のモニタで確かめられる</li>
+<li>virtio と昔ながらのデバイス（e1000・IDE）の違いを、「実在する部品の真似か、仮想マシンのための取り決めか」で説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: マシン型の版ごとの違い（<code>pc-i440fx-noble</code> と <code>pc-i440fx-8.2</code>）、iPXE の使い方、
+VNC で画面を見る方法、<code>-device</code> に渡せる細かい設定。この章のモニタ（<code>(qemu)</code>）は「QEMU に尋ねる窓がある」ことだけ分かれば足り、使い方は第2章で見る。</div></div>
+
+<h2 id="run">何も渡さずに起動する</h2>
+<div class="sgoal"><b>この節で分かること</b>: QEMU が、部品を何も指定されなくても止まらずに動き続けること。</div>
+<p>檻に入ったら、作業の場所（ボリュームの <code>~/work</code>）に移り、QEMU の版を見る。この記事は、ここから第7章まで同じシェルで続けて打つ。</p>
+<pre data-where="外（lab@host）"><code>$ cd ~/work
+$ qemu-system-x86_64 --version
+QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+Copyright (c) 2003-2023 Fabrice Bellard and the QEMU Project developers</code></pre>
+<p><code>qemu-system-x86_64</code> は「x86_64 の計算機（system）を丸ごと作る QEMU」という名前である。ARM の計算機を作る <code>qemu-system-aarch64</code> のように、作る計算機の種類ごとに別のプログラムがある（この檻には x86_64 のものだけが入っている）。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>QEMU は、仮想マシンのディスクのイメージを渡して起動するものだ。何も渡さずに打てば、使い方を表示するか、「ディスクが無い」というエラーで終わるはずだ。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64
+VNC server running on ::1:5900
+（打鍵: Ctrl-C）
+^Cqemu-system-x86_64: terminating on signal 2</code></pre>
+<div class="then"><b>だめな理由</b>: エラーで終わらず、プロンプトも戻ってこなかった（著者は数秒待って <code>Ctrl-C</code> で止めた。待ち続けても何も起きない）。
+QEMU は仮想の PC を1台組み立てて電源を入れ、その画面を VNC（画面を遠くから見るための仕組み）で出していた。
+この檻の QEMU には、窓を開いて画面を描く部品が入っていないので、画面の出し先に VNC を選び、このコンテナの中の <code>::1</code>（自分自身）の 5900 番で待ち受けた。誰も見ていない画面の中で、PC は動き続けていた。
+<b>QEMU の仕事は「渡されたディスクを動かす」ではなく「PC を組み立てて動かす」で、ディスクは部品の1つにすぎない。</b>部品を指定しなければ、既定の部品で組み立てる。</div></div>
+<div class="analogy"><b>たとえ</b>: QEMU は、<b>部品表を渡されると、その場で PC を組み立てて電源を入れる組み立て屋</b>に近い。
+部品表に書いていない部品は、店の標準品で埋める。
+<br>ただし<b>崩れる点</b>: 実物の組み立て屋は部品が無ければ組めないが、QEMU は部品を全部ソフトウェアで作るので、部品表が空でも1台組める。
+そして電源を切る（プロセスが終わる）と、PC は跡形もなく消える。残るのは、ディスクとして渡したファイルだけである。</div>
+
+<h2 id="parts">部品の選び方を QEMU に尋ねる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 「PC」を決める3つの選択（マシン型・CPU の型・デバイス）と、その一覧の出し方。virtio と昔ながらのデバイスの違い。</div>
+<p>何を組み立てるかは、3つのオプションで選ぶ。まずマシン型（<code>-machine</code>）。マザーボードとチップセットの型に当たる。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -machine help | grep -E '^(pc|q35) '
+pc                   Ubuntu 24.04 PC (i440FX + PIIX, 1996) (alias of pc-i440fx-noble)
+pc                   Standard PC (i440FX + PIIX, 1996) (alias of pc-i440fx-8.2)
+q35                  Ubuntu 24.04 PC (Q35 + ICH9, 2009) (alias of pc-q35-noble)
+q35                  Standard PC (Q35 + ICH9, 2009) (alias of pc-q35-8.2)
+$ qemu-system-x86_64 -machine help | grep default
+pc-i440fx-noble-v2   Ubuntu 24.04 PC v2 (i440FX + PIIX, arch_caps fix, 1996) (default)</code></pre>
+<p>大きく2種類ある。<code>pc</code> は 1996 年の Intel のチップセット（i440FX と PIIX）を、<code>q35</code> は 2007 年のもの（Q35 と ICH9。一覧の説明文には 2009 とある）を真似る。
+何も指定しないときに使われるのは <code>pc-i440fx-noble-v2</code>（<code>(default)</code> の行）で、1996 年型の PC だった。
+名前の後ろの <code>noble</code> や <code>8.2</code> は版である。QEMU を新しくしても、同じ版を指定すれば同じ部品の並びが組み上がる（中の OS から見たハードウェアが、QEMU の更新で勝手に変わらない）。
+同じ <code>pc</code> が2行あるのは、Ubuntu が自分の版（noble）の別名と、QEMU 本来の版（8.2）の別名を両方載せているためである。
+どちらが使われるかは、一覧からは分からない。この QEMU で <code>-machine pc</code> と打つと、QEMU 本来の版（<code>pc-i440fx-8.2</code>）のほうが組み上がる（<code>q35</code> も同じで、第5章で確かめる）。</p>
+<p>次に CPU の型（<code>-cpu</code>）。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -cpu help | grep -E '^x86 (qemu64|qemu64-v1|max|host) '
+x86 qemu64                (alias configured by machine type)
+x86 qemu64-v1             QEMU Virtual CPU version 2.5+
+x86 host                  processor with all supported host features
+x86 max                   Enables all features supported by the accelerator in the current host
+$ qemu-system-x86_64 -cpu help | grep -c '^x86 '
+145</code></pre>
+<p>何も指定しないと <code>qemu64</code> になる。その中身は「QEMU Virtual CPU version 2.5+」という、<b>どこの会社も売っていない CPU</b> で、
+どの PC の上でも同じに見えるよう、機能を少なめにしてある。<code>max</code> は使える機能を全部持たせた CPU、<code>host</code> はホストの CPU をそのまま見せる CPU で、<code>host</code> は KVM を使うときにしか選べない（第4章）。
+一覧には別名を含めて 145 の型が並び（最後の行）、ほとんどは実在する CPU（<code>Broadwell</code> や <code>EPYC</code> など）の機能を真似たものである。</p>
+<p>最後にデバイス（<code>-device</code>）。種類ごとに分かれている。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -device help | grep -E '^[A-Z].*:$'
+Controller/Bridge/Hub devices:
+USB devices:
+Storage devices:
+Network devices:
+Input devices:
+Display devices:
+Sound devices:
+Misc devices:
+CPU devices:
+Watchdog devices:
+Uncategorized devices:
+$ qemu-system-x86_64 -device help | grep -E '"(e1000|virtio-net-pci|ide-hd|virtio-blk-pci)"'
+name "ide-hd", bus IDE, desc "virtual IDE disk"
+name "virtio-blk-pci", bus PCI, alias "virtio-blk"
+name "e1000", bus PCI, alias "e1000-82540em", desc "Intel Gigabit Ethernet"
+name "virtio-net-pci", bus PCI, alias "virtio-net"</code></pre>
+<p>ディスクにも NIC にも、2つの系統がある。<code>ide-hd</code> と <code>e1000</code> は<b>実在する部品の真似</b>で、
+e1000 は Intel の 82540EM という実際の NIC の振る舞いを、レジスタ1つ1つまで再現する。中の OS は、本物の 82540EM のためのドライバをそのまま使う。
+<code>virtio-blk-pci</code> と <code>virtio-net-pci</code> は、<b>仮想マシンのために決めた取り決め</b>（virtio）に沿った部品で、手本にした実物の製品は無い（取り決めのほうに合わせて、後から実物の装置を作った製品はある）。
+中の OS は「相手は仮想の部品だ」と分かったうえで、少ないやりとりでまとめてデータを渡すので、本物の部品を真似る手間が要らない。そのかわり、中の OS に virtio のドライバが要る（Linux には入っている）。</p>
+<div class="scroll"><table>
+<tr><th></th><th>昔ながらのデバイス（e1000・IDE）</th><th>virtio（virtio-net・virtio-blk）</th></tr>
+<tr><td>何の真似か</td><td>実在する部品（Intel 82540EM・IDE のディスク）</td><td>何の真似でもない。仮想マシン用の取り決め</td></tr>
+<tr><td>中の OS に要るもの</td><td>その部品の、昔からあるドライバ</td><td>virtio のドライバ</td></tr>
+<tr><td>QEMU の仕事</td><td>本物のレジスタの読み書きを1つずつ再現する</td><td>決まった形の受け渡しの場所（キュー）を読み書きする</td></tr>
+<tr><td>中から見える名前（Linux）</td><td>ディスクは <code>/dev/sda</code>、NIC は e1000 のドライバ</td><td>ディスクは <code>/dev/vda</code>、NIC は virtio_net のドライバ</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 昔ながらのデバイスは、<b>本物そっくりに作った模型の電話</b>である。受話器を上げ、ダイヤルを回す手順まで本物と同じなので、使い方を知っている人なら誰でも使える。
+virtio は<b>社内の連絡箱</b>で、決まった用紙を入れれば相手に届く。手順が少ない分、速い。
+<br>ただし<b>崩れる点</b>: 連絡箱は社内の約束を知らない人には使えない。virtio のドライバを持たない古い OS は、virtio のディスクを見つけられずに起動できない。
+だから QEMU は、何も指定されなければ、誰でも使える模型の電話（e1000 や IDE）を付ける。</div>
+
+<h2 id="boot">画面を端末に出して、PC の起動を見る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 何も渡さない PC が、電源を入れてから何をしていたか。QEMU 自身に部品を尋ねる窓（モニタ）があること。</div>
+<p>VNC の代わりに、PC の画面を端末に出す <code>-nographic</code> を付けて、もう一度起動する。今度は <code>Ctrl-C</code> では止まらない（第2章で理由を見る）。
+止めるときは QEMU のモニタに切り替えて <code>quit</code> と打つ。モニタへの切り替えは、<code>Ctrl</code> を押しながら <code>a</code>、離してから <code>c</code>（以下 <code>Ctrl-a c</code> と書く）。</p>
+<p>起動すると、画面が一度消えてから PC の画面になる。<code>No bootable device.</code> が出たら（10 秒ほど）、<code>Ctrl-a c</code> でモニタに切り替え、<code>(qemu)</code> の後に打つ。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -nographic
+SeaBIOS (version 1.16.3-debian-1.16.3-2)
+iPXE (https://ipxe.org) 00:03.0 CA00 PCI2.10 PnP PMM+06FCAF60+06F0AF60 CA00
+Booting from Hard Disk...
+Boot failed: could not read the boot disk
+Booting from Floppy...
+Boot failed: could not read the boot disk
+Booting from DVD/CD...
+Boot failed: Could not read from CDROM (code 0003)
+Booting from ROM...
+iPXE (PCI 00:03.0) starting execution...ok
+iPXE initialising devices...ok
+iPXE 1.21.1+git-20220113.fbbdc3926-0ubuntu2 -- Open Source Network Boot Firmware
+（略）
+net0: 52:54:00:12:34:56 using 82540em on 0000:00:03.0 (Ethernet) [open]
+（略）
+net0: 10.0.2.15/255.255.255.0 gw 10.0.2.2
+net0: fec0::5054:ff:fe12:3456/64 gw fe80::2
+net0: fe80::5054:ff:fe12:3456/64
+Nothing to boot: No such file or directory (https://ipxe.org/2d03e13b)
+No more network devices
+No bootable device.
+（打鍵: Ctrl-a c）
+QEMU 8.2.2 monitor - type 'help' for more information
+(qemu) <kbd><b>info block</b></kbd>
+ide1-cd0: [not inserted]
+    Attached to:      /machine/unattached/device[6]
+    Removable device: not locked, tray closed
+floppy0: [not inserted]
+    Attached to:      /machine/unattached/device[16]
+    Removable device: not locked, tray closed
+sd0: [not inserted]
+    Removable device: not locked, tray closed
+(qemu) <kbd><b>info network</b></kbd>
+hub 0
+ \ hub0port1: #net149: index=0,type=user,net=10.0.2.0,restrict=off
+ \ hub0port0: e1000.0: index=0,type=nic,model=e1000,macaddr=52:54:00:12:34:56
+(qemu) <kbd><b>quit</b></kbd></code></pre>
+<p class="detail">太字（<b>info block</b> など）があなたが打つ文字。<code>#net</code> の後ろの数字は起動のたびに変わる。
+<code>Configuring (net0 …)</code> の点の数（DHCP の返事を待った時間）も毎回違うので、その前後と一緒に（略）とした。</p>
+<p>上から順に読む。電源が入った PC で最初に動くのはファームウェア（BIOS）で、QEMU の既定は <b>SeaBIOS</b> である。</p>
+<div class="scroll"><table>
+<tr><th>画面の行</th><th>出したもの</th><th>していたこと</th></tr>
+<tr><td><code>SeaBIOS (version 1.16.3-…)</code></td><td>ファームウェア（SeaBIOS）</td><td>電源が入って最初に動くプログラム</td></tr>
+<tr><td><code>iPXE (https://ipxe.org) 00:03.0 …</code></td><td>NIC（PCI の 00:03.0）に載ったプログラム</td><td>ネットワークから起動するための部品が見つかった</td></tr>
+<tr><td><code>Booting from Hard Disk</code> / <code>Floppy</code> / <code>DVD/CD...</code></td><td>SeaBIOS</td><td>起動できる媒体を順に探した。ハードディスクは無く、フロッピーと CD は空</td></tr>
+<tr><td><code>Booting from ROM...</code> → <code>iPXE …</code></td><td>iPXE</td><td>最後の手段として、ネットワークからの起動を試した</td></tr>
+<tr><td><code>net0: … using 82540em</code></td><td>iPXE</td><td>NIC は Intel 82540EM（e1000 の真似）だった</td></tr>
+<tr><td><code>net0: 10.0.2.15/255.255.255.0 gw 10.0.2.2</code></td><td>iPXE（相手は QEMU）</td><td>DHCP で IP アドレスをもらった</td></tr>
+<tr><td><code>Nothing to boot</code> → <code>No bootable device.</code></td><td>iPXE → SeaBIOS</td><td>どこにも起動するものが無かった。ここで待ち続ける</td></tr>
+</table></div>
+<p>何も指定しなかったのに、この PC にはフロッピーと CD-ROM の装置と NIC が付いていて、NIC の先にはネットワークまであり、DHCP でアドレスを配る誰かがいた。
+配ったのは、外のどこかではなく QEMU のプロセス自身である（第5章）。</p>
+<p><code>Ctrl-a c</code> で切り替えた <code>(qemu)</code> は、<b>QEMU のモニタ</b>（QEMU 自身への窓口）で、ここに打つものは仮想の PC にではなく QEMU のプロセスに届く。
+中の PC からは、モニタがあることも、そこで何を打たれたかも見えない。
+<code>info block</code> は、ディスクをつなげる口の一覧である。CD-ROM（<code>ide1-cd0</code>）とフロッピー（<code>floppy0</code>）の口があり、どちらも <code>[not inserted]</code>（媒体が入っていない）。<code>sd0</code> は QEMU が既定で用意した SD カード用のドライブだが、<code>Attached to:</code> の行が無い。この PC には、それを受ける装置（SD カードの差し込み口）が無いからである。
+装置はあるが中身が空なので、SeaBIOS は「Boot failed」と言った。
+<code>info network</code> は、NIC（<code>e1000.0</code>、MAC アドレス 52:54:00:12:34:56）と、その先のネットワーク（<code>type=user</code>、<code>net=10.0.2.0</code>）が、ハブ（<code>hub 0</code>）でつながっていることを示す。
+最後の <code>quit</code> は QEMU のプロセスを終わらせる。中の PC から見れば、電源コードを抜かれたのと同じである（第2章）。</p>
+<div class="analogy"><b>たとえ</b>: 何も言わずに頼んだ<b>定食</b>に近い。主菜（ディスク）を選ばなくても、ご飯・味噌汁・漬物（フロッピー・CD-ROM・NIC と、その先のネットワーク）が付いてくる。
+<br>ただし<b>崩れる点</b>: 定食の付け合わせは食べなければ済むが、QEMU の既定の部品は中の OS から見え、使われる。
+NIC があるから iPXE はネットワークから起動しようとし、DHCP のやりとりまで起きた。断りたいときは <code>-nodefaults</code> で、既定の部品を全部外せる（第7章で、libvirt がそうしているのを見る）。</div>
+<div class="note"><b>この章はここまで</b>: <code>quit</code> の後、プロンプト（<code>$</code>）は戻ってくるが、この端末はもう元のとおりではない。
+次の第2章は、この端末のまま始める（第2章を別の日に始めるなら、もう一度 <code>qemu-system-x86_64 -nographic</code> を打ち、<code>Ctrl-a x</code> で抜けてから始めると、同じ画面になる）。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/qemu/practice/">演習01</a>は、この章の「何も渡さない PC」を、画面をシリアル経由でファイルに書かせ、モニタを UNIX ソケットで受け付ける形で、端末から切り離して動かす課題である。
+判定は、あなたの QEMU にモニタ（QMP）で状態を尋ねて確かめる。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>qemu-system-x86_64</code> だけを打ったら <code>VNC server running on ::1:5900</code> と出て、プロンプトが戻らなかった。このとき QEMU は何をしているか。</p>
+<details><summary>答え</summary>
+<p>既定の部品で PC を1台組み立てて電源を入れ、その画面を VNC で出している（SeaBIOS が起動し、起動できる媒体を探している）。
+「ディスクが無いから何もしない」のではなく、ディスクの無い PC として動き続けている。<code>-nographic</code> を付けると、その様子が端末に出る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>iPXE の画面に <code>net0: 10.0.2.15/255.255.255.0 gw 10.0.2.2</code> と出た。この PC にアドレスを配ったのは誰か。そう言える根拠は何か。</p>
+<details><summary>答え</summary>
+<p>QEMU 自身。モニタの <code>info network</code> で、NIC（e1000）の先が <code>type=user,net=10.0.2.0</code> のネットワークにつながっていた。
+これは QEMU のプロセスの中にあるネットワーク（ユーザモードネットワーク）で、DHCP で 10.0.2.15 を配り、10.0.2.2 をゲートウェイとして演じる（第5章）。外の LAN の DHCP サーバではない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>モニタの <code>info block</code> に <code>floppy0: [not inserted]</code> と出た。この PC にフロッピーの装置はあるか。</p>
+<details><summary>答え</summary>
+<p>ある。<code>floppy0</code> という口（装置）はあり、媒体が入っていない（<code>not inserted</code>）。
+だから SeaBIOS は <code>Booting from Floppy...</code> と試して <code>Boot failed</code> になった。装置ごと無くすには <code>-nodefaults</code> などで外す。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>同じ Ubuntu のディスクを、<code>-device ide-hd</code> でつないだときと <code>-device virtio-blk-pci</code> でつないだときとで、中の Linux から見えるディスクの名前はどう違うか。違う理由は何か。</p>
+<details><summary>答え</summary>
+<p>IDE なら <code>/dev/sda</code>、virtio なら <code>/dev/vda</code>（第3章で <code>lsblk</code> を打つと vda が見える）。
+中の OS は、つながっている部品の種類を見て、その部品のドライバで扱う。IDE は実在する部品の真似なので昔からのドライバ（sd）が、virtio は仮想マシン用の取り決めなので virtio のドライバ（vd）が受け持つ。ディスクのファイルの中身は同じでも、名前は部品の種類で決まる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>QEMU は、渡されたディスクを動かすのではなく、PC を1台組み立てて電源を入れる。部品を指定しなければ既定の部品で組む</li>
+<li>既定の PC（<code>pc-i440fx-noble-v2</code>）には、SeaBIOS・IDE の CD-ROM・フロッピー・NIC（e1000）と、その先のネットワーク（10.0.2.0/24）が付く</li>
+<li>何を組むかは <code>-machine</code>（マシン型）・<code>-cpu</code>（CPU の型）・<code>-device</code>（部品）で選び、一覧は <code>help</code> で出る</li>
+<li>e1000 や IDE は実在する部品の真似、virtio は仮想マシンのための取り決め。中の OS には、それぞれのドライバが要る</li>
+<li><code>(qemu)</code> は QEMU 自身への窓口（モニタ）で、中の PC からは見えない。<code>Ctrl-a c</code> で切り替え、<code>quit</code> で QEMU を終わらせる</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:qemu-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / QEMU 8.2.2（Debian 1:8.2.2+ds-0ubuntu1.18、KVM なし・TCG）/ SeaBIOS 1.16.3 / iPXE 1.21.1 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/qemu/theory/">← 理論編 目次</a><a href="/qemu/theory/02-serial">次: 2. シリアルの先は、あなたの端末そのもの →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/qemu/chapters.js"></script>
+<script src="/qemu/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

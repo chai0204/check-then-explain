@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# qmp ソケット コマンド [引数の JSON] — QEMU の QMP に1つだけ問い合わせ、その返事（"return" か "error" を持つ行）を
+# 1行の JSON で出す。判定（verify）用。本文の第2章で読者が socat で打つのと同じことをしている。
+#   終了コード: 0 = 返事があった / 3 = ソケットが無い / 4 = つながらない・返事が無い（QEMU が終わっている）
+set -uo pipefail
+sock=${1:?ソケット} cmd=${2:?コマンド} args=${3:-}
+[ -S "$sock" ] || exit 3
+if [ -n "$args" ]; then
+  req=$(jq -nc --arg c "$cmd" --argjson a "$args" '{execute:$c, arguments:$a}') || exit 4
+else
+  req=$(jq -nc --arg c "$cmd" '{execute:$c}') || exit 4
+fi
+out=$(printf '%s\n%s\n' '{"execute":"qmp_capabilities"}' "$req" \
+      | timeout 8 socat -t 3 - UNIX-CONNECT:"$sock" 2>/dev/null) || true
+line=$(printf '%s\n' "$out" | jq -c 'select(type == "object" and (has("return") or has("error")))' 2>/dev/null | tail -1)
+[ -n "$line" ] || exit 4
+printf '%s\n' "$line"

@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. シリアルの先は、あなたの端末そのもの — 確かめて説明する QEMU</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="2" data-theme="qemu">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <a href="/qemu/theory/">理論編</a> › 第2章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/">詳しく</a></p>
+</div>
+<h1>2. シリアルの先は、あなたの端末そのもの</h1>
+<p class="lead">第1章で QEMU を抜けた端末で、長い1行を出してみる。80 桁で切れて、続きが消える。QEMU はもう終わっているのに、端末の折り返しが止まったままになっている。
+止めたのは QEMU ではなく、仮想の PC の中のファームウェア（SeaBIOS）がシリアルポートに書いた数バイトだった。
+<code>-nographic</code> は、仮想の PC のシリアルポートを、あなたの端末に直結する。そこを流れるバイトは、文字であると同時に、<b>あなたの端末への命令</b>にもなる。
+同じ1本の線には、QEMU 自身への窓口（モニタ）も同居している。</p>
+<div class="badges"><span>前提: 第1章を同じ端末で終えている</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>QEMU を終えた後に端末の表示が壊れる理由を、仮想の PC がシリアルに書いたバイト（エスケープシーケンス）で説明し、<code>tput smam</code> で直せる</li>
+<li><code>-nographic</code> が何をまとめた指定かを言え、<code>-display none</code>・<code>-machine graphics=off</code>・<code>-serial mon:stdio</code>・<code>-serial file:</code> を使い分けられる</li>
+<li><code>Ctrl-a</code> の操作（<code>h</code> <code>c</code> <code>x</code>）と、<code>Ctrl-C</code> がどこに届くかを説明できる</li>
+<li>QEMU のモニタ（HMP）と QMP で状態を尋ね、<code>system_powerdown</code> と <code>quit</code> の違いを「誰が止めると決めるか」で説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: エスケープシーケンスの一覧、モニタの命令の一覧（<code>help</code> で出る）、QMP の命令の引数の書き方、
+<code>socat</code> のオプション。<code>Ctrl-a</code> の後に押す文字は <code>h</code>（一覧を出す）だけ覚えておけば、残りは画面で引ける。</div></div>
+
+<h2 id="broken">端末が壊れていた</h2>
+<div class="sgoal"><b>この節で分かること</b>: QEMU を終えても、端末に残るものがあること。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>QEMU は端末の中で動くふつうのプログラムだ。<code>quit</code> で終わってプロンプトが戻れば、端末は QEMU を起動する前と同じに戻っている。
+1 から 40 までをカンマでつないだ1行（110 文字）を出せば、端末の幅（80 桁）で折り返して2行で見えるはずだ。</p>
+<pre data-where="外（lab@host）"><code>$ seq -s, 1 40
+1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30</code></pre>
+<div class="then"><b>だめな理由</b>: 30 で切れて、残りの「,31,…,40」がどこにも無い。<code>seq</code> は 40 まで出している（後で確かめる）。
+右端まで来た文字を次の行に送る、端末の<b>自動折り返し</b>が止まっていて、右端を越えた文字が最後の桁に上書きされ続けたのである。
+止めたのは QEMU のプログラムではない。第1章で動かした仮想の PC の中の SeaBIOS が、起動の最初に「折り返しをやめよ」という命令を<b>シリアルポートに書き</b>、
+<code>-nographic</code> がそのバイトをそのままあなたの端末に流した。端末は命令に従い、QEMU が終わった後も従い続けている。
+（あなたの端末が 80 桁より広ければ、切れる位置はその幅になる。第1章を別の日に読んだ場合は、<code>qemu-system-x86_64 -nographic</code> を起動して <code>Ctrl-a x</code> で抜けてから打つと、同じことが起きる。）</div></div>
+<p>直すのは、端末に「折り返しを戻せ」という命令を送ることである。<code>tput smam</code> は、いまの端末の種類（<code>TERM</code>）に合わせて、その命令のバイトを出す。</p>
+<pre data-where="外（lab@host）"><code>$ tput smam
+$ seq -s, 1 40
+1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40</code></pre>
+<p class="detail">本文の記録は端末の画面を写したもので、折り返しはつないで1行にしてある。あなたの画面では、80 桁のところで次の行に折り返して見える。
+端末を丸ごと初期化する <code>reset</code> でも直る（画面も消える）。</p>
+
+<h2 id="bytes">誰が折り返しを止めたのか</h2>
+<div class="sgoal"><b>この節で分かること</b>: SeaBIOS が書いたバイトの中身。シリアルポートの行き先は付け替えられること。SeaBIOS がシリアルに書くのは「画面が無い」と伝えられたときだけであること。</div>
+<p>シリアルポートの行き先を、端末の代わりにファイルにすれば、SeaBIOS が書いたバイトをそのまま取っておける。
+<code>-serial file:bios.log</code> がその指定で、<code>-display none</code> は画面を作らない指定、<code>-machine graphics=off</code> は「この PC には画面が無い」とファームウェアに伝える指定である。
+3 秒だけ動かして止める（<code>timeout 3</code> が3秒後に QEMU に終了の合図を送る）。</p>
+<pre data-where="外（lab@host）"><code>$ timeout 3 qemu-system-x86_64 -machine graphics=off -display none -serial file:bios.log
+qemu-system-x86_64: terminating on signal 15 from pid 84 (timeout)
+$ od -c bios.log | head -3
+0000000 033   c 033   [   ?   7   l 033   [   2   J 033   [   0   m   S
+0000020   e   a   B   I   O   S       (   v   e   r   s   i   o   n
+0000040   1   .   1   6   .   3   -   d   e   b   i   a   n   -   1   .</code></pre>
+<p class="detail"><code>pid 84</code> の数字は毎回違う（止める合図を送った <code>timeout</code> のプロセスの番号）。</p>
+<p><code>od -c</code> は、ファイルのバイトを1つずつ見せる。<code>033</code> は ESC（0x1b）で、ESC から始まる並びを、端末は文字ではなく命令として実行する（<b>エスケープシーケンス</b>）。
+SeaBIOS は、自分の名前（<code>SeaBIOS (version</code>）を出すより前に、端末に4つの命令を送っていた。</p>
+<div class="scroll"><table>
+<tr><th>バイト</th><th>端末への命令</th></tr>
+<tr><td><code>033 c</code></td><td>端末を初期状態に戻す（第1章で画面が一度消えたのはこれと次の次）</td></tr>
+<tr><td><code>033 [ ? 7 l</code></td><td><b>行の右端で折り返すのをやめる</b>（自動折り返しを止める）。戻すのは <code>033 [ ? 7 h</code>、<code>tput smam</code> が出すのはこれ</td></tr>
+<tr><td><code>033 [ 2 J</code></td><td>画面を消す</td></tr>
+<tr><td><code>033 [ 0 m</code></td><td>文字の色や太さを標準に戻す</td></tr>
+</table></div>
+<p>折り返しを止める命令を送った SeaBIOS は、最後まで戻す命令を送らなかった。QEMU は、シリアルポートに書かれたバイトを中身を見ずに端末へ流すだけで、終わるときに戻してもくれない。
+次に、「画面が無い」と伝えなかった場合を比べる。</p>
+<pre data-where="外（lab@host）"><code>$ timeout 3 qemu-system-x86_64 -display none -serial file:vga.log
+qemu-system-x86_64: terminating on signal 15 from pid 90 (timeout)
+$ ls -l bios.log vga.log
+-rw-r--r-- 1 lab lab 834 Oct 14 02:50 bios.log
+-rw-r--r-- 1 lab lab   0 Oct 14 02:50 vga.log</code></pre>
+<p><code>graphics=off</code> を付けなかった <code>vga.log</code> は 0 バイトだった。画面（VGA）があると思っている SeaBIOS は、画面にだけ書いてシリアルには何も書かない。
+<code>-display none</code> は「QEMU が画面を誰にも見せない」だけで、仮想の PC には VGA の画面がある。
+<b><code>-nographic</code> は、「画面を見せない（<code>-display none</code>）」「ファームウェアに画面が無いと伝える（<code>graphics=off</code>）」「シリアルとモニタを端末につなぐ（<code>-serial mon:stdio</code>）」をまとめた指定</b>（使わないパラレルポートは <code>null</code> につなぐ）で、
+2つ目があるから、SeaBIOS はシリアルを画面の代わりにし、あなたの端末を自分の画面のように扱った。</p>
+<div class="analogy"><b>たとえ</b>: シリアルポートは、隣の部屋との<b>伝声管</b>に近い。向こうで話したことが、そのままこちらに届く。
+<br>ただし<b>崩れる点</b>: 伝声管は声を運ぶだけだが、シリアルの先が端末だと、届いたバイトの中の命令（エスケープシーケンス）を端末が実行してしまう。
+相手（仮想の PC の中のプログラム）が「この部屋の電気を消せ」と言えば、こちらの電気が消える。そして伝声管（QEMU）は、相手が帰った後も部屋を元に戻さない。</div>
+
+<h2 id="mux">1本の線に、仮想の PC と QEMU が同居する</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>-serial mon:stdio</code> の「mon:」の意味。<code>Ctrl-a</code> が何をし、<code>Ctrl-C</code> がどこへ行くか。モニタで何が分かるか。</div>
+<p>今度は <code>-nographic</code> の代わりに、まとめずに書く。<code>graphics=off</code> を付けないので SeaBIOS はシリアルに書かず、端末は壊れない。
+ディスクは渡さないので、端末には何も出ない（画面の無い PC が、見えないところで第1章と同じことをしている）。起動したら、次の順に押す。</p>
+<ol>
+<li><code>Ctrl-a h</code>（<code>Ctrl-a</code> の後に使える操作の一覧が出る）</li>
+<li><code>Ctrl-C</code>（何も起きないことを確かめる）</li>
+<li><code>Ctrl-a c</code>（モニタに切り替わる）</li>
+</ol>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -display none -serial mon:stdio
+（打鍵: Ctrl-a h）
+C-a h    print this help
+C-a x    exit emulator
+C-a s    save disk data back to file (if -snapshot)
+C-a t    toggle console timestamps
+C-a b    send break (magic sysrq)
+C-a c    switch between console and monitor
+C-a C-a  sends C-a
+（打鍵: Ctrl-C）
+（打鍵: Ctrl-a c）
+QEMU 8.2.2 monitor - type 'help' for more information
+(qemu) <kbd><b>info status</b></kbd>
+VM status: running
+(qemu) <kbd><b>info chardev</b></kbd>
+parallel0: filename=vc
+serial0: filename=mux
+serial0-base: filename=stdio
+(qemu) <kbd><b>system_powerdown</b></kbd>
+(qemu) <kbd><b>info status</b></kbd>
+VM status: running
+(qemu) <kbd><b>quit</b></kbd></code></pre>
+<p><code>-serial mon:stdio</code> は「シリアルポートを標準入出力（<code>stdio</code>、この端末）につなぎ、その上にモニタ（<code>mon:</code>）を重ねる」という指定である。
+1本の線を2つの相手が共有するので、どちらに話しているかを切り替える合図が要る。それが <code>Ctrl-a</code> で、その後に押した1文字が QEMU への指示になる（一覧の <code>C-a</code> は <code>Ctrl-a</code> のこと）。</p>
+<ul>
+<li><code>Ctrl-a x</code> は QEMU を終わらせる（<code>quit</code> と同じ）。<code>Ctrl-a c</code> は、仮想の PC の画面（シリアル）とモニタを行き来する</li>
+<li><code>Ctrl-C</code> を押しても QEMU は終わらなかった。<code>-serial mon:stdio</code> は、端末を「打った文字をそのまま渡す」モードにし、<code>Ctrl-C</code> を QEMU を止める合図に使わない（<code>mon:stdio</code> と書くと <code>signal=off</code> の指定が入る。<code>-nographic</code> も同じ）。<code>Ctrl-C</code> は1つの文字（0x03）としてシリアルポートに送られ、仮想の PC の中のプログラムに届く。
+いまは中に OS がいないので、受け取る者がいなかった。練習機が動いていれば、中で動いているコマンドが止まる（外の QEMU ではなく）。<code>mon:</code> を付けない <code>-serial stdio</code> なら、<code>Ctrl-C</code> は QEMU を止める合図になり、QEMU は <code>terminating on signal 2</code> と言って終わる</li>
+<li>本当に <code>Ctrl-a</code> を仮想の PC に送りたいときは、<code>Ctrl-a</code> を2回押す（<code>C-a C-a  sends C-a</code>）</li>
+</ul>
+<p>モニタの <code>info chardev</code> は、この線のつながり方をそのまま見せている。シリアルポート（<code>serial0</code>）の行き先は <code>mux</code>（多重化。2つの相手で共有する）で、その下（<code>serial0-base</code>）が <code>stdio</code>、つまりこの端末である。
+QEMU では、シリアルもモニタも、バイトの流れの行き先（<b>キャラクタデバイス</b>）につなぐ形になっていて、行き先は端末にも、ファイル（さっきの <code>file:</code>）にも、ソケットにもできる。
+使っていないパラレルポート（<code>parallel0</code>）は <code>vc</code>（見えない画面の中の仮想の端末）につながっていた。</p>
+<p><code>system_powerdown</code> は、仮想の PC の<b>電源ボタンを押す</b>命令である（ACPI という取り決めで OS に伝わる）。押しても <code>VM status: running</code> のままだった。
+中に OS がいないので、ボタンが押されたことを聞いて「では止まろう」と決める者がいない。止めると決めるのは、いつもボタンを受け取る側である。
+<code>quit</code> は相手に何も尋ねず、QEMU のプロセスを終わらせる。中の PC から見れば電源コードを抜かれたのと同じで、中の OS は後片付けをする暇が無い（第3章で、OS がいるときの違いを見る）。</p>
+<div class="analogy"><b>たとえ</b>: <code>-serial mon:stdio</code> は、1本の電話回線に<b>交換台</b>を付けたものに近い。普段は相手（仮想の PC）とつながっていて、
+合図（<code>Ctrl-a</code>）を送ると交換手（QEMU）が出る。交換手に「つなぎ替えて」（<code>c</code>）「切って」（<code>x</code>）と頼める。
+<br>ただし<b>崩れる点</b>: 電話の交換台は合図の音を相手に聞かせないが、<code>Ctrl-a</code> そのものを相手に送りたいときは2回押すしかない。
+そして合図以外の音（<code>Ctrl-C</code> も）は、すべて相手に届く。交換手は会話の中身を聞いていない。</div>
+
+<h2 id="qmp">機械のための窓口、QMP</h2>
+<div class="sgoal"><b>この節で分かること</b>: QEMU を端末から切り離して動かす方法。プログラムが QEMU に命令する窓口（QMP）の形。</div>
+<p>モニタはもう1つの形でも開ける。人が打つ <code>(qemu)</code> の窓口（HMP）に対し、<b>QMP</b>（QEMU Machine Protocol）はプログラムのための窓口で、1行に1つの JSON でやりとりする。
+今度は QEMU を端末から切り離し（<code>-daemonize</code>）、QMP を UNIX ソケット <code>qmp.sock</code> で受け付ける。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -display none -qmp unix:qmp.sock,server=on,wait=off -daemonize
+$ ls -l qmp.sock
+srwxr-x--- 1 lab lab 0 Oct 14 02:50 qmp.sock</code></pre>
+<p>プロンプトはすぐに戻った。QEMU は後ろで動いていて、<code>qmp.sock</code>（先頭の <code>s</code> はソケットの印）で話しかけられるのを待っている。
+<code>socat</code> は、端末からの入力をソケットへ、ソケットからの返事を端末へつなぐ道具である。最初に <code>qmp_capabilities</code>（あいさつ）を送り、それから命令を送る。</p>
+<pre data-where="外（lab@host）"><code>$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"query-status"}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"return": {"status": "running", "singlestep": false, "running": true}}
+$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"system_powerdown"}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"timestamp": {"seconds": 1791913835, "microseconds": 524551}, "event": "POWERDOWN"}
+{"return": {}}
+$ pgrep -a qemu-system
+102 qemu-system-x86_64 -display none -qmp unix:qmp.sock,server=on,wait=off -daemonize</code></pre>
+<p>つなぐと、QEMU は最初に自分の版を名乗る（<code>{"QMP": …}</code>）。あいさつの返事 <code>{"return": {}}</code> の後、<code>query-status</code> の返事は <code>(qemu) info status</code> と同じ内容を JSON で返した。
+<code>system_powerdown</code> には、頼んでいない知らせ（<code>"event": "POWERDOWN"</code>、電源ボタンが押された）と、命令への返事 <code>{"return": {}}</code> が来た。
+しかし <code>pgrep</code> で見ると、QEMU のプロセス（<code>102</code> は PID。毎回違う）はまだいる。<code>{"return": {}}</code> は「ボタンを押した」までで、止まったという意味ではない。</p>
+<pre data-where="外（lab@host）"><code>$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"quit"}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"timestamp": {"seconds": 1791913837, "microseconds": 160756}, "event": "SHUTDOWN", "data": {"guest": false, "reason": "host-qmp-quit"}}
+{"return": {}}
+2026/10/14 02:50:37 socat[113] E read(5, 0x556c91250000, 8192): Connection reset by peer
+$ pgrep -a qemu-system; echo "exit=$?"
+exit=1
+$ rm bios.log vga.log qmp.sock</code></pre>
+<p><code>quit</code> には、止まったという知らせ（<code>"event": "SHUTDOWN"</code>）が来た。理由（<code>reason</code>）は <code>host-qmp-quit</code>、止めたのは中の OS ではなく外（<code>"guest": false</code>）からの QMP の <code>quit</code> だと、QEMU 自身が書いている。
+直後に QEMU が終わってソケットが閉じたので、<code>socat</code> は「相手に切られた」（<code>Connection reset by peer</code>。日時と番号は毎回違う）と言って終わった。<code>pgrep</code> はもう何も見つけない（<code>exit=1</code>）。
+最後の <code>rm</code> は、この章で作ったファイルの片付けである。QEMU はふつう、終わるときに自分のソケットのファイルを消すが、<code>-daemonize</code> した QEMU は作業ディレクトリを <code>/</code> に移しているので、相対パスで作った <code>qmp.sock</code> を消せず、ファイルが残る（絶対パスで作れば消える）。</p>
+<p>この窓口は、第7章で再び出てくる。<b>libvirt（<code>virsh</code>）は、仮想マシンごとに QMP のソケットを持ち、たとえば <code>virsh suspend</code>（一時停止）や、ゲストエージェントのいないときの <code>virsh shutdown</code>（電源ボタン）を、この JSON の命令（<code>stop</code>・<code>system_powerdown</code>）に置き換えて送っている</b>（第7章で、libvirt が QMP で話していることを確かめる）。
+このサイトの仮想マシン型の檻の <code>--stop-timeout 30</code> も、この話の続きである。<code>docker stop</code> を受けた檻は、練習機に止まるよう頼み、練習機の OS が自分で止まり終わるのを待つ。待ちきれずに QEMU ごと終わらされれば、<code>quit</code> と同じく電源を抜いたことになる。</p>
+<div class="analogy"><b>たとえ</b>: HMP が<b>窓口で口頭で頼む</b>ことなら、QMP は<b>決まった書式の申請書を出す</b>ことに近い。書式が決まっているので、プログラムが書いて出し、返事を読み取れる。
+<br>ただし<b>崩れる点</b>: 申請書の窓口は出したものにしか返事をしないが、QMP は頼んでいないことも知らせてくる（<code>event</code>）。
+「止まった」はいつも知らせのほうで届き、<code>system_powerdown</code> の返事を待っても来ない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/qemu/practice/">演習01</a>は、この章の3つ（画面を見せない・ファームウェアに画面が無いと伝える・シリアルとモニタの行き先を決める）を組み合わせて、
+端末から切り離した QEMU のシリアルをファイルへ、モニタを QMP のソケットへつなぐ課題である。<code>-nographic</code> を <code>-daemonize</code> と一緒に使うと、シリアル・モニタ・パラレルの行き先を全部自分で書き直さないかぎり断られるので、まとめずに書くほうが素直である。判定は QMP で問い合わせるだけでなく、そのソケットを待ち受けている QEMU のプロセスを見て、端末から切り離されているか、<code>serial.log</code> に書いているかも確かめる。</div>
+
+<div class="quiz"><b>確認</b>
+<p>仮想マシンの起動をシリアルで見ていたら、端末の長い行が右端で切れるようになった。QEMU を終えても直らない。何が起きていて、どう直すか。</p>
+<details><summary>答え</summary>
+<p>仮想マシンの中のプログラム（この章では SeaBIOS）が、シリアルポートに端末への命令（<code>ESC [ ? 7 l</code>、自動折り返しを止める）を書き、QEMU がそれを端末へそのまま流した。
+端末はその命令に従い続けている。<code>tput smam</code>（折り返しを戻す命令を送る）か <code>reset</code>（端末を初期化する）で直る。QEMU を起動し直しても直らない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>-display none -serial file:vga.log</code> で起動した PC の <code>vga.log</code> は 0 バイトだった。<code>-nographic</code> で起動すると SeaBIOS の画面が出る。この違いはどこから来るか。</p>
+<details><summary>答え</summary>
+<p><code>-nographic</code> は、画面を見せない（<code>-display none</code>）だけでなく、ファームウェアに「画面が無い」と伝える（<code>-machine graphics=off</code>）。
+SeaBIOS は画面が無いと伝えられたときだけ、シリアルを画面の代わりにする。<code>-display none</code> だけなら、仮想の PC には VGA の画面があり、SeaBIOS はそこにだけ書く。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>info chardev</code> に <code>serial0: filename=mux</code> と <code>serial0-base: filename=stdio</code> が出た。ここから何が言えるか。</p>
+<details><summary>答え</summary>
+<p>シリアルポートの行き先は多重化（mux）されていて、その下は QEMU の標準入出力（この端末）につながっている。同じ端末をモニタも共有していて、<code>Ctrl-a c</code> で行き来する。
+<code>-serial mon:stdio</code>（<code>-nographic</code> の中身でもある）の形そのものである。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>QMP に <code>system_powerdown</code> を送り、<code>{"return": {}}</code> が返った。仮想マシンは止まったと言えるか。</p>
+<details><summary>答え</summary>
+<p>言えない。返事は「電源ボタンを押した」まで。止まるかどうかは中の OS が決め、この章の PC のように OS がいなければ止まらない。
+止まったことは、<code>"event": "SHUTDOWN"</code> の知らせか、<code>query-status</code> や <code>pgrep</code> で確かめる。必ず止めたいなら <code>quit</code>（電源を抜く）だが、中の OS は後片付けができない。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>シリアルポートの先が端末なら、仮想マシンの中のプログラムが書いたバイトの中の命令（エスケープシーケンス）を、あなたの端末が実行する。QEMU を終えても残るので、<code>tput smam</code> か <code>reset</code> で戻す</li>
+<li><code>-nographic</code> = 画面を見せない（<code>-display none</code>）＋ファームウェアに画面が無いと伝える（<code>graphics=off</code>）＋シリアルとモニタを端末へ（<code>-serial mon:stdio</code>）＋パラレルポートは <code>null</code> へ</li>
+<li>シリアルもモニタも行き先（キャラクタデバイス）を付け替えられる。端末・ファイル・UNIX ソケット</li>
+<li><code>Ctrl-a</code> の後の1文字が QEMU への合図（<code>h</code> 一覧・<code>c</code> 切り替え・<code>x</code> 終了）。<code>mon:stdio</code> では <code>Ctrl-C</code> は仮想マシンに届く（<code>mon:</code> の無い <code>stdio</code> なら QEMU が終わる）</li>
+<li><code>system_powerdown</code> は電源ボタンを押すだけで、止めるかは中の OS が決める。<code>quit</code> は電源を抜く。QMP は同じ操作を JSON で受け付け、起きたことを <code>event</code> で知らせる</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:qemu-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / QEMU 8.2.2（Debian 1:8.2.2+ds-0ubuntu1.18、KVM なし・TCG）/ SeaBIOS 1.16.3 / socat 1.8.0.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁（TERM=xterm）で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/qemu/theory/01-machine">← 前: 1. 何も渡さなくても、PC が1台組み上がる</a><a href="/qemu/theory/03-disk">次: 3. ディスクは、書いたところだけを持つファイル →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/qemu/chapters.js"></script>
+<script src="/qemu/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

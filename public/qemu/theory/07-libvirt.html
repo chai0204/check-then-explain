@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>7. libvirt は、コマンド行を組み立てているだけ — 確かめて説明する QEMU</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="7" data-theme="qemu">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <a href="/qemu/theory/">理論編</a> › 第7章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/">詳しく</a></p>
+</div>
+<h1>7. libvirt は、コマンド行を組み立てているだけ</h1>
+<p class="lead">このサイトの仮想マシン型の檻で読者が打つ <code>virsh start linuc</code>。その後ろで動いているのは、この記事で自分の手で打ってきたのと同じ <code>qemu-system-x86_64</code> だった。
+libvirt は、定義の XML を読んで 100 個近い引数を組み立て、QEMU を1つ起動し、QMP のソケットで話しかけているだけである。
+その証拠に、libvirt のデーモンを止めても、練習機（QEMU のプロセス）は動き続け、デーモンを起こし直すと、動いている QEMU につなぎ直す。</p>
+<div class="badges"><span>前提: 第6章までを同じ端末で終えている（後ろで動いている QEMU が無い）</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>libvirt の練習機の定義（XML）を読み、それが QEMU のどの引数になるかを、動いている QEMU のプロセスの引数（<code>/proc/PID/cmdline</code>）と並べて言える</li>
+<li>libvirt のデーモンと QEMU のプロセスが別物で、デーモンが QMP で QEMU を操作していることを、デーモンを止めて確かめられる</li>
+<li>このサイトの仮想マシン型の檻の作り（TCG・UEFI・差分ディスク・ユーザモードネットワーク・pty のシリアル）を、この記事の各章と結び付けて説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: libvirt の XML の全項目、<code>-blockdev</code> の JSON の書式、<code>-sandbox</code>（QEMU 自身にかける制限）や <code>-overcommit</code> の意味、
+libvirt の session と system の違いの細部、ゲストエージェント（qemu-guest-agent）の命令。</div></div>
+
+<h2 id="xml">libvirt の定義を読む</h2>
+<div class="sgoal"><b>この節で分かること</b>: このサイトの仮想マシン型の檻が、練習機をどう定義しているか。</div>
+<p>このサイトの仮想マシン型の檻は、この定義をもとに練習機を作っている（<a href="/linuc-network/">ネットワークの基礎</a>や<a href="/linuc-disks/">ハードウェアとディスク</a>の記事のように、これに NIC やディスクを足した定義に置き換えている檻もある）。この檻にも、この土台の定義が入っている。</p>
+<pre data-where="外（lab@host）"><code>$ sed -n '/&lt;domain/,$p' /etc/lab-vm/domain.xml.in
+&lt;domain type='qemu' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'&gt;
+  &lt;name&gt;linuc&lt;/name&gt;
+  &lt;title&gt;LinuC 練習機&lt;/title&gt;
+  &lt;memory unit='MiB'&gt;1536&lt;/memory&gt;
+  &lt;vcpu&gt;2&lt;/vcpu&gt;
+  &lt;os firmware='efi'&gt;
+    &lt;type arch='x86_64' machine='q35'&gt;hvm&lt;/type&gt;
+    &lt;nvram&gt;@VMDIR@/linuc_VARS.fd&lt;/nvram&gt;
+  &lt;/os&gt;
+  &lt;features&gt;&lt;acpi/&gt;&lt;/features&gt;
+  &lt;cpu mode='maximum'/&gt;
+  &lt;clock offset='utc'/&gt;
+  &lt;on_poweroff&gt;destroy&lt;/on_poweroff&gt;
+  &lt;on_reboot&gt;restart&lt;/on_reboot&gt;
+  &lt;devices&gt;
+    &lt;disk type='file' device='disk'&gt;
+      &lt;driver name='qemu' type='qcow2' discard='unmap'/&gt;
+      &lt;source file='@VMDIR@/linuc.qcow2'/&gt;
+      &lt;target dev='vda' bus='virtio'/&gt;
+    &lt;/disk&gt;
+    &lt;serial type='pty'/&gt;
+    &lt;console type='pty'/&gt;
+    &lt;channel type='unix'&gt;
+      &lt;target type='virtio' name='org.qemu.guest_agent.0'/&gt;
+    &lt;/channel&gt;
+    &lt;rng model='virtio'&gt;&lt;backend model='random'&gt;/dev/urandom&lt;/backend&gt;&lt;/rng&gt;
+  &lt;/devices&gt;
+  &lt;qemu:commandline&gt;
+    &lt;qemu:arg value='-netdev'/&gt;
+    &lt;qemu:arg value='user,id=lab0,hostfwd=tcp:127.0.0.1:2222-:22'/&gt;
+    &lt;qemu:arg value='-device'/&gt;
+    &lt;qemu:arg value='virtio-net-pci,netdev=lab0,mac=52:54:00:12:34:56,addr=0x10'/&gt;
+  &lt;/qemu:commandline&gt;
+&lt;/domain&gt;</code></pre>
+<p>この記事で見てきた言葉が並んでいる。<code>type='qemu'</code>（KVM ではなく TCG。第4章）、<code>machine='q35'</code>（第1章・第5章）、<code>firmware='efi'</code> と <code>nvram</code>（UEFI と NVRAM のファイル。第6章）、
+qcow2 のディスク（第3章）、<code>serial type='pty'</code>（シリアルの行き先。第2章）。最後の <code>qemu:commandline</code> は、XML の書き方を通さずに QEMU へそのまま渡す引数で、
+第5章で自分で書いた <code>-netdev user,…,hostfwd=…</code> と <code>addr=0x10</code> の NIC がそのまま書いてある。libvirt 10 の XML でも、<code>&lt;interface type='user'/&gt;</code> と書けば同じ QEMU の内蔵のユーザモードネットワーク（slirp）の NIC になる。ただし XML でポート転送（<code>&lt;portForward&gt;</code>）を書けるのは、代わりの仕組みの passt を選んだときだけで、passt は docker の中では起動できなかった。だから hostfwd 付きの NIC を、QEMU の書き方のまま渡している。</p>
+<div class="analogy"><b>たとえ</b>: 定義の XML は、レストランの<b>注文票</b>に近い。「q35 で、メモリ 1.5GB、UEFI で」と料理の名前を書けば、厨房（libvirt）が調理の手順（QEMU の引数）に書き直してくれる。
+<br>ただし<b>崩れる点</b>: 注文票には書いていない手順も、厨房は勝手に足す（次の節で見る <code>-nodefaults</code> や <code>-S</code>）。
+逆に、注文票の書き方では頼めないものは、<code>&lt;qemu:commandline&gt;</code> に調理の手順をそのまま書いて渡すしかない。注文票は便利な書き方であって、QEMU にできることの全部ではない。</div>
+<p><code>@VMDIR@</code> を置き換えて登録し、差分ディスクを作り、電源を入れる。仮想マシン型の檻の <code>vm start</code> がしているのも、この3つである。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-img create -q -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 ~/vm/linuc.qcow2
+$ sed "s|@VMDIR@|$HOME/vm|g" /etc/lab-vm/domain.xml.in &gt; ~/vm/linuc.xml
+$ virsh define ~/vm/linuc.xml
+Domain 'linuc' defined from /home/lab/vm/linuc.xml
+$ virsh start linuc
+Domain 'linuc' started</code></pre>
+
+<h2 id="process">virsh start が起動したもの</h2>
+<div class="sgoal"><b>この節で分かること</b>: 電源を入れた後に動いているプロセスと、その引数。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>virsh</code> で動かす仮想マシンは、libvirt という仮想化のソフトが動かしている。libvirt のデーモン（<code>libvirtd</code>）の中で仮想マシンが動いていて、
+デーモンを止めれば、仮想マシンも一緒に止まるはずだ。</p>
+<pre data-where="外（lab@host）"><code>$ ps -o pid,ppid,comm -C qemu-system-x86,libvirtd,virtlogd
+    PID    PPID COMMAND
+    484       1 libvirtd
+    516       1 virtlogd
+    520       1 qemu-system-x86
+$ virsh qemu-monitor-command linuc --hmp 'info status'
+VM status: running
+$ virsh qemu-monitor-command linuc '{"execute":"query-status"}'
+{"return":{"status":"running","singlestep":false,"running":true},"id":"libvirt-451"}
+$ pkill -x libvirtd
+$ ps -o pid,ppid,comm -C qemu-system-x86,libvirtd,virtlogd
+    PID    PPID COMMAND
+    516       1 virtlogd
+    520       1 qemu-system-x86
+$ virsh list
+ Id   Name    State
+-----------------------
+ 1    linuc   running
+$ ps -o pid,ppid,comm -C qemu-system-x86,libvirtd,virtlogd
+    PID    PPID COMMAND
+    516       1 virtlogd
+    520       1 qemu-system-x86
+    544       1 libvirtd</code></pre>
+<p class="detail">PID の数字は毎回違う。</p>
+<div class="then"><b>だめな理由</b>: 練習機は <code>qemu-system-x86</code>（<code>qemu-system-x86_64</code> の名前の頭 15 文字）という独立したプロセスで、親（PPID）は <code>libvirtd</code> ではなく PID 1 だった。
+libvirt は QEMU を起動したあと、自分の子として抱えず切り離している。<code>pkill -x libvirtd</code> でデーモンを止めても、QEMU（PID 520）はそのまま動き続けた。
+次の <code>virsh list</code> で新しい <code>libvirtd</code>（PID 544）が自動で起き、まだ動いている QEMU を見つけてつなぎ直し、<code>running</code> と答えた。
+<b>仮想マシンを動かしているのは QEMU のプロセスで、libvirt はその起動と操作を代わりにしている係</b>である。
+<code>virsh qemu-monitor-command</code> は、libvirt が持っている QEMU のモニタに命令を素通しする。HMP の <code>info status</code> も、QMP の <code>query-status</code> も、第2章と同じ答えが返った。
+QMP の返事の <code>"id":"libvirt-451"</code> は、libvirt が自分の命令に付けている通し番号で、電源を入れてからここまでに、libvirt はこの QEMU に 450 回ほど QMP で話しかけていた。</div></div>
+<p>その QEMU に、libvirt は何を渡したのか。動いているプロセスの引数は <code>/proc/PID/cmdline</code> にあり、引数の区切りが 0 のバイトなので、改行に変えて読む。</p>
+<pre data-where="外（lab@host）"><code>$ tr '\0' '\n' &lt; /proc/$(pidof qemu-system-x86_64)/cmdline
+/usr/bin/qemu-system-x86_64
+-name
+guest=linuc,debug-threads=on
+-S
+-object
+{"qom-type":"secret","id":"masterKey0","format":"raw","file":"/home/lab/.config/libvirt/qemu/lib/domain-1-linuc/master-key.aes"}
+-blockdev
+{"driver":"file","filename":"/usr/share/OVMF/OVMF_CODE_4M.ms.fd","node-name":"libvirt-pflash0-storage","auto-read-only":true,"discard":"unmap"}
+-blockdev
+{"node-name":"libvirt-pflash0-format","read-only":true,"driver":"raw","file":"libvirt-pflash0-storage"}
+-blockdev
+{"driver":"file","filename":"/home/lab/vm/linuc_VARS.fd","node-name":"libvirt-pflash1-storage","auto-read-only":true,"discard":"unmap"}
+-blockdev
+{"node-name":"libvirt-pflash1-format","read-only":false,"driver":"raw","file":"libvirt-pflash1-storage"}
+-machine
+pc-q35-noble,usb=off,smm=on,dump-guest-core=off,memory-backend=pc.ram,pflash0=libvirt-pflash0-format,pflash1=libvirt-pflash1-format,acpi=on
+-accel
+tcg
+-cpu
+max
+-global
+driver=cfi.pflash01,property=secure,value=on
+-m
+size=1572864k
+-object
+{"qom-type":"memory-backend-ram","id":"pc.ram","size":1610612736}
+-overcommit
+mem-lock=off
+-smp
+2,sockets=2,cores=1,threads=1
+-uuid
+e9bd67f3-c662-4925-989c-712e76349459
+-display
+none
+-no-user-config
+-nodefaults
+-chardev
+socket,id=charmonitor,fd=24,server=on,wait=off
+-mon
+chardev=charmonitor,id=monitor,mode=control
+-rtc
+base=utc
+-no-shutdown
+-boot
+strict=on
+（略）
+-blockdev
+{"driver":"file","filename":"/var/lib/lab-vm/linuc-guest.qcow2","node-name":"libvirt-2-storage","auto-read-only":true,"discard":"unmap"}
+-blockdev
+{"node-name":"libvirt-2-format","read-only":true,"discard":"unmap","driver":"qcow2","file":"libvirt-2-storage","backing":null}
+-blockdev
+{"driver":"file","filename":"/home/lab/vm/linuc.qcow2","node-name":"libvirt-1-storage","auto-read-only":true,"discard":"unmap"}
+-blockdev
+{"node-name":"libvirt-1-format","read-only":false,"discard":"unmap","driver":"qcow2","file":"libvirt-1-storage","backing":"libvirt-2-format"}
+-device
+{"driver":"virtio-blk-pci","bus":"pci.3","addr":"0x0","drive":"libvirt-1-format","id":"virtio-disk0","bootindex":1}
+-chardev
+pty,id=charserial0
+-device
+{"driver":"isa-serial","chardev":"charserial0","id":"serial0","index":0}
+（略）
+-netdev
+user,id=lab0,hostfwd=tcp:127.0.0.1:2222-:22
+-device
+virtio-net-pci,netdev=lab0,mac=52:54:00:12:34:56,addr=0x10
+-sandbox
+on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny
+-msg
+timestamp=on
+$ tr '\0' '\n' &lt; /proc/$(pidof qemu-system-x86_64)/cmdline | tail -n +2 | wc -l
+98
+$ tr '\0' '\n' &lt; /proc/$(pidof qemu-system-x86_64)/cmdline | grep -c '^-'
+51</code></pre>
+<p class="detail"><code>-uuid</code> の値と <code>fd=</code> の数字は毎回違う。（略）としたところには、PCI Express の差し込み口（<code>pcie-root-port</code>）・USB・ゲストエージェントの通り道・メモリの風船（balloon）・乱数の部品が並ぶ。</p>
+<p>プログラムの名前を除いた引数は 98 個で、そのうち <code>-</code> で始まるオプションは 51 個だった。XML の1行が、引数の何個かに置き換わっている。この記事の各章で、自分で書いた指定と並べる。</p>
+<div class="scroll"><table>
+<tr><th>定義（XML）</th><th>libvirt が組み立てた引数</th><th>この記事で自分で書いた形</th><th>章</th></tr>
+<tr><td>（libvirt が足す）</td><td><code>-nodefaults</code> <code>-no-user-config</code> <code>-display none</code></td><td>（既定の部品を断らなかった。第1章のフロッピーや CD は、libvirt の練習機には無い）</td><td>1</td></tr>
+<tr><td><code>machine='q35'</code></td><td><code>-machine pc-q35-noble,…</code></td><td><code>-machine q35</code>（この QEMU では <code>pc-q35-8.2</code> になる。libvirt は q35 を <code>pc-q35-noble</code> と読み替えた）</td><td>1・5</td></tr>
+<tr><td><code>&lt;cpu mode='maximum'/&gt;</code></td><td><code>-cpu max</code></td><td>（既定の <code>qemu64</code> のまま）</td><td>1・4</td></tr>
+<tr><td><code>type='qemu'</code></td><td><code>-accel tcg</code></td><td>（既定で TCG）</td><td>4</td></tr>
+<tr><td><code>&lt;memory&gt;1536</code> <code>&lt;vcpu&gt;2</code></td><td><code>-m size=1572864k</code> <code>-smp 2,…</code></td><td><code>-m 1536</code> <code>-smp 2</code></td><td>3</td></tr>
+<tr><td>（libvirt が足す）</td><td><code>-chardev socket,id=charmonitor,…</code> と <code>-mon …,mode=control</code></td><td><code>-qmp unix:qmp.sock,server=on,wait=off</code>（mode=control が QMP）</td><td>2</td></tr>
+<tr><td><code>&lt;serial type='pty'/&gt;</code></td><td><code>-chardev pty,id=charserial0</code> と <code>-device isa-serial,…</code></td><td><code>-serial mon:stdio</code> / <code>-serial file:serial.log</code>（行き先が pty になっただけ）</td><td>2</td></tr>
+<tr><td><code>&lt;disk&gt;</code>（qcow2・<code>linuc.qcow2</code>）</td><td>土台と差分の <code>-blockdev</code>（差分の <code>"backing"</code> が土台）と <code>-device virtio-blk-pci</code></td><td><code>qemu-img create -b … -F qcow2</code> と <code>-drive file=linuc.qcow2,if=virtio</code></td><td>3</td></tr>
+<tr><td><code>firmware='efi'</code> と <code>&lt;nvram&gt;</code></td><td><code>OVMF_CODE_4M.ms.fd</code>（読むだけ）と <code>linuc_VARS.fd</code> の2つの <code>-blockdev</code>、<code>pflash0</code>・<code>pflash1</code></td><td><code>-drive if=pflash,…,readonly=on,file=…OVMF_CODE_4M.fd</code> と <code>-drive if=pflash,…,file=vars.fd</code></td><td>6</td></tr>
+<tr><td><code>&lt;qemu:commandline&gt;</code></td><td><code>-netdev user,id=lab0,hostfwd=…</code> と <code>-device virtio-net-pci,…,addr=0x10</code>（そのまま）</td><td>同じもの</td><td>5</td></tr>
+</table></div>
+<p>違いもある。libvirt は <code>-S</code>（CPU を止めたまま起動する）で QEMU を起動し、準備がすべて済んでから QMP で動かし始める。
+<code>-no-shutdown</code> は、練習機が電源を切っても QEMU のプロセスを終わらせずに残し、libvirt が後始末をする。
+UEFI は Secure Boot 用の組（プログラムの <code>OVMF_CODE_4M.ms.fd</code> と、Microsoft の鍵を入れた NVRAM のひな形 <code>OVMF_VARS_4M.ms.fd</code>）を選び、ディスクは土台まで自分で開いて読み取り専用にしている。
+どれも QEMU の引数で、libvirt にしかできないことではない。</p>
+<div class="analogy"><b>たとえ</b>: libvirt は、劇場の<b>舞台監督</b>に近い。台本（XML）を読んで役者（QEMU）に出番の段取り（引数）を渡し、本番中はインカム（QMP）で指示を出す。
+<br>ただし<b>崩れる点</b>: 舞台監督がいなくなっても劇は続く。役者は自分で演じていて、監督は指示を出していただけだからである。
+新しい監督が来れば、いま演じている役者のインカムに入り直す（<code>virsh list</code> の後の新しい <code>libvirtd</code>）。</div>
+
+<h2 id="site">止めて、片付ける</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>virsh destroy</code> と <code>undefine</code> が何を消すか。</div>
+<pre data-where="外（lab@host）"><code>$ virsh destroy linuc
+Domain 'linuc' destroyed
+$ virsh undefine --nvram linuc
+Domain 'linuc' has been undefined
+$ rm ~/vm/linuc.qcow2 ~/vm/linuc.xml</code></pre>
+<p><code>virsh destroy</code> は QEMU のプロセスを終わらせる（第2章の <code>quit</code> と同じく、電源を抜く）。<code>virsh undefine --nvram</code> は定義と、libvirt が作った NVRAM のファイル（<code>linuc_VARS.fd</code>）を消す。
+差分ディスクと XML は自分で作ったので、自分で消す。このサイトの仮想マシン型の檻の <code>vm reset --yes</code> も、同じものを消して作り直している。</p>
+<div class="analogy"><b>たとえ</b>: <code>virsh destroy</code> は<b>電源コードを抜く</b>こと、<code>virsh undefine</code> は<b>備品の台帳から名前を消す</b>ことに近い。
+<br>ただし<b>崩れる点</b>: 台帳から名前を消しても、倉庫の中身（差分ディスク）は残る。libvirt が消すのは自分が作ったもの（定義と、<code>--nvram</code> を付けたときの NVRAM のファイル）だけで、
+ディスクは libvirt の持ち物ではなく、QEMU に渡したただのファイルだからである。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/qemu/practice/">演習05</a>と<a href="/qemu/practice/">演習06</a>で組んだ QEMU の引数を、この章の libvirt の引数と並べてみてほしい。
+演習05 の判定は、127.0.0.1:2222 で待っている QEMU の引数に <code>-name guest=linuc</code>（libvirt が付ける印）があると、「自分の qemu-system-x86_64 で起動していない」と言う。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>ps</code> で、<code>qemu-system-x86</code> の親（PPID）が 1 だった。ここから、libvirt と QEMU の関係について何が言えるか。</p>
+<details><summary>答え</summary>
+<p>QEMU は libvirtd の子として動いているのではなく、独立したプロセスとして切り離されている。だから libvirtd を止めても QEMU は止まらない。
+libvirtd は QMP のソケットで QEMU に話しかける側で、起動し直せば動いている QEMU につなぎ直す（<code>virsh list</code> で確かめた）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>libvirt の定義に <code>&lt;serial type='pty'/&gt;</code> と書くと、QEMU の引数に何が現れるか。それは第2章のどの指定と同じ仕組みか。</p>
+<details><summary>答え</summary>
+<p><code>-chardev pty,id=charserial0</code> と <code>-device isa-serial,…,"chardev":"charserial0"</code>。シリアルポートの行き先（キャラクタデバイス）を疑似端末（pty）にしたもので、
+第2章の <code>-serial mon:stdio</code>（行き先を端末に）や <code>-serial file:</code>（行き先をファイルに）と同じく、線の先を付け替えているだけである。<code>virsh console</code> は、この pty にあなたの端末をつなぐ。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>このサイトの仮想マシン型の檻の定義では、NIC だけが <code>&lt;qemu:commandline&gt;</code> に書かれていた。そこに書くと、何が違うか。</p>
+<details><summary>答え</summary>
+<p>libvirt はその引数を読み解かず、QEMU のコマンド行の終わりのほう（<code>-sandbox</code> と <code>-msg</code> の手前）に、書いたとおりに並べる（引数の一覧で、XML に書いたとおりの <code>-netdev</code> と <code>-device</code> がそこにあった）。
+XML でポート転送を書けるのは passt を選んだときだけで、passt は docker の中で起動できないので、第5章と同じ QEMU のユーザモードネットワークを、hostfwd ごと QEMU の書き方のまま渡している。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>virsh qemu-monitor-command linuc '{"execute":"query-status"}'</code> の返事に <code>"id":"libvirt-451"</code> が付いていた。これは何を表しているか。</p>
+<details><summary>答え</summary>
+<p>libvirt が QEMU に送った QMP の命令の通し番号。libvirt は電源を入れるとき（<code>-S</code> で止めたまま起動し、準備をしてから動かす）や状態を見るたびに、QMP で QEMU に命令を送っている。
+<code>virsh</code> の操作の多くは、QMP の命令に置き換えられて QEMU に届く。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと — 7章を貫いていたもの</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4>
+<p><b>仮想マシンは、QEMU という1つのプロセスである。CPU もディスクも NIC もシリアルポートも、そのプロセスの中のソフトウェアが演じていて、何を演じるかは起動のときのコマンド行が決める（動いている間も、QMP で部品を足せる）。libvirt も、そのコマンド行を組み立てているだけだ。</b></p>
+<ul>
+<li>何も渡さなくても、既定の部品で PC が1台組み上がった（第1章）。libvirt は <code>-nodefaults</code> で既定を断り、要る部品を全部自分で書く</li>
+<li>シリアルポートの先は、QEMU のプロセスの標準入出力・ファイル・ソケット・pty のどれか（第2章）。libvirt は pty につなぎ、<code>virsh console</code> がそこに端末をつなぐ</li>
+<li>ディスクは QEMU が開くファイルで、qcow2 は書いたところだけを持ち、土台を重ねる（第3章）。libvirt も土台と差分の2つを開いている</li>
+<li>CPU は QEMU が命令を翻訳して動かしている（第4章）。<code>type='qemu'</code> は <code>-accel tcg</code></li>
+<li>ネットワークも QEMU の中で演じられ、ssh の入口で待つのは QEMU（第5章）。libvirt の定義にも同じ指定がそのまま入っている</li>
+<li>ファームウェアも QEMU が読むファイルで、NVRAM はファイルとして書き換わる（第6章）</li>
+<li>libvirt は QEMU を起動し、QMP で話しかけ続ける係で、いなくなっても仮想マシンは止まらない（この章）</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:qemu-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / QEMU 8.2.2（Debian 1:8.2.2+ds-0ubuntu1.18、KVM なし・TCG）/ libvirt 10.0.0（session モード）/ OVMF 2024.02-2ubuntu0.9 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/qemu/theory/06-firmware">← 前: 6. ファームウェアは、差し替えられるファイル</a><a href="/qemu/practice/">実践編へ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/qemu/chapters.js"></script>
+<script src="/qemu/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

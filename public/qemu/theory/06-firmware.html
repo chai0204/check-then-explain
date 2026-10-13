@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6. ファームウェアは、差し替えられるファイル — 確かめて説明する QEMU</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="6" data-theme="qemu">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <a href="/qemu/theory/">理論編</a> › 第6章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/">詳しく</a></p>
+</div>
+<h1>6. ファームウェアは、差し替えられるファイル</h1>
+<p class="lead">このサイトの練習機は、UEFI で起動するように作ってある。ところが第3章からずっと、QEMU の既定の BIOS（SeaBIOS）で起動していた。
+ディスクに BIOS 用の入口と UEFI 用の入口が両方あるからだ。PC の最初のプログラム（ファームウェア）は、QEMU にとってはファイルの1つで、差し替えれば UEFI（OVMF）で起動する。
+UEFI には2つのファイルが要る。読むだけのプログラムと、設定を書き込む NVRAM で、NVRAM は練習機の最初の起動で書き換わり、次の起動の道を変える。</p>
+<div class="badges"><span>前提: 第5章までを同じ端末で終えている（<code>~/work/linuc.qcow2</code> がある）</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>練習機が BIOS と UEFI のどちらで起動したかを、<code>/sys/firmware/efi</code> で見分けられる</li>
+<li>1つのディスクが BIOS でも UEFI でも起動できる理由を、区画（BIOS boot・EFI System）の一覧で説明できる</li>
+<li><code>-drive if=pflash</code> で OVMF の2つのファイル（プログラムと NVRAM）を渡して UEFI で起動し、NVRAM のファイルが書き換わることを <code>cmp</code> と <code>efibootmgr</code> で示せる</li>
+<li>UEFI が ESP の中のファイルを読んで起動すること、ESP の無いディスクでは起動できないことを示せる</li>
+<li>NVRAM を raw で渡すと <code>savevm</code> が断られる理由を言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: UEFI のブートの項目の書式（<code>HD(15,GPT,…)</code> の読み方）、shim と GRUB の分担、Secure Boot の鍵、
+<code>efibootmgr</code> での項目の作り方・並べ替え、BIOS の MBR の中身。</div></div>
+
+<h2 id="bios">UEFI 用の練習機は、BIOS でも起動していた</h2>
+<div class="sgoal"><b>この節で分かること</b>: いまの練習機が、どちらのファームウェアで起動しているか。そう見分ける方法。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>このサイトの練習機は UEFI で起動するように作った（libvirt の定義は UEFI のファームウェアを使う）。だから BIOS では起動しないし、
+これまでの章で起動できていた練習機も、どこかで UEFI が使われていたはずだ。</p>
+<p>第5章と同じ形で起動し、ssh で練習機の中を見る。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 -drive file=linuc.qcow2,if=virtio -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 -device virtio-net-pci,netdev=n0,addr=0x10 -display none -serial file:serial.log -qmp unix:qmp.sock,server=on,wait=off -daemonize
+$ until ssh -o ConnectTimeout=3 linuc true 2&gt;/dev/null; do sleep 3; done
+$ ssh linuc ls /sys/firmware/efi
+ls: cannot access '/sys/firmware/efi': No such file or directory
+$ ssh linuc lsblk -o NAME,SIZE,PARTTYPENAME /dev/vda
+NAME     SIZE PARTTYPENAME
+vda       20G
+├─vda1    19G Linux filesystem
+├─vda14    4M BIOS boot
+├─vda15  106M EFI System
+└─vda16  913M Linux extended boot
+$ ssh linuc findmnt /boot/efi
+TARGET    SOURCE     FSTYPE OPTIONS
+/boot/efi /dev/vda15 vfat   rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro
+$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"system_powerdown"}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"timestamp": {"seconds": 1791914283, "microseconds": 382378}, "event": "POWERDOWN"}
+{"return": {}}
+$ while pgrep -x qemu-system-x86 &gt; /dev/null; do sleep 1; done</code></pre>
+<div class="then"><b>だめな理由</b>: UEFI で起動した Linux には <code>/sys/firmware/efi</code> がある（ファームウェアが UEFI だと、カーネルがここに UEFI の情報を出す）。それが無い。
+<b>この練習機は、第3章からずっと BIOS（SeaBIOS）で起動していた</b>。QEMU は、ファームウェアを指定しなければ SeaBIOS を使う（第1章）。
+それでも起動できたのは、ディスクが<b>2つの入口</b>を持っているからである。区画の一覧に、BIOS 用の GRUB の続きが入る <code>BIOS boot</code>（vda14）と、
+UEFI が使う <code>EFI System</code>（vda15。ESP。UEFI が読む起動のファイルが入る FAT の区画）が並んでいる。BIOS が読むのはディスクの先頭（MBR）だけで、そこに書いてある GRUB の入口が、続きを <code>BIOS boot</code> から読む。
+BIOS はディスクの先頭から、UEFI は ESP から入り、入口の GRUB はそれぞれ別のものだが、どちらも同じ GRUB の設定（<code>/boot/grub/grub.cfg</code>）を読んで、同じカーネルを起動する。ESP は BIOS で起動しているいまも <code>/boot/efi</code> にマウントされているが、BIOS はそれを読まない。</div></div>
+<div class="analogy"><b>たとえ</b>: 練習機のディスクは、<b>表玄関と勝手口の両方がある家</b>に近い。BIOS は勝手口（ディスクの先頭と BIOS boot）から、UEFI は表玄関（ESP）から入り、奥の部屋（GRUB の設定とカーネル）は同じ。
+<br>ただし<b>崩れる点</b>: 家ならどちらの扉から入ったか住人には分からないが、練習機の Linux には分かる（<code>/sys/firmware/efi</code> の有無）。
+そして入ったファームウェアによって、OS が使える機能が変わる（UEFI の変数を読み書きする <code>efibootmgr</code> は、BIOS で起動したときは使えない）。</div>
+
+<h2 id="ovmf">UEFI で起動する: 2つのファイル</h2>
+<div class="sgoal"><b>この節で分かること</b>: OVMF に渡す2つのファイルの役割。UEFI が何を読んで起動するか。NVRAM が書き換わること。</div>
+<p>UEFI のファームウェアは、OVMF（仮想マシン用の UEFI）として入っている。渡すのは2つのファイルである。</p>
+<ul>
+<li><code>/usr/share/OVMF/OVMF_CODE_4M.fd</code> … UEFI のプログラム。読むだけ（<code>readonly=on</code>）</li>
+<li><code>/usr/share/OVMF/OVMF_VARS_4M.fd</code> … NVRAM（UEFI がブートの項目などの設定を書き込む場所）の<b>ひな形</b>。書き換わるので、自分の写しを作って渡す</li>
+</ul>
+<p>どちらも、仮想の PC のフラッシュメモリ（<code>if=pflash</code>）としてつなぐ。実機のマザーボードで、ファームウェアと設定が載っている部品に当たる。</p>
+<pre data-where="外（lab@host）"><code>$ cp /usr/share/OVMF/OVMF_VARS_4M.fd vars.fd
+$ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd -drive if=pflash,format=raw,file=vars.fd -drive file=linuc.qcow2,if=virtio -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 -device virtio-net-pci,netdev=n0,addr=0x10 -display none -serial file:serial.log -qmp unix:qmp.sock,server=on,wait=off -daemonize
+$ until ssh -o ConnectTimeout=3 linuc true 2&gt;/dev/null; do sleep 3; done
+$ grep -a -o 'BdsDxe: .*' serial.log | tr -d '\r'
+BdsDxe: loading Boot0001 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x2,0x0)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x2,0x0)
+$ ssh linuc ls /sys/firmware/efi
+config_table
+efivars
+fw_platform_size
+fw_vendor
+mok-variables
+runtime
+runtime-map
+systab</code></pre>
+<p>シリアルの記録から、UEFI のブートの係（BdsDxe）の行だけを抜き出した（シリアルの行は <code>\r\n</code> で終わるので、<code>tr -d '\r'</code> で <code>\r</code> を落としてから端末に出す）。
+UEFI は、NVRAM のブートの項目 <code>Boot0001</code>（「UEFI Misc Device」、PCI の 0x2 に差さったディスク）から起動した。
+今度は <code>/sys/firmware/efi</code> がある。同じディスク、同じカーネルでも、入ってきたファームウェアが違う。</p>
+<p>NVRAM の中身を、練習機の中から読む。<code>efibootmgr</code> は UEFI の変数（ブートの項目と順番）を読み書きする道具で、UEFI で起動したときだけ使える。</p>
+<pre data-where="外（lab@host）"><code>$ ssh linuc efibootmgr
+BootCurrent: 0001
+Timeout: 0 seconds
+BootOrder: 0007,0000,0001,0002,0003,0004,0005,0006
+Boot0000* UiApp FvVol(7cb8bdc9-f8eb-4f34-aaea-3ee4af6516a1)/FvFile(462caa21-7614-4503-836e-8ab6f4662331)
+Boot0001* UEFI Misc Device      PciRoot(0x0)/Pci(0x2,0x0){auto_created_boot_option}
+Boot0002* UEFI PXEv4 (MAC:525400123456) PciRoot(0x0)/Pci(0x10,0x0)/MAC(525400123456,1)/IPv4(0.0.0.00.0.0.0,0,0){auto_created_boot_option}
+Boot0003* UEFI PXEv6 (MAC:525400123456) PciRoot(0x0)/Pci(0x10,0x0)/MAC(525400123456,1)/IPv6([::]:&lt;-&gt;[::]:,0,0){auto_created_boot_option}
+Boot0004* UEFI HTTPv4 (MAC:525400123456)        PciRoot(0x0)/Pci(0x10,0x0)/MAC(525400123456,1)/IPv4(0.0.0.00.0.0.0,0,0)/Uri(){auto_created_boot_option}
+Boot0005* UEFI HTTPv6 (MAC:525400123456)        PciRoot(0x0)/Pci(0x10,0x0)/MAC(525400123456,1)/IPv6([::]:&lt;-&gt;[::]:,0,0)/Uri(){auto_created_boot_option}
+Boot0006* EFI Internal Shell    FvVol(7cb8bdc9-f8eb-4f34-aaea-3ee4af6516a1)/FvFile(7c04a583-9e3e-4f1c-ad65-e05268d0b4d1)
+Boot0007* Ubuntu        HD(15,GPT,9606bc98-2904-4577-9584-a8310313a04c,0x2800,0x35000)/File(\EFI\ubuntu\shimx64.efi)
+$ ssh linuc sudo ls /boot/efi/EFI/BOOT
+BOOTX64.EFI
+fbx64.efi
+mmx64.efi</code></pre>
+<p><code>BootCurrent: 0001</code> は、いまの起動が Boot0001 から来たこと。一覧の項目の多くは OVMF が自分で作ったもの（<code>auto_created_boot_option</code>）で、
+ディスク（0001）、NIC からのネットワーク起動（0002〜0005。第1章の iPXE に当たる UEFI の仕組み）、UEFI のシェル（0006）が並ぶ。
+ところが <b><code>Boot0007* Ubuntu</code> は、まっさらな NVRAM のひな形には無かった項目</b>で、しかも並び順（<code>BootOrder</code>）の先頭にいる。</p>
+<p>UEFI は、NVRAM に項目の無いディスクでは、ESP の決まった場所 <code>\EFI\BOOT\BOOTX64.EFI</code> を読む（Boot0001 の「UEFI Misc Device」はそれ）。
+練習機の ESP のそこには、Ubuntu の起動の入口（shim）が置かれている（<code>/boot/efi</code> は root しか読めない設定なので <code>sudo</code> で見た）。
+その shim が、隣の <code>fbx64.efi</code>（fallback）を使って ESP の <code>\EFI\ubuntu\</code> を調べ、「Ubuntu」という項目を NVRAM に書き込んだのが Boot0007 である。
+練習機の最初の UEFI の起動で、<b>NVRAM が書き換わった</b>。書き換わった先は、渡した <code>vars.fd</code> というファイルのはずである。</p>
+<pre data-where="外（lab@host）"><code>$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"human-monitor-command","arguments":{"command-line":"savevm s1"}}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"return": "Error: Device 'pflash1' is writable but does not support snapshots\r\n"}
+$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"system_powerdown"}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"timestamp": {"seconds": 1791914326, "microseconds": 235850}, "event": "POWERDOWN"}
+{"return": {}}
+$ while pgrep -x qemu-system-x86 &gt; /dev/null; do sleep 1; done
+$ cmp vars.fd /usr/share/OVMF/OVMF_VARS_4M.fd
+vars.fd /usr/share/OVMF/OVMF_VARS_4M.fd differ: byte 101, line 1</code></pre>
+<p>止める前に、第3章の <code>savevm</code> を試した（QMP の <code>human-monitor-command</code> は、HMP の命令をそのまま QMP で送る入れ物）。
+<b>断られた</b>。<code>pflash1</code>（2つ目のフラッシュ、つまり <code>vars.fd</code>）が「書き込めるのに、スナップショットに対応していない」。
+<code>savevm</code> は、書き込める部品の中身を全部いっしょに保存できないと、保存しない。NVRAM は、練習機が書き込むディスクの1つとして数えられていて、raw のファイルでは中にスナップショットをしまえない。
+NVRAM を qcow2 にして渡せば（<code>qemu-img convert -O qcow2 vars.fd vars.qcow2</code> で写し、<code>format=qcow2</code> でつなぐ）、<code>savevm</code> は通る（著者は試して通ることを確かめた）。
+ただし、動いている状態（メモリの中身）は、書き込める qcow2 のうち1つにだけ入り、このときは <code>vars.qcow2</code> のほうに入った。練習機のディスクの側には、<code>VM SIZE</code> が 0 B のスナップショットの印だけが残る（著者の記録で、<code>vars.qcow2</code> の側が 398MiB、ディスクの側が 0 B）。</p>
+<p>止めた後、<code>vars.fd</code> をひな形と比べると、101 バイト目から違っていた。練習機の起動が、このファイルを書き換えたのである。</p>
+<div class="analogy"><b>たとえ</b>: OVMF の2つのファイルは、<b>電話交換機と電話帳</b>に近い。交換機（プログラム）は誰の家でも同じなので共有し、電話帳（NVRAM）は家ごとに書き込まれるので、家ごとに1冊持つ。
+<br>ただし<b>崩れる点</b>: 電話帳は人が自分で書くが、NVRAM はファームウェアや OS（shim や GRUB を入れる道具）が勝手に書き込む。読者は何もしていないのに、最初の起動で中身が変わった。
+そして電話帳は紙なので写せば済むが、NVRAM はディスクと同じ扱いで、raw のままでは <code>savevm</code> を止める。</div>
+
+<h2 id="nvram">書き換わった NVRAM が、次の起動の道を変える</h2>
+<div class="sgoal"><b>この節で分かること</b>: NVRAM のファイルを持ち越すと、次の起動がどう変わるか。</div>
+<p>同じ <code>vars.fd</code> で、もう一度起動する。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd -drive if=pflash,format=raw,file=vars.fd -drive file=linuc.qcow2,if=virtio -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 -device virtio-net-pci,netdev=n0,addr=0x10 -display none -serial file:serial.log -qmp unix:qmp.sock,server=on,wait=off -daemonize
+$ until ssh -o ConnectTimeout=3 linuc true 2&gt;/dev/null; do sleep 3; done
+$ grep -a -o 'BdsDxe: .*' serial.log | tr -d '\r'
+BdsDxe: loading Boot0007 "Ubuntu" from HD(15,GPT,9606BC98-2904-4577-9584-A8310313A04C,0x2800,0x35000)/\EFI\ubuntu\shimx64.efi
+BdsDxe: starting Boot0007 "Ubuntu" from HD(15,GPT,9606BC98-2904-4577-9584-A8310313A04C,0x2800,0x35000)/\EFI\ubuntu\shimx64.efi
+$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"system_powerdown"}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"timestamp": {"seconds": 1791914363, "microseconds": 268751}, "event": "POWERDOWN"}
+{"return": {}}
+$ while pgrep -x qemu-system-x86 &gt; /dev/null; do sleep 1; done</code></pre>
+<p>今度の起動は Boot0007「Ubuntu」から始まり、ESP（GPT の 15 番目の区画）の <code>\EFI\ubuntu\shimx64.efi</code> を読んだ。前の起動が NVRAM に書いた項目が、並び順の先頭にあったからである。
+<b>ファームウェアの「設定」は、ディスクの中ではなく、<code>vars.fd</code> という別のファイルにある</b>。このファイルを捨てて新しいひな形で起動すれば、また Boot0001 からやり直しになる。
+このサイトの仮想マシン型の檻では、このファイルが <code>~/vm/linuc_VARS.fd</code> にあり、ボリュームに置かれて持ち越され、<code>vm reset --yes</code> で消される（第7章で、libvirt がこのファイルを渡している引数を読む）。</p>
+
+<h2 id="esp">ESP の無いディスクを、UEFI に渡す</h2>
+<div class="sgoal"><b>この節で分かること</b>: UEFI がディスクから起動するのに、何が要るか。</div>
+<p>最後に、何も書いていない 1GiB のディスクを UEFI に渡し、20 秒だけ動かす。NIC は付けない（<code>-nic none</code>。付けるとネットワーク起動を長く試す）。NVRAM も新しいひな形の写しにする。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-img create -f qcow2 blank.qcow2 1G
+Formatting 'blank.qcow2', fmt=qcow2 cluster_size=65536 extended_l2=off compression_type=zlib size=1073741824 lazy_refcounts=off refcount_bits=16
+$ cp /usr/share/OVMF/OVMF_VARS_4M.fd blank-vars.fd
+$ timeout 20 qemu-system-x86_64 -machine q35 -nic none -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd -drive if=pflash,format=raw,file=blank-vars.fd -drive file=blank.qcow2,if=virtio -display none -serial file:blank.log
+qemu-system-x86_64: terminating on signal 15 from pid 467 (timeout)
+$ grep -a -E 'BdsDxe|Shell' blank.log | tr -d '\r'
+BdsDxe: failed to load Boot0001 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x2,0x0): Not Found
+BdsDxe: loading Boot0002 "EFI Internal Shell" from Fv(7CB8BDC9-F8EB-4F34-AAEA-3EE4AF6516A1)/FvFile(7C04A583-9E3E-4F1C-AD65-E05268D0B4D1)
+BdsDxe: starting Boot0002 "EFI Internal Shell" from Fv(7CB8BDC9-F8EB-4F34-AAEA-3EE4AF6516A1)/FvFile(7C04A583-9E3E-4F1C-AD65-E05268D0B4D1)
+UEFI Interactive Shell v2.2
+Shell&gt;
+$ rm blank.qcow2 blank-vars.fd blank.log</code></pre>
+<p class="detail"><code>pid 467</code> の数字は毎回違う。</p>
+<p>UEFI はディスク（Boot0001）を試し、<code>Not Found</code>（起動するファイルが見つからない）で次へ進み、UEFI 自身のシェル（<code>Shell&gt;</code>）を起動して止まった。
+空のディスクには区画も ESP も無いので、<code>\EFI\BOOT\BOOTX64.EFI</code> が読めない。<b>UEFI はディスクの先頭のプログラムを実行するのではなく、ESP（FAT）の中のファイルを読む</b>。
+第1章の SeaBIOS が空のディスクで「Boot failed: could not read the boot disk」と言ったのと、探しているものが違う。最後の <code>rm</code> は片付けである。</p>
+<div class="scroll"><table>
+<tr><th></th><th>SeaBIOS（BIOS）</th><th>OVMF（UEFI）</th></tr>
+<tr><td>QEMU への渡し方</td><td>何も指定しない（既定）</td><td><code>-drive if=pflash</code> でプログラムと NVRAM の2つ（<code>-bios OVMF.fd</code> なら NVRAM を持ち越さない1つ）</td></tr>
+<tr><td>ディスクの何を読むか</td><td>先頭（MBR）の起動のプログラム</td><td>ESP（FAT の区画）の中の .efi ファイル</td></tr>
+<tr><td>どこから起動するかの設定</td><td>既定の順（ハードディスク・フロッピー・CD・ネットワーク。QEMU の <code>-boot</code> で変えられる）</td><td>NVRAM のブートの項目と BootOrder（OS からも書き換えられる）</td></tr>
+<tr><td>Linux から見た印</td><td><code>/sys/firmware/efi</code> が無い</td><td><code>/sys/firmware/efi</code> がある。<code>efibootmgr</code> が使える</td></tr>
+<tr><td>練習機のディスク</td><td>vda14（BIOS boot）と MBR から入る</td><td>vda15（ESP）の shim から入る</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: UEFI は<b>郵便受けまでしか来ない配達員</b>に近い。家の中（ディスクの先頭）には入らず、郵便受け（ESP）にある決まった封筒（.efi ファイル）を取って帰る。
+<br>ただし<b>崩れる点</b>: 郵便受けは家に1つだが、ディスクに ESP がいくつあってもよく、どれのどのファイルを読むかは NVRAM の項目が指す。
+項目が無いときにだけ、決まった封筒（<code>\EFI\BOOT\BOOTX64.EFI</code>）を探す。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/qemu/practice/">演習06</a>は、自分の差分ディスクと自分の <code>vars.fd</code> で練習機を UEFI で起動する課題である。
+判定は、<code>vars.fd</code> を開いている QEMU を <code>/proc</code> で探し、ssh で入って <code>/sys/firmware/efi</code> と <code>efibootmgr</code> を見て、<code>vars.fd</code> に「Ubuntu」の項目が書き込まれたかを読む。</div>
+
+<div class="quiz"><b>確認</b>
+<p>練習機の中で <code>ls /sys/firmware/efi</code> が <code>No such file or directory</code> になった。それでも <code>/boot/efi</code> には ESP がマウントされている。どちらのファームウェアで起動したか。なぜ ESP があるのか。</p>
+<details><summary>答え</summary>
+<p>BIOS（QEMU なら既定の SeaBIOS）。<code>/sys/firmware/efi</code> は UEFI で起動したときだけ現れる。
+ESP は、同じディスクを UEFI でも起動できるように用意された区画で、BIOS で起動したときも OS は普通の FAT の区画としてマウントする。BIOS 自身は ESP を読まない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>OVMF の NVRAM に、ひな形 <code>/usr/share/OVMF/OVMF_VARS_4M.fd</code> を直接渡すとどうなるか。写しを作る理由は何か。</p>
+<details><summary>答え</summary>
+<p>この檻では、ひな形は root の持ち物で書き込めないので、QEMU が開けずに起動しない（Permission denied）。書き込めたとしても、ひな形そのものが書き換わり、次に別の仮想マシンが同じひな形から始めるときに、前の仮想マシンの項目が残る。
+NVRAM は仮想マシンごとの設定なので、仮想マシンごとに写しを持つ（libvirt も、仮想マシンごとに <code>_VARS.fd</code> を作る）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>UEFI の練習機で <code>savevm</code> を打ったら <code>Device 'pflash1' is writable but does not support snapshots</code> と断られた。何が足りないのか。</p>
+<details><summary>答え</summary>
+<p><code>savevm</code> は、書き込める部品の中身をすべて一緒に保存する。NVRAM（<code>pflash1</code>）も書き込める部品で、raw のファイルでは中に保存できない。
+NVRAM を qcow2 にして（<code>qemu-img convert -O qcow2</code>）<code>format=qcow2</code> で渡せば通る。ただし動いている状態は NVRAM の qcow2 のほうに入り、練習機のディスクの側は <code>VM SIZE</code> が 0 B に見える。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>同じ <code>vars.fd</code> で2回起動すると、1回目は <code>Boot0001 "UEFI Misc Device"</code>、2回目は <code>Boot0007 "Ubuntu"</code> から起動した。何が変わったのか。</p>
+<details><summary>答え</summary>
+<p><code>vars.fd</code>（NVRAM）の中身。1回目は、項目の無いディスクとして ESP の <code>\EFI\BOOT\BOOTX64.EFI</code>（shim）を読み、shim の fallback が「Ubuntu」の項目を NVRAM に書き込んで、並び順の先頭に置いた。
+2回目は、その項目に従って <code>\EFI\ubuntu\shimx64.efi</code> を読んだ。ディスクは同じでも、ファームウェアの設定のファイルが変わると、起動の道が変わる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>QEMU のファームウェアは差し替えられるファイル。既定は SeaBIOS（BIOS）で、UEFI にするには OVMF を渡す</li>
+<li>練習機のディスクは BIOS 用の入口（MBR と BIOS boot の区画）と UEFI 用の入口（ESP）の両方を持つので、どちらでも起動する。どちらで起動したかは <code>/sys/firmware/efi</code> で分かる</li>
+<li>OVMF は2つのファイルで渡す。プログラム（読むだけ）と NVRAM（書き換わる。仮想マシンごとに写しを持つ）</li>
+<li>UEFI は ESP の中の .efi ファイルを読む。NVRAM に項目が無ければ <code>\EFI\BOOT\BOOTX64.EFI</code> を探し、ESP が無ければ起動できない</li>
+<li>練習機の最初の UEFI の起動で、NVRAM のファイルに「Ubuntu」の項目が書き込まれ、次からはそれで起動する。NVRAM も書き込める部品なので、raw のままだと <code>savevm</code> を止める</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:qemu-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / QEMU 8.2.2（Debian 1:8.2.2+ds-0ubuntu1.18、KVM なし・TCG）/ SeaBIOS 1.16.3 / OVMF 2024.02-2ubuntu0.9（Secure Boot なしの OVMF_CODE_4M.fd）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/qemu/theory/05-network">← 前: 5. ネットワークも、QEMU のプロセスの中にある</a><a href="/qemu/theory/07-libvirt">次: 7. libvirt は、コマンド行を組み立てているだけ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/qemu/chapters.js"></script>
+<script src="/qemu/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

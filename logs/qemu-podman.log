@@ -1,0 +1,202 @@
+# QEMU の記事: 檻（lab-qemu:1.0.0）を docker と podman（rootless）で起動し、本文第5章・演習 05 の流れが同じに動くかを確かめた記録。2026-10-14
+# 中で打ったもの: probe/qemu-podman.sh。起動は入口ページと同じオプション（--hostname host とボリューム2つ。ボリュームは名前なし）で、
+# -d -t で起動して、cp で入れたスクリプトを exec で走らせた。podman へは docker save | ssh lab podman load で送った（同じイメージ）
+
+========== docker 29.8.0（root のデーモン）・NixOS 26.05 (Yarara) ==========
+
+
+========== 0. 環境 ==========
+
+$ lab env
+テーマ    : lab-qemu 1.0.0
+イメージ  : ghcr.io/chai0204/lab:qemu-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+QEMU      : QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+ファーム  : SeaBIOS 1.16.3-2 / OVMF 2024.02-2ubuntu0.9
+/dev/kvm  : なし（TCG で動く。本文と同じ条件）
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+$ id
+uid=1000(lab) gid=1000(lab) groups=1000(lab)
+
+$ grep -E "^(CapEff|CapBnd)" /proc/self/status
+CapEff:	0000000000000000
+CapBnd:	00000000a80425fb
+
+$ ls -l /dev/kvm
+ls: cannot access '/dev/kvm': No such file or directory
+
+
+========== 第5章・演習 05（q35 の 0x10 に NIC を差し、外の 127.0.0.1:2222 を練習機の 22 番へ） ==========
+
+$ lab start 05 > /dev/null; cd ~/work/05; pwd
+/home/lab/work/05
+
+$ qemu-img create -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 linuc.qcow2
+Formatting 'linuc.qcow2', fmt=qcow2 cluster_size=65536 extended_l2=off compression_type=zlib size=21474836480 backing_file=/var/lib/lab-vm/linuc-guest.qcow2 backing_fmt=qcow2 lazy_refcounts=off refcount_bits=16
+
+$ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 -drive file=linuc.qcow2,if=virtio -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 -device virtio-net-pci,netdev=n0,addr=0x10 -display none -serial file:serial.log -qmp unix:qmp.sock,server=on,wait=off -daemonize
+
+$ ss -tlnp
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+LISTEN 0      1          127.0.0.1:2222      0.0.0.0:*    users:(("qemu-system-x86",pid=86,fd=13))
+
+$ SECONDS=0; until ssh -o ConnectTimeout=3 linuc true 2>/dev/null; do sleep 3; done; echo "ssh まで: $SECONDS 秒"
+ssh まで: 33 秒
+
+$ ssh linuc ip -br a
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+enp0s16          UP             10.0.2.15/24 metric 100 fec0::5054:ff:fe12:3456/64 fe80::5054:ff:fe12:3456/64 
+
+$ ssh linuc 'echo $SSH_CONNECTION'
+10.0.2.2 55036 10.0.2.15 22
+
+$ lab check 05
+✔ 05 達成
+  判定 : 観測型（127.0.0.1:2222 の待ち受けを ss で探し、そのプロセスのディスクを /proc と qemu-img で見て、ssh で入った）
+  観測 : 127.0.0.1:2222 で待っている → qemu-system-x86（PID 86）
+         そのプロセスが開いているディスク → /home/lab/work/05/linuc.qcow2
+         ~/work/05/linuc.qcow2 の土台（backing file）→ /var/lib/lab-vm/linuc-guest.qcow2
+         ssh linuc → 入れた
+           練習機の NIC（ip -br -4 addr show enp0s16）→ enp0s16 UP 10.0.2.15/24 metric 100 
+           練習機から見た接続元 → 10.0.2.2
+         外の 127.0.0.1:2222 を待っているのは QEMU のプロセスで、届いた接続を練習機の 22 番へ渡している
+         → 練習機の NIC は enp0s16 という名前で見え、QEMU の中の DHCP から 10.0.2.15 をもらっている
+
+$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"query-status"}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"return": {"status": "running", "singlestep": false, "running": true}}
+
+$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"system_powerdown"}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"timestamp": {"seconds": 1791915402, "microseconds": 615393}, "event": "POWERDOWN"}
+{"return": {}}
+
+$ SECONDS=0; while pgrep -x qemu-system-x86 > /dev/null; do sleep 1; done; echo "止まるまで: $SECONDS 秒"
+止まるまで: 5 秒
+
+$ tail -1 serial.log
+[   32.711590] reboot: Power down
+
+
+========== 後片付けの確認 ==========
+
+$ pgrep -a qemu-system-x86; echo "pgrep の終了コード: $?"
+pgrep の終了コード: 1
+
+$ lab ls
+演習一覧
+  · 01  画面の無い PC を後ろで動かし、QMP で尋ねられるようにする 12分 / 影響度 B
+  · 02  土台を汚さずに、自分の練習機のディスクを作って起動する 12分 / 影響度 B
+  · 03  ログインした直後の練習機を、メモリごと保存する 12分 / 影響度 B
+  · 04  TCG が最初に翻訳した命令を、記録に残す 8分 / 影響度 B
+  ✔ 05  外から ssh で練習機に入れるようにする 15分 / 影響度 B
+  · 06  練習機を UEFI で起動し、ブートの項目を NVRAM のファイルに残す 15分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+
+========== podman 5.8.6（rootless・ユーザ lab）・NixOS 26.05 (Yarara) ==========
+
+
+========== 0. 環境 ==========
+
+$ lab env
+テーマ    : lab-qemu 1.0.0
+イメージ  : ghcr.io/chai0204/lab:qemu-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: podman
+QEMU      : QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+ファーム  : SeaBIOS 1.16.3-2 / OVMF 2024.02-2ubuntu0.9
+/dev/kvm  : なし（TCG で動く。本文と同じ条件）
+特権      : CapEff=0000000000000000 CapBnd=00000000800405fb
+
+$ id
+uid=1000(lab) gid=1000(lab) groups=1000(lab)
+
+$ grep -E "^(CapEff|CapBnd)" /proc/self/status
+CapEff:	0000000000000000
+CapBnd:	00000000800405fb
+
+$ ls -l /dev/kvm
+ls: cannot access '/dev/kvm': No such file or directory
+
+
+========== 第5章・演習 05（q35 の 0x10 に NIC を差し、外の 127.0.0.1:2222 を練習機の 22 番へ） ==========
+
+$ lab start 05 > /dev/null; cd ~/work/05; pwd
+/home/lab/work/05
+
+$ qemu-img create -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 linuc.qcow2
+Formatting 'linuc.qcow2', fmt=qcow2 cluster_size=65536 extended_l2=off compression_type=zlib size=21474836480 backing_file=/var/lib/lab-vm/linuc-guest.qcow2 backing_fmt=qcow2 lazy_refcounts=off refcount_bits=16
+
+$ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 -drive file=linuc.qcow2,if=virtio -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 -device virtio-net-pci,netdev=n0,addr=0x10 -display none -serial file:serial.log -qmp unix:qmp.sock,server=on,wait=off -daemonize
+
+$ ss -tlnp
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+LISTEN 0      1          127.0.0.1:2222      0.0.0.0:*    users:(("qemu-system-x86",pid=76,fd=13))
+
+$ SECONDS=0; until ssh -o ConnectTimeout=3 linuc true 2>/dev/null; do sleep 3; done; echo "ssh まで: $SECONDS 秒"
+ssh まで: 47 秒
+
+$ ssh linuc ip -br a
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+enp0s16          UP             10.0.2.15/24 metric 100 fec0::5054:ff:fe12:3456/64 fe80::5054:ff:fe12:3456/64 
+
+$ ssh linuc 'echo $SSH_CONNECTION'
+10.0.2.2 40124 10.0.2.15 22
+
+$ lab check 05
+✔ 05 達成
+  判定 : 観測型（127.0.0.1:2222 の待ち受けを ss で探し、そのプロセスのディスクを /proc と qemu-img で見て、ssh で入った）
+  観測 : 127.0.0.1:2222 で待っている → qemu-system-x86（PID 76）
+         そのプロセスが開いているディスク → /home/lab/work/05/linuc.qcow2
+         ~/work/05/linuc.qcow2 の土台（backing file）→ /var/lib/lab-vm/linuc-guest.qcow2
+         ssh linuc → 入れた
+           練習機の NIC（ip -br -4 addr show enp0s16）→ enp0s16 UP 10.0.2.15/24 metric 100 
+           練習機から見た接続元 → 10.0.2.2
+         外の 127.0.0.1:2222 を待っているのは QEMU のプロセスで、届いた接続を練習機の 22 番へ渡している
+         → 練習機の NIC は enp0s16 という名前で見え、QEMU の中の DHCP から 10.0.2.15 をもらっている
+
+$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"query-status"}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"return": {"status": "running", "singlestep": false, "running": true}}
+
+$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"system_powerdown"}' | socat - UNIX-CONNECT:qmp.sock
+{"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
+{"return": {}}
+{"timestamp": {"seconds": 1791915462, "microseconds": 860990}, "event": "POWERDOWN"}
+{"return": {}}
+
+$ SECONDS=0; while pgrep -x qemu-system-x86 > /dev/null; do sleep 1; done; echo "止まるまで: $SECONDS 秒"
+止まるまで: 5 秒
+
+$ tail -1 serial.log
+[   47.921310] reboot: Power down
+
+
+========== 後片付けの確認 ==========
+
+$ pgrep -a qemu-system-x86; echo "pgrep の終了コード: $?"
+pgrep の終了コード: 1
+
+$ lab ls
+演習一覧
+  · 01  画面の無い PC を後ろで動かし、QMP で尋ねられるようにする 12分 / 影響度 B
+  · 02  土台を汚さずに、自分の練習機のディスクを作って起動する 12分 / 影響度 B
+  · 03  ログインした直後の練習機を、メモリごと保存する 12分 / 影響度 B
+  · 04  TCG が最初に翻訳した命令を、記録に残す 8分 / 影響度 B
+  ✔ 05  外から ssh で練習機に入れるようにする 15分 / 影響度 B
+  · 06  練習機を UEFI で起動し、ブートの項目を NVRAM のファイルに残す 15分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
