@@ -228,7 +228,7 @@ userdel: kai mail spool (/var/mail/kai) not found</code></pre>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>useradd</code> は台帳（<code>/etc/passwd</code>・<code>/etc/shadow</code>・<code>/etc/group</code>）に行を書く。<code>-m</code> なしでホームを作るかは <code>/etc/login.defs</code> の <code>CREATE_HOME</code> で決まり、Ubuntu は作らない（RHEL 系は作る）。<code>-m</code> を付ければどちらでも作る</li><li>既定値は <code>/etc/default/useradd</code>（シェル・ひな形）と <code>/etc/login.defs</code>（UID の範囲・私的グループ・ホームの権限・ホームを作るか）から来る。確かめるのは <code>useradd -D</code></li><li><code>/etc/skel</code> はホームを作る瞬間にだけ写される。所有者は新しいユーザになる</li><li>作ったばかりのユーザはパスワードが無い（<code>/etc/shadow</code> の2列目が Ubuntu は <code>!</code>、RHEL 系は <code>!!</code>）</li><li><code>adduser</code> は Debian 系の窓口で、ホーム・シェル・パスワードまでまとめて面倒を見る。本体は <code>useradd</code></li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / adduser 3.137ubuntu1 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.1@sha256:12d7e892161ff0ae543d529fe9d4c1cf7becae8786918dedf08309735d5f5f4b / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / adduser 3.137ubuntu1 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-admin/theory/01-ledger">← 1. ユーザの台帳は3枚に分かれている</a><a href="/linuc-admin/theory/03-membership">次: 3. 所属は、書いたとおりに置き換わる →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
