@@ -134,7 +134,7 @@ RTC にシステムクロックを書き戻すのは別の操作（<code>hwclock
 あるいは <code>chrony.conf</code> の <code>rtcsync</code>）である。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>1台のマシンに時計は2つある。RTC は電池で動き続け、システムクロックはカーネルが持ち、電源で消える</li><li>システムクロックは起動時に RTC から値を受け取り、そのあとは別々に進む。書き戻す仕組みが働かなければずれる（この檻では32秒ずれていた）</li><li><code>hwclock</code> の失敗は「コマンドが無い」ではなく「<code>/dev/rtc*</code> が無い」。同じ RTC は <code>/proc/driver/rtc</code> から読めた</li><li>コンテナにデバイスを渡さないのは設計どおり。だからこの章の失敗は読者の操作ミスではない</li><li><code>System clock synchronized</code> はシステムクロックの話であって、RTC が合っているとは言っていない。しかもこの檻では、その判断もホストのカーネルの状態から来ている</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/">← 理論編 目次</a><a href="/linuc-services/theory/02-timezone">次: 2. タイムゾーンは表示の都合だけ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

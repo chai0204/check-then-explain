@@ -248,7 +248,7 @@ logrotate は条件を満たさなければ何もせずに帰る。来たこと�
 <code>.2.gz</code> 以降が圧縮される。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>書く側（rsyslog）と捨てる側（logrotate）は別のプログラムで、設定ファイルも別</li><li><code>logrotate</code> は設定ファイルが group/other に書けると<b>丸ごと無視</b>する。しかも終了コードは 0</li><li>ログの親ディレクトリが group 書き込み可だと、<code>su</code> ディレクティブが無い限り飛ばす（こちらは終了コード 1）</li><li><code>/etc/logrotate.d/&lt;名前&gt;</code> を直接渡すと <code>/etc/logrotate.conf</code> の既定（<code>su root adm</code> など）が効かない。渡すのは <code>logrotate.conf</code></li><li>前回切った時刻は <code>/var/lib/logrotate/status</code> にある。無視させるのは <code>-f</code></li><li>logrotate は常駐しない。<code>logrotate.timer</code>（<code>OnCalendar=daily</code> / <code>Persistent=true</code>）が呼ぶ</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動と、umask の違いで1つ目の拒否が起きないことを確認）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動と、umask の違いで1つ目の拒否が起きないことを確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/05-journald">← 5. journald は隣にある別の箱</a><a href="/linuc-services/theory/07-mail">次: 7. 宛先に書いた名前は、希望にすぎない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
