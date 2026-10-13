@@ -1,0 +1,235 @@
+
+
+========== 第2章 入れるかどうかは、受け取る側のファイルが決める（1.01.1） ==========
+
+# --- 画面の写し: 初めての ssh（ホスト鍵の確認とパスワード） ---
+$ ls -la ~/.ssh
+total 12
+drwx------ 1 lab lab 4096 Oct 13 10:51 .
+drwxr-x--- 1 lab lab 4096 Oct 13 19:06 ..
+-rw-r--r-- 1 lab lab  502 Oct 13 10:11 config
+$ cat ~/.ssh/config
+# 外側（lab@host）から練習機（student@linuc）に入るときの設定。`ssh linuc` で入れる。
+# 実体は 127.0.0.1:2222（QEMU が練習機の 22 番に転送している）。
+#
+# 鍵のファイル（IdentityFile）はわざと書いていない。書かなければ ssh は既定の名前
+# （~/.ssh/id_rsa, id_ecdsa, id_ed25519 …）を順に探す。第2章でそれを確かめる。
+Host linuc
+    HostName 127.0.0.1
+    Port 2222
+    User student
+    ServerAliveInterval 15
+$ ssh linuc
+The authenticity of host '[127.0.0.1]:2222 ([127.0.0.1]:2222)' can't be established.
+ED25519 key fingerprint is SHA256:LLGx0nn0YXmUkM4Jll0C2u0/IExjmPKygELsGy+vBS4.
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '[127.0.0.1]:2222' (ED25519) to the list of known hosts.
+student@127.0.0.1's password:
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+student@linuc:~$ exit
+logout
+Connection to 127.0.0.1 closed.
+$ cut -c1-60 ~/.ssh/known_hosts
+|1|926QEiG/Qcn6sTFu3uTiykVvbFk=|xsekbwgJHfZAdFP533SGrB2yS1k=
+|1|J01hBi9mOc+DLr9vq69I9kxv3eg=|HYfFcc2m+Lysyi2a0tSc4Zcxw9c=
+|1|wXjvTMAfA61MsxyL/6uI2P0kiwI=|+hCYiGjxGFo50E4b3CA5QSJ9e+Q=
+$ ssh-keygen -F '[127.0.0.1]:2222' | cut -c1-60
+# Host [127.0.0.1]:2222 found: line 1
+|1|926QEiG/Qcn6sTFu3uTiykVvbFk=|xsekbwgJHfZAdFP533SGrB2yS1k=
+# Host [127.0.0.1]:2222 found: line 2
+|1|J01hBi9mOc+DLr9vq69I9kxv3eg=|HYfFcc2m+Lysyi2a0tSc4Zcxw9c=
+# Host [127.0.0.1]:2222 found: line 3
+|1|wXjvTMAfA61MsxyL/6uI2P0kiwI=|+hCYiGjxGFo50E4b3CA5QSJ9e+Q=
+$ ssh-keygen -F linuc; echo "終了コード $?"
+終了コード 1
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: ssh-keygen（何も付けずに） ---
+$ ssh-keygen
+Generating public/private ed25519 key pair.
+Enter file in which to save the key (/home/lab/.ssh/id_ed25519):
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /home/lab/.ssh/id_ed25519
+Your public key has been saved in /home/lab/.ssh/id_ed25519.pub
+The key fingerprint is:
+SHA256:T1D5V2Wb7Ir8W7oejw7qpRKWcs9WS0VeFxma/BiCVgs lab@host
+The key's randomart image is:
++--[ED25519 256]--+
+|         E.o   oB|
+|         .= o.++=|
+|        .o +o=.=.|
+|        ..  oo*  |
+|        S . .o o |
+|     . = o.o. .  |
+|      + + +=.o . |
+|       . ++.o *  |
+|        ++  oOo. |
++----[SHA256]-----+
+$ ls -l ~/.ssh
+total 20
+-rw-r--r-- 1 lab lab 502 Oct 13 10:11 config
+-rw------- 1 lab lab 399 Oct 13 19:10 id_ed25519
+-rw-r--r-- 1 lab lab  90 Oct 13 19:10 id_ed25519.pub
+-rw------- 1 lab lab 978 Oct 13 19:10 known_hosts
+-rw-r--r-- 1 lab lab 142 Oct 13 19:10 known_hosts.old
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: ssh-keygen -t rsa ---
+$ ssh-keygen -t rsa
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/lab/.ssh/id_rsa):
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /home/lab/.ssh/id_rsa
+Your public key has been saved in /home/lab/.ssh/id_rsa.pub
+The key fingerprint is:
+SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ lab@host
+The key's randomart image is:
++---[RSA 3072]----+
+|         .oo.    |
+|   .    . .o     |
+|  + .. o  .      |
+|o+E..oo  .       |
+|o+*o+.  S .      |
+|+=oBo  . * .     |
+|o+=o..  = o      |
+|+o=o= .  .       |
+| *=*oo           |
++----[SHA256]-----+
+$ ls -l ~/.ssh
+total 28
+-rw-r--r-- 1 lab lab  502 Oct 13 10:11 config
+-rw------- 1 lab lab  399 Oct 13 19:10 id_ed25519
+-rw-r--r-- 1 lab lab   90 Oct 13 19:10 id_ed25519.pub
+-rw------- 1 lab lab 2590 Oct 13 19:10 id_rsa
+-rw-r--r-- 1 lab lab  562 Oct 13 19:10 id_rsa.pub
+-rw------- 1 lab lab  978 Oct 13 19:10 known_hosts
+-rw-r--r-- 1 lab lab  142 Oct 13 19:10 known_hosts.old
+$ ssh-keygen -lf ~/.ssh/id_rsa.pub
+3072 SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ lab@host (RSA)
+$ ssh-keygen -lf ~/.ssh/id_ed25519.pub
+256 SHA256:T1D5V2Wb7Ir8W7oejw7qpRKWcs9WS0VeFxma/BiCVgs lab@host (ED25519)
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: 鍵を登録して、パスワードなしで入る ---
+$ ssh-copy-id -i ~/.ssh/id_rsa.pub linuc
+/usr/bin/ssh-copy-id: INFO: Source of key(s) to be installed: "/home/lab/.ssh/id_rsa.pub"
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+student@127.0.0.1's password:
+
+Number of key(s) added: 1
+
+Now try logging into the machine, with:   "ssh 'linuc'"
+and check to make sure that only the key(s) you wanted were added.
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Tue Oct 13 19:10:23 2026 from 10.0.2.2
+student@linuc:~$ PS1='$ '
+$ ls -la ~/.ssh
+total 12
+drwx------ 2 student student 4096 Oct 13 09:46 .
+drwxr-x--- 4 student student 4096 Oct 13 19:07 ..
+-rw------- 1 student student  562 Oct 13 19:10 authorized_keys
+$ cut -c1-60 ~/.ssh/authorized_keys
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC4IlAncEkRAD0/GkedVP+J
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+$ ssh -v linuc true 2>&1 | grep -E 'identity file /home/lab/.ssh/id_[a-z0-9_]+ type|Offering|Authenticated'
+debug1: identity file /home/lab/.ssh/id_rsa type 0
+debug1: identity file /home/lab/.ssh/id_ecdsa type -1
+debug1: identity file /home/lab/.ssh/id_ecdsa_sk type -1
+debug1: identity file /home/lab/.ssh/id_ed25519 type 3
+debug1: identity file /home/lab/.ssh/id_ed25519_sk type -1
+debug1: identity file /home/lab/.ssh/id_xmss type -1
+debug1: identity file /home/lab/.ssh/id_dsa type -1
+debug1: Offering public key: /home/lab/.ssh/id_rsa RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
+Authenticated to 127.0.0.1 ([127.0.0.1]:2222) using "publickey".
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: authorized_keys が他人に書けると、鍵は使われない ---
+$ ssh linuc 'id; chmod 664 ~/.ssh/authorized_keys; ls -l ~/.ssh/authorized_keys'
+uid=1000(student) gid=1000(student) groups=1000(student),4(adm),27(sudo)
+-rw-rw-r-- 1 student student 562 Oct 13 19:10 /home/student/.ssh/authorized_keys
+$ ssh linuc 'echo 鍵で入れた; getent group student'
+鍵で入れた
+student:x:1000:
+$ ssh linuc 'chmod 666 ~/.ssh/authorized_keys; ls -l ~/.ssh/authorized_keys'
+-rw-rw-rw- 1 student student 562 Oct 13 19:10 /home/student/.ssh/authorized_keys
+$ ssh linuc
+student@127.0.0.1's password:
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Tue Oct 13 19:10:37 2026 from 10.0.2.2
+student@linuc:~$ PS1='$ '
+$ sudo journalctl -u ssh --no-pager -n 30 | grep -E 'refused|Accepted'
+Oct 13 19:10:20 linuc sshd[650]: Accepted password for student from 10.0.2.2 port 52578 ssh2
+Oct 13 19:10:34 linuc sshd[690]: Accepted password for student from 10.0.2.2 port 55352 ssh2
+Oct 13 19:10:37 linuc sshd[718]: Accepted publickey for student from 10.0.2.2 port 55414 ssh2: RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
+Oct 13 19:10:41 linuc sshd[736]: Accepted publickey for student from 10.0.2.2 port 45100 ssh2: RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
+Oct 13 19:10:42 linuc sshd[742]: Accepted publickey for student from 10.0.2.2 port 45112 ssh2: RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
+Oct 13 19:10:44 linuc sshd[751]: Accepted publickey for student from 10.0.2.2 port 45128 ssh2: RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
+Oct 13 19:10:45 linuc sshd[757]: Accepted publickey for student from 10.0.2.2 port 45146 ssh2: RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
+Oct 13 19:10:46 linuc sshd[767]: Authentication refused: bad ownership or modes for file /home/student/.ssh/authorized_keys
+Oct 13 19:10:46 linuc sshd[767]: Authentication refused: bad ownership or modes for file /home/student/.ssh/authorized_keys
+Oct 13 19:10:47 linuc sshd[767]: Accepted password for student from 10.0.2.2 port 45186 ssh2
+$ chmod 600 ~/.ssh/authorized_keys
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+$ ssh linuc 'ls -l ~/.ssh/authorized_keys'
+-rw------- 1 student student 562 Oct 13 19:10 /home/student/.ssh/authorized_keys
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: logout・exit・Ctrl+D ---
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Tue Oct 13 19:10:47 2026 from 10.0.2.2
+student@linuc:~$ PS1='$ '
+$ shopt login_shell
+login_shell    	on
+$ bash
+student@linuc:~$ shopt login_shell
+login_shell    	off
+student@linuc:~$ logout
+bash: logout: not login shell: use `exit'
+student@linuc:~$ exit
+exit
+$
+logout
+Connection to 127.0.0.1 closed.
+$ ssh linuc 'hostname; shopt login_shell'
+linuc
+login_shell    	off
+$
+
+# --- ここまで ---

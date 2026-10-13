@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. コンテナの中のカーネルは、ホストのもの — 確かめて説明する LinuC 主題1.01</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="linuc-boot">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-boot/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
+</div>
+<h1>3. コンテナの中のカーネルは、ホストのもの</h1>
+<p class="lead">外側のコンテナで <code>/etc/os-release</code> を読むと <code>Ubuntu 24.04.5 LTS</code> と出る。同じコンテナで <code>uname -r</code> を打つと <code>7.2.6</code> と出る。
+Ubuntu 24.04 にそんな版のカーネルは無い。それは著者の PC（ホスト）のカーネルである。
+コンテナは計算機を持たず、ホストのカーネルを借りている。仮想マシンは自分のカーネルを持っている。</p>
+<div class="badges"><span>前提: 第2章まで読了（鍵で ssh linuc できる）</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.01.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>コンテナと仮想マシンの違いを、同じコマンドを両方で打った出力で示せる</li>
+<li>ハイパーバイザーの2つの型と、仮想化支援機能（VT-x / AMD-V）が何をするかを説明できる</li>
+<li><code>docker stop</code> / <code>docker start</code> が、コンテナの中の仮想マシンに何を起こすかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: Docker のイメージの層の仕組み、Dockerfile の書き方、Kubernetes などのオーケストレーション、
+仮想マシンの中でさらに仮想マシンを動かす入れ子の仮想化、QEMU が命令を翻訳する仕組みの細部。</div></div>
+
+<h2 id="kernel">同じ質問を、外と中に投げる</h2>
+<div class="sgoal"><b>この節で分かること</b>: コンテナと仮想マシンが、それぞれ誰のカーネルで動いているか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>コンテナも「Ubuntu 24.04 のイメージ」から作った小さな計算機だ。<code>/etc/os-release</code> が Ubuntu 24.04 なら、
+中では Ubuntu 24.04 のカーネルが動いているはずだ。</p>
+<pre data-where="外（lab@host）"><code>$ uname -r
+7.2.6
+$ uname -v
+#1-NixOS SMP PREEMPT_DYNAMIC Mon Sep 14 11:41:11 UTC 2026
+$ grep PRETTY_NAME /etc/os-release
+PRETTY_NAME="Ubuntu 24.04.5 LTS"</code></pre>
+<div class="then"><b>だめな理由</b>: <code>/etc/os-release</code> は Ubuntu なのに、カーネルは <code>7.2.6</code>、ビルドの印は <code>NixOS</code> だった。
+これは著者の PC で動いている<b>ホストOS</b>（コンテナや仮想マシンを動かしている側の OS）のカーネルである。<b>コンテナが Ubuntu なのはファイル（ユーザランド）だけで、カーネルはホストのものを借りている</b>。
+だから<b>この2行は、あなたの画面では本文と違う</b>（あなたの PC のカーネルが出る。Docker Desktop なら linuxkit、WSL2 なら microsoft-standard-WSL2 などが付く）。
+違うことが、この節の答えである。</div></div>
+<p>同じ質問を、練習機の中に投げる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ uname -r
+6.8.0-142-generic
+$ uname -v
+#142-Ubuntu SMP PREEMPT_DYNAMIC Wed Sep  2 14:24:27 UTC 2026
+$ grep PRETTY_NAME /etc/os-release
+PRETTY_NAME="Ubuntu 24.04.5 LTS"</code></pre>
+<p>練習機のカーネルは Ubuntu が配っている <code>6.8.0-142-generic</code> で、ビルドの印も Ubuntu である。
+<b>仮想マシンは自分のカーネルを持ち、自分で起動した</b>（第1章でコンソールに <code>Linux version 6.8.0-142-generic</code> と出たのはこれ）。こちらは読者全員が同じ画面になる。</p>
+<p>もっと並べる。</p>
+<pre data-where="外（lab@host）"><code>$ ps -p 1 -o pid,comm
+    PID COMMAND
+      1 tini
+$ nproc
+16
+$ free -m | head -2
+               total        used        free      shared  buff/cache   available
+Mem:           96068       27488       11377        3916       62162       68580</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ ps -p 1 -o pid,comm
+    PID COMMAND
+      1 systemd
+$ nproc
+2
+$ free -m | head -2
+               total        used        free      shared  buff/cache   available
+Mem:            1424         228        1158           0         171        1196</code></pre>
+<div class="scroll"><table>
+<tr><th>見たもの</th><th>外（コンテナ）</th><th>練習機（仮想マシン）</th><th>なぜ</th></tr>
+<tr><td>カーネル（<code>uname -r</code>）</td><td>ホストのもの</td><td>自分のもの</td><td>コンテナはカーネルを持たない</td></tr>
+<tr><td>PID 1</td><td><code>tini</code></td><td><code>systemd</code></td><td>コンテナは自分のプロセスの番号付けだけを持つ。1番は最初に起動したプログラム</td></tr>
+<tr><td>CPU の数</td><td>16（ホストの全部）</td><td>2（定義どおり）</td><td>コンテナは制限しなければホストの CPU がそのまま見える</td></tr>
+<tr><td>メモリ</td><td>約 94GB（ホストの全部）</td><td>約 1.4GB（定義の 1.5GB からカーネルの分を引いた残り）</td><td>仮想マシンには定義した分しか無い</td></tr>
+</table></div>
+<p>コンテナは、ホストのカーネルの上で「プロセスの番号・ホスト名・ファイルの見え方」などを分けてもらった<b>プロセスの集まり</b>である（分ける仕組みを名前空間、使える量を絞る仕組みを cgroup という）。
+外側のプロンプトのホスト名が <code>host</code> で PID 1 が <code>tini</code> なのは、この分け方のおかげで、カーネルそのものは共有している。</p>
+<div class="analogy"><b>たとえ</b>: コンテナは<b>アパートの1部屋</b>、仮想マシンは<b>敷地の中に建てた別棟</b>に近い。
+部屋の住人は自分の表札（ホスト名）と郵便受け（PID）を持つが、水道と電気（カーネル）は建物のものを使う。別棟は配管も電気も自前で引いている。
+<br>ただし<b>崩れる点</b>: 本物の別棟は大家の建物と無関係に建っているが、この檻の練習機（別棟）は、アパートの1部屋（コンテナ）の中で動く QEMU というプロセスである。
+部屋を解約すると（<code>docker rm</code>）、別棟も一緒に消える。</div>
+
+<h2 id="hypervisor">練習機の CPU は、ハイパーバイザーが見せている</h2>
+<div class="sgoal"><b>この節で分かること</b>: ハイパーバイザーと仮想化支援機能の関係。この檻がどちらの型か。</div>
+<pre data-where="外（lab@host）"><code>$ lscpu | grep -E '^(Model name|Virtualization|Hypervisor vendor):'
+Model name:                              Intel(R) Core(TM) Ultra 9 285H
+Virtualization:                          VT-x
+$ grep -o -w -E 'vmx|svm' /proc/cpuinfo | sort | uniq -c
+     32 vmx
+$ ls -l /dev/kvm
+ls: cannot access '/dev/kvm': No such file or directory</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ lscpu | grep -E '^(Model name|Virtualization|Hypervisor vendor):'
+Model name:                              QEMU TCG CPU version 2.5+
+Virtualization:                          AMD-V
+$ grep -o -w -E 'vmx|svm' /proc/cpuinfo | sort | uniq -c
+      2 svm
+$ systemd-detect-virt
+qemu</code></pre>
+<p>外から見える CPU は本物（Intel Core Ultra 9 285H）で、Intel の<b>仮想化支援機能</b> VT-x を表す <code>vmx</code> が flags に並んでいる（CPU 16個 × 2行ずつ）。
+ところが練習機の中から見える CPU は <code>QEMU TCG CPU</code> で、しかも AMD の仮想化支援機能 AMD-V（<code>svm</code>）を名乗っている。
+<b>練習機の CPU は、ハイパーバイザー（QEMU）がソフトで作って見せているもの</b>だからだ。
+外に <code>/dev/kvm</code> が無いので、QEMU は CPU の仮想化支援機能を使わず、ゲストの命令を1つずつ翻訳して実行している（TCG、完全エミュレーション）。
+起動に 30 秒以上かかるのはこのためで、代わりにあなたの PC の特権を1つも借りずに済んでいる。</p>
+<pre data-where="外（lab@host）"><code>$ virsh capabilities | grep -o "&lt;domain type='[a-z]*'" | sort | uniq -c
+      2 &lt;domain type='qemu'
+$ virsh version | grep -i hypervisor
+Running hypervisor: QEMU 8.2.2
+$ ps -o pid,user,etime,comm -C qemu-system-x86_64
+    PID USER         ELAPSED COMMAND
+   2523 lab            01:44 qemu-system-x86</code></pre>
+<p>libvirt が使える仮想マシンの種類は <code>qemu</code>（TCG）だけで、<code>kvm</code> は無い。ハイパーバイザーは QEMU 8.2.2 である。
+そして練習機は、外のコンテナの中で一般ユーザ <code>lab</code> が動かしている1つのプロセス（<code>qemu-system-x86_64</code>。名前は 15 文字で切れて見える。第8章）である。</p>
+<div class="scroll"><table>
+<tr><th>ハイパーバイザーの型</th><th>どこで動くか</th><th>例</th></tr>
+<tr><td>ハイパーバイザー型（ベアメタル型・Type 1）</td><td>ハードウェアの上で直接動き、その上に OS が乗る</td><td>VMware ESXi、Xen、Microsoft Hyper-V、Linux の KVM（カーネルの一部として動く）</td></tr>
+<tr><td>ホスト型（Type 2）</td><td>ホスト OS の上でアプリとして動く</td><td>VirtualBox、VMware Workstation、この檻の QEMU（TCG）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 仮想化支援機能は、国際会議の<b>同時通訳ブース</b>に近い。ブースがあれば、話者（ゲスト OS）の言葉はほぼそのまま聞き手（CPU）に届く。
+無ければ逐次通訳（TCG）で、1文ずつ訳すので時間がかかる。
+<br>ただし<b>崩れる点</b>: 通訳は話の中身を変えないが、TCG は CPU そのものを作り替えて見せる。Intel の PC の上の練習機が AMD-V を名乗るのは、通訳が話者の国籍まで変えてしまうようなものだ。</div>
+
+<h2 id="docker">コンテナを止めると、中の練習機はどうなるか</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>docker stop</code> / <code>docker start</code> の合図が、練習機にどう伝わるか。</div>
+<p>練習機を外から見ている「外側のコンテナ」も、あなたの PC から見れば1つのコンテナである。止めて、また起動する。
+<b>この2行は、あなたの PC の端末</b>（コンテナの外）で打つ。</p>
+<pre><code>docker stop lab-linuc-boot
+docker start lab-linuc-boot
+docker exec -it lab-linuc-boot bash -l</code></pre>
+<p>著者の環境では <code>docker stop</code> に 12.5 秒かかり、終了コードは 0 だった。
+<code>docker stop</code> はコンテナの PID 1（<code>tini</code>）に TERM という合図（シグナル、第8章）を送るだけで、
+受け取った檻の起動スクリプトが「練習機を <code>virsh shutdown</code> で正常に止めてから終わる」と決めている。
+docker は待つが、無限には待たない。猶予（既定 10 秒）を過ぎると KILL で打ち切る。練習機の正常停止には十数秒かかる（第1章では約 12 秒）ので、
+起動コマンドに <code>--stop-timeout 30</code> を付けて猶予を延ばしてある。</p>
+<p>起動し直した直後に外で一覧を見る。</p>
+<pre data-where="外（lab@host）"><code>$ virsh list
+ Id   Name    State
+-----------------------
+ 1    linuc   running</code></pre>
+<p>誰も <code>virsh start</code> を打っていないのに、練習機が動いている。第1章で付けた<b>自動起動の印</b>（<code>virsh autostart</code>）が効いた。
+練習機の側から見ると、こうなっている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ last -x reboot shutdown | head -4
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:12   still running
+shutdown system down  6.8.0-142-generi Tue Oct 13 19:11 - 19:12  (00:00)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:09 - 19:11  (00:01)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:08 - 19:11  (00:03)
+$ journalctl --list-boots --no-pager | tail -3
+ -2 e32c57f6bc5943b59acaf8b1066d871e Tue 2026-10-13 19:08:39 JST Tue 2026-10-13 19:08:41 JST
+ -1 1520a79687b64d5481ec0616af1f373a Tue 2026-10-13 19:09:56 JST Tue 2026-10-13 19:11:39 JST
+  0 5f59bbad0a98453982b60dc509603452 Tue 2026-10-13 19:12:07 JST Tue 2026-10-13 19:12:30 JST
+$ journalctl -b -1 -n 4 --no-pager
+Oct 13 19:11:38 linuc systemd-shutdown[1]: Syncing filesystems and block devices.
+Oct 13 19:11:39 linuc systemd-shutdown[1]: Sending SIGTERM to remaining processes...
+Oct 13 19:11:39 linuc systemd-journald[218]: Received SIGTERM from PID 1 (systemd-shutdow).
+Oct 13 19:11:39 linuc systemd-journald[218]: Journal stopped</code></pre>
+<p><code>last -x</code> は、起動（<code>reboot</code>）と停止（<code>shutdown</code>）の記録を新しい順に出す。いちばん上が今の起動で、その下に、前の起動が正常に終わった印（<code>shutdown system down</code>）がある。
+<code>journalctl --list-boots</code> は、起動ごとに最初と最後の記録の時刻を出し、<code>-b -1</code> は1つ前の起動の記録を指す。前の起動の最後の4行は、ディスクへの書き残しを同期して（<code>Syncing filesystems</code>）から記録を閉じている（<code>Journal stopped</code>）。
+<b>docker stop の合図は、檻の起動スクリプト → <code>virsh shutdown</code> → 練習機の OS と、受け取る側を順に渡っていき、最後の受け手が正常に止まると決めた。</b></p>
+<p>比べると、その下の2つの <code>reboot</code> の行の間には <code>shutdown</code> の行が無い。第1章で <code>virsh destroy</code>（電源を抜く）をした起動である。
+<code>--list-boots</code> の <code>-2</code> がその起動で、ログインの案内が出るまで動いていたのに、記録は最初の2秒分しか残っていない。
+猶予が足りずに途中で KILL されると、練習機は電源を抜かれたのと同じになる。そのとき何が起きるかは第7章で見る。</p>
+<div class="analogy"><b>たとえ</b>: <code>docker stop</code> は、閉館時刻に流す<b>館内放送</b>に近い。放送を聞いた警備員（檻の起動スクリプト）が、各部屋（練習機）に戸締まりを頼んで回る。
+<br>ただし<b>崩れる点</b>: 館内放送は戸締まりが終わるまで待ってくれるが、<code>docker stop</code> は猶予の秒数が来たら、戸締まりの途中でも建物の電源を落とす（KILL）。
+だから猶予を何秒にするかは、受け取る側の仕事の長さに合わせて、送る側が決めておく必要がある。</div>
+<div class="scroll"><table>
+<tr><th>docker のコマンド</th><th>何をするか</th></tr>
+<tr><td><code>docker pull イメージ:タグ</code></td><td>イメージを取ってくる（Docker Hub などから）。タグを省くと <code>latest</code> を取る。例: <code>docker pull ubuntu:24.04</code></td></tr>
+<tr><td><code>docker images</code></td><td>手元にあるイメージの一覧</td></tr>
+<tr><td><code>docker create --name 名前 イメージ</code></td><td>イメージからコンテナを作るだけ（起動はしない）</td></tr>
+<tr><td><code>docker run -d --name 名前 イメージ</code></td><td>手元に無ければ pull し、コンテナを作って（create）起動する（start）。<code>-d</code> は裏で動かす</td></tr>
+<tr><td><code>docker ps</code> / <code>docker ps -a</code></td><td>動いているコンテナ / 止まっているものも含めて一覧</td></tr>
+<tr><td><code>docker stop 名前</code></td><td>PID 1 に TERM を送り、猶予の後に KILL する</td></tr>
+<tr><td><code>docker start 名前</code></td><td>止まっているコンテナを起動し直す（中のファイルは残っている）</td></tr>
+<tr><td><code>docker exec -it 名前 bash -l</code></td><td>動いているコンテナの中で、もう1つシェルを起動する</td></tr>
+<tr><td><code>docker rm 名前</code> / <code>docker rmi イメージ</code></td><td>止まっているコンテナを消す（名前付きボリュームは残る） / 手元のイメージを消す</td></tr>
+</table></div>
+<p class="detail">この表の <code>docker</code> コマンドは、あなたの PC で打つものである。外側のコンテナ（lab@host）の中には docker が入っていないので、
+<code>pull</code> <code>images</code> <code>create</code> の実行の記録はこの本に無い。この本で打つのは、実践編の入口の <code>docker run</code> と <code>docker exec</code>、この節の <code>docker stop</code> と <code>docker start</code> である。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-boot/">演習01</a>で自動起動の印を付けたら、あなたの PC の端末で <code>docker stop lab-linuc-boot</code> と <code>docker start lab-linuc-boot</code> を打ち、
+何もしないで練習機が起動することを確かめてほしい。<code>lab check 01</code> はそのままもう一度通るはずである。</div>
+
+<div class="quiz"><b>確認</b>
+<p>コンテナと仮想マシンの違いについて、正しいものはどれか。</p>
+<p>A. コンテナはそれぞれ自分のカーネルを起動する<br>B. 仮想マシンはホスト OS のカーネルを共有する<br>C. コンテナはホスト OS のカーネルを共有し、仮想マシンは自分のカーネルを持つ<br>D. どちらもハイパーバイザーの上で動く</p>
+<details><summary>答え</summary>
+<p>C。実測で、Ubuntu のコンテナの <code>uname -r</code> はホストの 7.2.6 を、練習機は Ubuntu の 6.8.0-142-generic を答えた。
+D は誤り。コンテナはハイパーバイザーを使わず、ホストのカーネルの機能（名前空間・cgroup）で分けられている。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>CPU が仮想化支援機能を持っているかを <code>/proc/cpuinfo</code> で確かめたい。Intel と AMD で、それぞれ何というフラグを探すか。</p>
+<details><summary>答え</summary>
+<p>Intel（VT-x）は <code>vmx</code>、AMD（AMD-V）は <code>svm</code>。例: <code>grep -E -c 'vmx|svm' /proc/cpuinfo</code>。
+ファームウェアの設定で無効にされているとフラグは出ない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>ハードウェアの上で直接動くハイパーバイザー（ハイパーバイザー型）の例を挙げよ。また、VirtualBox はどちらの型か。</p>
+<details><summary>答え</summary>
+<p>VMware ESXi、Xen、Hyper-V（Linux の KVM もカーネルに組み込まれてこの型として働く）。
+VirtualBox はホスト OS の上でアプリとして動くホスト型。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>コンテナはホストのカーネルを共有する。<code>/etc/os-release</code> が何であっても、<code>uname -r</code> はホストのカーネルを答える</li>
+<li>仮想マシンは自分のカーネルを起動する。CPU・メモリはハイパーバイザーが見せたものだけが見える</li>
+<li>ハイパーバイザーには、ハードウェアの上で直接動く型と、ホスト OS の上で動く型がある</li>
+<li>仮想化支援機能は Intel が vmx（VT-x）、AMD が svm（AMD-V）。無ければ QEMU は TCG で翻訳して動かす（遅いが特権が要らない）</li>
+<li><code>docker stop</code> は PID 1 に TERM を送り、猶予の後に KILL する。中の練習機を正常に止められるかは、猶予と、受け取った側の作り次第</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-boot/theory/02-ssh">← 2. 入れるかどうかは、受け取る側のファイルが決める</a><a href="/linuc-boot/theory/04-install">次: 4. GUI が無くても、既定は graphical.target →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-boot/chapters.js"></script>
+<script src="/linuc-boot/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

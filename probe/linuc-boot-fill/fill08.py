@@ -1,0 +1,115 @@
+import pathlib as _pl, sys as _sys
+_HERE = _pl.Path(__file__).resolve().parent
+REPO = _HERE.parent.parent
+_sys.path.insert(0, str(_HERE))
+import sys
+from bootlog import chunk, pre
+G = '練習機の中（student@linuc）'
+P = str(REPO / 'public/linuc-boot/theory/08-signal.html')
+import re as _re
+_up = chunk('08', 'プロセスを見る', 'uptime', 'uptime', raw=True)
+LA1, LA5, LA15 = _re.search(r'load average: ([\d.]+), ([\d.]+), ([\d.]+)', _up).groups()
+UPTXT = _re.search(r'(up [^,]+),', _up).group(1)
+if float(LA1) > 2:
+    LOADCMP = f'1分の値（{LA1}）が 2 を超えていた間は、CPU の数より多くのプロセスが順番を待っていた'
+else:
+    LOADCMP = f'1分の値（{LA1}）でも 2 に届いていないので、起動の直後でも CPU の順番待ちは続いていなかった'
+
+see = f'''<p>まず、練習機がどれくらい忙しいかを1行で見る。</p>
+{pre(G, chunk('08', 'プロセスを見る', 'uptime', 'cat /proc/loadavg'))}
+<p><code>uptime</code> は、いまの時刻・起動してからの時間・ログイン中のユーザ数・<b>ロードアベレージ</b>を1行で出す。
+ロードアベレージは、実行中か実行の順番を待っている（またはディスクの読み書きを待っている）プロセスの数を、直近1分・5分・15分で平均したものである。
+同じ3つの数は <code>/proc/loadavg</code> にもあり、<code>uptime</code> も <code>top</code> もここを読んでいる。</p>
+<p>練習機は第7章の最後で再起動したばかりで（<code>{UPTXT}</code>）、1分の値（{LA1}）だけが高く、15分の値（{LA15}）はまだ低い。起動の作業が直前の1分に集まっていたからである。
+練習機の CPU は2個（第1章の <code>virsh dominfo</code>）で、ロードアベレージは CPU の数と比べて読む。{LOADCMP}。
+3つの数は「いまの値」ではなく平均なので、<b>1分と15分を比べると、忙しさが増えているのか収まりつつあるのか</b>が読める。</p>
+<p>次に、プロセスの一覧を見る。<code>ps</code> は、打った瞬間のプロセスを一覧にする。</p>
+{pre(G, chunk('08', 'プロセスを見る', 'ps aux | head -4', 'ps -ef | head -4'))}
+<p><code>ps</code> のオプションには書き方が2系統ある。<code>aux</code>（ハイフンなし。BSD 系）と <code>-ef</code>（ハイフンあり。System V 系）で、どちらも「全員のプロセスを」の意味だが、出る列が違う。
+<code>aux</code> は CPU とメモリの使用率（<code>%CPU</code> <code>%MEM</code>）と状態（<code>STAT</code>）を、<code>-ef</code> は親の PID（<code>PPID</code>）を出す。試験にはどちらも出る。</p>
+<div class="scroll"><table>
+<tr><th>STAT の文字</th><th>意味</th></tr>
+<tr><td><code>R</code></td><td>実行中か、実行の順番を待っている</td></tr>
+<tr><td><code>S</code></td><td>眠って待っている（何かが起きれば起きる）</td></tr>
+<tr><td><code>T</code></td><td>止められている（<code>Ctrl+Z</code> など。第9章）</td></tr>
+<tr><td><code>Z</code></td><td>終わったが、親がまだ後始末をしていない（ゾンビ）</td></tr>
+<tr><td>2文字目の <code>s</code></td><td>セッションの先頭（ログインシェルやデーモンの親）</td></tr>
+</table></div>
+<p>オプションの1文字の違いで、出るものが大きく変わる組がある。</p>
+{pre(G, chunk('08b', 'ps -f と ps f（と -A・e）'))}
+<p><code>-f</code>（ハイフンあり）は<b>列を増やす</b>だけで（フル形式。<code>UID</code>・<code>PPID</code>・<code>C</code>・<code>STIME</code> が付く）、親子の木は出さない。
+木を出すのはハイフンなしの <code>f</code>（<code>--forest</code> と同じ）で、<code>\\_</code> の線で子を字下げする。
+選ばれるプロセスの範囲も違う。ハイフンありの書き方はこの端末（<code>pts/1</code>）のものだけを、ハイフンなしの書き方は自分の、端末を持つプロセスすべてを出した（この記録は第10章まで進めた後に撮ったので、第9章で残す screen の中のシェル（<code>pts/3</code>）と、別の端末のシェル（<code>pts/0</code>）も写っている。順に進めてきた画面では、そのとき開いている端末の分だけが並ぶ）。
+<code>-A</code> は <code>-e</code> と同じ「全部」で、数えると同じ数になった。ハイフンなしの <code>e</code> は、コマンドの後ろに環境変数を並べる（上の最後の出力は <code>$$</code>、つまりこのシェル自身の分を 100 文字で切ったもの）。</p>
+<p>親子の関係は <code>pstree</code> が木で出す。<code>-p</code> で PID を添え、ユーザ名を付けるとそのユーザのプロセスだけを出す。</p>
+{pre(G, chunk('08', 'プロセスを見る', 'pstree -p student', 'pstree -p student'))}
+<p><code>lab-hog</code> が子として <code>sleep</code> を動かしていること、いま打った <code>pstree</code> 自身が sshd → bash の子であることが分かる。</p>
+<p><code>top</code> は一覧を数秒ごとに描き直し続ける（終えるのは <code>q</code>）。ここでは記録に残すため、<code>-b</code>（描き直さずに文字で出す）と <code>-n 1</code>（1回だけ）を付けた。</p>
+{pre(G, chunk('08', 'プロセスを見る', 'top -b -n 1 | head -12', 'top -b -n 1 | head -12'))}
+<p>1行目は <code>uptime</code> と同じ。2行目はプロセスの数を状態ごとに、3行目は CPU の使われ方、4〜5行目はメモリを出す。表は CPU を多く使っている順に並び、いちばん上は <code>top</code> 自身だった。</p>
+<p>特定のプロセスを探すのは <code>pgrep</code> である。条件に合うプロセスの PID だけを出すので、ほかのコマンドに埋め込める。</p>
+{pre(G, chunk('08', 'プロセスを見る', 'pgrep -a lab-hog', 'ps -o pid,ppid,user,stat,etime,cmd -p $(pgrep -x lab-hog)'))}
+<p><code>-a</code> は引数まで、<code>-l</code> は名前を添えて出し、<code>-u</code> はユーザで、<code>-x</code> は名前の完全一致で絞る。
+<code>$(pgrep -x lab-hog)</code> のように埋め込めば、PID を目で写し間違えずに済む。lab-hog の親（<code>PPID</code>）は 1、つまり systemd が起動したサービスである。</p>
+<div class="analogy"><b>たとえ</b>: <code>ps</code> は<b>集合写真</b>、<code>top</code> は<b>防犯カメラの映像</b>、<code>pstree</code> は<b>家系図</b>に近い。同じ人たちを、その瞬間・刻々・親子の向きで見ている。
+<br>ただし<b>崩れる点</b>: 集合写真は全員を同じ瞬間に写すが、<code>ps</code> はプロセスを1つずつ順に見て回る。見て回る間に生まれたものや消えたものは、写ったり写らなかったりする。
+<code>ps</code> や <code>pgrep</code> の結果は「打った頃の様子」であって、次の行を打つときにも同じとは限らない。</div>'''
+
+kill = f'''<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>kill</code> はプロセスを殺すコマンドだ。PID を渡せば、そのプロセスは消える。</p>
+{pre(G, chunk('08', 'TERM を無視するプロセスに kill', 'kill $(pgrep -x lab-hog)', 'ps -o pid,stat,comm -p $(pgrep -x lab-hog)'))}
+<div class="then"><b>だめな理由</b>: lab-hog は残っていて、状態も <code>Ss</code>（眠って待っている）のまま変わらない。
+<code>kill</code> は、プロセスに<b>シグナル</b>という番号付きの合図を送るだけのコマンドである。番号を付けなければ 15番の TERM（終了してください）を送る。
+受け取ったプロセスは、そのまま終わるか、自分で後片付けをしてから終わるか、無視するかを、自分で決めておける。lab-hog は、起動したときに TERM を無視すると決めていた。</div></div>
+<p>どのシグナルを無視しているかは、<code>/proc/PID/status</code> の <code>SigIgn</code>（無視する）と <code>SigCgt</code>（捕まえて自分で処理する）に、ビットの並びで出ている。</p>
+{pre(G, chunk('08', 'TERM を無視するプロセスに kill', 'grep -E "^Sig(Ign|Cgt)" /proc/$(pgrep -x lab-hog)/status', 'grep -E "^Sig(Ign|Cgt)" /proc/$(pgrep -x lab-hog)/status'))}
+<p>16進数の <code>5007</code> を2進数にすると <code>0101 0000 0000 0111</code> で、右端を1番として 1・2・3・13・15 番目が立っている。HUP（1）・INT（2）・QUIT（3）・PIPE（13）・TERM（15）を無視している。
+lab-hog が自分で無視を決めたのは TERM・INT・HUP の3つで（<code>trap '' TERM INT HUP</code>）、QUIT は bash がいつも無視するもの、PIPE は systemd がサービスを起動するときに無視させるもの（<code>IgnoreSIGPIPE=yes</code> が既定）である。
+<code>SigCgt</code> の <code>10000</code> は 17番の CHLD（子が終わった知らせ）で、bash は子の <code>sleep</code> が終わったことを知るためにこれを捕まえている。</p>
+<p>シグナルの番号と名前の一覧は <code>kill -l</code> で出る。</p>
+{pre(G, chunk('08', 'TERM を無視するプロセスに kill', 'kill -l', 'kill -l'))}
+<div class="scroll"><table>
+<tr><th>番号</th><th>名前</th><th>いつ送られるか</th><th>受け手が無視できるか</th></tr>
+<tr><td>1</td><td>HUP</td><td>端末（回線）が切れたとき（第9章）。デーモンには「設定を読み直して」の意味で送ることが多い</td><td>できる</td></tr>
+<tr><td>2</td><td>INT</td><td>端末で <code>Ctrl+C</code> を押したとき</td><td>できる</td></tr>
+<tr><td>9</td><td>KILL</td><td><code>kill -9</code>（<code>kill -KILL</code>）</td><td><b>できない</b></td></tr>
+<tr><td>15</td><td>TERM</td><td><code>kill</code>・<code>pkill</code>・<code>killall</code> の既定。<code>systemctl stop</code> も最初に送る</td><td>できる</td></tr>
+<tr><td>18</td><td>CONT</td><td>止まっているものを再開させる（<code>bg</code>・<code>fg</code> が送る）</td><td>再開そのものは断れない</td></tr>
+<tr><td>19</td><td>STOP</td><td>一時停止させる</td><td><b>できない</b></td></tr>
+<tr><td>20</td><td>TSTP</td><td>端末で <code>Ctrl+Z</code> を押したとき</td><td>できる</td></tr>
+</table></div>
+<p>無視も捕捉もできないのは、KILL と STOP の2つだけである。この2つはプロセスに渡されず、カーネルがその場で処理する。</p>
+{pre(G, chunk('08', 'TERM を無視するプロセスに kill', 'kill -KILL $(pgrep -x lab-hog)', 'systemctl status lab-hog --no-pager | head -6'))}
+<p><code>pgrep</code> は何も見つけられず、終了コード 1 を返した。systemd は lab-hog の終わり方を「シグナル KILL で殺された（<code>code=killed, signal=KILL</code>）」と記録している。
+<code>kill -9 PID</code> と <code>kill -KILL PID</code> は同じ意味である（9番が KILL）。</p>
+<p>シグナルの指定のしかたは、ほかにもある。<code>-SIG</code> を付けた名前と、<code>-s</code> の後ろに名前か番号を書く形である。</p>
+{pre(G, chunk('08b', 'kill -s 15 と kill -SIGKILL'))}
+<p><code>kill -s 15</code> は TERM（<code>Terminated</code>）、<code>kill -SIGKILL</code> は KILL（<code>Killed</code>）を送った。<code>$!</code> は、直前に <code>&amp;</code> で起動したプロセスの PID である。
+つまり KILL は、<code>kill -9</code>・<code>kill -KILL</code>・<code>kill -SIGKILL</code>・<code>kill -s KILL</code>・<code>kill -s 9</code> のどれで書いてもよい。</p>
+<div class="analogy"><b>たとえ</b>: TERM は「閉店です、お帰りください」という<b>館内放送</b>で、KILL は<b>警備員が腕をつかんで外へ出す</b>ことに近い。放送は聞き流せるが、警備員は断れない。
+<br>ただし<b>崩れる点</b>: 連れ出された客でも、自分の足で歩き、荷物くらいは持って出られる。KILL されたプロセスは何もしないまま消える。
+開いていたファイルを閉じる、一時ファイルを消す、書きかけを保存する、といった後片付けは一切されない。だから KILL は、TERM で止まらないときの最後の手段にする。</div>'''
+
+names = f'''<p>PID を調べずに、名前や条件で選んで送るコマンドが2つある。<code>sleep</code> を3つ動かして試す（<code>&amp;</code> は第9章で扱う。後ろで動かす印）。</p>
+{pre(G, chunk('08', 'pkill と killall', 'sleep 601 &', 'jobs', raw=False))}
+<p><code>pkill</code> は <code>pgrep</code> と同じ条件で選んで、シグナルを送る（既定は TERM）。<code>-f</code> を付けると、名前ではなく引数まで含めたコマンド行で照合するので、<code>sleep 601</code> の1つだけを選べた。
+<code>killall</code> は名前の完全一致で選ぶので、<code>sleep</code> という名前の残り2つが両方止まった。<code>pkill</code> の名前は正規表現で、名前の一部に一致すれば当たる。<code>killall</code> は名前全体が一致したものにだけ送る。</p>
+<p>名前で選ぶときには落とし穴が1つある。</p>
+{pre(G, chunk('08', '名前は 15 文字で切られる', 'cp /usr/bin/sleep /tmp/very-long-process-name', 'jobs'))}
+<p>プロセスの名前（<code>ps</code> の <code>COMMAND</code> 列の短いほう。comm と呼ぶ）は、カーネルの中に 15 文字までしか持っていない。
+<code>very-long-process-name</code>（22文字）は <code>very-long-proce</code> として記録され、それより長い名前で探すと <code>pgrep</code> は何も見つけられない（<code>pgrep</code> 自身がそう注意してくる）。
+長い名前のプロセスは、<code>-f</code> を付けてコマンド行全体で探す。</p>
+<p><code>killall</code> は、この点が逆になる。</p>
+{pre(G, chunk('08b', 'killall と長い名前'))}
+<p><code>pgrep</code> は 15 文字に切られた名前（<code>very-long-proce</code>）で見つけたが、<code>killall</code> はその名前では「無い」と答え、元の長い名前で止めた。
+<code>killall</code> は、名前がちょうど 15 文字で切れているプロセスについては、コマンド行のほうの名前と比べるからである。
+<b>短い名前で探すなら <code>pgrep</code>・<code>pkill</code>、長い名前のまま探すなら <code>killall</code> か <code>-f</code></b> と覚えると取り違えない。</p>
+<div class="analogy"><b>たとえ</b>: プロセスの名前は、<b>名前の欄が15文字しかない名札</b>に近い。長い名前は途中で切れて書かれている。
+<br>ただし<b>崩れる点</b>: 人なら、切れた名札でも「たぶんあの人だ」と見当をつけて呼べる。<code>pgrep</code> は切れた名札と探す名前を文字どおり比べるので、長い名前で探すと誰も返事をしない。
+見当をつけてくれる係はいないので、<code>-f</code> でコマンド行という別の札を見に行く。</div>'''
+
+BLOCKS = {'SEE': see, 'KILL': kill, 'NAMES': names}
+if __name__ == '__main__':
+    import bootfill
+    bootfill.apply(P, BLOCKS)
+    print('ok')

@@ -1,0 +1,84 @@
+
+
+========== 第6章の補足 長いカーネル引数を足すと、折り返しで崩れる（GRUB の編集画面・80 桁） ==========
+
+# --- 画面の写し（見えている範囲）: linux の行末に systemd.unit=rescue.target を足した（折り返す） ---
+
+ ┌────────────────────────────────────────────────────────────────────────────┐
+ │                                                                            │
+ │                                                                            │
+ │        recordfail                                                          │^
+ │        load_video                                                          │
+ │        gfxmode $linux_gfx_mode                                             │
+ │        insmod gzio                                                         │
+ │        if [ x$grub_platform = xxen ]; then insmod xzio; insmod lzopio; fi  │
+ │        insmod part_gpt                                                     │
+ │        insmod ext2                                                         │
+ │        search --no-floppy --fs-uuid --set=root a5eecc38-8587-4601-9295-c92\│
+ │dabc20612                                                                   │
+ │        linux        /vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c\│
+ │4-9280-015dbb828010 ro  console=tty1 console=ttyS0,115200 systemd.unit=resc\│
+ │        linux        /vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c\│v
+ │4-9280-015dbb828010 ro  console=tty1 console=ttyS0,115200 systemd.unit=resc\│
+ │ue.target                                                                   │
+ │        initrd        /microcode.cpio /initrd.img-6.8.0-142-generic         │
+ │                                                                            │
+ │                                                                            │
+                                                                              ┘
+
+
+# --- ここまで ---
+
+# --- 画面の写し（見えている範囲）: 起動した結果 ---
+         Starting modprobe@dm_mod.service - Load Kernel Module dm_mod...
+         Starting modprobe@efi_pstore.servi… - Load Kernel Module efi_pstore...
+         Starting modprobe@loop.service - Load Kernel Module loop...
+[  OK  ] Finished systemd-update-utmp.servi…ecord System Boot/Shutdown in UTMP.
+[  OK  ] Finished modprobe@dm_mod.service - Load Kernel Module dm_mod.
+[  OK  ] Finished modprobe@efi_pstore.service - Load Kernel Module efi_pstore.
+[  OK  ] Finished modprobe@loop.service - Load Kernel Module loop.
+[  OK  ] Listening on systemd-rfkill.socket…ll Switch Status /dev/rfkill Watch.
+[  OK  ] Started systemd-resolved.service - Network Name Resolution.
+[  OK  ] Reached target nss-lookup.target - Host and Network Name Lookups.
+[  OK  ] Finished apparmor.service - Load AppArmor profiles.
+[  OK  ] Reached target sysinit.target - System Initialization.
+         Starting grub-initrd-fallback.service - GRUB failed boot detection...
+[  OK  ] Started qemu-guest-agent.service - QEMU Guest Agent.
+[  OK  ] Started rescue.service - Rescue Shell.
+[  OK  ] Finished grub-initrd-fallback.service - GRUB failed boot detection.
+[  OK  ] Reached target rescue.target - Rescue Mode.
+         Starting systemd-update-utmp-runle…- Record Runlevel Change in UTMP...
+[  OK  ] Finished systemd-update-utmp-runle…e - Record Runlevel Change in UTMP.
+You are in rescue mode. After logging in, type "journalctl -xb" to view
+system logs, "systemctl reboot" to reboot, or "exit"
+to continue bootup.
+Press Enter for maintenance
+(or press Control-D to continue):
+# --- ここまで ---
+
+# --- 画面の写し（見えている範囲）: Enter を押した後（rescue.target の root のシェル） ---
+[  OK  ] Finished modprobe@efi_pstore.service - Load Kernel Module efi_pstore.
+[  OK  ] Finished modprobe@loop.service - Load Kernel Module loop.
+[  OK  ] Listening on systemd-rfkill.socket…ll Switch Status /dev/rfkill Watch.
+[  OK  ] Started systemd-resolved.service - Network Name Resolution.
+[  OK  ] Reached target nss-lookup.target - Host and Network Name Lookups.
+[  OK  ] Finished apparmor.service - Load AppArmor profiles.
+[  OK  ] Reached target sysinit.target - System Initialization.
+         Starting grub-initrd-fallback.service - GRUB failed boot detection...
+[  OK  ] Started qemu-guest-agent.service - QEMU Guest Agent.
+[  OK  ] Started rescue.service - Rescue Shell.
+[  OK  ] Finished grub-initrd-fallback.service - GRUB failed boot detection.
+[  OK  ] Reached target rescue.target - Rescue Mode.
+         Starting systemd-update-utmp-runle…- Record Runlevel Change in UTMP...
+[  OK  ] Finished systemd-update-utmp-runle…e - Record Runlevel Change in UTMP.
+You are in rescue mode. After logging in, type "journalctl -xb" to view
+system logs, "systemctl reboot" to reboot, or "exit"
+to continue bootup.
+Press Enter for maintenance
+
+root@linuc:~# cat /proc/cmdline; systemctl is-active rescue.target
+BOOT_IMAGE=/vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c4-9280-015dbb82
+8010 ro console=tty1 console=ttyS0,115200 systemd.unit=rescue.target
+active
+root@linuc:~#
+# --- ここまで ---

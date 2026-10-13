@@ -1,0 +1,104 @@
+
+
+========== 第3章 コンテナの中のカーネルは、ホストのもの（1.01.2） ==========
+
+# --- 画面の写し: 外（コンテナ lab@host） ---
+$ uname -r
+7.2.6
+$ uname -v
+#1-NixOS SMP PREEMPT_DYNAMIC Mon Sep 14 11:41:11 UTC 2026
+$ grep PRETTY_NAME /etc/os-release
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+$ ps -p 1 -o pid,comm
+    PID COMMAND
+      1 tini
+$ nproc
+16
+$ free -m | head -2
+               total        used        free      shared  buff/cache   available
+Mem:           96068       27488       11377        3916       62162       68580
+$ lscpu | grep -E '^(Model name|Virtualization|Hypervisor vendor):'
+Model name:                              Intel(R) Core(TM) Ultra 9 285H
+Virtualization:                          VT-x
+$ grep -o -w -E 'vmx|svm' /proc/cpuinfo | sort | uniq -c
+     32 vmx
+$ ls -l /dev/kvm
+ls: cannot access '/dev/kvm': No such file or directory
+$ virsh capabilities | grep -o "<domain type='[a-z]*'" | sort | uniq -c
+      2 <domain type='qemu'
+$ virsh version | grep -i hypervisor
+Running hypervisor: QEMU 8.2.2
+$ ps -o pid,user,etime,comm -C qemu-system-x86_64
+    PID USER         ELAPSED COMMAND
+   2523 lab            01:44 qemu-system-x86
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: 練習機の中（student@linuc） ---
+$ uname -r
+6.8.0-142-generic
+$ uname -v
+#142-Ubuntu SMP PREEMPT_DYNAMIC Wed Sep  2 14:24:27 UTC 2026
+$ grep PRETTY_NAME /etc/os-release
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+$ ps -p 1 -o pid,comm
+    PID COMMAND
+      1 systemd
+$ nproc
+2
+$ free -m | head -2
+               total        used        free      shared  buff/cache   available
+Mem:            1424         228        1158           0         171        1196
+$ lscpu | grep -E '^(Model name|Virtualization|Hypervisor vendor):'
+Model name:                              QEMU TCG CPU version 2.5+
+Virtualization:                          AMD-V
+$ grep -o -w -E 'vmx|svm' /proc/cpuinfo | sort | uniq -c
+      2 svm
+$ systemd-detect-virt
+qemu
+$ last -x reboot shutdown | head -4
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:09   still running
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:08   still running
+shutdown system down  6.8.0-142-generi Tue Oct 13 19:08 - 19:08  (00:00)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:07 - 19:08  (00:00)
+$
+
+# --- ここまで ---
+
+# ホストで docker stop linuc-boot-probe（読者は docker stop lab-linuc-boot）: 12.5 秒・終了コード 0
+
+# ホストで docker start linuc-boot-probe（読者は docker start lab-linuc-boot）
+
+# --- 画面の写し: docker start の直後（自動起動の印がある） ---
+$ virsh list
+ Id   Name    State
+-----------------------
+ 1    linuc   running
+
+$
+
+# --- ここまで ---
+
+# docker start から練習機の応答まで 48 秒
+
+# --- 画面の写し: docker stop / start の後の練習機の中 ---
+$ last -x reboot shutdown | head -4
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:12   still running
+shutdown system down  6.8.0-142-generi Tue Oct 13 19:11 - 19:12  (00:00)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:09 - 19:11  (00:01)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:08 - 19:11  (00:03)
+$ journalctl --list-boots --no-pager | tail -3
+ -2 e32c57f6bc5943b59acaf8b1066d871e Tue 2026-10-13 19:08:39 JST Tue 2026-10-13 19:08:41 JST
+ -1 1520a79687b64d5481ec0616af1f373a Tue 2026-10-13 19:09:56 JST Tue 2026-10-13 19:11:39 JST
+  0 5f59bbad0a98453982b60dc509603452 Tue 2026-10-13 19:12:07 JST Tue 2026-10-13 19:12:30 JST
+$ journalctl -b -1 -n 4 --no-pager
+Oct 13 19:11:38 linuc systemd-shutdown[1]: Syncing filesystems and block devices.
+Oct 13 19:11:39 linuc systemd-shutdown[1]: Sending SIGTERM to remaining processes...
+Oct 13 19:11:39 linuc systemd-journald[218]: Received SIGTERM from PID 1 (systemd-shutdow).
+Oct 13 19:11:39 linuc systemd-journald[218]: Journal stopped
+$ journalctl -b -k --no-pager | grep -c 'recovery complete'
+0
+$
+
+# --- ここまで ---

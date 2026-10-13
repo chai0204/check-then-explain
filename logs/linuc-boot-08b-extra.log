@@ -1,0 +1,54 @@
+
+
+========== 第8章の補足 ps の書き方・kill の書き方・killall と長い名前（[5483][3273]） ==========
+
+# --- 画面の写し: ps -f と ps f（と -A・e） ---
+$ ps -f
+UID          PID    PPID  C STIME TTY          TIME CMD
+student      963     962  3 19:30 pts/1    00:00:00 -bash
+student      991     963 99 19:30 pts/1    00:00:00 ps -f
+$ ps f
+    PID TTY      STAT   TIME COMMAND
+    963 pts/1    Ss     0:00 -bash
+    992 pts/1    R+     0:00  \_ ps f
+    889 pts/3    Ss+    0:00 /bin/bash
+    672 pts/0    Ss+    0:00 -bash
+$ ps -A | wc -l; ps -e | wc -l
+131
+131
+$ ps e -o args= -p $$ | cut -c1-100
+-bash LANG=C.UTF-8 USER=student LOGNAME=student HOME=/home/student PATH=/usr/local/sbin:/usr/local/b
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: kill -s 15 と kill -SIGKILL ---
+$ sleep 801 &
+[1] 1000
+$ kill -s 15 $!
+$ sleep 802 &
+[2] 1001
+[1]   Terminated              sleep 801
+$ kill -SIGKILL $!
+$ jobs
+[2]+  Killed                  sleep 802
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: killall と長い名前 ---
+$ cp /usr/bin/sleep /tmp/very-long-process-name
+$ /tmp/very-long-process-name 300 &
+[1] 1004
+$ pgrep -l very-long-proce
+1004 very-long-proce
+$ killall very-long-proce; echo "終了コード $?"
+very-long-proce: no process found
+終了コード 1
+$ killall very-long-process-name; echo "終了コード $?"
+[1]+  Terminated              /tmp/very-long-process-name 300
+終了コード 0
+$ jobs
+$
+
+# --- ここまで ---

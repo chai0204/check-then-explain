@@ -1,0 +1,43 @@
+
+
+========== 第10章 X では、画面の側がサーバー（1.01.5） ==========
+
+# --- 画面の写し: 練習機の中（X は入っていない） ---
+$ echo "DISPLAY=[$DISPLAY]"
+DISPLAY=[]
+$ command -v startx Xorg xauth xterm; echo "終了コード $?"
+終了コード 1
+$ systemctl status display-manager.service
+Unit display-manager.service could not be found.
+$ sudo sshd -T | grep -i x11
+x11displayoffset 10
+x11forwarding yes
+x11uselocalhost yes
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: 外から ssh -X ---
+$ echo "DISPLAY=[$DISPLAY]"
+DISPLAY=[]
+$ ssh -X linuc 'echo DISPLAY=[$DISPLAY]'
+DISPLAY=[]
+$ ssh -v -X linuc true 2>&1 | grep -iE 'x11|display'
+debug1: Remote: /home/student/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Remote: /home/student/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: X11 forwarding requested but DISPLAY not set
+$ DISPLAY=:0 ssh -X linuc 'echo DISPLAY=[$DISPLAY]'
+Warning: No xauth data; using fake authentication data for X11 forwarding.
+X11 forwarding request failed on channel 0
+DISPLAY=[]
+$ DISPLAY=:0 ssh -v -X linuc true 2>&1 | grep -iE 'x11|xauth'
+debug1: Remote: /home/student/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Remote: /home/student/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: No xauth program.
+Warning: No xauth data; using fake authentication data for X11 forwarding.
+debug1: Requesting X11 forwarding with authentication spoofing.
+debug1: Remote: No xauth program; cannot forward X11.
+X11 forwarding request failed on channel 0
+$
+
+# --- ここまで ---

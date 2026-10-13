@@ -1,0 +1,17 @@
+#!/bin/bash
+# lab env の追加行。このコースは「練習機（仮想マシン）がどう動いているか」が切り分けの中心。
+#   KVM を足して起動した読者は /proc/cpuinfo などの画面が本文と変わるので、それが分かる行を出す。
+export LIBVIRT_DEFAULT_URI=qemu:///session
+st=$(virsh domstate linuc 2>/dev/null | head -1)
+dt=$(virsh dumpxml linuc 2>/dev/null | sed -n "s/^<domain type='\([a-z]*\)'.*/\1/p" | head -1)
+case "$dt" in
+  qemu) acc="TCG（完全エミュレーション。domain type=qemu）" ;;
+  kvm)  acc="KVM（domain type=kvm）" ;;
+  *)    acc="不明" ;;
+esac
+printf '練習機    : %s\n' "${st:-未定義}"
+printf '仮想化    : %s / /dev/kvm %s\n' "$acc" "$([ -e /dev/kvm ] && echo あり || echo なし)"
+if [ "$st" = running ]; then
+  g=$(lab-guest '. /etc/os-release; echo "$PRETTY_NAME / カーネル $(uname -r) / systemd $(systemctl --version | head -1 | cut -d" " -f2)"' 2>/dev/null)
+  printf '練習機の中: %s\n' "${g:-応答なし（起動の途中か、止まっている）}"
+fi

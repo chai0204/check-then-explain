@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>9. exit では消えず、切断で消える — 確かめて説明する LinuC 主題1.01</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="9" data-theme="linuc-boot">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-boot/theory/">理論編</a> › 第9章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
+</div>
+<h1>9. exit では消えず、切断で消える</h1>
+<p class="lead"><code>&amp;</code> でバックグラウンドに回したジョブは、ログアウトすると消える——と教わることが多い。練習機で確かめると、<code>exit</code> で抜けたときは消えなかった。
+消えたのは、回線が切れたときだった。消すのはログアウトではなく、回線が切れたときに届く SIGHUP という合図で、それをどう扱うかを決めておくのが <code>nohup</code> と <code>tmux</code> / <code>screen</code> である。</p>
+<div class="badges"><span>前提: 第8章まで読了</span><span>前提: 端末を2つ開いている</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.01.4（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>&amp;</code>・<code>Ctrl+Z</code>・<code>jobs</code>・<code>bg</code>・<code>fg</code> で、フォアグラウンドとバックグラウンドを行き来できる</li>
+<li>ssh を切断したときに何が起きるかを、SIGHUP という言葉で説明できる</li>
+<li><code>nohup</code> と <code>tmux</code> / <code>screen</code> で、切断しても止まらない処理を残せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: tmux と screen の画面分割・設定ファイル（<code>~/.tmux.conf</code>・<code>~/.screenrc</code>）、
+<code>disown</code> や <code>setsid</code> など他の切り離し方、bash がジョブを管理する仕組み（プロセスグループ・端末の制御）の細部。</div></div>
+
+<h2 id="jobs">フォアグラウンドとバックグラウンド</h2>
+<div class="sgoal"><b>この節で分かること</b>: ジョブを止めて、後ろで動かして、前に戻す。</div>
+<!-- gen:JOBS -->
+<p>端末を2つ使う。端末1は、外（lab@host）から <code>ssh linuc</code> で練習機に入り、入ったり切ったりする係。端末2は、練習機に入ったまま様子を見る係にする。</p>
+<p>端末1で練習機に入り、<code>sleep 300</code>（300 秒待つだけのコマンド）を打って、終わる前に <code>Ctrl+Z</code> を押す。</p>
+<pre data-where="端末1（外から ssh linuc で入る）"><code>$ sleep 300
+^Z
+[1]+  Stopped                 sleep 300
+$ jobs -l
+[1]+   747 Stopped                 sleep 300
+$ ps -o pid,stat,cmd -p $(pgrep -f "sleep 300")
+    PID STAT CMD
+    747 T    sleep 300
+$ bg
+[1]+ sleep 300 &amp;
+$ jobs
+[1]+  Running                 sleep 300 &amp;
+$ fg
+sleep 300
+^C
+$ jobs
+$ exit
+logout
+Connection to 127.0.0.1 closed.</code></pre>
+<p>打ったコマンドが終わるまでプロンプトが戻らない状態を<b>フォアグラウンド</b>、プロンプトが戻って、裏で動き続けている状態を<b>バックグラウンド</b>と呼ぶ。シェルはそれぞれを<b>ジョブ</b>として番号（<code>[1]</code>）で管理する。</p>
+<div class="scroll"><table>
+<tr><th>操作</th><th>何が起きたか（上の記録）</th></tr>
+<tr><td><code>Ctrl+Z</code></td><td>端末が TSTP（20番）を送り、<code>sleep</code> は止まった（<code>Stopped</code>、<code>ps</code> の状態は <code>T</code>）。終わったのではない</td></tr>
+<tr><td><code>jobs</code></td><td>このシェルのジョブの一覧。<code>-l</code> で PID も出る。<code>+</code> は今のジョブ（番号を省いたときの相手）、<code>-</code> はその前のもの</td></tr>
+<tr><td><code>bg</code></td><td>止めたジョブを、バックグラウンドで再開した（<code>[1]+ sleep 300 &amp;</code>）</td></tr>
+<tr><td><code>fg</code></td><td>バックグラウンドのジョブを、フォアグラウンドに戻した。ここで <code>Ctrl+C</code>（INT、2番）を押して終わらせた</td></tr>
+<tr><td>末尾の <code>&amp;</code></td><td>はじめからバックグラウンドで起動する（次の節）</td></tr>
+</table></div>
+<p>ジョブが複数あるときは、番号で選ぶ。端末2（練習機の中）で試す。</p>
+<pre data-where="練習機の中（student@linuc）・端末2（様子を見る）"><code>$ sleep 701 &amp;
+[1] 1009
+$ sleep 702 &amp;
+[2] 1010
+$ jobs
+[1]-  Running                 sleep 701 &amp;
+[2]+  Running                 sleep 702 &amp;
+$ fg 2
+sleep 702
+^C
+$ fg %1
+sleep 701
+^C
+$ jobs
+$ sleep 703 &amp;
+[1] 1011
+$ kill %1
+$ jobs
+[1]+  Terminated              sleep 703</code></pre>
+<p><code>fg 2</code> は2番のジョブ（<code>sleep 702</code>）を、<code>fg %1</code> は1番のジョブを前に戻した。番号の前の <code>%</code> は付けても付けなくてもよい（<code>bg</code> も同じ）。
+<code>kill %1</code> のように、ジョブ番号は <code>kill</code> にも渡せるが、そのときは <code>%</code> が要る（<code>%</code> を付けないと PID の意味になる）。
+ジョブはシェルごとの番号で、別の端末のシェルからは見えない（そちらでは PID を使う）。</p>
+<div class="analogy"><b>たとえ</b>: 端末は、<b>1本しかないマイク</b>に近い。フォアグラウンドのジョブだけがマイクを持っていて、あなたのキー入力を受け取れる。
+バックグラウンドのジョブはマイクを持たずに作業を続け、<code>Ctrl+Z</code> はマイクを持っている者の作業を凍らせる。
+<br>ただし<b>崩れる点</b>: マイクを持っていなくても、バックグラウンドのジョブは端末に文字を出せる。入力は受け取れないのに出力はできるので、前で打っているコマンドの表示に割り込んで混ざることがある。
+この章の <code>nohup</code> の案内が、プロンプトの後ろに出たのもそのためである。</div>
+<!-- /gen:JOBS -->
+
+<h2 id="exit">exit と切断</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>&amp;</code> のジョブが消えるのは、いつか。</div>
+<!-- gen:EXIT -->
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>末尾に <code>&amp;</code> を付けてバックグラウンドで動かしたジョブは、ログアウトすると一緒に消える。だから、ログアウトした後も動かし続けたいなら <code>nohup</code> が要る。</p>
+<pre data-where="端末1（外から ssh linuc で入る）"><code>$ sleep 1001 &amp;
+[1] 766
+$ jobs -l
+[1]+   766 Running                 sleep 1001 &amp;
+$ shopt huponexit
+huponexit      	off
+$ exit
+logout
+Connection to 127.0.0.1 closed.</code></pre>
+<pre data-where="練習機の中（student@linuc）・端末2（様子を見る）"><code>$ pgrep -a -f 'sleep 100'
+766 sleep 1001</code></pre>
+<div class="then"><b>だめな理由</b>: <code>exit</code> でログアウトしても、<code>sleep 1001</code> は消えずに動いている。
+bash は、自分が終わるときにジョブへ SIGHUP（1番、「端末が無くなった」という合図）を配るかどうかを <code>huponexit</code> という設定で決めていて、これが <code>off</code> だった（Ubuntu の既定）。
+自分から <code>exit</code> したときは、ジョブに合図は届かない。</div></div>
+<p>今度は、回線が切れたときを再現する。ssh は、行の先頭で <code>~.</code>（チルダ、ピリオドの順）を打つと、その場で接続を切る。<code>~.</code> は画面に出ないので、<code>Enter</code> を押してから打つ。相手から見ると、回線が突然切れたのと同じである。</p>
+<pre data-where="端末1（外から ssh linuc で入る）"><code>$ sleep 1002 &amp;
+[1] 785
+$
+$ Connection to 127.0.0.1 closed.</code></pre>
+<pre data-where="練習機の中（student@linuc）・端末2（様子を見る）"><code>$ pgrep -a -f 'sleep 100'
+766 sleep 1001</code></pre>
+<p><code>sleep 1002</code> は消えた（<code>sleep 1001</code> だけが残っている）。回線が切れると、練習機の sshd はログインに使っていた端末（擬似端末）を閉じ、ログインしていたシェルに SIGHUP が届く。
+bash は SIGHUP を受け取ると、自分のジョブにも SIGHUP を配ってから終わる。<code>sleep</code> は SIGHUP を無視していないので、既定の動き（終了）で終わった。
+「ログアウトするとジョブが消える」と言われるのは、端末のウィンドウを閉じる・回線が切れるといった、<b>この経路</b>のことである。</p>
+<div class="note"><b>試験との関係</b>: 試験の例題では「ログアウトすると、<code>&amp;</code> のジョブにも HUP が送られて止まる」と説明されることがある。
+bash の既定（<code>huponexit</code> が off）では、上で見たとおり <code>exit</code> では送らず、回線が切れたときに送る。どちらの説明でも、
+「ログアウトした後も実行を続けるには」と問われたら、答えは <code>nohup</code>（と、端末ごと残す <code>screen</code>・<code>tmux</code>）である。</div>
+<div class="analogy"><b>たとえ</b>: <code>&amp;</code> のジョブは、部屋（シェル）に残した作業員に近い。<code>exit</code> は、あなたが静かに部屋を出ることで、作業員には何も言わないので作業は続く。
+切断は、建物の回線が切れて<b>非常放送</b>（SIGHUP）が流れることで、作業員はふつう放送を聞いて帰る。
+<br>ただし<b>崩れる点</b>: 建物の停電なら作業そのものができなくなるが、練習機は止まっていない。消えたのは「つながっていた端末」だけで、作業員を帰らせたのは停電ではなく、シェルが流した放送のほうである。
+放送を聞かない作業員（次の節の <code>nohup</code>）は、端末が消えた後も仕事を続ける。</div>
+<!-- /gen:EXIT -->
+
+<h2 id="nohup">nohup: SIGHUP を無視させてから起動する</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>nohup</code> が実際に何を変えているか。</div>
+<!-- gen:NOHUP -->
+<p><code>nohup</code> を付けて起動し、同じように <code>~.</code> で切断する。</p>
+<pre data-where="端末1（外から ssh linuc で入る）"><code>$ nohup sleep 1003 &amp;
+[1] 803
+$ nohup: ignoring input and appending output to 'nohup.out'
+
+$ grep SigIgn /proc/$!/status
+SigIgn:	0000000000000001
+$
+$ Connection to 127.0.0.1 closed.</code></pre>
+<pre data-where="練習機の中（student@linuc）・端末2（様子を見る）"><code>$ pgrep -a -f 'sleep 100'
+766 sleep 1001
+803 sleep 1003
+$ cat ~/nohup.out; ls -l ~/nohup.out
+-rw------- 1 student student 0 Oct 13 19:29 /home/student/nohup.out</code></pre>
+<p><code>sleep 1003</code> は切断の後も残った。<code>nohup</code> は、SIGHUP を無視する設定にしてから、指定したコマンドを起動する。
+<code>SigIgn</code> の右端（1番、HUP）が立っているのがその印で（第8章の読み方）、無視の設定は起動したコマンドに引き継がれる。だから SIGHUP が届いても何も起きない。</p>
+<p><code>nohup</code> はもう1つ、出力の行き先も変える。端末が消えた後に端末へ書こうとすると困るので、出力を <code>nohup.out</code>（カレントディレクトリ。書けなければホームディレクトリ）に足していく。
+<code>sleep</code> は何も出さないので 0 バイトのままで、ファイルは本人しか読めない形（<code>-rw-------</code>）で作られた。
+なお、<code>nohup</code> の案内（<code>nohup: ignoring input and appending output to 'nohup.out'</code>）は、バックグラウンドのジョブが出すので、プロンプトの後ろに出ることがある。<code>Enter</code> を押せば新しいプロンプトが出る。</p>
+<p><code>nohup</code> は SIGHUP を無視させるだけで、ジョブを端末から切り離すわけではない。末尾の <code>&amp;</code> を付けなければ、<code>nohup</code> を付けてもフォアグラウンドで動き、プロンプトは戻らない。</p>
+<!-- /gen:NOHUP -->
+
+<h2 id="tmux">tmux と screen: 端末ごと練習機に預ける</h2>
+<div class="sgoal"><b>この節で分かること</b>: 切断しても、後から画面ごと戻れる方法。</div>
+<!-- gen:TMUX -->
+<p><code>nohup</code> は「合図を無視させる」方法だった。もう1つの方法は、端末そのものを練習機の中に残しておくことである。
+1つの端末の中で複数の端末を動かし、それを切り離して残しておけるソフトを<b>端末多重化</b>（ターミナルマルチプレクサ）と呼び、<code>tmux</code> と <code>screen</code> がある。</p>
+<p>端末1で練習機に入り、<code>tmux new -s work</code> を打つ。画面が tmux の中に切り替わり、下端に <code>[work]</code> で始まる帯が出る。そこで <code>lab-count</code>（1秒ごとに数を数える）を打ち、数え始めたら <code>Ctrl+B</code> を押してから <code>d</code> を押す。
+画面は元に戻り、<code>[detached (from session work)]</code> と出る。そのまま <code>~.</code> で切断する。</p>
+<pre data-where="端末1（外から ssh linuc で入る）"><code>$ tmux new -s work
+[detached (from session work)]
+$
+$ Connection to 127.0.0.1 closed.</code></pre>
+<pre data-where="練習機の中（student@linuc）・端末2（様子を見る）"><code>$ tmux ls
+work: 1 windows (created Tue Oct 13 19:29:20 2026)
+$ pgrep -a lab-count
+838 /bin/bash /usr/local/bin/lab-count</code></pre>
+<p>セッション <code>work</code> は残っていて、<code>lab-count</code> も動いている。端末1でもう一度練習機に入り、<code>tmux attach -t work</code> で戻る。</p>
+<pre data-where="端末1（外から ssh linuc で入る）（tmux attach -t work で戻った画面）"><code>student@linuc:~$ lab-count
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+
+[work] 0:bash*                                                                                   "linuc" 19:29 13-Oct-26</code></pre>
+<p>切り離して、回線まで切っていた間も、<code>lab-count</code> は数え続けていた。戻った画面には、その間の表示がそのまま残っている。
+tmux の中のプログラムは、あなたの ssh のシェルではなく、練習機の中で動き続ける tmux（の server）の子として動いているので、回線が切れても SIGHUP は届かない。
+<code>Ctrl+C</code> で <code>lab-count</code> を止め、tmux の中のシェルを <code>exit</code> で終えると、セッションも終わる（<code>[exited]</code>）。</p>
+<pre data-where="端末1（外から ssh linuc で入る）"><code>$ tmux attach -t work
+[exited]
+$ exit
+logout
+Connection to 127.0.0.1 closed.</code></pre>
+<p><code>screen</code> も同じことをする。切り離すキーは <code>Ctrl+A</code> を押してから <code>d</code> である。</p>
+<pre data-where="端末1（外から ssh linuc で入る）"><code>$ screen -S job
+[detached from 888.job]
+$ screen -ls
+There is a screen on:
+	888.job	(10/13/26 19:29:43)	(Detached)
+1 Socket in /run/screen/S-student.
+$
+$ Connection to 127.0.0.1 closed.</code></pre>
+<pre data-where="練習機の中（student@linuc）・端末2（様子を見る）"><code>$ screen -ls
+There is a screen on:
+	888.job	(10/13/26 19:29:43)	(Detached)
+1 Socket in /run/screen/S-student.
+$ pgrep -a lab-count
+896 /bin/bash /usr/local/bin/lab-count
+$ pkill lab-count; pkill -f "sleep 100"</code></pre>
+<div class="scroll"><table>
+<tr><th>すること</th><th>tmux</th><th>screen</th></tr>
+<tr><td>名前を付けて始める</td><td><code>tmux new -s 名前</code></td><td><code>screen -S 名前</code></td></tr>
+<tr><td>切り離す（中は動いたまま）</td><td><code>Ctrl+B</code> → <code>d</code></td><td><code>Ctrl+A</code> → <code>d</code></td></tr>
+<tr><td>一覧</td><td><code>tmux ls</code></td><td><code>screen -ls</code></td></tr>
+<tr><td>戻る</td><td><code>tmux attach -t 名前</code></td><td><code>screen -r 名前</code></td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: <code>nohup</code> は、作業員に<b>耳栓</b>をさせて放送が聞こえないようにすること。tmux と screen は、<b>作業部屋ごと練習機の中に移して</b>、あなたは窓から覗いているだけにすることに近い。窓（ssh）が割れても、部屋は無事である。
+<br>ただし<b>崩れる点</b>: 本物の窓なら、見ていなかった間の出来事は見えない。tmux は画面の中身ごと持っているので、戻った人は、離れていた間に画面に出たものを続きから見られる。
+<code>nohup</code> にはこれが無く、出力は <code>nohup.out</code> というファイルに溜まるだけである。</div>
+<!-- /gen:TMUX -->
+
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-boot/">演習07</a>は、<code>lab-count</code> を切断しても止まらない形で動かし、実際に <code>~.</code> で切断してから確かめる課題である。
+判定は、プロセスの親をたどり、SIGHUP を無視しているか（<code>/proc/PID/status</code> の SigIgn）、tmux / screen の中にいるかを見る。</div>
+
+<div class="quiz"><b>確認</b>
+<p>ログアウトした後もコマンド <code>backup.sh</code> を実行し続けさせたい。SIGHUP を無視させて起動するコマンドはどれか。</p>
+<p>A. <code>bg backup.sh</code>　B. <code>nohup backup.sh &amp;</code>　C. <code>jobs backup.sh</code>　D. <code>fg backup.sh</code></p>
+<details><summary>答え</summary>
+<p>B。<code>nohup</code> は SIGHUP を無視する設定にしてから起動する。端末に出るはずの出力は <code>nohup.out</code> に書かれる。
+末尾の <code>&amp;</code> でバックグラウンドにすると、すぐにプロンプトが戻る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>実行中のコマンドを <code>Ctrl+Z</code> で一時停止した。それをバックグラウンドで実行し直すコマンドと、フォアグラウンドに戻すコマンドは何か。</p>
+<details><summary>答え</summary>
+<p><code>bg</code> でバックグラウンドで再開、<code>fg</code> でフォアグラウンドに戻す。ジョブが複数あるときは <code>bg %2</code> のようにジョブ番号を付ける。
+一覧は <code>jobs</code>（<code>-l</code> で PID も）。実測では、止めたジョブの状態は <code>ps</code> で <code>T</code>（停止）と出た。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>tmux のセッションから、中のプログラムを動かしたまま抜けるキー操作は何か。また、後から戻るコマンドは何か。</p>
+<details><summary>答え</summary>
+<p><code>Ctrl+B</code> を押してから <code>d</code>（デタッチ）。戻るのは <code>tmux attach -t セッション名</code>（一覧は <code>tmux ls</code>）。
+screen なら <code>Ctrl+A</code> → <code>d</code> で抜け、<code>screen -r</code> で戻る（一覧は <code>screen -ls</code>）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>末尾の <code>&amp;</code> でバックグラウンド、<code>Ctrl+Z</code> で一時停止、<code>bg</code> で後ろで再開、<code>fg</code> で前へ、<code>jobs</code> で一覧</li>
+<li>回線が切れると、ログインしていたシェルに SIGHUP が届き、シェルはそれを自分のジョブに配る。<code>&amp;</code> だけのジョブはこれで止まる</li>
+<li><code>exit</code> で普通に抜けたときは、bash は（huponexit が off なので）ジョブに配らない。だから「exit では消えず、切断で消える」</li>
+<li><code>nohup</code> は SIGHUP を無視させてから起動する（SigIgn の 1番が立つ）。出力は <code>nohup.out</code></li>
+<li><code>tmux</code> / <code>screen</code> は端末ごと相手に残す。切断しても動き続け、後から画面ごと戻れる</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-boot/theory/08-signal">← 8. kill は止めない。合図を送るだけ</a><a href="/linuc-boot/theory/10-x11">次: 10. X では、画面の側がサーバー →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-boot/chapters.js"></script>
+<script src="/linuc-boot/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

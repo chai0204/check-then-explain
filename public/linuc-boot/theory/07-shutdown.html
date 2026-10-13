@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>7. halt では電源は切れない — 確かめて説明する LinuC 主題1.01</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="7" data-theme="linuc-boot">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-boot/theory/">理論編</a> › 第7章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
+</div>
+<h1>7. halt では電源は切れない</h1>
+<p class="lead"><code>sudo halt</code> を打つと、練習機は最後に <code>reboot: System halted</code> と書いて止まる。ところが外で <code>virsh domstate</code> を打つと <code>running</code> と出る。
+<code>halt</code> が止めたのは CPU で、電源ではない。電源を切るのは <code>poweroff</code> で、しかもこの2つと <code>shutdown</code> <code>reboot</code> は、同じ1つのプログラムである。</p>
+<div class="badges"><span>前提: 第6章まで読了</span><span>前提: 端末を2つ開いている</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.01.3（重要度4）</span><span>出題範囲 1.01.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>shutdown</code> に時刻と文を渡して停止を予約し、取り消せる（<code>-h</code> <code>-r</code> <code>-c</code> <code>now</code> <code>+分</code>）</li>
+<li><code>halt</code>・<code>poweroff</code>・<code>reboot</code> の違いを、仮想マシンの状態で示せる</li>
+<li>電源を抜いて止めた（<code>virsh destroy</code>）次の起動で何が起きるかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: systemd が止まるときのユニットの順番（shutdown.target・final.target）の細部、
+ACPI の仕様、ログイン記録のファイル（wtmp）の形式、<code>/run/systemd/shutdown/scheduled</code> の各行の意味。</div></div>
+
+<h2 id="same">4つのコマンドは、同じプログラム</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>shutdown</code> <code>halt</code> <code>poweroff</code> <code>reboot</code> の正体。</div>
+<!-- gen:SAME -->
+<pre data-where="練習機の中（student@linuc）"><code>$ ls -l /usr/sbin/shutdown /usr/sbin/halt /usr/sbin/poweroff /usr/sbin/reboot
+lrwxrwxrwx 1 root root 16 Jul 29 00:04 /usr/sbin/halt -&gt; ../bin/systemctl
+lrwxrwxrwx 1 root root 16 Jul 29 00:04 /usr/sbin/poweroff -&gt; ../bin/systemctl
+lrwxrwxrwx 1 root root 16 Jul 29 00:04 /usr/sbin/reboot -&gt; ../bin/systemctl
+lrwxrwxrwx 1 root root 16 Jul 29 00:04 /usr/sbin/shutdown -&gt; ../bin/systemctl</code></pre>
+<p>4つとも <code>systemctl</code> へのシンボリックリンクである。<code>systemctl</code> は「どの名前で呼ばれたか」を見て、<code>halt</code> なら halt、<code>poweroff</code> なら poweroff として振る舞う。
+SysV init の時代に別々のプログラムだった名前を、互換のために残している。だから <code>systemctl halt</code> と <code>halt</code>、<code>systemctl poweroff</code> と <code>poweroff</code> は同じことをする。</p>
+<div class="analogy"><b>たとえ</b>: 4つのコマンドは、1人の係員が<b>4つの窓口の名札</b>を付け替えているのに近い。「停止」の窓口に座れば停止の受付を、「再起動」の窓口なら再起動の受付をする。
+<br>ただし<b>崩れる点</b>: 人は名札を替えても同じ人だと分かるが、コマンドの名前だけを見ても、それが同じプログラムかは分からない。<code>ls -l</code> でリンク先を見て初めて分かる。</div>
+<!-- /gen:SAME -->
+
+<h2 id="schedule">予約して、知らせて、取り消す</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>shutdown</code> の時刻と文が、誰にどう届くか。</div>
+<!-- gen:SCHEDULE -->
+<p>端末を2つ使う。端末2で練習機に入って待っておき、端末1で停止を予約する。</p>
+<pre data-where="練習機の中（student@linuc）・端末1（予約する人）"><code>$ sudo shutdown -h +30 "メンテナンスのため停止します"
+Shutdown scheduled for Tue 2026-10-13 19:52:24 JST, use 'shutdown -c' to cancel.
+$ cat /run/systemd/shutdown/scheduled
+USEC=1791888744488464
+WARN_WALL=1
+MODE=poweroff
+UID=0
+TTY=pts/2
+WALL_MESSAGE=\xe3\x83\xa1\xe3\x83\xb3\xe3\x83\x86\xe3\x83\x8a\xe3\x83\xb3\xe3\x82\xb9\xe3\x81\xae\xe3\x81\x9f\xe3\x82\x81\xe5\x81\x9c\xe6\xad\xa2\xe3\x81\x97\xe3\x81\xbe\xe3\x81\x99
+$ busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager ScheduledShutdown
+(st) "poweroff" 1791888744488464
+$ ls -l /run/nologin
+ls: cannot access '/run/nologin': No such file or directory</code></pre>
+<p><code>shutdown</code> は止めたのではなく、<b>予約</b>した。予約を持っているのは systemd-logind で、<code>/run/systemd/shutdown/scheduled</code> に時刻（1970年からのマイクロ秒）・種類・文が書かれている。
+<code>-h</code> の種類は <code>poweroff</code>（電源を切る）になった。文は UTF-8 のバイト列を <code>\x..</code> で書き並べた形で保存されている。</p>
+<p>この時点で、端末2には何も届いていなかった。続けて予約を取り消し、今度は時刻を付けずに打つ。</p>
+<pre data-where="練習機の中（student@linuc）・端末1（予約する人）"><code>$ sudo shutdown -c
+
+Broadcast message from root@linuc on pts/2 (Tue 2026-10-13 19:22:33 JST):
+
+System shutdown has been cancelled
+
+$ sudo shutdown
+
+Broadcast message from root@linuc on pts/2 (Tue 2026-10-13 19:22:37 JST):
+
+The system will power off at Tue 2026-10-13 19:23:37 JST!
+
+Shutdown scheduled for Tue 2026-10-13 19:23:37 JST, use 'shutdown -c' to cancel.
+$ cat /run/nologin
+System is going down. Unprivileged users are not permitted to log in anymore. For technical details, see pam_nologin(8).</code></pre>
+<p><b>時刻を付けない <code>shutdown</code> は「いますぐ」ではなく「1分後」</b>だった（19:22:37 に打って、予約は 19:23:37）。
+今度はすぐに知らせ（Broadcast message）が出て、さらに <code>/run/nologin</code> が作られた。残り 5 分を切ると作られるファイルで、これがある間、一般ユーザは新しくログインできない。外から試す。</p>
+<pre data-where="外（lab@host）"><code>$ ssh linuc hostname
+System is going down. Unprivileged users are not permitted to log in anymore. For technical details, see pam_nologin(8).
+
+Connection closed by 127.0.0.1 port 2222</code></pre>
+<p>練習機の sshd は、パスワードも鍵も確かめる前に <code>/run/nologin</code> の文を見せて、接続を閉じた。取り消して、全員に文を送る <code>wall</code> も試す。</p>
+<pre data-where="練習機の中（student@linuc）・端末1（予約する人）"><code>$ sudo shutdown -c
+
+Broadcast message from root@linuc on pts/2 (Tue 2026-10-13 19:22:43 JST):
+
+System shutdown has been cancelled
+
+$ wall "これは wall の試験です"
+
+Broadcast message from student@linuc (pts/0) (Tue Oct 13 19:22:47 2026):
+
+これは wall の試験です</code></pre>
+<p>入って待っていた端末2の画面には、こう届いていた。</p>
+<pre data-where="練習機の中（student@linuc）・端末2（入って待っていた人）"><code>Broadcast message from root@linuc on pts/2 (Tue 2026-10-13 19:22:33 JST):
+
+System shutdown has been cancelled
+
+Broadcast message from root@linuc on pts/2 (Tue 2026-10-13 19:22:37 JST):
+
+The system will power off at Tue 2026-10-13 19:23:37 JST!
+
+Broadcast message from root@linuc on pts/2 (Tue 2026-10-13 19:22:43 JST):
+
+System shutdown has been cancelled
+
+Broadcast message from student@linuc (pts/0) (Tue Oct 13 19:22:47 2026):
+
+これは wall の試験です</code></pre>
+<p>30 分後の予約（とその文）は、予約した時点では端末2に届いていない。logind は残り時間に応じて間を置いて知らせるので、遠い予約ほど、最初の知らせは後になる。
+すぐ知らせたいなら <code>wall</code> を自分で打つ。</p>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>意味</th></tr>
+<tr><td><code>shutdown -h now</code></td><td>いますぐ止める（Ubuntu では電源を切る。<code>-P</code> と同じ）</td></tr>
+<tr><td><code>shutdown -h +30 "文"</code></td><td>30 分後に止める予約。文はログイン中の端末に届く</td></tr>
+<tr><td><code>shutdown -r 23:00</code></td><td>23 時に再起動する予約</td></tr>
+<tr><td><code>shutdown -H now</code></td><td>止めるが、電源は切らない（halt）</td></tr>
+<tr><td><code>shutdown -c</code></td><td>予約を取り消す</td></tr>
+<tr><td><code>shutdown</code>（時刻なし）</td><td>1 分後に電源を切る</td></tr>
+</table></div>
+<!-- /gen:SCHEDULE -->
+
+<h2 id="halt">halt と poweroff</h2>
+<div class="sgoal"><b>この節で分かること</b>: 「止める」と「電源を切る」が別のことだと。</div>
+<!-- gen:HALT -->
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>halt</code> は「システムを止める」コマンドだ。止まったのだから、電源も切れているはずだ。外から見れば、仮想マシンは <code>shut off</code> になっているだろう。</p>
+<pre data-where="練習機の中（student@linuc）・端末1"><code>$ sudo halt
+
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 19:22:51 JST):
+
+The system will halt now!
+
+$ Connection to 127.0.0.1 closed by remote host.
+Connection to 127.0.0.1 closed.</code></pre>
+<pre data-where="外（lab@host）・練習機のコンソール"><code>[  OK  ] Reached target shutdown.target - System Shutdown.
+[  OK  ] Reached target final.target - Late Shutdown Services.
+[  OK  ] Finished systemd-halt.service - System Halt.
+[  OK  ] Reached target halt.target - System Halt.
+[  101.872821] reboot: System halted</code></pre>
+<pre data-where="外（lab@host）"><code>$ virsh domstate linuc --reason
+running (booted)</code></pre>
+<div class="then"><b>だめな理由</b>: 練習機の中では systemd が後片付けを終え、カーネルが <code>System halted</code> と書いて止まった。それでも外から見ると <code>running</code> のままで、
+10 秒待っても変わらない。<b><code>halt</code> は CPU を止める（何もしない状態で待たせる）だけで、電源を切る指示は出さない</b>。
+電源を切るのは別の動き（ACPI でハードウェアに「切って」と頼む）で、それをするのが <code>poweroff</code> である。
+昔の機械では halt の後に人が電源スイッチを切った。仮想マシンでは、外から <code>virsh destroy</code> で切るしかない。</div></div>
+<pre data-where="外（lab@host）"><code>$ virsh destroy linuc
+Domain 'linuc' destroyed
+
+$ virsh domstate linuc --reason
+shut off (destroyed)
+
+$ virsh start linuc
+Domain 'linuc' started</code></pre>
+<p>同じことを <code>poweroff</code> で行う。</p>
+<pre data-where="練習機の中（student@linuc）・端末1"><code>$ sudo poweroff
+
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 19:24:20 JST):
+
+The system will power off now!
+
+$ Connection to 127.0.0.1 closed by remote host.
+Connection to 127.0.0.1 closed.</code></pre>
+<pre data-where="外（lab@host）・練習機のコンソール"><code>[  OK  ] Reached target shutdown.target - System Shutdown.
+[  OK  ] Reached target final.target - Late Shutdown Services.
+[  OK  ] Finished systemd-poweroff.service - System Power Off.
+[  OK  ] Reached target poweroff.target - System Power Off.
+[   56.235857] reboot: Power down</code></pre>
+<pre data-where="外（lab@host）"><code>$ virsh domstate linuc --reason
+shut off (shutdown)
+
+$ virsh start linuc
+Domain 'linuc' started</code></pre>
+<p>最後の行が <code>reboot: Power down</code> に変わり、外から見た状態も <code>shut off (shutdown)</code>（中から止まった）になった。
+<code>halt</code> と <code>poweroff</code> の違いは、止まる最後に電源を切るよう頼むかどうかだけである。前の節で見たとおり、Ubuntu の <code>shutdown -h</code> は poweroff として予約された（<code>MODE=poweroff</code>）。
+止めるだけにしたいときは <code>shutdown -H</code>、電源まで切るなら <code>shutdown -P</code> と書き分けられる。</p>
+<div class="analogy"><b>たとえ</b>: <code>halt</code> は、店の<b>閉店作業を終えて照明を落とした</b>状態に近い。店は営業していないが、建物の電気（電源）は来たままである。<code>poweroff</code> はブレーカーまで落とす。
+<br>ただし<b>崩れる点</b>: 店なら照明が消えていれば外から「閉まった」と分かるが、仮想マシンは halt した後も外からは <code>running</code> にしか見えない。
+中で何が起きたかは、コンソールの最後の1行（<code>System halted</code>）を見ないと分からない。</div>
+<!-- /gen:HALT -->
+
+<h2 id="destroy">電源を抜くと、次の起動で何が起きるか</h2>
+<div class="sgoal"><b>この節で分かること</b>: 正しく止めることに、何の意味があるか。</div>
+<!-- gen:DESTROY -->
+<p>今度は、正しく止めずに電源を抜く。練習機の中でファイルを1つ書き、数秒のうちに外から <code>virsh destroy</code> する。</p>
+<pre data-where="練習機の中（student@linuc）・端末1"><code>$ echo "抜く前に書いた" &gt; memo.txt; ls -l memo.txt
+-rw-rw-r-- 1 student student 22 Oct 13 19:30 memo.txt
+$ Connection to 127.0.0.1 closed by remote host.
+Connection to 127.0.0.1 closed.</code></pre>
+<pre data-where="外（lab@host）"><code>$ virsh destroy linuc
+Domain 'linuc' destroyed
+
+$ virsh start linuc
+Domain 'linuc' started</code></pre>
+<p>起動し直したら、もう一度入って、同じ場所を見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo cat /run/initramfs/fsck.log
+Log of fsck -C -a -V -t ext4 /dev/vda1
+Tue Oct 13 10:31:14 2026
+
+fsck from util-linux 2.39.3
+[/usr/sbin/fsck.ext4 (1) -- /dev/vda1] fsck.ext4 -a -C0 /dev/vda1
+cloudimg-rootfs: recovering journal
+cloudimg-rootfs: clean, 31930/2490368 files, 431007/4980475 blocks
+
+Tue Oct 13 10:31:14 2026
+----------------
+$ ls -l memo.txt; cat memo.txt
+ls: cannot access 'memo.txt': No such file or directory
+cat: memo.txt: No such file or directory</code></pre>
+<p>2つのことが起きている。1つ目に、起動の途中（initramfs の中）で <code>fsck</code> がルートのファイルシステムを調べ、<code>recovering journal</code>（ジャーナルを再生した）と書いている。
+ext4 は、書き換えの予定を先に<b>ジャーナル</b>という控えに書いてから、本体を書き換える。途中で電源が切れても、次の起動で控えを読み直せば、ファイルシステムを壊れていない状態に戻せる。
+正しく止めたときは止める前に書き終えているので、この作業は要らない（第5章の起動では <code>clean</code> とだけ出ていた）。
+なお、この記録の時刻は UTC（日本時間の 9 時間前）で書かれている。initramfs の中では、まだタイムゾーンの設定を読んでいないからである。</p>
+<p>2つ目に、電源を抜く数秒前に書いた <code>memo.txt</code> は、ファイルごと残っていなかった。ファイルシステムが守ったのは「壊れていない」ことで、「書いたものが残る」ことではない。
+書いた中身はすぐにはディスクに書かれず、しばらくメモリの上に置かれてから、まとめて書き出される。その前に電源が消えれば、書いたつもりのものは無かったことになる。
+<code>shutdown</code> や <code>poweroff</code> が止まる前にしていたのは、この書き出しと、各サービスの後片付けである。</p>
+<div class="analogy"><b>たとえ</b>: 正しい停止は、閉店のあとで<b>帳簿を締めて金庫にしまう</b>ことに近い。電源を抜くのは、営業中に停電することである。
+翌朝、帳簿の控え（ジャーナル）を見れば、最後に締めたところまでは戻せる。
+<br>ただし<b>崩れる点</b>: 店なら、停電の直前に書いた注文のメモも、紙として机の上に残っている。コンピュータでは、書いたつもりのものはまだメモリの上にあり、紙（ディスク）に写す前だった。
+「書いた」と「残った」が別の出来事であるところが、人の感覚とずれる。</div>
+<!-- /gen:DESTROY -->
+
+<h2 id="reboot">reboot と、起動の記録</h2>
+<div class="sgoal"><b>この節で分かること</b>: 再起動したことを、後から確かめる方法。</div>
+<!-- gen:REBOOT -->
+<p>最後に再起動する。<code>/proc/sys/kernel/random/boot_id</code> は起動のたびに作り直される乱数で、この値が変われば、間に再起動があったと分かる。</p>
+<pre data-where="練習機の中（student@linuc）・端末1"><code>$ cat /proc/sys/kernel/random/boot_id
+19186b57-efbc-48cd-a458-622572354c78
+$ sudo reboot
+
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 19:31:49 JST):
+
+The system will reboot now!
+
+$ Connection to 127.0.0.1 closed by remote host.
+Connection to 127.0.0.1 closed.</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ cat /proc/sys/kernel/random/boot_id
+58b2c094-2ef8-4e45-baa5-889dbd24f2a2
+$ last -x reboot shutdown | head -8
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:32   still running
+shutdown system down  6.8.0-142-generi Tue Oct 13 19:32 - 19:32  (00:00)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:31 - 19:32  (00:00)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:27 - 19:32  (00:04)
+shutdown system down  6.8.0-142-generi Tue Oct 13 19:26 - 19:27  (00:00)
+（略）</code></pre>
+<p><code>boot_id</code> が変わった。<code>last -x</code> は、ログインの記録から起動（<code>reboot</code>）と停止（<code>shutdown</code>）の行を出す。1行が1回の起動か停止で、新しいものが上に並ぶ。
+正しく止めた起動は、その上に <code>shutdown</code> の行が付く。電源を抜かれた起動には <code>shutdown</code> の行が無く、<code>reboot</code> の行が2つ続いている（上から3行目と4行目）。
+後から「この機械は正しく止められていたか」を調べるときの手がかりになる（6行目より下は、それまでに何回起動し直したかで人ごとに変わるので略した）。</p>
+<p><code>reboot</code> も、これまでの3つと同じく <code>systemctl</code> へのリンクで、<code>shutdown -r now</code> と同じことをする。再起動の前に、ログイン中の端末へ知らせが届き、接続が閉じられた。</p>
+<!-- /gen:REBOOT -->
+
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-boot/">演習05</a>は、30 分後に電源を切る予約を、理由の文を付けて入れる課題である。
+判定は予約を持っている systemd-logind に、予約の種類・時刻・文を尋ねる。確かめたら <code>shutdown -c</code> で取り消すこと。</div>
+
+<div class="quiz"><b>確認</b>
+<p>10 分後にシステムの電源を切り、ログイン中のユーザに「メンテナンスします」と知らせたい。正しいコマンドはどれか。</p>
+<p>A. <code>shutdown -c +10 "メンテナンスします"</code><br>B. <code>shutdown -h +10 "メンテナンスします"</code><br>C. <code>shutdown -r 10 "メンテナンスします"</code><br>D. <code>halt +10 "メンテナンスします"</code></p>
+<details><summary>答え</summary>
+<p>B。時刻は <code>+分</code>（または <code>hh:mm</code>、<code>now</code>）、文は時刻の後に書く。<code>-h</code> は Ubuntu（systemd）では電源断（poweroff）になった（実測で <code>MODE=poweroff</code>）。
+A の <code>-c</code> は予約の取り消し、C の <code>-r</code> は再起動で、<code>10</code> だけでは 10 時ちょうど（<code>10:00</code>）の意味にもならない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>shutdown</code> を時刻なしで実行したら、どうなるか。</p>
+<details><summary>答え</summary>
+<p>1分後の電源断が予約される（すぐには止まらない）。実測では「The system will power off at …!」がすぐに他の端末へ届き、
+残り 5 分以内なので <code>/run/nologin</code> が作られて、一般ユーザは新しくログインできなくなった。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>halt</code> と <code>poweroff</code> の違いは何か。</p>
+<details><summary>答え</summary>
+<p>どちらもシステムを止めるが、<code>halt</code> は CPU を止めるだけで電源は切らない。<code>poweroff</code> は最後にハードウェア（ACPI）に電源を切ってもらう。
+実測では <code>halt</code> の後も仮想マシンは <code>running</code> のままで、<code>poweroff</code> の後は <code>shut off (shutdown)</code> になった。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>予約した停止を取り消すコマンドは何か。取り消すと、ログイン中のユーザには何が届くか。</p>
+<details><summary>答え</summary>
+<p><code>shutdown -c</code>。ログイン中の端末に「System shutdown has been cancelled」という知らせ（Broadcast message）が届いた（実測）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li><code>shutdown</code> <code>halt</code> <code>poweroff</code> <code>reboot</code> はどれも systemctl へのリンク。呼ばれた名前で動きを変える</li>
+<li><code>shutdown -h +30 "文"</code> は予約。予約を持つのは systemd-logind で、<code>shutdown -c</code> で取り消す。時刻なしは1分後</li>
+<li>残り 5 分を切ると <code>/run/nologin</code> ができ、一般ユーザは新しくログインできない。<code>wall</code> は全端末に文を送る</li>
+<li><code>halt</code> は CPU を止めるだけで、電源は切らない。電源を切るのは <code>poweroff</code></li>
+<li>電源を抜くと（<code>virsh destroy</code>）、次の起動でファイルシステムの回復が走る。止め方の違いは、後片付けをさせるかどうか</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-boot/theory/06-target">← 6. root にパスワードが無いと、シングルユーザモードは何も聞かずに root を渡す</a><a href="/linuc-boot/theory/08-signal">次: 8. kill は止めない。合図を送るだけ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-boot/chapters.js"></script>
+<script src="/linuc-boot/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,71 @@
+
+
+========== 第4章 GUI が無くても、既定は graphical.target（1.01.1） ==========
+
+# --- 画面の写し: GUI と CUI（ターゲット） ---
+$ systemctl get-default
+graphical.target
+$ runlevel
+N 5
+$ who -r
+         run-level 5  2026-10-13 19:12
+$ systemctl list-units --type=target --state=active --no-legend --no-pager | grep -E "graphical|multi-user"
+  graphical.target        loaded active active Graphical Interface
+  multi-user.target       loaded active active Multi-User System
+$ systemctl status display-manager.service
+Unit display-manager.service could not be found.
+$ ls /usr/share/xsessions /usr/bin/Xorg
+ls: cannot access '/usr/share/xsessions': No such file or directory
+ls: cannot access '/usr/bin/Xorg': No such file or directory
+$ ls -l /usr/lib/systemd/system/default.target /etc/systemd/system/default.target
+ls: cannot access '/etc/systemd/system/default.target': No such file or directory
+lrwxrwxrwx 1 root root 16 Jul 29 00:04 /usr/lib/systemd/system/default.target -> graphical.target
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: タイムゾーン・パスワード・パッケージ・ディスク ---
+$ timedatectl | grep -E "Local time|Time zone"
+               Local time: Tue 2026-10-13 19:12:43 JST
+                Time zone: Asia/Tokyo (JST, +0900)
+$ ls -l /etc/localtime
+lrwxrwxrwx 1 root root 30 Oct 13 10:06 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
+$ localectl status
+System Locale: LANG=C.UTF-8
+    VC Keymap: (unset)
+   X11 Layout: us
+    X11 Model: pc105
+$ sudo passwd -S root
+root L 2026-09-05 0 99999 7 -1
+$ sudo passwd -S student
+student P 2026-10-13 0 99999 7 -1
+$ sudo grep -E "^(root|student):" /etc/shadow | cut -d: -f1,2 | cut -c1-16
+root:*
+student:$y$j9T$z
+$ id
+uid=1000(student) gid=1000(student) groups=1000(student),4(adm),27(sudo)
+$ dpkg-query -W | wc -l
+418
+$ dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'ubuntu-*'
+un  ubuntu-advantage-tools
+ii  ubuntu-cloud-minimal
+un  ubuntu-cloudimage-keyring
+un  ubuntu-core-launcher
+ii  ubuntu-drivers-common
+ii  ubuntu-keyring
+ii  ubuntu-pro-client
+un  ubuntu-pro-client-l10n
+ii  ubuntu-release-upgrader-core
+un  ubuntu-server
+un  ubuntu-snappy
+un  ubuntu-snappy-cli
+$ lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS /dev/vda
+NAME     SIZE FSTYPE MOUNTPOINTS
+vda       20G
+├─vda1    19G ext4   /
+├─vda14    4M
+├─vda15  106M vfat   /boot/efi
+└─vda16  913M ext4   /boot
+$
+
+# --- ここまで ---

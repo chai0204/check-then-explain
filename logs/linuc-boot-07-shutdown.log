@@ -1,0 +1,264 @@
+
+
+========== 第7章 halt では電源は切れない（1.01.1 / 1.01.3） ==========
+
+# --- 画面の写し: 4つのコマンドの正体 ---
+$ ls -l /usr/sbin/shutdown /usr/sbin/halt /usr/sbin/poweroff /usr/sbin/reboot
+lrwxrwxrwx 1 root root 16 Jul 29 00:04 /usr/sbin/halt -> ../bin/systemctl
+lrwxrwxrwx 1 root root 16 Jul 29 00:04 /usr/sbin/poweroff -> ../bin/systemctl
+lrwxrwxrwx 1 root root 16 Jul 29 00:04 /usr/sbin/reboot -> ../bin/systemctl
+lrwxrwxrwx 1 root root 16 Jul 29 00:04 /usr/sbin/shutdown -> ../bin/systemctl
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: 端末1: 予約する人 ---
+$ sudo shutdown -h +30 "メンテナンスのため停止します"
+Shutdown scheduled for Tue 2026-10-13 19:52:24 JST, use 'shutdown -c' to cancel.
+$ cat /run/systemd/shutdown/scheduled
+USEC=1791888744488464
+WARN_WALL=1
+MODE=poweroff
+UID=0
+TTY=pts/2
+WALL_MESSAGE=\xe3\x83\xa1\xe3\x83\xb3\xe3\x83\x86\xe3\x83\x8a\xe3\x83\xb3\xe3\x82\xb9\xe3\x81\xae\xe3\x81\x9f\xe3\x82\x81\xe5\x81\x9c\xe6\xad\xa2\xe3\x81\x97\xe3\x81\xbe\xe3\x81\x99
+$ busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager ScheduledShutdown
+(st) "poweroff" 1791888744488464
+$ ls -l /run/nologin
+ls: cannot access '/run/nologin': No such file or directory
+$ sudo shutdown -c
+
+Broadcast message from root@linuc on pts/2 (Tue 2026-10-13 19:22:33 JST):
+
+System shutdown has been cancelled
+
+$ sudo shutdown
+
+Broadcast message from root@linuc on pts/2 (Tue 2026-10-13 19:22:37 JST):
+
+The system will power off at Tue 2026-10-13 19:23:37 JST!
+
+Shutdown scheduled for Tue 2026-10-13 19:23:37 JST, use 'shutdown -c' to cancel.
+$ cat /run/nologin
+System is going down. Unprivileged users are not permitted to log in anymore. For technical details, see pam_nologin(8).
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: 予約が5分以内に迫っているとき、外から入ろうとする ---
+$ ssh linuc hostname
+System is going down. Unprivileged users are not permitted to log in anymore. For technical details, see pam_nologin(8).
+
+Connection closed by 127.0.0.1 port 2222
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: 端末1: 取り消して、wall を送る ---
+$ sudo shutdown -c
+
+Broadcast message from root@linuc on pts/2 (Tue 2026-10-13 19:22:43 JST):
+
+System shutdown has been cancelled
+
+$ wall "これは wall の試験です"
+
+Broadcast message from student@linuc (pts/0) (Tue Oct 13 19:22:47 2026):
+
+これは wall の試験です
+
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: 端末2: 入って待っていた人の画面 ---
+$
+Broadcast message from root@linuc on pts/2 (Tue 2026-10-13 19:22:33 JST):
+
+System shutdown has been cancelled
+
+Broadcast message from root@linuc on pts/2 (Tue 2026-10-13 19:22:37 JST):
+
+The system will power off at Tue 2026-10-13 19:23:37 JST!
+
+Broadcast message from root@linuc on pts/2 (Tue 2026-10-13 19:22:43 JST):
+
+System shutdown has been cancelled
+
+Broadcast message from student@linuc (pts/0) (Tue Oct 13 19:22:47 2026):
+
+これは wall の試験です
+
+# --- ここまで ---
+
+# --- 画面の写し: 端末1: sudo halt ---
+$ sudo halt
+
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 19:22:51 JST):
+
+The system will halt now!
+
+$ Connection to 127.0.0.1 closed by remote host.
+Connection to 127.0.0.1 closed.
+$
+
+# --- ここまで ---
+
+# --- 画面の写し（見えている範囲）: halt の後のコンソール ---
+[  OK  ] Unset automount proc-sys-fs-binfmt…ormats File System Automount Point.
+[  OK  ] Stopped target local-fs.target - Local File Systems.
+[  OK  ] Stopped target snapd.mounts.target - Mounted snaps.
+[  OK  ] Stopped target snapd.mounts-pre.target - Mounting snaps.
+         Unmounting boot-efi.mount - /boot/efi...
+[  OK  ] Unmounted boot-efi.mount - /boot/efi.
+         Unmounting boot.mount - /boot...
+[  OK  ] Stopped systemd-fsck@dev-disk-by\x…m Check on /dev/disk/by-label/UEFI.
+[  OK  ] Unmounted boot.mount - /boot.
+[  OK  ] Reached target umount.target - Unmount All Filesystems.
+[  OK  ] Stopped systemd-fsck@dev-disk-by\x…m Check on /dev/disk/by-label/BOOT.
+[  OK  ] Removed slice system-systemd\x2dfs…slice - Slice /system/systemd-fsck.
+[  OK  ] Stopped target local-fs-pre.target…Preparation for Local File Systems.
+         Stopping lvm2-monitor.service - Mo…ing dmeventd or progress polling...
+[  OK  ] Stopped systemd-remount-fs.service…mount Root and Kernel File Systems.
+[  OK  ] Stopped systemd-tmpfiles-setup-dev…Create Static Device Nodes in /dev.
+[  OK  ] Stopped systemd-tmpfiles-setup-dev…ic Device Nodes in /dev gracefully.
+[  OK  ] Stopped lvm2-monitor.service - Mon…using dmeventd or progress polling.
+[  OK  ] Reached target shutdown.target - System Shutdown.
+[  OK  ] Reached target final.target - Late Shutdown Services.
+[  OK  ] Finished systemd-halt.service - System Halt.
+[  OK  ] Reached target halt.target - System Halt.
+[  101.872821] reboot: System halted
+
+# --- ここまで ---
+
+# --- 画面の写し: 外から見た halt の後 ---
+$ virsh domstate linuc --reason
+running (booted)
+
+$ virsh domstate linuc --reason
+running (booted)
+
+$ virsh destroy linuc
+Domain 'linuc' destroyed
+
+$ virsh domstate linuc --reason
+shut off (destroyed)
+
+$ virsh start linuc
+Domain 'linuc' started
+
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: 端末1: sudo poweroff ---
+$ sudo poweroff
+
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 19:24:20 JST):
+
+The system will power off now!
+
+$ Connection to 127.0.0.1 closed by remote host.
+Connection to 127.0.0.1 closed.
+$
+
+# --- ここまで ---
+
+# --- 画面の写し（見えている範囲）: poweroff の後のコンソール ---
+[  OK  ] Stopped target local-fs.target - Local File Systems.
+[  OK  ] Stopped target snapd.mounts.target - Mounted snaps.
+[  OK  ] Stopped target snapd.mounts-pre.target - Mounting snaps.
+         Unmounting boot-efi.mount - /boot/efi...
+[  OK  ] Unmounted boot-efi.mount - /boot/efi.
+         Unmounting boot.mount - /boot...
+[  OK  ] Stopped systemd-fsck@dev-disk-by\x…m Check on /dev/disk/by-label/UEFI.
+[  OK  ] Unmounted boot.mount - /boot.
+[  OK  ] Reached target umount.target - Unmount All Filesystems.
+[  OK  ] Stopped systemd-fsck@dev-disk-by\x…m Check on /dev/disk/by-label/BOOT.
+[  OK  ] Removed slice system-systemd\x2dfs…slice - Slice /system/systemd-fsck.
+[  OK  ] Stopped target local-fs-pre.target…Preparation for Local File Systems.
+         Stopping lvm2-monitor.service - Mo…ing dmeventd or progress polling...
+[  OK  ] Stopped systemd-remount-fs.service…mount Root and Kernel File Systems.
+[  OK  ] Stopped systemd-tmpfiles-setup-dev…Create Static Device Nodes in /dev.
+[  OK  ] Stopped systemd-tmpfiles-setup-dev…ic Device Nodes in /dev gracefully.
+[  OK  ] Stopped lvm2-monitor.service - Mon…using dmeventd or progress polling.
+[  OK  ] Reached target shutdown.target - System Shutdown.
+[  OK  ] Reached target final.target - Late Shutdown Services.
+[  OK  ] Finished systemd-poweroff.service - System Power Off.
+[  OK  ] Reached target poweroff.target - System Power Off.
+[   56.235857] reboot: Power down
+
+$
+# --- ここまで ---
+
+# --- 画面の写し: poweroff の後 ---
+$ virsh domstate linuc --reason
+shut off (shutdown)
+
+$ virsh start linuc
+Domain 'linuc' started
+
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: 端末1: 書いてすぐに電源を抜かれる ---
+$ echo "抜く前に書いた" > memo.txt; ls -l memo.txt
+-rw-rw-r-- 1 student student 22 Oct 13 19:25 memo.txt
+$ Connection to 127.0.0.1 closed by remote host.
+Connection to 127.0.0.1 closed.
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: 外: 動いている練習機を destroy して、また起動する ---
+$ virsh destroy linuc
+Domain 'linuc' destroyed
+
+$ virsh start linuc
+Domain 'linuc' started
+
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: 電源を抜かれた次の起動 ---
+$ cat /run/initramfs/fsck.log
+cat: /run/initramfs/fsck.log: Permission denied
+$ ls -l memo.txt; cat memo.txt
+ls: cannot access 'memo.txt': No such file or directory
+cat: memo.txt: No such file or directory
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: sudo reboot ---
+$ cat /proc/sys/kernel/random/boot_id
+a85f1d5b-1436-46ac-9f9d-114a1f513145
+$ sudo reboot
+
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 19:26:40 JST):
+
+The system will reboot now!
+
+$ Connection to 127.0.0.1 closed by remote host.
+Connection to 127.0.0.1 closed.
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: reboot の後 ---
+$ cat /proc/sys/kernel/random/boot_id
+de3f9480-8e40-4571-850c-fad9bf03b5f1
+$ last -x reboot shutdown | head -8
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:27   still running
+shutdown system down  6.8.0-142-generi Tue Oct 13 19:26 - 19:27  (00:00)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:26 - 19:26  (00:00)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:24 - 19:26  (00:01)
+shutdown system down  6.8.0-142-generi Tue Oct 13 19:24 - 19:24  (00:00)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:23 - 19:24  (00:00)
+shutdown system down  6.8.0-142-generi Tue Oct 13 19:23 - 19:23  (00:00)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 19:21 - 19:23  (00:01)
+$
+
+# --- ここまで ---

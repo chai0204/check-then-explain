@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>10. X では、画面の側がサーバー — 確かめて説明する LinuC 主題1.01</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="10" data-theme="linuc-boot">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-boot/theory/">理論編</a> › 第10章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
+</div>
+<h1>10. X では、画面の側がサーバー</h1>
+<p class="lead">X Window System では、アプリが動いている計算機ではなく、<b>画面とキーボードがある側</b>を「X サーバー」と呼ぶ。
+だから遠くの計算機の GUI を手元に出すとき、X サーバーは手元で動いていなければならない。
+画面の無いこの檻で <code>ssh -X</code> を試すと、その順番どおりに、手元の側から断られる。</p>
+<div class="badges"><span>前提: 第9章まで読了</span><span>所要 14分</span><span class="impact-c">影響度 C</span><span>出題範囲 1.01.5（重要度1）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>X サーバーと X クライアントが、どちらの計算機で動くかを説明できる</li>
+<li>ディスプレイマネージャ・ウィンドウマネージャ・統合デスクトップ環境・ターミナルの役割を区別できる</li>
+<li><code>DISPLAY</code> と <code>xauth</code> が何のためにあり、<code>ssh -X</code> で何が起きるかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: X のプロトコルの中身、Xorg の設定ファイル（<code>xorg.conf</code>）、
+Wayland の仕組みの細部、デスクトップ環境ごとの操作方法。
+この章は GUI を再現できない檻で書いているので、手で確かめられるのは「X が無いこと」と <code>ssh -X</code> の失敗のしかただけである（理由は<a href="/linuc-boot/theory/#cage">理論編の目次</a>）。</div></div>
+
+<h2 id="none">練習機には X が無い</h2>
+<div class="sgoal"><b>この節で分かること</b>: GUI が無い計算機で、X の部品がどこにも無いことの確かめ方。</div>
+<!-- gen:NONE -->
+<p>練習機の中で、X の部品があるかを確かめる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo "DISPLAY=[$DISPLAY]"
+DISPLAY=[]
+$ command -v startx Xorg xauth xterm; echo "終了コード $?"
+終了コード 1
+$ systemctl status display-manager.service
+Unit display-manager.service could not be found.
+$ sudo sshd -T | grep -i x11
+x11displayoffset 10
+x11forwarding yes
+x11uselocalhost yes</code></pre>
+<p><code>DISPLAY</code> は空で、<code>startx</code> も、X サーバー（<code>Xorg</code>）も、<code>xauth</code> も、<code>xterm</code> も入っていない（<code>command -v</code> は1つも見つけられず、終了コード 1）。
+GUI のログイン画面を出すディスプレイマネージャ（<code>display-manager.service</code>）も無い。第4章で見たとおり、練習機はクラウド用の最小構成で、デスクトップのパッケージを入れていない。</p>
+<p>それでも sshd は、X11 の転送を受け付ける設定（<code>x11forwarding yes</code>）になっている。<b>受け付ける設定があることと、受け付けたものを処理する部品があることは、別のこと</b>である。次の節で、その差がそのまま断られ方に出る。</p>
+<!-- /gen:NONE -->
+
+<h2 id="roles">サーバーとクライアントの向き</h2>
+<div class="sgoal"><b>この節で分かること</b>: X の部品の名前と、それぞれがどこで動くか。</div>
+<pre><code>手元の PC（画面・キーボード・マウスがある）                 遠くのサーバ（画面が無い）
+┌─────────────────────────────────┐            ┌────────────────────────┐
+│ X サーバー（Xorg）……画面に描く・入力を受ける │ ←X の要求── │ X クライアント（アプリ） │
+│ ウィンドウマネージャ……窓の枠・移動・重なり   │   DISPLAY   │  例: xterm、xeyes        │
+│ ディスプレイマネージャ……GUI のログイン画面   │  を見て接続 │  DISPLAY=localhost:10.0  │
+└─────────────────────────────────┘            └────────────────────────┘</code></pre>
+<div class="scroll"><table>
+<tr><th>部品</th><th>役目</th><th>例</th></tr>
+<tr><td>X サーバー</td><td>画面に描き、キーボードとマウスの入力を受ける。クライアントからの「描いて」という要求を待つ側</td><td>Xorg</td></tr>
+<tr><td>X クライアント</td><td>X サーバーに描いてもらうアプリ。別の計算機で動いていてもよい</td><td>xterm、firefox、xeyes</td></tr>
+<tr><td>ウィンドウマネージャ</td><td>窓の枠・移動・大きさ・重なりを受け持つ（これも X クライアントの1つ）</td><td>mutter、kwin、xfwm4、twm</td></tr>
+<tr><td>ディスプレイマネージャ</td><td>GUI のログイン画面を出し、ログインしたらデスクトップを起動する</td><td>gdm3、lightdm、sddm、xdm</td></tr>
+<tr><td>統合デスクトップ環境</td><td>ウィンドウマネージャ・パネル・ファイル管理・設定を揃えた一式</td><td>GNOME、KDE Plasma、Xfce</td></tr>
+<tr><td>ターミナル</td><td>X の上でシェルを動かす X クライアント（端末エミュレータ）</td><td>xterm、gnome-terminal、konsole</td></tr>
+</table></div>
+<p>ディスプレイマネージャが無い計算機では、ログインした後に <code>startx</code> を打って X を起動する。<code>startx</code> は <code>xinit</code> を呼び、
+<code>~/.xinitrc</code> に書いたもの（ウィンドウマネージャや最初のアプリ）を X クライアントとして起動する。</p>
+<p>X クライアントがどの X サーバーに描いてもらうかは、環境変数 <b><code>DISPLAY</code></b> で決まる。書式は <code>ホスト名:ディスプレイ番号.スクリーン番号</code>。
+手元の最初の画面は <code>:0</code>（ホスト名を省くと自分の計算機）、<code>ssh -X</code> が作る通り道は <code>localhost:10.0</code> のような値になる。
+誰でも画面に描けては困るので、X サーバーは合い言葉（MIT-MAGIC-COOKIE と呼ぶ乱数）を知っている相手だけを受け入れる。
+その合い言葉を <code>~/.Xauthority</code> に出し入れするのが <b><code>xauth</code></b> である。</p>
+<div class="analogy"><b>たとえ</b>: X サーバーは<b>映画館の映写室</b>に近い。フィルム（アプリ）がどこの配給会社から届いても、映すのは館の映写機で、客席（画面）があるのも館の側である。
+<br>ただし<b>崩れる点</b>: 映画館は大きな建物で、ふつうの感覚の「サーバ」（遠くの大きな機械）に近いが、X サーバーはあなたの手元の小さな PC で動く。
+<b>「サービスを受け付ける側」がサーバー</b>という定義に忠実なだけで、ssh でいう「サーバ」とは向きが逆になる。</div>
+
+<p>X サーバーが動いている計算機では、その様子を文字で尋ねるコマンドがある。どれも X クライアントで、<code>DISPLAY</code> の指す X サーバーに尋ねる。
+練習機には X が無いので、この表は記録ではなく、試験のための一覧である。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>何を出すか</th></tr>
+<tr><td><code>xdpyinfo</code></td><td>X サーバー（ディスプレイ）の情報。版・画面の大きさ・色深度（<code>depth of root window: 24 planes</code> のような行）</td></tr>
+<tr><td><code>xwininfo</code></td><td>ウィンドウの情報。クリックした窓、または <code>-root</code> で画面全体（ルートウィンドウ）。色深度は <code>Depth:</code> の行</td></tr>
+<tr><td><code>xlsclients</code></td><td>いま X サーバーにつながっている X クライアントの一覧</td></tr>
+<tr><td><code>xwd</code></td><td>ウィンドウや画面を画像（XWD 形式）に書き出す</td></tr>
+<tr><td><code>showrgb</code></td><td>使える色の名前と、その RGB の値の一覧</td></tr>
+</table></div>
+
+<h2 id="sshx">ssh -X を試す</h2>
+<div class="sgoal"><b>この節で分かること</b>: リモートの GUI を手元に出すのに、どちらの計算機に何が要るか。</div>
+<!-- gen:SSHX -->
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>ssh -X</code> を付ければ、相手の計算機の GUI アプリを手元に出せる。相手（サーバー）の sshd が X11 の転送を許していれば、つながるはずだ。</p>
+<pre data-where="外（lab@host）"><code>$ echo "DISPLAY=[$DISPLAY]"
+DISPLAY=[]
+$ ssh -X linuc 'echo DISPLAY=[$DISPLAY]'
+DISPLAY=[]
+$ ssh -v -X linuc true 2&gt;&amp;1 | grep -iE 'x11|display'
+debug1: Remote: /home/student/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Remote: /home/student/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: X11 forwarding requested but DISPLAY not set</code></pre>
+<div class="then"><b>だめな理由</b>: 練習機の sshd は X11 の転送を許している（前の節の <code>x11forwarding yes</code>）のに、相手の側に <code>DISPLAY</code> は作られなかった。
+断ったのは手元の ssh で、<code>-v</code> の表示が「X11 の転送を頼まれたが、<code>DISPLAY</code> が無い」と言っている。
+<code>ssh -X</code> は「相手のアプリの描画を、<b>手元の X サーバー</b>まで運ぶ通り道を作ってほしい」という頼みである。手元に X サーバーが無ければ（<code>DISPLAY</code> が空なら）、運ぶ先が無いので、頼み自体を出さない。</div></div>
+<p>手元に X サーバーがある振りをして、<code>DISPLAY=:0</code> を付けて打つ。</p>
+<pre data-where="外（lab@host）"><code>$ DISPLAY=:0 ssh -X linuc 'echo DISPLAY=[$DISPLAY]'
+Warning: No xauth data; using fake authentication data for X11 forwarding.
+X11 forwarding request failed on channel 0
+DISPLAY=[]
+$ DISPLAY=:0 ssh -v -X linuc true 2&gt;&amp;1 | grep -iE 'x11|xauth'
+debug1: Remote: /home/student/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Remote: /home/student/.ssh/authorized_keys:1: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: No xauth program.
+Warning: No xauth data; using fake authentication data for X11 forwarding.
+debug1: Requesting X11 forwarding with authentication spoofing.
+debug1: Remote: No xauth program; cannot forward X11.
+X11 forwarding request failed on channel 0</code></pre>
+<p>今度は手元の ssh が頼みを送り、相手の sshd が「xauth が無いので X11 を転送できない」と断った（<code>Remote:</code> で始まる行は、相手から届いた知らせ）。
+手元の側にも <code>xauth</code> が無いので、ssh は本物の合い言葉の代わりに偽物（<code>fake authentication data</code>）を作って送っていた。</p>
+<p><code>ssh -X</code> が通るには、手元の X サーバー（<code>DISPLAY</code>）、手元と相手の <code>xauth</code>、相手の sshd の許可（<code>X11Forwarding yes</code>）が揃っている必要がある。
+揃っていれば、相手の側に <code>DISPLAY=localhost:10.0</code> のような値が作られ、そこに描いたものが ssh の中を通って手元の X サーバーに届く。どれか1つでも欠ければ、受け取った側が通り道を作らない。</p>
+<div class="analogy"><b>たとえ</b>: <code>ssh -X</code> は、遠くの工場（相手）に「できた製品（絵）は、うちの店（手元の X サーバー）に届けてくれ」と<b>配送先を伝える</b>頼みに近い。
+店が無ければ届け先を書けないので、頼みを出せない（手元の ssh が断った）。伝票を書く道具（<code>xauth</code>）が工場に無ければ、工場が引き受けない（相手の sshd が断った）。
+<br>ただし<b>崩れる点</b>: 本物の配送なら、届け先の店が閉まっていても荷物は先に出せる。X の絵は、届け先の X サーバーとつながったまま1枚ずつやり取りして描くので、届け先が無いまま描き始めることはできない。</div>
+<!-- /gen:SSHX -->
+
+<h2 id="spine">10章を1本にする</h2>
+<div class="sgoal"><b>この節で分かること</b>: 10章の「予想と違ったこと」が、1つの事実の言い換えだったこと。</div>
+<p>10章で、送った側の期待と、受け取った側の振る舞いが食い違う場面を10回見た。並べる。</p>
+<div class="scroll"><table>
+<tr><th>章</th><th>送ったもの（合図）</th><th>受け取った側</th><th>受け取った側が決めたこと</th></tr>
+<tr><td>1</td><td><code>virsh shutdown</code>（電源ボタン）</td><td>中の OS（GRUB の間は誰もいない）</td><td>聞く者がいない間に押されたボタンは消えた</td></tr>
+<tr><td>2</td><td>ssh の公開鍵</td><td>相手の sshd と <code>authorized_keys</code></td><td>他人が書ける名簿の鍵は使わない</td></tr>
+<tr><td>3</td><td><code>docker stop</code>（TERM）</td><td>檻の起動スクリプト → 練習機</td><td>練習機を正常に止めてから終わる（猶予の中で）</td></tr>
+<tr><td>4</td><td>インストール時の選択</td><td>起動時の systemd（<code>default.target</code>）</td><td>GUI が無くても graphical.target まで進む</td></tr>
+<tr><td>5</td><td>ブート順（BootOrder）</td><td>起動された shim の fallback</td><td>書き換えたブート順を元に戻した</td></tr>
+<tr><td>6</td><td>カーネル引数 <code>single</code></td><td>sulogin</td><td>パスワードの無い root を、聞かずに渡した</td></tr>
+<tr><td>7</td><td><code>halt</code></td><td>カーネル（と、電源を切る ACPI）</td><td>CPU は止めたが、電源は切らなかった</td></tr>
+<tr><td>8</td><td><code>kill</code>（TERM）</td><td>lab-hog</td><td>無視した。KILL だけは断れなかった</td></tr>
+<tr><td>9</td><td>回線の切断（SIGHUP）</td><td>シェルとそのジョブ</td><td>nohup・tmux の中のものは無視した</td></tr>
+<tr><td>10</td><td><code>ssh -X</code> の要求</td><td>手元の ssh と、相手の sshd</td><td>X サーバーも xauth も無いので、通り道を作らなかった</td></tr>
+</table></div>
+<div class="goal"><p><b>電源ボタンも、停止も、シグナルも、ログインも、相手に送る「合図」でしかない。どう振る舞うかは、受け取った側が決める。</b></p>
+<p>受け手に決めさせずに止められるのは、電源を抜く <code>virsh destroy</code> と <code>kill -9</code> だけで、どちらも後片付けの機会を奪う。
+試験に <code>shutdown</code> <code>halt</code> <code>poweroff</code> <code>reboot</code>、<code>kill</code> <code>pkill</code> <code>killall</code>、<code>nohup</code> <code>screen</code> <code>tmux</code> と似たものが並ぶのは、
+<b>送る合図と、受け取る相手が違うから</b>である。コマンドを覚えるときは「誰に、何を頼んでいるか」を一緒に覚えると、取り違えなくなる。</p></div>
+<div class="analogy"><b>たとえ</b>: この10章は、<b>郵便を出す</b>ことに似ている。差出人は封筒（合図）を出せるが、開けるか、従うか、捨てるかは受取人が決める。
+<br>ただし<b>崩れる点</b>: 郵便には「受け取りを拒否できない」書留のような強制は無いが、コンピュータには2つだけある。電源を抜くことと、KILL である。
+強制は確実だが、受取人に片付けの暇を与えない。だから最後の手段にする。</div>
+
+<div class="note try"><b>手を動かす</b>:
+この章に対応する演習はありません（X を再現できないため）。代わりに、外の端末で本文の <code>ssh -X</code> の2つの試し方（<code>DISPLAY</code> なし・<code>DISPLAY=:0</code>）を打ち、
+同じ断られ方をするか確かめてください。<code>-v</code> を付けると、どちらの側が断ったかが分かります。</div>
+
+<div class="quiz"><b>確認</b>
+<p>X Window System の説明として正しいものはどれか。</p>
+<p>A. X サーバーは、アプリケーションが動いているリモートの計算機で動く<br>B. X サーバーは、ディスプレイやキーボードを持つ手元の計算機で動く<br>C. X クライアントは、必ず X サーバーと同じ計算機で動く<br>D. ウィンドウマネージャは X サーバーの一部である</p>
+<details><summary>答え</summary>
+<p>B。X サーバーは画面に描いて入力を受け取る側で、手元で動く。X クライアントは別の計算機で動いてもよく（ネットワーク越しに描いてもらえる）、
+ウィンドウマネージャも X クライアントの1つである。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>環境変数 <code>DISPLAY</code> に <code>remotehost:0.0</code> と設定した。何を意味するか。</p>
+<details><summary>答え</summary>
+<p>X クライアントは、<code>remotehost</code> で動いている X サーバーの、ディスプレイ番号 0・スクリーン番号 0 に描きに行く。
+ホスト名を省いた <code>:0</code> は自分の計算機の最初の画面。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>X サーバーへの接続を許可するための認証情報（MIT-MAGIC-COOKIE）を表示・追加するコマンドはどれか。</p>
+<p>A. <code>xhost</code>　B. <code>xauth</code>　C. <code>startx</code>　D. <code>xinit</code></p>
+<details><summary>答え</summary>
+<p>B。<code>xauth</code> は <code>~/.Xauthority</code> の中の合い言葉を扱う（<code>xauth list</code> で表示）。
+実測では、練習機に xauth が無いので sshd が「No xauth program; cannot forward X11」と断った。
+A の <code>xhost</code> は、ホスト単位で接続を許すかを X サーバーに伝える別の仕組み。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>X サーバーは画面・キーボードのある手元で動き、X クライアント（アプリ）の要求を受けて描く。向きは ssh の「サーバ」と逆</li>
+<li>ディスプレイマネージャはログイン画面、ウィンドウマネージャは窓の管理、統合デスクトップ環境はその一式、ターミナルはシェルを動かす X クライアント</li>
+<li>ディスプレイマネージャが無ければ <code>startx</code>（<code>~/.xinitrc</code>）で X を起動する</li>
+<li><code>DISPLAY</code> は描きに行く先（<code>ホスト:ディスプレイ.スクリーン</code>）、<code>xauth</code> は接続の合い言葉を扱う</li>
+<li><code>ssh -X</code> には、手元の X サーバー（<code>DISPLAY</code>）と、相手の <code>xauth</code> の両方が要る。どちらかが無ければ、受け取る側が通り道を作らない</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-boot/theory/09-hup">← 9. exit では消えず、切断で消える</a><a href="/linuc-boot/theory/">理論編 目次 →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-boot/chapters.js"></script>
+<script src="/linuc-boot/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. GUI が無くても、既定は graphical.target — 確かめて説明する LinuC 主題1.01</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="linuc-boot">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-boot/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
+</div>
+<h1>4. GUI が無くても、既定は graphical.target</h1>
+<p class="lead">この練習機には X も、GUI のログイン画面も入っていない。それでも <code>systemctl get-default</code> は <code>graphical.target</code> と答え、<code>runlevel</code> は <code>5</code> と答える。
+インストールのときに選ぶ「GUI か CUI か」は、<b>入れるパッケージ</b>と、<b>1本のシンボリックリンク</b>の2か所で、別々に決まっている。</p>
+<div class="badges"><span>前提: 第3章まで読了</span><span>所要 12分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.01.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>インストーラが聞くこと（ブートメディア・タイムゾーン・パスワード・パッケージグループ・GUI/CUI）が、インストール後にどこに残るかを言える</li>
+<li>GUI / CUI の既定がブートターゲットで決まることを、出力で示せる</li>
+<li>root がロックされた Ubuntu の流儀を、<code>passwd -S</code> で確かめられる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: インストーラの画面ごとの操作（ディストリビューションと版ごとに違う）、
+インストールを自動で進める仕組み（kickstart・autoinstall・cloud-init の書き方）、ロケールやキーボード配列の細かい選択肢。</div></div>
+
+<h2 id="installer">インストーラが聞くことと、その行き先</h2>
+<div class="sgoal"><b>この節で分かること</b>: 「仕様書に従ってインストールする」とき、決めたことが後でどこに見えるか。</div>
+<p>DVD や ISO イメージ（ブートメディア）から起動すると、インストーラが順に聞いてくる。答えはインストールが終わった後、決まった場所に残る。</p>
+<div class="scroll"><table>
+<tr><th>聞かれること</th><th>例</th><th>インストール後に残る場所</th><th>確かめるコマンド</th></tr>
+<tr><td>どこから起動するか（ブートメディア）</td><td>DVD・USB・ISO・ネットワーク</td><td>UEFI / BIOS の設定（ブート順）</td><td><code>efibootmgr</code>（第5章）</td></tr>
+<tr><td>ディスクの割り当て</td><td>/ と /boot と ESP、スワップ</td><td>パーティションと <code>/etc/fstab</code></td><td><code>lsblk</code></td></tr>
+<tr><td>タイムゾーン</td><td>Asia/Tokyo</td><td><code>/etc/localtime</code> のリンク先</td><td><code>timedatectl</code></td></tr>
+<tr><td>パスワード</td><td>root のパスワード、最初のユーザ</td><td><code>/etc/shadow</code></td><td><code>passwd -S</code></td></tr>
+<tr><td>パッケージグループ（ソフトウェアの選択）</td><td>Server with GUI / Minimal Install</td><td>入っているパッケージ</td><td><code>dpkg-query</code> / <code>rpm -qa</code></td></tr>
+<tr><td>GUI か CUI か</td><td>グラフィカルログイン / テキスト</td><td><code>default.target</code> のリンク先</td><td><code>systemctl get-default</code></td></tr>
+</table></div>
+<p>この練習機はインストーラではなく、Ubuntu が配っているクラウド用のイメージから作った（インストール済みのディスクを複製し、初回起動で名前やユーザを設定する方式）。
+それでも、決めたことの置き場所は同じである。練習機の中で1つずつ読む。</p>
+<div class="analogy"><b>たとえ</b>: インストーラの質問は、新しい家に入るときの<b>入居の申込書</b>に近い。書いた内容（時刻の地域・合い言葉・家具のセット）は、それぞれ別の係に回されて保管される。
+<br>ただし<b>崩れる点</b>: 申込書は1枚の紙として手元に控えが残るが、インストールの答えは1か所にまとまって残らない。
+タイムゾーンはリンクに、パスワードは <code>/etc/shadow</code> に、GUI か CUI かは別のリンクに散らばる。どこに回ったかを知らないと、後から読み返せない。</div>
+
+<h2 id="gui">GUI と CUI は、パッケージとリンクで別々に決まる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 既定のブートターゲットが何で決まり、GUI が入っているかとは関係なく決まること。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>この練習機には GUI を入れていない。インストールで GUI を選ばなかったのだから、既定は CUI の <code>multi-user.target</code>（昔のランレベル3）で起動しているはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ systemctl get-default
+graphical.target
+$ runlevel
+N 5
+$ who -r
+         run-level 5  2026-10-13 19:12
+$ systemctl list-units --type=target --state=active --no-legend --no-pager | grep -E "graphical|multi-user"
+  graphical.target        loaded active active Graphical Interface
+  multi-user.target       loaded active active Multi-User System</code></pre>
+<div class="then"><b>だめな理由</b>: 既定は <code>graphical.target</code>（GUI 用）で、ランレベルも 5 と答えた。GUI のログイン画面を出すプログラム（ディスプレイマネージャ）も X も入っていないのに、である。
+<b>「どこまで起動するか」（ターゲット）と、「GUI の部品が入っているか」（パッケージ）は別々に決まる。</b>
+Ubuntu のサーバ向けのイメージは systemd の元々の既定（graphical.target）を変えておらず、部品が無いまま graphical.target に到達している。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>$ systemctl status display-manager.service
+Unit display-manager.service could not be found.
+$ ls /usr/share/xsessions /usr/bin/Xorg
+ls: cannot access '/usr/share/xsessions': No such file or directory
+ls: cannot access '/usr/bin/Xorg': No such file or directory
+$ ls -l /usr/lib/systemd/system/default.target /etc/systemd/system/default.target
+ls: cannot access '/etc/systemd/system/default.target': No such file or directory
+lrwxrwxrwx 1 root root 16 Jul 29 00:04 /usr/lib/systemd/system/default.target -&gt; graphical.target</code></pre>
+<p>graphical.target は「multi-user.target に、ディスプレイマネージャ（display-manager.service）を足したもの」である。
+足すはずのものが入っていないので、graphical.target に着いても何も増えない。だから GUI の無いサーバが graphical.target で動いていても困らない。</p>
+<p>既定の指定は <code>/usr/lib/systemd/system/default.target</code> というリンクで、<code>/etc/systemd/system/default.target</code> はまだ無い。
+<code>/etc</code> 側にリンクを置けば、そちらが優先される。それを作るのが <code>systemctl set-default</code> で、第6章と演習04で使う。
+RHEL 系のインストーラは、GUI を含まないパッケージグループを選ぶと、ここを <code>multi-user.target</code> にしておく。</p>
+<div class="analogy"><b>たとえ</b>: 既定のブートターゲットは、エレベーターに最初から押してある<b>行き先の階のボタン</b>に近い。
+5階（graphical）が押してあれば、4階（multi-user）を通って5階まで上がる。5階に何も無くても（GUI が入っていなくても）、エレベーターは5階に着いて止まる。
+<br>ただし<b>崩れる点</b>: エレベーターは1つの階にしか止まっていないが、systemd のターゲットは重なっている。5階に着いた後も4階は「着いた」状態のままで、
+上の出力でも graphical.target と multi-user.target が両方 <code>active</code> だった。</div>
+
+<h2 id="tz">タイムゾーンとパスワード</h2>
+<div class="sgoal"><b>この節で分かること</b>: インストールで決めたタイムゾーンとパスワードの残り方。Ubuntu の root がどうなっているか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ timedatectl | grep -E "Local time|Time zone"
+               Local time: Tue 2026-10-13 19:12:43 JST
+                Time zone: Asia/Tokyo (JST, +0900)
+$ ls -l /etc/localtime
+lrwxrwxrwx 1 root root 30 Oct 13 10:06 /etc/localtime -&gt; /usr/share/zoneinfo/Asia/Tokyo
+$ localectl status
+System Locale: LANG=C.UTF-8
+    VC Keymap: (unset)
+   X11 Layout: us
+    X11 Model: pc105</code></pre>
+<p>タイムゾーンは <code>/etc/localtime</code> というリンクの行き先（<code>Asia/Tokyo</code>）として残っている。インストーラで選んだ地域が、このリンクになる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo passwd -S root
+root L 2026-09-05 0 99999 7 -1
+$ sudo passwd -S student
+student P 2026-10-13 0 99999 7 -1
+$ sudo grep -E "^(root|student):" /etc/shadow | cut -d: -f1,2 | cut -c1-16
+root:*
+student:$y$j9T$z
+$ id
+uid=1000(student) gid=1000(student) groups=1000(student),4(adm),27(sudo)</code></pre>
+<p><code>passwd -S</code> の2列目は、<code>L</code> がロック（パスワードでは入れない）、<code>P</code> が使えるパスワードあり。
+root の <code>/etc/shadow</code> のパスワード欄は <code>*</code> で、どんなパスワードとも一致しない。
+<b>Ubuntu のインストーラは root にパスワードを付けず、最初のユーザを sudo グループに入れる</b>（<code>groups=…27(sudo)</code>）。RHEL 系のインストーラは root のパスワードを聞く。</p>
+<div class="analogy"><b>たとえ</b>: Ubuntu の root は、<b>鍵穴をふさいだ金庫</b>に近い。合い鍵（パスワード）を作れないので、誰も鍵では開けられない。管理は sudo という別の扉から行う。
+<br>ただし<b>崩れる点</b>: ふさいだ金庫は誰にも開けられないが、Ubuntu の root は「鍵穴が無いなら確かめようがない」として、保守用の入口（シングルユーザモード）では逆に誰でも通してしまう。第6章で確かめる。</div>
+
+<h2 id="packages">パッケージグループと、ディスクの割り当て</h2>
+<div class="sgoal"><b>この節で分かること</b>: 「用途を選ぶ」と何が入るか。ディスクがどう分けられたか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ dpkg-query -W | wc -l
+418
+$ dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'ubuntu-*'
+un  ubuntu-advantage-tools
+ii  ubuntu-cloud-minimal
+un  ubuntu-cloudimage-keyring
+un  ubuntu-core-launcher
+ii  ubuntu-drivers-common
+ii  ubuntu-keyring
+ii  ubuntu-pro-client
+un  ubuntu-pro-client-l10n
+ii  ubuntu-release-upgrader-core
+un  ubuntu-server
+un  ubuntu-snappy
+un  ubuntu-snappy-cli</code></pre>
+<p>練習機に入っているパッケージは 418 個。<code>ubuntu-</code> で始まるものの先頭の2文字が状態で、<code>ii</code> は入っている、<code>un</code> は名前だけ知っていて入っていない。
+この練習機の中身を決めているのは <code>ubuntu-cloud-minimal</code>（クラウド向けの最小構成）で、<code>ubuntu-server</code> も GUI の <code>ubuntu-desktop</code> も入っていない。
+<b>こうした「中身を持たず、依存関係として他のパッケージをまとめて引き込むだけのパッケージ」（メタパッケージ）が、Ubuntu でのパッケージグループに当たる。</b></p>
+<p>インストーラの「ソフトウェアの選択」は、個々のパッケージではなく<b>パッケージグループ</b>（用途ごとのまとまり）を選ばせる。</p>
+<div class="scroll"><table>
+<tr><th>系統</th><th>インストール時に選ぶもの</th><th>後から見る・足す</th></tr>
+<tr><td>RHEL・AlmaLinux など</td><td>環境グループ（Server with GUI / Server / Minimal Install / Workstation）</td><td><code>dnf group list</code> / <code>dnf groupinstall "Server with GUI"</code></td></tr>
+<tr><td>Debian・Ubuntu</td><td>タスク（デスクトップ環境・SSH サーバ など）、メタパッケージ</td><td><code>tasksel</code> / <code>apt install ubuntu-desktop</code></td></tr>
+</table></div>
+<p>GUI のグループを後から足しても、既定のブートターゲットまでは変わらない場合がある。そのときは <code>systemctl set-default graphical.target</code> も要る（GUI とターゲットは別々、が前節の結論）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS /dev/vda
+NAME     SIZE FSTYPE MOUNTPOINTS
+vda       20G
+├─vda1    19G ext4   /
+├─vda14    4M
+├─vda15  106M vfat   /boot/efi
+└─vda16  913M ext4   /boot</code></pre>
+<p>ディスクは4つに分けられている。/（ext4）、/boot（ext4）、/boot/efi（vfat、UEFI が読む区画）、そしてファイルシステムを持たない 4MB の区画（vda14）。
+最後の2つが何のためにあるかは、次の第5章で、電源を入れてから login: が出るまでを追って確かめる。区画の作り方そのものは主題1.05 のコースで手を動かす。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-boot/">演習04</a>は、この練習機の既定を CUI（multi-user.target）に変え、再起動しても CUI で起動することを確かめる課題である。
+インストーラで CUI を選んだのと同じ状態を、後から作ることになる。</div>
+
+<div class="quiz"><b>確認</b>
+<p>次回の起動から GUI ではなく CUI（マルチユーザ）で起動するように設定したい。打つコマンドはどれか。</p>
+<p>A. <code>systemctl isolate multi-user.target</code>　B. <code>systemctl set-default multi-user.target</code>　C. <code>systemctl start multi-user.target</code>　D. <code>runlevel 3</code></p>
+<details><summary>答え</summary>
+<p>B。<code>set-default</code> は <code>/etc/systemd/system/default.target</code> のリンクを書き換え、次回の起動から効く。
+A はいまの状態だけを切り替え、再起動すると既定に戻る。D の <code>runlevel</code> は今と前回のランレベルを表示するだけのコマンドである。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>runlevel</code> を実行したら <code>N 5</code> と表示された。それぞれの意味は何か。また systemd ではどのターゲットに当たるか。</p>
+<details><summary>答え</summary>
+<p>1つ目は前回のランレベルで、<code>N</code> は「前回が無い」（起動してから一度も切り替えていない）。2つ目がいまのランレベルで 5。
+systemd では <code>runlevel5.target</code> が <code>graphical.target</code> を指している。この練習機は GUI が入っていなくても 5 と答えた。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>Ubuntu で <code>sudo passwd -S root</code> を実行すると、2列目に <code>L</code> と表示された。何を意味するか。</p>
+<details><summary>答え</summary>
+<p>root のパスワードがロックされている（パスワードでは root としてログインできない）。<code>/etc/shadow</code> のパスワード欄が <code>*</code> や <code>!</code> で始まっている状態。
+Ubuntu のインストーラは root にパスワードを付けず、最初のユーザに sudo を使わせる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>インストーラで決めたことは、インストール後にファイルとして残る（タイムゾーン → <code>/etc/localtime</code>、パスワード → <code>/etc/shadow</code>、GUI/CUI → <code>default.target</code>）</li>
+<li>GUI / CUI は「どこまで起動するか（ターゲット）」と「GUI の部品が入っているか（パッケージ）」の2つで決まり、別々に変えられる</li>
+<li>GUI の無い Ubuntu のサーバでも、既定は graphical.target のことがある。<code>systemctl get-default</code> と <code>runlevel</code> で確かめる</li>
+<li>Ubuntu は root をロックし（<code>passwd -S</code> で <code>L</code>）、最初のユーザを sudo グループに入れる</li>
+<li>パッケージグループは用途ごとのまとまり。RHEL 系は <code>dnf group</code>、Debian / Ubuntu は tasksel やメタパッケージ</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-boot/theory/03-container">← 3. コンテナの中のカーネルは、ホストのもの</a><a href="/linuc-boot/theory/05-boot">次: 5. ファームウェアが読めるのは、FAT の中の1ファイルだけ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-boot/chapters.js"></script>
+<script src="/linuc-boot/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. virsh が触れるのは、電源とボタンだけ — 確かめて説明する LinuC 主題1.01</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="1" data-theme="linuc-boot">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-boot/theory/">理論編</a> › 第1章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
+</div>
+<h1>1. virsh が触れるのは、電源とボタンだけ</h1>
+<p class="lead"><code>virsh start linuc</code> は一瞬で <code>Domain 'linuc' started</code> と返る。その瞬間、練習機の中の OS はまだ1行も動いていない。
+<code>virsh shutdown</code> は「止める」コマンドに見えるが、電源ボタンを押すだけで、止まるかどうかは中の OS が決める。
+virsh が触れるのは仮想マシンの電源とボタンで、OS ではない。</p>
+<div class="badges"><span>前提: 檻が起動している</span><span>前提: 端末を2つ開いている</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.01.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>virsh</code> で仮想マシンの一覧・起動・停止・強制停止・自動起動を操作できる（<code>list --all</code> <code>start</code> <code>shutdown</code> <code>destroy</code> <code>autostart</code> <code>dominfo</code> <code>console</code>）</li>
+<li>「定義がある」と「動いている」、「running」と「OS が応答する」が別のことだと、出力で示せる</li>
+<li><code>virsh shutdown</code> と <code>virsh destroy</code> の違いを、受け取る相手の違いとして説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: libvirt の XML の各項目の意味（<code>&lt;memory&gt;</code> や <code>&lt;vcpu&gt;</code> が何を決めているかだけ分かれば足りる）、
+<code>virsh define</code> / <code>undefine</code> による定義の作り直し、スナップショット（<code>virsh snapshot-*</code>）、仮想ネットワーク（<code>virsh net-*</code>）は扱わない。
+仮想マシンを新しく作る <code>virt-install</code> も出てこない。出題範囲が求めているのは、できあがった仮想マシンの起動と停止とログインである。</div></div>
+
+<h2 id="define">定義はあるが、電源が入っていない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 仮想マシンが「どこに・何として」あるか。一覧に出ない仮想マシンがあること。</div>
+<p>檻に入ったら、外（<code>lab@host</code>）で一覧を出す。</p>
+<pre data-where="外（lab@host）"><code>$ virsh list
+ Id   Name   State
+--------------------
+
+$ virsh list --all
+ Id   Name    State
+------------------------
+ -    linuc   shut off</code></pre>
+<p><code>virsh list</code> は<b>動いている</b>仮想マシンしか出さない。<code>--all</code> を付けて初めて、電源の入っていない <code>linuc</code> が見える。
+試験で「停止しているものも含めて一覧する」と問われたら <code>--all</code> である。</p>
+<p>電源が入っていなくても、仮想マシンの「定義」はある。中身を見る。</p>
+<pre data-where="外（lab@host）"><code>$ virsh dominfo linuc
+Id:             -
+Name:           linuc
+UUID:           8d735545-3f4d-464e-8d06-8637d73b0c72
+OS Type:        hvm
+State:          shut off
+CPU(s):         2
+Max memory:     1572864 KiB
+Used memory:    1572864 KiB
+Persistent:     yes
+Autostart:      disable
+Managed save:   no
+Security model: none
+Security DOI:   0
+
+$ virsh dumpxml linuc | grep -E '&lt;domain|&lt;memory|&lt;vcpu|&lt;os|&lt;loader|&lt;nvram|&lt;source file|&lt;target dev|&lt;serial|&lt;console'
+&lt;domain type='qemu' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'&gt;
+  &lt;memory unit='KiB'&gt;1572864&lt;/memory&gt;
+  &lt;vcpu placement='static'&gt;2&lt;/vcpu&gt;
+  &lt;os firmware='efi'&gt;
+    &lt;loader readonly='yes' secure='yes' type='pflash'&gt;/usr/share/OVMF/OVMF_CODE_4M.ms.fd&lt;/loader&gt;
+    &lt;nvram template='/usr/share/OVMF/OVMF_VARS_4M.ms.fd'&gt;/home/lab/vm/linuc_VARS.fd&lt;/nvram&gt;
+      &lt;source file='/home/lab/vm/linuc.qcow2'/&gt;
+      &lt;target dev='vda' bus='virtio'/&gt;
+    &lt;serial type='pty'&gt;
+    &lt;console type='pty'&gt;</code></pre>
+<p>CPU が2個、メモリが 1.5GB（1572864 KiB）、ファームウェアは UEFI（<code>firmware='efi'</code>）、ディスクは <code>~/vm/linuc.qcow2</code> という1つのファイル。
+<b>仮想マシンの「ハードウェア」は、この XML の数行がすべて</b>である。ディスクのファイルを見る。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-img info ~/vm/linuc.qcow2 | grep -E '^(image|file format|virtual size|backing file):'
+image: /home/lab/vm/linuc.qcow2
+file format: qcow2
+virtual size: 20 GiB (21474836480 bytes)
+backing file: /var/lib/lab-vm/linuc-guest.qcow2</code></pre>
+<p>練習機から見ると 20GiB のディスクだが、実体は「土台（<code>backing file</code>）との差分」だけを持つファイルである。
+練習機の中で何をしても土台は変わらないので、外で <code>vm reset --yes</code> を打てば、この差分を捨てて工場出荷時に戻せる。</p>
+<div class="analogy"><b>たとえ</b>: 仮想マシンの定義は、<b>部品表と設計図が揃っていて、まだ組み立てていない PC</b>に近い。
+CPU 2個・メモリ 1.5GB・ディスク1台という構成は決まっていて、置き場所（<code>~/vm</code>）もある。
+<br>ただし<b>崩れる点</b>: 実物の PC は電源を切っても部品がそこにあるが、仮想マシンは電源が切れている間、XML の文字とディスクのファイルでしかない。
+電源を入れた瞬間にだけ、QEMU というプロセスがこの表を読んで、CPU やメモリを組み立てる。</div>
+
+<h2 id="start">電源を入れても、OS はまだいない</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>running</code> が何を意味し、何を意味しないか。仮想マシンの画面に入る方法。</div>
+<p>端末を2つ使う。1つ目で、電源を入れると同時に練習機の画面（シリアルコンソール）につなぐ。</p>
+<pre data-where="外（lab@host）・端末1"><code>$ virsh start linuc --console
+Domain 'linuc' started
+Connected to domain 'linuc'
+Escape character is ^] (Ctrl + ])
+BdsDxe: loading Boot0001 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x1,0x2)/Pci(0x0,0x0)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x1,0x2)/Pci(0x0,0x0)
+（略）
+[    0.000000] Linux version 6.8.0-142-generic (buildd@lcy02-amd64-049) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #142-Ubuntu SMP PREEMPT_DYNAMIC Wed Sep  2 14:24:27 UTC 2026 (Ubuntu 6.8.0-142.142-generic 6.8.12)
+（略）
+[  OK  ] Reached target multi-user.target - Multi-User System.
+[  OK  ] Reached target graphical.target - Graphical Interface.
+（略）
+Ubuntu 24.04.5 LTS linuc ttyS0
+linuc login:</code></pre>
+<p>ファームウェア（<code>BdsDxe</code>）→ GRUB → カーネル（<code>Linux version</code>）→ systemd（<code>[  OK  ]</code> の行）→ ログインの案内、と流れる。
+この順番は第5章で1行ずつ読む。ここで見たいのは、<b><code>Domain 'linuc' started</code> と <code>linuc login:</code> の間に 30 秒以上ある</b>ことだ。</p>
+<p>電源を入れた直後に、2つ目の端末で状態を尋ねる。</p>
+<pre data-where="外（lab@host）・端末2"><code>$ virsh domstate linuc
+running
+
+$ virsh qemu-agent-command linuc '{"execute":"guest-ping"}'
+error: Guest agent is not responding: QEMU guest agent is not connected</code></pre>
+<p><code>running</code> と答えたのに、練習機の中で待っているはずの案内役（ゲストエージェント）は「つながっていない」。
+<code>login:</code> が出た後にもう一度尋ねると、今度は返事が来る。</p>
+<pre data-where="外（lab@host）・端末2"><code>$ virsh qemu-agent-command linuc '{"execute":"guest-ping"}'
+{"return":{}}</code></pre>
+<p><b><code>running</code> は「QEMU のプロセスが動いていて、仮想の CPU に電気が来ている」という意味でしかない。</b>
+中の OS が起動し終わったかどうかは、OS 自身に尋ねるしかない。<code>ssh linuc</code> も同じで、起動の途中に打つと、OS の sshd が待ち受けを始めるまで何も返ってこない。</p>
+<p>端末1の画面は、練習機の<b>シリアルコンソール</b>である。物理のサーバなら、本体につないだ画面とキーボードに当たる。ここからログインもできる。</p>
+<pre data-where="外（lab@host）・端末1（練習機のコンソール）"><code>linuc login: student
+Password:
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+student@linuc:~$ tty
+/dev/ttyS0
+student@linuc:~$ who
+student  ttyS0        2026-10-13 19:07
+
+logout
+
+Ubuntu 24.04.5 LTS linuc ttyS0
+
+linuc login:</code></pre>
+<p>パスワードは <code>student</code>（打っても表示されない）。端末は <code>/dev/ttyS0</code>（1本目のシリアルポート）で、ネットワークを1つも通っていない。
+最後に <code>Ctrl+D</code> を押すと <code>logout</code> と出て、ログインの案内に戻る。コンソールから抜けて外の端末に戻るのは <code>Ctrl+]</code> である。</p>
+<div class="analogy"><b>たとえ</b>: <code>virsh start</code> は、PC の<b>電源ボタンを押して手を離す</b>ことに近い。
+ファンが回り始めた（<code>running</code>）からといって、デスクトップが出ているわけではない。
+<br>ただし<b>崩れる点</b>: 実物の PC は画面を見れば起動の進み具合が分かるが、仮想マシンの画面は、自分で <code>virsh console</code> をつながない限りどこにも映らない。
+見ていない間も起動は進み、終わったことを知る手段は、中の OS に問い合わせることだけである。</div>
+
+<h2 id="shutdown">shutdown は、ボタンを押すだけ</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>virsh shutdown</code> と <code>virsh destroy</code> が、それぞれ誰に何を頼んでいるか。</div>
+<p>起動し終わった練習機を止める。</p>
+<pre data-where="外（lab@host）"><code>$ virsh shutdown linuc
+Domain 'linuc' is being shutdown
+
+$ virsh domstate linuc
+running
+
+$ virsh domstate linuc --reason
+shut off (shutdown)</code></pre>
+<p><code>virsh shutdown</code> の直後はまだ <code>running</code> で、十数秒たってから <code>shut off</code> になった。返事も「止めた」ではなく「止めている途中」（<code>is being shutdown</code>）である。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>virsh shutdown</code> は仮想マシンを止めるコマンドだ。時間がかかるのは OS の後片付けのせいで、
+起動の途中（GRUB のメニューが出ている間）に打てば、片付けるものも無いのですぐ止まるはずだ。</p>
+<pre data-where="外（lab@host）・端末2（端末1に GRUB のメニューが出ている間に打つ）"><code>$ virsh shutdown linuc
+Domain 'linuc' is being shutdown
+
+$ virsh domstate linuc
+running</code></pre>
+<pre data-where="外（lab@host）・端末1（練習機のコンソール。shutdown を送った後も流れ続ける）"><code>   The highlighted entry will be executed automatically in 0s.
+（略）
+Begin: Running /scripts/init-bottom ... done.
+（略）
+Welcome to Ubuntu 24.04.5 LTS!
+（略）
+[  OK  ] Reached target graphical.target - Graphical Interface.
+（略）
+Ubuntu 24.04.5 LTS linuc ttyS0</code></pre>
+<pre data-where="外（lab@host）・端末2（ログインの案内が出て、さらに 20 秒待った後）"><code>$ virsh domstate linuc --reason
+running (unpaused)</code></pre>
+<div class="then"><b>だめな理由</b>: 止まらなかった。GRUB のメニューはそのまま数え下げを終え、Ubuntu が最後まで起動して、ログインを待っている。
+<code>virsh shutdown</code> がしたのは、仮想マシンの<b>電源ボタン（ACPI のボタン）を押すこと</b>だけだった。
+押されたことを受け取って「では止まろう」と決めるのは中の OS（Linux の systemd-logind）で、
+GRUB のメニューにはボタンを聞く者がいない。聞く者がいない間に押されたボタンは、誰にも届かずに消えた（著者は4回試して4回とも同じだった）。
+<b>止めるかどうかを決めていたのは、virsh ではなく受け取る側だった。</b>
+（状態の理由が <code>booted</code> ではなく <code>unpaused</code> なのは、<code>--console</code> を付けて起動すると、virsh がいったん一時停止の状態で起動し、
+コンソールをつないでから動かすため。起動の最初の表示を取りこぼさないための工夫で、ここでの話とは関係ない。）</div></div>
+<p>受け取る側に決めさせずに止める方法が1つだけある。電源を抜くことである。動いたままの練習機に対して打つ。</p>
+<pre data-where="外（lab@host）"><code>$ virsh destroy linuc
+Domain 'linuc' destroyed
+
+$ virsh domstate linuc --reason
+shut off (destroyed)</code></pre>
+<p><code>destroy</code> は名前に反して何も壊さない（定義もディスクも残る）。QEMU のプロセスを終わらせる、つまり<b>電源コードを抜く</b>。
+中の OS は止まる準備をする暇が無いので、書きかけのデータは失われうる。何が起きるかは第7章で確かめる。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>誰に届くか</th><th>中の OS が断れるか</th></tr>
+<tr><td><code>virsh start</code></td><td>ハイパーバイザー（QEMU のプロセスを起動する）</td><td>— （まだ OS がいない）</td></tr>
+<tr><td><code>virsh shutdown</code></td><td>中の OS（ACPI の電源ボタン）</td><td>断れる・聞いていなければ届かない</td></tr>
+<tr><td><code>virsh reboot</code></td><td>中の OS（ACPI のボタン、またはゲストエージェント）</td><td>断れる</td></tr>
+<tr><td><code>virsh destroy</code></td><td>ハイパーバイザー（QEMU のプロセスを終わらせる）</td><td>断れない（電源を抜く）</td></tr>
+<tr><td><code>virsh console</code></td><td>仮想のシリアルポート</td><td>— （画面とキーボードをつなぐだけ）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: <code>virsh shutdown</code> は PC の<b>電源ボタンを短く押す</b>こと、<code>virsh destroy</code> は<b>コンセントを抜く</b>ことに近い。
+短く押せば OS が片付けてから切る。抜けば片付けは無い。
+<br>ただし<b>崩れる点</b>: 実物の電源ボタンは押し続けると（4秒ほどで）強制的に電源が切れるが、<code>virsh shutdown</code> は何秒待っても強制には変わらない。
+強制したければ、人が自分で <code>destroy</code> を打つ。</div>
+
+<h2 id="autostart">自動起動の印と、つなぎっぱなしのコンソール</h2>
+<div class="sgoal"><b>この節で分かること</b>: 起動のしかたを libvirt に覚えさせる方法と、コンソールが1人分しか無いこと。</div>
+<pre data-where="外（lab@host）"><code>$ virsh autostart linuc
+Domain 'linuc' marked as autostarted
+
+$ virsh dominfo linuc | grep Autostart
+Autostart:      enable
+$ ls -l ~/.config/libvirt/qemu/autostart/
+total 0
+lrwxrwxrwx 1 lab lab 40 Oct 13 19:09 linuc.xml -&gt; /home/lab/.config/libvirt/qemu/linuc.xml
+$ virsh start linuc
+Domain 'linuc' started</code></pre>
+<p>自動起動の印は、定義へのシンボリックリンク1本である。libvirt は自分が起動したとき（実機ならホストの起動時、この檻ではコンテナの起動時）にこのディレクトリを見て、
+印の付いた仮想マシンの電源を入れる。本当にそうなるかは第3章で、コンテナを止めて起動し直して確かめる。</p>
+<p>コンソールは<b>1人分しか無い</b>。<code>virsh console</code> をつないだまま端末の窓を閉じると、次につなごうとしたときに断られる。</p>
+<pre data-where="外（lab@host）"><code>$ virsh console linuc
+Connected to domain 'linuc'
+Escape character is ^] (Ctrl + ])
+error: operation failed: Active console session exists for this domain
+
+$ virsh console --force linuc
+Connected to domain 'linuc'
+Escape character is ^] (Ctrl + ])</code></pre>
+<p>窓を閉じても、外のコンテナの中では古い <code>virsh console</code> が「つながっている」と言い張っている。<code>--force</code> で奪えば入れる。
+抜けるときは窓を閉じずに <code>Ctrl+]</code> で抜ける習慣にしておけば、こうはならない。</p>
+<div class="analogy"><b>たとえ</b>: コンソールは、サーバ室に1台だけある<b>保守用の端末</b>に近い。誰かが座っていれば、次の人は座れない。
+<br>ただし<b>崩れる点</b>: 実物の端末なら席を立てば空くが、<code>virsh console</code> は窓を閉じても「座っている」記録が残る。
+空いているかどうかを決めているのは、端末を閉じた人ではなく、コンソールを持っている側（libvirt）である。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-boot/">演習01</a>は、電源を入れ、自動起動の印を付ける課題である。
+判定は libvirt に状態を尋ねるのとは別に、練習機の中の OS から返事が来るかを確かめる。<code>running</code> だけでは合格にならない。</div>
+
+<div class="quiz"><b>確認</b>
+<p>libvirt で管理している仮想マシンのうち、<b>停止しているものも含めて</b>一覧を表示するコマンドはどれか。</p>
+<p>A. <code>virsh list</code>　B. <code>virsh list --all</code>　C. <code>virsh dominfo</code>　D. <code>virsh domstate</code></p>
+<details><summary>答え</summary>
+<p>B。<code>virsh list</code> は動いているものだけを出す。実測では、電源の入っていない <code>linuc</code> は <code>--all</code> を付けたときにだけ <code>shut off</code> として出た。
+<code>dominfo</code> と <code>domstate</code> は1台を指定して詳しく見るコマンドである。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>virsh shutdown vm1</code> を実行したが、いつまでも <code>running</code> のままである。ゲスト OS が応答していない。
+仮想マシンを直ちに停止するコマンドはどれか。また、その副作用は何か。</p>
+<details><summary>答え</summary>
+<p><code>virsh destroy vm1</code>。<code>shutdown</code> は電源ボタンを押すだけなので、受け取る OS が応答しなければ止まらない。
+<code>destroy</code> は QEMU のプロセスを終わらせる（電源を抜く）。定義とディスクは消えないが、ゲストは後片付けをできないので、書きかけのデータを失うことがある。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>ホスト（この檻では外側のコンテナ）が起動したとき、仮想マシン <code>vm1</code> も起動するように設定したい。打つコマンドは何か。</p>
+<details><summary>答え</summary>
+<p><code>virsh autostart vm1</code>。<code>virsh dominfo vm1</code> の <code>Autostart</code> が <code>enable</code> になる。
+外すときは <code>virsh autostart --disable vm1</code>。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li><code>virsh list</code> は動いているものだけ。止まっているものまで見るのは <code>virsh list --all</code></li>
+<li>仮想マシンのハードウェアは定義（XML）の数行で、ディスクは1つのファイル。<code>dominfo</code> <code>dumpxml</code> で読める</li>
+<li><code>running</code> は電源が入っているだけ。OS が起動し終わったかは、OS に尋ねないと分からない</li>
+<li><code>virsh shutdown</code> は電源ボタンを押すだけで、止めるかは中の OS が決める。聞く者がいなければ届かない</li>
+<li><code>virsh destroy</code> は電源を抜く。受け手に決めさせない代わりに、後片付けもさせない</li>
+<li><code>virsh console</code> は1人分。抜けるのは <code>Ctrl+]</code>、奪うのは <code>--force</code>。自動起動は <code>virsh autostart</code></li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-boot/theory/">← 理論編 目次</a><a href="/linuc-boot/theory/02-ssh">次: 2. 入れるかどうかは、受け取る側のファイルが決める →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-boot/chapters.js"></script>
+<script src="/linuc-boot/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

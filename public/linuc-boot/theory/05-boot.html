@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5. ファームウェアが読めるのは、FAT の中の1ファイルだけ — 確かめて説明する LinuC 主題1.01</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="5" data-theme="linuc-boot">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-boot/theory/">理論編</a> › 第5章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
+</div>
+<h1>5. ファームウェアが読めるのは、FAT の中の1ファイルだけ</h1>
+<p class="lead">Linux のカーネルは <code>/boot</code> の中にある。ところが電源を入れて最初に動く UEFI ファームウェアは、<code>/boot</code>（ext4）を1バイトも読めない。
+読めるのは ESP という FAT の小さな区画の中のファイルだけで、そこから先は「起動された側が、次に起動するものを自分で探しに行く」リレーになっている。
+ブート順を書き換えても、起動された側がそれを書き戻すことさえある。</p>
+<div class="badges"><span>前提: 第4章まで読了</span><span>前提: 端末を2つ開いている</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.01.3（重要度4）</span><span>出題範囲 1.01.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>ファームウェア（UEFI / BIOS）→ ブートローダ（GRUB）→ カーネル → initramfs → systemd の順番と、それぞれが何を読むかを言える</li>
+<li>UEFI と BIOS で、ファームウェアが最初に読む場所の違い（ESP と MBR）を説明できる</li>
+<li>ブートメディアの優先順位を、ファームウェアの設定画面と <code>efibootmgr</code> で確かめ、変えられる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: Secure Boot の署名を検証する仕組み（shim と MOK）、
+<code>grub.cfg</code> の文法と GRUB のコマンド、カーネルが起動時に出す1行1行の意味、<code>systemd-analyze</code> の細かい使い方。</div></div>
+
+<h2 id="relay">電源から login: までを、コンソールで追う</h2>
+<div class="sgoal"><b>この節で分かること</b>: 起動の途中で、誰が誰に仕事を渡しているか。</div>
+<p>端末1で練習機のコンソールにつなぎ、端末2で再起動の合図を送る。</p>
+<pre data-where="外（lab@host）・端末2"><code>$ virsh reboot linuc
+Domain 'linuc' is being rebooted</code></pre>
+<p>端末1に流れる表示から、担当が替わる行だけを抜き出す。</p>
+<pre data-where="外（lab@host）・端末1（練習機のコンソール）"><code>$ virsh console linuc
+（略）
+BdsDxe: loading Boot0002 "Ubuntu" from HD(15,GPT,9606BC98-2904-4577-9584-A8310313A04C,0x2800,0x35000)/\EFI\ubuntu\shimx64.efi
+BdsDxe: starting Boot0002 "Ubuntu" from HD(15,GPT,9606BC98-2904-4577-9584-A8310313A04C,0x2800,0x35000)/\EFI\ubuntu\shimx64.efi
+error: prohibited by secure boot policy.
+error: prohibited by secure boot policy.
+（略）
+   The highlighted entry will be executed automatically in 0s.
+EFI stub: Loaded initrd from LINUX_EFI_INITRD_MEDIA_GUID device path
+EFI stub: UEFI Secure Boot is enabled.
+[    0.000000] Linux version 6.8.0-142-generic (buildd@lcy02-amd64-049) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #142-Ubuntu SMP PREEMPT_DYNAMIC Wed Sep  2 14:24:27 UTC 2026 (Ubuntu 6.8.0-142.142-generic 6.8.12)
+[    0.000000] Command line: BOOT_IMAGE=/vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c4-9280-015dbb828010 ro console=tty1 console=ttyS0,115200
+（略）
+[    3.059533] Run /init as init process
+（略）
+Begin: Loading essential drivers ... done.
+（略）
+Begin: Will now check root file system ... fsck from util-linux 2.39.3
+[/usr/sbin/fsck.ext4 (1) -- /dev/vda1] fsck.ext4 -a -C0 /dev/vda1
+cloudimg-rootfs: clean, 31889/2490368 files, 404046/4980475 blocks
+（略）
+Begin: Running /scripts/init-bottom ... done.
+（略）
+Welcome to Ubuntu 24.04.5 LTS!
+（略）
+[  OK  ] Reached target multi-user.target - Multi-User System.
+[  OK  ] Reached target graphical.target - Graphical Interface.
+（略）
+Ubuntu 24.04.5 LTS linuc ttyS0
+（略）
+linuc login:</code></pre>
+<div class="scroll"><table>
+<tr><th>段</th><th>担当</th><th>上の表示</th><th>何を読み、誰に渡すか</th></tr>
+<tr><td>1</td><td>ファームウェア（UEFI）</td><td><code>BdsDxe: loading Boot0002 "Ubuntu"</code></td><td>NVRAM のブート順を見て、ESP の <code>\EFI\ubuntu\shimx64.efi</code> を読み、起動する</td></tr>
+<tr><td>2</td><td>ブートローダ（shim → GRUB）</td><td>メニューと数え下げ</td><td><code>/boot/grub/grub.cfg</code> を読み、カーネルと initramfs を読み込み、カーネルに引数を渡す</td></tr>
+<tr><td>3</td><td>カーネル</td><td><code>Linux version</code> / <code>Command line:</code></td><td>ハードウェアを初期化し、initramfs の <code>/init</code> を最初のプロセスとして起動する（<code>Run /init</code>）</td></tr>
+<tr><td>4</td><td>initramfs</td><td><code>Begin: …</code> の行</td><td>ディスクのドライバを読み込み、ルートを fsck してマウントし、本物の <code>/sbin/init</code> に替わる</td></tr>
+<tr><td>5</td><td>systemd（PID 1）</td><td><code>Welcome to Ubuntu</code> / <code>[  OK  ]</code></td><td>既定のブートターゲット（graphical.target）に必要なものを起動し、ログインを待つ</td></tr>
+</table></div>
+<p>ブートローダは GRUB で、ここで止めればカーネルに渡す引数を書き換えられる（第6章）。
+カーネルは自分だけではルートのディスクを開けない構成もあるので、ブートローダが一緒に渡した小さなファイルシステム <b>initramfs</b> に最初の仕事を任せる。
+<code>Begin:</code> で始まる行は、その initramfs の中のスクリプトが出している。
+なお <code>error: prohibited by secure boot policy.</code> の2行は、Secure Boot が有効なときに GRUB が出すもので、この練習機の起動には影響していない（毎回出る）。</p>
+<div class="analogy"><b>たとえ</b>: 起動は<b>リレー</b>に近い。各走者は、次の走者がどこに立っているかを自分の資料（NVRAM・grub.cfg・カーネル引数・default.target）で知っていて、バトンを渡したら退場する。
+<br>ただし<b>崩れる点</b>: リレーのバトンは同じ1本だが、起動では渡すものが毎回変わる（ファイルの場所 → カーネルとその引数 → ルートのファイルシステム → 目標のターゲット）。
+しかも後の走者ほど読める範囲が広い。最初の走者（ファームウェア）は FAT しか読めない。</div>
+
+<h2 id="esp">ファームウェアが読めるもの</h2>
+<div class="sgoal"><b>この節で分かること</b>: UEFI のファームウェアがディスクの何を読み、なぜ /boot/efi という区画があるのか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>電源を入れると、UEFI（昔なら BIOS）が <code>/boot</code> にあるカーネル（<code>vmlinuz</code>）を読み込んで起動する。ブート順の設定に書いてあるのは「どのディスクのカーネルか」だろう。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ls /sys/firmware/efi
+config_table  efivars  fw_platform_size  fw_vendor  mok-variables  runtime  runtime-map  systab
+$ sudo efibootmgr
+BootCurrent: 0002
+Timeout: 0 seconds
+BootOrder: 0002,0001,0000
+Boot0000* UiApp	FvVol(7cb8bdc9-f8eb-4f34-aaea-3ee4af6516a1)/FvFile(462caa21-7614-4503-836e-8ab6f4662331)
+Boot0001* UEFI Misc Device	PciRoot(0x0)/Pci(0x1,0x2)/Pci(0x0,0x0){auto_created_boot_option}
+Boot0002* Ubuntu	HD(15,GPT,9606bc98-2904-4577-9584-a8310313a04c,0x2800,0x35000)/File(\EFI\ubuntu\shimx64.efi)
+$ lsblk -o NAME,FSTYPE,LABEL,UUID,MOUNTPOINTS /dev/vda
+NAME    FSTYPE LABEL           UUID                                 MOUNTPOINTS
+vda
+├─vda1  ext4   cloudimg-rootfs f89220a3-172e-48c4-9280-015dbb828010 /
+├─vda14
+├─vda15 vfat   UEFI            B792-27AD                            /boot/efi
+└─vda16 ext4   BOOT            a5eecc38-8587-4601-9295-c92dabc20612 /boot</code></pre>
+<div class="then"><b>だめな理由</b>: ブート順の先頭 <code>Boot0002</code> に書いてあるのは、カーネルではなく
+「15番目の区画（<code>HD(15,GPT,…)</code>）の <code>\EFI\ubuntu\shimx64.efi</code> というファイル」だった。
+15番目の区画 <code>vda15</code> は <b>FAT（vfat）</b>で、<code>/boot/efi</code> にマウントされている。カーネルのある <code>/boot</code> は別の区画 <code>vda16</code> で、ext4 である。
+<b>UEFI のファームウェアが読めるファイルシステムは FAT だけ</b>で、ext4 の <code>/boot</code> はファームウェアからは中身の分からない領域でしかない。
+だから FAT の区画（ESP: EFI システムパーティション）にブートローダを置き、そこから先の ext4 を読む仕事はブートローダ（GRUB）に任せている。</div></div>
+<p><code>/sys/firmware/efi</code> があることが、この Linux が UEFI で起動したことの証拠になる（BIOS で起動していれば無い）。ESP の中を見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ findmnt -n -o TARGET,FSTYPE,OPTIONS /boot/efi
+/boot/efi vfat   rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro
+$ ls /boot/efi
+ls: cannot open directory '/boot/efi': Permission denied
+$ sudo ls -l /boot/efi/EFI/ubuntu
+total 4380
+-rwx------ 1 root root     108 Oct 13 09:58 BOOTX64.CSV
+-rwx------ 1 root root     112 Oct 13 09:58 grub.cfg
+-rwx------ 1 root root 2660232 Oct 13 09:58 grubx64.efi
+-rwx------ 1 root root  856280 Oct 13 09:58 mmx64.efi
+-rwx------ 1 root root  966664 Oct 13 09:58 shimx64.efi
+$ sudo cat /boot/efi/EFI/ubuntu/grub.cfg
+search.fs_uuid a5eecc38-8587-4601-9295-c92dabc20612 root
+set prefix=($root)'/grub'
+configfile $prefix/grub.cfg</code></pre>
+<p>ESP は FAT で、root 以外には中を見せない設定（<code>fmask=0077,dmask=0077</code>）でマウントされている。だから一般ユーザの <code>ls</code> は断られた。
+中にあるのは、ファームウェアが最初に起動する <code>shimx64.efi</code>、そこから起動される GRUB 本体の <code>grubx64.efi</code>、そして<b>3行しかない</b> <code>grub.cfg</code> である。
+3行の中身は「この UUID の区画を探し、その中の <code>/grub/grub.cfg</code> を読め」で、ESP の中に本当の設定は無い。UUID の <code>a5eecc38-…</code> は、上の <code>lsblk</code> で <code>BOOT</code> の区画（<code>vda16</code>）である。
+GRUB は ext4 を読めるので、ここで初めて <code>/boot</code>（<code>vda16</code>）の中に手が届く。</p>
+<div class="analogy"><b>たとえ</b>: ESP は建物の<b>受付カウンター</b>に近い。受付（ファームウェア）が手を伸ばせるのはカウンターの上だけで、
+そこに置いてある案内係（shim と GRUB）を呼び、奥の部屋（ext4 の <code>/boot</code>）へは案内係に行ってもらう。カウンターの上のメモ（3行の grub.cfg）には「奥の何号室へ」としか書いていない。
+<br>ただし<b>崩れる点</b>: 受付は奥の部屋の存在を知っているが、ファームウェアは ext4 の区画の中身を何も知らない。知っているのは、カウンターに置かれたファイルの名前だけである。</div>
+
+<h2 id="bios">BIOS で起動する場合</h2>
+<div class="sgoal"><b>この節で分かること</b>: UEFI と BIOS で、ファームウェアが最初に読む場所の違い。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk -l /dev/vda
+Disk /dev/vda: 20 GiB, 21474836480 bytes, 41943040 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: gpt
+Disk identifier: D6802C58-E607-4421-9940-13246D0847AC
+
+Device       Start      End  Sectors  Size Type
+/dev/vda1  2099200 41943006 39843807   19G Linux filesystem
+/dev/vda14    2048    10239     8192    4M BIOS boot
+/dev/vda15   10240   227327   217088  106M EFI System
+/dev/vda16  227328  2097152  1869825  913M Linux extended boot
+
+Partition table entries are not in disk order.</code></pre>
+<p>第4章で「ファイルシステムを持たない 4MB の区画」と呼んだ <code>vda14</code> の種類は <b>BIOS boot</b> だった。
+このディスクは、UEFI でも BIOS でも起動できるように作ってある（練習機のファームウェアは UEFI 専用なので、BIOS の側は使われない）。</p>
+<div class="scroll"><table>
+<tr><th></th><th>BIOS</th><th>UEFI</th></tr>
+<tr><td>最初に読む場所</td><td>ディスクの先頭 512 バイト（MBR）のうち、起動コードの 446 バイト</td><td>ESP（FAT）の中の .efi ファイル</td></tr>
+<tr><td>ブートローダの本体</td><td>MBR の直後や BIOS boot 区画（GPT の場合）に置く</td><td>ESP の中（<code>\EFI\ubuntu\grubx64.efi</code>）</td></tr>
+<tr><td>ブート順（ブートメディアの優先順位）</td><td>BIOS の設定画面で、ディスク単位で決める</td><td>NVRAM の BootOrder。設定画面か <code>efibootmgr</code> で変える</td></tr>
+<tr><td>Linux から見分ける</td><td><code>/sys/firmware/efi</code> が無い</td><td><code>/sys/firmware/efi</code> がある</td></tr>
+</table></div>
+
+<h2 id="order">ブートメディアの優先順位は、NVRAM にある</h2>
+<div class="sgoal"><b>この節で分かること</b>: 起動する順番がどこに書かれ、どうやって変えるか。変えた順番が守られるとは限らないこと。</div>
+<p><code>efibootmgr</code> の <code>BootOrder: 0002,0001,0000</code> が、ファームウェアが試す順番である。
+<code>0002</code>（Ubuntu）、<code>0001</code>（UEFI Misc Device。ディスクの決まった場所 <code>\EFI\BOOT\BOOTX64.EFI</code> を試す汎用の候補）、<code>0000</code>（UiApp。ファームウェアの設定画面）の順になっている。
+この順番はディスクではなく、ファームウェアの記憶領域（NVRAM）に入っている（練習機では外の <code>~/vm/linuc_VARS.fd</code> がその中身）。</p>
+<p>実機で「起動時に F2 や Del を押して入る設定画面」は、ここでは <code>UiApp</code> である。次の1回だけ、そこから起動させる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo efibootmgr -n 0000
+BootNext: 0000
+BootCurrent: 0002
+Timeout: 0 seconds
+BootOrder: 0002,0001,0000
+Boot0000* UiApp	FvVol(7cb8bdc9-f8eb-4f34-aaea-3ee4af6516a1)/FvFile(462caa21-7614-4503-836e-8ab6f4662331)
+Boot0001* UEFI Misc Device	PciRoot(0x0)/Pci(0x1,0x2)/Pci(0x0,0x0){auto_created_boot_option}
+Boot0002* Ubuntu	HD(15,GPT,9606bc98-2904-4577-9584-a8310313a04c,0x2800,0x35000)/File(\EFI\ubuntu\shimx64.efi)</code></pre>
+<p><code>BootNext: 0000</code> が増えた。<code>BootOrder</code> を変えずに、次の1回だけ <code>0000</code>（UiApp）から起動する指定である。<code>sudo reboot</code> で再起動すると、コンソールに設定画面が出る。</p>
+<pre data-where="外（lab@host）・端末1（練習機のコンソール）"><code> Ubuntu 24.04 PC (Q35 + ICH9, 2009)
+ pc-q35-noble                                        2.00 GHz
+ 2024.02-2ubuntu0.9                                  1536 MB RAM
+
+
+
+   Select Language            &lt;Standard English&gt;         This is the option
+                                                         one adjusts to change
+ ► Device Manager                                        the language for the
+ ► Boot Manager                                          current system
+ ► Boot Maintenance Manager
+
+   Continue
+   Reset</code></pre>
+<p>矢印キーで <code>Boot Manager</code> を選んで Enter を押すと、<b>今回1回だけ起動するもの</b>を選ぶ画面になる（実機で起動時に F12 などで出すメニューに当たる）。</p>
+<pre data-where="外（lab@host）・端末1（練習機のコンソール）"><code>   Boot Manager Menu                                     HD(15,GPT,9606BC98-290
+                                                         4-4577-9584-A8310313A0
+   Ubuntu                                                4C,0x2800,0x35000)/\EF
+   UEFI Misc Device                                      I\ubuntu\shimx64.efi
+   UEFI PXEv4 (MAC:525400123456)
+   UEFI PXEv6 (MAC:525400123456)
+   UEFI HTTPv4 (MAC:525400123456)
+   UEFI HTTPv6 (MAC:525400123456)</code></pre>
+<p>ディスクの2つの候補のほかに、ネットワークからの起動（PXE・HTTP）が並んでいる。これらもブートメディアである。
+並び順そのものを変えるのは <code>Boot Maintenance Manager</code> → <code>Boot Options</code> → <code>Change Boot Order</code> で、ここで変えた結果が NVRAM の BootOrder になる。</p>
+<pre data-where="外（lab@host）・端末1（練習機のコンソール）"><code>   Change the order           &lt;Ubuntu&gt;                   Change the order
+                              &lt;UEFI Misc Device&gt;
+                              &lt;UEFI PXEv4
+                              (MAC:525400123456)&gt;
+                              &lt;UEFI PXEv6
+                              (MAC:525400123456)&gt;
+                              &lt;UEFI HTTPv4
+                              (MAC:525400123456)&gt;
+                              &lt;UEFI HTTPv6
+                              (MAC:525400123456)&gt;
+   Commit Changes and Exit
+   Discard Changes and Exit</code></pre>
+<p>ここでは何も変えずに戻り、Boot Manager で <code>Ubuntu</code> を選んで起動した。起動した後に NVRAM を読み直す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo efibootmgr
+BootCurrent: 0002
+Timeout: 0 seconds
+BootOrder: 0002,0001,0000,0003,0004,0005,0006
+（略）
+Boot0003* UEFI PXEv4 (MAC:525400123456)	PciRoot(0x0)/Pci(0x10,0x0)/MAC(525400123456,1)/IPv4(0.0.0.00.0.0.0,0,0){auto_created_boot_option}
+Boot0004* UEFI PXEv6 (MAC:525400123456)	PciRoot(0x0)/Pci(0x10,0x0)/MAC(525400123456,1)/IPv6([::]:&lt;-&gt;[::]:,0,0){auto_created_boot_option}
+Boot0005* UEFI HTTPv4 (MAC:525400123456)	PciRoot(0x0)/Pci(0x10,0x0)/MAC(525400123456,1)/IPv4(0.0.0.00.0.0.0,0,0)/Uri(){auto_created_boot_option}
+Boot0006* UEFI HTTPv6 (MAC:525400123456)	PciRoot(0x0)/Pci(0x10,0x0)/MAC(525400123456,1)/IPv6([::]:&lt;-&gt;[::]:,0,0)/Uri(){auto_created_boot_option}</code></pre>
+<p><code>BootNext</code> は1回使われて消え、設定画面を開いたときにファームウェアが見つけたネットワーク起動の候補（<code>Boot0003</code>〜<code>0006</code>）が、自動で NVRAM に足されて BootOrder の後ろに並んだ。</p>
+
+<p>今度は Linux から、ブート順の先頭を <code>0001</code>（UEFI Misc Device）に書き換えて再起動する。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo efibootmgr -o 0001,0002,0000
+BootCurrent: 0002
+Timeout: 0 seconds
+BootOrder: 0001,0002,0000
+（略）</code></pre>
+<pre data-where="外（lab@host）・端末1（練習機のコンソール）"><code>BdsDxe: loading Boot0001 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x1,0x2)/Pci(0x0,0x0)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x1,0x2)/Pci(0x0,0x0)</code></pre>
+<p>ファームウェアは書き換えたとおり <code>Boot0001</code> から起動した。起動し終わってから NVRAM を見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo efibootmgr
+BootCurrent: 0001
+Timeout: 0 seconds
+BootOrder: 0002,0001,0000
+（略）
+$ sudo ls -l /boot/efi/EFI/BOOT
+total 1868
+-rwx------ 1 root root 966664 Oct 13 09:58 BOOTX64.EFI
+-rwx------ 1 root root  88344 Oct 13 09:58 fbx64.efi
+-rwx------ 1 root root 856280 Oct 13 09:58 mmx64.efi
+$ sudo iconv -f UTF-16 -t UTF-8 /boot/efi/EFI/ubuntu/BOOTX64.CSV
+shimx64.efi,Ubuntu,,This is the boot entry for Ubuntu</code></pre>
+<p>今回の起動は <code>0001</code> から（<code>BootCurrent: 0001</code>）なのに、<b>BootOrder は <code>0002</code>（Ubuntu）が先頭に戻っていた</b>。
+<code>0001</code> が起動するのはディスクの決まった場所 <code>\EFI\BOOT\BOOTX64.EFI</code> で、その大きさ（966664 バイト）は <code>shimx64.efi</code> と同じ、つまり中身は shim である。
+shim はこの場所から起動されると、隣の <code>fbx64.efi</code>（fallback）を動かす。fallback は <code>BOOTX64.CSV</code>（「shimx64.efi を Ubuntu という名前で登録せよ」）を読んで、
+Ubuntu の候補を NVRAM に登録し直し、先頭に置く。<b>ブート順を決めるのはファームウェアの設定のはずが、起動された側がそれを書き戻した。</b>
+（第1章で練習機を初めて起動したとき、コンソールに <code>Boot0001 "UEFI Misc Device"</code> と出ていたのも同じ仕組みで、そのとき Ubuntu の候補が作られた。）</p>
+<div class="analogy"><b>たとえ</b>: BootOrder は、受付に貼られた<b>呼び出しの順番表</b>に近い。管理人（あなた）が順番表を書き換えると、受付はその順に呼ぶ。
+<br>ただし<b>崩れる点</b>: 順番表を書き換えられるのは管理人だけのはずが、ここでは呼ばれた案内係（shim の fallback）が自分で順番表を書き直した。
+NVRAM は「ファームウェアの設定」でも、OS や起動されたプログラムから書ける場所である。</div>
+
+<h2 id="kernel">カーネルに渡された引数と、GRUB の設定</h2>
+<div class="sgoal"><b>この節で分かること</b>: カーネル引数がどこから来て、どこで確かめられるか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ cat /proc/cmdline
+BOOT_IMAGE=/vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c4-9280-015dbb828010 ro console=tty1 console=ttyS0,115200
+$ grep -E '^GRUB_(TIMEOUT|CMDLINE_LINUX_DEFAULT|TERMINAL|FORCE_PARTUUID)=' /etc/default/grub /etc/default/grub.d/*.cfg
+/etc/default/grub:GRUB_TIMEOUT=0
+/etc/default/grub:GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+/etc/default/grub.d/40-force-partuuid.cfg:GRUB_FORCE_PARTUUID=425be860-371a-491e-872c-6e1c1e5e7b99
+/etc/default/grub.d/50-cloudimg-settings.cfg:GRUB_TIMEOUT=0
+/etc/default/grub.d/50-cloudimg-settings.cfg:GRUB_CMDLINE_LINUX_DEFAULT="console=tty1 console=ttyS0"
+/etc/default/grub.d/50-cloudimg-settings.cfg:GRUB_TERMINAL=console
+/etc/default/grub.d/99-lab.cfg:GRUB_TIMEOUT=3
+/etc/default/grub.d/99-lab.cfg:GRUB_TERMINAL="serial console"
+/etc/default/grub.d/99-lab.cfg:GRUB_CMDLINE_LINUX_DEFAULT="console=tty1 console=ttyS0,115200"
+/etc/default/grub.d/zz-linuc-boot.cfg:GRUB_TIMEOUT=10
+/etc/default/grub.d/zz-linuc-boot.cfg:GRUB_FORCE_PARTUUID=
+$ sudo grep -m2 -E '^\s+(linux|initrd)\s' /boot/grub/grub.cfg
+	linux	/vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c4-9280-015dbb828010 ro  console=tty1 console=ttyS0,115200
+	initrd	/microcode.cpio /initrd.img-6.8.0-142-generic
+$ systemd-analyze
+Startup finished in 8.051s (kernel) + 27.119s (userspace) = 35.171s
+graphical.target reached after 26.948s in userspace.</code></pre>
+<p>カーネルが受け取った引数は <code>/proc/cmdline</code> にそのまま残っている。<code>root=UUID=…</code> がルートの区画、<code>ro</code> は「まず読み取り専用でマウントせよ」、<code>console=</code> は表示の行き先である。</p>
+<p>その引数の出どころは、<code>/etc/default/grub</code> と <code>/etc/default/grub.d/*.cfg</code> である。同じ設定がファイルの順に何度も上書きされ（タイムアウトは 0 → 0 → 3 → 10）、
+最後に読んだものが勝つ。これを <code>update-grub</code>（中身は <code>grub-mkconfig -o /boot/grub/grub.cfg</code>）が <code>/boot/grub/grub.cfg</code> に書き出し、
+GRUB は起動のたびにそれを読む。<b>grub.cfg を手で直しても、次に update-grub が走ると消える</b>ので、毎回の設定は <code>/etc/default/grub</code> の側に書く。
+1回だけ変えたいときは、GRUB のメニューで書き換える（第6章）。</p>
+<p><code>systemd-analyze</code> は、カーネルと initramfs の段（kernel）と、systemd が既定のターゲットに着くまで（userspace）の時間を分けて出す。この練習機は KVM を使わないので、合わせて 35 秒ほどかかった。</p>
+
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-boot/">演習03</a>は、GRUB のメニューで e を押し、この章で見た linux の行に1語足して、その1回の起動だけ別のターゲットで起動する課題である。
+判定は、カーネルが受け取った引数（<code>/proc/cmdline</code>）と、systemd が到達したターゲットを練習機の中で見る。</div>
+
+<div class="quiz"><b>確認</b>
+<p>UEFI で起動するシステムで、ブートローダ（GRUB など）のファイルが置かれる区画は何か。また、そのファイルシステムは何か。</p>
+<details><summary>答え</summary>
+<p>EFI システムパーティション（ESP）。ファイルシステムは FAT（実測では vfat、FAT32）で、Linux では <code>/boot/efi</code> にマウントされる。
+UEFI のファームウェアが読めるのは FAT だけなので、ext4 の <code>/boot</code> には置けない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>次のうち、Linux の起動の順番として正しいものはどれか。</p>
+<p>A. カーネル → ブートローダ → UEFI → systemd<br>B. UEFI → ブートローダ → カーネル → initramfs → systemd<br>C. UEFI → カーネル → ブートローダ → systemd<br>D. ブートローダ → UEFI → initramfs → カーネル</p>
+<details><summary>答え</summary>
+<p>B。コンソールの表示の順（<code>BdsDxe</code> → GRUB のメニュー → <code>Linux version</code> → <code>Run /init</code> と <code>Begin:</code> の行 → <code>Welcome to Ubuntu</code>）と一致する。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>UEFI のブート順を Linux から変更するコマンドと、次回の1回だけ起動するものを指定するオプションは何か。</p>
+<details><summary>答え</summary>
+<p><code>efibootmgr</code>。順番は <code>-o</code>（例: <code>efibootmgr -o 0001,0002,0000</code>）、次回の1回だけは <code>-n</code>（例: <code>efibootmgr -n 0000</code>）。
+どちらも root の権限が要る。ファームウェアの設定画面（Boot Maintenance Manager → Change Boot Order）からも変えられる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>BIOS で起動するとき、ファームウェアが最初に読み込むのはディスクのどこか。</p>
+<details><summary>答え</summary>
+<p>ディスクの先頭 512 バイト（MBR）。そのうち先頭の 446 バイトが起動コードで、そこからブートローダの続きを読み込む。
+UEFI はこれと違い、ESP の中のファイルを名前で読む。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>起動はリレー: ファームウェア（UEFI / BIOS）→ ブートローダ（GRUB）→ カーネル → initramfs → systemd</li>
+<li>UEFI のファームウェアが読めるのは FAT の ESP（<code>/boot/efi</code>）だけ。カーネルのある ext4 の <code>/boot</code> は、ブートローダが読む</li>
+<li>BIOS はディスクの先頭（MBR）の起動コードを読む。UEFI は ESP の .efi ファイルを読む。<code>/sys/firmware/efi</code> があれば UEFI で起動している</li>
+<li>ブートメディアの優先順位は NVRAM の BootOrder。<code>efibootmgr -o</code> で順番、<code>-n</code> で次の1回。設定画面からも変えられる</li>
+<li>変えた順番は、起動された側（shim の fallback）が書き戻すことがある。決めるのは最後に受け取った側</li>
+<li>カーネルに渡った引数は <code>/proc/cmdline</code>。毎回の引数は <code>/etc/default/grub</code>（と <code>grub.d/</code>）に書いて update-grub で grub.cfg に反映する</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-boot/theory/04-install">← 4. GUI が無くても、既定は graphical.target</a><a href="/linuc-boot/theory/06-target">次: 6. root にパスワードが無いと、シングルユーザモードは何も聞かずに root を渡す →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-boot/chapters.js"></script>
+<script src="/linuc-boot/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>
