@@ -1,0 +1,6 @@
+#!/bin/bash
+# lab env の追加行（仮想マシン型）。本文と違う画面が出たとき、練習機が動いているか・何が動いているかで切り分ける。
+st=$(/usr/local/bin/vm status --short 2>/dev/null | sed 's/^練習機 linuc: //')
+printf '練習機    : %s\n' "${st:-不明}"
+os=$(lab-guest '. /etc/os-release; printf "%s / %s" "$PRETTY_NAME" "$(uname -r)"' 2>/dev/null) || os='応答なし（vm start）'
+printf '練習機 OS : %s\n' "$os"

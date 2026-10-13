@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. ifconfig に見えないアドレスがある — 確かめて説明する LinuC 主題1.07</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="2" data-theme="linuc-network">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-network/theory/">理論編</a> › 第2章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/">詳しく</a></p>
+</div>
+<h1>2. ifconfig に見えないアドレスがある</h1>
+<p class="lead">NIC にアドレスを2つ付ける。<code>ip addr</code> には2つ並ぶのに、<code>ifconfig</code> には1つしか出ない。どちらかが壊れているのではない。<code>ifconfig</code> は「1つの名前に1つのアドレス」という古い表を読んでいて、その表には2つ目の欄が無い。</p>
+<div class="badges"><span>前提: 第1章まで読了</span><span>所要 14分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.2（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>ip link</code>・<code>ip addr</code>・<code>ifconfig</code> の出力から、NIC が上がっているか、どのアドレスが付いているかを読める</li><li>NIC を手で上げ下げし、アドレスを付け外しできる（<code>ip link set</code> / <code>ip addr add</code>・<code>del</code>・<code>flush</code> / <code>ifconfig</code>）</li><li><code>ifconfig</code> と <code>ip</code> が違う答えを返す理由を、見ている表の違いとして説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>ip</code> のトンネルやブリッジを作るサブコマンド、<code>ip neigh</code> の状態の語（REACHABLE / STALE など）の細かい意味、<code>ifconfig</code> で MAC アドレスを変える操作。ここで付けた設定は再起動で消える。残す方法（ifupdown と NetworkManager）は第3章で扱う。</div></div>
+
+<h2 id="see">NIC の一覧は、道具によって数が違う</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>ip link</code> と <code>ifconfig</code> が出す一覧の違い。</div>
+<p>練習機の NIC を全部出す。<code>ip link</code> はリンク（ケーブルの口）の状態だけを出す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ip link show
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: enp0s16: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:12:34:56 brd ff:ff:ff:ff:ff:ff
+3: enp0s17: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
+4: enp0s18: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:12:34:58 brd ff:ff:ff:ff:ff:ff
+5: lab0@if3: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:0a:00:02 brd ff:ff:ff:ff:ff:ff link-netns sw</code></pre>
+<p>山かっこの中の <code>UP</code> は「上げてある（使う設定になっている）」、<code>LOWER_UP</code> は「ケーブルの先がつながっている」。
+<code>enp0s17</code> にはどちらも無く、<code>state DOWN</code> である。誰もまだ上げていない。
+<code>link/ether</code> の後ろが MAC アドレス。<code>lab0@if3 … link-netns sw</code> は、lab0 がケーブル（veth）の片端で、
+もう片端がスイッチ（名前空間 sw）の3番の口にささっていることを示している。</p>
+<p>同じことを <code>ifconfig</code> で見る。行の先頭が NIC 名なので、その行だけ抜き出す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ifconfig | grep '^[a-z]'
+enp0s16: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+enp0s18: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+lab0: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+lo: flags=73&lt;UP,LOOPBACK,RUNNING&gt;  mtu 65536
+$ ifconfig -a | grep '^[a-z]'
+enp0s16: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+enp0s17: flags=4098&lt;BROADCAST,MULTICAST&gt;  mtu 1500
+enp0s18: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+lab0: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+lo: flags=73&lt;UP,LOOPBACK,RUNNING&gt;  mtu 65536</code></pre>
+<p><code>ifconfig</code> は<b>上がっている NIC だけ</b>を出す。上がっていない enp0s17 を見るには <code>-a</code>（all）が要る。
+「ifconfig に出てこない＝NIC が無い」ではない。名前を指定すれば、上がっていなくても出る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ip addr show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
+$ ifconfig enp0s17
+enp0s17: flags=4098&lt;BROADCAST,MULTICAST&gt;  mtu 1500
+        ether 52:54:00:12:34:57  txqueuelen 1000  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 0  bytes 0 (0.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0</code></pre>
+<p>アドレスの行（<code>inet</code>）が1つも無い。<code>ifconfig</code> は送受信したパケットの数（RX / TX）も出す。まだ0である。</p>
+
+<h2 id="up">上げて、付ける</h2>
+<div class="sgoal"><b>この節で分かること</b>: 「リンクが上がっている」と「アドレスが付いている」が別々の状態であること。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ip link set enp0s17 up
+$ ip addr show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::5054:ff:fe12:3457/64 scope link
+       valid_lft forever preferred_lft forever</code></pre>
+<p>上げただけで <code>state UP</code> になり、<b>IPv6 のアドレス（<code>fe80::…</code>）が勝手に付いた</b>。これは第6章の主題なので、ここでは「IPv4 のアドレスはまだ無い」ことだけ見ておく。
+IPv4 のアドレスを足す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ip addr add 10.0.3.50/24 dev enp0s17
+$ ip -4 addr show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.3.50/24 scope global enp0s17
+       valid_lft forever preferred_lft forever
+$ ping -c 2 10.0.3.2
+PING 10.0.3.2 (10.0.3.2) 56(84) bytes of data.
+64 bytes from 10.0.3.2: icmp_seq=1 ttl=255 time=5.37 ms
+64 bytes from 10.0.3.2: icmp_seq=2 ttl=255 time=0.898 ms
+
+--- 10.0.3.2 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1003ms
+rtt min/avg/max/mdev = 0.898/3.133/5.369/2.235 ms</code></pre>
+<p>10.0.3.2 は、この練習用ネットワークで待っている相手（QEMU が作る仮想のゲートウェイ）である。
+同じ /24 の中にいるので、付けた直後から直接話せる（時間の ms はあなたの画面では違う）。
+直接話す相手の MAC アドレスは ARP で調べ、表に残っている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ip neigh show dev enp0s17
+10.0.3.2 lladdr 52:55:0a:00:03:02 REACHABLE</code></pre>
+<div class="analogy"><b>たとえ</b>: 新しい電話機の設置に近い。電源を入れて回線につなぐ（<code>ip link set up</code>）のと、
+番号を割り当てる（<code>ip addr add</code>）のは別の作業で、どちらが欠けても話せない。
+<br>ただし<b>崩れる点</b>: 電話機は番号が無ければ何も名乗らないが、IPv6 の NIC は上げた瞬間に自分で番号（<code>fe80::</code>）を作って名乗る。
+「上げただけ」の状態は、IPv4 と IPv6 で同じではない。</div>
+
+<h2 id="hidden">ifconfig に見えないアドレス</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>ifconfig</code> と <code>ip addr</code> が別の表を読んでいること。</div>
+<p>同じ NIC に、同じネットワークのアドレスをもう1つ足す（1台の機械に2つの名前を持たせたいときに使う）。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>ifconfig</code> と <code>ip addr</code> は、同じ NIC の同じ設定を、別の見た目で出しているだけだ。
+片方に出るアドレスは、もう片方にも出るはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ip addr add 10.0.3.51/24 dev enp0s17
+$ ip -4 addr show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.3.50/24 scope global enp0s17
+       valid_lft forever preferred_lft forever
+    inet 10.0.3.51/24 scope global secondary enp0s17
+       valid_lft forever preferred_lft forever
+$ ifconfig enp0s17
+enp0s17: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+        inet 10.0.3.50  netmask 255.255.255.0  broadcast 0.0.0.0
+        inet6 fe80::5054:ff:fe12:3457  prefixlen 64  scopeid 0x20&lt;link&gt;
+        ether 52:54:00:12:34:57  txqueuelen 1000  (Ethernet)
+        RX packets 3  bytes 260 (260.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 11  bytes 894 (894.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0</code></pre>
+<div class="then"><b>だめな理由</b>: <code>ip</code> には2つ、<code>ifconfig</code> には <code>10.0.3.50</code> の1つしか出ない。
+<code>ifconfig</code>（net-tools）は、カーネルに「この名前の NIC のアドレスは？」と聞く古い窓口（ioctl）を使う。
+その窓口は1つの名前に1つのアドレスしか返さない。<code>ip</code>（iproute2）は、NIC に付いたアドレスを全部並べて返す新しい窓口（netlink）を使う。
+2つ目のアドレスには <code>secondary</code> の印が付いていて、<code>ifconfig</code> の表にはその欄が無い。
+もう1つ、<code>broadcast 0.0.0.0</code> にも注意する。<code>ip addr add</code> は <code>brd</code> を指定しないとブロードキャストアドレスを付けない。</div></div>
+<p>名前（ラベル）を付けて足すと、<code>ifconfig</code> にも見えるようになる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ip addr add 10.0.3.52/24 dev enp0s17 label enp0s17:1
+$ ifconfig | grep '^[a-z]'
+enp0s16: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+enp0s17: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+enp0s17:1: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+enp0s18: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+lab0: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+lo: flags=73&lt;UP,LOOPBACK,RUNNING&gt;  mtu 65536
+$ ifconfig enp0s17:1
+enp0s17:1: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+        inet 10.0.3.52  netmask 255.255.255.0  broadcast 0.0.0.0
+        ether 52:54:00:12:34:57  txqueuelen 1000  (Ethernet)</code></pre>
+<p><code>enp0s17:1</code> という「別の NIC のような名前」（エイリアス）で出てきた。MAC アドレスは enp0s17 と同じで、実体は同じ NIC である。
+<code>ifconfig</code> の時代は、2つ目のアドレスをこの形（<code>ifconfig enp0s17:1 10.0.3.52</code>）で付けていた。
+<code>ifconfig</code> から見えるのはラベルの付いたものだけで、<code>10.0.3.51</code> はまだ見えないままである。</p>
+<div class="analogy"><b>たとえ</b>: 社員名簿の「内線番号」の欄に近い。欄が1つしか無い名簿（ifconfig）には、2つ目の内線を書く場所が無い。
+別の名前（enp0s17:1）で1行増やせば、名簿にも載る。
+<br>ただし<b>崩れる点</b>: 名簿なら書き漏れに気づけるが、<code>ifconfig</code> は「書いていない」ことを表示しない。
+見えないアドレスは、無いのと区別がつかない。</div>
+
+<h2 id="replace">ifconfig で付けると、置き換わる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>ip addr add</code> と <code>ifconfig</code> の、付け方の違い。</div>
+<p>いま enp0s17 には 10.0.3.50・10.0.3.51・10.0.3.52 の3つが付いている。ここで <code>ifconfig</code> でアドレスを付ける。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ifconfig enp0s17 10.0.3.60 netmask 255.255.255.0
+$ ip -4 addr show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.3.60/24 brd 10.0.3.255 scope global enp0s17
+       valid_lft forever preferred_lft forever</code></pre>
+<p>3つとも消えて、10.0.3.60 だけになった。<code>ifconfig 名前 アドレス</code> は「この名前のアドレスを<b>これにする</b>」という命令で、足すのではなく置き換える。
+1つ目（primary）のアドレスが消えると、同じネットワークの2つ目以降（secondary）も一緒に消える
+（この練習機の既定。<code>sysctl net.ipv4.conf.enp0s17.promote_secondaries</code> が 1 の機械では、2つ目が1つ目に繰り上がって残る）。
+<code>ifconfig</code> で付けると、ブロードキャスト（<code>brd 10.0.3.255</code>）はマスクから自動で計算される。元に戻しておく。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ifconfig enp0s17 10.0.3.50 netmask 255.255.255.0
+$ ip -4 addr show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.3.50/24 brd 10.0.3.255 scope global enp0s17
+       valid_lft forever preferred_lft forever</code></pre>
+<div class="scroll"><table>
+<tr><th>やりたいこと</th><th>ip（iproute2）</th><th>ifconfig（net-tools）</th></tr>
+<tr><td>一覧（上がっていないものも）</td><td><code>ip link show</code> / <code>ip addr show</code></td><td><code>ifconfig -a</code></td></tr>
+<tr><td>上げる / 下げる</td><td><code>ip link set enp0s17 up</code> / <code>down</code></td><td><code>ifconfig enp0s17 up</code> / <code>down</code></td></tr>
+<tr><td>アドレスを付ける</td><td><code>ip addr add 10.0.3.50/24 dev enp0s17</code>（<b>足す</b>）</td><td><code>ifconfig enp0s17 10.0.3.50 netmask 255.255.255.0</code>（<b>置き換える</b>）</td></tr>
+<tr><td>2つ目を付ける</td><td>もう一度 <code>ip addr add</code></td><td><code>ifconfig enp0s17:1 10.0.3.52 netmask …</code>（エイリアス）</td></tr>
+<tr><td>1つ外す / 全部外す</td><td><code>ip addr del 10.0.3.51/24 dev enp0s17</code> / <code>ip addr flush dev enp0s17</code></td><td>—（この章では ip を使う）</td></tr>
+<tr><td>見えるアドレス</td><td>全部（secondary も）</td><td>名前ごとに1つ</td></tr>
+</table></div>
+<p>Ubuntu 24.04 や RHEL 9 の最小構成には <code>ifconfig</code> が入っていないこともある（net-tools は古い道具として別パッケージ）。試験では両方の形が問われる。</p>
+<div class="quiz"><b>確認</b>
+<p>eth0 に IPv4 アドレス 192.168.1.10/24 を<b>追加</b>するコマンドとして正しいものはどれか。</p>
+<p>A. <code>ip link add 192.168.1.10/24 dev eth0</code>　B. <code>ip addr add 192.168.1.10/24 dev eth0</code>　C. <code>ip route add 192.168.1.10/24 dev eth0</code>　D. <code>ifconfig eth0 add 192.168.1.10/24</code></p>
+<details><summary>答え</summary>
+<p>B。<code>ip addr</code>（address）がアドレス、<code>ip link</code> がリンク、<code>ip route</code> が経路を扱う。
+<code>ifconfig eth0 192.168.1.10 netmask 255.255.255.0</code> でも付くが、それは「追加」ではなく、元のアドレスとの置き換えになる。</p></details></div>
+
+<h2 id="down">下げても、アドレスは消えない</h2>
+<div class="sgoal"><b>この節で分かること</b>: リンクを下げたときに消えるものと残るもの。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ip link set enp0s17 down
+$ ip -4 addr show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc fq_codel state DOWN group default qlen 1000
+    inet 10.0.3.50/24 brd 10.0.3.255 scope global enp0s17
+       valid_lft forever preferred_lft forever
+$ ip route
+default via 192.168.10.254 dev lab0 onlink
+10.0.2.0/24 dev enp0s16 proto kernel scope link src 10.0.2.15 metric 100
+192.168.10.0/24 dev lab0 proto kernel scope link src 192.168.10.2</code></pre>
+<p>下げてもアドレスは残る（<code>state DOWN</code> のまま <code>inet</code> の行がある）。消えたのは経路表の <code>10.0.3.0/24</code> の行である。
+アドレスとマスクを付けると「そのネットワークへは、この NIC から直接」という行（直結の経路、<code>proto kernel scope link</code>）がカーネルに自動で足され、
+リンクが下がっている間は使えないので外される。上げ直すと戻る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ip link set enp0s17 up
+$ ip route
+default via 192.168.10.254 dev lab0 onlink
+10.0.2.0/24 dev enp0s16 proto kernel scope link src 10.0.2.15 metric 100
+10.0.3.0/24 dev enp0s17 proto kernel scope link src 10.0.3.50
+192.168.10.0/24 dev lab0 proto kernel scope link src 192.168.10.2
+$ ping -c 1 10.0.3.2
+PING 10.0.3.2 (10.0.3.2) 56(84) bytes of data.
+64 bytes from 10.0.3.2: icmp_seq=1 ttl=255 time=3.32 ms
+
+--- 10.0.3.2 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 3.322/3.322/3.322/0.000 ms</code></pre>
+<p>この表の1行目（<code>default via 192.168.10.254</code>）は、第4章で直すことになる。</p>
+<div class="analogy"><b>たとえ</b>: 店のシャッターに近い。シャッターを下ろしても（<code>down</code>）看板（アドレス）は掛かったままだが、
+地図アプリの「営業中の店」の一覧（経路表）からは外れる。
+<br>ただし<b>崩れる点</b>: 店ならシャッターを上げれば客は自分で戻ってくるが、経路表の行はカーネルが付け直さないと戻らない。
+付け直すのは「アドレスとマスクから」なので、アドレスを外して上げても行は戻らない。</div>
+<div class="quiz"><b>確認</b>
+<p><code>ip addr show eth0</code> には 192.168.1.10/24 と 192.168.1.11/24 の2つが表示されるが、<code>ifconfig eth0</code> には 192.168.1.10 しか表示されない。正しい説明はどれか。</p>
+<p>A. 192.168.1.11 は設定ファイルにしか無く、まだ有効になっていない　B. ifconfig はラベルの無い2つ目（secondary）のアドレスを表示しない　C. eth0 が down になっている　D. 192.168.1.11 は IPv6 のアドレスである</p>
+<details><summary>答え</summary>
+<p>B。<code>ip addr show</code> に出ているのでカーネルには付いている（A は誤り）。<code>ifconfig</code> は1つの名前に1つのアドレスしか表示しない。
+<code>ip addr add … label eth0:1</code> のようにラベルを付けると <code>ifconfig</code> にも <code>eth0:1</code> として出る。</p></details></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-network/">演習01</a>が、この章の操作そのもの（enp0s17 を上げて 10.0.3.50/24 を付け、10.0.3.2 と話す）である。
+判定は enp0s17 の状態を読み、判定の中で 10.0.3.2 に ping を1回打って確かめる。ここで付けた設定は再起動で消えるので、第3章と演習02 で残し方を扱う。</div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>ifconfig</code> は上がっている NIC しか一覧に出さない。全部見るなら <code>ifconfig -a</code> か <code>ip link show</code></li><li>リンクを上げる（<code>ip link set … up</code>）とアドレスを付ける（<code>ip addr add</code>）は別の操作。下げてもアドレスは残り、直結の経路だけ消える</li><li><code>ip addr add</code> は足す。<code>ifconfig 名前 アドレス</code> は置き換える（2つ目以降も消える）</li><li><code>ifconfig</code> はラベルの無い2つ目（secondary）のアドレスを表示しない。<code>ip addr</code> は全部出す</li><li><code>ip addr add</code> で <code>brd</code> を省くとブロードキャストが付かない（<code>ifconfig</code> に <code>broadcast 0.0.0.0</code>）</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / net-tools 2.10 / iputils 20240117 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-network/theory/01-address">← 1. アドレスは、分けるたびに減る</a><a href="/linuc-network/theory/03-owner">次: 3. ifup は、自分が付けたものしか知らない →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-network/chapters.js"></script>
+<script src="/linuc-network/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

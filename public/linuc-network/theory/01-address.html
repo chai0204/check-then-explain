@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. アドレスは、分けるたびに減る — 確かめて説明する LinuC 主題1.07</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="1" data-theme="linuc-network">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-network/theory/">理論編</a> › 第1章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/">詳しく</a></p>
+</div>
+<h1>1. アドレスは、分けるたびに減る</h1>
+<p class="lead">254 台が使えるネットワークを、マスクを1ビット長くして2つに分ける。半分ずつなら 127 台ずつのはずだが、<code>ipcalc</code> は <b>126 台ずつ・合計 252 台</b>と答える。2台ぶんは、分けたこと自体で消えた。アドレスの数え方は、マスクという「線」の引き方で決まっている。</p>
+<div class="badges"><span>前提: 練習機に ssh linuc で入れる（実践編の「はじめる」）</span><span>所要 12分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.07.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>アドレスとネットワークマスク（<code>/24</code> と <code>255.255.255.0</code>）から、ネットワークアドレス・ブロードキャストアドレス・使える台数を出せる</li><li>サブネットに分けると使える台数が減る理由を、ビットの図で説明できる</li><li>プライベートアドレスの3つの範囲を言え、パブリックアドレスとの違いを説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: クラス A/B/C の細かい規則（今は CIDR で考える。<code>ipcalc</code> が表示する Class は読めれば足りる）、NAT がアドレスを付け替える仕組みの細部、IPv4 ヘッダのフィールドの並び。IPv6 は第6章で扱う。</div></div>
+
+<h2 id="three">練習機には、ネットワークが3つある</h2>
+<div class="sgoal"><b>この節で分かること</b>: アドレスの後ろの <code>/24</code> が何を言っているか。</div>
+<p>練習機に入り（外で <code>ssh linuc</code>）、IPv4 のアドレスを全部出す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ip -4 addr show
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+2: enp0s16: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.2.15/24 metric 100 brd 10.0.2.255 scope global dynamic enp0s16
+       valid_lft 86377sec preferred_lft 86377sec
+5: lab0@if3: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc noqueue state UP group default qlen 1000 link-netns sw
+    inet 192.168.10.2/24 brd 192.168.10.255 scope global lab0
+       valid_lft forever preferred_lft forever</code></pre>
+<p><code>inet</code> の行がアドレスで、<code>/</code> の後ろの数がネットワークマスクの長さ（<b>CIDR</b> 表記）である。
+<code>10.0.2.15/24</code> は「前から24ビットがネットワークの番号、残り8ビットがその中の機械の番号」という意味になる。
+<code>brd</code> の後ろはブロードキャストアドレス（後で出す）。enp0s16 の <code>dynamic</code> と <code>valid_lft 86377sec</code> は
+DHCP で借りたアドレスで、残り時間が減っていく（あなたの画面では秒数が違う）。</p>
+<div class="scroll"><table>
+<tr><th>NIC</th><th>アドレス</th><th>何のネットワークか</th></tr>
+<tr><td><code>lo</code></td><td>127.0.0.1/8</td><td>ループバック。この機械の中だけで折り返す</td></tr>
+<tr><td><code>enp0s16</code></td><td>10.0.2.15/24</td><td>管理用。外のコンテナからの ssh が通る（QEMU が作る小さなネットワーク）</td></tr>
+<tr><td><code>lab0</code></td><td>192.168.10.2/24</td><td>社内 LAN。ルータ（192.168.10.1）と旧ルータ（192.168.10.254）がいる</td></tr>
+</table></div>
+<p>3つとも、後で見る<b>プライベートアドレス</b>の範囲に入っている。この章では、この3つを材料に「マスクが何を決めているか」を確かめる。
+<code>enp0s17</code> と <code>enp0s18</code> はまだアドレスを持っていないので出てこない（第2章と第3章で付ける）。</p>
+
+<h2 id="mask">マスクは、どこまでが同じネットワークかの線</h2>
+<div class="sgoal"><b>この節で分かること</b>: マスクの読み方と、宛先が同じネットワークかどうかの判定。</div>
+<p><code>ipcalc</code> にアドレスとマスクを渡すと、2進数で並べてくれる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ipcalc 192.168.10.2/24
+Address:   192.168.10.2         11000000.10101000.00001010. 00000010
+Netmask:   255.255.255.0 = 24   11111111.11111111.11111111. 00000000
+Wildcard:  0.0.0.255            00000000.00000000.00000000. 11111111
+=&gt;
+Network:   192.168.10.0/24      11000000.10101000.00001010. 00000000
+HostMin:   192.168.10.1         11000000.10101000.00001010. 00000001
+HostMax:   192.168.10.254       11000000.10101000.00001010. 11111110
+Broadcast: 192.168.10.255       11000000.10101000.00001010. 11111111
+Hosts/Net: 254                   Class C, Private Internet</code></pre>
+<p>2進数の中の<b>空白が線</b>である。空白の左（24ビット）がネットワーク部、右（8ビット）がホスト部。
+ネットワークマスクは、ネットワーク部を 1、ホスト部を 0 にした数で、<code>255.255.255.0</code> と <code>/24</code> は同じものを2通りに書いただけである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ipcalc -b 192.168.10.2 255.255.255.0
+Address:   192.168.10.2
+Netmask:   255.255.255.0 = 24
+...
+Broadcast: 192.168.10.255
+Hosts/Net: 254                   Class C, Private Internet</code></pre>
+<p>ホスト部の8ビットで作れる番号は 256 個。そのうち2つは機械に割り当てられない。</p>
+<div class="scroll"><table>
+<tr><th>ホスト部</th><th>アドレス</th><th>意味</th></tr>
+<tr><td>全部 0</td><td>192.168.10.0</td><td>ネットワークそのものの名前（Network）</td></tr>
+<tr><td>全部 1</td><td>192.168.10.255</td><td>そのネットワークの全員宛て（Broadcast）</td></tr>
+<tr><td>それ以外</td><td>192.168.10.1〜254</td><td>機械に付けられる（HostMin〜HostMax）。256 − 2 = 254 個</td></tr>
+</table></div>
+<p>マスクが実際に効くのは、送るときである。宛先が自分と同じネットワークなら直接送り、違えばルータ（ゲートウェイ）に渡す。
+カーネルにどちらにするかを聞ける。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ip route get 192.168.10.200
+192.168.10.200 dev lab0 src 192.168.10.2 uid 1000
+    cache
+$ ip route get 192.168.11.1
+192.168.11.1 via 192.168.10.254 dev lab0 src 192.168.10.2 uid 1000
+    cache</code></pre>
+<p>192.168.10.200 は /24 の線の内側なので <code>via</code> が無い（直接送る）。192.168.11.1 は3つ目の数が違うので線の外で、
+<code>via 192.168.10.254</code>（ルータ）に渡される。この 192.168.10.254 が「撤去予定の旧ルータ」であることは第4章で問題になる。</p>
+<div class="analogy"><b>たとえ</b>: 住所の「何丁目までが同じなら、歩いて届けに行く」という線引きに近い。
+線の内側なら自分で届け、外なら郵便局（ルータ）に預ける。
+<br>ただし<b>崩れる点</b>: 住所の区切りは丁目・番地と決まっているが、マスクは1ビット単位でどこにでも引ける。
+/24 の次は /25、/26 と、線を右へずらすたびに「同じネットワーク」の範囲が半分になる。</div>
+
+<h2 id="subnet">分けると、使える台数が減る</h2>
+<div class="sgoal"><b>この節で分かること</b>: サブネットに分けたとき、何台ぶん減るかの数え方。</div>
+<p>192.168.10.0/24 を2つのネットワーク（サブネット）に分けたい。マスクを1ビット長くして /25 にすればよい。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>254 台使えるネットワークを半分に分けるのだから、半分ずつ 127 台。2つ合わせれば 254 台のままだろう。
+分けても台数は変わらないはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ipcalc 192.168.10.0/24 /25
+...
+Subnets after transition from /24 to /25
+
+Netmask:   255.255.255.128 = 25 11111111.11111111.11111111.1 0000000
+Wildcard:  0.0.0.127            00000000.00000000.00000000.0 1111111
+
+ 1.
+Network:   192.168.10.0/25      11000000.10101000.00001010.0 0000000
+HostMin:   192.168.10.1         11000000.10101000.00001010.0 0000001
+HostMax:   192.168.10.126       11000000.10101000.00001010.0 1111110
+Broadcast: 192.168.10.127       11000000.10101000.00001010.0 1111111
+Hosts/Net: 126                   Class C, Private Internet
+
+ 2.
+Network:   192.168.10.128/25    11000000.10101000.00001010.1 0000000
+HostMin:   192.168.10.129       11000000.10101000.00001010.1 0000001
+HostMax:   192.168.10.254       11000000.10101000.00001010.1 1111110
+Broadcast: 192.168.10.255       11000000.10101000.00001010.1 1111111
+Hosts/Net: 126                   Class C, Private Internet
+
+
+Subnets:   2
+Hosts:     252</code></pre>
+<div class="then"><b>だめな理由</b>: 126 台ずつ、合計 <b>252 台</b>である。2台減った。
+減ったのは <code>192.168.10.127</code>（1つ目のブロードキャスト）と <code>192.168.10.128</code>（2つ目のネットワークアドレス）。
+分ける前はどちらも普通の機械に付けられる番号だったが、分けた瞬間に、それぞれのサブネットの「両端の予約席」になった。
+<b>どのネットワークにも、ホスト部が全部 0 と全部 1 の2つが要る</b>ので、N 個に分けると予約席も N 組になる。</div></div>
+<p>4つに分けると、さらに減る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ipcalc -b 192.168.10.0/24 /26 | tail -3
+
+Subnets:   4
+Hosts:     248</code></pre>
+<div class="scroll"><table>
+<tr><th>分け方</th><th>マスク</th><th>1つあたり</th><th>合計</th><th>減った数</th></tr>
+<tr><td>/24 × 1</td><td>255.255.255.0</td><td>254</td><td>254</td><td>—</td></tr>
+<tr><td>/25 × 2</td><td>255.255.255.128</td><td>126</td><td>252</td><td>2</td></tr>
+<tr><td>/26 × 4</td><td>255.255.255.192</td><td>62</td><td>248</td><td>6</td></tr>
+</table></div>
+<p>1つあたりの台数は「2の（ホスト部のビット数）乗 − 2」。/25 はホスト部が7ビットなので 128 − 2 = 126、/26 は6ビットなので 64 − 2 = 62 になる。
+試験では、ある機械のアドレスとマスクから「そのネットワークのブロードキャストは何か」を問われる。手で出す練習をして、<code>ipcalc</code> で答え合わせする。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ipcalc -b 192.168.10.130/25
+Address:   192.168.10.130
+Netmask:   255.255.255.128 = 25
+Wildcard:  0.0.0.127
+=&gt;
+Network:   192.168.10.128/25
+HostMin:   192.168.10.129
+HostMax:   192.168.10.254
+Broadcast: 192.168.10.255
+Hosts/Net: 126                   Class C, Private Internet</code></pre>
+<p>手で出すなら、最後の数 130 を2進数にする（<code>10000010</code>）。/25 なら先頭の1ビットだけがネットワーク部に入るので、
+残り7ビットを全部 0 にすると 128（ネットワークアドレス）、全部 1 にすると 255（ブロードキャスト）。</p>
+<div class="analogy"><b>たとえ</b>: 1棟のアパートを2棟に建て替えるようなものだ。
+どの棟にも管理人室と掲示板が1つずつ要るので、棟を増やすたびに住める部屋が2つずつ減る。
+<br>ただし<b>崩れる点</b>: アパートの管理人室は建物の好きな場所に置けるが、
+ネットワークアドレスとブロードキャストは必ず番号の<b>両端</b>に来る。どこを予約するかは選べない。</div>
+<div class="quiz"><b>確認</b>
+<p>IP アドレス <code>172.16.20.70/26</code> の機械がある。この機械が属するネットワークのネットワークアドレスとブロードキャストアドレスの組み合わせとして正しいものはどれか。</p>
+<p>A. 172.16.20.0 と 172.16.20.255　B. 172.16.20.64 と 172.16.20.127　C. 172.16.20.64 と 172.16.20.255　D. 172.16.20.70 と 172.16.20.127</p>
+<details><summary>答え</summary>
+<p>B。/26 はホスト部が6ビット（64 個ずつ）なので、最後の数は 0〜63、64〜127、128〜191、192〜255 の4つに分かれる。
+70 は 64〜127 の組に入るので、ネットワークアドレスは 172.16.20.64、ブロードキャストは 172.16.20.127。
+使える台数は 64 − 2 = 62。<code>ipcalc -b 172.16.20.70/26</code> で確かめられる。</p></details></div>
+
+<h2 id="private">プライベートとパブリック</h2>
+<div class="sgoal"><b>この節で分かること</b>: 自由に使ってよいアドレスの3つの範囲と、その外側。</div>
+<p><code>ipcalc</code> の最後の行の <code>Private Internet</code> が、もう1つの区別である。練習機の3つのネットワークを順に見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ipcalc -b 10.0.2.15/24
+...
+Hosts/Net: 254                   Class A, Private Internet
+$ ipcalc -b 172.16.20.10/24
+...
+Hosts/Net: 254                   Class B, Private Internet
+$ ipcalc -b 172.32.0.1/16
+...
+Hosts/Net: 65534                 Class B
+$ ipcalc -b 203.0.113.10/24
+...
+Hosts/Net: 254                   Class C</code></pre>
+<p>10.0.2.15 と 172.16.20.10 は <code>Private Internet</code>、172.32.0.1 と 203.0.113.10 には付かない。
+<b>プライベートアドレス</b>は、組織の中で自由に使ってよいと RFC 1918 が決めた3つの範囲である。</p>
+<div class="scroll"><table>
+<tr><th>範囲</th><th>CIDR</th><th>この練習機での例</th></tr>
+<tr><td>10.0.0.0 〜 10.255.255.255</td><td>10.0.0.0/8</td><td>10.0.2.15（管理用）、10.0.3.0/24・10.0.4.0/24（練習用）</td></tr>
+<tr><td>172.16.0.0 〜 172.31.255.255</td><td>172.16.0.0/12</td><td>172.16.20.10（サーバ）</td></tr>
+<tr><td>192.168.0.0 〜 192.168.255.255</td><td>192.168.0.0/16</td><td>192.168.10.2（社内 LAN）</td></tr>
+</table></div>
+<p>172 で始まっても、プライベートなのは 172.16〜172.31 だけである（/12 は2つ目の数の上位4ビットまでを固定する）。
+172.32.0.1 はその外なので、ipcalc は Private と書かない。これは試験でよく狙われる。</p>
+<p>プライベートアドレスはどの家・どの会社でも同じものを使うので、インターネットの上では通用しない。
+インターネットで使うのは世界で1つしかない<b>パブリックアドレス</b>で、プライベートアドレスの機械が外へ出るときは、ルータが送り元をパブリックアドレスに付け替える（NAT）。
+203.0.113.10 はパブリックアドレスの形をしているが、実は説明書のために予約された範囲（203.0.113.0/24）で、どこにもつながっていない。
+この教材はインターネットに出ないので、パブリックアドレスの例にはこれを使う。</p>
+<p>最後に、どれとも違うのが <b>ループバック</b>である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ipcalc -b 127.0.0.1/8
+...
+Network:   127.0.0.0/8
+HostMin:   127.0.0.1
+HostMax:   127.255.255.254
+Broadcast: 127.255.255.255
+Hosts/Net: 16777214              Class A, Loopback</code></pre>
+<p>127.0.0.0/8 は1600万個以上の番号を持つが、どれもその機械自身を指し、NIC から外へ出ない。第7章で、ここで待ち受けるサービスに外から入れないことを確かめる。</p>
+<div class="analogy"><b>たとえ</b>: 会社の内線番号に近い。社内では「101番」で通じるが、
+外からかけるには代表番号（パブリックアドレス）を通すしかない。どの会社にも101番があるので、内線番号だけでは相手を特定できない。
+<br>ただし<b>崩れる点</b>: 内線番号の範囲は会社が自由に決めるが、プライベートアドレスの範囲は RFC で決まっていて、
+172.32.0.1 のように「それらしい」番号でも範囲の外ならパブリックである。</div>
+<div class="quiz"><b>確認</b>
+<p>次の IPv4 アドレスのうち、プライベートアドレスでないものを1つ選べ。</p>
+<p>A. 10.200.1.1　B. 172.20.0.5　C. 172.40.0.5　D. 192.168.255.1</p>
+<details><summary>答え</summary>
+<p>C。172 で始まるプライベートアドレスは 172.16.0.0/12、つまり 172.16〜172.31 だけ。
+172.40 はその外である。B の 172.20 は範囲内。<code>ipcalc -b 172.40.0.5/16</code> と打つと、172.32.0.1 と同じく
+<code>Private Internet</code> が付かない。</p></details></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-network/">演習01</a>で、練習用の NIC に 10.0.3.50/24 を付け、同じネットワークの 10.0.3.2 と直接話す。
+付けたあと <code>ip route get 10.0.3.2</code> を打つと、<code>via</code> の無い（直接届ける）行が選ばれていることが分かる。</div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/24</code> と <code>255.255.255.0</code> は同じもの。マスクは「どこまでがネットワーク部か」の線（CIDR は線の位置をビット数で書く）</li><li>ホスト部が全部 0 がネットワークアドレス、全部 1 がブロードキャストアドレス。この2つは機械に付けられない</li><li>N 個に分けると、使える台数は (N − 1) × 2 減る（/24 → /25 × 2 で 254 → 252、/26 × 4 で 248）</li><li>宛先が線の内側なら直接、外ならゲートウェイへ。<code>ip route get</code> でカーネルの判断を聞ける</li><li>プライベートは 10/8・172.16/12・192.168/16 の3つ。172.32 はパブリック。127/8 はループバック</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ ipcalc 0.51 / iproute2 6.1.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-network/theory/">← 理論編 目次</a><a href="/linuc-network/theory/02-interface">次: 2. ifconfig に見えないアドレスがある →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-network/chapters.js"></script>
+<script src="/linuc-network/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

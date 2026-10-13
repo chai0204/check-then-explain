@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>9. dig と ping は、別の表を引いている — 確かめて説明する LinuC 主題1.07</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="9" data-theme="linuc-network">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-network/theory/">理論編</a> › 第9章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/">詳しく</a></p>
+</div>
+<h1>9. dig と ping は、別の表を引いている</h1>
+<p class="lead"><code>dig +short www.lab.example</code> は 172.16.20.10 と答える。同じ名前で <code>ping</code> を打つと、172.16.20.99 へ飛んでいって <code>Destination Host Unreachable</code> になる。<code>dig</code> は DNS サーバだけに聞き、<code>ping</code> は先に <code>/etc/hosts</code> を読む。同じ名前でも、道具が違えば読む表が違う。</p>
+<div class="badges"><span>前提: 第8章を終えている（resolv.conf が 172.16.20.10 を向いている）</span><span>所要 14分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.4（重要度2）</span><span>出題範囲 1.07.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>/etc/nsswitch.conf</code> の <code>hosts:</code> 行から、名前をどの表からどの順に引くかを言える</li><li><code>getent</code> で ping と同じ引き方をして、/etc/hosts と DNS のどちらが答えたかを特定できる</li><li>ホスト名の3つの置き場所（今の名前・<code>/etc/hostname</code>・<code>/etc/hosts</code> の 127.0.1.1）の関係を説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>nsswitch.conf</code> の hosts 以外の行（passwd / group などは主題1.08 のアカウント管理で使う）、mDNS（<code>.local</code> の名前）、<code>hostnamectl</code> の pretty / transient の名前の区別。</div></div>
+
+<h2 id="mismatch">dig と ping が、違うアドレスへ行く</h2>
+<div class="sgoal"><b>この節で分かること</b>: ping が名前をどこから引いているか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>名前からアドレスを引くのは DNS の仕事である。<code>dig</code> で 172.16.20.10 と確かめたのだから、
+同じ名前で打つ <code>ping</code> も <code>curl</code> も 172.16.20.10 へ行くはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ dig +short www.lab.example
+172.16.20.10
+$ ping -c 1 www.lab.example
+PING www.lab.example (172.16.20.99) 56(84) bytes of data.
+From router.lab.example (192.168.10.1) icmp_seq=1 Destination Host Unreachable
+
+--- www.lab.example ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+$ curl -s -m 3 http://www.lab.example/; echo $?
+28</code></pre>
+<div class="then"><b>だめな理由</b>: ping は <b>172.16.20.99</b> へ行った。router が「そのネットワーク（172.16.20.0/24）に 172.16.20.99 という機械はいない」と返している（Host Unreachable）。
+curl も3秒待って時間切れ（終了コード 28）。<code>dig</code> は DNS サーバだけに聞く道具で、<code>ping</code> と <code>curl</code> は OS の名前解決の仕組み（glibc の <b>NSS</b>）を通して引く。
+その仕組みが見る表と順番は、別のファイルに書いてある。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>$ grep '^hosts' /etc/nsswitch.conf
+hosts:          files dns
+$ getent hosts www.lab.example
+172.16.20.99    www.lab.example
+$ cat /etc/hosts
+127.0.0.1 localhost
+127.0.1.1 linuc
+172.16.20.99 www.lab.example
+
+# The following lines are desirable for IPv6 capable hosts
+::1 ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+ff02::3 ip6-allhosts</code></pre>
+<p><code>hosts: files dns</code> は「先に files（<code>/etc/hosts</code>）、見つからなければ dns」。<code>/etc/hosts</code> の3行目に、前任者が書いた古い行が残っていた。
+<code>getent hosts 名前</code> は、NSS を通して引いた結果をそのまま出す道具で、<b>ping がどのアドレスを使うかを確かめるときに使う</b>。古い行を消す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo sed -i '/www.lab.example/d' /etc/hosts
+$ getent hosts www.lab.example
+172.16.20.10    www.lab.example
+$ ping -c 1 www.lab.example
+PING www.lab.example (172.16.20.10) 56(84) bytes of data.
+64 bytes from server.lab.example (172.16.20.10): icmp_seq=1 ttl=63 time=0.557 ms
+
+--- www.lab.example ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.557/0.557/0.557/0.000 ms
+$ curl -s http://www.lab.example/
+hello from www.lab.example (172.16.20.10, 80/tcp)</code></pre>
+<p>ping の返事の行が <code>server.lab.example</code> になっているのは、返事の差出人のアドレス（172.16.20.10）を逆引きした名前だから。ping に渡した名前とは別に引いている（第8章の逆引き）。</p>
+<div class="analogy"><b>たとえ</b>: 電話をかけるとき「まず自分の手帳、載っていなければ番号案内（104）」という決まりで動く秘書に近い（ping）。
+dig は、いつも番号案内に直接かける人である。手帳に古い番号が残っていると、秘書だけが古い番号にかけ続ける。
+<br>ただし<b>崩れる点</b>: 人の秘書なら「最近この番号つながりませんね」と気づいて手帳を直すが、NSS は files で見つかった時点で dns を見に行かない。
+つながらなくても、何度でも古い行を使う。</div>
+
+<h2 id="order">順番を入れ替える</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>nsswitch.conf</code> の順番が、答えをどう変えるか。</div>
+<p>わざと ns.lab.example の偽の行を /etc/hosts に足し、順番を入れ替えて比べる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo '172.16.20.88 ns.lab.example' | sudo tee -a /etc/hosts
+172.16.20.88 ns.lab.example
+$ getent hosts ns.lab.example
+172.16.20.88    ns.lab.example
+$ sudo sed -i 's/^hosts:.*/hosts:          dns files/' /etc/nsswitch.conf
+$ grep '^hosts' /etc/nsswitch.conf
+hosts:          dns files
+$ getent hosts ns.lab.example
+172.16.20.10    ns.lab.example
+$ sudo sed -i 's/^hosts:.*/hosts:          files dns/' /etc/nsswitch.conf
+$ sudo sed -i '/172.16.20.88/d' /etc/hosts</code></pre>
+<p><code>files dns</code> のときは /etc/hosts の偽の行（.88）が、<code>dns files</code> にすると DNS の答え（.10）が勝った。
+順番を変えると練習機のすべての名前の引き方が変わるので、ふつうは /etc/hosts の行のほうを直す。最後に元に戻した。</p>
+<div class="analogy"><b>たとえ</b>: 図書館で「まず自分の書棚、無ければ図書館」と決めている人と、「まず図書館、無ければ自分の書棚」と決めている人に近い。
+同じ本の古い版が自分の書棚にあると、前の人だけが古い版を読み続ける。
+<br>ただし<b>崩れる点</b>: 人は図書館に新しい版があれば気づけるが、NSS は先に見つけた方で止まり、もう一方を見に行かない。
+「どちらが新しいか」ではなく「どちらを先に見るか」で答えが決まる。</div>
+<p>もう1つ、<code>getent hosts</code> の癖を押さえておく。IPv4 と IPv6 の両方を持つ名前では、IPv6 を先に聞く。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ getent hosts server.lab.example
+fd00:20::10     server.lab.example
+$ getent ahosts server.lab.example
+fd00:20::10     STREAM server.lab.example
+fd00:20::10     DGRAM
+fd00:20::10     RAW
+172.16.20.10    STREAM
+172.16.20.10    DGRAM
+172.16.20.10    RAW</code></pre>
+<p><code>getent hosts</code> は1つしか出さず、IPv6 のアドレスを先に返した。<code>getent ahosts</code> は、プログラムが接続に使う関数（getaddrinfo）と同じ引き方で、候補を全部、使う順に並べる。</p>
+<div class="scroll"><table>
+<tr><th>道具</th><th>読む表</th><th>/etc/hosts を見るか</th></tr>
+<tr><td><code>dig</code> / <code>host</code> / <code>nslookup</code></td><td>DNS サーバ（resolv.conf の nameserver、または指定したサーバ）</td><td>見ない（ただし問い合わせ先が 127.0.0.53 なら、systemd-resolved が /etc/hosts を混ぜて答える。第8章）</td></tr>
+<tr><td><code>ping</code> / <code>curl</code> / <code>ssh</code> / <code>traceroute</code></td><td>NSS（<code>/etc/nsswitch.conf</code> の hosts: の順）</td><td>見る（files が先なら最優先）</td></tr>
+<tr><td><code>getent hosts</code> / <code>getent ahosts</code></td><td>NSS（ping と同じ）</td><td>見る。ping の答えを確かめる道具</td></tr>
+</table></div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/nsswitch.conf</code> が <code>hosts: files dns</code> で、/etc/hosts に <code>10.0.0.5 app.example.com</code> があり、DNS では app.example.com は 10.0.0.9 である。
+<code>getent hosts app.example.com</code> と <code>dig +short app.example.com</code> の結果の組み合わせとして正しいものはどれか（IPv6 のアドレスは無いものとする）。</p>
+<p>A. 10.0.0.5 と 10.0.0.5　B. 10.0.0.5 と 10.0.0.9　C. 10.0.0.9 と 10.0.0.9　D. 10.0.0.9 と 10.0.0.5</p>
+<details><summary>答え</summary>
+<p>B。getent は NSS の順（files が先）で /etc/hosts の 10.0.0.5 を返す。dig は DNS サーバだけに聞くので 10.0.0.9。
+ping や ssh で app.example.com に接続すると 10.0.0.5 に行く。この練習機の www.lab.example と同じ形である。</p></details></div>
+
+<h2 id="hostname">ホスト名は、3か所にある</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>hostname</code>・<code>/etc/hostname</code>・<code>/etc/hosts</code> の関係と、どれが再起動で残るか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ hostname
+linuc
+$ cat /etc/hostname
+linuc
+$ grep 127.0.1.1 /etc/hosts
+127.0.1.1 linuc
+$ hostname -I
+10.0.2.15 10.0.3.50 10.0.4.15 192.168.10.2 fd00:10::5054:ff:fe0a:2</code></pre>
+<p>今のホスト名（カーネルが持っている値。<code>hostname</code> が出す）、起動時に読む名前（<code>/etc/hostname</code>）、
+その名前を自分のアドレスに引くための行（<code>/etc/hosts</code> の 127.0.1.1。Debian 系の慣習）の3つがある。<code>hostname -I</code> は自分のアドレスを全部並べる（リンクローカルとループバックは除く）。
+<code>hostname</code> で名前を変える。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo hostname web01
+$ hostname
+web01
+$ cat /etc/hostname
+linuc
+$ sudo true
+sudo: unable to resolve host web01: Temporary failure in name resolution
+$ hostname -f
+hostname: Temporary failure in name resolution</code></pre>
+<p>変わったのは今の値だけで、<code>/etc/hostname</code> は linuc のまま。そして <code>sudo</code> が「web01 を引けない」と言い出した。
+sudo は自分のホスト名を名前解決で確かめる。/etc/hosts には 127.0.1.1 linuc しか無く、DNS にも web01 は無い（<code>hostname -f</code> も完全な名前を出せない）。
+練習機を再起動する（ssh は切れるので、1分ほど待って外から <code>ssh linuc</code> で入り直す）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo systemctl reboot
+sudo: unable to resolve host web01: Temporary failure in name resolution
+...
+$ hostname
+linuc
+$ sudo true</code></pre>
+<p>起動時に <code>/etc/hostname</code> が読まれ、linuc に戻った。sudo も黙った。
+ついでに、この章までに直したものが再起動を越えて残っているかを確かめる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ip route show default
+default via 192.168.10.1 dev lab0 onlink
+$ ifquery --state
+lo=lo
+lab0=lab0
+enp0s17=enp0s17
+$ nmcli device status
+DEVICE   TYPE      STATE      CONNECTION
+enp0s18  ethernet  connected  lab-dhcp
+enp0s16  ethernet  unmanaged  --
+enp0s17  ethernet  unmanaged  --
+lab0     ethernet  unmanaged  --
+lo       loopback  unmanaged  --
+$ cat /etc/resolv.conf
+nameserver 172.16.20.10
+search lab.example
+$ ss -tln | grep 8080
+LISTEN 0      10           0.0.0.0:8080      0.0.0.0:*</code></pre>
+<p>デフォルトルート（第4章・ifupdown のファイル）、enp0s17（第3章・ifupdown）、enp0s18（第3章・NetworkManager）、resolv.conf（第8章・ふつうのファイル）、
+掲示板の待ち受け（第7章・サービスの設定）。全部、持ち主の設定ファイルに書いたので残った。
+名前を残す形で変えるなら <code>hostnamectl</code> を使う。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo hostnamectl set-hostname web01
+$ cat /etc/hostname
+web01
+$ hostnamectl hostname
+web01
+$ sudo true
+sudo: unable to resolve host web01: Temporary failure in name resolution
+$ sudo hostnamectl set-hostname linuc
+sudo: unable to resolve host web01: Temporary failure in name resolution
+$ sudo true
+$ cat /etc/hostname
+linuc</code></pre>
+<p><code>hostnamectl set-hostname</code> は今の値と <code>/etc/hostname</code> の両方を変える。それでも sudo は文句を言う。<b>/etc/hosts の 127.0.1.1 の行は変えてくれない</b>からである。
+名前を変えるなら、3か所目（/etc/hosts）も自分で直す。</p>
+<div class="scroll"><table>
+<tr><th>置き場所</th><th>役割</th><th>変える道具</th><th>再起動すると</th></tr>
+<tr><td>今の名前（カーネル）</td><td>プロンプトやログに出る名前</td><td><code>hostname 名前</code></td><td>/etc/hostname の値に戻る</td></tr>
+<tr><td><code>/etc/hostname</code></td><td>起動時に読む名前</td><td><code>hostnamectl set-hostname</code>（またはファイルを直接）</td><td>残る</td></tr>
+<tr><td><code>/etc/hosts</code> の 127.0.1.1</td><td>自分の名前を自分のアドレスに引く</td><td>手で書く</td><td>残る（hostnamectl は直さない）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 名札（今の名前）、社員名簿（/etc/hostname）、内線表（/etc/hosts）に近い。
+名札だけ付け替えても、翌朝は名簿の名前の名札が配られる。名簿を直しても、内線表が古いと「その名前の人は内線表にいない」と言われる。
+<br>ただし<b>崩れる点</b>: 会社なら総務が名簿と内線表をまとめて直すが、Linux では <code>hostnamectl</code> は名簿までしか直さない。内線表は自分で直す。</div>
+<div class="quiz"><b>確認</b>
+<p>ホスト名を <code>hostname newname</code> で変更したあと、システムを再起動した。再起動後のホスト名はどうなるか。</p>
+<p>A. newname のまま　B. /etc/hostname に書かれている名前に戻る　C. /etc/hosts の 127.0.0.1 の行の名前になる　D. localhost になる</p>
+<details><summary>答え</summary>
+<p>B。<code>hostname</code> コマンドはカーネルが持つ今の値だけを変える。起動時には <code>/etc/hostname</code> が読まれる。
+再起動後も残したいなら <code>hostnamectl set-hostname</code> を使うか /etc/hostname を書き換え、/etc/hosts の 127.0.1.1 の行も合わせる。</p></details></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-network/">演習07</a>が、www.lab.example を正しいサーバに向ける課題である。
+判定は <code>getent ahostsv4 www.lab.example</code> の答えと、判定の中で実際に <code>http://www.lab.example/</code> を取りに行った結果を見る（DNS が引けない状態では「この環境では判定できません」と出る）。</div>
+
+<h2 id="spine">9章を通して見たもの</h2>
+<div class="sgoal"><b>この節で分かること</b>: 9つの章が1つの事実から出ていたこと。</div>
+<p>この9章で驚いたことは、どれも「道具が読んだ表が違った」だけだった。</p>
+<div class="scroll"><table>
+<tr><th>章</th><th>食い違ったもの</th><th>それぞれが読んでいた表</th></tr>
+<tr><td>1</td><td>254 台の半分が 127 台にならない</td><td>マスクが引く線（ネットワークアドレスとブロードキャストが分けた数だけ要る）</td></tr>
+<tr><td>2</td><td><code>ifconfig</code> と <code>ip addr</code></td><td>名前ごとに1つのアドレスを返す古い窓口 ／ NIC の全部のアドレス</td></tr>
+<tr><td>3</td><td><code>ifup</code> / <code>ifdown</code> と NIC の実際</td><td>ifupdown 自身の作業記録 ／ カーネルの状態</td></tr>
+<tr><td>4</td><td>ping の相手と、返事をした機械</td><td>経路表のデフォルトルートの1行</td></tr>
+<tr><td>5</td><td>traceroute の <code>*</code> と、実際の到達</td><td>途中の機械が返す ICMP（返さないこともある）</td></tr>
+<tr><td>6</td><td>設定に無い IPv6 アドレス</td><td>ルータ広告と MAC アドレス</td></tr>
+<tr><td>7</td><td>LISTEN と、外からの接続</td><td>待ち受けの表の Local Address</td></tr>
+<tr><td>8</td><td>resolv.conf に書いた1行</td><td>systemd-resolved が作り直す /run のファイル</td></tr>
+<tr><td>9</td><td><code>dig</code> と <code>ping</code></td><td>DNS サーバ ／ NSS（/etc/hosts が先）</td></tr>
+</table></div>
+<div class="goal"><p><b>ネットワークの「見え方」は、道具が読んだ表で決まる。
+ifconfig と ip、ifup と nmcli、dig と ping は、同じものを別々の表から読んでいる。
+つながらないときは、相手を疑う前に「どの道具が、どの表の、どの1行を読んだか」を確かめる。</b></p>
+<p>主題1.07 の詳細欄にコマンドと設定ファイルが並んでいるのは、試験が「どの道具が何を読むか」を問うているからである。
+表の場所（/etc/network/interfaces・/etc/resolv.conf・/etc/nsswitch.conf・/etc/hosts・/etc/hostname）と、それを読む道具を組で覚えれば、選択肢の大半は消去できる。</p></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/etc/nsswitch.conf</code> の <code>hosts: files dns</code> は「先に /etc/hosts、無ければ DNS」。順番を変えると全部の名前の引き方が変わる</li><li><code>dig</code> / <code>host</code> は DNS サーバだけに聞く。<code>ping</code> / <code>curl</code> / <code>ssh</code> は NSS を通す。ping が使うアドレスは <code>getent hosts</code> で確かめる</li><li><code>getent hosts</code> は IPv6 を先に聞いて1つだけ出す。全部見るなら <code>getent ahosts</code></li><li><code>hostname 名前</code> は今だけ。再起動で <code>/etc/hostname</code> に戻る。<code>hostnamectl set-hostname</code> は /etc/hostname まで変えるが、/etc/hosts の 127.0.1.1 は変えない</li><li>直したものを再起動で残すには、それぞれの持ち主の設定ファイルに書く</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ systemd 255.4（hostnamectl）/ bind9-dnsutils 9.18.39 / iputils 20240117 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-network/theory/08-dns">← 8. resolv.conf に書いた1行は、消される</a><a href="/linuc-network/theory/">理論編 目次へ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-network/chapters.js"></script>
+<script src="/linuc-network/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

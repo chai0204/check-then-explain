@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. 返事をしたのは、相手ではなかった — 確かめて説明する LinuC 主題1.07</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="linuc-network">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-network/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/">詳しく</a></p>
+</div>
+<h1>4. 返事をしたのは、相手ではなかった</h1>
+<p class="lead">社内のサーバ 172.16.20.10 に <code>ping</code> を打つと、<code>Destination Net Unreachable</code> が返ってくる。サーバが止まっていると考えたくなるが、<code>From</code> に書かれているのは 192.168.10.254 — 撤去予定の旧ルータである。返事をしたのは相手ではなく、こちらの経路表の1行が送りつけた先だった。しかもその1行は、直しても再起動で戻る。</p>
+<div class="badges"><span>前提: 第3章を終えている</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.2（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>ip route</code>・<code>route -n</code>・<code>netstat -rn</code> で経路表を読み、ある宛先にどの行が使われるかを言える</li><li><code>ping</code> の <code>From</code> と ICMP のエラーの種類から、どこで止まったかを特定できる</li><li>不適切なデフォルトルートを <code>ip route</code> と <code>route</code> で直し、ifupdown の設定にも残せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: ポリシールーティング（<code>ip rule</code> と複数の経路表）、ルーティングプロトコル（OSPF / BGP）、ルータ側で転送を許す設定（<code>ip_forward</code>）。経路表の行を手で読み書きすることと、デフォルトルートの直し方だけで足りる。</div></div>
+
+<h2 id="symptom">サーバに、ping が届かない</h2>
+<div class="sgoal"><b>この節で分かること</b>: ping の From が何を言っているか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>ping が返ってこないのは、相手のサーバが止まっているか、ネットワークのケーブルが抜けているからだ。
+自分の機械の設定は、さっきまで普通に使えていたのだから関係ない。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ping -c 3 172.16.20.10
+PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
+From 192.168.10.254 icmp_seq=1 Destination Net Unreachable
+From 192.168.10.254 icmp_seq=2 Destination Net Unreachable
+From 192.168.10.254 icmp_seq=3 Destination Net Unreachable
+
+--- 172.16.20.10 ping statistics ---
+3 packets transmitted, 0 received, +3 errors, 100% packet loss, time 2005ms</code></pre>
+<div class="then"><b>だめな理由</b>: 3回とも返事は来ている。ただし差出人（<code>From</code>）は 172.16.20.10 ではなく <b>192.168.10.254</b> で、
+中身は「その先のネットワークへの道を知らない（Destination Net Unreachable）」という ICMP のエラーである。
+パケットは旧ルータまでは届き、旧ルータが先へ行けずに突き返した。サーバまでは1度も行っていない。
+そしてサーバは生きている。IPv6 で聞くと返事が来る。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>$ ping6 -c 2 fd00:20::10
+PING fd00:20::10 (fd00:20::10) 56 data bytes
+64 bytes from fd00:20::10: icmp_seq=1 ttl=63 time=4.58 ms
+64 bytes from fd00:20::10: icmp_seq=2 ttl=63 time=0.798 ms
+
+--- fd00:20::10 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1002ms
+rtt min/avg/max/mdev = 0.798/2.688/4.579/1.890 ms</code></pre>
+<p>同じサーバ（fd00:20::10 は 172.16.20.10 と同じ機械）に IPv6 では届く。IPv4 と IPv6 は<b>別々の経路表</b>を持っていて、壊れているのは IPv4 の表のほうである。
+<code>ttl=63</code> は、サーバが 64 で出した返事がルータを1つ通って届いたことを示す（第5章）。</p>
+
+<h2 id="table">経路表を読む</h2>
+<div class="sgoal"><b>この節で分かること</b>: 経路表の各行の意味と、宛先ごとにどの行が選ばれるか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ ip route
+default via 192.168.10.254 dev lab0 onlink
+10.0.2.0/24 dev enp0s16 proto kernel scope link src 10.0.2.15 metric 100
+10.0.3.0/24 dev enp0s17 proto kernel scope link src 10.0.3.50
+10.0.4.0/24 dev enp0s18 proto kernel scope link src 10.0.4.15 metric 100
+192.168.10.0/24 dev lab0 proto kernel scope link src 192.168.10.2</code></pre>
+<p>2行目から下は「そのネットワークへは、この NIC から直接」という行（直結の経路）で、アドレスを付けたときにカーネルが足したもの（<code>proto kernel scope link</code>）。
+1行目の <code>default</code> がデフォルトルートで、「どの行にも当てはまらない宛先は、192.168.10.254 に渡す」と言っている。
+172.16.20.10 はどの直結の行にも当てはまらないので、この行で旧ルータへ送られた。</p>
+<p>同じ表を古い道具で見る。試験では <code>route</code> の形もよく出る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.10.254  0.0.0.0         UG    0      0        0 lab0
+10.0.2.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s16
+10.0.3.0        0.0.0.0         255.255.255.0   U     0      0        0 enp0s17
+10.0.4.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s18
+192.168.10.0    0.0.0.0         255.255.255.0   U     0      0        0 lab0
+$ netstat -rn
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
+0.0.0.0         192.168.10.254  0.0.0.0         UG        0 0          0 lab0
+10.0.2.0        0.0.0.0         255.255.255.0   U         0 0          0 enp0s16
+10.0.3.0        0.0.0.0         255.255.255.0   U         0 0          0 enp0s17
+10.0.4.0        0.0.0.0         255.255.255.0   U         0 0          0 enp0s18
+192.168.10.0    0.0.0.0         255.255.255.0   U         0 0          0 lab0</code></pre>
+<div class="scroll"><table>
+<tr><th>列・印</th><th>意味</th></tr>
+<tr><td>Destination <code>0.0.0.0</code> と Genmask <code>0.0.0.0</code></td><td>すべての宛先（/0）＝デフォルトルート。ip route の <code>default</code></td></tr>
+<tr><td>Gateway <code>0.0.0.0</code></td><td>ゲートウェイ無し＝直結（ip route の <code>via</code> が無い行）</td></tr>
+<tr><td>Flags <code>U</code> / <code>G</code> / <code>H</code></td><td>U = 使える（Up）、G = ゲートウェイ経由、H = 1台だけ宛ての経路（ホスト経路）</td></tr>
+<tr><td>Metric</td><td>同じ宛先に複数の行があるときの優先度（小さいほうが優先）</td></tr>
+<tr><td>Iface</td><td>出ていく NIC（ip route の <code>dev</code>）</td></tr>
+</table></div>
+<p>どの行が選ばれるかは、カーネルに直接聞ける。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ip route get 172.16.20.10
+172.16.20.10 via 192.168.10.254 dev lab0 src 192.168.10.2 uid 1000
+    cache
+$ ip route get 10.0.2.2
+10.0.2.2 dev enp0s16 src 10.0.2.15 uid 1000
+    cache
+$ traceroute -n 172.16.20.10
+traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
+ 1  192.168.10.254  0.841 ms !N  0.061 ms !N  0.066 ms !N</code></pre>
+<p>10.0.2.2（外のコンテナへの出口）は 10.0.2.0/24 の直結の行で届く。宛先に一致する行が複数あるとき、カーネルは<b>一致する部分がいちばん長い行</b>（最長一致）を選ぶ。
+デフォルトルートは /0 で一致の長さが 0 なので、いつも最後に回される。だからデフォルトルートが間違っていても、<b>ssh も練習機の中の <code>lab check</code> も切れない</b>。
+<code>traceroute</code> の <code>!N</code> は「ネットワークに届かない（Net Unreachable）」の印で、1番目の機械（旧ルータ）で止まったことを示す（第5章）。</p>
+<div class="analogy"><b>たとえ</b>: 郵便局の仕分け棚に近い。「10.0.2 丁目宛ては1番の棚」「192.168.10 丁目宛ては2番の棚」と並び、最後に「その他」の箱がある。
+その他の箱の行き先が、撤去予定の旧ルータになっていた。
+<br>ただし<b>崩れる点</b>: 郵便局は棚を上から順に見るが、経路表は書かれた順に関係なく、宛先にいちばん細かく一致する行を選ぶ。
+「その他」は表の1行目に書かれていても、いつも最後に回る。</div>
+
+<h2 id="fix">1行を直す</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>ip route</code> と <code>route</code> での消し方・足し方。</div>
+<p>デフォルトルートを消す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ip route del default
+$ ip route
+10.0.2.0/24 dev enp0s16 proto kernel scope link src 10.0.2.15 metric 100
+10.0.3.0/24 dev enp0s17 proto kernel scope link src 10.0.3.50
+10.0.4.0/24 dev enp0s18 proto kernel scope link src 10.0.4.15 metric 100
+192.168.10.0/24 dev lab0 proto kernel scope link src 192.168.10.2
+$ ping -c 1 172.16.20.10
+ping: connect: Network is unreachable</code></pre>
+<p>こんどは <code>From</code> が無い。経路表に当てはまる行が1つも無いので、カーネルが送る前に「道が無い」と断った（<code>connect: Network is unreachable</code>）。
+「旧ルータが断った」のとは別の失敗で、エラーの出どころが自分の機械である。</p>
+<div class="analogy"><b>たとえ</b>: 出かける前に地図を見て「この町への道が載っていない」と分かるのが <code>connect: Network is unreachable</code>、
+途中の交番で「この先は通行止めです」と言われるのが <code>From 192.168.10.254 … Net Unreachable</code> に近い。どちらも着かないが、止まった場所が違う。
+<br>ただし<b>崩れる点</b>: 交番なら迂回路を教えてくれるが、ルータが返す ICMP には「行けない」という種類の番号しか入っていない。
+どこへ回ればよいかは、自分の経路表を直して決める。</div>
+<p>正しいルータを足す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ip route add default via 192.168.10.1
+$ ip route show default
+default via 192.168.10.1 dev lab0
+$ ping -c 2 172.16.20.10
+PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
+64 bytes from 172.16.20.10: icmp_seq=1 ttl=63 time=7.26 ms
+64 bytes from 172.16.20.10: icmp_seq=2 ttl=63 time=0.525 ms
+
+--- 172.16.20.10 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1003ms
+rtt min/avg/max/mdev = 0.525/3.891/7.257/3.366 ms
+$ route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.10.1    0.0.0.0         UG    0      0        0 lab0
+...</code></pre>
+<p><code>route</code> での書き方も確かめる。1台だけ宛ての経路（ホスト経路）を、わざと旧ルータに向けて足す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo route add -host 203.0.113.5 gw 192.168.10.254
+$ route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.10.1    0.0.0.0         UG    0      0        0 lab0
+10.0.2.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s16
+10.0.3.0        0.0.0.0         255.255.255.0   U     0      0        0 enp0s17
+10.0.4.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s18
+192.168.10.0    0.0.0.0         255.255.255.0   U     0      0        0 lab0
+203.0.113.5     192.168.10.254  255.255.255.255 UGH   0      0        0 lab0
+$ ip route get 203.0.113.5
+203.0.113.5 via 192.168.10.254 dev lab0 src 192.168.10.2 uid 1000
+    cache
+$ ping -c 1 203.0.113.5
+PING 203.0.113.5 (203.0.113.5) 56(84) bytes of data.
+From 192.168.10.254 icmp_seq=1 Destination Net Unreachable
+
+--- 203.0.113.5 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+$ sudo route del -host 203.0.113.5 gw 192.168.10.254</code></pre>
+<p>203.0.113.5 にはデフォルトルート（/0）とホスト経路（/32）の両方が当てはまるが、長い /32 が選ばれて旧ルータへ行った。最長一致の実物である。</p>
+<div class="scroll"><table>
+<tr><th>やりたいこと</th><th>ip route</th><th>route</th></tr>
+<tr><td>表を見る</td><td><code>ip route</code>（<code>ip route show</code>）</td><td><code>route -n</code>（<code>netstat -rn</code> も同じ）</td></tr>
+<tr><td>デフォルトルートを足す</td><td><code>ip route add default via 192.168.10.1</code></td><td><code>route add default gw 192.168.10.1</code></td></tr>
+<tr><td>デフォルトルートを消す</td><td><code>ip route del default</code></td><td><code>route del default gw 192.168.10.254</code></td></tr>
+<tr><td>置き換える（1回で）</td><td><code>ip route replace default via 192.168.10.1</code></td><td>—（del してから add）</td></tr>
+<tr><td>ネットワーク宛て / 1台宛て</td><td><code>ip route add 203.0.113.0/24 via …</code></td><td><code>route add -net 203.0.113.0/24 gw …</code> / <code>route add -host … gw …</code></td></tr>
+<tr><td>どの行が使われるか</td><td><code>ip route get 宛先</code></td><td>—</td></tr>
+</table></div>
+<p><code>-n</code> は「アドレスを名前に引かない（数字のまま出す）」。付けないと Destination や Gateway の列が名前に置き換わる
+（この練習機ではゲートウェイが <code>_gateway</code> という名前で出る。systemd-resolved が付ける名前で、第5章の traceroute にも出てくる）。
+試験の選択肢も <code>-n</code> 付きの形が多い。</p>
+<div class="quiz"><b>確認</b>
+<p>デフォルトゲートウェイを 192.168.1.1 に設定するコマンドとして正しいものを2つ選べ。</p>
+<p>A. <code>route add default gw 192.168.1.1</code>　B. <code>ip route add default via 192.168.1.1</code>　C. <code>ip addr add default 192.168.1.1</code>　D. <code>route add gw 192.168.1.1 default</code>　E. <code>ip route add 192.168.1.1 default</code></p>
+<details><summary>答え</summary>
+<p>A と B。<code>route</code> はゲートウェイを <code>gw</code>、<code>ip route</code> は <code>via</code> で書く。<code>ip addr</code> はアドレスを扱うコマンドで、経路は扱わない。
+すでに別のデフォルトルートがあるときは、足す前に <code>del</code> するか、<code>ip route replace</code> で置き換える
+（この練習機で、デフォルトルートがあるところへ同じメトリックで足すと <code>File exists</code> で断られた）。</p></details></div>
+
+<h2 id="persist">直したのに、戻る</h2>
+<div class="sgoal"><b>この節で分かること</b>: その場の修正と、設定ファイルの関係。</div>
+<p>いまの経路表は正しい。ここで lab0 を ifupdown で下げて、上げ直す（再起動したときと同じことが起きる）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ifdown lab0
+RTNETLINK answers: No such process
+$ sudo ifup lab0
+$ ip route show default
+default via 192.168.10.254 dev lab0 onlink
+$ ping -c 1 172.16.20.10
+PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
+From 192.168.10.254 icmp_seq=1 Destination Net Unreachable
+
+--- 172.16.20.10 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms</code></pre>
+<p>旧ルータに戻った。lab0 の持ち主は ifupdown で、<code>ifup</code> は <code>/etc/network/interfaces</code> の <code>gateway 192.168.10.254</code> を読んでデフォルトルートを入れ直した。
+<code>ifdown</code> の <code>RTNETLINK answers: No such process</code> は、ifdown が<b>ファイルに書かれた</b> 192.168.10.254 の経路を消そうとして、
+それがもう無かった（手で 192.168.10.1 に直してあった）という意味である。第3章と同じく、ifupdown は今の状態ではなくファイルを見ている。
+設定ファイルを直す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo sed -i 's/gateway 192.168.10.254/gateway 192.168.10.1/' /etc/network/interfaces
+$ ifquery lab0
+address: 192.168.10.2
+gateway: 192.168.10.1
+broadcast: 192.168.10.255
+netmask: 255.255.255.0
+privext: 0
+accept_ra: 2
+request_prefix: 0
+ll-attempts: 60
+ll-interval: 0.1
+$ sudo ifdown lab0
+RTNETLINK answers: No such process
+$ sudo ifup lab0
+$ ip route show default
+default via 192.168.10.1 dev lab0 onlink
+$ ping -c 2 172.16.20.10
+PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
+64 bytes from 172.16.20.10: icmp_seq=1 ttl=63 time=3.74 ms
+64 bytes from 172.16.20.10: icmp_seq=2 ttl=63 time=0.426 ms
+
+--- 172.16.20.10 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1003ms
+rtt min/avg/max/mdev = 0.426/2.083/3.740/1.657 ms</code></pre>
+<p>2回目の <code>No such process</code> は、ifdown が新しいファイルの 192.168.10.1 を消そうとして、その時点の経路が 192.168.10.254 だったため。
+<code>ifup</code> のあとは 192.168.10.1 になり、ファイルにも残った。<code>onlink</code> は ifupdown が付ける印で、「ゲートウェイはこの NIC に直接つながっているものとして扱う」という意味である。</p>
+<p>IPv6 の表は最初から正しかった。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ip -6 route show default
+default via fe80::5054:ff:fe0a:1 dev lab0 proto ra metric 1024 expires 1794sec hoplimit 64 pref medium</code></pre>
+<p>IPv6 のデフォルトルートは、ルータ（router）が LAN に流す広告（<code>proto ra</code>）から自動で入る。ifupdown の <code>gateway</code> 行は IPv4 にしか効いていない（<code>expires</code> の秒数は見るたびに減る）。</p>
+<div class="analogy"><b>たとえ</b>: ホワイトボードと台帳の関係に近い。<code>ip route</code> で直すのはホワイトボードの書き換えで、すぐ効くが、
+朝になると台帳（<code>/etc/network/interfaces</code>）の内容で書き直される。
+<br>ただし<b>崩れる点</b>: 人ならホワイトボードの新しい値に気づいて台帳を直すが、ifupdown は気づかない。
+台帳を直すのは、いつも人の仕事である。</div>
+<div class="quiz"><b>確認</b>
+<p><code>ping 10.1.1.1</code> を打つと次のように表示された。原因として最も考えられるものはどれか。</p>
+<pre><code>From 192.168.0.254 icmp_seq=1 Destination Net Unreachable</code></pre>
+<p>A. 10.1.1.1 のサーバが停止している　B. 自分の機械に経路表の行が1つも無い　C. 192.168.0.254 のルータが 10.1.1.1 への経路を持っていない　D. 自分の NIC が down している</p>
+<details><summary>答え</summary>
+<p>C。返事を出したのは 192.168.0.254 で、内容は「その先のネットワークへの道を知らない」。
+自分の経路表がそのルータに送り、ルータが行き止まりだった。自分に経路が無いとき（B）は <code>ping: connect: Network is unreachable</code> になり、From は付かない。
+デフォルトゲートウェイが正しいかどうかを <code>ip route</code> で疑う。</p></details></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-network/">演習04</a>が、このデフォルトルートを直す課題である。
+判定は経路表・判定の中での <code>ping 172.16.20.10</code>・<code>ifquery lab0</code> の gateway の3つを見るので、<code>ip route</code> だけで直すと ✗ のまま
+（「設定ファイルの gateway が 192.168.10.1 ではない」と出る）。</div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>ping</code> の <code>From</code> は返事（エラー）を出した機械。相手とは限らない。<code>Destination Net Unreachable</code> は途中のルータが道を知らなかった印</li><li>経路表は <code>ip route</code> / <code>route -n</code> / <code>netstat -rn</code> で見る。宛先に一致する行のうち、いちばん長く一致する行が選ばれる（デフォルトルートは /0 で最後）</li><li>直結の宛先はデフォルトルートに関係なく届く。だからデフォルトルートを壊しても ssh は切れない</li><li><code>ip route add default via X</code> ＝ <code>route add default gw X</code>。消すのは <code>del</code></li><li>その場の修正は持ち主（ここでは ifupdown）が設定ファイルから書き直す。残すなら <code>gateway</code> の行を直す</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / net-tools 2.10 / iputils 20240117 / traceroute 2.1.5 / ifupdown 0.8.41 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-network/theory/03-owner">← 3. ifup は、自分が付けたものしか知らない</a><a href="/linuc-network/theory/05-trace">次: 5. traceroute は、断られた返事で道を知る →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-network/chapters.js"></script>
+<script src="/linuc-network/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

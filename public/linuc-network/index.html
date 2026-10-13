@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>確かめて説明する LinuC 主題1.07 — ネットワークの基礎を仮想マシンで確かめる</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="linuc-network">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <strong>主題1.07</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文の出力はすべて実機の記録で、演習7本は模範解答どおりに通ること・未達のときに判定が鳴ることを
+   両方確認してあります。それでも<b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、読者として通した段階で4回に分けて不備が出ました。
+   詰まったら <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   ページ下のコメントへ。それが直す順番になります。</p>
+</div>
+
+<h1>確かめて説明する LinuC 主題1.07</h1>
+<p class="lead">LinuC レベル1 <strong>102 試験・主題1.07「ネットワークの基礎」</strong>
+（プロトコルの基礎 / ネットワーク構成 / 問題解決 / クライアント側の DNS 設定。重要度の合計 14）を、
+<strong>仮想マシンの中に作った社内 LAN で実際に打って</strong>確かめます。
+<code>ip</code> も <code>ifup</code> も <code>nmcli</code> も <code>traceroute</code> も、本物のカーネルの上で動きます。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<div class="notfor">
+<h4>この教材が向かない人</h4>
+<ul>
+<li>いま動かしたいだけの人 → 公式ドキュメントのほうが速い</li>
+<li>答えだけ欲しい人 → AI に聞いたほうが速く、あなたの語彙に合う</li>
+</ul>
+<p>向く人: コマンドは打てる。写経すれば動く。
+でも「なぜ動くのか」を人に説明できない人。<br>
+<b>LinuC を受ける人向けには</b>: ip と ifconfig、ifup と nmcli、dig と ping を「同じことをする別の道具」として覚えていて、
+どれを打てば何が分かるのかで止まっている人。</p>
+</div>
+
+<h2 id="cage">この教材の檻</h2>
+<div class="cages"><div class="scroll"><table>
+<tr><th>檻</th><th>準備</th><th>ここで触れる</th><th>ここでは触れない（逃がす先）</th></tr>
+<tr><td>仮想マシン型（コンテナの中で QEMU が練習機を1台動かす）</td><td>イメージの取得（約 2GB）＋初回の起動 1〜2分</td>
+    <td>NIC 3枚（管理用・ifupdown 用・NetworkManager 用）、練習機の中の社内 LAN（ルータ・旧ルータ・DNS と Web のサーバ）</td>
+    <td>インターネット・無線 LAN・本物の DHCP サーバ（あなたの家のルータ）→ 本文は理論として説明</td></tr>
+</table></div></div>
+<p>影響度 <b>B</b>（変更は練習機の中だけ。母艦の設定もファイルも書き換えません）。
+演習は練習機の <code>/etc</code> を書き換え、経路を壊します。<b>母艦では絶対に実行しないでください</b>。
+練習機を最初の状態に戻したいときは、外で <code>vm reset --yes</code> です。</p>
+
+<h2 id="start">はじめる</h2>
+<p>Docker の場合。2行です。</p>
+<pre><code>docker run -d --name lab-linuc-network --hostname host --stop-timeout 30 \
+  -v lab-linuc-network-vm:/home/lab/vm \
+  -v lab-linuc-network-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:__DIGEST__
+
+docker exec -it lab-linuc-network bash -l</code></pre>
+<p>入ると外のコンテナ（プロンプト <code>lab@host</code>）にいます。現在地が出ます。</p>
+<pre><code>練習機 linuc: running（エージェント 応答あり / ssh 待ち受け中）
+  vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
+
+── lab-linuc-network 1.0.0 ────────────────────────────────────────
+lab-linuc-network  進捗 0/7
+  次 → 01 「enp0s17 にアドレスを手で付ける」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-network-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────</code></pre>
+<p>最初の起動では、練習機の起動（KVM なしで 40〜90 秒）と、このコースの準備（社内 LAN を作る）が続けて走ります。
+著者の環境では、<code>docker run</code> から準備が終わるまで約 65 秒でした。
+1行目が <code>running（エージェント 応答あり / ssh 待ち受け中）</code> になると練習機に入れますが、初回はその後 20 秒ほど準備が続きます。
+準備が終わったかは、外で次のコマンドがファイル名を表示することで分かります（まだなら <code>No such file or directory</code>）。</p>
+<pre><code>ls ~/vm/.provisioned</code></pre>
+<pre><code>ssh linuc</code></pre>
+<p>プロンプトが <code>student@linuc</code> に変わります。本文の端末の見出しが「練習機の中（student@linuc）」なら練習機で、
+「外（lab@host）」なら外のコンテナで打ってください。抜けるのは <code>exit</code> です。</p>
+
+<div class="note">
+<p><b>起動コマンドの <code>--stop-timeout 30</code> について</b>（権限ではありません）</p>
+<p><code>docker stop</code> は既定で 10 秒待って強制終了します。練習機の正常な停止には KVM なしで約 13 秒かかるので、
+10 秒では電源を抜いたのと同じになり、次の起動でディスクの回復が走ります。30 秒待たせれば正常に止まります。
+付けずに作ったコンテナは <code>docker stop -t 30 lab-linuc-network</code> で止めてください。</p>
+<p><b>読者に渡してもらう権限は1つもありません</b>（<code>--cap-add</code> も <code>--privileged</code> も無し）。
+練習機は QEMU の完全エミュレーション（TCG）で動き、ホストの特権を借りずに本物のカーネルを動かします。
+Linux で速くしたい人だけ <code>--device /dev/kvm</code> を足せますが、本文の出力は KVM なしで取ったものです。</p>
+</div>
+
+<div class="note warn">
+<p><b>練習機はインターネットに出ません（わざとです）</b></p>
+<p>練習機の管理用 NIC（enp0s16）は、外のコンテナを通って読者のネットワークにつながっています。
+そのままにすると、練習機の通信の一部が読者の家や会社のネットワークへ出ていき、読者ごとに画面が変わります。
+著者の環境で実測した例: 管理用 NIC が受け取った IPv6 のデフォルトルート（<code>default via fe80::2 metric 100</code>）が
+社内 LAN のルータの経路（metric 1024）より優先され、練習機の IPv6 の通信が全部外へ出て、社内のサーバに <code>ping6</code> が届きませんでした。</p>
+<p>そこで管理用 NIC からは<b>デフォルトルート・DNS サーバ・IPv6 の自動設定を受け取らない</b>ようにしてあります
+（ssh と <code>lab check</code> は 10.0.2.2 と直接つながっているので、デフォルトルートが無くても通ります）。
+練習用の2枚の NIC も外へは転送しない設定です。<code>apt install</code> はできませんが、この主題で使う道具は全部入っています。</p>
+</div>
+
+<h2 id="ex">演習</h2>
+<p>7本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません
+（判定は外のコンテナが qemu-guest-agent 経由で練習機の中を見るので、経路や ssh を壊しても採点は止まりません）。
+<code>lab check NN</code> は練習機の中でも外でも打てます。
+詰まったら <code>lab hint NN</code> を何度でも。使い切ったら <code>lab solve NN</code> で模範解答に必ず届きます
+（見ても構いません。進捗には「solve を見た」として残ります）。</p>
+<div class="scroll"><table>
+<tr><th>No</th><th>やること</th><th>副題</th><th>章</th><th>目安</th></tr>
+<tr><td>01</td><td>enp0s17 にアドレスを手で付ける</td><td>1.07.2 / 1.07.3</td><td><a href="/linuc-network/theory/02-interface">2</a></td><td>10分</td></tr>
+<tr><td>02</td><td>enp0s17 を ifupdown に持たせる</td><td>1.07.2 / 1.07.3</td><td><a href="/linuc-network/theory/03-owner">3</a></td><td>12分</td></tr>
+<tr><td>03</td><td>enp0s18 を nmcli で DHCP につなぐ</td><td>1.07.2 / 1.07.3</td><td><a href="/linuc-network/theory/03-owner">3</a></td><td>10分</td></tr>
+<tr><td>04</td><td>デフォルトルートを正しいルータに直す</td><td>1.07.2 / 1.07.3</td><td><a href="/linuc-network/theory/04-route">4</a></td><td>12分</td></tr>
+<tr><td>05</td><td>掲示板を外から見えるようにする</td><td>1.07.1 / 1.07.3</td><td><a href="/linuc-network/theory/07-ports">7</a></td><td>10分</td></tr>
+<tr><td>06</td><td>lab.example の名前を引けるようにする</td><td>1.07.4 / 1.07.3</td><td><a href="/linuc-network/theory/08-dns">8</a></td><td>12分</td></tr>
+<tr><td>07</td><td>www.lab.example を正しいサーバに向ける</td><td>1.07.4 / 1.07.2</td><td><a href="/linuc-network/theory/09-names">9</a></td><td>8分</td></tr>
+</table></div>
+<p>02 は 01 の続き、06 は 04 の後、07 は 06 の後に解いてください（前提が欠けていると、判定は「この環境では判定できません」と出します）。
+先に読む場合は <a href="/linuc-network/theory/">理論編（9章）</a>へ。章と演習は対応しているので、どちらから始めても構いません。</p>
+
+<h2 id="report">本文と違う出力が出たら</h2>
+<p>教材のバグとして直します。次の4つを貼ってください。</p>
+<ol>
+<li>打ったコマンド（外か練習機の中か）</li>
+<li>本文に書いてある出力</li>
+<li>あなたの画面に出た出力</li>
+<li><code>lab env</code> の全文（外のコンテナで打つ）</li>
+</ol>
+<pre><code>$ lab env
+テーマ    : lab-linuc-network 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:network-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+練習機    : running（エージェント 応答あり / ssh 待ち受け中）
+練習機 OS : Ubuntu 24.04.5 LTS / 6.8.0-142-generic
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb</code></pre>
+<p><a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。
+<code>カーネル</code> の行はあなたの母艦のカーネルなので、違っていて正常です。練習機の版は <code>練習機 OS</code> の行です。
+<code>練習機</code> の行が <code>running</code> 以外のときは、外で <code>vm start</code> を打ってください。</p>
+<p>ping や traceroute の時間（ms）、DHCP の残り時間、プロセス番号、nmcli が作る UUID、tcpdump のポート番号とシーケンス番号は
+毎回変わります。本文では変わる値の近くにそう書いてあります。<code>ss</code> の列の間隔は端末の幅で変わります（本文は 80 桁の端末で取りました）。</p>
+
+<h2 id="end">終わったら</h2>
+<pre><code>docker rm -f lab-linuc-network
+docker volume rm lab-linuc-network-vm        # 練習機のディスク（差分）も消す場合
+docker volume rm lab-linuc-network-state     # 進捗も消す場合</code></pre>
+<p>イメージは <code>docker rmi</code> で消せます。
+母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。</p>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / ifupdown 0.8.41 / network-manager 1.46.0 / net-tools 2.10 / iputils 20240117 / traceroute 2.1.5 / netcat-openbsd 1.226 / ncat 7.94 / bind9-dnsutils 9.18.39 / dnsmasq-base 2.91 / ipcalc 0.51 / systemd 255.4 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で演習7本を完走 / 検証日 2026-10-13</div>
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-network/theory/">理論編</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

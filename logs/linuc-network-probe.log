@@ -1,0 +1,1588 @@
+
+
+########## 0. 環境 ##########
+
+$ lab env
+テーマ    : lab-linuc-network 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:network-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+練習機    : running（エージェント 応答あり / ssh 待ち受け中）
+練習機 OS : Ubuntu 24.04.5 LTS / 6.8.0-142-generic
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+$ vm status
+練習機     : linuc
+状態       : running
+エージェント: 応答あり
+ssh        : 待ち受け中（127.0.0.1:2222 → 練習機の 22）
+ディスク   : /home/lab/vm/linuc.qcow2（土台 /var/lib/lab-vm/linuc-guest.qcow2）
+
+$ qemu-system-x86_64 --version | head -1
+QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+
+$ virsh domstate linuc
+running
+
+
+$ cat /etc/os-release | head -4
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.5 LTS (Noble Numbat)"
+
+$ uname -r
+6.8.0-142-generic
+
+$ dpkg-query -W iproute2 ifupdown network-manager net-tools iputils-ping iputils-tracepath traceroute netcat-openbsd ncat bind9-dnsutils dnsmasq-base ipcalc systemd
+bind9-dnsutils	1:9.18.39-0ubuntu0.24.04.7
+dnsmasq-base	2.91-0ubuntu0.24.04.1
+ifupdown	0.8.41ubuntu1
+ipcalc	0.51-1
+iproute2	6.1.0-1ubuntu6.4
+iputils-ping	3:20240117-1ubuntu0.1
+iputils-tracepath	3:20240117-1ubuntu0.1
+ncat	7.94+git20230807.3be01efb1+dfsg-3build2
+net-tools	2.10-0.1ubuntu4.4
+netcat-openbsd	1.226-1ubuntu2
+network-manager	1.46.0-1ubuntu2.8
+systemd	255.4-1ubuntu8.17
+traceroute	1:2.1.5-1
+
+$ bash -lic true
+bash: cannot set terminal process group (1194): Inappropriate ioctl for device
+bash: no job control in this shell
+練習機 linuc: running（エージェント 応答あり / ssh 待ち受け中）
+  vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
+
+
+── lab-linuc-network 1.0.0 ────────────────────────────────────────
+lab-linuc-network  進捗 0/7
+  次 → 01 「enp0s17 にアドレスを手で付ける」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-network-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+########## 1. アドレスとマスク（01-address） ##########
+
+$ ip -4 addr show
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+2: enp0s16: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.2.15/24 metric 100 brd 10.0.2.255 scope global dynamic enp0s16
+       valid_lft 86377sec preferred_lft 86377sec
+5: lab0@if3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000 link-netns sw
+    inet 192.168.10.2/24 brd 192.168.10.255 scope global lab0
+       valid_lft forever preferred_lft forever
+
+$ ipcalc 192.168.10.2/24
+Address:   192.168.10.2         11000000.10101000.00001010. 00000010
+Netmask:   255.255.255.0 = 24   11111111.11111111.11111111. 00000000
+Wildcard:  0.0.0.255            00000000.00000000.00000000. 11111111
+=>
+Network:   192.168.10.0/24      11000000.10101000.00001010. 00000000
+HostMin:   192.168.10.1         11000000.10101000.00001010. 00000001
+HostMax:   192.168.10.254       11000000.10101000.00001010. 11111110
+Broadcast: 192.168.10.255       11000000.10101000.00001010. 11111111
+Hosts/Net: 254                   Class C, Private Internet
+
+
+$ ipcalc -b 192.168.10.2 255.255.255.0
+Address:   192.168.10.2         
+Netmask:   255.255.255.0 = 24   
+Wildcard:  0.0.0.255            
+=>
+Network:   192.168.10.0/24      
+HostMin:   192.168.10.1         
+HostMax:   192.168.10.254       
+Broadcast: 192.168.10.255       
+Hosts/Net: 254                   Class C, Private Internet
+
+
+$ ipcalc 192.168.10.0/24 /25
+Address:   192.168.10.0         11000000.10101000.00001010. 00000000
+Netmask:   255.255.255.0 = 24   11111111.11111111.11111111. 00000000
+Wildcard:  0.0.0.255            00000000.00000000.00000000. 11111111
+=>
+Network:   192.168.10.0/24      11000000.10101000.00001010. 00000000
+HostMin:   192.168.10.1         11000000.10101000.00001010. 00000001
+HostMax:   192.168.10.254       11000000.10101000.00001010. 11111110
+Broadcast: 192.168.10.255       11000000.10101000.00001010. 11111111
+Hosts/Net: 254                   Class C, Private Internet
+
+Subnets after transition from /24 to /25
+
+Netmask:   255.255.255.128 = 25 11111111.11111111.11111111.1 0000000
+Wildcard:  0.0.0.127            00000000.00000000.00000000.0 1111111
+
+ 1.
+Network:   192.168.10.0/25      11000000.10101000.00001010.0 0000000
+HostMin:   192.168.10.1         11000000.10101000.00001010.0 0000001
+HostMax:   192.168.10.126       11000000.10101000.00001010.0 1111110
+Broadcast: 192.168.10.127       11000000.10101000.00001010.0 1111111
+Hosts/Net: 126                   Class C, Private Internet
+
+ 2.
+Network:   192.168.10.128/25    11000000.10101000.00001010.1 0000000
+HostMin:   192.168.10.129       11000000.10101000.00001010.1 0000001
+HostMax:   192.168.10.254       11000000.10101000.00001010.1 1111110
+Broadcast: 192.168.10.255       11000000.10101000.00001010.1 1111111
+Hosts/Net: 126                   Class C, Private Internet
+
+
+Subnets:   2
+Hosts:     252
+
+$ ipcalc -b 192.168.10.0/24 /26 | tail -3
+
+Subnets:   4
+Hosts:     248
+
+$ ipcalc -b 192.168.10.130/25
+Address:   192.168.10.130       
+Netmask:   255.255.255.128 = 25 
+Wildcard:  0.0.0.127            
+=>
+Network:   192.168.10.128/25    
+HostMin:   192.168.10.129       
+HostMax:   192.168.10.254       
+Broadcast: 192.168.10.255       
+Hosts/Net: 126                   Class C, Private Internet
+
+
+$ ip route get 192.168.10.200
+192.168.10.200 dev lab0 src 192.168.10.2 uid 1000 
+    cache 
+
+$ ip route get 192.168.11.1
+192.168.11.1 via 192.168.10.254 dev lab0 src 192.168.10.2 uid 1000 
+    cache 
+
+$ ipcalc -b 10.0.2.15/24
+Address:   10.0.2.15            
+Netmask:   255.255.255.0 = 24   
+Wildcard:  0.0.0.255            
+=>
+Network:   10.0.2.0/24          
+HostMin:   10.0.2.1             
+HostMax:   10.0.2.254           
+Broadcast: 10.0.2.255           
+Hosts/Net: 254                   Class A, Private Internet
+
+
+$ ipcalc -b 172.16.20.10/24
+Address:   172.16.20.10         
+Netmask:   255.255.255.0 = 24   
+Wildcard:  0.0.0.255            
+=>
+Network:   172.16.20.0/24       
+HostMin:   172.16.20.1          
+HostMax:   172.16.20.254        
+Broadcast: 172.16.20.255        
+Hosts/Net: 254                   Class B, Private Internet
+
+
+$ ipcalc -b 172.32.0.1/16
+Address:   172.32.0.1           
+Netmask:   255.255.0.0 = 16     
+Wildcard:  0.0.255.255          
+=>
+Network:   172.32.0.0/16        
+HostMin:   172.32.0.1           
+HostMax:   172.32.255.254       
+Broadcast: 172.32.255.255       
+Hosts/Net: 65534                 Class B
+
+
+$ ipcalc -b 203.0.113.10/24
+Address:   203.0.113.10         
+Netmask:   255.255.255.0 = 24   
+Wildcard:  0.0.0.255            
+=>
+Network:   203.0.113.0/24       
+HostMin:   203.0.113.1          
+HostMax:   203.0.113.254        
+Broadcast: 203.0.113.255        
+Hosts/Net: 254                   Class C
+
+
+$ ipcalc -b 127.0.0.1/8
+Address:   127.0.0.1            
+Netmask:   255.0.0.0 = 8        
+Wildcard:  0.255.255.255        
+=>
+Network:   127.0.0.0/8          
+HostMin:   127.0.0.1            
+HostMax:   127.255.255.254      
+Broadcast: 127.255.255.255      
+Hosts/Net: 16777214              Class A, Loopback
+
+
+
+########## 2. NIC を手で設定する（02-interface） ##########
+
+$ ip link show
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: enp0s16: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:12:34:56 brd ff:ff:ff:ff:ff:ff
+3: enp0s17: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
+4: enp0s18: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:12:34:58 brd ff:ff:ff:ff:ff:ff
+5: lab0@if3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:0a:00:02 brd ff:ff:ff:ff:ff:ff link-netns sw
+
+$ ifconfig | grep '^[a-z]'
+enp0s16: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+enp0s18: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+lab0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
+
+$ ifconfig -a | grep '^[a-z]'
+enp0s16: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+enp0s17: flags=4098<BROADCAST,MULTICAST>  mtu 1500
+enp0s18: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+lab0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
+
+$ ip addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
+
+$ ifconfig enp0s17
+enp0s17: flags=4098<BROADCAST,MULTICAST>  mtu 1500
+        ether 52:54:00:12:34:57  txqueuelen 1000  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 0  bytes 0 (0.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+
+$ sudo ip link set enp0s17 up
+
+$ ip addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::5054:ff:fe12:3457/64 scope link 
+       valid_lft forever preferred_lft forever
+
+$ sudo ip addr add 10.0.3.50/24 dev enp0s17
+
+$ ip -4 addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.3.50/24 scope global enp0s17
+       valid_lft forever preferred_lft forever
+
+$ ping -c 2 10.0.3.2
+PING 10.0.3.2 (10.0.3.2) 56(84) bytes of data.
+64 bytes from 10.0.3.2: icmp_seq=1 ttl=255 time=5.37 ms
+64 bytes from 10.0.3.2: icmp_seq=2 ttl=255 time=0.898 ms
+
+--- 10.0.3.2 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1003ms
+rtt min/avg/max/mdev = 0.898/3.133/5.369/2.235 ms
+
+$ ip neigh show dev enp0s17
+10.0.3.2 lladdr 52:55:0a:00:03:02 REACHABLE 
+
+$ sudo ip addr add 10.0.3.51/24 dev enp0s17
+
+$ ip -4 addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.3.50/24 scope global enp0s17
+       valid_lft forever preferred_lft forever
+    inet 10.0.3.51/24 scope global secondary enp0s17
+       valid_lft forever preferred_lft forever
+
+$ ifconfig enp0s17
+enp0s17: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 10.0.3.50  netmask 255.255.255.0  broadcast 0.0.0.0
+        inet6 fe80::5054:ff:fe12:3457  prefixlen 64  scopeid 0x20<link>
+        ether 52:54:00:12:34:57  txqueuelen 1000  (Ethernet)
+        RX packets 3  bytes 260 (260.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 11  bytes 894 (894.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+
+$ sudo ip addr add 10.0.3.52/24 dev enp0s17 label enp0s17:1
+
+$ ifconfig | grep '^[a-z]'
+enp0s16: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+enp0s17: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+enp0s17:1: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+enp0s18: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+lab0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
+
+$ ifconfig enp0s17:1
+enp0s17:1: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 10.0.3.52  netmask 255.255.255.0  broadcast 0.0.0.0
+        ether 52:54:00:12:34:57  txqueuelen 1000  (Ethernet)
+
+
+$ sudo ifconfig enp0s17 10.0.3.60 netmask 255.255.255.0
+
+$ ip -4 addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.3.60/24 brd 10.0.3.255 scope global enp0s17
+       valid_lft forever preferred_lft forever
+
+$ sudo ifconfig enp0s17 10.0.3.50 netmask 255.255.255.0
+
+$ ip -4 addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.3.50/24 brd 10.0.3.255 scope global enp0s17
+       valid_lft forever preferred_lft forever
+
+$ sudo ip link set enp0s17 down
+
+$ ip -4 addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST> mtu 1500 qdisc fq_codel state DOWN group default qlen 1000
+    inet 10.0.3.50/24 brd 10.0.3.255 scope global enp0s17
+       valid_lft forever preferred_lft forever
+
+$ ip route
+default via 192.168.10.254 dev lab0 onlink 
+10.0.2.0/24 dev enp0s16 proto kernel scope link src 10.0.2.15 metric 100 
+192.168.10.0/24 dev lab0 proto kernel scope link src 192.168.10.2 
+
+$ sudo ip link set enp0s17 up
+
+$ ip route
+default via 192.168.10.254 dev lab0 onlink 
+10.0.2.0/24 dev enp0s16 proto kernel scope link src 10.0.2.15 metric 100 
+10.0.3.0/24 dev enp0s17 proto kernel scope link src 10.0.3.50 
+192.168.10.0/24 dev lab0 proto kernel scope link src 192.168.10.2 
+
+$ ping -c 1 10.0.3.2
+PING 10.0.3.2 (10.0.3.2) 56(84) bytes of data.
+64 bytes from 10.0.3.2: icmp_seq=1 ttl=255 time=3.32 ms
+
+--- 10.0.3.2 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 3.322/3.322/3.322/0.000 ms
+
+
+########## 3. 設定の持ち主（03-owner） ##########
+
+$ cat /etc/network/interfaces
+# interfaces(5) — ifupdown の設定ファイル。ifup / ifdown はこのファイルを読む。
+#
+# この練習機では、NIC ごとに設定する道具（持ち主）が違う:
+#   enp0s16  管理用。netplan（/etc/netplan/）→ systemd-networkd が持つ。触らない
+#   enp0s17  練習用。ifupdown が持つ（このファイルに書く）
+#   enp0s18  練習用。NetworkManager が持つ（nmcli で設定する）
+#   lab0     社内 LAN。ifupdown が持つ（下に書いてある）
+
+source /etc/network/interfaces.d/*
+
+auto lo
+iface lo inet loopback
+
+# 社内 LAN
+auto lab0
+iface lab0 inet static
+    address 192.168.10.2/24
+    gateway 192.168.10.254
+
+iface lab0 inet6 auto
+    privext 0
+
+$ ifquery --list
+lo
+lab0
+
+$ sudo ifup enp0s17
+ifup: unknown interface enp0s17
+
+$ printf 'auto enp0s17\niface enp0s17 inet static\n    address 10.0.3.50/24\n' | sudo tee /etc/network/interfaces.d/enp0s17
+auto enp0s17
+iface enp0s17 inet static
+    address 10.0.3.50/24
+
+$ ifquery --list
+lo
+enp0s17
+lab0
+
+$ ifquery enp0s17
+address: 10.0.3.50
+broadcast: 10.0.3.255
+netmask: 255.255.255.0
+
+$ sudo ifup enp0s17
+Error: ipv4: Address already assigned.
+ifup: failed to bring up enp0s17
+
+$ ifquery --state
+lab0=lab0
+lo=lo
+
+$ sudo ifdown enp0s17
+ifdown: interface enp0s17 not configured
+
+$ ip -4 addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.3.50/24 brd 10.0.3.255 scope global enp0s17
+       valid_lft forever preferred_lft forever
+
+$ sudo ip addr flush dev enp0s17
+
+$ sudo ifup enp0s17
+
+$ ifquery --state
+enp0s17=enp0s17
+lab0=lab0
+lo=lo
+
+$ ip -4 addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.3.50/24 brd 10.0.3.255 scope global enp0s17
+       valid_lft forever preferred_lft forever
+
+$ sudo ifdown enp0s17
+
+$ ip addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST> mtu 1500 qdisc fq_codel state DOWN group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
+
+$ sudo ifup enp0s17
+
+$ ping -c 1 10.0.3.2
+PING 10.0.3.2 (10.0.3.2) 56(84) bytes of data.
+64 bytes from 10.0.3.2: icmp_seq=1 ttl=255 time=4.30 ms
+
+--- 10.0.3.2 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 4.297/4.297/4.297/0.000 ms
+
+$ nmcli device status
+DEVICE   TYPE      STATE         CONNECTION 
+enp0s18  ethernet  disconnected  --         
+enp0s16  ethernet  unmanaged     --         
+enp0s17  ethernet  unmanaged     --         
+lab0     ethernet  unmanaged     --         
+lo       loopback  unmanaged     --         
+
+$ cat /etc/NetworkManager/conf.d/90-lab.conf
+# この練習機の NetworkManager は enp0s18 だけを持つ（nmcli の練習用）。
+# enp0s16 は netplan（systemd-networkd）、enp0s17 と lab0 は ifupdown が持つ。
+[main]
+# 接続の定義が無い NIC に「有線接続 1」を勝手に作って DHCP を始めない（作るのは読者）
+no-auto-default=*
+# DHCP で受け取った DNS サーバを systemd-resolved に渡さない（第8章の画面を揃えるため）
+dns=none
+
+[keyfile]
+unmanaged-devices=*,except:interface-name:enp0s18
+
+[connection]
+# IPv6 のアドレスを MAC から作る（0 = eui64）。既定の stable-privacy は練習機ごとに乱数の鍵を作り、画面が揃わない。
+# 値は数字で書く。"eui64" と書くと読まれず、stable-privacy のままだった（NetworkManager 1.46・実測 2026-10-13）
+ipv6.addr-gen-mode=0
+
+$ nmcli connection show
+
+
+$ sudo nmcli connection add type ethernet ifname enp0s18 con-name lab-dhcp
+Connection 'lab-dhcp' (585c3a5c-f14b-45bc-8a9c-2f3829d58102) successfully added.
+
+$ nmcli -f NAME,TYPE,DEVICE connection show
+NAME      TYPE      DEVICE  
+lab-dhcp  ethernet  enp0s18 
+
+$ sudo nmcli connection up lab-dhcp
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/2)
+
+$ nmcli device status
+DEVICE   TYPE      STATE      CONNECTION 
+enp0s18  ethernet  connected  lab-dhcp   
+enp0s16  ethernet  unmanaged  --         
+enp0s17  ethernet  unmanaged  --         
+lab0     ethernet  unmanaged  --         
+lo       loopback  unmanaged  --         
+
+$ ip -4 addr show enp0s18
+4: enp0s18: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.4.15/24 brd 10.0.4.255 scope global dynamic noprefixroute enp0s18
+       valid_lft 86397sec preferred_lft 86397sec
+
+$ nmcli -f IP4 device show enp0s18
+IP4.ADDRESS[1]:                         10.0.4.15/24
+IP4.GATEWAY:                            --
+IP4.ROUTE[1]:                           dst = 10.0.4.0/24, nh = 0.0.0.0, mt = 100
+
+$ ls /etc/netplan/
+01-lab-mgmt.yaml  90-NM-585c3a5c-f14b-45bc-8a9c-2f3829d58102.yaml
+
+$ sudo nmcli connection modify lab-dhcp ipv4.method manual ipv4.addresses 10.0.4.50/24
+
+$ ip -4 addr show enp0s18
+4: enp0s18: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.4.15/24 brd 10.0.4.255 scope global dynamic noprefixroute enp0s18
+       valid_lft 86387sec preferred_lft 86387sec
+
+$ sudo nmcli connection up lab-dhcp
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/3)
+
+$ ip -4 addr show enp0s18
+4: enp0s18: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.4.50/24 brd 10.0.4.255 scope global noprefixroute enp0s18
+       valid_lft forever preferred_lft forever
+
+$ sudo nmcli connection modify lab-dhcp ipv4.method auto ipv4.addresses ''
+
+$ sudo nmcli connection up lab-dhcp
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/4)
+
+$ ip -4 addr show enp0s18
+4: enp0s18: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.4.15/24 brd 10.0.4.255 scope global dynamic noprefixroute enp0s18
+       valid_lft 86399sec preferred_lft 86399sec
+
+$ nmcli -g ipv4.method,connection.autoconnect connection show lab-dhcp
+auto
+yes
+
+$ networkctl
+IDX LINK    TYPE     OPERATIONAL SETUP     
+  1 lo      loopback carrier     unmanaged
+  2 enp0s16 ether    routable    configured
+  3 enp0s17 ether    routable    unmanaged
+  4 enp0s18 ether    routable    unmanaged
+  5 lab0    ether    routable    unmanaged
+
+5 links listed.
+
+$ sudo cat /etc/netplan/01-lab-mgmt.yaml
+# 管理用の NIC。外（コンテナ）からの ssh と、練習機の中からの lab はここを通る。
+# この NIC を止めると ssh が切れる。そのときは外で vm console（シリアル）から入る。
+#
+# ネットワークのコースでは、DHCP からデフォルトルートと DNS を受け取らない（use-routes / use-dns）。
+# 練習機の「外」は、中に作った社内 LAN（lab0）だけにしてある。
+network:
+  version: 2
+  ethernets:
+    enp0s16:
+      dhcp4: true
+      dhcp4-overrides:
+        use-routes: false
+        use-dns: false
+
+$ sudo nmcli device connect enp0s17
+Error: Failed to add/activate new connection: Connection 'enp0s17' is not available on device enp0s17 because device is strictly unmanaged
+
+$ sudo cat /etc/netplan/01-lab-mgmt.yaml
+network:
+  version: 2
+  ethernets:
+    enp0s16:
+      dhcp4: true
+      dhcp4-overrides:
+        use-dns: false
+        use-routes: false
+
+
+########## 4. 経路（04-route） ##########
+
+$ ping -c 3 172.16.20.10
+PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
+From 192.168.10.254 icmp_seq=1 Destination Net Unreachable
+From 192.168.10.254 icmp_seq=2 Destination Net Unreachable
+From 192.168.10.254 icmp_seq=3 Destination Net Unreachable
+
+--- 172.16.20.10 ping statistics ---
+3 packets transmitted, 0 received, +3 errors, 100% packet loss, time 2005ms
+
+
+$ ping6 -c 2 fd00:20::10
+PING fd00:20::10 (fd00:20::10) 56 data bytes
+64 bytes from fd00:20::10: icmp_seq=1 ttl=63 time=4.58 ms
+64 bytes from fd00:20::10: icmp_seq=2 ttl=63 time=0.798 ms
+
+--- fd00:20::10 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1002ms
+rtt min/avg/max/mdev = 0.798/2.688/4.579/1.890 ms
+
+$ ip route
+default via 192.168.10.254 dev lab0 onlink 
+10.0.2.0/24 dev enp0s16 proto kernel scope link src 10.0.2.15 metric 100 
+10.0.3.0/24 dev enp0s17 proto kernel scope link src 10.0.3.50 
+10.0.4.0/24 dev enp0s18 proto kernel scope link src 10.0.4.15 metric 100 
+192.168.10.0/24 dev lab0 proto kernel scope link src 192.168.10.2 
+
+$ route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.10.254  0.0.0.0         UG    0      0        0 lab0
+10.0.2.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s16
+10.0.3.0        0.0.0.0         255.255.255.0   U     0      0        0 enp0s17
+10.0.4.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s18
+192.168.10.0    0.0.0.0         255.255.255.0   U     0      0        0 lab0
+
+$ netstat -rn
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
+0.0.0.0         192.168.10.254  0.0.0.0         UG        0 0          0 lab0
+10.0.2.0        0.0.0.0         255.255.255.0   U         0 0          0 enp0s16
+10.0.3.0        0.0.0.0         255.255.255.0   U         0 0          0 enp0s17
+10.0.4.0        0.0.0.0         255.255.255.0   U         0 0          0 enp0s18
+192.168.10.0    0.0.0.0         255.255.255.0   U         0 0          0 lab0
+
+$ ip route get 172.16.20.10
+172.16.20.10 via 192.168.10.254 dev lab0 src 192.168.10.2 uid 1000 
+    cache 
+
+$ ip route get 10.0.2.2
+10.0.2.2 dev enp0s16 src 10.0.2.15 uid 1000 
+    cache 
+
+$ traceroute -n 172.16.20.10
+traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
+ 1  192.168.10.254  0.841 ms !N  0.061 ms !N  0.066 ms !N
+
+$ sudo ip route del default
+
+$ ip route
+10.0.2.0/24 dev enp0s16 proto kernel scope link src 10.0.2.15 metric 100 
+10.0.3.0/24 dev enp0s17 proto kernel scope link src 10.0.3.50 
+10.0.4.0/24 dev enp0s18 proto kernel scope link src 10.0.4.15 metric 100 
+192.168.10.0/24 dev lab0 proto kernel scope link src 192.168.10.2 
+
+$ ping -c 1 172.16.20.10
+ping: connect: Network is unreachable
+
+$ sudo ip route add default via 192.168.10.1
+
+$ ip route show default
+default via 192.168.10.1 dev lab0 
+
+$ ping -c 2 172.16.20.10
+PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
+64 bytes from 172.16.20.10: icmp_seq=1 ttl=63 time=7.26 ms
+64 bytes from 172.16.20.10: icmp_seq=2 ttl=63 time=0.525 ms
+
+--- 172.16.20.10 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1003ms
+rtt min/avg/max/mdev = 0.525/3.891/7.257/3.366 ms
+
+$ route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.10.1    0.0.0.0         UG    0      0        0 lab0
+10.0.2.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s16
+10.0.3.0        0.0.0.0         255.255.255.0   U     0      0        0 enp0s17
+10.0.4.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s18
+192.168.10.0    0.0.0.0         255.255.255.0   U     0      0        0 lab0
+
+$ sudo route add -host 203.0.113.5 gw 192.168.10.254
+
+$ route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.10.1    0.0.0.0         UG    0      0        0 lab0
+10.0.2.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s16
+10.0.3.0        0.0.0.0         255.255.255.0   U     0      0        0 enp0s17
+10.0.4.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s18
+192.168.10.0    0.0.0.0         255.255.255.0   U     0      0        0 lab0
+203.0.113.5     192.168.10.254  255.255.255.255 UGH   0      0        0 lab0
+
+$ ip route get 203.0.113.5
+203.0.113.5 via 192.168.10.254 dev lab0 src 192.168.10.2 uid 1000 
+    cache 
+
+$ ping -c 1 203.0.113.5
+PING 203.0.113.5 (203.0.113.5) 56(84) bytes of data.
+From 192.168.10.254 icmp_seq=1 Destination Net Unreachable
+
+--- 203.0.113.5 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+
+
+$ sudo route del -host 203.0.113.5 gw 192.168.10.254
+
+$ sudo ifdown lab0
+RTNETLINK answers: No such process
+
+$ sudo ifup lab0
+
+$ ip route show default
+default via 192.168.10.254 dev lab0 onlink 
+
+$ ping -c 1 172.16.20.10
+PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
+From 192.168.10.254 icmp_seq=1 Destination Net Unreachable
+
+--- 172.16.20.10 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+
+
+$ sudo sed -i 's/gateway 192.168.10.254/gateway 192.168.10.1/' /etc/network/interfaces
+
+$ ifquery lab0
+address: 192.168.10.2
+gateway: 192.168.10.1
+broadcast: 192.168.10.255
+netmask: 255.255.255.0
+privext: 0
+accept_ra: 2
+request_prefix: 0
+ll-attempts: 60
+ll-interval: 0.1
+
+$ sudo ifdown lab0
+RTNETLINK answers: No such process
+
+$ sudo ifup lab0
+
+$ ip route show default
+default via 192.168.10.1 dev lab0 onlink 
+
+$ ping -c 2 172.16.20.10
+PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
+64 bytes from 172.16.20.10: icmp_seq=1 ttl=63 time=3.74 ms
+64 bytes from 172.16.20.10: icmp_seq=2 ttl=63 time=0.426 ms
+
+--- 172.16.20.10 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1003ms
+rtt min/avg/max/mdev = 0.426/2.083/3.740/1.657 ms
+
+$ ip -6 route show default
+default via fe80::5054:ff:fe0a:1 dev lab0 proto ra metric 1024 expires 1794sec hoplimit 64 pref medium
+
+
+########## 5. 経路をたどる（05-trace） ##########
+
+$ traceroute -n 172.16.20.10
+traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
+ 1  192.168.10.1  2.023 ms  0.147 ms  0.083 ms
+ 2  172.16.20.10  0.374 ms  0.070 ms  0.055 ms
+
+$ traceroute 172.16.20.10
+traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
+ 1  _gateway (192.168.10.1)  0.421 ms  0.064 ms  0.049 ms
+ 2  172.16.20.10 (172.16.20.10)  0.080 ms  0.062 ms  0.051 ms
+
+$ sudo tcpdump -l -n -t -i lab0 -c 4 "udp or icmp" 2>/dev/null & sleep 2; traceroute -n -q 1 -N 1 172.16.20.10; wait
+[1] 3237
+traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
+ 1  192.168.10.1  1.230 ms
+ 2  172.16.20.10  0.191 ms
+IP 192.168.10.2.48439 > 172.16.20.10.33434: UDP, length 32
+IP 192.168.10.1 > 192.168.10.2: ICMP time exceeded in-transit, length 68
+IP 192.168.10.2.52514 > 172.16.20.10.33435: UDP, length 32
+IP 172.16.20.10 > 192.168.10.2: ICMP 172.16.20.10 udp port 33435 unreachable, length 68
+[1]+  Done                    sudo tcpdump -l -n -t -i lab0 -c 4 "udp or icmp" 2> /dev/null
+
+$ ping -c 1 -t 1 172.16.20.10
+PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
+From 192.168.10.1 icmp_seq=1 Time to live exceeded
+
+--- 172.16.20.10 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+
+
+$ ping -c 1 -t 2 172.16.20.10
+PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
+64 bytes from 172.16.20.10: icmp_seq=1 ttl=63 time=0.448 ms
+
+--- 172.16.20.10 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.448/0.448/0.448/0.000 ms
+
+$ traceroute -I -n 172.16.20.10
+You do not have enough privileges to use this traceroute method.
+socket: Operation not permitted
+
+$ sudo traceroute -I -n 172.16.20.10
+traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
+ 1  192.168.10.1  7.368 ms  0.326 ms  0.142 ms
+ 2  172.16.20.10  0.484 ms * *
+
+$ sudo traceroute -I -n -N 1 172.16.20.10
+traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
+ 1  192.168.10.1  0.299 ms  0.228 ms  0.105 ms
+ 2  172.16.20.10  0.114 ms  0.106 ms  0.101 ms
+
+$ tracepath -n 172.16.20.10
+ 1?: [LOCALHOST]                      pmtu 1500
+ 1:  192.168.10.1                                          1.852ms 
+ 1:  192.168.10.1                                          0.116ms 
+ 2:  172.16.20.10                                          0.495ms reached
+     Resume: pmtu 1500 hops 2 back 2 
+
+$ tracepath 172.16.20.10
+ 1?: [LOCALHOST]                      pmtu 1500
+ 1:  _gateway                                              1.136ms 
+ 1:  _gateway                                              0.578ms 
+ 2:  ???                                                   0.690ms reached
+     Resume: pmtu 1500 hops 2 back 2 
+
+$ sudo ip netns exec router iptables -A OUTPUT -p icmp --icmp-type time-exceeded -j DROP
+
+$ traceroute -n 172.16.20.10
+traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
+ 1  * * *
+ 2  172.16.20.10  0.297 ms  0.072 ms  0.062 ms
+
+$ tracepath -n 172.16.20.10
+ 1?: [LOCALHOST]                      pmtu 1500
+ 1:  no reply
+ 2:  172.16.20.10                                          0.837ms reached
+     Resume: pmtu 1500 hops 2 back 2 
+
+$ ping -c 1 172.16.20.10
+PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
+64 bytes from 172.16.20.10: icmp_seq=1 ttl=63 time=0.547 ms
+
+--- 172.16.20.10 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.547/0.547/0.547/0.000 ms
+
+$ sudo ip netns exec router iptables -D OUTPUT -p icmp --icmp-type time-exceeded -j DROP
+
+$ traceroute -n 172.16.20.10
+traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
+ 1  192.168.10.1  0.340 ms  0.069 ms  0.047 ms
+ 2  172.16.20.10  0.068 ms  0.061 ms  0.084 ms
+
+$ ip netns list
+server
+oldgw
+router
+sw (id: 0)
+
+$ sudo ip netns exec router ip route
+172.16.20.0/24 dev eth1 proto kernel scope link src 172.16.20.1 
+192.168.10.0/24 dev eth0 proto kernel scope link src 192.168.10.1 
+
+
+########## 6. IPv6（06-ipv6） ##########
+
+$ ifquery lab0
+address: 192.168.10.2
+gateway: 192.168.10.1
+broadcast: 192.168.10.255
+netmask: 255.255.255.0
+privext: 0
+accept_ra: 2
+request_prefix: 0
+ll-attempts: 60
+ll-interval: 0.1
+
+$ ip -6 addr show lab0
+5: lab0@if3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000 link-netns sw
+    inet6 fd00:10::5054:ff:fe0a:2/64 scope global dynamic mngtmpaddr 
+       valid_lft forever preferred_lft forever
+    inet6 fe80::5054:ff:fe0a:2/64 scope link 
+       valid_lft forever preferred_lft forever
+
+$ ip link show lab0
+5: lab0@if3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:0a:00:02 brd ff:ff:ff:ff:ff:ff link-netns sw
+
+$ ip -6 addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet6 fe80::5054:ff:fe12:3457/64 scope link 
+       valid_lft forever preferred_lft forever
+
+$ ip -6 route
+fd00:10::/64 dev lab0 proto kernel metric 256 pref medium
+fe80::/64 dev enp0s16 proto kernel metric 256 pref medium
+fe80::/64 dev enp0s17 proto kernel metric 256 pref medium
+fe80::/64 dev lab0 proto kernel metric 256 pref medium
+fe80::/64 dev enp0s18 proto kernel metric 1024 pref medium
+default via fe80::5054:ff:fe0a:1 dev lab0 proto ra metric 1024 expires 1758sec hoplimit 64 pref medium
+
+$ ping6 -c 1 fe80::5054:ff:fe0a:1
+PING fe80::5054:ff:fe0a:1 (fe80::5054:ff:fe0a:1) 56 data bytes
+From fe80::5054:ff:fe12:3456%enp0s16 icmp_seq=1 Destination unreachable: Address unreachable
+
+--- fe80::5054:ff:fe0a:1 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+
+
+$ ping6 -c 1 fe80::5054:ff:fe0a:1%lab0
+PING fe80::5054:ff:fe0a:1%lab0 (fe80::5054:ff:fe0a:1%lab0) 56 data bytes
+64 bytes from fe80::5054:ff:fe0a:1%lab0: icmp_seq=1 ttl=64 time=7.52 ms
+
+--- fe80::5054:ff:fe0a:1%lab0 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 7.518/7.518/7.518/0.000 ms
+
+$ ping -c 1 fe80::5054:ff:fe0a:1%lab0
+PING fe80::5054:ff:fe0a:1%lab0 (fe80::5054:ff:fe0a:1%lab0) 56 data bytes
+64 bytes from fe80::5054:ff:fe0a:1%lab0: icmp_seq=1 ttl=64 time=0.314 ms
+
+--- fe80::5054:ff:fe0a:1%lab0 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.314/0.314/0.314/0.000 ms
+
+$ ping6 -c 2 -w 3 ff02::1%lab0
+PING ff02::1%lab0 (ff02::1%lab0) 56 data bytes
+64 bytes from fe80::5054:ff:fe0a:2%lab0: icmp_seq=1 ttl=64 time=1.19 ms
+64 bytes from fe80::5054:ff:fe0a:1%lab0: icmp_seq=1 ttl=64 time=1.87 ms
+64 bytes from fe80::5054:ff:fe0a:2%lab0: icmp_seq=2 ttl=64 time=0.597 ms
+
+--- ff02::1%lab0 ping statistics ---
+2 packets transmitted, 2 received, +1 duplicates, 0% packet loss, time 1002ms
+rtt min/avg/max/mdev = 0.597/1.218/1.866/0.518 ms
+
+$ ip -6 neigh show dev lab0
+fe80::5054:ff:fe0a:1 lladdr 52:54:00:0a:00:01 router DELAY 
+
+$ ping6 -c 2 fd00:20::10
+PING fd00:20::10 (fd00:20::10) 56 data bytes
+64 bytes from fd00:20::10: icmp_seq=1 ttl=63 time=0.640 ms
+64 bytes from fd00:20::10: icmp_seq=2 ttl=63 time=0.767 ms
+
+--- fd00:20::10 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1002ms
+rtt min/avg/max/mdev = 0.640/0.703/0.767/0.063 ms
+
+$ traceroute6 -n fd00:20::10
+traceroute to fd00:20::10 (fd00:20::10), 30 hops max, 80 byte packets
+ 1  fd00:10::1  2.312 ms  0.129 ms  0.080 ms
+ 2  fd00:20::10  0.448 ms  0.064 ms  0.055 ms
+
+$ tracepath -6 -n fd00:20::10
+ 1?: [LOCALHOST]                        0.417ms pmtu 1500
+ 1:  fd00:10::1                                            1.189ms 
+ 1:  fd00:10::1                                            0.142ms 
+ 2:  fd00:20::10                                           0.132ms reached
+     Resume: pmtu 1500 hops 2 back 2 
+
+$ tracepath6 fd00:20::10
+bash: tracepath6: command not found
+
+$ python3 -c 'import ipaddress; print(ipaddress.ip_address("fd00:10::5054:ff:fe0a:2").exploded)'
+fd00:0010:0000:0000:5054:00ff:fe0a:0002
+
+$ grep ip6 /etc/hosts
+::1 ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+ff02::3 ip6-allhosts
+
+$ ping6 -c 1 ip6-localhost
+PING ip6-localhost (::1) 56 data bytes
+64 bytes from ip6-localhost (::1): icmp_seq=1 ttl=64 time=0.225 ms
+
+--- ip6-localhost ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.225/0.225/0.225/0.000 ms
+
+
+########## 7. プロトコルとポート（07-ports） ##########
+
+$ grep -wE '^(ssh|smtp|domain|http|ntp|https)' /etc/services
+ssh		22/tcp				# SSH Remote Login Protocol
+smtp		25/tcp		mail
+domain		53/tcp				# Domain Name Server
+domain		53/udp
+http		80/tcp		www		# WorldWideWeb HTTP
+ntp		123/udp				# Network Time Protocol
+https		443/tcp				# http protocol over TLS/SSL
+https		443/udp				# HTTP/3
+domain-s	853/tcp				# DNS over TLS [RFC7858]
+domain-s	853/udp				# DNS over DTLS [RFC8094]
+http-alt	8080/tcp	webcache	# WWW caching service
+
+$ ss -tuln
+Netid State  Recv-Q Send-Q       Local Address:Port   Peer Address:Port Process 
+udp   UNCONN 0      0               127.0.0.54:53          0.0.0.0:*            
+udp   UNCONN 0      0            127.0.0.53%lo:53          0.0.0.0:*            
+udp   UNCONN 0      0        10.0.2.15%enp0s16:68          0.0.0.0:*            
+tcp   LISTEN 0      4096               0.0.0.0:22          0.0.0.0:*            
+tcp   LISTEN 0      4096            127.0.0.54:53          0.0.0.0:*            
+tcp   LISTEN 0      10               127.0.0.1:8080        0.0.0.0:*            
+tcp   LISTEN 0      4096         127.0.0.53%lo:53          0.0.0.0:*            
+tcp   LISTEN 0      4096                  [::]:22             [::]:*            
+
+$ sudo ss -tulnp
+Netid  State   Recv-Q  Send-Q         Local Address:Port     Peer Address:Port  Process                                                                         
+udp    UNCONN  0       0                 127.0.0.54:53            0.0.0.0:*      users:(("systemd-resolve",pid=917,fd=16))                                      
+udp    UNCONN  0       0              127.0.0.53%lo:53            0.0.0.0:*      users:(("systemd-resolve",pid=917,fd=14))                                      
+udp    UNCONN  0       0          10.0.2.15%enp0s16:68            0.0.0.0:*      users:(("systemd-network",pid=205,fd=23))                                      
+tcp    LISTEN  0       4096                 0.0.0.0:22            0.0.0.0:*      users:(("sshd",pid=661,fd=3),("systemd",pid=1,fd=155))                         
+tcp    LISTEN  0       4096              127.0.0.54:53            0.0.0.0:*      users:(("systemd-resolve",pid=917,fd=17))                                      
+tcp    LISTEN  0       10                 127.0.0.1:8080          0.0.0.0:*      users:(("ncat",pid=830,fd=3))                                                  
+tcp    LISTEN  0       4096           127.0.0.53%lo:53            0.0.0.0:*      users:(("systemd-resolve",pid=917,fd=15))                                      
+tcp    LISTEN  0       4096                    [::]:22               [::]:*      users:(("sshd",pid=661,fd=4),("systemd",pid=1,fd=156))                         
+
+$ sudo netstat -tulnp
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      1/init              
+tcp        0      0 127.0.0.54:53           0.0.0.0:*               LISTEN      917/systemd-resolve 
+tcp        0      0 127.0.0.1:8080          0.0.0.0:*               LISTEN      830/ncat            
+tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN      917/systemd-resolve 
+tcp6       0      0 :::22                   :::*                    LISTEN      1/init              
+udp        0      0 127.0.0.54:53           0.0.0.0:*                           917/systemd-resolve 
+udp        0      0 127.0.0.53:53           0.0.0.0:*                           917/systemd-resolve 
+udp        0      0 10.0.2.15:68            0.0.0.0:*                           205/systemd-network 
+
+$ curl -s http://127.0.0.1:8080/
+lab-board: no news today
+
+$ nc -zv 127.0.0.1 8080
+Connection to 127.0.0.1 8080 port [tcp/http-alt] succeeded!
+
+$ nc -zv 192.168.10.2 8080
+nc: connect to 192.168.10.2 port 8080 (tcp) failed: Connection refused
+
+$ sudo ip netns exec router nc -zv 192.168.10.2 8080
+nc: connect to 192.168.10.2 port 8080 (tcp) failed: Connection refused
+
+$ sudo ip netns exec router nc -zv 192.168.10.2 22
+Connection to 192.168.10.2 22 port [tcp/ssh] succeeded!
+
+$ cat /etc/default/lab-board
+# lab-board.service（社内掲示板）が読む設定。変えたら: sudo systemctl restart lab-board
+# 待ち受けるアドレス
+LISTEN_ADDRESS=127.0.0.1
+
+$ systemctl cat lab-board | grep ExecStart
+ExecStart=/usr/bin/ncat --keep-open --listen ${LISTEN_ADDRESS} 8080 --sh-exec /usr/local/lib/lab-net/board-reply
+
+$ sudo ip netns exec server ss -tulnp
+Netid   State    Recv-Q   Send-Q     Local Address:Port     Peer Address:Port   Process                                                                         
+udp     UNCONN   0        0           172.16.20.10:53            0.0.0.0:*       users:(("dnsmasq",pid=828,fd=4))                                               
+udp     UNCONN   0        0          [fd00:20::10]:53               [::]:*       users:(("dnsmasq",pid=828,fd=6))                                               
+tcp     LISTEN   0        10               0.0.0.0:80            0.0.0.0:*       users:(("ncat",pid=829,fd=4))                                                  
+tcp     LISTEN   0        32          172.16.20.10:53            0.0.0.0:*       users:(("dnsmasq",pid=828,fd=5))                                               
+tcp     LISTEN   0        32         [fd00:20::10]:53               [::]:*       users:(("dnsmasq",pid=828,fd=7))                                               
+tcp     LISTEN   0        10                  [::]:80               [::]:*       users:(("ncat",pid=829,fd=3))                                                  
+
+$ nc -zv 172.16.20.10 80
+Connection to 172.16.20.10 80 port [tcp/http] succeeded!
+
+$ nc -zv 172.16.20.10 25
+nc: connect to 172.16.20.10 port 25 (tcp) failed: Connection refused
+
+$ nc -zv 172.16.20.10 443
+nc: connect to 172.16.20.10 port 443 (tcp) failed: Connection refused
+
+$ printf 'GET / HTTP/1.0\r\n\r\n' | nc 172.16.20.10 80
+HTTP/1.0 200 OK
+Content-Type: text/plain
+Content-Length: 50
+Connection: close
+
+hello from www.lab.example (172.16.20.10, 80/tcp)
+
+$ nc -zuv 172.16.20.10 53
+Connection to 172.16.20.10 53 port [udp/domain] succeeded!
+
+$ nc -zuv 172.16.20.10 123; echo $?
+1
+
+$ ncat -zuv 172.16.20.10 123
+Ncat: Version 7.94SVN ( https://nmap.org/ncat )
+Ncat: Connected to 172.16.20.10:123.
+Ncat: Connection refused.
+
+$ ncat -zv 172.16.20.10 25
+Ncat: Version 7.94SVN ( https://nmap.org/ncat )
+Ncat: Connection refused.
+
+$ sudo tcpdump -l -n -t -i lab0 -c 2 "tcp port 25" 2>/dev/null & sleep 2; nc -zv 172.16.20.10 25; wait
+[1] 3942
+nc: connect to 172.16.20.10 port 25 (tcp) failed: Connection refused
+IP 192.168.10.2.39238 > 172.16.20.10.25: Flags [S], seq 1717338176, win 64240, options [mss 1460,sackOK,TS val 4041209353 ecr 0,nop,wscale 7], length 0
+IP 172.16.20.10.25 > 192.168.10.2.39238: Flags [R.], seq 0, ack 1717338177, win 0, length 0
+[1]+  Done                    sudo tcpdump -l -n -t -i lab0 -c 2 "tcp port 25" 2> /dev/null
+
+$ sudo tcpdump -l -n -t -i lab0 -c 2 "port 123 or icmp" 2>/dev/null & sleep 2; nc -zuv 172.16.20.10 123; wait
+[1] 3959
+IP 192.168.10.2.49972 > 172.16.20.10.123: NTPv3, unspecified, length 1
+IP 172.16.20.10 > 192.168.10.2: ICMP 172.16.20.10 udp port 123 unreachable, length 37
+[1]+  Done                    sudo tcpdump -l -n -t -i lab0 -c 2 "port 123 or icmp" 2> /dev/null
+
+$ sudo tcpdump -l -n -t -i lab0 -c 3 "tcp port 80" 2>/dev/null & sleep 2; nc -zv 172.16.20.10 80; wait
+[1] 3976
+Connection to 172.16.20.10 80 port [tcp/http] succeeded!
+IP 192.168.10.2.54568 > 172.16.20.10.80: Flags [S], seq 1582733727, win 64240, options [mss 1460,sackOK,TS val 4041216602 ecr 0,nop,wscale 7], length 0
+IP 172.16.20.10.80 > 192.168.10.2.54568: Flags [S.], seq 3013205994, ack 1582733728, win 65160, options [mss 1460,sackOK,TS val 3476493701 ecr 4041216602,nop,wscale 7], length 0
+IP 192.168.10.2.54568 > 172.16.20.10.80: Flags [.], ack 1, win 502, options [nop,nop,TS val 4041216608 ecr 3476493701], length 0
+[1]+  Done                    sudo tcpdump -l -n -t -i lab0 -c 3 "tcp port 80" 2> /dev/null
+
+$ sudo sed -i 's/^LISTEN_ADDRESS=.*/LISTEN_ADDRESS=0.0.0.0/' /etc/default/lab-board
+
+$ sudo systemctl restart lab-board
+
+$ ss -tln
+State    Recv-Q   Send-Q     Local Address:Port     Peer Address:Port  Process  
+LISTEN   0        4096             0.0.0.0:22            0.0.0.0:*              
+LISTEN   0        4096          127.0.0.54:53            0.0.0.0:*              
+LISTEN   0        4096       127.0.0.53%lo:53            0.0.0.0:*              
+LISTEN   0        10               0.0.0.0:8080          0.0.0.0:*              
+LISTEN   0        4096                [::]:22               [::]:*              
+
+$ nc -zv 192.168.10.2 8080
+Connection to 192.168.10.2 8080 port [tcp/http-alt] succeeded!
+
+$ sudo ip netns exec router curl -s http://192.168.10.2:8080/
+lab-board: no news today
+
+
+########## 8. DNS（08-dns） ##########
+
+$ ls -l /etc/resolv.conf
+lrwxrwxrwx 1 root root 39 Sep  5 20:21 /etc/resolv.conf -> ../run/systemd/resolve/stub-resolv.conf
+
+$ cat /etc/resolv.conf
+# This is /run/systemd/resolve/stub-resolv.conf managed by man:systemd-resolved(8).
+# Do not edit.
+#
+# This file might be symlinked as /etc/resolv.conf. If you're looking at
+# /etc/resolv.conf and seeing this text, you have followed the symlink.
+#
+# This is a dynamic resolv.conf file for connecting local clients to the
+# internal DNS stub resolver of systemd-resolved. This file lists all
+# configured search domains.
+#
+# Run "resolvectl status" to see details about the uplink DNS servers
+# currently in use.
+#
+# Third party programs should typically not access this file directly, but only
+# through the symlink at /etc/resolv.conf. To manage man:resolv.conf(5) in a
+# different way, replace this symlink by a static file or a different symlink.
+#
+# See man:systemd-resolved.service(8) for details about the supported modes of
+# operation for /etc/resolv.conf.
+
+nameserver 127.0.0.53
+options edns0 trust-ad
+search .
+
+$ resolvectl status
+Global
+         Protocols: -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+  resolv.conf mode: stub
+
+Link 2 (enp0s16)
+    Current Scopes: none
+         Protocols: -DefaultRoute -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+
+Link 3 (enp0s17)
+    Current Scopes: none
+         Protocols: -DefaultRoute -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+
+Link 4 (enp0s18)
+    Current Scopes: none
+         Protocols: -DefaultRoute -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+
+Link 5 (lab0)
+    Current Scopes: none
+         Protocols: -DefaultRoute -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+
+$ host server.lab.example
+Host server.lab.example not found: 2(SERVFAIL)
+
+$ getent hosts server.lab.example; echo $?
+2
+
+$ dig @172.16.20.10 server.lab.example
+
+; <<>> DiG 9.18.39-0ubuntu0.24.04.7-Ubuntu <<>> @172.16.20.10 server.lab.example
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 40342
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 1232
+;; QUESTION SECTION:
+;server.lab.example.		IN	A
+
+;; ANSWER SECTION:
+server.lab.example.	300	IN	A	172.16.20.10
+
+;; Query time: 5 msec
+;; SERVER: 172.16.20.10#53(172.16.20.10) (UDP)
+;; WHEN: Tue Oct 13 11:40:53 JST 2026
+;; MSG SIZE  rcvd: 63
+
+
+$ host server.lab.example 172.16.20.10
+Using domain server:
+Name: 172.16.20.10
+Address: 172.16.20.10#53
+Aliases: 
+
+server.lab.example has address 172.16.20.10
+server.lab.example has IPv6 address fd00:20::10
+
+$ echo 'nameserver 172.16.20.10' | sudo tee -a /etc/resolv.conf
+nameserver 172.16.20.10
+
+$ host server.lab.example
+server.lab.example has address 172.16.20.10
+server.lab.example has IPv6 address fd00:20::10
+
+$ sudo systemctl restart systemd-resolved
+
+$ grep -v '^#' /etc/resolv.conf
+
+nameserver 127.0.0.53
+options edns0 trust-ad
+search .
+
+$ host server.lab.example
+Host server.lab.example not found: 2(SERVFAIL)
+
+$ sudo resolvectl dns lab0 172.16.20.10
+
+$ sudo resolvectl domain lab0 lab.example
+
+$ resolvectl status lab0
+Link 5 (lab0)
+    Current Scopes: DNS
+         Protocols: +DefaultRoute -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+       DNS Servers: 172.16.20.10
+        DNS Domain: lab.example
+
+$ grep -v '^#' /etc/resolv.conf
+
+nameserver 127.0.0.53
+options edns0 trust-ad
+search lab.example
+
+$ host server
+server.lab.example has address 172.16.20.10
+server.lab.example has IPv6 address fd00:20::10
+
+$ host www.lab.example
+www.lab.example has address 172.16.20.99
+
+$ sudo resolvectl revert lab0
+
+$ host server
+Host server not found: 2(SERVFAIL)
+
+$ sudo unlink /etc/resolv.conf
+
+$ printf 'nameserver 172.16.20.10\nsearch lab.example\n' | sudo tee /etc/resolv.conf
+nameserver 172.16.20.10
+search lab.example
+
+$ ls -l /etc/resolv.conf
+-rw-r--r-- 1 root root 43 Oct 13 11:41 /etc/resolv.conf
+
+$ dig server.lab.example
+
+; <<>> DiG 9.18.39-0ubuntu0.24.04.7-Ubuntu <<>> server.lab.example
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 39001
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 1232
+;; QUESTION SECTION:
+;server.lab.example.		IN	A
+
+;; ANSWER SECTION:
+server.lab.example.	300	IN	A	172.16.20.10
+
+;; Query time: 3 msec
+;; SERVER: 172.16.20.10#53(172.16.20.10) (UDP)
+;; WHEN: Tue Oct 13 11:41:19 JST 2026
+;; MSG SIZE  rcvd: 63
+
+
+$ dig +short server.lab.example
+172.16.20.10
+
+$ host server
+server.lab.example has address 172.16.20.10
+server.lab.example has IPv6 address fd00:20::10
+
+$ dig +short server
+
+$ dig +short +search server
+172.16.20.10
+
+$ host www.lab.example
+www.lab.example has address 172.16.20.10
+
+$ dig +short -x 172.16.20.10
+server.lab.example.
+
+$ host 172.16.20.10
+10.20.16.172.in-addr.arpa domain name pointer server.lab.example.
+
+$ dig +short MX lab.example
+10 mail.lab.example.
+
+$ host -t MX lab.example
+lab.example mail is handled by 10 mail.lab.example.
+
+$ dig +short AAAA server.lab.example
+fd00:20::10
+
+$ dig +noall +answer web.lab.example
+web.lab.example.	300	IN	CNAME	www.lab.example.
+www.lab.example.	300	IN	A	172.16.20.10
+
+$ host nosuch.lab.example
+Host nosuch.lab.example not found: 3(NXDOMAIN)
+
+$ host example.com
+Host example.com not found: 5(REFUSED)
+
+$ traceroute 172.16.20.10
+traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
+ 1  router.lab.example (192.168.10.1)  4.036 ms  0.231 ms  0.230 ms
+ 2  server.lab.example (172.16.20.10)  0.609 ms  0.183 ms  0.185 ms
+
+$ sudo systemctl restart systemd-resolved
+
+$ cat /etc/resolv.conf
+nameserver 172.16.20.10
+search lab.example
+
+$ getent hosts ns.lab.example
+172.16.20.10    ns.lab.example
+
+
+########## 9. 名前の表の順番（09-names） ##########
+
+$ dig +short www.lab.example
+172.16.20.10
+
+$ ping -c 1 www.lab.example
+PING www.lab.example (172.16.20.99) 56(84) bytes of data.
+From router.lab.example (192.168.10.1) icmp_seq=1 Destination Host Unreachable
+
+--- www.lab.example ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+
+
+$ curl -s -m 3 http://www.lab.example/; echo $?
+28
+
+$ grep '^hosts' /etc/nsswitch.conf
+hosts:          files dns
+
+$ getent hosts www.lab.example
+172.16.20.99    www.lab.example
+
+$ cat /etc/hosts
+127.0.0.1 localhost
+127.0.1.1 linuc
+172.16.20.99 www.lab.example
+
+# The following lines are desirable for IPv6 capable hosts
+::1 ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+ff02::3 ip6-allhosts
+
+$ sudo sed -i '/www.lab.example/d' /etc/hosts
+
+$ getent hosts www.lab.example
+172.16.20.10    www.lab.example
+
+$ ping -c 1 www.lab.example
+PING www.lab.example (172.16.20.10) 56(84) bytes of data.
+64 bytes from server.lab.example (172.16.20.10): icmp_seq=1 ttl=63 time=0.557 ms
+
+--- www.lab.example ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.557/0.557/0.557/0.000 ms
+
+$ curl -s http://www.lab.example/
+hello from www.lab.example (172.16.20.10, 80/tcp)
+
+$ echo '172.16.20.88 ns.lab.example' | sudo tee -a /etc/hosts
+172.16.20.88 ns.lab.example
+
+$ getent hosts ns.lab.example
+172.16.20.88    ns.lab.example
+
+$ sudo sed -i 's/^hosts:.*/hosts:          dns files/' /etc/nsswitch.conf
+
+$ grep '^hosts' /etc/nsswitch.conf
+hosts:          dns files
+
+$ getent hosts ns.lab.example
+172.16.20.10    ns.lab.example
+
+$ sudo sed -i 's/^hosts:.*/hosts:          files dns/' /etc/nsswitch.conf
+
+$ sudo sed -i '/172.16.20.88/d' /etc/hosts
+
+$ getent hosts server.lab.example
+fd00:20::10     server.lab.example
+
+$ getent ahosts server.lab.example
+fd00:20::10     STREAM server.lab.example
+fd00:20::10     DGRAM  
+fd00:20::10     RAW    
+172.16.20.10    STREAM 
+172.16.20.10    DGRAM  
+172.16.20.10    RAW    
+
+$ hostname
+linuc
+
+$ cat /etc/hostname
+linuc
+
+$ grep 127.0.1.1 /etc/hosts
+127.0.1.1 linuc
+
+$ hostname -I
+10.0.2.15 10.0.3.50 10.0.4.15 192.168.10.2 fd00:10::5054:ff:fe0a:2 
+
+$ sudo hostname web01
+
+$ hostname
+web01
+
+$ cat /etc/hostname
+linuc
+
+$ sudo true
+sudo: unable to resolve host web01: Temporary failure in name resolution
+
+$ hostname -f
+hostname: Temporary failure in name resolution
+
+$ sudo systemctl reboot
+sudo: unable to resolve host web01: Temporary failure in name resolution
+
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 11:42:24 JST):
+
+The system will reboot now!
+
+
+$ hostname
+linuc
+
+$ sudo true
+
+$ ip route show default
+default via 192.168.10.1 dev lab0 onlink 
+
+$ ifquery --state
+lo=lo
+lab0=lab0
+enp0s17=enp0s17
+
+$ nmcli device status
+DEVICE   TYPE      STATE      CONNECTION 
+enp0s18  ethernet  connected  lab-dhcp   
+enp0s16  ethernet  unmanaged  --         
+enp0s17  ethernet  unmanaged  --         
+lab0     ethernet  unmanaged  --         
+lo       loopback  unmanaged  --         
+
+$ cat /etc/resolv.conf
+nameserver 172.16.20.10
+search lab.example
+
+$ ss -tln | grep 8080
+LISTEN 0      10           0.0.0.0:8080      0.0.0.0:*          
+
+$ sudo hostnamectl set-hostname web01
+
+$ cat /etc/hostname
+web01
+
+$ hostnamectl hostname
+web01
+
+$ sudo true
+sudo: unable to resolve host web01: Temporary failure in name resolution
+
+$ sudo hostnamectl set-hostname linuc
+sudo: unable to resolve host web01: Temporary failure in name resolution
+
+$ sudo true
+
+$ cat /etc/hostname
+linuc
+
+
+########## 付録. ifupdown の dhcp（最後に試す: dhcpcd が enp0s17 の IPv6 の設定を書き換えて戻さないため） ##########
+
+$ sysctl net.ipv6.conf.enp0s17.addr_gen_mode net.ipv4.conf.enp0s17.promote_secondaries
+net.ipv6.conf.enp0s17.addr_gen_mode = 0
+net.ipv4.conf.enp0s17.promote_secondaries = 0
+
+$ sudo ifdown enp0s17
+
+$ printf 'auto enp0s17\niface enp0s17 inet dhcp\n' | sudo tee /etc/network/interfaces.d/enp0s17
+auto enp0s17
+iface enp0s17 inet dhcp
+
+$ sudo ifup enp0s17
+dhcpcd-10.0.6 starting
+Dropped protocol specifier '.link' from 'enp0s17.link'. Using 'enp0s17' (ifindex=3).
+enp0s17: waiting for carrier
+enp0s17: carrier acquired
+DUID 00:01:00:01:32:60:57:5d:52:54:00:12:34:57
+enp0s17: IAID 00:12:34:57
+enp0s17: adding address fe80::8152:a320:2328:7c91
+enp0s17: soliciting an IPv6 router
+enp0s17: soliciting a DHCP lease
+enp0s17: offered 10.0.3.15 from 10.0.3.2
+enp0s17: probing address 10.0.3.15/24
+enp0s17: leased 10.0.3.15 for 86400 seconds
+enp0s17: adding route to 10.0.3.0/24
+Dropped protocol specifier '.dhcp' from 'enp0s17.dhcp'. Using 'enp0s17' (ifindex=3).
+
+$ ip addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
+    inet 10.0.3.15/24 brd 10.0.3.255 scope global dynamic noprefixroute enp0s17
+       valid_lft 86398sec preferred_lft 75598sec
+    inet6 fe80::8152:a320:2328:7c91/64 scope link 
+       valid_lft forever preferred_lft forever
+
+$ ps -eo pid,args | grep [d]hcpcd
+   1165 dhcpcd: enp0s17 [ip4] [ip6]
+   1166 dhcpcd: [privileged proxy] enp0s17 [ip4] [ip6]
+   1167 dhcpcd: [network proxy] enp0s17 [ip4] [ip6]
+   1168 dhcpcd: [control proxy] enp0s17 [ip4] [ip6]
+   1187 dhcpcd: [DHCP6 proxy] fe80::8152:a320:2328:7c91
+   1189 dhcpcd: [BPF ARP] enp0s17 10.0.3.15
+   1196 dhcpcd: [BOOTP proxy] 10.0.3.15
+
+$ sudo ifdown enp0s17
+sending signal ALRM to pid 1165
+waiting for pid 1165 to exit
+
+$ printf 'auto enp0s17\niface enp0s17 inet static\n    address 10.0.3.50/24\n' | sudo tee /etc/network/interfaces.d/enp0s17
+auto enp0s17
+iface enp0s17 inet static
+    address 10.0.3.50/24
+
+$ sudo ifup enp0s17
+
+$ ip addr show enp0s17
+3: enp0s17: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
+    inet 10.0.3.50/24 brd 10.0.3.255 scope global enp0s17
+       valid_lft forever preferred_lft forever
+
+$ sysctl net.ipv6.conf.enp0s17.addr_gen_mode net.ipv4.conf.enp0s17.promote_secondaries
+net.ipv6.conf.enp0s17.addr_gen_mode = 1
+net.ipv4.conf.enp0s17.promote_secondaries = 1

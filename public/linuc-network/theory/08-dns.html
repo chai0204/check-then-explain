@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>8. resolv.conf に書いた1行は、消される — 確かめて説明する LinuC 主題1.07</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="8" data-theme="linuc-network">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-network/theory/">理論編</a> › 第8章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/">詳しく</a></p>
+</div>
+<h1>8. resolv.conf に書いた1行は、消される</h1>
+<p class="lead"><code>/etc/resolv.conf</code> に <code>nameserver 172.16.20.10</code> を1行足すと、名前が引けるようになる。ところが <code>systemd-resolved</code> を再起動すると、その行は跡形もなく消えている。書き込んだ先は <code>/etc</code> ではなく、systemd-resolved が起動のたびに作り直す <code>/run</code> の中のファイルだった。</p>
+<div class="badges"><span>前提: 第4章を終えている（172.16.20.10 に届く）</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.4（重要度2）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>/etc/resolv.conf</code> の書き方（<code>nameserver</code> / <code>search</code>）と、Ubuntu での実体（127.0.0.53 の systemd-resolved）を説明できる</li><li><code>host</code> と <code>dig</code> で決まった DNS サーバに問い合わせ、答えの種類（NOERROR / NXDOMAIN / SERVFAIL / REFUSED）を読める</li><li>問い合わせ先の DNS サーバと検索ドメインを、再起動しても消えない形で設定できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: DNS サーバ側の設定（ゾーンファイル・再帰の仕組み。LinuC レベル2の範囲）、DNSSEC や DNS over TLS、<code>resolved.conf</code> の細かい項目（<code>DNS=</code> と <code>Domains=</code> だけで足りる）。クライアントとして「どこに聞くか」を決めるところまでを扱う。</div></div>
+
+<h2 id="stub">nameserver 127.0.0.53 は、DNS サーバではない</h2>
+<div class="sgoal"><b>この節で分かること</b>: Ubuntu の <code>/etc/resolv.conf</code> の正体。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ ls -l /etc/resolv.conf
+lrwxrwxrwx 1 root root 39 Sep  5 20:21 /etc/resolv.conf -&gt; ../run/systemd/resolve/stub-resolv.conf
+$ cat /etc/resolv.conf
+# This is /run/systemd/resolve/stub-resolv.conf managed by man:systemd-resolved(8).
+# Do not edit.
+...
+# Third party programs should typically not access this file directly, but only
+# through the symlink at /etc/resolv.conf. To manage man:resolv.conf(5) in a
+# different way, replace this symlink by a static file or a different symlink.
+...
+nameserver 127.0.0.53
+options edns0 trust-ad
+search .</code></pre>
+<p><code>/etc/resolv.conf</code> はシンボリックリンクで、実体は <code>/run/systemd/resolve/stub-resolv.conf</code>。先頭に <b>Do not edit.</b>（編集するな）とある。
+<code>nameserver 127.0.0.53</code> はこの練習機の中のループバックで、そこにいるのは DNS サーバではなく、名前解決を中継する <b>systemd-resolved</b> である（第7章の <code>ss</code> にも <code>127.0.0.53%lo:53</code> が出ていた）。
+本当の問い合わせ先は systemd-resolved に聞く。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ resolvectl status
+Global
+         Protocols: -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+  resolv.conf mode: stub
+
+Link 2 (enp0s16)
+    Current Scopes: none
+         Protocols: -DefaultRoute -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+...
+Link 5 (lab0)
+    Current Scopes: none
+         Protocols: -DefaultRoute -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+$ host server.lab.example
+Host server.lab.example not found: 2(SERVFAIL)
+$ getent hosts server.lab.example; echo $?
+2</code></pre>
+<p>どの NIC にも DNS サーバ（<code>DNS Servers:</code> の行）が無い。この練習機は、読者のネットワークの DNS を使わないように、中継の先を空にしてある。
+中継役は聞く相手がいないので <code>SERVFAIL</code>（サーバ側の失敗）を返し、<code>getent</code>（第9章）も見つからない（終了コード 2）。名前は「無い」のではなく「聞けない」。</p>
+
+<h2 id="ask">DNS サーバに、直接聞く</h2>
+<div class="sgoal"><b>この節で分かること</b>: dig と host で決まったサーバに聞く方法と、答えの読み方。</div>
+<p>社内の DNS サーバは 172.16.20.10 である。<code>dig</code> は <code>@サーバ</code> で、resolv.conf を通さずに直接聞ける。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ dig @172.16.20.10 server.lab.example
+
+; &lt;&lt;&gt;&gt; DiG 9.18.39-0ubuntu0.24.04.7-Ubuntu &lt;&lt;&gt;&gt; @172.16.20.10 server.lab.example
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 40342
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 1232
+;; QUESTION SECTION:
+;server.lab.example.		IN	A
+
+;; ANSWER SECTION:
+server.lab.example.	300	IN	A	172.16.20.10
+
+;; Query time: 5 msec
+;; SERVER: 172.16.20.10#53(172.16.20.10) (UDP)
+;; WHEN: Tue Oct 13 11:40:53 JST 2026
+;; MSG SIZE  rcvd: 63</code></pre>
+<div class="scroll"><table>
+<tr><th>部分</th><th>読み方</th></tr>
+<tr><td><code>status: NOERROR</code></td><td>答えの種類（応答コード）。名前があった</td></tr>
+<tr><td><code>flags: qr aa rd ra</code></td><td>qr = 応答、aa = 自分の持ち物として答えた、rd / ra = 再帰を頼んだ / できる</td></tr>
+<tr><td>QUESTION SECTION</td><td>聞いたもの（server.lab.example の A レコード＝IPv4 アドレス）</td></tr>
+<tr><td>ANSWER SECTION</td><td>答え。<code>300</code> はキャッシュしてよい秒数（TTL）、<code>A</code> はレコードの種類</td></tr>
+<tr><td><code>SERVER:</code></td><td>答えたサーバ。resolv.conf に従ったときは、ここが 127.0.0.53 になる</td></tr>
+</table></div>
+<p>（<code>id</code> と <code>WHEN</code> と <code>Query time</code> はあなたの画面では違う。）<code>host</code> は同じことを1行の文で答える。2つ目の引数がサーバである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ host server.lab.example 172.16.20.10
+Using domain server:
+Name: 172.16.20.10
+Address: 172.16.20.10#53
+Aliases:
+
+server.lab.example has address 172.16.20.10
+server.lab.example has IPv6 address fd00:20::10</code></pre>
+<p><code>host</code> は種類を指定しないと IPv4（A）・IPv6（AAAA）・メールの受け先（MX）をまとめて聞き、あったものだけを表示する。<code>dig</code> は何も指定しなければ A だけを聞く。</p>
+
+<h2 id="append">1行足すと引けるようになり、そして消える</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/etc/resolv.conf</code> に書き込んだ先が、どこだったか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>問い合わせ先の DNS サーバは <code>/etc/resolv.conf</code> の <code>nameserver</code> 行で決まる。ここに1行足せば、以後はずっとそのサーバに聞きに行くはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo 'nameserver 172.16.20.10' | sudo tee -a /etc/resolv.conf
+nameserver 172.16.20.10
+$ host server.lab.example
+server.lab.example has address 172.16.20.10
+server.lab.example has IPv6 address fd00:20::10
+$ sudo systemctl restart systemd-resolved
+$ grep -v '^#' /etc/resolv.conf
+
+nameserver 127.0.0.53
+options edns0 trust-ad
+search .
+$ host server.lab.example
+Host server.lab.example not found: 2(SERVFAIL)</code></pre>
+<div class="then"><b>だめな理由</b>: 足した直後は引けた（<code>host</code> は1行目の 127.0.0.53 で SERVFAIL を受けると、2行目の 172.16.20.10 にも聞く）。
+ところが systemd-resolved を再起動すると、足した行が消えていた。<code>tee -a /etc/resolv.conf</code> が書き込んだのはリンクの先の
+<code>/run/systemd/resolve/stub-resolv.conf</code> で、これは systemd-resolved が起動のたびに（設定が変わるたびにも）作り直すファイルである。
+<code>/run</code> は再起動で空になる場所でもある。「Do not edit.」の通り、ここに書いたものは残らない。</div></div>
+
+<h2 id="keep">残す方法は2つある</h2>
+<div class="sgoal"><b>この節で分かること</b>: systemd-resolved に教える方法と、resolv.conf をふつうのファイルにする方法。</div>
+<p>1つ目は、中継役の systemd-resolved に「lab0 の先の DNS サーバは 172.16.20.10、検索ドメインは lab.example」と教える方法である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo resolvectl dns lab0 172.16.20.10
+$ sudo resolvectl domain lab0 lab.example
+$ resolvectl status lab0
+Link 5 (lab0)
+    Current Scopes: DNS
+         Protocols: +DefaultRoute -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+       DNS Servers: 172.16.20.10
+        DNS Domain: lab.example
+$ grep -v '^#' /etc/resolv.conf
+
+nameserver 127.0.0.53
+options edns0 trust-ad
+search lab.example
+$ host server
+server.lab.example has address 172.16.20.10
+server.lab.example has IPv6 address fd00:20::10</code></pre>
+<p>systemd-resolved が自分の作るファイルに <code>search lab.example</code> を書き足した。<code>host server</code> のように短い名前で聞くと、後ろに lab.example を付けて引いてくれる（<b>検索ドメイン</b>）。
+この方法は systemd-resolved の再起動では消えないが、<b>練習機を再起動すると消える</b>（残すなら <code>/etc/systemd/resolved.conf</code> の <code>[Resolve]</code> に <code>DNS=</code> と <code>Domains=</code> を書く）。
+1つ寄り道をする。この状態で www.lab.example を引く。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ host www.lab.example
+www.lab.example has address 172.16.20.99</code></pre>
+<p>DNS サーバ（172.16.20.10）に聞けば 172.16.20.10 と答える名前なのに、172.16.20.99 が返った。systemd-resolved は DNS サーバに聞く前に <b>/etc/hosts も読んで</b>答える。
+その /etc/hosts に古い行が残っている。これは第9章の主題なので、ここでは「中継役を通すと、DNS の道具（host）にも /etc/hosts が混ざる」とだけ覚えておく。元に戻す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo resolvectl revert lab0
+$ host server
+Host server not found: 2(SERVFAIL)</code></pre>
+<p>2つ目は、リンクをやめて <code>/etc/resolv.conf</code> を<b>ふつうのファイル</b>にする方法である。ファイルの先頭のコメント（replace this symlink by a static file）が勧めているやり方で、
+LinuC の試験が想定している「resolv.conf に書く」はこちらの形になる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo unlink /etc/resolv.conf
+$ printf 'nameserver 172.16.20.10\nsearch lab.example\n' | sudo tee /etc/resolv.conf
+nameserver 172.16.20.10
+search lab.example
+$ ls -l /etc/resolv.conf
+-rw-r--r-- 1 root root 43 Oct 13 11:41 /etc/resolv.conf</code></pre>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>意味</th></tr>
+<tr><td><code>nameserver 172.16.20.10</code></td><td>問い合わせ先の DNS サーバ。3つまで書け、上から順に試す</td></tr>
+<tr><td><code>search lab.example</code></td><td>短い名前に付け足して試すドメイン（検索ドメイン）。複数並べられる</td></tr>
+<tr><td><code>domain lab.example</code></td><td>search の古い形（1つだけ）。search と両方書くと後に書いた方が効く</td></tr>
+<tr><td><code>options …</code></td><td>待ち時間や試す回数などの細かい指定（<code>timeout:</code> <code>attempts:</code> など）</td></tr>
+</table></div>
+<p>こんどはリンクではないので、systemd-resolved を再起動しても書き換えられない。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo systemctl restart systemd-resolved
+$ cat /etc/resolv.conf
+nameserver 172.16.20.10
+search lab.example
+$ getent hosts ns.lab.example
+172.16.20.10    ns.lab.example</code></pre>
+<div class="analogy"><b>たとえ</b>: 会社の代表電話の「取り次ぎ表」に近い。ふだんは受付（systemd-resolved）が取り次ぎ表を持っていて、
+社員が見る掲示（/run の stub-resolv.conf）は受付が毎朝貼り替える。掲示に手で書き足しても、翌朝には消えている。
+<br>ただし<b>崩れる点</b>: 会社なら掲示を剥がして自分の表を貼れば受付は口を出さないが、Linux でも同じことができる。
+リンクをやめてふつうのファイルにすれば、systemd-resolved はそのファイルに触らない（そのかわり、中継役の便利な機能は使われなくなる）。</div>
+
+<h2 id="search">dig は、search を使わない</h2>
+<div class="sgoal"><b>この節で分かること</b>: host と dig の、短い名前の扱いの違い。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ dig +short server.lab.example
+172.16.20.10
+$ host server
+server.lab.example has address 172.16.20.10
+server.lab.example has IPv6 address fd00:20::10
+$ dig +short server
+$ dig +short +search server
+172.16.20.10</code></pre>
+<p><code>host</code> は resolv.conf の <code>search</code> を使って server を server.lab.example として引く。<code>dig</code> は<b>何も付け足さず</b>に「server.」という名前を聞くので何も返らない（<code>+short</code> は答えだけを出す指定）。
+<code>+search</code> を付けると search を使う。「dig で引けないから DNS に無い」とは限らない。</p>
+<div class="analogy"><b>たとえ</b>: 社内で「鈴木さん」と言えば同じ部の鈴木さんと分かる（host）が、外線の交換手（dig）は「鈴木さんという方は何社の？」と聞き返さず、そのまま「該当なし」と答える。
+<br>ただし<b>崩れる点</b>: 人は聞き返してくれることもあるが、dig は <code>+search</code> を付けない限り決して付け足さない。道具の決まりで、文脈は関係ない。</div>
+
+<h2 id="records">DNS の答えを読む</h2>
+<div class="sgoal"><b>この節で分かること</b>: 逆引き・MX・AAAA・CNAME と、答えが無いときの種類。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ dig +short -x 172.16.20.10
+server.lab.example.
+$ host 172.16.20.10
+10.20.16.172.in-addr.arpa domain name pointer server.lab.example.
+$ dig +short MX lab.example
+10 mail.lab.example.
+$ host -t MX lab.example
+lab.example mail is handled by 10 mail.lab.example.
+$ dig +short AAAA server.lab.example
+fd00:20::10
+$ dig +noall +answer web.lab.example
+web.lab.example.	300	IN	CNAME	www.lab.example.
+www.lab.example.	300	IN	A	172.16.20.10
+$ host nosuch.lab.example
+Host nosuch.lab.example not found: 3(NXDOMAIN)
+$ host example.com
+Host example.com not found: 5(REFUSED)</code></pre>
+<div class="scroll"><table>
+<tr><th>聞き方</th><th>意味</th></tr>
+<tr><td><code>dig -x アドレス</code> / <code>host アドレス</code></td><td><b>逆引き</b>（アドレスから名前。<code>in-addr.arpa</code> の PTR レコード）</td></tr>
+<tr><td><code>dig MX</code> / <code>host -t MX</code></td><td>そのドメイン宛てのメールを受ける機械（数が小さいほど優先）</td></tr>
+<tr><td><code>dig AAAA</code></td><td>IPv6 アドレス（A は IPv4）</td></tr>
+<tr><td>CNAME</td><td>別名。web.lab.example は www.lab.example の別名で、dig は行き先の A まで一緒に返した</td></tr>
+<tr><td><code>3(NXDOMAIN)</code></td><td>その名前は存在しない（確かな答え）</td></tr>
+<tr><td><code>2(SERVFAIL)</code></td><td>サーバが答えを用意できなかった（この練習機では中継の先が無かった）</td></tr>
+<tr><td><code>5(REFUSED)</code></td><td>答えるのを断った。この社内 DNS は lab.example しか知らず、外の名前は聞きに行かない</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 問い合わせ窓口の3つの返事に近い。「該当者はおりません」（NXDOMAIN）、「担当者が不在で調べられません」（SERVFAIL）、
+「こちらではお答えできません」（REFUSED）。名前が無いと言っているのは1つ目だけである。
+<br>ただし<b>崩れる点</b>: 人の窓口は理由を添えて話してくれるが、DNS は番号1つしか返さない。
+SERVFAIL の理由（この練習機では中継の先が空だったこと）は、<code>resolvectl status</code> のように別の道具で調べるしかない。</div>
+<p>名前が引けるようになったので、第5章の traceroute の表示も変わる。名前はアドレスの逆引きで、DNS サーバが答えている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ traceroute 172.16.20.10
+traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
+ 1  router.lab.example (192.168.10.1)  4.036 ms  0.231 ms  0.230 ms
+ 2  server.lab.example (172.16.20.10)  0.609 ms  0.183 ms  0.185 ms</code></pre>
+<p>第5章では1番目が <code>_gateway</code>（systemd-resolved が付けた名前）、2番目は名前が付かなかった。答えている表が変わると、同じ道具の表示が変わる。</p>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/resolv.conf</code> が次の内容のとき、<code>ping web</code> を打つと最初に問い合わせる名前はどれか（/etc/hosts には web の行が無いものとする）。</p>
+<pre><code>nameserver 192.168.1.53
+search example.co.jp example.com</code></pre>
+<p>A. web　B. web.example.co.jp　C. web.example.com　D. 192.168.1.53.web</p>
+<details><summary>答え</summary>
+<p>B。ドットを含まない短い名前は、search に書いた順に付け足して試す（見つからなければ web.example.com、最後に web そのもの）。
+問い合わせ先は nameserver の 192.168.1.53。<code>dig web</code> なら search を使わず web だけを聞く。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>DNS サーバ 192.168.1.53 に、www.example.com の IPv4 アドレスだけを直接問い合わせるコマンドとして正しいものはどれか。</p>
+<p>A. <code>dig www.example.com 192.168.1.53</code>　B. <code>dig @192.168.1.53 www.example.com</code>　C. <code>host -s 192.168.1.53 www.example.com</code>　D. <code>dig -x www.example.com @192.168.1.53</code></p>
+<details><summary>答え</summary>
+<p>B。dig はサーバを <code>@</code> で指定する（A の形は、2つ目の引数を名前として聞いてしまう）。種類を書かなければ A レコード（IPv4）を聞く。
+host なら <code>host www.example.com 192.168.1.53</code>（サーバは2つ目の引数）。<code>-x</code> は逆引き。</p></details></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-network/">演習06</a>が、lab.example の名前を引けるようにする課題である。
+判定は<b>判定の中で systemd-resolved を再起動してから</b>名前を引くので、リンクの先に1行足しただけでは ✗ になる（この章の「消える」をそのまま踏む）。</div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/etc/resolv.conf</code> の <code>nameserver</code> は問い合わせ先（3つまで）、<code>search</code> は短い名前に付け足すドメイン</li><li>Ubuntu の既定では resolv.conf は /run へのリンクで、<code>127.0.0.53</code> は中継役の systemd-resolved。本当の問い合わせ先は <code>resolvectl status</code></li><li>リンクの先に書いた行は systemd-resolved が消す。残すなら resolv.conf をふつうのファイルにするか、resolved.conf に書く（<code>resolvectl</code> は再起動で消える）</li><li><code>dig @サーバ 名前</code>（<code>+short</code> / <code>-x</code> / <code>MX</code> / <code>AAAA</code>）と <code>host 名前 サーバ</code>（<code>-t MX</code>）。dig は search を使わない</li><li>NXDOMAIN は「無い」、SERVFAIL は「答えられない」、REFUSED は「断る」。引けないことと名前が無いことは別</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ systemd 255.4（systemd-resolved）/ bind9-dnsutils 9.18.39（dig / host）/ dnsmasq-base 2.91（社内 DNS）/ traceroute 2.1.5 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-network/theory/07-ports">← 7. LISTEN していても、外からは入れない</a><a href="/linuc-network/theory/09-names">次: 9. dig と ping は、別の表を引いている →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-network/chapters.js"></script>
+<script src="/linuc-network/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

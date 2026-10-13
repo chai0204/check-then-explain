@@ -1,0 +1,62 @@
+<!--
+  LinuC 練習機の定義（主題1.07 ネットワークの基礎）。@VMDIR@ は vm が置き換える。
+  土台（containers/linuc-machine/host/etc/domain.xml.in）との違いは、練習用の NIC を2枚足したことだけ。
+
+  NIC は3枚になる（PCI のスロット番号がそのまま名前になる: 0x10 → enp0s16）。
+    enp0s16  lab0  管理用（土台と同じ）。外からの ssh（127.0.0.1:2222 → 22）と、練習機の中の lab はここを通る
+    enp0s17  lab1  練習用。ifupdown（ifup / ifdown）で設定する。10.0.3.0/24
+    enp0s18  lab2  練習用。NetworkManager（nmcli）で設定する。10.0.4.0/24
+
+  練習用の2枚は QEMU 内蔵の slirp につないだ別々の小さなネットワークで、それぞれに
+  DHCP サーバとゲートウェイ（.2）がいる。restrict=on で外への転送を止めてあるので、
+  ここから出たパケットが読者の家や会社のネットワークに届くことはない（画面が読者ごとに変わらない）。
+  restrict=on の slirp は DHCP でアドレスだけを配り、ゲートウェイと DNS は配らない（実測 2026-10-13）。
+
+  ipv6=off（3枚とも）: slirp のルータ広告を止める。管理用の NIC だけは土台に1つ足した。
+  付けないと、管理用の NIC が fec0::/64 のアドレスと「default via fe80::2 metric 100」を受け取り、
+  社内 LAN のルータ（metric 1024）より優先される。練習機の IPv6 の通信が全部 slirp から
+  読者のネットワークへ出て行き、社内 LAN のサーバに ping6 が届かなかった（実測 2026-10-13）。
+  ssh のポート転送（IPv4）には影響しない。IPv6 は練習機の中の社内 LAN（lab0）だけで扱う。
+-->
+<domain type='qemu' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
+  <name>linuc</name>
+  <title>LinuC 練習機</title>
+  <memory unit='MiB'>1536</memory>
+  <vcpu>2</vcpu>
+  <os firmware='efi'>
+    <type arch='x86_64' machine='q35'>hvm</type>
+    <nvram>@VMDIR@/linuc_VARS.fd</nvram>
+  </os>
+  <features><acpi/></features>
+  <cpu mode='maximum'/>
+  <clock offset='utc'/>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <devices>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' discard='unmap'/>
+      <source file='@VMDIR@/linuc.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+    <serial type='pty'/>
+    <console type='pty'/>
+    <channel type='unix'>
+      <target type='virtio' name='org.qemu.guest_agent.0'/>
+    </channel>
+    <rng model='virtio'><backend model='random'>/dev/urandom</backend></rng>
+  </devices>
+  <qemu:commandline>
+    <qemu:arg value='-netdev'/>
+    <qemu:arg value='user,id=lab0,ipv6=off,hostfwd=tcp:127.0.0.1:2222-:22'/>
+    <qemu:arg value='-device'/>
+    <qemu:arg value='virtio-net-pci,netdev=lab0,mac=52:54:00:12:34:56,addr=0x10'/>
+    <qemu:arg value='-netdev'/>
+    <qemu:arg value='user,id=lab1,net=10.0.3.0/24,restrict=on,ipv6=off'/>
+    <qemu:arg value='-device'/>
+    <qemu:arg value='virtio-net-pci,netdev=lab1,mac=52:54:00:12:34:57,addr=0x11'/>
+    <qemu:arg value='-netdev'/>
+    <qemu:arg value='user,id=lab2,net=10.0.4.0/24,restrict=on,ipv6=off'/>
+    <qemu:arg value='-device'/>
+    <qemu:arg value='virtio-net-pci,netdev=lab2,mac=52:54:00:12:34:58,addr=0x12'/>
+  </qemu:commandline>
+</domain>

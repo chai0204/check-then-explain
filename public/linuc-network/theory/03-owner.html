@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. ifup は、自分が付けたものしか知らない — 確かめて説明する LinuC 主題1.07</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="linuc-network">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-network/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/">詳しく</a></p>
+</div>
+<h1>3. ifup は、自分が付けたものしか知らない</h1>
+<p class="lead">第2章で手で付けた 10.0.3.50/24 を、そのまま設定ファイルに書いて <code>ifup</code> する。ファイルの中身と今の状態はまったく同じなのに、<code>ifup</code> は失敗し、<code>ifdown</code> は「設定されていない」と言う。ifupdown が見ているのは NIC ではなく、自分の作業記録だからだ。NIC には「持ち主」がいて、持ち主の道具でしか設定は残らない。</p>
+<div class="badges"><span>前提: 第2章を終えている（enp0s17 に 10.0.3.50/24 が付いている）</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.2（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>/etc/network/interfaces</code> の書式（<code>auto</code> / <code>iface … inet static</code> / <code>address</code> / <code>gateway</code> / <code>inet dhcp</code>）を読み書きし、<code>ifup</code> / <code>ifdown</code> で反映できる</li><li><code>nmcli</code> で接続（プロファイル）を作り、DHCP による自動の設定と固定の設定を切り替えられる</li><li>NIC ごとの持ち主（ifupdown / NetworkManager / systemd-networkd）を見分け、持ち主に合った道具を選べる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: NetworkManager の画面の道具（<code>nmtui</code> や GUI）、Wi-Fi・ボンディング・VLAN の設定、netplan の YAML の細かい書き方、RHEL の古い <code>ifcfg-*</code> ファイル。持ち主の見分け方と、ifupdown・nmcli の基本の操作だけで足りる。</div></div>
+
+<h2 id="file">ifupdown は、設定ファイルを読んで実行する</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/etc/network/interfaces</code> の読み方と、<code>ifup</code> が何を読むか。</div>
+<p>この練習機では、社内 LAN の lab0 を ifupdown が持っている。設定ファイルを読む。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ cat /etc/network/interfaces
+# interfaces(5) — ifupdown の設定ファイル。ifup / ifdown はこのファイルを読む。
+#
+# この練習機では、NIC ごとに設定する道具（持ち主）が違う:
+#   enp0s16  管理用。netplan（/etc/netplan/）→ systemd-networkd が持つ。触らない
+#   enp0s17  練習用。ifupdown が持つ（このファイルに書く）
+#   enp0s18  練習用。NetworkManager が持つ（nmcli で設定する）
+#   lab0     社内 LAN。ifupdown が持つ（下に書いてある）
+
+source /etc/network/interfaces.d/*
+
+auto lo
+iface lo inet loopback
+
+# 社内 LAN
+auto lab0
+iface lab0 inet static
+    address 192.168.10.2/24
+    gateway 192.168.10.254
+
+iface lab0 inet6 auto
+    privext 0</code></pre>
+<div class="scroll"><table>
+<tr><th>行</th><th>意味</th></tr>
+<tr><td><code>source /etc/network/interfaces.d/*</code></td><td>このディレクトリのファイルも、ここに書いたものとして読む</td></tr>
+<tr><td><code>auto lab0</code></td><td>起動時（<code>networking.service</code> が打つ <code>ifup -a</code>）に上げる NIC</td></tr>
+<tr><td><code>iface lab0 inet static</code></td><td>lab0 の IPv4 を固定（static）で設定する。DHCP なら <code>inet dhcp</code></td></tr>
+<tr><td><code>address 192.168.10.2/24</code></td><td>付けるアドレス（<code>netmask 255.255.255.0</code> と分けて書く形もある）</td></tr>
+<tr><td><code>gateway 192.168.10.254</code></td><td>デフォルトルートの行き先（第4章で、これが問題になる）</td></tr>
+<tr><td><code>iface lab0 inet6 auto</code></td><td>IPv6 はルータ広告で自動に作る（第6章）</td></tr>
+</table></div>
+<p><code>ifquery</code> は、ifupdown がこのファイルをどう読んだかを答える。<code>--list</code> は <code>auto</code> の付いた NIC の一覧である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ifquery --list
+lo
+lab0
+$ sudo ifup enp0s17
+ifup: unknown interface enp0s17</code></pre>
+<p>ifupdown は enp0s17 を知らない。ファイルに書いていないからである。<code>ifup</code> は「NIC を上げるコマンド」ではなく、
+「<b>ファイルに書かれた手順で</b> NIC を上げるコマンド」である。
+第2章の enp0s17 の設定（10.0.3.50/24）を、ファイルに書く。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ printf 'auto enp0s17\niface enp0s17 inet static\n    address 10.0.3.50/24\n' | sudo tee /etc/network/interfaces.d/enp0s17
+auto enp0s17
+iface enp0s17 inet static
+    address 10.0.3.50/24
+$ ifquery --list
+lo
+enp0s17
+lab0
+$ ifquery enp0s17
+address: 10.0.3.50
+broadcast: 10.0.3.255
+netmask: 255.255.255.0</code></pre>
+
+<h2 id="refuse">同じ状態なのに、断られる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>ifup</code> と <code>ifdown</code> が、何を見て動いているか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>ファイルには、いま付いているのと同じ 10.0.3.50/24 を書いた。<code>ifup</code> すれば「もうその通りです」で何事もなく終わる。
+<code>ifdown</code> すれば、付いているアドレスは外れるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ifup enp0s17
+Error: ipv4: Address already assigned.
+ifup: failed to bring up enp0s17
+$ ifquery --state
+lab0=lab0
+lo=lo
+$ sudo ifdown enp0s17
+ifdown: interface enp0s17 not configured
+$ ip -4 addr show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.3.50/24 brd 10.0.3.255 scope global enp0s17
+       valid_lft forever preferred_lft forever</code></pre>
+<div class="then"><b>だめな理由</b>: <code>ifup</code> は今の状態とファイルを見比べない。ファイルに書かれた手順（<code>ip addr add 10.0.3.50/24 …</code>）を
+<b>そのまま実行して</b>、同じアドレスがもうあるので失敗した。
+<code>ifdown</code> は逆に、NIC の状態ではなく <b>ifupdown 自身の作業記録</b>（<code>/run/network/ifstate</code>。<code>ifquery --state</code> が読む）を見る。
+記録にあるのは lab0 と lo だけで、enp0s17 は「自分が上げたものではない」ので下げない。アドレスは残ったままである。</div></div>
+<p>手で付けたものは、手で外す。そのあとで <code>ifup</code> すれば、ifupdown が自分で付け、記録にも残る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ip addr flush dev enp0s17
+$ sudo ifup enp0s17
+$ ifquery --state
+enp0s17=enp0s17
+lab0=lab0
+lo=lo
+$ ip -4 addr show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.3.50/24 brd 10.0.3.255 scope global enp0s17
+       valid_lft forever preferred_lft forever</code></pre>
+<p>こんどは <code>ifdown</code> が効く。リンクごと下げ、アドレスも外す。もう一度 <code>ifup</code> すれば戻る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ifdown enp0s17
+$ ip addr show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc fq_codel state DOWN group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
+$ sudo ifup enp0s17
+$ ping -c 1 10.0.3.2
+PING 10.0.3.2 (10.0.3.2) 56(84) bytes of data.
+64 bytes from 10.0.3.2: icmp_seq=1 ttl=255 time=4.30 ms
+
+--- 10.0.3.2 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 4.297/4.297/4.297/0.000 ms</code></pre>
+<p>これで enp0s17 は再起動しても 10.0.3.50/24 になる。起動時に <code>networking.service</code> が <code>ifup -a</code> を打ち、<code>auto</code> の付いた NIC を上げるからである。</p>
+<div class="analogy"><b>たとえ</b>: 手順書どおりに作業し、作業日誌を付ける作業員に近い。
+<code>ifup</code> は手順書（<code>/etc/network/interfaces</code>）の作業をして日誌に「enp0s17 済」と書き、<code>ifdown</code> は日誌に書いた作業だけを片付ける。
+<br>ただし<b>崩れる点</b>: 人の作業員なら現場を見て「もう付いている」と気づくが、<code>ifup</code> は現場を見ずに手順を実行して失敗する。
+誰かが手で付けたものは、日誌に無いので片付けもしない。</div>
+
+<h3 id="dhcp-ifupdown">ifupdown で DHCP にするなら</h3>
+<p><code>inet static</code> の代わりに <code>inet dhcp</code> と書く。ただし ifupdown は DHCP を自分ではせず、外の DHCP クライアント（Debian の伝統では dhclient、この練習機では dhcpcd）を起動する。
+その DHCP クライアントが NIC の設定を書き換えて元に戻さないので、著者は<b>第9章まで全部終えたあとに</b>試した（ここで試すと第6章の画面が変わる）。その記録だけ載せる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ printf 'auto enp0s17\niface enp0s17 inet dhcp\n' | sudo tee /etc/network/interfaces.d/enp0s17
+auto enp0s17
+iface enp0s17 inet dhcp
+$ sudo ifup enp0s17
+dhcpcd-10.0.6 starting
+...
+enp0s17: offered 10.0.3.15 from 10.0.3.2
+enp0s17: probing address 10.0.3.15/24
+enp0s17: leased 10.0.3.15 for 86400 seconds
+enp0s17: adding route to 10.0.3.0/24
+...</code></pre>
+<p>DHCP サーバ（10.0.3.2）から 10.0.3.15 を 86400 秒（1日）借りた。<code>ifup</code> の出力は dhcpcd のものである。
+試すなら全章を終えてからにし、終わったら外で <code>vm reset --yes</code> で練習機を戻せる。</p>
+
+<h2 id="nm">NetworkManager は、持っている NIC にしか効かない</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>nmcli</code> の device と connection、自動（DHCP）と固定の切り替え。</div>
+<p>enp0s18 は NetworkManager の持ち物である。NetworkManager に、知っている NIC を聞く。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ nmcli device status
+DEVICE   TYPE      STATE         CONNECTION
+enp0s18  ethernet  disconnected  --
+enp0s16  ethernet  unmanaged     --
+enp0s17  ethernet  unmanaged     --
+lab0     ethernet  unmanaged     --
+lo       loopback  unmanaged     --</code></pre>
+<p><code>unmanaged</code> は「NetworkManager の持ち物ではない」という意味で、壊れているわけではない。この練習機では、設定でそう決めてある。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ cat /etc/NetworkManager/conf.d/90-lab.conf
+...
+[keyfile]
+unmanaged-devices=*,except:interface-name:enp0s18
+...
+$ nmcli connection show</code></pre>
+<p>enp0s18 は持ち物だが、まだ <code>disconnected</code> で、接続（connection）が1つも無い。
+nmcli では、NIC（device）に「接続」という設定のひとまとまり（プロファイル）を作って当てはめ、それを有効にする（up）。
+アドレスの方式を指定しなければ DHCP（<code>ipv4.method auto</code>）になる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo nmcli connection add type ethernet ifname enp0s18 con-name lab-dhcp
+Connection 'lab-dhcp' (585c3a5c-f14b-45bc-8a9c-2f3829d58102) successfully added.
+$ nmcli -f NAME,TYPE,DEVICE connection show
+NAME      TYPE      DEVICE
+lab-dhcp  ethernet  enp0s18
+$ sudo nmcli connection up lab-dhcp
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/2)
+$ nmcli device status
+DEVICE   TYPE      STATE      CONNECTION
+enp0s18  ethernet  connected  lab-dhcp
+enp0s16  ethernet  unmanaged  --
+enp0s17  ethernet  unmanaged  --
+lab0     ethernet  unmanaged  --
+lo       loopback  unmanaged  --
+$ ip -4 addr show enp0s18
+4: enp0s18: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.4.15/24 brd 10.0.4.255 scope global dynamic noprefixroute enp0s18
+       valid_lft 86397sec preferred_lft 86397sec</code></pre>
+<p>DHCP サーバから 10.0.4.15/24 を借りた（<code>dynamic</code> と、減っていく残り時間 <code>valid_lft</code>。UUID と秒数はあなたの画面では違う）。
+NetworkManager は DHCP クライアントを自分の中に持っている。何を受け取ったかは nmcli で見られる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ nmcli -f IP4 device show enp0s18
+IP4.ADDRESS[1]:                         10.0.4.15/24
+IP4.GATEWAY:                            --
+IP4.ROUTE[1]:                           dst = 10.0.4.0/24, nh = 0.0.0.0, mt = 100</code></pre>
+<p><code>IP4.GATEWAY</code> が <code>--</code>。この練習用ネットワークの DHCP サーバはアドレスだけを配り、ゲートウェイも DNS サーバも配らない設定になっている。
+DHCP で「つながった」からといって、デフォルトルートや DNS まで来るとは限らない。</p>
+<p>固定のアドレスに変える。<code>modify</code> は接続（プロファイル）を書き換えるだけで、NIC には反映しない。<code>up</code> し直して初めて反映される。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo nmcli connection modify lab-dhcp ipv4.method manual ipv4.addresses 10.0.4.50/24
+$ ip -4 addr show enp0s18
+4: enp0s18: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.4.15/24 brd 10.0.4.255 scope global dynamic noprefixroute enp0s18
+       valid_lft 86387sec preferred_lft 86387sec
+$ sudo nmcli connection up lab-dhcp
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/3)
+$ ip -4 addr show enp0s18
+4: enp0s18: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.4.50/24 brd 10.0.4.255 scope global noprefixroute enp0s18
+       valid_lft forever preferred_lft forever</code></pre>
+<p>固定になると <code>dynamic</code> が消え、残り時間は <code>forever</code> になる。DHCP に戻しておく（演習03 の判定は DHCP で見る）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo nmcli connection modify lab-dhcp ipv4.method auto ipv4.addresses ''
+$ sudo nmcli connection up lab-dhcp
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/4)
+$ ip -4 addr show enp0s18
+4: enp0s18: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 10.0.4.15/24 brd 10.0.4.255 scope global dynamic noprefixroute enp0s18
+       valid_lft 86399sec preferred_lft 86399sec
+$ nmcli -g ipv4.method,connection.autoconnect connection show lab-dhcp
+auto
+yes</code></pre>
+<p><code>connection.autoconnect</code> が <code>yes</code> なので、再起動すれば NetworkManager がこの接続を自動で上げる。設定はどこに残ったか。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ls /etc/netplan/
+01-lab-mgmt.yaml  90-NM-585c3a5c-f14b-45bc-8a9c-2f3829d58102.yaml</code></pre>
+<p>Ubuntu の NetworkManager は、nmcli で作った接続を netplan の YAML（<code>90-NM-&lt;UUID&gt;.yaml</code>）として保存する。
+RHEL 系なら <code>/etc/NetworkManager/system-connections/</code> に置かれる。どちらでも、nmcli から見れば同じ接続である。</p>
+<div class="analogy"><b>たとえ</b>: 車のメモリーシートに近い。座席や鏡の位置を「プロファイル」として覚えさせ、ボタン1つで呼び出す。
+<code>connection add</code> が覚えさせる操作、<code>connection up</code> が呼び出す操作である。
+<br>ただし<b>崩れる点</b>: メモリーシートは記憶を書き換えた瞬間に座席が動くことが多いが、<code>nmcli connection modify</code> は記憶を書き換えるだけで、
+<code>up</code> し直すまで今の状態は変わらない（上の記録で、modify の直後も 10.0.4.15 のままだった）。</div>
+<div class="quiz"><b>確認</b>
+<p>NetworkManager の接続 office の IPv4 アドレスを固定の 192.168.1.10/24 に変え、すぐに反映させたい。正しい手順はどれか。</p>
+<p>A. <code>nmcli connection modify office ipv4.addresses 192.168.1.10/24</code> だけ打つ<br>
+B. <code>nmcli connection modify office ipv4.method manual ipv4.addresses 192.168.1.10/24</code> のあと <code>nmcli connection up office</code><br>
+C. <code>nmcli device set office ipv4.addresses 192.168.1.10/24</code><br>
+D. <code>/etc/network/interfaces</code> に書いて <code>ifup office</code></p>
+<details><summary>答え</summary>
+<p>B。<code>modify</code> は接続の設定を書き換えるだけなので、<code>up</code> し直して反映させる。
+<code>ipv4.method</code> を <code>manual</code> にしないと、DHCP（auto）のまま固定のアドレスが足される形になる。
+D は ifupdown の方法で、NetworkManager の持ち物の NIC には使わない。</p></details></div>
+
+<h2 id="owners">持ち主は3人いる</h2>
+<div class="sgoal"><b>この節で分かること</b>: NIC ごとの持ち主の見分け方と、持ち主の違う道具がどう振る舞うか。</div>
+<p>管理用の enp0s16 の持ち主は、ifupdown でも NetworkManager でもない。systemd-networkd に聞く。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ networkctl
+IDX LINK    TYPE     OPERATIONAL SETUP
+  1 lo      loopback carrier     unmanaged
+  2 enp0s16 ether    routable    configured
+  3 enp0s17 ether    routable    unmanaged
+  4 enp0s18 ether    routable    unmanaged
+  5 lab0    ether    routable    unmanaged
+
+5 links listed.
+$ sudo cat /etc/netplan/01-lab-mgmt.yaml
+# 管理用の NIC。外（コンテナ）からの ssh と、練習機の中からの lab はここを通る。
+# この NIC を止めると ssh が切れる。そのときは外で vm console（シリアル）から入る。
+#
+# ネットワークのコースでは、DHCP からデフォルトルートと DNS を受け取らない（use-routes / use-dns）。
+# 練習機の「外」は、中に作った社内 LAN（lab0）だけにしてある。
+network:
+  version: 2
+  ethernets:
+    enp0s16:
+      dhcp4: true
+      dhcp4-overrides:
+        use-routes: false
+        use-dns: false</code></pre>
+<p>enp0s16 だけが <code>configured</code>。Ubuntu では netplan の YAML（<code>/etc/netplan/</code>）を書くと、それが systemd-networkd の設定に変換される。
+<code>networkctl</code> でも、enp0s17・enp0s18・lab0 は <code>unmanaged</code>（networkd の持ち物ではない）と出る。どの道具も、自分の持ち物しか <code>configured</code> と言わない。</p>
+<div class="scroll"><table>
+<tr><th>NIC</th><th>持ち主</th><th>設定ファイル</th><th>状態を聞く道具</th></tr>
+<tr><td>enp0s16</td><td>systemd-networkd（netplan 経由）</td><td><code>/etc/netplan/01-lab-mgmt.yaml</code></td><td><code>networkctl</code></td></tr>
+<tr><td>enp0s17・lab0</td><td>ifupdown</td><td><code>/etc/network/interfaces</code>（と <code>interfaces.d/</code>）</td><td><code>ifquery --state</code></td></tr>
+<tr><td>enp0s18</td><td>NetworkManager</td><td>接続（Ubuntu では <code>/etc/netplan/90-NM-*.yaml</code>）</td><td><code>nmcli device status</code></td></tr>
+</table></div>
+<p>持ち主でない道具で触ると、どうなるか。NetworkManager に enp0s17 をつながせる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo nmcli device connect enp0s17
+Error: Failed to add/activate new connection: Connection 'enp0s17' is not available on device enp0s17 because device is strictly unmanaged
+$ sudo cat /etc/netplan/01-lab-mgmt.yaml
+network:
+  version: 2
+  ethernets:
+    enp0s16:
+      dhcp4: true
+      dhcp4-overrides:
+        use-dns: false
+        use-routes: false</code></pre>
+<p>NetworkManager は断った。enp0s17 は「厳密に（strictly）持ち物でない」。
+ところが、そのあと enp0s16 の netplan の YAML を見ると、<b>コメントが全部消え、項目の順番が変わっている</b>。
+断ったはずの NetworkManager が、Ubuntu の netplan との連携の中で <code>/etc/netplan/</code> のファイルを書き直していた（中身の意味は同じなので、enp0s16 の動きは変わらない）。
+著者はこれを、記録を取り直して初めて見つけた。持ち主の違うファイルに、別の道具が触ることがある。設定ファイルにコメントで残した経緯は、当てにしないほうがよい。</p>
+<div class="analogy"><b>たとえ</b>: 1つのマンションに、部屋ごとに別の管理会社が入っているようなものだ。
+自分の会社の部屋（持ち物）の鍵しか開けられず、他社の部屋のことは「管理外」としか答えない。
+<br>ただし<b>崩れる点</b>: 管理会社は他社の書類に手を出さないが、NetworkManager は（Ubuntu では）netplan の書類棚を共有していて、
+断った用件のついでに他の書類を清書し直した。持ち主の線は、ファイルの単位ではきれいに引かれていない。</div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/network/interfaces</code> に次の設定がある。システムの起動時に eth1 に起きることとして正しいものはどれか。</p>
+<pre><code>iface eth1 inet static
+    address 192.168.50.10/24</code></pre>
+<p>A. 192.168.50.10/24 が付く　B. 何も起きない（eth1 は上がらない）　C. DHCP でアドレスを借りる　D. エラーで起動が止まる</p>
+<details><summary>答え</summary>
+<p>B。<code>auto eth1</code>（または <code>allow-hotplug eth1</code>）が無いので、起動時の <code>ifup -a</code> の対象にならない。
+手で <code>ifup eth1</code> と打てば 192.168.50.10/24 が付く。<code>ifquery --list</code> に eth1 が出ないことで確かめられる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>ip addr</code> で eth0 にアドレスが付いているのに、<code>ifdown eth0</code> が <code>ifdown: interface eth0 not configured</code> と表示して何もしなかった。最も考えられる理由はどれか。</p>
+<p>A. eth0 の LAN ケーブルが抜けている　B. eth0 のアドレスは ifup ではなく別の方法（ip addr add や NetworkManager）で付けられた　C. /etc/hostname が無い　D. ifdown には root の権限が要らない</p>
+<details><summary>答え</summary>
+<p>B。<code>ifdown</code> は ifupdown 自身の記録（<code>/run/network/ifstate</code>、<code>ifquery --state</code>）に無い NIC を下げない。
+手で付けたアドレスなら <code>ip addr del</code> / <code>flush</code> で外し、持ち主が NetworkManager なら <code>nmcli connection down</code> を使う。</p></details></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-network/">演習02</a>（enp0s17 を ifupdown に持たせる）と<a href="/linuc-network/">演習03</a>（enp0s18 を nmcli で DHCP につなぐ）。
+演習02 の判定は <code>ifquery --state</code>（ifupdown の作業記録）と <code>ifquery --list</code>（起動時に上げる一覧）と実際のアドレスを見るので、
+手で付けたままでは通らない。この章の「断られる」を一度踏むことになる。</div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>ifup</code> は <code>/etc/network/interfaces</code> の手順をそのまま実行する。すでにあるアドレスとぶつかると失敗する</li><li><code>ifdown</code> は ifupdown 自身の記録（<code>ifquery --state</code>）にある NIC しか下げない。手で付けたものは手で外す</li><li><code>auto</code> の付いた NIC だけが起動時に上がる（<code>ifup -a</code>）。<code>inet static</code> / <code>inet dhcp</code> で方式を選ぶ</li><li><code>nmcli connection add</code> で接続を作り、<code>up</code> で反映。<code>modify</code> しただけでは変わらない</li><li>NIC には持ち主（ifupdown / NetworkManager / systemd-networkd）がいて、持ち主でない道具は <code>unmanaged</code> と言うか、断る</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ ifupdown 0.8.41 / network-manager 1.46.0 / systemd 255.4 / dhcpcd 10.0.6 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-network/theory/02-interface">← 2. ifconfig に見えないアドレスがある</a><a href="/linuc-network/theory/04-route">次: 4. 返事をしたのは、相手ではなかった →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-network/chapters.js"></script>
+<script src="/linuc-network/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

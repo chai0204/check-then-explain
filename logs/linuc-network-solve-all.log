@@ -1,0 +1,405 @@
+
+
+########## 0. 環境と一覧 ##########
+
+$ lab env
+テーマ    : lab-linuc-network 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:network-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+練習機    : running（エージェント 応答あり / ssh 待ち受け中）
+練習機 OS : Ubuntu 24.04.5 LTS / 6.8.0-142-generic
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+$ lab ls
+演習一覧
+  · 01  enp0s17 にアドレスを手で付ける    10分 / 影響度 B
+  · 02  enp0s17 を ifupdown に持たせる         12分 / 影響度 B
+  · 03  enp0s18 を nmcli で DHCP につなぐ      10分 / 影響度 B
+  · 04  デフォルトルートを正しいルータに直す 12分 / 影響度 B
+  · 05  掲示板を外から見えるようにする 10分 / 影響度 B
+  · 06  lab.example の名前を引けるようにする 12分 / 影響度 B
+  · 07  www.lab.example を正しいサーバに向ける 8分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+$ lab start 01
+
+演習 01 — enp0s17 にアドレスを手で付ける                          影響度 B / 目安 10分
+
+  この演習は練習機（linuc）の中で作業します。外の端末で ssh linuc と打って入ってください。
+  システム全体を触ります。最初からやり直すときは、外で vm reset --yes（練習機ごと工場出荷時に戻る）。
+
+【いまの状態を見てください】
+
+    ip link show enp0s17
+    ifconfig | grep '^[a-z]'
+    ifconfig -a | grep '^[a-z]'
+
+  enp0s17 は ifconfig の一覧に出てきません。-a を付けると出てきます。何が違うのでしょうか。
+
+【やること】
+
+  enp0s17 を上げ（up）、10.0.3.50/24 を付けてください。
+  このネットワーク（10.0.3.0/24）には 10.0.3.2 という相手がいます。そこへ ping が届けば完成です。
+
+      ping -c 2 10.0.3.2
+
+  設定ファイルには書かなくて構いません（手で付けるだけ。ファイルに書くのは演習 02）。
+  ip でも ifconfig でも構いません。両方で付けてみて、ifconfig と ip addr の表示を比べてください。
+
+【できたら】
+
+    lab check 01        （練習機の中でも、外でも打てます）
+
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+
+
+
+########## 演習 01 ##########
+
+$ lab check 01
+✗ 01 未達
+  判定 : 観測型（enp0s17 の状態を読み、判定の中で 10.0.3.2 に ping を1回打った）
+  観測 : enp0s17 のリンク = down
+         enp0s17 の IPv4  = （なし）
+         ping 10.0.3.2    = 返事なし
+         → enp0s17 のリンクが up ではない
+         → enp0s17 に 10.0.3.50/24 が無い
+         → 10.0.3.2 から返事が来ない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+
+$ sudo ip link set enp0s17 up
+
+$ sudo ip addr add 10.0.3.50/24 dev enp0s17
+
+$ lab check 01
+✔ 01 達成
+  判定 : 観測型（enp0s17 の状態を読み、判定の中で 10.0.3.2 に ping を1回打った）
+  観測 : enp0s17 のリンク = up
+         enp0s17 の IPv4  = 10.0.3.50/24
+         ping 10.0.3.2    = 返事あり
+         enp0s17 に 10.0.3.50/24 が付き、同じネットワークの 10.0.3.2 と直接話せた（ルータを通らない）
+
+$ lab check 01
+✔ 01 達成
+  判定 : 観測型（enp0s17 の状態を読み、判定の中で 10.0.3.2 に ping を1回打った）
+  観測 : enp0s17 のリンク = up
+         enp0s17 の IPv4  = 10.0.3.50/24
+         ping 10.0.3.2    = 返事あり
+         enp0s17 に 10.0.3.50/24 が付き、同じネットワークの 10.0.3.2 と直接話せた（ルータを通らない）
+
+
+########## 演習 02 ##########
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（ifupdown の記録と、enp0s17 の実際のアドレスを読んだ）
+  観測 : ifupdown が上げた記録（ifquery --state enp0s17） = （記録なし）
+         起動時に上げる NIC（ifquery --list）            = lo lab0
+         設定ファイルのアドレス（ifquery enp0s17）        = （enp0s17 の設定が無い）
+         いまの enp0s17 の IPv4                          = 10.0.3.50/24
+         → ifupdown の記録に enp0s17 が無い
+         → 起動時に上げる一覧（auto）に enp0s17 が無い
+         → 設定ファイルに enp0s17 の address 10.0.3.50 が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ printf 'auto enp0s17\niface enp0s17 inet static\n    address 10.0.3.50/24\n' | sudo tee /etc/network/interfaces.d/enp0s17
+auto enp0s17
+iface enp0s17 inet static
+    address 10.0.3.50/24
+
+$ sudo ifup enp0s17
+Error: ipv4: Address already assigned.
+ifup: failed to bring up enp0s17
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（ifupdown の記録と、enp0s17 の実際のアドレスを読んだ）
+  観測 : ifupdown が上げた記録（ifquery --state enp0s17） = （記録なし）
+         起動時に上げる NIC（ifquery --list）            = lo enp0s17 lab0
+         設定ファイルのアドレス（ifquery enp0s17）        = 10.0.3.50
+         いまの enp0s17 の IPv4                          = 10.0.3.50/24
+         → ifupdown の記録に enp0s17 が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ sudo ip addr flush dev enp0s17
+
+$ sudo ifup enp0s17
+
+$ lab check 02
+✔ 02 達成
+  判定 : 観測型（ifupdown の記録と、enp0s17 の実際のアドレスを読んだ）
+  観測 : ifupdown が上げた記録（ifquery --state enp0s17） = enp0s17=enp0s17
+         起動時に上げる NIC（ifquery --list）            = lo enp0s17 lab0
+         設定ファイルのアドレス（ifquery enp0s17）        = 10.0.3.50
+         いまの enp0s17 の IPv4                          = 10.0.3.50/24
+         設定ファイルに書かれ、ifupdown が自分で上げたと記録している（再起動しても ifup -a で同じになる）
+
+
+########## 演習 03 ##########
+
+$ lab check 03
+✗ 03 未達
+  判定 : 観測型（nmcli で enp0s18 の状態と接続の設定を聞き、ip で実際のアドレスを見た）
+  観測 : enp0s18 の状態       = 30 (disconnected)
+         使っている接続       = （なし）
+         接続の ipv4.method   = —
+         自動で接続するか     = —
+         いまの enp0s18 の IPv4 = （なし）
+         → enp0s18 が connected（100）ではない
+         → 接続の ipv4.method が auto（DHCP）ではない
+         → 接続が autoconnect でない（起動しても自動ではつながらない）
+         → enp0s18 に DHCP で借りたアドレスが無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+
+$ sudo nmcli connection add type ethernet ifname enp0s18 con-name lab-dhcp
+Connection 'lab-dhcp' (c6f1881b-2321-4450-9a3d-8075a6c78e5e) successfully added.
+
+$ sudo nmcli connection up lab-dhcp
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/2)
+
+$ lab check 03
+✔ 03 達成
+  判定 : 観測型（nmcli で enp0s18 の状態と接続の設定を聞き、ip で実際のアドレスを見た）
+  観測 : enp0s18 の状態       = 100 (connected)
+         使っている接続       = lab-dhcp
+         接続の ipv4.method   = auto
+         自動で接続するか     = yes
+         いまの enp0s18 の IPv4 = 10.0.4.15/24 （DHCP で借りたもの: dynamic）
+         NetworkManager の接続「lab-dhcp」が DHCP でアドレスを借り、起動時にも自動でつながる設定になっている
+
+
+########## 演習 04 ##########
+
+$ lab check 04
+✗ 04 未達
+  判定 : 観測型（経路表を読み、判定の中で 172.16.20.10 に ping を1回打ち、ifupdown が読む lab0 の設定を見た）
+  観測 : デフォルトルート       = default via 192.168.10.254 dev lab0 onlink 
+         ping 172.16.20.10      = 返事なし
+         設定の gateway（ifquery lab0） = 192.168.10.254
+         → デフォルトルートが 192.168.10.1 を向いていない
+         → 192.168.10.254 へのデフォルトルートが残っている
+         → 172.16.20.10 から返事が来ない
+         → 設定ファイルの gateway が 192.168.10.1 ではない（ifdown / ifup や再起動のたびにこの値に戻る）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+
+$ sudo route del default gw 192.168.10.254
+
+$ sudo route add default gw 192.168.10.1
+
+$ route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.10.1    0.0.0.0         UG    0      0        0 lab0
+10.0.2.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s16
+10.0.3.0        0.0.0.0         255.255.255.0   U     0      0        0 enp0s17
+10.0.4.0        0.0.0.0         255.255.255.0   U     100    0        0 enp0s18
+192.168.10.0    0.0.0.0         255.255.255.0   U     0      0        0 lab0
+
+$ lab check 04
+✗ 04 未達
+  判定 : 観測型（経路表を読み、判定の中で 172.16.20.10 に ping を1回打ち、ifupdown が読む lab0 の設定を見た）
+  観測 : デフォルトルート       = default via 192.168.10.1 dev lab0 
+         ping 172.16.20.10      = 返事あり
+         設定の gateway（ifquery lab0） = 192.168.10.254
+         → 設定ファイルの gateway が 192.168.10.1 ではない（ifdown / ifup や再起動のたびにこの値に戻る）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+
+$ sudo sed -i 's/gateway 192.168.10.254/gateway 192.168.10.1/' /etc/network/interfaces
+
+$ sudo ifdown lab0
+
+$ sudo ifup lab0
+
+$ lab check 04
+✔ 04 達成
+  判定 : 観測型（経路表を読み、判定の中で 172.16.20.10 に ping を1回打ち、ifupdown が読む lab0 の設定を見た）
+  観測 : デフォルトルート       = default via 192.168.10.1 dev lab0 onlink 
+         ping 172.16.20.10      = 返事あり
+         設定の gateway（ifquery lab0） = 192.168.10.1
+         いまの経路表も設定ファイルも 192.168.10.1 を向き、サーバの LAN（172.16.20.0/24）に届いた
+
+
+########## 演習 05 ##########
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（判定の中で router から http://192.168.10.2:8080/ を取りに行った）
+  観測 : lab-board.service      = active
+         8080 番の待ち受け      = 127.0.0.1:8080
+         router から取れた中身  = （取れなかった）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+$ sudo sed -i 's/^LISTEN_ADDRESS=.*/LISTEN_ADDRESS=0.0.0.0/' /etc/default/lab-board
+
+$ sudo systemctl restart lab-board
+
+$ lab check 05
+✔ 05 達成
+  判定 : 観測型（判定の中で router から http://192.168.10.2:8080/ を取りに行った）
+  観測 : lab-board.service      = active
+         8080 番の待ち受け      = 0.0.0.0:8080
+         router から取れた中身  = lab-board: no news today
+         別の機械（router）から 192.168.10.2:8080 につながり、掲示板の応答が返った
+
+
+########## 演習 06 ##########
+
+$ lab check 06
+✗ 06 未達
+  判定 : 観測型（判定の中で systemd-resolved を再起動し、そのあと getent で名前を引いた）
+  観測 : /etc/resolv.conf          = シンボリックリンク → ../run/systemd/resolve/stub-resolv.conf
+         その中の設定              = nameserver 127.0.0.53 search .
+         t14990x3106.check.lab.example = （引けない）
+         ns（短い名前）            = （引けない）
+         → lab.example の名前が DNS から引けない
+         → 短い名前 ns が ns.lab.example として引けない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+
+$ echo 'nameserver 172.16.20.10' | sudo tee -a /etc/resolv.conf
+nameserver 172.16.20.10
+
+$ getent hosts ns.lab.example
+172.16.20.10    ns.lab.example
+
+$ lab check 06
+✗ 06 未達
+  判定 : 観測型（判定の中で systemd-resolved を再起動し、そのあと getent で名前を引いた）
+  観測 : /etc/resolv.conf          = シンボリックリンク → ../run/systemd/resolve/stub-resolv.conf
+         その中の設定              = nameserver 127.0.0.53 search .
+         t19237x3353.check.lab.example = （引けない）
+         ns（短い名前）            = （引けない）
+         → lab.example の名前が DNS から引けない
+         → 短い名前 ns が ns.lab.example として引けない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+
+$ sudo unlink /etc/resolv.conf
+
+$ printf 'nameserver 172.16.20.10\nsearch lab.example\n' | sudo tee /etc/resolv.conf
+nameserver 172.16.20.10
+search lab.example
+
+$ lab check 06
+✔ 06 達成
+  判定 : 観測型（判定の中で systemd-resolved を再起動し、そのあと getent で名前を引いた）
+  観測 : /etc/resolv.conf          = ふつうのファイル
+         その中の設定              = nameserver 172.16.20.10 search lab.example
+         t14495x3608.check.lab.example = 172.16.20.10
+         ns（短い名前）            = 172.16.20.10
+         systemd-resolved を再起動したあとも、lab.example の名前を 172.16.20.10 の DNS から引けた（短い名前も）
+
+
+########## 演習 07 ##########
+
+$ lab check 07
+✗ 07 未達
+  判定 : 観測型（getent で www.lab.example を引き、判定の中でその名前で http を取りに行った）
+  観測 : getent ahostsv4 www.lab.example = 172.16.20.99
+         http://www.lab.example/ の中身  = （取れなかった）
+         localhost / 自分のホスト名       = 127.0.0.1 / 127.0.1.1
+         → www.lab.example が 172.16.20.10 以外になる
+         → www.lab.example の Web の応答が返らない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+
+$ sudo sed -i '/www.lab.example/d' /etc/hosts
+
+$ lab check 07
+✔ 07 達成
+  判定 : 観測型（getent で www.lab.example を引き、判定の中でその名前で http を取りに行った）
+  観測 : getent ahostsv4 www.lab.example = 172.16.20.10
+         http://www.lab.example/ の中身  = hello from www.lab.example (172.16.20.10, 80/tcp)
+         localhost / 自分のホスト名       = 127.0.0.1 / 127.0.1.1
+         ping も curl も使う名前解決（getent）が、DNS と同じ 172.16.20.10 を返した
+
+  ════════════════════════════════════════
+   確かめて説明する LinuC 主題1.07 — 全7演習クリア
+  ════════════════════════════════════════
+
+  所要 1分（最初の達成から最後の達成まで）
+
+  自分の手で確かめたこと
+
+   ✔ 01  ip addr add は足し、ifconfig は置き換える。ifconfig には2つ目のアドレスが見えないこと
+   ✔ 02  ifup / ifdown は NIC の実際の状態ではなく、設定ファイルと自分の記録で動くこと
+   ✔ 03  nmcli は NetworkManager が持つ NIC にしか効かず、接続（プロファイル）を作ってから上げること
+   ✔ 04  返事をしたのは相手ではなく途中のルータだったこと。経路表の1行を直せば届くこと
+   ✔ 05  LISTEN していても 127.0.0.1 で待っていれば、外からは入れないこと
+   ✔ 06  resolv.conf に書いた1行は、systemd-resolved に書き直されて消えること
+   ✔ 07  dig は DNS だけを見て、ping は /etc/hosts を先に見ること
+
+  この7つは全部、1つの事実から出ていました。
+
+      ネットワークの「見え方」は、道具が読んだ表で決まる。
+      ifconfig と ip、ifup と nmcli、dig と ping は、同じものを別々の表から読んでいる。
+      つながらないときは、相手を疑う前に「どの道具が、どの表の、どの1行を読んだか」を確かめる。
+
+  理論編の最終章に、それぞれがどう繋がるかを書いてあります → /linuc-network/theory/09-names
+
+
+
+########## 全体 ##########
+
+$ lab ls
+演習一覧
+  ✔ 01  enp0s17 にアドレスを手で付ける    10分 / 影響度 B
+  ✔ 02  enp0s17 を ifupdown に持たせる         12分 / 影響度 B
+  ✔ 03  enp0s18 を nmcli で DHCP につなぐ      10分 / 影響度 B
+  ✔ 04  デフォルトルートを正しいルータに直す 12分 / 影響度 B
+  ✔ 05  掲示板を外から見えるようにする 10分 / 影響度 B
+  ✔ 06  lab.example の名前を引けるようにする 12分 / 影響度 B
+  ✔ 07  www.lab.example を正しいサーバに向ける 8分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+$ lab check
+✔ 01 達成
+  判定 : 観測型（enp0s17 の状態を読み、判定の中で 10.0.3.2 に ping を1回打った）
+  観測 : enp0s17 のリンク = up
+         enp0s17 の IPv4  = 10.0.3.50/24
+         ping 10.0.3.2    = 返事あり
+         enp0s17 に 10.0.3.50/24 が付き、同じネットワークの 10.0.3.2 と直接話せた（ルータを通らない）
+✔ 02 達成
+  判定 : 観測型（ifupdown の記録と、enp0s17 の実際のアドレスを読んだ）
+  観測 : ifupdown が上げた記録（ifquery --state enp0s17） = enp0s17=enp0s17
+         起動時に上げる NIC（ifquery --list）            = lo enp0s17 lab0
+         設定ファイルのアドレス（ifquery enp0s17）        = 10.0.3.50
+         いまの enp0s17 の IPv4                          = 10.0.3.50/24
+         設定ファイルに書かれ、ifupdown が自分で上げたと記録している（再起動しても ifup -a で同じになる）
+✔ 03 達成
+  判定 : 観測型（nmcli で enp0s18 の状態と接続の設定を聞き、ip で実際のアドレスを見た）
+  観測 : enp0s18 の状態       = 100 (connected)
+         使っている接続       = lab-dhcp
+         接続の ipv4.method   = auto
+         自動で接続するか     = yes
+         いまの enp0s18 の IPv4 = 10.0.4.15/24 （DHCP で借りたもの: dynamic）
+         NetworkManager の接続「lab-dhcp」が DHCP でアドレスを借り、起動時にも自動でつながる設定になっている
+✔ 04 達成
+  判定 : 観測型（経路表を読み、判定の中で 172.16.20.10 に ping を1回打ち、ifupdown が読む lab0 の設定を見た）
+  観測 : デフォルトルート       = default via 192.168.10.1 dev lab0 onlink 
+         ping 172.16.20.10      = 返事あり
+         設定の gateway（ifquery lab0） = 192.168.10.1
+         いまの経路表も設定ファイルも 192.168.10.1 を向き、サーバの LAN（172.16.20.0/24）に届いた
+✔ 05 達成
+  判定 : 観測型（判定の中で router から http://192.168.10.2:8080/ を取りに行った）
+  観測 : lab-board.service      = active
+         8080 番の待ち受け      = 0.0.0.0:8080
+         router から取れた中身  = lab-board: no news today
+         別の機械（router）から 192.168.10.2:8080 につながり、掲示板の応答が返った
+✔ 06 達成
+  判定 : 観測型（判定の中で systemd-resolved を再起動し、そのあと getent で名前を引いた）
+  観測 : /etc/resolv.conf          = ふつうのファイル
+         その中の設定              = nameserver 172.16.20.10 search lab.example
+         t23764x5074.check.lab.example = 172.16.20.10
+         ns（短い名前）            = 172.16.20.10
+         systemd-resolved を再起動したあとも、lab.example の名前を 172.16.20.10 の DNS から引けた（短い名前も）
+✔ 07 達成
+  判定 : 観測型（getent で www.lab.example を引き、判定の中でその名前で http を取りに行った）
+  観測 : getent ahostsv4 www.lab.example = 172.16.20.10
+         http://www.lab.example/ の中身  = hello from www.lab.example (172.16.20.10, 80/tcp)
+         localhost / 自分のホスト名       = 127.0.0.1 / 127.0.1.1
+         ping も curl も使う名前解決（getent）が、DNS と同じ 172.16.20.10 を返した
