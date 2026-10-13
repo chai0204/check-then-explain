@@ -23,7 +23,7 @@ S() { printf '\n\n========== %s ==========\n' "$*"; }
 waitq() { while pgrep -x qemu-system-x86 > /dev/null; do sleep 0.3; done; }
 mkdir -p ~/work/x && cd ~/work/x || exit 1
 # socat -v の記録（送られた塊ごとに「> 時刻 length=…」の見出しが付く。CR は \r と書かれる）から、
-# 各バイトが流れた時刻を戻し、最後の「login: 」と「\r と空白と \r」の時刻を出す（第16節で使う）
+# 各バイトが流れた時刻を戻し、最後の「login: 」と「\r と空白と \r」の時刻を出す（第17節で使う）
 cat > /tmp/dumptime.pl <<'PL'
 local $/; my $d = <>;
 my @p = split /> (\d{4}\/\d\d\/\d\d \d\d:\d\d:\d\d)\.\d+\s+length=\d+ from=\d+ to=\d+\n/, $d;
@@ -96,7 +96,7 @@ R 'boot; hmp "savevm s2"; hmp "loadvm s2"; halt; size'
 R 'qemu-img snapshot -d s2 d.qcow2; size'
 R 'rm -f d.qcow2 ser.log'
 
-S "9. 第6章: NVRAM を qcow2 で渡すと savevm は通るが、動いている状態は NVRAM の qcow2 のほうに入る"
+S "9. 第6章: NVRAM を qcow2 で渡すと savevm は通る。第6章の並べ方（NVRAM が先）では、動いている状態は NVRAM の qcow2 のほうに入る"
 R 'qemu-img create -q -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 d.qcow2; qemu-img convert -O qcow2 /usr/share/OVMF/OVMF_VARS_4M.fd vars.qcow2'
 R ': > ser.log; qemu-system-x86_64 -machine q35 -m 1536 -smp 2 -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd -drive if=pflash,format=qcow2,file=vars.qcow2 -drive file=d.qcow2,if=virtio -display none -serial file:ser.log -qmp unix:q.sock,server=on,wait=off -daemonize; until grep -q "login:" ser.log; do sleep 1; done; hmp "savevm s1"; halt'
 R 'qemu-img snapshot -l vars.qcow2'
@@ -142,7 +142,20 @@ R 'for f in /usr/share/OVMF/OVMF_VARS_4M.fd /usr/share/OVMF/OVMF_VARS_4M.ms.fd; 
 R 'jq -c "{targets, features, code: .mapping.executable.filename, vars: .mapping.\"nvram-template\".filename}" /usr/share/qemu/firmware/40-edk2-x86_64-secure-enrolled.json'
 R 'export LIBVIRT_DEFAULT_URI=qemu:///session; mkdir -p ~/vm; sed "s|@VMDIR@|$HOME/vm|g" /etc/lab-vm/domain.xml.in > ~/vm/linuc.xml; virsh define ~/vm/linuc.xml > /dev/null; virsh dumpxml linuc | grep -E "machine=|<loader|<nvram"; virsh undefine --nvram linuc > /dev/null; rm -f ~/vm/linuc.xml'
 
-S "16. 第3章の注: 練習機のコンソールのプロンプトが消えるとき（\\r と空白と \\r）と、systemd-fsckd の退場の時刻"
+S "16. 第3章・第6章・演習03: savevm の状態は、-drive で先に並べた書き込める qcow2 に入る（電源を入れて数秒で保存する）"
+R 'order() { : > ser.log; qemu-system-x86_64 "$@" -display none -qmp unix:q.sock,server=on,wait=off -daemonize; sleep 5; hmp "savevm s1"; halt; }
+show() { for f in "$@"; do printf "%-12s VM SIZE %s\n" $f "$(qemu-img snapshot -l $f | awk "NR==3{print \$3, \$4}")"; done; }
+CODE="-drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd"
+echo "（order・show を定義した）"'
+R 'qemu-img create -q -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 d.qcow2; qemu-img convert -O qcow2 /usr/share/OVMF/OVMF_VARS_4M.fd vars.qcow2'
+R 'order -machine q35 -m 1536 $CODE -drive if=pflash,format=qcow2,file=vars.qcow2 -drive file=d.qcow2,if=virtio; show vars.qcow2 d.qcow2'
+R 'rm -f d.qcow2 vars.qcow2; qemu-img create -q -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 d.qcow2; qemu-img convert -O qcow2 /usr/share/OVMF/OVMF_VARS_4M.fd vars.qcow2'
+R 'order -machine q35 -m 1536 -drive file=d.qcow2,if=virtio $CODE -drive if=pflash,format=qcow2,file=vars.qcow2; show vars.qcow2 d.qcow2'
+R 'qemu-img create -q -f qcow2 a.qcow2 1G; qemu-img create -q -f qcow2 b.qcow2 1G'
+R 'order -m 512 -drive file=b.qcow2,if=virtio -drive file=a.qcow2,if=virtio; show a.qcow2 b.qcow2'
+R 'rm -f d.qcow2 vars.qcow2 a.qcow2 b.qcow2 ser.log'
+
+S "17. 第3章の注: 練習機のコンソールのプロンプトが消えるとき（\\r と空白と \\r）と、systemd-fsckd の退場の時刻"
 R 'qemu-img create -q -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 d.qcow2'
 R 'qemu-system-x86_64 -machine q35 -m 1536 -smp 2 -drive file=d.qcow2,if=virtio -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 -device virtio-net-pci,netdev=n0,addr=0x10 -display none -chardev socket,id=s0,path=ser.sock,server=on,wait=on -serial chardev:s0 -qmp unix:q.sock,server=on,wait=off > /dev/null 2>&1 &
 until [ -S ser.sock ]; do sleep 0.1; done

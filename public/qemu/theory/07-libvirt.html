@@ -81,9 +81,9 @@ Domain 'linuc' started</code></pre>
 デーモンを止めれば、仮想マシンも一緒に止まるはずだ。</p>
 <pre data-where="外（lab@host）"><code>$ ps -o pid,ppid,comm -C qemu-system-x86,libvirtd,virtlogd
     PID    PPID COMMAND
-    484       1 libvirtd
-    516       1 virtlogd
-    520       1 qemu-system-x86
+    488       1 libvirtd
+    520       1 virtlogd
+    524       1 qemu-system-x86
 $ virsh qemu-monitor-command linuc --hmp 'info status'
 VM status: running
 $ virsh qemu-monitor-command linuc '{"execute":"query-status"}'
@@ -91,21 +91,21 @@ $ virsh qemu-monitor-command linuc '{"execute":"query-status"}'
 $ pkill -x libvirtd
 $ ps -o pid,ppid,comm -C qemu-system-x86,libvirtd,virtlogd
     PID    PPID COMMAND
-    516       1 virtlogd
-    520       1 qemu-system-x86
+    520       1 virtlogd
+    524       1 qemu-system-x86
 $ virsh list
  Id   Name    State
 -----------------------
  1    linuc   running
 $ ps -o pid,ppid,comm -C qemu-system-x86,libvirtd,virtlogd
     PID    PPID COMMAND
-    516       1 virtlogd
-    520       1 qemu-system-x86
-    544       1 libvirtd</code></pre>
+    520       1 virtlogd
+    524       1 qemu-system-x86
+    548       1 libvirtd</code></pre>
 <p class="detail">PID の数字は毎回違う。</p>
 <div class="then"><b>だめな理由</b>: 練習機は <code>qemu-system-x86</code>（<code>qemu-system-x86_64</code> の名前の頭 15 文字）という独立したプロセスで、親（PPID）は <code>libvirtd</code> ではなく PID 1 だった。
-libvirt は QEMU を起動したあと、自分の子として抱えず切り離している。<code>pkill -x libvirtd</code> でデーモンを止めても、QEMU（PID 520）はそのまま動き続けた。
-次の <code>virsh list</code> で新しい <code>libvirtd</code>（PID 544）が自動で起き、まだ動いている QEMU を見つけてつなぎ直し、<code>running</code> と答えた。
+libvirt は QEMU を起動したあと、自分の子として抱えず切り離している。<code>pkill -x libvirtd</code> でデーモンを止めても、QEMU（PID 524）はそのまま動き続けた。
+次の <code>virsh list</code> で新しい <code>libvirtd</code>（PID 548）が自動で起き、まだ動いている QEMU を見つけてつなぎ直し、<code>running</code> と答えた。
 <b>仮想マシンを動かしているのは QEMU のプロセスで、libvirt はその起動と操作を代わりにしている係</b>である。
 <code>virsh qemu-monitor-command</code> は、libvirt が持っている QEMU のモニタに命令を素通しする。HMP の <code>info status</code> も、QMP の <code>query-status</code> も、第2章と同じ答えが返った。
 QMP の返事の <code>"id":"libvirt-451"</code> は、libvirt が自分の命令に付けている通し番号で、電源を入れてからここまでに、libvirt はこの QEMU に 450 回ほど QMP で話しかけていた。</div></div>
@@ -142,13 +142,13 @@ mem-lock=off
 -smp
 2,sockets=2,cores=1,threads=1
 -uuid
-e9bd67f3-c662-4925-989c-712e76349459
+05c41067-7a17-46e5-9675-8cad58c6d64d
 -display
 none
 -no-user-config
 -nodefaults
 -chardev
-socket,id=charmonitor,fd=24,server=on,wait=off
+socket,id=charmonitor,fd=23,server=on,wait=off
 -mon
 chardev=charmonitor,id=monitor,mode=control
 -rtc

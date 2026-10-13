@@ -7,7 +7,7 @@ $ qemu-system-x86_64 -display none -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222
 
 $ ss -tlnp
 State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
-LISTEN 0      1          127.0.0.1:2222      0.0.0.0:*    users:(("qemu-system-x86",pid=50,fd=11))
+LISTEN 0      1          127.0.0.1:2222      0.0.0.0:*    users:(("qemu-system-x86",pid=51,fd=11))
 
 $ qemu-system-x86_64 -machine q35 -display none -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 -device virtio-net-pci,netdev=n0,addr=0x10 -daemonize; echo "終了コード: $?"
 qemu-system-x86_64: -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22: Could not set up host forwarding rule 'tcp:127.0.0.1:2222-:22'
@@ -19,9 +19,9 @@ $ pgrep -c -x qemu-system-x86
 $ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"quit"}' | socat - UNIX-CONNECT:first.sock
 {"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
 {"return": {}}
-{"timestamp": {"seconds": 1791914976, "microseconds": 84217}, "event": "SHUTDOWN", "data": {"guest": false, "reason": "host-qmp-quit"}}
+{"timestamp": {"seconds": 1791918737, "microseconds": 153387}, "event": "SHUTDOWN", "data": {"guest": false, "reason": "host-qmp-quit"}}
 {"return": {}}
-2026/10/14 03:09:36 socat[67] E read(5, 0x6313df903000, 8192): Connection reset by peer
+2026/10/14 04:12:17 socat[68] E read(5, 0x5dcb0d35f000, 8192): Connection reset by peer
 
 
 ========== 2. 第1章・第5章・第7章: -machine の値が、どの版のマシン型になるか（QMP の qom-get /machine type） ==========
@@ -63,9 +63,8 @@ $ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"qom-get","argument
 {"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
 {"return": {}}
 {"return": false}
-{"timestamp": {"seconds": 1791914976, "microseconds": 750080}, "event": "SHUTDOWN", "data": {"guest": false, "reason": "host-qmp-quit"}}
+{"timestamp": {"seconds": 1791918738, "microseconds": 429941}, "event": "SHUTDOWN", "data": {"guest": false, "reason": "host-qmp-quit"}}
 {"return": {}}
-2026/10/14 03:09:36 socat[151] E read(5, 0x5e30ea421000, 8192): Connection reset by peer
 
 
 ========== 4. 第2章: -nographic のときの線のつながり方（端末が要るので script で疑似端末を作る。Ctrl-a c で切り替えて info chardev） ==========
@@ -117,7 +116,7 @@ $ ls -A /var/tmp
 $ for fd in /proc/$(pgrep -x qemu-system-x86)/fd/*; do readlink $fd; done | grep -E "qcow2|/var/tmp"
 /home/lab/work/x/snap.qcow2
 /var/lib/lab-vm/linuc-guest.qcow2
-/var/tmp/vl.IB3NW3 (deleted)
+/var/tmp/vl.SKB0W3 (deleted)
 
 $ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"quit"}' | socat -t 2 - UNIX-CONNECT:s.sock > /dev/null 2>&1; while pgrep -x qemu-system-x86 > /dev/null; do sleep 0.2; done; rm -f snap.qcow2
 
@@ -134,21 +133,21 @@ $ hmp() { printf "%s\n" "{\"execute\":\"qmp_capabilities\"}" "{\"execute\":\"hum
 （hmp・boot・halt・size を定義した）
 
 $ boot; hmp "savevm s1"; halt; size
-ls -l 369885184 バイト / disk size: 353 MiB
+ls -l 368640000 バイト / disk size: 351 MiB
 
 $ qemu-img snapshot -d s1 d.qcow2; size
-ls -l 369885184 バイト / disk size: 7.57 MiB
+ls -l 368640000 バイト / disk size: 7.63 MiB
 
 $ boot; hmp "savevm s2"; hmp "loadvm s2"; halt; size
-ls -l 376307712 バイト / disk size: 359 MiB
+ls -l 375652352 バイト / disk size: 358 MiB
 
 $ qemu-img snapshot -d s2 d.qcow2; size
-ls -l 376307712 バイト / disk size: 359 MiB
+ls -l 375652352 バイト / disk size: 358 MiB
 
 $ rm -f d.qcow2 ser.log
 
 
-========== 9. 第6章: NVRAM を qcow2 で渡すと savevm は通るが、動いている状態は NVRAM の qcow2 のほうに入る ==========
+========== 9. 第6章: NVRAM を qcow2 で渡すと savevm は通る。第6章の並べ方（NVRAM が先）では、動いている状態は NVRAM の qcow2 のほうに入る ==========
 
 $ qemu-img create -q -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 d.qcow2; qemu-img convert -O qcow2 /usr/share/OVMF/OVMF_VARS_4M.fd vars.qcow2
 
@@ -157,12 +156,12 @@ $ : > ser.log; qemu-system-x86_64 -machine q35 -m 1536 -smp 2 -drive if=pflash,f
 $ qemu-img snapshot -l vars.qcow2
 Snapshot list:
 ID        TAG               VM SIZE                DATE     VM CLOCK     ICOUNT
-1         s1                398 MiB 2026-10-14 03:11:26 00:00:29.072           
+1         s1                395 MiB 2026-10-14 04:14:08 00:00:31.082           
 
 $ qemu-img snapshot -l d.qcow2
 Snapshot list:
 ID        TAG               VM SIZE                DATE     VM CLOCK     ICOUNT
-1         s1                    0 B 2026-10-14 03:11:26 00:00:29.072           
+1         s1                    0 B 2026-10-14 04:14:08 00:00:31.082           
 
 $ rm -f d.qcow2 vars.qcow2 ser.log
 
@@ -197,13 +196,13 @@ $ SECONDS=0; exec 3<>/dev/tcp/127.0.0.1/2223 && echo "2223 につながった: $
 切れた: 0 秒
 
 $ ip -br -4 addr show eth0
-eth0@if2270      UP             172.17.0.4/16 
+eth0@if2383      UP             172.17.0.7/16 
 
 $ ssh linuc 'echo $SSH_CONNECTION'
-10.0.2.2 37456 10.0.2.15 22
+10.0.2.2 34042 10.0.2.15 22
 
 $ ssh -o HostName=$(ip -br -4 addr show eth0 | awk '{print $3}' | cut -d/ -f1) -o Port=2224 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR linuc 'echo $SSH_CONNECTION'
-172.17.0.4 52108 10.0.2.15 22
+172.17.0.7 52558 10.0.2.15 22
 
 $ halt; rm -f d.qcow2 ser.log
 
@@ -211,10 +210,10 @@ $ halt; rm -f d.qcow2 ser.log
 ========== 12. 第4章・演習04: 5秒の -d in_asm の塊の数（5回）と、何度も翻訳された番地 ==========
 
 $ for i in 1 2 3 4 5; do timeout 5 qemu-system-x86_64 -display none -d in_asm -D tcg$i.log 2>/dev/null; echo "$i 回目: IN: $(grep -c '^IN:' tcg$i.log) 個 / 番地の種類 $(grep -A1 '^IN:' tcg$i.log | grep '^0x' | sort -u | wc -l)"; done
-1 回目: IN: 6056 個 / 番地の種類 5806
+1 回目: IN: 6055 個 / 番地の種類 5805
 2 回目: IN: 6056 個 / 番地の種類 5806
-3 回目: IN: 6050 個 / 番地の種類 5802
-4 回目: IN: 6055 個 / 番地の種類 5805
+3 回目: IN: 6054 個 / 番地の種類 5804
+4 回目: IN: 6054 個 / 番地の種類 5804
 5 回目: IN: 6055 個 / 番地の種類 5805
 
 $ grep -A1 '^IN:' tcg1.log | grep '^0x' | sort | uniq -c | sort -rn | head -3
@@ -254,9 +253,9 @@ $ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"device_add","argum
 {"return": {}}
 {"return": {}}
 {"return": [{"name": "type", "type": "string"}, {"name": "rng-added", "type": "child<virtio-rng-pci>"}]}
-{"timestamp": {"seconds": 1791915263, "microseconds": 743232}, "event": "SHUTDOWN", "data": {"guest": false, "reason": "host-qmp-quit"}}
+{"timestamp": {"seconds": 1791919024, "microseconds": 540883}, "event": "SHUTDOWN", "data": {"guest": false, "reason": "host-qmp-quit"}}
 {"return": {}}
-2026/10/14 03:14:23 socat[808] E read(5, 0x5a0e1d9fc000, 8192): Connection reset by peer
+2026/10/14 04:17:04 socat[790] E read(5, 0x62bc6f336000, 8192): Connection reset by peer
 
 
 ========== 15. 第6章・演習06・用語辞書: OVMF の NVRAM のひな形と、Secure Boot 用の組 ==========
@@ -284,7 +283,36 @@ $ export LIBVIRT_DEFAULT_URI=qemu:///session; mkdir -p ~/vm; sed "s|@VMDIR@|$HOM
     <nvram template='/usr/share/OVMF/OVMF_VARS_4M.ms.fd'>/home/lab/vm/linuc_VARS.fd</nvram>
 
 
-========== 16. 第3章の注: 練習機のコンソールのプロンプトが消えるとき（\r と空白と \r）と、systemd-fsckd の退場の時刻 ==========
+========== 16. 第3章・第6章・演習03: savevm の状態は、-drive で先に並べた書き込める qcow2 に入る（電源を入れて数秒で保存する） ==========
+
+$ order() { : > ser.log; qemu-system-x86_64 "$@" -display none -qmp unix:q.sock,server=on,wait=off -daemonize; sleep 5; hmp "savevm s1"; halt; }
+> show() { for f in "$@"; do printf "%-12s VM SIZE %s\n" $f "$(qemu-img snapshot -l $f | awk "NR==3{print \$3, \$4}")"; done; }
+> CODE="-drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd"
+> echo "（order・show を定義した）"
+（order・show を定義した）
+
+$ qemu-img create -q -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 d.qcow2; qemu-img convert -O qcow2 /usr/share/OVMF/OVMF_VARS_4M.fd vars.qcow2
+
+$ order -machine q35 -m 1536 $CODE -drive if=pflash,format=qcow2,file=vars.qcow2 -drive file=d.qcow2,if=virtio; show vars.qcow2 d.qcow2
+vars.qcow2   VM SIZE 108 MiB
+d.qcow2      VM SIZE 0 B
+
+$ rm -f d.qcow2 vars.qcow2; qemu-img create -q -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 d.qcow2; qemu-img convert -O qcow2 /usr/share/OVMF/OVMF_VARS_4M.fd vars.qcow2
+
+$ order -machine q35 -m 1536 -drive file=d.qcow2,if=virtio $CODE -drive if=pflash,format=qcow2,file=vars.qcow2; show vars.qcow2 d.qcow2
+vars.qcow2   VM SIZE 0 B
+d.qcow2      VM SIZE 70 MiB
+
+$ qemu-img create -q -f qcow2 a.qcow2 1G; qemu-img create -q -f qcow2 b.qcow2 1G
+
+$ order -m 512 -drive file=b.qcow2,if=virtio -drive file=a.qcow2,if=virtio; show a.qcow2 b.qcow2
+a.qcow2      VM SIZE 0 B
+b.qcow2      VM SIZE 3.15 MiB
+
+$ rm -f d.qcow2 vars.qcow2 a.qcow2 b.qcow2 ser.log
+
+
+========== 17. 第3章の注: 練習機のコンソールのプロンプトが消えるとき（\r と空白と \r）と、systemd-fsckd の退場の時刻 ==========
 
 $ qemu-img create -q -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 d.qcow2
 
@@ -295,14 +323,14 @@ $ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 -drive file=d.qcow2,if=virtio -
 ssh に入れてから 40 秒待った
 
 $ perl /tmp/dumptime.pl ser.dump
-最後の「login: 」が流れた時刻: 2026/10/14 03:14:58
-「\r と空白 51 個と \r」が流れた時刻: 2026/10/14 03:15:12
+最後の「login: 」が流れた時刻: 2026/10/14 04:17:52
+「\r と空白 51 個と \r」が流れた時刻: 2026/10/14 04:18:07
 
 $ ssh linuc 'journalctl -b -o short-iso-precise --no-pager -u systemd-fsckd.service; journalctl -b -o short-iso-precise --no-pager | grep -E "systemd-fsck\[" | tail -2'
-2026-10-14T03:14:38.332708+09:00 linuc systemd[1]: Started systemd-fsckd.service - File System Check Daemon to report status.
-2026-10-14T03:15:12.527369+09:00 linuc systemd[1]: systemd-fsckd.service: Deactivated successfully.
-2026-10-14T03:14:42.464358+09:00 linuc systemd-fsck[217]: fsck.fat 4.2 (2021-01-31)
-2026-10-14T03:14:42.464358+09:00 linuc systemd-fsck[217]: /dev/vda15: 12 files, 12499/213663 clusters
+2026-10-14T04:17:33.966754+09:00 linuc systemd[1]: Started systemd-fsckd.service - File System Check Daemon to report status.
+2026-10-14T04:18:07.511818+09:00 linuc systemd[1]: systemd-fsckd.service: Deactivated successfully.
+2026-10-14T04:17:37.326139+09:00 linuc systemd-fsck[215]: /dev/vda15: 12 files, 12499/213663 clusters
+2026-10-14T04:17:37.428570+09:00 linuc systemd-fsck[218]: BOOT: clean, 606/58496 files, 54488/233728 blocks
 
 $ halt; wait; rm -f d.qcow2 ser.sock ser.dump
 

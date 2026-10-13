@@ -47,7 +47,7 @@ TARGET    SOURCE     FSTYPE OPTIONS
 $ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"system_powerdown"}' | socat - UNIX-CONNECT:qmp.sock
 {"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
 {"return": {}}
-{"timestamp": {"seconds": 1791914283, "microseconds": 382378}, "event": "POWERDOWN"}
+{"timestamp": {"seconds": 1791918601, "microseconds": 499674}, "event": "POWERDOWN"}
 {"return": {}}
 $ while pgrep -x qemu-system-x86 &gt; /dev/null; do sleep 1; done</code></pre>
 <div class="then"><b>だめな理由</b>: UEFI で起動した Linux には <code>/sys/firmware/efi</code> がある（ファームウェアが UEFI だと、カーネルがここに UEFI の情報を出す）。それが無い。
@@ -102,9 +102,9 @@ $ ssh linuc sudo ls /boot/efi/EFI/BOOT
 BOOTX64.EFI
 fbx64.efi
 mmx64.efi</code></pre>
-<p><code>BootCurrent: 0001</code> は、いまの起動が Boot0001 から来たこと。一覧の項目の多くは OVMF が自分で作ったもの（<code>auto_created_boot_option</code>）で、
-ディスク（0001）、NIC からのネットワーク起動（0002〜0005。第1章の iPXE に当たる UEFI の仕組み）、UEFI のシェル（0006）が並ぶ。
-ところが <b><code>Boot0007* Ubuntu</code> は、まっさらな NVRAM のひな形には無かった項目</b>で、しかも並び順（<code>BootOrder</code>）の先頭にいる。</p>
+<p><code>BootCurrent: 0001</code> は、いまの起動が Boot0001 から来たこと。写しの元にしたまっさらな NVRAM のひな形には、ブートの項目が1つも無い。
+0000〜0006 は、起動のときに OVMF が自分で作った項目で、UEFI の設定の画面（0000 の UiApp）、ディスク（0001）、NIC からのネットワーク起動（0002〜0005。第1章の iPXE に当たる UEFI の仕組み）、UEFI のシェル（0006）が並ぶ（つながった装置から作った 0001〜0005 には <code>{auto_created_boot_option}</code> の印が付いている）。
+<b><code>Boot0007* Ubuntu</code> だけは、OVMF ではなく練習機の側が書き込んだ項目</b>で、しかも並び順（<code>BootOrder</code>）の先頭にいる。</p>
 <p>UEFI は、NVRAM に項目の無いディスクでは、ESP の決まった場所 <code>\EFI\BOOT\BOOTX64.EFI</code> を読む（Boot0001 の「UEFI Misc Device」はそれ）。
 練習機の ESP のそこには、Ubuntu の起動の入口（shim）が置かれている（<code>/boot/efi</code> は root しか読めない設定なので <code>sudo</code> で見た）。
 その shim が、隣の <code>fbx64.efi</code>（fallback）を使って ESP の <code>\EFI\ubuntu\</code> を調べ、「Ubuntu」という項目を NVRAM に書き込んだのが Boot0007 である。
@@ -116,7 +116,7 @@ mmx64.efi</code></pre>
 $ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"system_powerdown"}' | socat - UNIX-CONNECT:qmp.sock
 {"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
 {"return": {}}
-{"timestamp": {"seconds": 1791914326, "microseconds": 235850}, "event": "POWERDOWN"}
+{"timestamp": {"seconds": 1791918640, "microseconds": 997142}, "event": "POWERDOWN"}
 {"return": {}}
 $ while pgrep -x qemu-system-x86 &gt; /dev/null; do sleep 1; done
 $ cmp vars.fd /usr/share/OVMF/OVMF_VARS_4M.fd
@@ -125,7 +125,7 @@ vars.fd /usr/share/OVMF/OVMF_VARS_4M.fd differ: byte 101, line 1</code></pre>
 <b>断られた</b>。<code>pflash1</code>（2つ目のフラッシュ、つまり <code>vars.fd</code>）が「書き込めるのに、スナップショットに対応していない」。
 <code>savevm</code> は、書き込める部品の中身を全部いっしょに保存できないと、保存しない。NVRAM は、練習機が書き込むディスクの1つとして数えられていて、raw のファイルでは中にスナップショットをしまえない。
 NVRAM を qcow2 にして渡せば（<code>qemu-img convert -O qcow2 vars.fd vars.qcow2</code> で写し、<code>format=qcow2</code> でつなぐ）、<code>savevm</code> は通る（著者は試して通ることを確かめた）。
-ただし、動いている状態（メモリの中身）は、書き込める qcow2 のうち1つにだけ入り、このときは <code>vars.qcow2</code> のほうに入った。練習機のディスクの側には、<code>VM SIZE</code> が 0 B のスナップショットの印だけが残る（著者の記録で、<code>vars.qcow2</code> の側が 398MiB、ディスクの側が 0 B）。</p>
+ただし、動いている状態（メモリの中身）は、書き込める qcow2 のうち <code>-drive</code> で先に並べた1つにだけ入り、この章の並べ方（NVRAM が先）では <code>vars.qcow2</code> のほうに入った。練習機のディスクの側には、<code>VM SIZE</code> が 0 B のスナップショットの印だけが残る（著者の記録で、<code>vars.qcow2</code> の側が 395MiB、ディスクの側が 0 B）。</p>
 <p>止めた後、<code>vars.fd</code> をひな形と比べると、101 バイト目から違っていた。練習機の起動が、このファイルを書き換えたのである。</p>
 <div class="analogy"><b>たとえ</b>: OVMF の2つのファイルは、<b>電話交換機と電話帳</b>に近い。交換機（プログラム）は誰の家でも同じなので共有し、電話帳（NVRAM）は家ごとに書き込まれるので、家ごとに1冊持つ。
 <br>ただし<b>崩れる点</b>: 電話帳は人が自分で書くが、NVRAM はファームウェアや OS（shim や GRUB を入れる道具）が勝手に書き込む。読者は何もしていないのに、最初の起動で中身が変わった。
@@ -142,7 +142,7 @@ BdsDxe: starting Boot0007 "Ubuntu" from HD(15,GPT,9606BC98-2904-4577-9584-A83103
 $ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"system_powerdown"}' | socat - UNIX-CONNECT:qmp.sock
 {"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
 {"return": {}}
-{"timestamp": {"seconds": 1791914363, "microseconds": 268751}, "event": "POWERDOWN"}
+{"timestamp": {"seconds": 1791918677, "microseconds": 487144}, "event": "POWERDOWN"}
 {"return": {}}
 $ while pgrep -x qemu-system-x86 &gt; /dev/null; do sleep 1; done</code></pre>
 <p>今度の起動は Boot0007「Ubuntu」から始まり、ESP（GPT の 15 番目の区画）の <code>\EFI\ubuntu\shimx64.efi</code> を読んだ。前の起動が NVRAM に書いた項目が、並び順の先頭にあったからである。
@@ -156,7 +156,7 @@ $ while pgrep -x qemu-system-x86 &gt; /dev/null; do sleep 1; done</code></pre>
 Formatting 'blank.qcow2', fmt=qcow2 cluster_size=65536 extended_l2=off compression_type=zlib size=1073741824 lazy_refcounts=off refcount_bits=16
 $ cp /usr/share/OVMF/OVMF_VARS_4M.fd blank-vars.fd
 $ timeout 20 qemu-system-x86_64 -machine q35 -nic none -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd -drive if=pflash,format=raw,file=blank-vars.fd -drive file=blank.qcow2,if=virtio -display none -serial file:blank.log
-qemu-system-x86_64: terminating on signal 15 from pid 467 (timeout)
+qemu-system-x86_64: terminating on signal 15 from pid 471 (timeout)
 $ grep -a -E 'BdsDxe|Shell' blank.log | tr -d '\r'
 BdsDxe: failed to load Boot0001 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x2,0x0): Not Found
 BdsDxe: loading Boot0002 "EFI Internal Shell" from Fv(7CB8BDC9-F8EB-4F34-AAEA-3EE4AF6516A1)/FvFile(7C04A583-9E3E-4F1C-AD65-E05268D0B4D1)
@@ -164,7 +164,7 @@ BdsDxe: starting Boot0002 "EFI Internal Shell" from Fv(7CB8BDC9-F8EB-4F34-AAEA-3
 UEFI Interactive Shell v2.2
 Shell&gt;
 $ rm blank.qcow2 blank-vars.fd blank.log</code></pre>
-<p class="detail"><code>pid 467</code> の数字は毎回違う。</p>
+<p class="detail"><code>pid 471</code> の数字は毎回違う。</p>
 <p>UEFI はディスク（Boot0001）を試し、<code>Not Found</code>（起動するファイルが見つからない）で次へ進み、UEFI 自身のシェル（<code>Shell&gt;</code>）を起動して止まった。
 空のディスクには区画も ESP も無いので、<code>\EFI\BOOT\BOOTX64.EFI</code> が読めない。<b>UEFI はディスクの先頭のプログラムを実行するのではなく、ESP（FAT）の中のファイルを読む</b>。
 第1章の SeaBIOS が空のディスクで「Boot failed: could not read the boot disk」と言ったのと、探しているものが違う。最後の <code>rm</code> は片付けである。</p>
@@ -197,7 +197,7 @@ NVRAM は仮想マシンごとの設定なので、仮想マシンごとに写�
 <p>UEFI の練習機で <code>savevm</code> を打ったら <code>Device 'pflash1' is writable but does not support snapshots</code> と断られた。何が足りないのか。</p>
 <details><summary>答え</summary>
 <p><code>savevm</code> は、書き込める部品の中身をすべて一緒に保存する。NVRAM（<code>pflash1</code>）も書き込める部品で、raw のファイルでは中に保存できない。
-NVRAM を qcow2 にして（<code>qemu-img convert -O qcow2</code>）<code>format=qcow2</code> で渡せば通る。ただし動いている状態は NVRAM の qcow2 のほうに入り、練習機のディスクの側は <code>VM SIZE</code> が 0 B に見える。</p></details></div>
+NVRAM を qcow2 にして（<code>qemu-img convert -O qcow2</code>）<code>format=qcow2</code> で渡せば通る。ただし動いている状態は、<code>-drive</code> で先に並べた書き込める qcow2 に入る。この章の並べ方（NVRAM が先）なら NVRAM の qcow2 のほうに入り、練習機のディスクの側は <code>VM SIZE</code> が 0 B に見える。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>同じ <code>vars.fd</code> で2回起動すると、1回目は <code>Boot0001 "UEFI Misc Device"</code>、2回目は <code>Boot0007 "Ubuntu"</code> から起動した。何が変わったのか。</p>
 <details><summary>答え</summary>

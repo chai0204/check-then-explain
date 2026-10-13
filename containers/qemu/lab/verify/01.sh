@@ -6,7 +6,8 @@
 #                            端末を手放す。& で後ろに回しただけなら、制御端末はこの端末のまま
 #   - serial.log がいまの QEMU のものか : そのプロセスが ~/work/01/serial.log を開いている（/proc/PID/fd）
 #   ソケットとプロセスは、/proc/net/unix の inode と /proc/PID/fd の socket:[inode] で突き合わせる。
-#   相対パスで作ったソケットは /proc/net/unix に相対パスで出るので、そのプロセスを起動したときの PWD を前に付けて比べる
+#   相対パスで作ったソケットは /proc/net/unix に書いたとおりの相対パス（qmp.sock・./qmp.sock・../01/qmp.sock など）で出るので、
+#   そのプロセスを起動したときの PWD を前に付け、realpath -m で正規化してから比べる
 #   （-daemonize した QEMU は作業ディレクトリを / に移しているので、/proc/PID/cwd は使えない）。
 set -uo pipefail
 command -v socat >/dev/null && command -v jq >/dev/null || { echo "前提不足: socat か jq が見つかりません（檻のイメージを確かめてください）"; exit 2; }
@@ -43,7 +44,8 @@ for p in $(pgrep -x qemu-system-x86); do
     path=$(awk -v i="$ino" '$7 == i && NF >= 8 {print $8}' /proc/net/unix)
     [ -n "$path" ] || continue
     case $path in /*) ;; *) path=${pwd0:-?}/$path ;; esac
-    [ "$path" = "$sock" ] && { qpid=$p; break 2; }
+    path=$(realpath -m -- "$path")        # ./qmp.sock や ../01/qmp.sock も同じ1つの形にしてから比べる
+    [ "$path" = "$(realpath -m -- "$sock")" ] && { qpid=$p; break 2; }
   done
 done
 tty="?"; holds=no

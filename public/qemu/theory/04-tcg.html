@@ -12,7 +12,7 @@
 </div>
 <h1>4. CPU は、命令を翻訳して動いている</h1>
 <p class="lead">練習機の中で CPU の名前を見ると「QEMU Virtual CPU version 2.5+」と出る。そんな製品は無い。
-同じ 20 万回のループが、外（コンテナ）では 0.3 秒、練習機の中では 4.9 秒かかった。
+同じ 20 万回のループが、外（コンテナ）では 0.3 秒、練習機の中では 6.5 秒かかった。
 KVM を使わない QEMU は、練習機の CPU の命令を<b>ひと塊ずつ読んで、ホストの CPU の命令に翻訳してから実行している</b>（TCG）。
 特権が1つも要らない代わりに、遅い。その翻訳の跡は、QEMU のモニタと記録で見られる。</p>
 <div class="badges"><span>前提: 第3章までを同じ端末で終えている（<code>~/work/linuc.qcow2</code> がある）</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
@@ -32,9 +32,9 @@ model name      : Intel(R) Core(TM) Ultra 9 285H
 $ nproc
 16
 $ time (i=0; while [ $i -lt 200000 ]; do i=$((i+1)); done)
-real    0m0.291s
-user    0m0.290s
-sys     0m0.000s</code></pre>
+real    0m0.272s
+user    0m0.271s
+sys     0m0.001s</code></pre>
 <p class="detail">CPU の名前・数・かかった時間は、あなたの PC で変わる（コンテナはホストの CPU をそのまま使うので、あなたの PC の CPU が出る）。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>仮想マシンの中のプログラムも、結局はこの PC の CPU で動いている。仮想化の手間で少しは遅くなっても、同じループなら、かかる時間はせいぜい数割増しのはずだ。
@@ -54,19 +54,19 @@ model name      : QEMU Virtual CPU version 2.5+
 student@linuc:~$ <kbd><b>nproc</b></kbd>
 2
 student@linuc:~$ <kbd><b>time (i=0; while [ $i -lt 200000 ]; do i=$((i+1)); done)</b></kbd>
-real    0m4.946s
-user    0m4.933s
-sys     0m0.003s
+real    0m6.484s
+user    0m6.481s
+sys     0m0.002s
 （打鍵: Ctrl-a c）
 student@linuc:~$ QEMU 8.2.2 monitor - type 'help' for more information
 (qemu) <kbd><b>info jit</b></kbd>
 Accelerator settings:
 one-insn-per-tb: off
 Translation buffer state:
-gen code size       384623539/1073659904
-TB count            681427
+gen code size       367596259/1073659904
+TB count            650626
 TB avg target size  18 max=2014 bytes
-TB avg host size    324 bytes (expansion ratio: 17.3)
+TB avg host size    324 bytes (expansion ratio: 17.4)
 （略）
 Statistics:
 TB flush count      1
@@ -75,16 +75,16 @@ TB flush count      1
 （略）</code></pre>
 <p class="detail">時間と <code>info jit</code> の数は、毎回違い、あなたの PC の速さでも変わる。この記録では、ログインの後の最初のコマンドの行でプロンプトが消えている（第3章の注）。</p>
 <div class="then"><b>だめな理由</b>: CPU の名前は「QEMU Virtual CPU version 2.5+」で、数は 2（<code>-smp 2</code> で決めたとおり）。外の Intel の CPU は見えない。
-そして同じループに 4.9 秒、外の約 17 倍かかった。数割増しどころではない。
+そして同じループに 6.5 秒、外の約 24 倍かかった。数割増しどころではない。
 練習機の中で動いている命令は、この PC の CPU が直接実行しているのではない。<b>QEMU が練習機の命令をひと塊ずつ読み、同じ意味のホストの命令の列に翻訳し、その翻訳を実行している</b>。
 この仕組みを TCG（Tiny Code Generator）という。CPU の名前も QEMU が作った CPU のもので、第1章の <code>-cpu help</code> の既定（<code>qemu64</code>）である。</div></div>
 <p><code>info jit</code> は、その翻訳の作業場の様子である。</p>
 <div class="scroll"><table>
 <tr><th>行</th><th>読み方</th></tr>
-<tr><td><code>TB count 681427</code></td><td>翻訳の置き場所に、いまある塊（Translation Block）の数。約 68 万。下の <code>TB flush count</code> のとおり一度全部捨てているので、起動からの総数ではない</td></tr>
+<tr><td><code>TB count 650626</code></td><td>翻訳の置き場所に、いまある塊（Translation Block）の数。約 65 万。下の <code>TB flush count</code> のとおり一度全部捨てているので、起動からの総数ではない</td></tr>
 <tr><td><code>TB avg target size 18</code></td><td>1つの塊が、練習機の命令で平均 18 バイト（だいたい分岐の命令までの数個の命令）</td></tr>
-<tr><td><code>TB avg host size 324 bytes (expansion ratio: 17.3)</code></td><td>その塊を翻訳したホストの命令は平均 324 バイトで、元の 17.3 倍に膨らむ</td></tr>
-<tr><td><code>gen code size 384623539/1073659904</code></td><td>翻訳したホストの命令の置き場所（約 1GiB）のうち、約 370MiB を使っている</td></tr>
+<tr><td><code>TB avg host size 324 bytes (expansion ratio: 17.4)</code></td><td>その塊を翻訳したホストの命令は平均 324 バイト。全部の塊を合わせると、元の 17.4 倍に膨らんでいる（平均の欄は小数を切り捨てた値）</td></tr>
+<tr><td><code>gen code size 367596259/1073659904</code></td><td>翻訳したホストの命令の置き場所（約 1GiB）のうち、約 350MiB を使っている</td></tr>
 <tr><td><code>TB flush count 1</code></td><td>置き場所を一度、全部捨てて作り直した（翻訳はやり直しになる）</td></tr>
 </table></div>
 <p>翻訳には時間がかかるが、翻訳した塊は取っておき、同じ場所をもう一度通るときはそのまま使う（命令が書き換えられた所は、翻訳し直す）。だからループのように同じ命令を何度も通る処理は、2回目からは翻訳済みのものを実行するだけになる。
@@ -103,7 +103,7 @@ out_asm         show generated host assembly code for each compiled TB
 in_asm          show target assembly code for each compiled TB</code></pre>
 <p><code>in_asm</code> は「翻訳した塊（TB）ごとに、元の（target＝練習機の）命令を書く」項目である。ディスクの無い PC を5秒だけ動かし、書き出す先を <code>-D</code> でファイルにする。</p>
 <pre data-where="外（lab@host）"><code>$ timeout 5 qemu-system-x86_64 -display none -d in_asm -D tcg.log
-qemu-system-x86_64: terminating on signal 15 from pid 246 (timeout)
+qemu-system-x86_64: terminating on signal 15 from pid 250 (timeout)
 $ head -9 tcg.log
 ----------------
 IN:
@@ -114,18 +114,18 @@ IN:
 0x000fe05b:
 OBJD-T: 2e66833e2862000f8545f0
 $ grep -c '^IN:' tcg.log
-6055
+6054
 $ rm tcg.log</code></pre>
-<p class="detail">塊の数（6055）は、5秒のうちにファームウェアがどこまで進むかで決まり、少し変わる（著者が続けて5回取ると 6050〜6056 だった）。PC の速さでも変わる。</p>
+<p class="detail">塊の数（6054）は、5秒のうちにファームウェアがどこまで進むかで決まり、少し変わる（著者が続けて5回取ると 6054〜6056 だった）。PC の速さでも変わる。</p>
 <p>「IN:」の1つが翻訳した1つの塊で、次の行がその塊の番地、<code>OBJD-T:</code> の後ろが命令のバイト列である（この Ubuntu の QEMU は、命令を読める形に直す部品を持たないので、バイトのまま出す）。</p>
 <ul>
-<li><b>最初の塊の番地は 0xfffffff0</b>。386 より後の x86 の CPU は電源を入れた直後、必ずこの番地（4GiB の 16 バイト手前）から命令を読む（<b>リセットベクタ</b>。8086 は 0xffff0、80286 は 0xfffff0 だった）。そこにはファームウェアの ROM が見えている</li>
+<li><b>最初の塊の番地は 0xfffffff0</b>。386 以降の x86 の CPU は電源を入れた直後、必ずこの番地（4GiB の 16 バイト手前）から命令を読む（<b>リセットベクタ</b>。8086 は 0xffff0、80286 は 0xfffff0 だった）。そこにはファームウェアの ROM が見えている</li>
 <li>そこにあったのは <code>ea 5b e0 00 f0</code> の1命令で、「f000 の e05b へ跳べ」（遠くへのジャンプ）。だから2つ目の塊は <code>0x000fe05b</code>（f000:e05b を番地にしたもの）で、ここからが SeaBIOS の本体</li>
-<li>5秒で 6055 個の塊を翻訳した。ファームウェアが初めて通る道は、すべて翻訳から始まる</li>
+<li>5秒で 6054 個の塊を翻訳した。ファームウェアが初めて通る道は、すべて翻訳から始まる</li>
 </ul>
 <p>本物の PC の CPU も同じ番地から始めるが、本物は ROM の命令をそのまま実行する。TCG は、その1命令目から翻訳している。</p>
 <div class="analogy"><b>たとえ</b>: リセットベクタは、新入社員が初日に必ず行く<b>受付</b>に近い。受付では仕事をせず、「3階（SeaBIOS の本体）へ」と案内されるだけ。
-<br>ただし<b>崩れる点</b>: 受付の場所は会社ごとに違うが、リセットベクタの番地は 386 より後の x86 の CPU なら全部同じで、本物の CPU も、QEMU が作った CPU も、必ずここから始まる。だから TCG の記録の1行目は、誰が取っても同じになる。</div>
+<br>ただし<b>崩れる点</b>: 受付の場所は会社ごとに違うが、リセットベクタの番地は 386 以降の x86 の CPU なら全部同じで、本物の CPU も、QEMU が作った CPU も、必ずここから始まる。だから TCG の記録の1行目は、誰が取っても同じになる。</div>
 
 <h2 id="accel">翻訳しない方法は、この檻では使えない</h2>
 <div class="sgoal"><b>この節で分かること</b>: 翻訳をしない方法（KVM）が何を要るか。それがこの檻に無いこと。</div>
@@ -160,14 +160,14 @@ KVM で同じ練習機を動かすとどうなるかは、<a href="/kvm/theory/"
 <p>練習機に見えている CPU は、ホストの CPU ではなく、QEMU が作った CPU（既定の型 <code>qemu64</code>）である。
 命令はホストの CPU が直接実行しているのではなく、QEMU が翻訳して実行している（KVM で <code>-cpu host</code> にすれば、ホストの CPU の名前が見える）。</p></details></div>
 <div class="quiz"><b>確認</b>
-<p><code>info jit</code> に <code>TB avg target size 18</code> と <code>TB avg host size 324 bytes (expansion ratio: 17.3)</code> と出た。何と何の比か。</p>
+<p><code>info jit</code> に <code>TB avg target size 18</code> と <code>TB avg host size 324 bytes (expansion ratio: 17.4)</code> と出た。何と何の比か。</p>
 <details><summary>答え</summary>
-<p>翻訳した1つの塊（TB）の大きさを、元の練習機の命令で測ると平均 18 バイト、翻訳したホストの命令で測ると平均 324 バイト。その比が 17.3。
+<p>翻訳した1つの塊（TB）の大きさを、元の練習機の命令で測ると平均 18 バイト、翻訳したホストの命令で測ると平均 324 バイト。<code>expansion ratio</code> の 17.4 は、全部の塊の大きさの合計どうしの比である（平均の2つの欄は小数を切り捨てて出しているので、324÷18 とは少しずれる）。
 翻訳すると、命令はバイト数で元の 17 倍ほどの大きさになる（命令の数の比ではない）。翻訳済みの塊は使い回すが、それでも外より何倍も遅い理由の1つである。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>-d in_asm</code> の記録の最初の塊が、何度取っても <code>0xfffffff0</code> になるのはなぜか。</p>
 <details><summary>答え</summary>
-<p>386 より後の x86 の CPU は、電源投入（リセット）の直後に必ず 0xfffffff0 から命令を読む決まり（リセットベクタ）で、QEMU が作る CPU もそれに従う。
+<p>386 以降の x86 の CPU は、電源投入（リセット）の直後に必ず 0xfffffff0 から命令を読む決まり（リセットベクタ）で、QEMU が作る CPU もそれに従う。
 そこにあるファームウェアの最初の命令（f000:e05b へのジャンプ）が、TCG が最初に翻訳する塊になる。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>この檻で <code>-accel kvm</code> を付けると断られた。檻に何を足せば使えるようになるか。その代わりに何が変わるか。</p>
@@ -177,7 +177,7 @@ KVM で同じ練習機を動かすとどうなるかは、<a href="/kvm/theory/"
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
-<li>KVM を使わない QEMU（TCG）は、練習機の命令をひと塊（TB）ずつホストの命令に翻訳してから実行する。特権は要らないが遅い（この記録では同じループが約 17 倍）</li>
+<li>KVM を使わない QEMU（TCG）は、練習機の命令をひと塊（TB）ずつホストの命令に翻訳してから実行する。特権は要らないが遅い（この記録では同じループが約 24 倍）</li>
 <li>練習機に見える CPU は QEMU が作った CPU（既定は <code>qemu64</code>、「QEMU Virtual CPU version 2.5+」）</li>
 <li><code>info jit</code> は翻訳の作業場の統計、<code>-d in_asm -D ファイル</code> は翻訳した塊ごとの元の命令の記録。最初の塊はリセットベクタ 0xfffffff0</li>
 <li>翻訳しない方法は KVM（<code>-accel kvm</code>）で、<code>/dev/kvm</code> が要る。この檻とこのサイトの仮想マシン型の檻は、権限を求めず同じ画面を出すために使わない</li>

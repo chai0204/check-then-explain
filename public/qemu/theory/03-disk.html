@@ -44,7 +44,7 @@ Image end offset: 552337408</code></pre>
 <code>qemu-img check</code> は、中身を 64KiB の塊に分けて数えた。20GiB は 327680 個の塊で、書かれているのはそのうち 18878 個（5.76%、約 1.15GiB）だけだった。
 <b>書かれていない残りの約 18.8GiB は、どこにも置かれていない</b>。書かれた約 1.15GiB が 527MiB に収まっているのは、塊の 88.07% が圧縮されているから（<code>compressed clusters</code>）で、この檻を作ったときに、配るために圧縮した。
 練習機が後から書く塊は、圧縮されない。</p>
-<p class="detail"><code>fragmented</code> は塊がファイルの中で番地の順に並んでいない割合で、ここでは気にしなくてよい。</p>
+<p class="detail"><code>fragmented</code> は、塊がファイルの中で番地の順に並んでいない割合である。QEMU は圧縮した塊をすべてここに数えるので、90.38% のうち 88.07 ポイントは圧縮の分で、ふつうの塊で順に並んでいないのは 2.3% ほどにすぎない。ここでは気にしなくてよい。</p>
 
 <h2 id="size">20GiB のディスクを作る</h2>
 <div class="sgoal"><b>この節で分かること</b>: 仮想マシンのディスクの大きさと、ファイルの大きさが別物であること。raw と qcow2 の違い。</div>
@@ -53,13 +53,13 @@ Image end offset: 552337408</code></pre>
 <pre data-where="外（lab@host）"><code>$ qemu-img create -f raw empty.raw 20G
 Formatting 'empty.raw', fmt=raw size=21474836480
 $ ls -l empty.raw
--rw-r--r-- 1 lab lab 21474836480 Oct 14 02:50 empty.raw
+-rw-r--r-- 1 lab lab 21474836480 Oct 14 04:02 empty.raw
 $ du -h empty.raw
 4.0K    empty.raw
 $ qemu-img create -f qcow2 empty.qcow2 20G
 Formatting 'empty.qcow2', fmt=qcow2 cluster_size=65536 extended_l2=off compression_type=zlib size=21474836480 lazy_refcounts=off refcount_bits=16
 $ ls -l empty.qcow2
--rw-r--r-- 1 lab lab 196928 Oct 14 02:50 empty.qcow2
+-rw-r--r-- 1 lab lab 196928 Oct 14 04:02 empty.qcow2
 $ head -c 4 empty.qcow2 | od -c
 0000000   Q   F   I 373
 0000004
@@ -93,7 +93,7 @@ qemu-system-x86_64: -drive file=/var/lib/lab-vm/linuc-guest.qcow2,if=virtio: Cou
 <pre data-where="外（lab@host）"><code>$ qemu-img create -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 linuc.qcow2
 Formatting 'linuc.qcow2', fmt=qcow2 cluster_size=65536 extended_l2=off compression_type=zlib size=21474836480 backing_file=/var/lib/lab-vm/linuc-guest.qcow2 backing_fmt=qcow2 lazy_refcounts=off refcount_bits=16
 $ ls -l linuc.qcow2
--rw-r--r-- 1 lab lab 196928 Oct 14 02:50 linuc.qcow2
+-rw-r--r-- 1 lab lab 196928 Oct 14 04:02 linuc.qcow2
 $ qemu-img info --backing-chain linuc.qcow2 | grep -E '^(image|virtual size|disk size|backing file):'
 image: linuc.qcow2
 virtual size: 20 GiB (21474836480 bytes)
@@ -117,7 +117,7 @@ GRUB_FORCE_PARTUUID set, attempting initrdless boot.
 （略）
 [    0.000000] DMI: QEMU Ubuntu 24.04 PC v2 (i440FX + PIIX, arch_caps fix, 1996), BIOS 1.16.3-debian-1.16.3-2 04/01/2014
 （略）
-[    1.513897]  vda: vda1 vda14 vda15 vda16
+[    1.468290]  vda: vda1 vda14 vda15 vda16
 （略）
 Welcome to Ubuntu 24.04.5 LTS!
 （略）
@@ -144,8 +144,8 @@ student@linuc:~$ QEMU 8.2.2 monitor - type 'help' for more information
 (qemu) <kbd><b>system_powerdown</b></kbd>
 （略）
 [  OK  ] Reached target poweroff.target - System Power Off.
-[   52.424274] reboot: Power down</code></pre>
-<p class="detail">行の頭の <code>[    1.513897]</code> は、カーネルが起動してからの秒数で、毎回違う。
+[   53.558881] reboot: Power down</code></pre>
+<p class="detail">行の頭の <code>[    1.468290]</code> は、カーネルが起動してからの秒数で、毎回違う。
 練習機の中の表示（「この中でも lab check NN で…」）は他の記事の檻の案内で、この檻では使えない。</p>
 <p>流れたのは、第1章の何も無い PC と同じ順番の続きである。GRUB（ディスクの中の起動のプログラム）が出て、Linux のカーネルが起動し、
 <code>DMI: QEMU Ubuntu 24.04 PC v2 (i440FX + PIIX, …)</code> と、自分が動いている PC が QEMU の既定のマシン型であることを書き、
@@ -159,7 +159,7 @@ student@linuc:~$ QEMU 8.2.2 monitor - type 'help' for more information
 どの行に当たるかは、あなたの PC の速さと、打つまでの間で変わる。本文の記録では、ログインして最初に打った行が毎回これに当たり、プロンプトが消えている（記録はログインしてから 15 秒ほど待って打った）。消えて見えても、打ったものはそのまま届いている。</div>
 <p>止まった後の差分ディスクと土台を見る。</p>
 <pre data-where="外（lab@host）"><code>$ ls -l linuc.qcow2
--rw-r--r-- 1 lab lab 19136512 Oct 14 02:51 linuc.qcow2
+-rw-r--r-- 1 lab lab 19136512 Oct 14 04:03 linuc.qcow2
 $ sha256sum /var/lib/lab-vm/linuc-guest.qcow2
 698763d45569b666a7c8e41ea4b34eec86d86a803c6c0c562d18c28059234c8d  /var/lib/lab-vm/linuc-guest.qcow2
 $ cat /var/lib/lab-vm/linuc-guest.sha256
@@ -189,7 +189,7 @@ student@linuc:~$ <kbd><b>ls</b></kbd>
 （打鍵: Ctrl-a c）
 student@linuc:~$ QEMU 8.2.2 monitor - type 'help' for more information
 (qemu) <kbd><b>info block</b></kbd>
-virtio0 (#block857): json:{"backing": {"driver": "qcow2", "file": {"driver": "file", "filename": "linuc.qcow2"}}, "driver": "qcow2", "file": {"driver": "file", "filename": "/var/tmp/vl.Q8H2W3"}} (qcow2)
+virtio0 (#block888): json:{"backing": {"driver": "qcow2", "file": {"driver": "file", "filename": "linuc.qcow2"}}, "driver": "qcow2", "file": {"driver": "file", "filename": "/var/tmp/vl.EL2RW3"}} (qcow2)
     Attached to:      /machine/peripheral-anon/device[0]/virtio-backend
     Cache mode:       writeback, ignore flushes
     Backing file:     linuc.qcow2 (chain depth: 2)
@@ -203,7 +203,7 @@ sd0: [not inserted]
     Removable device: not locked, tray closed
 (qemu) <kbd><b>quit</b></kbd>
 $ ls -l linuc.qcow2
--rw-r--r-- 1 lab lab 19136512 Oct 14 02:51 linuc.qcow2</code></pre>
+-rw-r--r-- 1 lab lab 19136512 Oct 14 04:03 linuc.qcow2</code></pre>
 <p class="detail"><code>#block</code> の後ろの数字と、<code>/var/tmp/vl.</code> の後ろの名前は毎回違う。この記録では、ログインの後の最初の <code>rm hello.txt</code> の行で、プロンプトが消えている（上の注）。</p>
 <p>中の OS からは確かに消え（<code>ls</code> が何も出さない）、電源も抜いたのに、<code>linuc.qcow2</code> は大きさも時刻も起動の前のままだった。
 <code>info block</code> が理由を書いている。練習機のディスク（<code>virtio0</code>）の実体は <code>/var/tmp/vl.</code> で始まる名前の一時ファイルで、その土台が <code>linuc.qcow2</code>、さらにその土台が練習機の土台で、重なりは2段（<code>chain depth: 2</code>）になっていた。
@@ -246,34 +246,34 @@ hello.txt
 student@linuc:~$ (qemu) <kbd><b>info snapshots</b></kbd>
 List of snapshots present on all disks:
 ID        TAG               VM SIZE                DATE     VM CLOCK     ICOUNT
---        clean             343 MiB 2026-10-14 02:53:47 00:00:53.829
+--        clean             347 MiB 2026-10-14 04:05:44 00:00:53.821
 (qemu) <kbd><b>system_powerdown</b></kbd>
 （略）
-[   64.049083] reboot: Power down</code></pre>
+[   65.876836] reboot: Power down</code></pre>
 <p class="detail">モニタの <code>(qemu)</code> は、2回目からは練習機のプロンプトの後ろに続けて出る（切り替えたときにカーソルがあった場所に出るため）。
 <code>VM SIZE</code>・<code>DATE</code>・<code>VM CLOCK</code> は毎回違う。ここでも、ログインの後の最初の <code>ls</code> の行で、プロンプトが消えている。</p>
 <p><code>-snapshot</code> の起動で消した <code>hello.txt</code> は、残っていた（あの削除は一時ファイルごと捨てられた）。
 <code>savevm clean</code> の後に消した <code>hello.txt</code> は、<code>loadvm clean</code> で戻った。戻ったのはファイルだけではない。
 <code>loadvm</code> は、ディスクの中身と一緒に、メモリの中身・CPU のレジスタ・部品の状態を保存した瞬間に戻すので、練習機の中の OS は「ログインして <code>ls</code> を打った直後」の続きから動き出した。
-<code>info snapshots</code> の <code>VM SIZE</code>（343MiB）が、保存した<b>動いている状態</b>（主にメモリの中身）の大きさで、<code>VM CLOCK</code> は練習機の電源を入れてから保存までの時間（54 秒）である。</p>
+<code>info snapshots</code> の <code>VM SIZE</code>（347MiB）が、保存した<b>動いている状態</b>（主にメモリの中身）の大きさで、<code>VM CLOCK</code> は練習機の電源を入れてから保存までの時間（54 秒）である。</p>
 <pre data-where="外（lab@host）"><code>$ qemu-img snapshot -l linuc.qcow2
 Snapshot list:
 ID        TAG               VM SIZE                DATE     VM CLOCK     ICOUNT
-1         clean             343 MiB 2026-10-14 02:53:47 00:00:53.829
+1         clean             347 MiB 2026-10-14 04:05:44 00:00:53.821
 $ ls -l linuc.qcow2
--rw-r--r-- 1 lab lab 394854400 Oct 14 02:54 linuc.qcow2
+-rw-r--r-- 1 lab lab 399638528 Oct 14 04:06 linuc.qcow2
 $ qemu-img info linuc.qcow2 | grep '^disk size'
-disk size: 376 MiB
+disk size: 381 MiB
 $ qemu-img snapshot -d clean linuc.qcow2
 $ ls -l linuc.qcow2
--rw-r--r-- 1 lab lab 394854400 Oct 14 02:54 linuc.qcow2
+-rw-r--r-- 1 lab lab 399638528 Oct 14 04:06 linuc.qcow2
 $ qemu-img info linuc.qcow2 | grep '^disk size'
-disk size: 375 MiB</code></pre>
+disk size: 379 MiB</code></pre>
 <p>QEMU を止めた後でも、<code>qemu-img snapshot -l</code> で同じ一覧が読めた。保存したものは、どこか別の場所ではなく <b><code>linuc.qcow2</code> というファイルの中</b>にある（<b>内部スナップショット</b>）。
-そのぶん、ファイルは 18.3MiB から 377MiB（394854400 バイト）に増えた。
-<code>qemu-img snapshot -d</code> で消しても、<code>ls -l</code> の長さは変わらなかった。qcow2 は、ファイルを短くはしない。そのうえ、ここでは <code>disk size</code>（実際に場所を取っている量）も、376MiB が 375MiB になっただけだった。
+そのぶん、ファイルは 18.3MiB から 381MiB（399638528 バイト）に増えた。
+<code>qemu-img snapshot -d</code> で消しても、<code>ls -l</code> の長さは変わらなかった。qcow2 は、ファイルを短くはしない。そのうえ、ここでは <code>disk size</code>（実際に場所を取っている量）も、381MiB が 379MiB になっただけだった。
 ふつうは、消したスナップショットだけが使っていた塊を、qcow2 がファイルの穴に戻す（下のファイルシステムに「ここはもう要らない」と伝える。discard）ので、<code>ls -l</code> の長さは同じでも <code>disk size</code> は減る。
-ここでほとんど減らなかったのは、<code>loadvm clean</code> で保存した瞬間に戻ったとき、保存した状態の塊を、いまのディスクも指すようになったからである（著者が <code>loadvm</code> をせずに消すと、353MiB が 7.57MiB に減った）。</p>
+ここでほとんど減らなかったのは、<code>loadvm clean</code> で保存した瞬間に戻ったとき、保存した状態の塊を、いまのディスクも指すようになったからである（著者が <code>loadvm</code> をせずに消すと、351MiB が 7.63MiB に減った）。</p>
 <div class="analogy"><b>たとえ</b>: <code>savevm</code> はゲームの<b>セーブ</b>に近い。持ち物（ディスク）だけでなく、いる場所や体力（メモリ・CPU）まで戻る。
 <br>ただし<b>崩れる点</b>: ゲームのセーブは別のファイルになるが、内部スナップショットはディスクのファイルそのものに入る。消すと場所はふつう返るが、<code>loadvm</code> でそのセーブに戻った後は、いまのディスクも同じ場所を使っているので返らない。
 もう1つ、セーブはいつでもできるとは限らない。書き込める部品が全部 qcow2 でないと、<code>savevm</code> は断られる（第6章で、UEFI のファームウェアの設定のファイルがそれに当たる）。</div>
@@ -297,11 +297,11 @@ disk size: 375 MiB</code></pre>
 <p>壊れたディスクに見える。<code>a.qcow2</code> は「書いた塊」しか持たず、残りは <code>base.qcow2</code> の同じ番地を読む。土台の中身が別物になると、差分の塊と土台の塊が食い違い、ファイルシステムの表と中身が合わなくなる。
 土台は読み取り専用にしておく（この檻の土台が root の持ち物で <code>r--r--r--</code> なのはそのため）。</p></details></div>
 <div class="quiz"><b>確認</b>
-<p><code>info snapshots</code> の <code>VM SIZE</code> が 343 MiB のスナップショットと、0 B のスナップショットがある。それぞれ、どうやって作られたものと考えられるか。</p>
+<p><code>info snapshots</code> の <code>VM SIZE</code> が 347 MiB のスナップショットと、0 B のスナップショットがある。それぞれ、どうやって作られたものと考えられるか。</p>
 <details><summary>答え</summary>
-<p>343 MiB のほうは、動いている練習機のモニタで <code>savevm</code> したもので、メモリの中身などの動いている状態を持つ。<code>loadvm</code> すると保存した瞬間の続きに戻る。
+<p>347 MiB のほうは、動いている練習機のモニタで <code>savevm</code> したもので、メモリの中身などの動いている状態を持つ。<code>loadvm</code> すると保存した瞬間の続きに戻る。
 0 B のほうは、ふつうは止まっているディスクに外から <code>qemu-img snapshot -c</code> で取ったもので、ディスクの中身だけを持つ。戻すと「電源を入れる前」の状態に戻る（演習03 の判定はこの違いを見る）。
-ただし、<code>savevm</code> で取ったのに 0 B に見えることもある。<code>savevm</code> は動いている状態を、書き込める qcow2 のうち1つにだけ入れるので、ほかの qcow2（たとえば UEFI の NVRAM。第6章）も渡していると、状態はそちらに入っている。</p></details></div>
+ただし、<code>savevm</code> で取ったのに 0 B に見えることもある。<code>savevm</code> は動いている状態を、書き込める qcow2 のうち <code>-drive</code> で先に並べた1つにだけ入れるので、ほかの qcow2（たとえば UEFI の NVRAM。第6章）をディスクより先に並べていると、状態はそちらに入っている。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul>

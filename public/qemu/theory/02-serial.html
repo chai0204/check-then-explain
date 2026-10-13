@@ -69,8 +69,8 @@ SeaBIOS は、自分の名前（<code>SeaBIOS (version</code>）を出すより�
 <pre data-where="外（lab@host）"><code>$ timeout 3 qemu-system-x86_64 -display none -serial file:vga.log
 qemu-system-x86_64: terminating on signal 15 from pid 90 (timeout)
 $ ls -l bios.log vga.log
--rw-r--r-- 1 lab lab 834 Oct 14 02:50 bios.log
--rw-r--r-- 1 lab lab   0 Oct 14 02:50 vga.log</code></pre>
+-rw-r--r-- 1 lab lab 834 Oct 14 04:02 bios.log
+-rw-r--r-- 1 lab lab   0 Oct 14 04:02 vga.log</code></pre>
 <p><code>graphics=off</code> を付けなかった <code>vga.log</code> は 0 バイトだった。画面（VGA）があると思っている SeaBIOS は、画面にだけ書いてシリアルには何も書かない。
 <code>-display none</code> は「QEMU が画面を誰にも見せない」だけで、仮想の PC には VGA の画面がある。
 <b><code>-nographic</code> は、「画面を見せない（<code>-display none</code>）」「ファームウェアに画面が無いと伝える（<code>graphics=off</code>）」「シリアルとモニタを端末につなぐ（<code>-serial mon:stdio</code>）」をまとめた指定</b>（使わないパラレルポートは <code>null</code> につなぐ）で、
@@ -135,7 +135,7 @@ QEMU では、シリアルもモニタも、バイトの流れの行き先（<b>
 今度は QEMU を端末から切り離し（<code>-daemonize</code>）、QMP を UNIX ソケット <code>qmp.sock</code> で受け付ける。</p>
 <pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -display none -qmp unix:qmp.sock,server=on,wait=off -daemonize
 $ ls -l qmp.sock
-srwxr-x--- 1 lab lab 0 Oct 14 02:50 qmp.sock</code></pre>
+srwxr-x--- 1 lab lab 0 Oct 14 04:02 qmp.sock</code></pre>
 <p>プロンプトはすぐに戻った。QEMU は後ろで動いていて、<code>qmp.sock</code>（先頭の <code>s</code> はソケットの印）で話しかけられるのを待っている。
 <code>socat</code> は、端末からの入力をソケットへ、ソケットからの返事を端末へつなぐ道具である。最初に <code>qmp_capabilities</code>（あいさつ）を送り、それから命令を送る。</p>
 <pre data-where="外（lab@host）"><code>$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"query-status"}' | socat - UNIX-CONNECT:qmp.sock
@@ -145,7 +145,7 @@ srwxr-x--- 1 lab lab 0 Oct 14 02:50 qmp.sock</code></pre>
 $ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"system_powerdown"}' | socat - UNIX-CONNECT:qmp.sock
 {"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
 {"return": {}}
-{"timestamp": {"seconds": 1791913835, "microseconds": 524551}, "event": "POWERDOWN"}
+{"timestamp": {"seconds": 1791918153, "microseconds": 341890}, "event": "POWERDOWN"}
 {"return": {}}
 $ pgrep -a qemu-system
 102 qemu-system-x86_64 -display none -qmp unix:qmp.sock,server=on,wait=off -daemonize</code></pre>
@@ -155,9 +155,9 @@ $ pgrep -a qemu-system
 <pre data-where="外（lab@host）"><code>$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"quit"}' | socat - UNIX-CONNECT:qmp.sock
 {"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
 {"return": {}}
-{"timestamp": {"seconds": 1791913837, "microseconds": 160756}, "event": "SHUTDOWN", "data": {"guest": false, "reason": "host-qmp-quit"}}
+{"timestamp": {"seconds": 1791918154, "microseconds": 971278}, "event": "SHUTDOWN", "data": {"guest": false, "reason": "host-qmp-quit"}}
 {"return": {}}
-2026/10/14 02:50:37 socat[113] E read(5, 0x556c91250000, 8192): Connection reset by peer
+2026/10/14 04:02:34 socat[113] E read(5, 0x6535da6c1000, 8192): Connection reset by peer
 $ pgrep -a qemu-system; echo "exit=$?"
 exit=1
 $ rm bios.log vga.log qmp.sock</code></pre>

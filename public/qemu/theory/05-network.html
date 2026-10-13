@@ -56,24 +56,24 @@ virtio-net-pci.0: index=0,type=nic,model=virtio-net-pci,macaddr=52:54:00:12:34:5
  \ n0: index=0,type=user,net=10.0.2.0,restrict=off
 (qemu) <kbd><b>system_powerdown</b></kbd>
 （略）
-[   52.653821] reboot: Power down</code></pre>
+[   52.631592] reboot: Power down</code></pre>
 <p class="detail">この記録では、ログインの後の最初の <code>ip -br a</code> の行で、プロンプトが消えている（第3章の注）。</p>
 <div class="then"><b>だめな理由</b>: NIC はある（<code>ens3</code>）。QEMU の側でも、virtio の NIC（<code>virtio-net-pci.0</code>）がネットワーク n0（<code>type=user,net=10.0.2.0</code>）につながっている。
 それでも <code>ens3</code> は <code>DOWN</code> で、アドレスが無い。練習機の設定（netplan）を読むと、DHCP でアドレスをもらうのは <b><code>enp0s16</code> という名前の NIC だけ</b>だった。
-名前が違う NIC は、つながっていても誰も設定しない。<b>NIC の名前は、NIC の種類ではなく、QEMU がその NIC を差した位置で決まる</b>。この PC（既定の <code>pc</code>）では、3番目のスロットに差したので <code>ens3</code> になった。</div></div>
+名前が違う NIC は、つながっていても誰も設定しない。<b>NIC の名前は、NIC の種類ではなく、QEMU がその NIC を差した位置で決まる</b>。この PC（何も指定しないときの i440FX の系統。<code>pc</code> 系）では、3番目のスロットに差したので <code>ens3</code> になった。</div></div>
 
 <h2 id="slot">名前は、差した位置で決まる</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>ens3</code> と <code>enp0s16</code> の読み方。練習機が <code>enp0s16</code> を待っている理由。</div>
 <p>Linux（systemd）は、NIC に「どこに差さっているか」から名前を付ける（予測可能なインターフェース名。起動のたびに eth0・eth1 の順番が入れ替わらないように、位置から名前を作る）。</p>
 <div class="scroll"><table>
 <tr><th>名前</th><th>読み方</th><th>こうなる条件</th></tr>
-<tr><td><code>ens3</code></td><td>en（Ethernet）＋ s3（スロット 3）</td><td>ファームウェアが、抜き差しできるスロットの番号を OS に伝えている（既定の <code>pc</code> の PCI のスロット）</td></tr>
+<tr><td><code>ens3</code></td><td>en（Ethernet）＋ s3（スロット 3）</td><td>ファームウェアが、抜き差しできるスロットの番号を OS に伝えている（i440FX（<code>pc</code> 系）の PCI のスロット）</td></tr>
 <tr><td><code>enp0s16</code></td><td>en ＋ p0（PCI のバス 0）＋ s16（スロット 16）</td><td>スロットの番号が伝わらないので、PCI の位置から名前を作る（<code>q35</code> の根っこの PCI Express のバス）</td></tr>
 </table></div>
-<p>QEMU は、部品を PCI の空いている位置に順に差していく。既定の <code>pc</code> では 0〜2 番がチップセットと VGA で埋まっているので、足した NIC は 3 番に入って <code>ens3</code> になった。
+<p>QEMU は、部品を PCI の空いている位置に順に差していく。何も指定しないときの i440FX（<code>pc</code> 系）では 0〜2 番がチップセットと VGA で埋まっているので、足した NIC は 3 番に入って <code>ens3</code> になった。
 練習機の設定が <code>enp0s16</code>（バス 0・スロット 16）を待っているのは、このサイトの仮想マシン型の檻（libvirt）の定義が、<b><code>q35</code> のマシン型で、NIC を位置 0x10（16）に差している</b>からである（第7章でその行を読む）。
 同じ位置に差せば、同じ名前になる。<code>-device</code> の <code>addr=0x10</code> が、差す位置の指定である。</p>
-<p class="detail">既定の <code>pc</code> のまま <code>addr=0x10</code> に差すと、スロットの番号が伝わるので名前は <code>ens16</code> になる。著者が試すと、それでもアドレスは付いた。
+<p class="detail">何も指定しない i440FX（<code>pc</code> 系）のまま <code>addr=0x10</code> に差すと、スロットの番号が伝わるので名前は <code>ens16</code> になる。著者が試すと、それでもアドレスは付いた。
 Linux がこの NIC に別名（altname）として <code>enp0s16</code> も付け、設定がその別名に当たったためである（<code>ip link show ens16</code> に <code>altname enp0s16</code> と出た）。
 迷わないよう、この章では libvirt の定義と同じ q35 の系統にそろえる（<code>-machine q35</code>。版まで同じではないことを、次の節で確かめる）。</p>
 <div class="analogy"><b>たとえ</b>: NIC の名前は、郵便の<b>住所</b>に近い。同じ人（同じ NIC）でも、住む場所（差した位置）が変われば宛名が変わり、旧住所あての郵便（設定）は届かない。
@@ -87,12 +87,12 @@ Linux がこの NIC に別名（altname）として <code>enp0s16</code> も付�
 <pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 -drive file=linuc.qcow2,if=virtio -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 -device virtio-net-pci,netdev=n0,addr=0x10 -display none -serial file:serial.log -qmp unix:qmp.sock,server=on,wait=off -daemonize
 $ ss -tlnp
 State    Recv-Q   Send-Q     Local Address:Port     Peer Address:Port  Process
-LISTEN   0        1              127.0.0.1:2222          0.0.0.0:*      users:(("qemu-system-x86",pid=279,fd=13))
+LISTEN   0        1              127.0.0.1:2222          0.0.0.0:*      users:(("qemu-system-x86",pid=280,fd=13))
 $ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"qom-get","arguments":{"path":"/machine","property":"type"}}' | socat - UNIX-CONNECT:qmp.sock
 {"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
 {"return": {}}
 {"return": "pc-q35-8.2-machine"}</code></pre>
-<p class="detail"><code>pid=279</code> の数字は毎回違う。</p>
+<p class="detail"><code>pid=280</code> の数字は毎回違う。</p>
 <p>QMP の <code>qom-get</code> で、組み上がった PC のマシン型を尋ねた。<code>-machine q35</code> で選ばれたのは <code>pc-q35-8.2</code> で、第1章の一覧の q35 の2行のうち、QEMU 本来の版のほうだった。libvirt の練習機は、同じ q35 の系統の別の版（<code>pc-q35-noble</code>）で動いている（第7章）。版が違っても、NIC を差す位置の決まりは同じなので、名前は同じになる（この後の <code>ip -br a</code> で確かめる）。</p>
 <p>練習機はまだ起動の途中なのに、127.0.0.1:2222 ではもう誰かが待っている。待っているのは <b><code>qemu-system-x86</code> のプロセス</b>（QEMU）である。
 <code>ssh linuc</code> は、この檻の <code>~/.ssh/config</code> で 127.0.0.1 の 2222 番に行くよう決めてあるので、その接続はまず QEMU が受け取る。
@@ -108,8 +108,8 @@ default via 10.0.2.2 dev enp0s16 proto dhcp src 10.0.2.15 metric 100
 10.0.2.3 dev enp0s16 proto dhcp scope link src 10.0.2.15 metric 100
 $ ssh linuc ss -tn
 State Recv-Q Send-Q Local Address:Port Peer Address:Port Process
-ESTAB 0      0          10.0.2.15:22       10.0.2.2:41452</code></pre>
-<p class="detail"><code>10.0.2.2:41452</code> の番号は毎回違う。<code>ssh linuc コマンド</code> は、練習機の中でそのコマンドを1つ打って、出力を持ち帰る。</p>
+ESTAB 0      0          10.0.2.15:22       10.0.2.2:45998</code></pre>
+<p class="detail"><code>10.0.2.2:45998</code> の番号は毎回違う。<code>ssh linuc コマンド</code> は、練習機の中でそのコマンドを1つ打って、出力を持ち帰る。</p>
 <p>名前は <code>enp0s16</code> になり、DHCP で 10.0.2.15/24 をもらい、ゲートウェイ（<code>default via</code>）は 10.0.2.2 になった。
 練習機の ssh から見ると、いまの ssh の接続（<code>ESTAB</code>）の相手は 10.0.2.2 から来ている。あなたは 127.0.0.1 につないだのに、練習機には 10.0.2.2 からの接続に見える。
 <b>この 10.0.2.x のネットワークは、外のどこにも無い</b>。QEMU のプロセスの中に小さな TCP/IP があり（ユーザモードネットワーク。中身は slirp という部品）、練習機に対して次の役を演じている。</p>
@@ -136,11 +136,11 @@ QEMU が、練習機からの接続を受け取り、自分の側の 127.0.0.1 �
 <pre data-where="外（lab@host）"><code>$ printf '%s\n' '{"execute":"qmp_capabilities"}' '{"execute":"system_powerdown"}' | socat - UNIX-CONNECT:qmp.sock
 {"QMP": {"version": {"qemu": {"micro": 2, "minor": 2, "major": 8}, "package": "Debian 1:8.2.2+ds-0ubuntu1.18"}, "capabilities": ["oob"]}}
 {"return": {}}
-{"timestamp": {"seconds": 1791914247, "microseconds": 299897}, "event": "POWERDOWN"}
+{"timestamp": {"seconds": 1791918565, "microseconds": 410215}, "event": "POWERDOWN"}
 {"return": {}}
 $ while pgrep -x qemu-system-x86 &gt; /dev/null; do sleep 1; done
 $ tail -1 serial.log
-[   33.405186] reboot: Power down</code></pre>
+[   34.068096] reboot: Power down</code></pre>
 <div class="analogy"><b>たとえ</b>: <code>hostfwd</code> は、代表番号への電話を決まった<b>内線へ転送する設定</b>に近い。
 <br>ただし<b>崩れる点</b>: 電話の転送は相手がいなければすぐ分かるが、<code>hostfwd</code> は練習機が起動していなくても入口を開けて待ち、接続を受け取ってしまう。だから起動の途中の <code>ssh</code> は、つながったのに返事が来ないまま待たされるか、すぐ切られる。
 入口があることと、その先に相手がいることは別である（<code>until</code> で入れるまで試したのはそのため）。</div>
@@ -172,7 +172,7 @@ OS がネットワークを上げていて ssh の待ち受けがまだなら、
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
-<li>NIC の名前は、QEMU が差した位置で決まる（<code>pc</code> のスロット 3 なら <code>ens3</code>、<code>q35</code> のバス 0・スロット 16 なら <code>enp0s16</code>）。名前で当てる設定は、位置やマシン型を変えると当たらなくなる</li>
+<li>NIC の名前は、QEMU が差した位置で決まる（i440FX（<code>pc</code> 系）のスロット 3 なら <code>ens3</code>、<code>q35</code> のバス 0・スロット 16 なら <code>enp0s16</code>）。名前で当てる設定は、位置やマシン型を変えると当たらなくなる</li>
 <li><code>-netdev user</code>（ユーザモードネットワーク）は、QEMU のプロセスの中で、DHCP（10.0.2.15 を配る）・ゲートウェイ（10.0.2.2）・DNS（10.0.2.3）を演じる。特権は要らない</li>
 <li>10.0.2.2 そのものへの接続は、QEMU が動いている側の 127.0.0.1 に届く。このサイトの檻の、練習機の中の <code>lab check</code> はこの道を通る</li>
 <li><code>hostfwd=tcp:127.0.0.1:2222-:22</code> は、QEMU が外の 127.0.0.1:2222 で待ち受け、来た接続を練習機の 22 番に渡す。<code>ssh linuc</code> の相手は、まず QEMU</li>
