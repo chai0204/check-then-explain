@@ -35,13 +35,13 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 
 <h2 id="spine">この10章を貫いている1つの事実</h2>
 <div class="goal">
-<p><b>電源ボタンも、停止も、シグナルも、ログインも、相手に送る「合図」でしかない。どう振る舞うかは、受け取った側が決める。</b></p>
-<p><code>virsh shutdown</code> は仮想マシンの電源ボタンを押すだけで、止まるかどうかは中の OS が決める。
+<p><b>停止の頼みも、シグナルも、ログインも、相手に送る「合図」でしかない。どう振る舞うかは、受け取った側が決める。</b></p>
+<p><code>virsh shutdown</code> は中の OS に止まるよう頼むだけで（ゲストエージェントがいればエージェント経由、いなければ ACPI の電源ボタンで）、止まるかどうかは中の OS が決める。
 <code>kill</code> は番号の付いた合図を送るだけで、受け取ったプロセスは無視できる。
 <code>ssh</code> の鍵は見せるだけで、通すかどうかは相手の <code>authorized_keys</code> が決める。
 出題範囲に <code>shutdown</code> <code>halt</code> <code>poweroff</code> <code>reboot</code>、<code>kill</code> <code>pkill</code> <code>killall</code>、<code>nohup</code> <code>screen</code> <code>tmux</code> と
 <b>似たコマンドがいくつも並ぶのは、送る合図と、受け取る相手が違うから</b>です。
-受け手に決めさせずに止められるのは、電源を抜く <code>virsh destroy</code> と <code>kill -9</code> だけです。</p>
+受け手に決めさせずに終わらせられるのは、電源を抜く <code>virsh destroy</code> と <code>kill -9</code> だけです。</p>
 <div class="skip"><b>ここで覚えなくていいこと</b>:
 libvirt の XML の全項目、仮想ネットワークやストレージプール（<code>virsh net-*</code> <code>pool-*</code>）、
 GRUB の設定ファイルの文法（<code>grub.cfg</code> を手で書く）、Secure Boot の署名の仕組み、
@@ -101,39 +101,42 @@ DVD や ISO イメージからのインストーラ（練習機はクラウド�
 <tr><td>タイムゾーン</td><td>インストール時に選ぶ。<code>/etc/localtime</code> のリンク先に残り、<code>timedatectl</code> で見る</td><td><a href="/linuc-boot/theory/04-install">4</a></td></tr>
 <tr><td>パスワード</td><td>インストール時に決める。Ubuntu は root をロック（<code>passwd -S</code> で L）し、一般ユーザと sudo を使う</td><td><a href="/linuc-boot/theory/04-install">4</a></td></tr>
 <tr><td>GUI / CUI</td><td>既定のブートターゲット（graphical.target / multi-user.target）。GUI が無くても graphical のことがある</td><td><a href="/linuc-boot/theory/04-install">4</a></td></tr>
-<tr><td><code>shutdown</code></td><td>時刻と文を付けて停止を予約する。<code>-h</code> 電源断・<code>-r</code> 再起動・<code>-c</code> 取り消し。時刻なしは1分後</td><td><a href="/linuc-boot/theory/07-shutdown">7</a></td></tr>
+<tr><td><code>shutdown</code></td><td>時刻と文を付けて停止を予約する。<code>-h</code> 電源断・<code>-r</code> 再起動・<code>-c</code> 取り消し・<code>-k</code> 知らせだけ。時刻なしは1分後、数だけ（<code>10</code>）なら分。<code>-f</code> / <code>-F</code> は fsck を飛ばす / 必ず行う（SysV の書き方）</td><td><a href="/linuc-boot/theory/07-shutdown">7</a></td></tr>
 <tr><td><code>reboot</code></td><td>再起動。実体は systemctl へのシンボリックリンク</td><td><a href="/linuc-boot/theory/07-shutdown">7</a></td></tr>
-<tr><td><code>halt</code></td><td>CPU を止める。<b>電源は切らない</b></td><td><a href="/linuc-boot/theory/07-shutdown">7</a></td></tr>
+<tr><td><code>halt</code></td><td>CPU を止める。<b>電源は切らない</b>（<code>-p</code> なら切る）。<code>-f</code> は後片付けをせずすぐに、<code>-w</code> は記録（wtmp）に書くだけ。<code>reboot -f</code> / <code>-w</code>、<code>poweroff -f</code> も同じ意味</td><td><a href="/linuc-boot/theory/07-shutdown">7</a></td></tr>
 <tr><td><code>ssh</code></td><td>暗号化した遠隔ログイン。<code>ssh ホスト</code> で入る、<code>ssh ホスト コマンド</code> で1つだけ打つ</td><td><a href="/linuc-boot/theory/02-ssh">2</a></td></tr>
-<tr><td><code>ssh -i</code> / <code>-p</code> / <code>-l</code></td><td>使う<b>秘密鍵</b> / 接続先のポート（既定 22）/ ログインするユーザ（<code>ユーザ@ホスト</code> と同じ）。<code>ssh-copy-id -i</code> に渡すのは<b>公開鍵</b></td><td><a href="/linuc-boot/theory/02-ssh">2</a></td></tr>
-<tr><td><code>~/.ssh/authorized_keys</code></td><td>入ってよい公開鍵の一覧（接続される側に置く）。group や other に書けると使われない</td><td><a href="/linuc-boot/theory/02-ssh">2</a></td></tr>
+<tr><td><code>ssh -i</code> / <code>-p</code> / <code>-l</code></td><td>使う<b>秘密鍵</b> / 接続先のポート（既定 22）/ ログインするユーザ（<code>ユーザ@ホスト</code> と同じ）。<code>ssh-copy-id -i</code> には鍵の組の名前を渡す（<code>.pub</code> は省ける。送られるのは常に<b>公開鍵</b>）</td><td><a href="/linuc-boot/theory/02-ssh">2</a></td></tr>
+<tr><td><code>~/.ssh/authorized_keys</code></td><td>入ってよい公開鍵の一覧（接続される側に置く）。group や other に書けると使われない（試験では 600 と答える。Ubuntu の sshd だけは、本人だけのグループなら group に書けても使う）</td><td><a href="/linuc-boot/theory/02-ssh">2</a></td></tr>
 <tr><td><code>~/.ssh/known_hosts</code></td><td>接続したことのある相手のホスト鍵（接続する側に置く）。初回に yes と答えると追加される</td><td><a href="/linuc-boot/theory/02-ssh">2</a></td></tr>
-<tr><td><code>id_rsa</code> / <code>id_rsa.pub</code></td><td>RSA の秘密鍵 / 公開鍵の既定の名前。<code>ssh-keygen -t rsa</code> で作る（何も付けないと id_ed25519）</td><td><a href="/linuc-boot/theory/02-ssh">2</a></td></tr>
+<tr><td><code>id_rsa</code> / <code>id_rsa.pub</code></td><td>RSA の秘密鍵 / 公開鍵の既定の名前。<code>ssh-keygen -t rsa</code> で作る（OpenSSH 9.5 以降は、何も付けないと id_ed25519。試験の例題は id_rsa ができる前提で書かれていることがある）</td><td><a href="/linuc-boot/theory/02-ssh">2</a></td></tr>
 <tr><td><code>logout</code> / <code>exit</code> / <code>Ctrl+D</code></td><td>シェルを抜ける。<code>logout</code> はログインシェルでだけ使える。<code>Ctrl+D</code> は入力の終わり</td><td><a href="/linuc-boot/theory/02-ssh">2</a></td></tr>
 <tr><td colspan="3"><b>1.01.2 仮想マシン・コンテナ</b></td></tr>
-<tr><td>ハイパーバイザー</td><td>仮想マシンを動かす層。ハードウェアの上で直接動く型と、ホスト OS の上で動く型がある</td><td><a href="/linuc-boot/theory/03-container">3</a></td></tr>
+<tr><td>ハイパーバイザー</td><td>仮想マシンを動かす層。ハードウェアの上で直接動く型（ネイティブ型・ベアメタル型・Type 1）と、ホスト OS の上で動く型（ホスト型・Type 2）がある</td><td><a href="/linuc-boot/theory/03-container">3</a></td></tr>
 <tr><td>仮想化支援機能</td><td>Intel VT-x（flags に vmx）/ AMD-V（svm）。KVM はこれを使う</td><td><a href="/linuc-boot/theory/03-container">3</a></td></tr>
 <tr><td>仮想マシン</td><td>自分のカーネルを持つ。CPU・メモリ・ディスクはハイパーバイザーが見せる</td><td><a href="/linuc-boot/theory/01-virsh">1</a> <a href="/linuc-boot/theory/03-container">3</a></td></tr>
-<tr><td>コンテナ</td><td>ホスト OS のカーネルを共有し、プロセスとファイルの見え方だけを分けたもの</td><td><a href="/linuc-boot/theory/03-container">3</a></td></tr>
+<tr><td>コンテナ</td><td>アプリの実行に要るライブラリや設定をひとまとめにして動かす仕組み。ホスト OS のカーネルを共有し、プロセス・ファイル・ホスト名・ネットワークの見え方を分け、使える量（cgroup）も区切る</td><td><a href="/linuc-boot/theory/03-container">3</a></td></tr>
 <tr><td>ホストOS</td><td>仮想マシンやコンテナを動かしている側の OS</td><td><a href="/linuc-boot/theory/03-container">3</a></td></tr>
-<tr><td><code>virsh</code></td><td>libvirt の操作。<code>list --all</code> <code>start</code> <code>shutdown</code> <code>destroy</code> <code>console</code> <code>autostart</code> <code>dominfo</code></td><td><a href="/linuc-boot/theory/01-virsh">1</a></td></tr>
-<tr><td><code>docker</code></td><td>コンテナの操作。<code>run</code> <code>ps</code> <code>stop</code> <code>start</code> <code>exec</code></td><td><a href="/linuc-boot/theory/03-container">3</a></td></tr>
+<tr><td><code>virsh</code></td><td>libvirt の操作。<code>list --all</code> <code>start</code> <code>shutdown</code> <code>destroy</code> <code>suspend</code> <code>resume</code> <code>console</code> <code>autostart</code> <code>dominfo</code>。画面（GUI）は <code>virt-viewer</code> で見る</td><td><a href="/linuc-boot/theory/01-virsh">1</a></td></tr>
+<tr><td><code>docker</code></td><td>コンテナの操作。<code>run</code> <code>ps</code> <code>stop</code> <code>start</code> <code>restart</code> <code>exec</code> <code>pause</code> / <code>unpause</code> <code>kill</code> <code>attach</code>（<code>Ctrl+P</code> → <code>Ctrl+Q</code> で抜ける）</td><td><a href="/linuc-boot/theory/03-container">3</a></td></tr>
 <tr><td><code>docker pull</code> / <code>images</code> / <code>create</code></td><td>イメージを取ってくる（タグを省くと <code>latest</code>）/ 手元のイメージの一覧 / コンテナを作るだけ（起動しない）。<code>run</code> は pull・create・start をまとめたもの</td><td><a href="/linuc-boot/theory/03-container">3</a></td></tr>
+<tr><td><code>docker build</code> / <code>commit</code> / <code>tag</code></td><td>Dockerfile からイメージを作る / 動かしたコンテナからイメージを作る / イメージに別名（タグ）を付ける</td><td><a href="/linuc-boot/theory/03-container">3</a></td></tr>
+<tr><td><code>docker export</code> / <code>import</code> / <code>save</code></td><td>コンテナのファイルシステムを tar に書き出す / その tar からイメージを作る / イメージそのもの（層ごと）を tar に書き出す（読み込みは <code>load</code>）</td><td><a href="/linuc-boot/theory/03-container">3</a></td></tr>
 <tr><td colspan="3"><b>1.01.3 ブートプロセスと systemd</b></td></tr>
-<tr><td>ブートローダ</td><td>GRUB。カーネルと initramfs を読み込み、カーネルに引数を渡す</td><td><a href="/linuc-boot/theory/05-boot">5</a></td></tr>
+<tr><td>ブートローダ</td><td>GRUB。カーネルと initramfs を読み込み、カーネルに引数を渡す。いまは GRUB 2（設定は <code>grub.cfg</code> を生成する）、古いものは GRUB Legacy（<code>menu.lst</code> や <code>grub.conf</code> を手で書く）</td><td><a href="/linuc-boot/theory/05-boot">5</a></td></tr>
 <tr><td>カーネル</td><td><code>/boot/vmlinuz-*</code>。initramfs の助けでルートをマウントし、PID 1 を起動する</td><td><a href="/linuc-boot/theory/05-boot">5</a></td></tr>
+<tr><td><code>dmesg</code></td><td>カーネルが起動の途中から書いてきた記録（リングバッファ）を出す。Ubuntu では一般ユーザに読ませないので <code>sudo dmesg</code></td><td><a href="/linuc-boot/theory/05-boot">5</a></td></tr>
 <tr><td>initramfs</td><td>カーネルと一緒に読み込まれる小さなルート。fsck とルートのマウントをする</td><td><a href="/linuc-boot/theory/05-boot">5</a></td></tr>
 <tr><td>systemd</td><td>PID 1。既定のターゲットに必要なユニットを起動していく</td><td><a href="/linuc-boot/theory/05-boot">5</a> <a href="/linuc-boot/theory/06-target">6</a></td></tr>
 <tr><td>ブートターゲット</td><td>systemd の到達目標。既定は <code>default.target</code> のリンク先</td><td><a href="/linuc-boot/theory/06-target">6</a></td></tr>
 <tr><td>シングルユーザモード</td><td>rescue.target（ランレベル1）。カーネル引数 <code>single</code> / <code>1</code> / <code>systemd.unit=rescue.target</code>、または <code>systemctl rescue</code></td><td><a href="/linuc-boot/theory/06-target">6</a></td></tr>
-<tr><td><code>systemctl</code></td><td><code>get-default</code> <code>set-default</code> <code>isolate</code> <code>rescue</code> <code>poweroff</code> <code>reboot</code></td><td><a href="/linuc-boot/theory/06-target">6</a> <a href="/linuc-boot/theory/07-shutdown">7</a></td></tr>
+<tr><td><code>systemctl</code></td><td><code>get-default</code> <code>set-default</code> <code>isolate</code> <code>default</code>（既定のターゲットに戻す）<code>rescue</code> <code>poweroff</code> <code>reboot</code></td><td><a href="/linuc-boot/theory/06-target">6</a> <a href="/linuc-boot/theory/07-shutdown">7</a></td></tr>
 <tr><td><code>poweroff</code></td><td>電源を切る（ACPI で切ってもらう）</td><td><a href="/linuc-boot/theory/07-shutdown">7</a></td></tr>
 <tr><td colspan="3"><b>1.01.4 プロセス</b></td></tr>
 <tr><td><code>&amp;</code> <code>jobs</code> <code>bg</code> <code>fg</code></td><td>末尾の &amp; でバックグラウンド。<code>Ctrl+Z</code> で一時停止、<code>bg</code> で後ろで再開、<code>fg</code> で前へ</td><td><a href="/linuc-boot/theory/09-hup">9</a></td></tr>
 <tr><td><code>nohup</code></td><td>SIGHUP を無視させて起動する。出力は <code>nohup.out</code></td><td><a href="/linuc-boot/theory/09-hup">9</a></td></tr>
 <tr><td><code>screen</code> / <code>tmux</code></td><td>端末ごと預けて切り離す（Ctrl+A d / Ctrl+B d）。後で <code>screen -r</code> / <code>tmux attach</code> で戻る</td><td><a href="/linuc-boot/theory/09-hup">9</a></td></tr>
 <tr><td><code>ps</code> / <code>top</code> / <code>pstree</code></td><td>プロセスの一覧（<code>ps aux</code> / <code>ps -ef</code>）・刻々の様子・親子の木</td><td><a href="/linuc-boot/theory/08-signal">8</a></td></tr>
-<tr><td><code>ps -f</code> と <code>ps f</code></td><td><code>-f</code> は列を増やす（UID・PPID・STIME）だけで木は出さない。木はハイフンなしの <code>f</code> か <code>pstree</code>（<code>-p</code> で PID を添える）。<code>-A</code> は <code>-e</code> と同じ、ハイフンなしの <code>e</code> は環境変数も出す</td><td><a href="/linuc-boot/theory/08-signal">8</a></td></tr>
+<tr><td><code>ps -f</code> と <code>ps f</code></td><td><code>-f</code> は列を増やす（UID・PPID・STIME）だけで木は出さない。木はハイフンなしの <code>f</code>、ハイフンありの <code>-H</code>、または <code>pstree</code>（<code>-p</code> で PID を添える）。<code>-A</code> は <code>-e</code> と同じ、ハイフンなしの <code>e</code> は環境変数も出す</td><td><a href="/linuc-boot/theory/08-signal">8</a></td></tr>
 <tr><td><code>uptime</code></td><td>起動からの時間とロードアベレージ（1・5・15分）</td><td><a href="/linuc-boot/theory/08-signal">8</a></td></tr>
 <tr><td><code>pgrep</code></td><td>名前や条件で PID を探す。<code>-a</code> で引数まで、<code>-f</code> で引数も含めて照合</td><td><a href="/linuc-boot/theory/08-signal">8</a></td></tr>
 <tr><td><code>kill</code> / <code>pkill</code> / <code>killall</code></td><td>PID で / 条件で / 名前で、シグナルを送る。既定は TERM（15）。<code>kill -9</code> = <code>-KILL</code> = <code>-SIGKILL</code> = <code>-s 9</code></td><td><a href="/linuc-boot/theory/08-signal">8</a></td></tr>
@@ -155,18 +158,18 @@ DVD や ISO イメージからのインストーラ（練習機はクラウド�
 <h2 id="chapters">章</h2>
 <div class="toc">
 <ol>
-<li><a href="/linuc-boot/theory/01-virsh">virsh が触れるのは、電源とボタンだけ</a> —
-    <span class="detail"><code>virsh start</code> は一瞬で返るが、OS はまだいない。<code>virsh shutdown</code> は押すだけ（18分）</span></li>
+<li><a href="/linuc-boot/theory/01-virsh">virsh は電源を入れ、止まるよう頼むだけ</a> —
+    <span class="detail"><code>virsh start</code> は一瞬で返るが、OS はまだいない。<code>virsh shutdown</code> は頼むだけ（25分）</span></li>
 <li><a href="/linuc-boot/theory/02-ssh">入れるかどうかは、受け取る側のファイルが決める</a> —
     <span class="detail"><code>ssh-keygen</code> が作るのは id_rsa ではなかった。権限が緩い authorized_keys は無視される（20分）</span></li>
 <li><a href="/linuc-boot/theory/03-container">コンテナの中のカーネルは、ホストのもの</a> —
     <span class="detail">Ubuntu 24.04 のコンテナで <code>uname -r</code> が 7.2.6 を出す。練習機の CPU は AMD-V を名乗る（15分）</span></li>
 <li><a href="/linuc-boot/theory/04-install">GUI が無くても、既定は graphical.target</a> —
     <span class="detail">X の無い練習機で <code>runlevel</code> が 5 を返す。インストールの選択はファイルに残る（12分）</span></li>
-<li><a href="/linuc-boot/theory/05-boot">ファームウェアが読めるのは、FAT の中の1ファイルだけ</a> —
+<li><a href="/linuc-boot/theory/05-boot">ファームウェアが必ず読めるのは、FAT の中のファイルだけ</a> —
     <span class="detail">UEFI → GRUB → カーネル → initramfs → systemd のリレー。書き換えたブート順が戻される（20分）</span></li>
-<li><a href="/linuc-boot/theory/06-target">root にパスワードが無いと、シングルユーザモードは何も聞かずに root を渡す</a> —
-    <span class="detail">root がロックされていても、Enter 1回で root のシェル（18分）</span></li>
+<li><a href="/linuc-boot/theory/06-target">Ubuntu では、root にパスワードが無いとシングルユーザモードは何も聞かずに root を渡す</a> —
+    <span class="detail">root がロックされた Ubuntu では、Enter 1回で root のシェル。本家の sulogin は止まる（18分）</span></li>
 <li><a href="/linuc-boot/theory/07-shutdown">halt では電源は切れない</a> —
     <span class="detail">System halted と出た後も、外から見ると running。電源を抜くと、直前に書いたファイルが消えた（16分）</span></li>
 <li><a href="/linuc-boot/theory/08-signal">kill は止めない。合図を送るだけ</a> —
@@ -198,7 +201,10 @@ DVD や ISO イメージからのインストーラ（練習機はクラウド�
 <tr><td>X の情報を出すコマンド（<code>xdpyinfo</code>・<code>xwininfo</code>・<code>xlsclients</code>・<code>xwd</code>・<code>showrgb</code>）</td>
     <td>尋ねる先の X サーバーが無い（上の GUI と同じ理由）</td>
     <td>第10章で、何を出すコマンドかを表にした（記録は無い）</td></tr>
-<tr><td><code>docker pull</code>・<code>docker images</code>・<code>docker create</code></td>
+<tr><td><code>virt-viewer</code>（仮想マシンの画面を GUI で見る）</td>
+    <td>練習機には画面が無く（シリアルコンソールだけ）、読者の手元に GUI の窓を出す経路も無い</td>
+    <td>第1章で、同じ役目をシリアルコンソール（<code>virsh console</code>）で果たした</td></tr>
+<tr><td><code>docker pull</code>・<code>docker images</code>・<code>docker create</code>、<code>build</code>・<code>commit</code>・<code>tag</code>・<code>export</code>・<code>import</code>・<code>save</code>、<code>restart</code>・<code>pause</code>・<code>kill</code>・<code>attach</code></td>
     <td>外側のコンテナの中に docker は無い。docker は読者の PC で打つもので、イメージの取得はネットワークと読者の環境に左右される</td>
     <td>第3章で、<code>run</code> との関係を表にした（記録は無い）</td></tr>
 </table></div>

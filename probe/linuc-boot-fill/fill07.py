@@ -14,6 +14,10 @@ P = str(REPO / 'public/linuc-boot/theory/07-shutdown.html')
 t = chunk('07', '端末1: 予約する人', 'sudo shutdown', 'sudo shutdown', raw=True)
 typed = re.search(r'\(Tue \d{4}-\d\d-\d\d (\d\d:\d\d:\d\d) JST\)', t).group(1)
 at = re.search(r'power off at Tue \d{4}-\d\d-\d\d (\d\d:\d\d:\d\d) JST', t).group(1)
+r10 = chunk('07', '端末1: 予約する人', 'sudo shutdown -c', stop_before='sudo shutdown', raw=True)
+r10_at = re.search(r'Reboot scheduled for \w+ \d{4}-\d\d-\d\d (\d\d:\d\d:\d\d) JST', r10).group(1)
+_r10 = r10.split('$ sudo shutdown -r 10')[1].split('$ sudo shutdown -c')[0]
+r10_typed = re.search(r'\(\w+ \d{4}-\d\d-\d\d (\d\d:\d\d:\d\d) JST\)', _r10).group(1)
 
 same = f'''{pre(G, chunk('07', '4つのコマンドの正体'))}
 <p>4つとも <code>systemctl</code> へのシンボリックリンクである。<code>systemctl</code> は「どの名前で呼ばれたか」を見て、<code>halt</code> なら halt、<code>poweroff</code> なら poweroff として振る舞う。
@@ -25,28 +29,43 @@ schedule = f'''<p>端末を2つ使う。端末2で練習機に入って待って
 {pre(G + '・端末1（予約する人）', chunk('07', '端末1: 予約する人', 'sudo shutdown -h +30 "メンテナンスのため停止します"', 'ls -l /run/nologin'))}
 <p><code>shutdown</code> は止めたのではなく、<b>予約</b>した。予約を持っているのは systemd-logind で、<code>/run/systemd/shutdown/scheduled</code> に時刻（1970年からのマイクロ秒）・種類・文が書かれている。
 <code>-h</code> の種類は <code>poweroff</code>（電源を切る）になった。文は UTF-8 のバイト列を <code>\\x..</code> で書き並べた形で保存されている。</p>
-<p>この時点で、端末2には何も届いていなかった。続けて予約を取り消し、今度は時刻を付けずに打つ。</p>
-{pre(G + '・端末1（予約する人）', chunk('07', '端末1: 予約する人', 'sudo shutdown -c', 'cat /run/nologin'))}
+<p>この時点で、端末2には何も届いていなかった。予約を取り消し、時刻の書き方を1つ確かめる。</p>
+{pre(G + '・端末1（予約する人）', chunk('07', '端末1: 予約する人', 'sudo shutdown -c', stop_before='sudo shutdown'))}
+<p><code>-r 10</code> は {r10_typed} に打って、予約は {r10_at} だった。<code>10</code> は「10 時」ではなく「10 分後」（<code>+10</code> と同じ）と読まれる。10 時にしたいなら <code>10:00</code> と書く。
+こちらは、予約した時点で知らせ（Broadcast message）が出た。</p>
+<div class="note warn"><b>次の1行は、1分後に本当に電源を切る予約になる</b>: 外の端末（lab@host）を先に開いておき、試したら <b>1分以内に</b> 端末1で <code>sudo shutdown -c</code> を打って取り消す。
+間に合わなければ練習機は止まる（外で <code>virsh start linuc</code> を打てば起動する）。</div>
+{pre(G + '・端末1（予約する人）', chunk('07', '端末1: 予約する人', 'sudo shutdown', 'cat /run/nologin'))}
 <p><b>時刻を付けない <code>shutdown</code> は「いますぐ」ではなく「1分後」</b>だった（{typed} に打って、予約は {at}）。
-今度はすぐに知らせ（Broadcast message）が出て、さらに <code>/run/nologin</code> が作られた。残り 5 分を切ると作られるファイルで、これがある間、一般ユーザは新しくログインできない。外から試す。</p>
+今度はすぐに知らせ（Broadcast message）が出て、さらに <code>/run/nologin</code> が作られた。残り 5 分を切ると作られるファイルで、これがある間、一般ユーザは新しくログインできない。外の端末から試す。</p>
 {pre(A, chunk('07', '予約が5分以内に迫っているとき、外から入ろうとする'))}
-<p>練習機の sshd は、パスワードも鍵も確かめる前に <code>/run/nologin</code> の文を見せて、接続を閉じた。取り消して、全員に文を送る <code>wall</code> も試す。</p>
-{pre(G + '・端末1（予約する人）', chunk('07', '端末1: 取り消して、wall を送る'))}
-<p>入って待っていた端末2の画面には、こう届いていた。</p>
+<p>入れなかった。<code>-v</code> の表示を見ると、断られたのは鍵の照合の<b>後</b>である。練習機の sshd は鍵を受け入れ（<code>Server accepts key</code>）、
+そのあと「このユーザをいまログインさせてよいか」を確かめる段（PAM のアカウントの確認。<code>pam_nologin</code>）で <code>/run/nologin</code> を見つけ、その文を見せて接続を閉じた。
+端末1で予約を取り消し、練習機の側の記録を見る。</p>
+{pre(G + '・端末1（予約する人）', chunk('07', '端末1: 取り消して、wall を送る', 'sudo shutdown -c', "sudo journalctl -u ssh --no-pager -n 20 | grep 'Access denied'"))}
+<p>sshd の記録にも「PAM のアカウントの設定で断った」（<code>by PAM account configuration</code>）と残っている。続けて、全員に文を送る <code>wall</code> と、止めないための <code>shutdown -k</code> を試す。</p>
+{pre(G + '・端末1（予約する人）', chunk('07', '端末1: 取り消して、wall を送る', 'wall "これは wall の試験です"', 'systemctl is-system-running'))}
+<p><code>-k</code> は「止めない」ための書き方で、<code>now</code> を付けても何も起きず、システムは <code>running</code> のままだった（この版の systemd では、<code>now</code> のときは知らせも出なかった）。
+時刻を付けた <code>-k +5 "文"</code> のような書き方なら、止めない予約として、知らせだけを送る（<code>man shutdown</code> の説明）。
+入って待っていた端末2の画面には、ここまでの知らせがこう届いていた。</p>
 {pre(G + '・端末2（入って待っていた人）', chunk('07', '端末2: 入って待っていた人の画面'))}
-<p>30 分後の予約（とその文）は、予約した時点では端末2に届いていない。logind は残り時間に応じて間を置いて知らせるので、遠い予約ほど、最初の知らせは後になる。
-すぐ知らせたいなら <code>wall</code> を自分で打つ。</p>
+<p>30 分後の予約（とその文）は、予約した時点では端末2に届いていない。10 分後の予約と1分後の予約は、すぐに届いた。
+logind は残り時間に応じて間を置いて知らせるので、遠い予約ほど、最初の知らせは後になる。すぐ知らせたいなら <code>wall</code> を自分で打つ。</p>
 <div class="scroll"><table>
 <tr><th>書き方</th><th>意味</th></tr>
 <tr><td><code>shutdown -h now</code></td><td>いますぐ止める（Ubuntu では電源を切る。<code>-P</code> と同じ）</td></tr>
 <tr><td><code>shutdown -h +30 "文"</code></td><td>30 分後に止める予約。文はログイン中の端末に届く</td></tr>
-<tr><td><code>shutdown -r 23:00</code></td><td>23 時に再起動する予約</td></tr>
+<tr><td><code>shutdown -r 23:00</code> / <code>shutdown -r 10</code></td><td>23 時に再起動 / 10 分後に再起動（数だけなら分）</td></tr>
 <tr><td><code>shutdown -H now</code></td><td>止めるが、電源は切らない（halt）</td></tr>
+<tr><td><code>shutdown -k +5 "文"</code></td><td>止めない。知らせだけを送る（<code>now</code> では何も起きなかった。実測）</td></tr>
 <tr><td><code>shutdown -c</code></td><td>予約を取り消す</td></tr>
 <tr><td><code>shutdown</code>（時刻なし）</td><td>1 分後に電源を切る</td></tr>
+<tr><td><code>shutdown -f</code> / <code>-F</code></td><td>次の起動で fsck を飛ばす / 必ず行う（SysV init の書き方。systemd の <code>shutdown</code> は受け付けるが、何もしない）</td></tr>
 </table></div>'''
 
-halt = f'''<div class="naive"><h4>ふつうこう考える</h4>
+halt = f'''<p><code>halt</code> の後に何が起きるかは、練習機の画面（コンソール）でしか見えない。外の窓で <code>virsh console linuc</code> をつないでおく
+（第6章からつないだままなら、そのままでよい）。端末2は <code>exit</code> で抜けておく。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
 <p><code>halt</code> は「システムを止める」コマンドだ。止まったのだから、電源も切れているはずだ。外から見れば、仮想マシンは <code>shut off</code> になっているだろう。</p>
 {pre(G1, chunk('07', '端末1: sudo halt'))}
 {pre(CON, chunk('07', 'halt の後のコンソール', tail=5))}
@@ -56,25 +75,35 @@ halt = f'''<div class="naive"><h4>ふつうこう考える</h4>
 電源を切るのは別の動き（ACPI でハードウェアに「切って」と頼む）で、それをするのが <code>poweroff</code> である。
 昔の機械では halt の後に人が電源スイッチを切った。仮想マシンでは、外から <code>virsh destroy</code> で切るしかない。</div></div>
 {pre(A, chunk('07', '外から見た halt の後', 'virsh destroy linuc', 'virsh start linuc'))}
-<p>同じことを <code>poweroff</code> で行う。</p>
+<p>コンソールは <code>destroy</code> で切れたので（外の端末に戻っている）、起動し直したら <code>virsh console linuc</code> でつなぎ直す。
+<code>login:</code> が出たら、端末1で練習機に入り直し、同じことを <code>poweroff</code> で行う。</p>
 {pre(G1, chunk('07', '端末1: sudo poweroff'))}
 {pre(CON, chunk('07', 'poweroff の後のコンソール', tail=5))}
 {pre(A, chunk('07', 'poweroff の後'))}
 <p>最後の行が <code>reboot: Power down</code> に変わり、外から見た状態も <code>shut off (shutdown)</code>（中から止まった）になった。
 <code>halt</code> と <code>poweroff</code> の違いは、止まる最後に電源を切るよう頼むかどうかだけである。前の節で見たとおり、Ubuntu の <code>shutdown -h</code> は poweroff として予約された（<code>MODE=poweroff</code>）。
 止めるだけにしたいときは <code>shutdown -H</code>、電源まで切るなら <code>shutdown -P</code> と書き分けられる。</p>
+<div class="scroll"><table>
+<tr><th>書き方（試験に出るもの）</th><th>意味</th></tr>
+<tr><td><code>halt -p</code></td><td>halt と打ちながら電源まで切る（<code>poweroff</code> と同じ）</td></tr>
+<tr><td><code>halt -f</code> / <code>reboot -f</code> / <code>poweroff -f</code></td><td>サービスを順に止める後片付けをせずに、すぐに止める / 再起動する / 電源を切る（systemd に頼まない）</td></tr>
+<tr><td><code>halt -w</code> / <code>reboot -w</code></td><td>止めずに、ログインの記録（wtmp）に停止・再起動の印だけを書く</td></tr>
+</table></div>
+<p class="detail">この表の書き方は試していない（<code>-f</code> は電源を抜くのに近く、<code>-w</code> は次の節で読む起動の記録を書き換えてしまうため）。意味は Ubuntu 24.04 の <code>man halt</code> による。</p>
 <div class="analogy"><b>たとえ</b>: <code>halt</code> は、店の<b>閉店作業を終えて照明を落とした</b>状態に近い。店は営業していないが、建物の電気（電源）は来たままである。<code>poweroff</code> はブレーカーまで落とす。
 <br>ただし<b>崩れる点</b>: 店なら照明が消えていれば外から「閉まった」と分かるが、仮想マシンは halt した後も外からは <code>running</code> にしか見えない。
 中で何が起きたかは、コンソールの最後の1行（<code>System halted</code>）を見ないと分からない。</div>'''
 
-destroy = f'''<p>今度は、正しく止めずに電源を抜く。練習機の中でファイルを1つ書き、数秒のうちに外から <code>virsh destroy</code> する。</p>
-{pre(G1, chunk('07b', '端末1: 書いてすぐに電源を抜かれる'))}
-{pre(A, chunk('07b', '外: 動いている練習機を destroy して、また起動する'))}
+_fsck = chunk('07', '電源を抜かれた次の起動', raw=True)
+ORPHAN = ('<code>Clearing orphaned inode</code> の行は、使い終わる途中だったファイル（消す予定の i ノード）を、fsck が片付けた跡である。' if 'Clearing orphaned inode' in _fsck else '')
+destroy = f'''<p>今度は、正しく止めずに電源を抜く。起動したら端末1で練習機に入り直し、ファイルを1つ書いて、数秒のうちに外から <code>virsh destroy</code> する。</p>
+{pre(G1, chunk('07', '端末1: 書いてすぐに電源を抜かれる'))}
+{pre(A, chunk('07', '外: 動いている練習機を destroy して、また起動する'))}
 <p>起動し直したら、もう一度入って、同じ場所を見る。</p>
-{pre(G, chunk('07b', '電源を抜かれた次の起動'))}
+{pre(G, chunk('07', '電源を抜かれた次の起動'))}
 <p>2つのことが起きている。1つ目に、起動の途中（initramfs の中）で <code>fsck</code> がルートのファイルシステムを調べ、<code>recovering journal</code>（ジャーナルを再生した）と書いている。
 ext4 は、書き換えの予定を先に<b>ジャーナル</b>という控えに書いてから、本体を書き換える。途中で電源が切れても、次の起動で控えを読み直せば、ファイルシステムを壊れていない状態に戻せる。
-正しく止めたときは止める前に書き終えているので、この作業は要らない（第5章の起動では <code>clean</code> とだけ出ていた）。
+{ORPHAN}正しく止めたときは止める前に書き終えているので、この作業は要らない（第5章の起動では <code>clean</code> とだけ出ていた）。
 なお、この記録の時刻は UTC（日本時間の 9 時間前）で書かれている。initramfs の中では、まだタイムゾーンの設定を読んでいないからである。</p>
 <p>2つ目に、電源を抜く数秒前に書いた <code>memo.txt</code> は、ファイルごと残っていなかった。ファイルシステムが守ったのは「壊れていない」ことで、「書いたものが残る」ことではない。
 書いた中身はすぐにはディスクに書かれず、しばらくメモリの上に置かれてから、まとめて書き出される。その前に電源が消えれば、書いたつもりのものは無かったことになる。
@@ -84,11 +113,11 @@ ext4 は、書き換えの予定を先に<b>ジャーナル</b>という控え�
 <br>ただし<b>崩れる点</b>: 店なら、停電の直前に書いた注文のメモも、紙として机の上に残っている。コンピュータでは、書いたつもりのものはまだメモリの上にあり、紙（ディスク）に写す前だった。
 「書いた」と「残った」が別の出来事であるところが、人の感覚とずれる。</div>'''
 
-_ra = chunk('07b', 'reboot の後', raw=True).split('\n')
+_ra = chunk('07', 'reboot の後', raw=True).split('\n')
 _k = next(i for i, l in enumerate(_ra) if l.startswith('$ last -x'))
 REBOOT_AFTER = html.escape('\n'.join(_ra[:_k + 6] + ['（略）']), quote=False)   # last -x の出力は上の5行だけ見せる
 reboot = f'''<p>最後に再起動する。<code>/proc/sys/kernel/random/boot_id</code> は起動のたびに作り直される乱数で、この値が変われば、間に再起動があったと分かる。</p>
-{pre(G1, chunk('07b', 'sudo reboot'))}
+{pre(G1, chunk('07', 'sudo reboot'))}
 {pre(G, REBOOT_AFTER)}
 <p><code>boot_id</code> が変わった。<code>last -x</code> は、ログインの記録から起動（<code>reboot</code>）と停止（<code>shutdown</code>）の行を出す。1行が1回の起動か停止で、新しいものが上に並ぶ。
 正しく止めた起動は、その上に <code>shutdown</code> の行が付く。電源を抜かれた起動には <code>shutdown</code> の行が無く、<code>reboot</code> の行が2つ続いている（上から3行目と4行目）。

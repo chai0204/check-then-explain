@@ -36,8 +36,8 @@ window.TERM_GROUPS = [
 
     { t:"ACPI", alt:[], id:"acpi",
       hint:"OS とハードウェアの、電源やボタンについての取り決め",
-      body:"Advanced Configuration and Power Interface。電源ボタン・電源断・スリープなどを、OS とハードウェアの間でやりとりするための取り決め。<code>virsh shutdown</code> は仮想マシンの電源ボタンを ACPI で押すだけで、止めるかどうかは中の OS が決める（Linux では systemd-logind が受けて poweroff する）。<code>poweroff</code> は逆に、OS が ACPI でハードウェアに「電源を切って」と頼む。<b>たとえ</b>: 玄関の<b>インターホン</b>。押されたことを中の人が聞いて、出るかどうかを決める。<b>崩れる点</b>: インターホンは誰もいなくても鳴り続けるが、ACPI のボタンは聞く OS がいない間（GRUB のメニューなど）に押されると、伝わらないまま消えることがある。",
-      misread:"virsh shutdown がハードウェア的に電源を切ると思われがちだが、ボタンを押すだけである。電源を直接切るのは virsh destroy。", ch:1 },
+      body:"Advanced Configuration and Power Interface。電源ボタン・電源断・スリープなどを、OS とハードウェアの間でやりとりするための取り決め。<code>virsh shutdown</code> は、練習機の中のゲストエージェントがつながっていなければ、仮想マシンの電源ボタンを ACPI で押して止まるよう頼む（つながっていればエージェントに頼む。<code>--mode acpi</code> で ACPI に固定できる）。押されたボタンを受け取って止めるかを決めるのは中の OS で、Linux では systemd-logind が「Power key pressed short.」と受けて poweroff する。<code>poweroff</code> は逆に、OS が ACPI でハードウェアに「電源を切って」と頼む。<b>たとえ</b>: 玄関の<b>インターホン</b>。押されたことを中の人が聞いて、出るかどうかを決める。<b>崩れる点</b>: インターホンは誰もいなくても鳴り続けるが、ACPI のボタンは聞く OS がいない間（GRUB のメニューなど）に押されると、伝わらないまま消えることがある。",
+      misread:"virsh shutdown がハードウェア的に電源を切ると思われがちだが、中の OS に止まるよう頼むだけである（ゲストエージェント経由か、ACPI の電源ボタンで）。電源を直接切るのは virsh destroy。", ch:1 },
 
     { t:"シリアルコンソール", alt:["virsh console"], id:"serial-console",
       hint:"画面の代わりにシリアルポートで入出力する端末。virsh console でつながる",
@@ -70,7 +70,7 @@ window.TERM_GROUPS = [
 
     { t:"UEFI", alt:[], id:"uefi",
       hint:"いまのファームウェアの規格。ESP の .efi ファイルを起動し、ブート順を NVRAM に持つ",
-      body:"電源を入れて最初に動くファームウェアの、いまの規格。ディスクの中の EFI システムパーティション（ESP、FAT）にある .efi ファイルを起動する。どの .efi をどの順で試すかは NVRAM の変数（BootOrder・Boot0000 など）に持ち、Linux から <code>efibootmgr</code> で読み書きできる。設定画面からも変えられる。<b>たとえ</b>: 建物の<b>受付</b>。来客名簿（BootOrder）の順に、決まった部屋（ESP）にいる人を呼ぶ。<b>崩れる点</b>: 受付は建物の全部屋を知っているが、UEFI が読めるのは FAT の区画だけで、ext4 の /boot の中は1バイトも読めない。",
+      body:"電源を入れて最初に動くファームウェアの、いまの規格。ディスクの中の EFI システムパーティション（ESP、FAT）にある .efi ファイルを起動する。どの .efi をどの順で試すかは NVRAM の変数（BootOrder・Boot0000 など）に持ち、Linux から <code>efibootmgr</code> で読み書きできる。設定画面からも変えられる。<b>たとえ</b>: 建物の<b>受付</b>。来客名簿（BootOrder）の順に、決まった部屋（ESP）にいる人を呼ぶ。<b>崩れる点</b>: 受付は建物の全部屋を知っているが、UEFI の仕様がファームウェアに必ず読めるよう求めているのは FAT の区画だけで、ext4 の /boot の中は（読める作りのファームウェアでない限り）1バイトも読めない。",
       misread:"UEFI がカーネルを直接読むと思われがちだが、読むのは ESP の中の1ファイル（shimx64.efi など）で、カーネルを読むのはその先のブートローダである。", ch:5 },
 
     { t:"BIOS", alt:["レガシー BIOS"], id:"bios",
@@ -79,9 +79,9 @@ window.TERM_GROUPS = [
       misread:"BIOS と UEFI を同じものの別名と思われがちだが、起動の手順（MBR の起動コードか、ESP のファイルか）が違う。", ch:5 },
 
     { t:"ESP", alt:["EFI システムパーティション"], id:"esp",
-      hint:"UEFI が読む FAT の区画。Linux では /boot/efi にマウントされる",
-      body:"EFI System Partition。UEFI のファームウェアが読める FAT の区画で、ブートローダの .efi ファイルを置く。Ubuntu では <code>/boot/efi</code> にマウントされ、<code>\\EFI\\ubuntu\\shimx64.efi</code> などが入っている。カーネル本体はふつう別の区画（ext4 の /boot）にある。<b>たとえ</b>: 建物の<b>受付カウンター</b>。受付（UEFI）が手を伸ばせるのはカウンターの上だけで、案内係（GRUB）を呼んで奥へ行ってもらう。<b>崩れる点</b>: 受付カウンターは1つだが、ESP には複数の OS のブートローダを並べて置ける。",
-      misread:"/boot と同じものだと思われがちだが、/boot（ext4）と /boot/efi（FAT）は別の区画で、ファームウェアが読めるのは後者だけである。", ch:5 },
+      hint:"UEFI が必ず読める FAT の区画。Linux では /boot/efi にマウントされる",
+      body:"EFI System Partition。UEFI のファームウェアが必ず読める（仕様で決まっている）FAT の区画で、ブートローダの .efi ファイルを置く。Ubuntu では <code>/boot/efi</code> にマウントされ、<code>\\EFI\\ubuntu\\shimx64.efi</code> などが入っている。カーネル本体はふつう別の区画（ext4 の /boot）にある。<b>たとえ</b>: 建物の<b>受付カウンター</b>。受付（UEFI）が手を伸ばせるのはカウンターの上だけで、案内係（GRUB）を呼んで奥へ行ってもらう。<b>崩れる点</b>: 受付カウンターは1つだが、ESP には複数の OS のブートローダを並べて置ける。",
+      misread:"/boot と同じものだと思われがちだが、/boot（ext4）と /boot/efi（FAT）は別の区画で、ファームウェアが必ず読めるのは後者だけである。", ch:5 },
 
     { t:"NVRAM", alt:["BootOrder"], id:"nvram",
       hint:"電源を切っても消えない、ファームウェアの設定の置き場所",
@@ -90,18 +90,18 @@ window.TERM_GROUPS = [
 
     { t:"ブートローダ", alt:["ブートローダー"], id:"bootloader",
       hint:"カーネルと initramfs を読み込み、カーネルに引数を渡して起動するプログラム",
-      body:"ファームウェアから起動され、カーネルと initramfs をディスクから読み込み、カーネル引数を渡して起動するプログラム。Linux では GRUB（GRUB 2）がふつうで、メニューで起動するものを選ばせ、<code>e</code> で起動のコマンドを1回だけ書き換えられる。設定は /etc/default/grub を直して update-grub（grub-mkconfig）で /boot/grub/grub.cfg を作り直す。<b>たとえ</b>: 劇場の<b>案内係</b>。受付（ファームウェア）から引き継ぎ、客（カーネル）を席に案内して、上演の条件（引数）を伝える。<b>崩れる点</b>: 案内係は案内が済めば帰るが、カーネルは GRUB が去った後も、渡された引数を /proc/cmdline に持ち続ける。",
+      body:"ファームウェアから起動され、カーネルと initramfs をディスクから読み込み、カーネル引数を渡して起動するプログラム。Linux では GRUB（GRUB 2）がふつうで、メニューで起動するものを選ばせ、<code>e</code> で起動のコマンドを1回だけ書き換えられる。設定は /etc/default/grub を直して update-grub（grub-mkconfig）で /boot/grub/grub.cfg を作り直す（RHEL 系では grub2-mkconfig -o /boot/grub2/grub.cfg）。古い GRUB Legacy は設定ファイル（menu.lst・grub.conf）を直接書いた。<b>たとえ</b>: 劇場の<b>案内係</b>。受付（ファームウェア）から引き継ぎ、客（カーネル）を席に案内して、上演の条件（引数）を伝える。<b>崩れる点</b>: 案内係は案内が済めば帰るが、カーネルは GRUB が去った後も、渡された引数を /proc/cmdline に持ち続ける。",
       misread:"ブートローダがカーネルの一部だと思われがちだが、別のプログラムである。カーネルが動き出した時点で、ブートローダの仕事は終わっている。", ch:5 },
 
     { t:"initramfs", alt:["initrd"], id:"initramfs",
       hint:"カーネルと一緒に読み込まれる小さなルート。fsck とルートのマウントをする",
-      body:"カーネルと一緒にブートローダが読み込む、メモリ上の小さなファイルシステム。カーネルは最初にこの中の /init を動かし、ディスクのドライバを読み込み、ルートのファイルシステムを fsck してマウントしてから、本物の /sbin/init（systemd）に引き継ぐ。練習機のコンソールに出る「Begin: Will now check root file system」はこの中の処理。<b>たとえ</b>: 引っ越し初日の<b>段ボール1箱</b>。工具と鍵だけが入っていて、それで家（ルート）を開けたら役目を終える。<b>崩れる点</b>: 段ボールは開けたら空になるが、initramfs は作り直しが要る。カーネルを更新すると、update-initramfs で新しい箱を作る。",
+      body:"カーネルと一緒にブートローダが読み込む、メモリ上の小さなファイルシステム。カーネルは最初にこの中の /init を動かし、ディスクのドライバを読み込み、ルートのファイルシステムを fsck してマウントしてから、本物の /sbin/init（systemd）に引き継ぐ。練習機のコンソールに出る「Begin: Will now check root file system」はこの中の処理。<b>たとえ</b>: 引っ越し初日の<b>段ボール1箱</b>。工具と鍵だけが入っていて、それで家（ルート）を開けたら役目を終える。<b>崩れる点</b>: 段ボールは開けたら空になるが、initramfs は作り直しが要る。カーネルを更新すると、新しい箱を作る（Ubuntu は update-initramfs、RHEL 系は dracut）。",
       misread:"カーネルだけで起動できると思われがちだが、ルートのディスクのドライバがカーネルに入っていない構成では initramfs が無いと起動できない。", ch:5 },
 
     { t:"カーネルパラメータ", alt:["カーネル引数"], id:"kernel-param",
       hint:"ブートローダがカーネルに渡す引数。/proc/cmdline で見られる",
       body:"ブートローダがカーネルに渡す文字列。root= でルートの区画、ro で読み取り専用で始めること、console= で表示の行き先を伝える。カーネルが使わない語は init（systemd）に渡り、systemd.unit=rescue.target や single、1、3 で起動先のターゲットを、init=/bin/bash で PID 1 そのものを変えられる。いまのものは /proc/cmdline で読める。<b>たとえ</b>: 出発前に運転手に渡す<b>行き先のメモ</b>。<b>崩れる点</b>: メモは運転手が読めば済むが、カーネルパラメータは運転手（カーネル）が読まない部分を、次の担当（systemd）が読む。",
-      misread:"GRUB のメニューで足した引数が保存されると思われがちだが、その1回の起動だけで消える。毎回使うなら /etc/default/grub に書いて update-grub する。", ch:6 },
+      misread:"GRUB のメニューで足した引数が保存されると思われがちだが、その1回の起動だけで消える。毎回使うなら /etc/default/grub に書いて update-grub（RHEL 系は grub2-mkconfig）する。", ch:6 },
 
     { t:"ブートターゲット", alt:[], id:"boot-target",
       hint:"systemd の到達目標。既定は default.target のリンク先",
@@ -115,12 +115,12 @@ window.TERM_GROUPS = [
 
     { t:"シングルユーザモード", alt:["レスキューモード"], id:"single-user",
       hint:"保守のための最小限の状態。systemd では rescue.target",
-      body:"保守のため、ネットワークも他のユーザのログインも無い最小限の状態で起動すること。systemd では rescue.target（ランレベル1）。カーネル引数 single / 1 / systemd.unit=rescue.target、または <code>systemctl rescue</code> で入る。入ると sulogin が root の認証をする。Ubuntu の sulogin は、root がロックされている（パスワードが無い）とき、パスワードを聞かずに root のシェルを渡す。<b>たとえ</b>: 店の<b>閉店後の作業時間</b>。客（他のユーザ）もレジ（ネットワーク）も止め、店長だけが入る。<b>崩れる点</b>: 店長は鍵で入るが、この練習機では鍵を持たない人でも Enter 1回で入れた。コンソールに触れられる人は root になれる。",
-      misread:"root にパスワードが無ければシングルユーザモードでも root になれないと思われがちだが、逆である（Ubuntu で実測）。守りたければ GRUB にパスワードを掛ける。", ch:6 },
+      body:"保守のため、ネットワークも他のユーザのログインも無い最小限の状態で起動すること。systemd では rescue.target（ランレベル1）。カーネル引数 single / 1 / systemd.unit=rescue.target、または <code>systemctl rescue</code> で入る。入ると sulogin が root の認証をする。root にパスワードがあれば聞く。root がロックされている（パスワードが無い）とき、Ubuntu の sulogin は聞かずに root のシェルを渡すが（Ubuntu の改造）、本家の sulogin（RHEL 系など）はシェルを渡さずに止まる。<b>たとえ</b>: 店の<b>閉店後の作業時間</b>。客（他のユーザ）もレジ（ネットワーク）も止め、店長だけが入る。<b>崩れる点</b>: 店長は鍵で入るが、この練習機では鍵を持たない人でも Enter 1回で入れた。コンソールに触れられる人は root になれる。",
+      misread:"root にパスワードが無ければシングルユーザモードでも root になれないと思われがちだが、Ubuntu では逆である（実測）。本家の sulogin や RHEL 系ではそのとおり止まる。守りたければ GRUB にパスワードを掛ける。", ch:6 },
 
     { t:"sulogin", alt:[], id:"sulogin",
       hint:"シングルユーザモードで root の認証をする小さなログインプログラム",
-      body:"シングルユーザモード（rescue.target・emergency.target）で、root としてシェルを渡してよいかを決める小さなプログラム。systemd は rescue.service から systemd-sulogin-shell 経由で起動する。root のパスワードがあれば聞き、Ubuntu ではロックされていれば聞かずに通す。抜けると（exit）systemd は既定のターゲットへ起動を続ける。<b>たとえ</b>: 夜間通用口の<b>守衛</b>。<b>崩れる点</b>: 守衛は顔の分からない人を通さないが、Ubuntu の sulogin は「合い言葉が設定されていない」とき、誰でも通す。",
+      body:"シングルユーザモード（rescue.target・emergency.target）で、root としてシェルを渡してよいかを決める小さなプログラム。systemd は rescue.service から systemd-sulogin-shell 経由で起動する。root のパスワードがあれば聞く。ロックされていると、Ubuntu の sulogin は聞かずに通し（Ubuntu の改造）、本家の sulogin（RHEL 系など）は「Cannot open access to console, the root account is locked.」と言って止まる（<code>--force</code> のときだけ通す）。抜けると（exit）systemd は既定のターゲットへ起動を続ける。<b>たとえ</b>: 夜間通用口の<b>守衛</b>。<b>崩れる点</b>: 守衛は顔の分からない人を通さないが、Ubuntu の sulogin は「合い言葉が設定されていない」とき、誰でも通す。",
       misread:"カーネル引数が root のシェルを出していると思われがちだが、引数は rescue.target を頼むだけで、通すかどうかは sulogin が決めている。", ch:6 },
   ]},
 

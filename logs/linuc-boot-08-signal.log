@@ -4,59 +4,75 @@
 
 # --- 画面の写し: プロセスを見る ---
 $ uptime
- 19:28:07 up 0 min,  1 user,  load average: 1.58, 0.41, 0.14
+ 21:03:39 up 0 min,  1 user,  load average: 3.10, 0.76, 0.26
 $ cat /proc/loadavg
-1.58 0.41 0.14 1/129 689
+3.10 0.76 0.26 1/128 690
 $ ps aux | head -4
 USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
-root           1 15.1  0.8  21692 12932 ?        Ss   19:27   0:05 /sbin/init
-root           2  0.1  0.0      0     0 ?        S    19:27   0:00 [kthreadd]
-root           3  0.0  0.0      0     0 ?        S    19:27   0:00 [pool_workqueue_release]
+root           1 15.3  0.8  21820 12980 ?        Ss   21:03   0:05 /sbin/init
+root           2  0.1  0.0      0     0 ?        S    21:03   0:00 [kthreadd]
+root           3  0.0  0.0      0     0 ?        S    21:03   0:00 [pool_workqueue_release]
 $ ps -ef | head -4
 UID          PID    PPID  C STIME TTY          TIME CMD
-root           1       0 14 19:27 ?        00:00:05 /sbin/init
-root           2       0  0 19:27 ?        00:00:00 [kthreadd]
-root           3       2  0 19:27 ?        00:00:00 [pool_workqueue_release]
+root           1       0 14 21:03 ?        00:00:05 /sbin/init
+root           2       0  0 21:03 ?        00:00:00 [kthreadd]
+root           3       2  0 21:03 ?        00:00:00 [pool_workqueue_release]
+$ ps -f
+UID          PID    PPID  C STIME TTY          TIME CMD
+student      673     672  4 21:03 pts/0    00:00:00 -bash
+student      695     673 99 21:03 pts/0    00:00:00 ps -f
+$ ps f
+    PID TTY      STAT   TIME COMMAND
+    673 pts/0    Ss     0:00 -bash
+    696 pts/0    R+     0:00  \_ ps f
+$ ps -H
+    PID TTY          TIME CMD
+    673 pts/0    00:00:00 bash
+    698 pts/0    00:00:00   ps
+$ ps -A | wc -l; ps -e | wc -l
+128
+128
+$ ps e -o args= -p $$ | cut -c1-100
+-bash LANG=C.UTF-8 USER=student LOGNAME=student HOME=/home/student PATH=/usr/local/sbin:/usr/local/b
 $ pstree -p student
-lab-hog(504)───sleep(686)
+lab-hog(503)───sleep(697)
 
-sshd(671)───bash(672)───pstree(694)
+sshd(672)───bash(673)───pstree(705)
 
-systemd(654)───(sd-pam)(655)
+systemd(655)───(sd-pam)(656)
 $ top -b -n 1 | head -12
-top - 19:28:13 up 0 min,  1 user,  load average: 1.45, 0.40, 0.14
-Tasks: 128 total,   1 running, 127 sleeping,   0 stopped,   0 zombie
-%Cpu(s):  9.4 us,  9.4 sy,  0.0 ni, 78.1 id,  0.0 wa,  0.0 hi,  3.1 si,  0.0 st
-MiB Mem :   1424.9 total,   1120.6 free,    264.8 used,    173.4 buff/cache
-MiB Swap:      0.0 total,      0.0 free,      0.0 used.   1160.2 avail Mem
+top - 21:03:50 up 0 min,  1 user,  load average: 2.62, 0.74, 0.25
+Tasks: 127 total,   1 running, 126 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  6.9 us,  6.9 sy,  0.0 ni, 86.2 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+MiB Mem :   1424.9 total,   1142.3 free,    243.0 used,    173.4 buff/cache
+MiB Swap:      0.0 total,      0.0 free,      0.0 used.   1181.9 avail Mem
 
     PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
-    695 student   20   0    9380   5328   3200 R  14.3   0.4   0:00.13 top
-    671 student   20   0   14476   6468   4768 S   7.1   0.4   0:00.65 sshd
-      1 root      20   0   21692  12932   9528 S   0.0   0.9   0:05.89 systemd
-      2 root      20   0       0      0      0 S   0.0   0.0   0:00.06 kthreadd
+    706 student   20   0    9380   5348   3216 R  25.0   0.4   0:00.13 top
+      1 root      20   0   21820  12980   9572 S   0.0   0.9   0:05.43 systemd
+      2 root      20   0       0      0      0 S   0.0   0.0   0:00.05 kthreadd
       3 root      20   0       0      0      0 S   0.0   0.0   0:00.00 pool_wo+
+      4 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker+
 $ pgrep -a lab-hog
-504 /bin/bash /usr/local/bin/lab-hog
+503 /bin/bash /usr/local/bin/lab-hog
 $ pgrep -l -u student
-504 lab-hog
-654 systemd
-655 (sd-pam)
-671 sshd
-672 bash
-696 sleep
+503 lab-hog
+655 systemd
+656 (sd-pam)
+672 sshd
+673 bash
+709 sleep
 $ ps -o pid,ppid,user,stat,etime,cmd -p $(pgrep -x lab-hog)
     PID    PPID USER     STAT     ELAPSED CMD
-    504       1 student  Ss         00:24 /bin/bash /usr/local/bin/lab-hog
+    503       1 student  Ss         00:28 /bin/bash /usr/local/bin/lab-hog
 $
-
 # --- ここまで ---
 
 # --- 画面の写し: TERM を無視するプロセスに kill ---
 $ kill $(pgrep -x lab-hog)
 $ ps -o pid,stat,comm -p $(pgrep -x lab-hog)
     PID STAT COMMAND
-    504 Ss   lab-hog
+    503 Ss   lab-hog
 $ grep -E "^Sig(Ign|Cgt)" /proc/$(pgrep -x lab-hog)/status
 SigIgn:	0000000000005007
 SigCgt:	0000000000010000
@@ -78,31 +94,45 @@ $ kill -KILL $(pgrep -x lab-hog)
 $ pgrep -a lab-hog; echo "終了コード $?"
 終了コード 1
 $ systemctl status lab-hog --no-pager | head -6
-× lab-hog.service - linuc-boot exercise 06: a process that ignores SIGTERM
+● lab-hog.service - linuc-boot exercise 06: a process that ignores SIGTERM
      Loaded: loaded (/etc/systemd/system/lab-hog.service; enabled; preset: enabled)
-     Active: failed (Result: signal) since Tue 2026-10-13 19:28:22 JST; 187ms ago
-   Duration: 29.566s
-    Process: 504 ExecStart=/usr/local/bin/lab-hog (code=killed, signal=KILL)
-   Main PID: 504 (code=killed, signal=KILL)
+     Active: deactivating (stop-sigterm) (Result: signal) since Tue 2026-10-13 21:03:57 JST; 1s ago
+    Process: 503 ExecStart=/usr/local/bin/lab-hog (code=killed, signal=KILL)
+   Main PID: 503 (code=killed, signal=KILL)
+      Tasks: 1 (limit: 1605)
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: kill -s 15 と kill -SIGKILL ---
+$ sleep 801 &
+[1] 727
+$ kill -s 15 $!
+$ sleep 802 &
+[2] 731
+[1]   Terminated              sleep 801
+$ kill -SIGKILL $!
+$ jobs
+[2]+  Killed                  sleep 802
 $
 
 # --- ここまで ---
 
 # --- 画面の写し: pkill と killall ---
 $ sleep 601 &
-[1] 716
+[1] 733
 $ sleep 602 &
-[2] 717
+[2] 734
 $ sleep 603 &
-[3] 718
+[3] 735
 $ jobs
 [1]   Running                 sleep 601 &
 [2]-  Running                 sleep 602 &
 [3]+  Running                 sleep 603 &
 $ pgrep -a -f 'sleep 60'
-716 sleep 601
-717 sleep 602
-718 sleep 603
+733 sleep 601
+734 sleep 602
+735 sleep 603
 $ pkill -f 'sleep 601'
 [1]   Terminated              sleep 601
 $ jobs
@@ -119,18 +149,34 @@ $
 # --- 画面の写し: 名前は 15 文字で切られる ---
 $ cp /usr/bin/sleep /tmp/very-long-process-name
 $ /tmp/very-long-process-name 300 &
-[1] 727
+[1] 741
 $ pgrep very-long-process-name; echo "終了コード $?"
 pgrep: pattern that searches for process name longer than 15 characters will result in zero matches
 Try `pgrep -f' option to match against the complete command line.
 終了コード 1
 $ pgrep -f very-long-process-name
-727
+741
 $ ps -o pid,comm,args -p $!
     PID COMMAND         COMMAND
-    727 very-long-proce /tmp/very-long-process-name 300
+    741 very-long-proce /tmp/very-long-process-name 300
 $ pkill -f very-long-process-name
 [1]+  Terminated              /tmp/very-long-process-name 300
+$ jobs
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: killall と長い名前 ---
+$ /tmp/very-long-process-name 300 &
+[1] 747
+$ pgrep -l very-long-proce
+747 very-long-proce
+$ killall very-long-proce; echo "終了コード $?"
+very-long-proce: no process found
+終了コード 1
+$ killall very-long-process-name; echo "終了コード $?"
+[1]+  Terminated              /tmp/very-long-process-name 300
+終了コード 0
 $ jobs
 $
 

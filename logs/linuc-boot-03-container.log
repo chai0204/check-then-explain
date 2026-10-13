@@ -16,7 +16,7 @@ $ nproc
 16
 $ free -m | head -2
                total        used        free      shared  buff/cache   available
-Mem:           96068       27488       11377        3916       62162       68580
+Mem:           96068       18544       18632        3692       63627       77523
 $ lscpu | grep -E '^(Model name|Virtualization|Hypervisor vendor):'
 Model name:                              Intel(R) Core(TM) Ultra 9 285H
 Virtualization:                          VT-x
@@ -30,7 +30,7 @@ $ virsh version | grep -i hypervisor
 Running hypervisor: QEMU 8.2.2
 $ ps -o pid,user,etime,comm -C qemu-system-x86_64
     PID USER         ELAPSED COMMAND
-   2523 lab            01:44 qemu-system-x86
+   2665 lab            01:59 qemu-system-x86
 $
 
 # --- ここまで ---
@@ -49,7 +49,7 @@ $ nproc
 2
 $ free -m | head -2
                total        used        free      shared  buff/cache   available
-Mem:            1424         228        1158           0         171        1196
+Mem:            1424         231        1157           0         169        1193
 $ lscpu | grep -E '^(Model name|Virtualization|Hypervisor vendor):'
 Model name:                              QEMU TCG CPU version 2.5+
 Virtualization:                          AMD-V
@@ -58,15 +58,15 @@ $ grep -o -w -E 'vmx|svm' /proc/cpuinfo | sort | uniq -c
 $ systemd-detect-virt
 qemu
 $ last -x reboot shutdown | head -4
-reboot   system boot  6.8.0-142-generi Tue Oct 13 19:09   still running
-reboot   system boot  6.8.0-142-generi Tue Oct 13 19:08   still running
-shutdown system down  6.8.0-142-generi Tue Oct 13 19:08 - 19:08  (00:00)
-reboot   system boot  6.8.0-142-generi Tue Oct 13 19:07 - 19:08  (00:00)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 20:45   still running
+reboot   system boot  6.8.0-142-generi Tue Oct 13 20:44   still running
+shutdown system down  6.8.0-142-generi Tue Oct 13 20:43 - 20:44  (00:00)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 20:42 - 20:43  (00:01)
 $
 
 # --- ここまで ---
 
-# ホストで docker stop linuc-boot-probe（読者は docker stop lab-linuc-boot）: 12.5 秒・終了コード 0
+# ホストで docker stop linuc-boot-probe（読者は docker stop lab-linuc-boot）: 12.4 秒・終了コード 0
 
 # ホストで docker start linuc-boot-probe（読者は docker start lab-linuc-boot）
 
@@ -80,23 +80,23 @@ $
 
 # --- ここまで ---
 
-# docker start から練習機の応答まで 48 秒
+# docker start から練習機の応答まで 46 秒
 
 # --- 画面の写し: docker stop / start の後の練習機の中 ---
 $ last -x reboot shutdown | head -4
-reboot   system boot  6.8.0-142-generi Tue Oct 13 19:12   still running
-shutdown system down  6.8.0-142-generi Tue Oct 13 19:11 - 19:12  (00:00)
-reboot   system boot  6.8.0-142-generi Tue Oct 13 19:09 - 19:11  (00:01)
-reboot   system boot  6.8.0-142-generi Tue Oct 13 19:08 - 19:11  (00:03)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 20:47   still running
+shutdown system down  6.8.0-142-generi Tue Oct 13 20:47 - 20:47  (00:00)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 20:45 - 20:47  (00:02)
+reboot   system boot  6.8.0-142-generi Tue Oct 13 20:44 - 20:47  (00:03)
 $ journalctl --list-boots --no-pager | tail -3
- -2 e32c57f6bc5943b59acaf8b1066d871e Tue 2026-10-13 19:08:39 JST Tue 2026-10-13 19:08:41 JST
- -1 1520a79687b64d5481ec0616af1f373a Tue 2026-10-13 19:09:56 JST Tue 2026-10-13 19:11:39 JST
-  0 5f59bbad0a98453982b60dc509603452 Tue 2026-10-13 19:12:07 JST Tue 2026-10-13 19:12:30 JST
+ -2 7e1c965c0c824c11a432a91f5cb34d8d Tue 2026-10-13 20:44:07 JST Tue 2026-10-13 20:44:30 JST
+ -1 a63712b96ef14e4fbde4511c2ae11087 Tue 2026-10-13 20:45:08 JST Tue 2026-10-13 20:47:09 JST
+  0 70f480a3ca08412e9fa9842cc2ba3c59 Tue 2026-10-13 20:47:40 JST Tue 2026-10-13 20:48:02 JST
 $ journalctl -b -1 -n 4 --no-pager
-Oct 13 19:11:38 linuc systemd-shutdown[1]: Syncing filesystems and block devices.
-Oct 13 19:11:39 linuc systemd-shutdown[1]: Sending SIGTERM to remaining processes...
-Oct 13 19:11:39 linuc systemd-journald[218]: Received SIGTERM from PID 1 (systemd-shutdow).
-Oct 13 19:11:39 linuc systemd-journald[218]: Journal stopped
+Oct 13 20:47:09 linuc systemd-shutdown[1]: Syncing filesystems and block devices.
+Oct 13 20:47:09 linuc systemd-shutdown[1]: Sending SIGTERM to remaining processes...
+Oct 13 20:47:09 linuc systemd-journald[221]: Received SIGTERM from PID 1 (systemd-shutdow).
+Oct 13 20:47:09 linuc systemd-journald[221]: Journal stopped
 $ journalctl -b -k --no-pager | grep -c 'recovery complete'
 0
 $

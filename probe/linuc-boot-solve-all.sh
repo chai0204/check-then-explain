@@ -9,7 +9,7 @@
 # 判定（lab check）も読者と同じく外の端末で打つ。
 set -u
 cd /home/shun/learning-labs || exit 1
-IMG=${IMG:-lab-linuc-boot:1.0.0}
+IMG=${IMG:-lab-linuc-boot:1.0.1}
 RUN=${RUN:-s1}
 export C=linuc-boot-solve TMUX_SOCK=linuc-boot-solve   # probe と同時に走らせられるよう tmux を分ける
 . probe/linuc-boot-lib.sh

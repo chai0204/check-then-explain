@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>5. ファームウェアが読めるのは、FAT の中の1ファイルだけ — 確かめて説明する LinuC 主題1.01</title>
+<title>5. ファームウェアが必ず読めるのは、FAT の中のファイルだけ — 確かめて説明する LinuC 主題1.01</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="5" data-theme="linuc-boot">
@@ -10,7 +10,7 @@
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
 </div>
-<h1>5. ファームウェアが読めるのは、FAT の中の1ファイルだけ</h1>
+<h1>5. ファームウェアが必ず読めるのは、FAT の中のファイルだけ</h1>
 <p class="lead">Linux のカーネルは <code>/boot</code> の中にある。ところが電源を入れて最初に動く UEFI ファームウェアは、<code>/boot</code>（ext4）を1バイトも読めない。
 読めるのは ESP という FAT の小さな区画の中のファイルだけで、そこから先は「起動された側が、次に起動するものを自分で探しに行く」リレーになっている。
 ブート順を書き換えても、起動された側がそれを書き戻すことさえある。</p>
@@ -41,13 +41,13 @@ EFI stub: UEFI Secure Boot is enabled.
 [    0.000000] Linux version 6.8.0-142-generic (buildd@lcy02-amd64-049) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #142-Ubuntu SMP PREEMPT_DYNAMIC Wed Sep  2 14:24:27 UTC 2026 (Ubuntu 6.8.0-142.142-generic 6.8.12)
 [    0.000000] Command line: BOOT_IMAGE=/vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c4-9280-015dbb828010 ro console=tty1 console=ttyS0,115200
 （略）
-[    3.059533] Run /init as init process
+[    2.609198] Run /init as init process
 （略）
 Begin: Loading essential drivers ... done.
 （略）
 Begin: Will now check root file system ... fsck from util-linux 2.39.3
 [/usr/sbin/fsck.ext4 (1) -- /dev/vda1] fsck.ext4 -a -C0 /dev/vda1
-cloudimg-rootfs: clean, 31889/2490368 files, 404046/4980475 blocks
+cloudimg-rootfs: clean, 31892/2490368 files, 407332/4980475 blocks
 （略）
 Begin: Running /scripts/init-bottom ... done.
 （略）
@@ -98,11 +98,15 @@ vda
 <div class="then"><b>だめな理由</b>: ブート順の先頭 <code>Boot0002</code> に書いてあるのは、カーネルではなく
 「15番目の区画（<code>HD(15,GPT,…)</code>）の <code>\EFI\ubuntu\shimx64.efi</code> というファイル」だった。
 15番目の区画 <code>vda15</code> は <b>FAT（vfat）</b>で、<code>/boot/efi</code> にマウントされている。カーネルのある <code>/boot</code> は別の区画 <code>vda16</code> で、ext4 である。
-<b>UEFI のファームウェアが読めるファイルシステムは FAT だけ</b>で、ext4 の <code>/boot</code> はファームウェアからは中身の分からない領域でしかない。
+<b>UEFI の仕様がファームウェアに必ず読めるよう求めているファイルシステムは FAT だけ</b>で（ほかのファイルシステムを読めるファームウェアもあるが、当てにはできない）、ext4 の <code>/boot</code> はファームウェアからは中身の分からない領域でしかない。
 だから FAT の区画（ESP: EFI システムパーティション）にブートローダを置き、そこから先の ext4 を読む仕事はブートローダ（GRUB）に任せている。</div></div>
 <p><code>/sys/firmware/efi</code> があることが、この Linux が UEFI で起動したことの証拠になる（BIOS で起動していれば無い）。ESP の中を見る。</p>
+<!-- gen:ESP -->
 <pre data-where="練習機の中（student@linuc）"><code>$ findmnt -n -o TARGET,FSTYPE,OPTIONS /boot/efi
 /boot/efi vfat   rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro
+$ sudo blkid -p -o export /dev/vda15 | grep -E '^(TYPE|VERSION)='
+VERSION=FAT32
+TYPE=vfat
 $ ls /boot/efi
 ls: cannot open directory '/boot/efi': Permission denied
 $ sudo ls -l /boot/efi/EFI/ubuntu
@@ -116,7 +120,8 @@ $ sudo cat /boot/efi/EFI/ubuntu/grub.cfg
 search.fs_uuid a5eecc38-8587-4601-9295-c92dabc20612 root
 set prefix=($root)'/grub'
 configfile $prefix/grub.cfg</code></pre>
-<p>ESP は FAT で、root 以外には中を見せない設定（<code>fmask=0077,dmask=0077</code>）でマウントされている。だから一般ユーザの <code>ls</code> は断られた。
+<!-- /gen:ESP -->
+<p>ESP は FAT（<code>blkid -p</code> で区画そのものを調べると、版は FAT32）で、root 以外には中を見せない設定（<code>fmask=0077,dmask=0077</code>）でマウントされている。だから一般ユーザの <code>ls</code> は断られた。
 中にあるのは、ファームウェアが最初に起動する <code>shimx64.efi</code>、そこから起動される GRUB 本体の <code>grubx64.efi</code>、そして<b>3行しかない</b> <code>grub.cfg</code> である。
 3行の中身は「この UUID の区画を探し、その中の <code>/grub/grub.cfg</code> を読め」で、ESP の中に本当の設定は無い。UUID の <code>a5eecc38-…</code> は、上の <code>lsblk</code> で <code>BOOT</code> の区画（<code>vda16</code>）である。
 GRUB は ext4 を読めるので、ここで初めて <code>/boot</code>（<code>vda16</code>）の中に手が届く。</p>
@@ -265,14 +270,28 @@ $ sudo grep -m2 -E '^\s+(linux|initrd)\s' /boot/grub/grub.cfg
 	linux	/vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c4-9280-015dbb828010 ro  console=tty1 console=ttyS0,115200
 	initrd	/microcode.cpio /initrd.img-6.8.0-142-generic
 $ systemd-analyze
-Startup finished in 8.051s (kernel) + 27.119s (userspace) = 35.171s
-graphical.target reached after 26.948s in userspace.</code></pre>
+Startup finished in 6.362s (kernel) + 24.400s (userspace) = 30.762s
+graphical.target reached after 24.241s in userspace.</code></pre>
 <p>カーネルが受け取った引数は <code>/proc/cmdline</code> にそのまま残っている。<code>root=UUID=…</code> がルートの区画、<code>ro</code> は「まず読み取り専用でマウントせよ」、<code>console=</code> は表示の行き先である。</p>
 <p>その引数の出どころは、<code>/etc/default/grub</code> と <code>/etc/default/grub.d/*.cfg</code> である。同じ設定がファイルの順に何度も上書きされ（タイムアウトは 0 → 0 → 3 → 10）、
 最後に読んだものが勝つ。これを <code>update-grub</code>（中身は <code>grub-mkconfig -o /boot/grub/grub.cfg</code>）が <code>/boot/grub/grub.cfg</code> に書き出し、
 GRUB は起動のたびにそれを読む。<b>grub.cfg を手で直しても、次に update-grub が走ると消える</b>ので、毎回の設定は <code>/etc/default/grub</code> の側に書く。
 1回だけ変えたいときは、GRUB のメニューで書き換える（第6章）。</p>
-<p><code>systemd-analyze</code> は、カーネルと initramfs の段（kernel）と、systemd が既定のターゲットに着くまで（userspace）の時間を分けて出す。この練習機は KVM を使わないので、合わせて 35 秒ほどかかった。</p>
+<p>ここで見ているのは <b>GRUB 2</b>（いまの GRUB）である。古い <b>GRUB Legacy</b> は、設定ファイル（<code>/boot/grub/menu.lst</code>、RHEL 系では <code>grub.conf</code>）を人が直接書き、生成する仕組みは無かった。
+RHEL 系の GRUB 2 では、<code>update-grub</code> に当たるのが <code>grub2-mkconfig -o /boot/grub2/grub.cfg</code> で（UEFI の機械では出力先が変わる版もある）、
+initramfs を作り直すコマンドも Ubuntu の <code>update-initramfs</code> に対して <code>dracut</code> である。</p>
+<!-- gen:ANALYZE -->
+<p><code>systemd-analyze</code> は、カーネルと initramfs の段（kernel）と、systemd が既定のターゲットに着くまで（userspace）の時間を分けて出す。この練習機は KVM を使わないので、合わせて 31 秒ほどかかった。</p>
+<p>起動の途中にカーネルがコンソールへ書いた行（第1章・この章の始めの <code>[    0.000000] Linux version …</code> など）は、起動した後でも <code>dmesg</code> で読み返せる。
+カーネルが自分の記録（リングバッファ）に残しているからである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ dmesg | head -3
+dmesg: read kernel buffer failed: Operation not permitted
+$ sudo dmesg | grep -E 'Linux version|Command line|Run /init'
+[    0.000000] Linux version 6.8.0-142-generic (buildd@lcy02-amd64-049) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #142-Ubuntu SMP PREEMPT_DYNAMIC Wed Sep  2 14:24:27 UTC 2026 (Ubuntu 6.8.0-142.142-generic 6.8.12)
+[    0.000000] Command line: BOOT_IMAGE=/vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c4-9280-015dbb828010 ro console=tty1 console=ttyS0,115200
+[    2.609198] Run /init as init process</code></pre>
+<p>Ubuntu は、カーネルの記録を一般ユーザには読ませない設定なので、<code>sudo</code> を付けて読む。コンソールで見たカーネルの版・引数・<code>Run /init</code> の行が、同じ時刻の印（起動からの秒数）で残っている。</p>
+<!-- /gen:ANALYZE -->
 
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-boot/">演習03</a>は、GRUB のメニューで e を押し、この章で見た linux の行に1語足して、その1回の起動だけ別のターゲットで起動する課題である。
@@ -281,8 +300,8 @@ GRUB は起動のたびにそれを読む。<b>grub.cfg を手で直しても、
 <div class="quiz"><b>確認</b>
 <p>UEFI で起動するシステムで、ブートローダ（GRUB など）のファイルが置かれる区画は何か。また、そのファイルシステムは何か。</p>
 <details><summary>答え</summary>
-<p>EFI システムパーティション（ESP）。ファイルシステムは FAT（実測では vfat、FAT32）で、Linux では <code>/boot/efi</code> にマウントされる。
-UEFI のファームウェアが読めるのは FAT だけなので、ext4 の <code>/boot</code> には置けない。</p></details></div>
+<p>EFI システムパーティション（ESP）。ファイルシステムは FAT（実測では、マウントの種類が vfat、<code>blkid -p</code> で調べた版が FAT32）で、Linux では <code>/boot/efi</code> にマウントされる。
+UEFI の仕様がファームウェアに必ず読めるよう求めているのは FAT だけなので、ext4 の <code>/boot</code> には置けない。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>次のうち、Linux の起動の順番として正しいものはどれか。</p>
 <p>A. カーネル → ブートローダ → UEFI → systemd<br>B. UEFI → ブートローダ → カーネル → initramfs → systemd<br>C. UEFI → カーネル → ブートローダ → systemd<br>D. ブートローダ → UEFI → initramfs → カーネル</p>
@@ -302,14 +321,14 @@ UEFI はこれと違い、ESP の中のファイルを名前で読む。</p></de
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
 <li>起動はリレー: ファームウェア（UEFI / BIOS）→ ブートローダ（GRUB）→ カーネル → initramfs → systemd</li>
-<li>UEFI のファームウェアが読めるのは FAT の ESP（<code>/boot/efi</code>）だけ。カーネルのある ext4 の <code>/boot</code> は、ブートローダが読む</li>
+<li>UEFI のファームウェアが必ず読めるのは FAT の ESP（<code>/boot/efi</code>）だけ。カーネルのある ext4 の <code>/boot</code> は、ブートローダが読む</li>
 <li>BIOS はディスクの先頭（MBR）の起動コードを読む。UEFI は ESP の .efi ファイルを読む。<code>/sys/firmware/efi</code> があれば UEFI で起動している</li>
 <li>ブートメディアの優先順位は NVRAM の BootOrder。<code>efibootmgr -o</code> で順番、<code>-n</code> で次の1回。設定画面からも変えられる</li>
 <li>変えた順番は、起動された側（shim の fallback）が書き戻すことがある。決めるのは最後に受け取った側</li>
 <li>カーネルに渡った引数は <code>/proc/cmdline</code>。毎回の引数は <code>/etc/default/grub</code>（と <code>grub.d/</code>）に書いて update-grub で grub.cfg に反映する</li>
 </ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
-<nav class="pager"><a href="/linuc-boot/theory/04-install">← 4. GUI が無くても、既定は graphical.target</a><a href="/linuc-boot/theory/06-target">次: 6. root にパスワードが無いと、シングルユーザモードは何も聞かずに root を渡す →</a></nav>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-boot/theory/04-install">← 4. GUI が無くても、既定は graphical.target</a><a href="/linuc-boot/theory/06-target">次: 6. Ubuntu では、root にパスワードが無いとシングルユーザモードは何も聞かずに root を渡す →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>

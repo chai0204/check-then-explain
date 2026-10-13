@@ -6,7 +6,7 @@
 $ ls -la ~/.ssh
 total 12
 drwx------ 1 lab lab 4096 Oct 13 10:51 .
-drwxr-x--- 1 lab lab 4096 Oct 13 19:06 ..
+drwxr-x--- 1 lab lab 4096 Oct 13 20:40 ..
 -rw-r--r-- 1 lab lab  502 Oct 13 10:11 config
 $ cat ~/.ssh/config
 # 外側（lab@host）から練習機（student@linuc）に入るときの設定。`ssh linuc` で入れる。
@@ -35,16 +35,16 @@ student@linuc:~$ exit
 logout
 Connection to 127.0.0.1 closed.
 $ cut -c1-60 ~/.ssh/known_hosts
-|1|926QEiG/Qcn6sTFu3uTiykVvbFk=|xsekbwgJHfZAdFP533SGrB2yS1k=
-|1|J01hBi9mOc+DLr9vq69I9kxv3eg=|HYfFcc2m+Lysyi2a0tSc4Zcxw9c=
-|1|wXjvTMAfA61MsxyL/6uI2P0kiwI=|+hCYiGjxGFo50E4b3CA5QSJ9e+Q=
+|1|8BliHPcGMVBoZAF2cTfzCnwXP2w=|AO1eScacB70ijbpgRh9HRQV2EVw=
+|1|8Yyd3mWGtszczAPO/GWlcKi6AwU=|y/wH05bfLIleit7QtDp85ZnyZXU=
+|1|2Ml1lNiPxSWc4VP0A5tYcCgVo6A=|3InIktgKL6NULQrxuAyKgY+5NMA=
 $ ssh-keygen -F '[127.0.0.1]:2222' | cut -c1-60
 # Host [127.0.0.1]:2222 found: line 1
-|1|926QEiG/Qcn6sTFu3uTiykVvbFk=|xsekbwgJHfZAdFP533SGrB2yS1k=
+|1|8BliHPcGMVBoZAF2cTfzCnwXP2w=|AO1eScacB70ijbpgRh9HRQV2EVw=
 # Host [127.0.0.1]:2222 found: line 2
-|1|J01hBi9mOc+DLr9vq69I9kxv3eg=|HYfFcc2m+Lysyi2a0tSc4Zcxw9c=
+|1|8Yyd3mWGtszczAPO/GWlcKi6AwU=|y/wH05bfLIleit7QtDp85ZnyZXU=
 # Host [127.0.0.1]:2222 found: line 3
-|1|wXjvTMAfA61MsxyL/6uI2P0kiwI=|+hCYiGjxGFo50E4b3CA5QSJ9e+Q=
+|1|2Ml1lNiPxSWc4VP0A5tYcCgVo6A=|3InIktgKL6NULQrxuAyKgY+5NMA=
 $ ssh-keygen -F linuc; echo "終了コード $?"
 終了コード 1
 $
@@ -60,26 +60,26 @@ Enter same passphrase again:
 Your identification has been saved in /home/lab/.ssh/id_ed25519
 Your public key has been saved in /home/lab/.ssh/id_ed25519.pub
 The key fingerprint is:
-SHA256:T1D5V2Wb7Ir8W7oejw7qpRKWcs9WS0VeFxma/BiCVgs lab@host
+SHA256:8m/RVM6D6wf282LHkSSCvJ43EDRwz9IJs7+U1HhrRtI lab@host
 The key's randomart image is:
 +--[ED25519 256]--+
-|         E.o   oB|
-|         .= o.++=|
-|        .o +o=.=.|
-|        ..  oo*  |
-|        S . .o o |
-|     . = o.o. .  |
-|      + + +=.o . |
-|       . ++.o *  |
-|        ++  oOo. |
+|       ..+       |
+|        .oB = .  |
+|        oooO E   |
+|         ++.B.=. |
+|      . S o*.=o..|
+|       o oo O  o |
+|        o o= o ..|
+|         +.o. * o|
+|         .o .o =.|
 +----[SHA256]-----+
 $ ls -l ~/.ssh
 total 20
 -rw-r--r-- 1 lab lab 502 Oct 13 10:11 config
--rw------- 1 lab lab 399 Oct 13 19:10 id_ed25519
--rw-r--r-- 1 lab lab  90 Oct 13 19:10 id_ed25519.pub
--rw------- 1 lab lab 978 Oct 13 19:10 known_hosts
--rw-r--r-- 1 lab lab 142 Oct 13 19:10 known_hosts.old
+-rw------- 1 lab lab 399 Oct 13 20:45 id_ed25519
+-rw-r--r-- 1 lab lab  90 Oct 13 20:45 id_ed25519.pub
+-rw------- 1 lab lab 978 Oct 13 20:45 known_hosts
+-rw-r--r-- 1 lab lab 142 Oct 13 20:45 known_hosts.old
 $
 
 # --- ここまで ---
@@ -93,32 +93,32 @@ Enter same passphrase again:
 Your identification has been saved in /home/lab/.ssh/id_rsa
 Your public key has been saved in /home/lab/.ssh/id_rsa.pub
 The key fingerprint is:
-SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ lab@host
+SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0 lab@host
 The key's randomart image is:
 +---[RSA 3072]----+
-|         .oo.    |
-|   .    . .o     |
-|  + .. o  .      |
-|o+E..oo  .       |
-|o+*o+.  S .      |
-|+=oBo  . * .     |
-|o+=o..  = o      |
-|+o=o= .  .       |
-| *=*oo           |
+| .  o+o.o.o.. . o|
+|. ooo.. .+o* oE=.|
+|. o+ ..o..B.+ ...|
+| o.   .*o*       |
+|o .. +..S.o      |
+| o. = +..o       |
+|   . + +.        |
+|    . .          |
+|                 |
 +----[SHA256]-----+
 $ ls -l ~/.ssh
 total 28
 -rw-r--r-- 1 lab lab  502 Oct 13 10:11 config
--rw------- 1 lab lab  399 Oct 13 19:10 id_ed25519
--rw-r--r-- 1 lab lab   90 Oct 13 19:10 id_ed25519.pub
--rw------- 1 lab lab 2590 Oct 13 19:10 id_rsa
--rw-r--r-- 1 lab lab  562 Oct 13 19:10 id_rsa.pub
--rw------- 1 lab lab  978 Oct 13 19:10 known_hosts
--rw-r--r-- 1 lab lab  142 Oct 13 19:10 known_hosts.old
+-rw------- 1 lab lab  399 Oct 13 20:45 id_ed25519
+-rw-r--r-- 1 lab lab   90 Oct 13 20:45 id_ed25519.pub
+-rw------- 1 lab lab 2590 Oct 13 20:45 id_rsa
+-rw-r--r-- 1 lab lab  562 Oct 13 20:45 id_rsa.pub
+-rw------- 1 lab lab  978 Oct 13 20:45 known_hosts
+-rw-r--r-- 1 lab lab  142 Oct 13 20:45 known_hosts.old
 $ ssh-keygen -lf ~/.ssh/id_rsa.pub
-3072 SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ lab@host (RSA)
+3072 SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0 lab@host (RSA)
 $ ssh-keygen -lf ~/.ssh/id_ed25519.pub
-256 SHA256:T1D5V2Wb7Ir8W7oejw7qpRKWcs9WS0VeFxma/BiCVgs lab@host (ED25519)
+256 SHA256:8m/RVM6D6wf282LHkSSCvJ43EDRwz9IJs7+U1HhrRtI lab@host (ED25519)
 $
 
 # --- ここまで ---
@@ -141,15 +141,15 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 13 19:10:23 2026 from 10.0.2.2
+Last login: Tue Oct 13 20:45:47 2026 from 10.0.2.2
 student@linuc:~$ PS1='$ '
 $ ls -la ~/.ssh
 total 12
 drwx------ 2 student student 4096 Oct 13 09:46 .
-drwxr-x--- 4 student student 4096 Oct 13 19:07 ..
--rw------- 1 student student  562 Oct 13 19:10 authorized_keys
+drwxr-x--- 4 student student 4096 Oct 13 20:41 ..
+-rw------- 1 student student  562 Oct 13 20:45 authorized_keys
 $ cut -c1-60 ~/.ssh/authorized_keys
-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC4IlAncEkRAD0/GkedVP+J
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC/L0tputTKYbA5lh7bcvHS
 $ exit
 logout
 Connection to 127.0.0.1 closed.
@@ -161,8 +161,41 @@ debug1: identity file /home/lab/.ssh/id_ed25519 type 3
 debug1: identity file /home/lab/.ssh/id_ed25519_sk type -1
 debug1: identity file /home/lab/.ssh/id_xmss type -1
 debug1: identity file /home/lab/.ssh/id_dsa type -1
-debug1: Offering public key: /home/lab/.ssh/id_rsa RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
+debug1: Offering public key: /home/lab/.ssh/id_rsa RSA SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0
 Authenticated to 127.0.0.1 ([127.0.0.1]:2222) using "publickey".
+$
+
+# --- ここまで ---
+
+# --- 画面の写し: ssh の -i・-p・-l ---
+$ cat ~/.ssh/config
+# 外側（lab@host）から練習機（student@linuc）に入るときの設定。`ssh linuc` で入れる。
+# 実体は 127.0.0.1:2222（QEMU が練習機の 22 番に転送している）。
+#
+# 鍵のファイル（IdentityFile）はわざと書いていない。書かなければ ssh は既定の名前
+# （~/.ssh/id_rsa, id_ecdsa, id_ed25519 …）を順に探す。第2章でそれを確かめる。
+Host linuc
+    HostName 127.0.0.1
+    Port 2222
+    User student
+    ServerAliveInterval 15
+$ ssh -i ~/.ssh/id_rsa -p 2222 -l student 127.0.0.1 hostname
+linuc
+$ ssh -i ~/.ssh/id_rsa -p 2222 student@127.0.0.1 hostname
+linuc
+$ ssh -v -i ~/.ssh/id_rsa -p 2222 -l student 127.0.0.1 true 2>&1 | grep -E 'Connecting to|Offering public key|Authenticated to'
+debug1: Connecting to 127.0.0.1 [127.0.0.1] port 2222.
+debug1: Offering public key: /home/lab/.ssh/id_rsa RSA SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0 explicit
+Authenticated to 127.0.0.1 ([127.0.0.1]:2222) using "publickey".
+$ ssh -l student 127.0.0.1 hostname
+ssh: connect to host 127.0.0.1 port 22: Connection refused
+$ ssh-copy-id -i ~/.ssh/id_rsa linuc
+/usr/bin/ssh-copy-id: INFO: Source of key(s) to be installed: "/home/lab/.ssh/id_rsa.pub"
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+
+/usr/bin/ssh-copy-id: WARNING: All keys were skipped because they already exist on the remote system.
+		(if you think this is a mistake, you may want to use -f option)
+
 $
 
 # --- ここまで ---
@@ -170,12 +203,19 @@ $
 # --- 画面の写し: authorized_keys が他人に書けると、鍵は使われない ---
 $ ssh linuc 'id; chmod 664 ~/.ssh/authorized_keys; ls -l ~/.ssh/authorized_keys'
 uid=1000(student) gid=1000(student) groups=1000(student),4(adm),27(sudo)
--rw-rw-r-- 1 student student 562 Oct 13 19:10 /home/student/.ssh/authorized_keys
+-rw-rw-r-- 1 student student 562 Oct 13 20:45 /home/student/.ssh/authorized_keys
 $ ssh linuc 'echo 鍵で入れた; getent group student'
 鍵で入れた
 student:x:1000:
+$ ssh linuc "man ssh | grep -B2 -A2 'group-writable'"
+troff:<standard input>:970: warning [p 8, 8.8i]: cannot adjust line
+               of  the potential for abuse, this file must have strict permis‐
+               sions: read/write for the user, and not writable by others.  It
+               may be group-writable provided that the group in question  con‐
+               tains only the user.
+
 $ ssh linuc 'chmod 666 ~/.ssh/authorized_keys; ls -l ~/.ssh/authorized_keys'
--rw-rw-rw- 1 student student 562 Oct 13 19:10 /home/student/.ssh/authorized_keys
+-rw-rw-rw- 1 student student 562 Oct 13 20:45 /home/student/.ssh/authorized_keys
 $ ssh linuc
 student@127.0.0.1's password:
 
@@ -183,27 +223,27 @@ student@127.0.0.1's password:
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 13 19:10:37 2026 from 10.0.2.2
+Last login: Tue Oct 13 20:45:59 2026 from 10.0.2.2
 student@linuc:~$ PS1='$ '
 $ sudo journalctl -u ssh --no-pager -n 30 | grep -E 'refused|Accepted'
-Oct 13 19:10:20 linuc sshd[650]: Accepted password for student from 10.0.2.2 port 52578 ssh2
-Oct 13 19:10:34 linuc sshd[690]: Accepted password for student from 10.0.2.2 port 55352 ssh2
-Oct 13 19:10:37 linuc sshd[718]: Accepted publickey for student from 10.0.2.2 port 55414 ssh2: RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
-Oct 13 19:10:41 linuc sshd[736]: Accepted publickey for student from 10.0.2.2 port 45100 ssh2: RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
-Oct 13 19:10:42 linuc sshd[742]: Accepted publickey for student from 10.0.2.2 port 45112 ssh2: RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
-Oct 13 19:10:44 linuc sshd[751]: Accepted publickey for student from 10.0.2.2 port 45128 ssh2: RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
-Oct 13 19:10:45 linuc sshd[757]: Accepted publickey for student from 10.0.2.2 port 45146 ssh2: RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
-Oct 13 19:10:46 linuc sshd[767]: Authentication refused: bad ownership or modes for file /home/student/.ssh/authorized_keys
-Oct 13 19:10:46 linuc sshd[767]: Authentication refused: bad ownership or modes for file /home/student/.ssh/authorized_keys
-Oct 13 19:10:47 linuc sshd[767]: Accepted password for student from 10.0.2.2 port 45186 ssh2
+Oct 13 20:46:05 linuc sshd[731]: Accepted publickey for student from 10.0.2.2 port 57154 ssh2: RSA SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0
+Oct 13 20:46:06 linuc sshd[737]: Accepted publickey for student from 10.0.2.2 port 57158 ssh2: RSA SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0
+Oct 13 20:46:08 linuc sshd[744]: Accepted publickey for student from 10.0.2.2 port 57166 ssh2: RSA SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0
+Oct 13 20:46:10 linuc sshd[752]: Accepted publickey for student from 10.0.2.2 port 60070 ssh2: RSA SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0
+Oct 13 20:46:11 linuc sshd[758]: Accepted publickey for student from 10.0.2.2 port 60078 ssh2: RSA SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0
+Oct 13 20:46:13 linuc sshd[767]: Accepted publickey for student from 10.0.2.2 port 60084 ssh2: RSA SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0
+Oct 13 20:46:14 linuc sshd[773]: Accepted publickey for student from 10.0.2.2 port 60096 ssh2: RSA SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0
+Oct 13 20:46:16 linuc sshd[794]: Accepted publickey for student from 10.0.2.2 port 60116 ssh2: RSA SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0
+Oct 13 20:46:18 linuc sshd[802]: Authentication refused: bad ownership or modes for file /home/student/.ssh/authorized_keys
+Oct 13 20:46:18 linuc sshd[802]: Authentication refused: bad ownership or modes for file /home/student/.ssh/authorized_keys
+Oct 13 20:46:18 linuc sshd[802]: Accepted password for student from 10.0.2.2 port 60122 ssh2
 $ chmod 600 ~/.ssh/authorized_keys
 $ exit
 logout
 Connection to 127.0.0.1 closed.
 $ ssh linuc 'ls -l ~/.ssh/authorized_keys'
--rw------- 1 student student 562 Oct 13 19:10 /home/student/.ssh/authorized_keys
+-rw------- 1 student student 562 Oct 13 20:45 /home/student/.ssh/authorized_keys
 $
-
 # --- ここまで ---
 
 # --- 画面の写し: logout・exit・Ctrl+D ---
@@ -213,7 +253,7 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 13 19:10:47 2026 from 10.0.2.2
+Last login: Tue Oct 13 20:46:19 2026 from 10.0.2.2
 student@linuc:~$ PS1='$ '
 $ shopt login_shell
 login_shell    	on

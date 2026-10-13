@@ -48,7 +48,7 @@ graphical.target
 $ runlevel
 N 5
 $ who -r
-         run-level 5  2026-10-13 19:12
+         run-level 5  2026-10-13 20:47
 $ systemctl list-units --type=target --state=active --no-legend --no-pager | grep -E "graphical|multi-user"
   graphical.target        loaded active active Graphical Interface
   multi-user.target       loaded active active Multi-User System</code></pre>
@@ -76,7 +76,7 @@ RHEL 系のインストーラは、GUI を含まないパッケージグルー�
 <h2 id="tz">タイムゾーンとパスワード</h2>
 <div class="sgoal"><b>この節で分かること</b>: インストールで決めたタイムゾーンとパスワードの残り方。Ubuntu の root がどうなっているか。</div>
 <pre data-where="練習機の中（student@linuc）"><code>$ timedatectl | grep -E "Local time|Time zone"
-               Local time: Tue 2026-10-13 19:12:43 JST
+               Local time: Tue 2026-10-13 20:48:14 JST
                 Time zone: Asia/Tokyo (JST, +0900)
 $ ls -l /etc/localtime
 lrwxrwxrwx 1 root root 30 Oct 13 10:06 /etc/localtime -&gt; /usr/share/zoneinfo/Asia/Tokyo
@@ -166,8 +166,8 @@ Ubuntu のインストーラは root にパスワードを付けず、最初の�
 <li>Ubuntu は root をロックし（<code>passwd -S</code> で <code>L</code>）、最初のユーザを sudo グループに入れる</li>
 <li>パッケージグループは用途ごとのまとまり。RHEL 系は <code>dnf group</code>、Debian / Ubuntu は tasksel やメタパッケージ</li>
 </ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
-<nav class="pager"><a href="/linuc-boot/theory/03-container">← 3. コンテナの中のカーネルは、ホストのもの</a><a href="/linuc-boot/theory/05-boot">次: 5. ファームウェアが読めるのは、FAT の中の1ファイルだけ →</a></nav>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-boot/theory/03-container">← 3. コンテナの中のカーネルは、ホストのもの</a><a href="/linuc-boot/theory/05-boot">次: 5. ファームウェアが必ず読めるのは、FAT の中のファイルだけ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>

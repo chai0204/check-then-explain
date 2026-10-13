@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>6. root にパスワードが無いと、シングルユーザモードは何も聞かずに root を渡す — 確かめて説明する LinuC 主題1.01</title>
+<title>6. Ubuntu では、root にパスワードが無いとシングルユーザモードは何も聞かずに root を渡す — 確かめて説明する LinuC 主題1.01</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="6" data-theme="linuc-boot">
@@ -10,12 +10,13 @@
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
 </div>
-<h1>6. root にパスワードが無いと、シングルユーザモードは何も聞かずに root を渡す</h1>
+<h1>6. Ubuntu では、root にパスワードが無いとシングルユーザモードは何も聞かずに root を渡す</h1>
 <p class="lead">この練習機の root にはパスワードが無い（第4章で <code>L</code>＝ロックと確かめた）。だから root では誰も入れない——はずである。
 ところが GRUB でカーネル引数に <code>single</code> と1語足して起動し、Enter を1回押すと、パスワードを1文字も打たずに root のシェルが出る。
 シングルユーザモードを頼んだのはカーネル引数だが、root を渡すと決めたのは、それを受け取ったプログラムだった。</p>
-<div class="note"><b>試験との関係</b>: root にパスワードを設定してある計算機（RHEL 系の既定）では、同じプログラム（sulogin）が root のパスワードを聞く。
-試験の「シングルユーザモードでは root のパスワードを求められる」は、その場合の説明で、誤りではない。この章は、root がロックされている Ubuntu で何が起きるかを確かめる。</div>
+<div class="note"><b>試験との関係</b>: root にパスワードを設定してある計算機では、同じプログラム（sulogin）が root のパスワードを聞く。
+試験の「シングルユーザモードでは root のパスワードを求められる」は、その場合の説明で、誤りではない。
+また、root がロックされているときに聞かずに通すのは <b>Ubuntu の改造</b>で、本家の sulogin（RHEL 系など）はシェルを渡さずに止まる（この章の後半で比べる）。この章は、root がロックされている Ubuntu で何が起きるかを確かめる。</div>
 <div class="badges"><span>前提: 第5章まで読了</span><span>前提: 端末を2つ開いている</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.01.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>ブートターゲットとランレベルの対応を言え、<code>get-default</code> / <code>set-default</code> / <code>isolate</code> を使い分けられる</li>
@@ -70,15 +71,15 @@ inactive
 active
 $ runlevel
 5 3
-$ sudo systemctl isolate graphical.target
+$ sudo systemctl default
 $ runlevel
 3 5</code></pre>
 <p><code>isolate</code> は「指定したターゲットに要るものだけを残し、要らないものを止める」。multi-user.target に isolate すると graphical.target が <code>inactive</code> になり、
-<code>runlevel</code> は「前回 5、いま 3」と答えた。graphical.target に戻すと「前回 3、いま 5」。<b>isolate はいまの状態だけを変え、次の起動には何も残さない。</b></p>
+<code>runlevel</code> は「前回 5、いま 3」と答えた。<code>systemctl default</code>（既定のターゲットに isolate する）で戻すと「前回 3、いま 5」。<b>isolate はいまの状態だけを変え、次の起動には何も残さない。</b></p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo systemctl set-default multi-user.target
 Created symlink /etc/systemd/system/default.target → /usr/lib/systemd/system/multi-user.target.
 $ ls -l /etc/systemd/system/default.target
-lrwxrwxrwx 1 root root 41 Oct 13 19:19 /etc/systemd/system/default.target -&gt; /usr/lib/systemd/system/multi-user.target
+lrwxrwxrwx 1 root root 41 Oct 13 20:53 /etc/systemd/system/default.target -&gt; /usr/lib/systemd/system/multi-user.target
 $ systemctl get-default
 multi-user.target
 $ systemctl is-active graphical.target
@@ -87,12 +88,12 @@ $ sudo systemctl set-default graphical.target
 Removed "/etc/systemd/system/default.target".
 Created symlink /etc/systemd/system/default.target → /usr/lib/systemd/system/graphical.target.
 $ ls -l /etc/systemd/system/default.target
-lrwxrwxrwx 1 root root 40 Oct 13 19:19 /etc/systemd/system/default.target -&gt; /usr/lib/systemd/system/graphical.target</code></pre>
+lrwxrwxrwx 1 root root 40 Oct 13 20:54 /etc/systemd/system/default.target -&gt; /usr/lib/systemd/system/graphical.target</code></pre>
 <p><code>set-default</code> がしたのは、<code>/etc/systemd/system/default.target</code> というリンクを作ることだけで、いまの状態（graphical.target が <code>active</code>）は変わらなかった。
 効くのは次の起動からである。元に戻すと、リンクは消えずに graphical.target を指すリンクとして作り直された。</p>
 <div class="scroll"><table>
 <tr><th>変えたいもの</th><th>やり方</th><th>いまの状態</th><th>次の起動</th></tr>
-<tr><td>いまだけ</td><td><code>systemctl isolate 〇〇.target</code>（<code>systemctl rescue</code> なども）</td><td>変わる</td><td>既定に戻る</td></tr>
+<tr><td>いまだけ</td><td><code>systemctl isolate 〇〇.target</code>（<code>systemctl rescue</code>、既定に戻す <code>systemctl default</code> なども）</td><td>変わる</td><td>既定に戻る</td></tr>
 <tr><td>次の起動から</td><td><code>systemctl set-default 〇〇.target</code></td><td>変わらない</td><td>変わる</td></tr>
 <tr><td>次の1回だけ</td><td>GRUB でカーネル引数に足す（<code>systemd.unit=〇〇.target</code>、<code>single</code>、<code>3</code> など）</td><td>—</td><td>その1回だけ変わる</td></tr>
 </table></div>
@@ -137,7 +138,7 @@ active</code></pre>
 <div class="then"><b>だめな理由</b>: パスワードは聞かれなかった。「Press Enter for maintenance」に Enter を1回押しただけで、<code>uid=0(root)</code> のシェルが出た。
 <code>single</code> が頼んだのは「rescue.target で起動せよ」だけで、root のシェルを渡すかどうかは、rescue.target が起動する <b>sulogin</b>（シングルユーザ用のログイン）が決めている。
 Ubuntu の sulogin は、root のパスワード欄が <code>*</code>（ロック）だと「確かめようがない」として、パスワードを聞かずに通す。
-もし聞いて止まる作りなら、root をロックした Ubuntu は、壊れたときに誰も直せなくなるからだ。
+これは Ubuntu が sulogin に入れている改造で（本家の sulogin は止まる。後で比べる）、root をロックした Ubuntu が、壊れたときに誰も直せなくならないようにしている。
 <b>コンソールに触れられる人は root になれる</b>。守るのは GRUB のパスワード（引数の書き換えを禁じる）、ディスクの暗号化、機械に触らせないことである。</div></div>
 <p>root のシェルを <code>exit</code> で抜けると、systemd は既定のターゲットへの起動を続ける。</p>
 <pre data-where="外（lab@host）・端末1（練習機のコンソール）"><code>root@linuc:~# exit
@@ -149,18 +150,19 @@ linuc login:</code></pre>
 <pre data-where="練習機の中（student@linuc。起動し終わってから ssh で）"><code>$ cat /proc/cmdline
 BOOT_IMAGE=/vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c4-9280-015dbb828010 ro console=tty1 console=ttyS0,115200 single
 $ journalctl -b -u rescue.service --no-pager
-Oct 13 19:20:06 linuc systemd[1]: Started rescue.service - Rescue Shell.
-Oct 13 19:20:16 linuc systemd[1]: Stopping rescue.service - Rescue Shell...
-Oct 13 19:20:16 linuc systemd[1]: rescue.service: Deactivated successfully.
-Oct 13 19:20:16 linuc systemd[1]: Stopped rescue.service - Rescue Shell.
+Oct 13 20:55:00 linuc systemd[1]: Started rescue.service - Rescue Shell.
+Oct 13 20:55:09 linuc systemd[1]: Stopping rescue.service - Rescue Shell...
+Oct 13 20:55:09 linuc systemd[1]: rescue.service: Deactivated successfully.
+Oct 13 20:55:09 linuc systemd[1]: Stopped rescue.service - Rescue Shell.
 $ sudo grep -E "^root:" /etc/shadow | cut -d: -f1,2
 root:*</code></pre>
 <p>カーネルが受け取った引数の最後に <code>single</code> がある。GRUB で足した語は保存されないので、次に普通に起動すれば消える。
 root は相変わらず <code>*</code>（ロック）のままで、パスワードを付けずに入れたことが分かる。</p>
 <!-- gen:LONGPARAM -->
 <p><b>長い語を足すとき</b>: <code>single</code> の代わりに <code>systemd.unit=rescue.target</code>（27 文字）を足すこともできる。
-ただし、この練習機のコンソール（シリアル 80 桁）では、linux の行の2段目の残りは 20 桁ほどしかなく、長い語は右端の <code>\</code> で次の段に折り返して表示される。</p>
-<pre data-where="外（lab@host）・練習機のコンソール（GRUB の編集画面）"><code> ┌────────────────────────────────────────────────────────────────────────────┐
+ただし、この練習機のコンソール（シリアル 80 桁）では、linux の行の2段目の残りは 20 桁ほどしかなく、長い語は右端の <code>\</code> で次の段に折り返して表示される。
+著者が <code>single</code> のときと同じ手順（端末2で <code>sudo reboot</code>、端末1の GRUB で足す）で打った記録を載せる。</p>
+<pre data-where="外（lab@host）・練習機のコンソール（GRUB の編集画面。systemd.unit=rescue.target と打った後）"><code> ┌────────────────────────────────────────────────────────────────────────────┐
  │                                                                            │
  │                                                                            │
  │        recordfail                                                          │^
@@ -173,22 +175,27 @@ root は相変わらず <code>*</code>（ロック）のままで、パスワー
  │        search --no-floppy --fs-uuid --set=root a5eecc38-8587-4601-9295-c92\│
  │dabc20612                                                                   │
  │        linux        /vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c\│
- │4-9280-015dbb828010 ro  console=tty1 console=ttyS0,115200 systemd.unit=resc\│
+ │4-9280-015dbb828010 ro  console=tty1 console=ttyS0,115200 eue.targetsystmd.\│
  │        linux        /vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c\│v
- │4-9280-015dbb828010 ro  console=tty1 console=ttyS0,115200 systemd.unit=resc\│
- │ue.target                                                                   │
+ │4-9280-015dbb828010 ro  console=tty1 console=ttyS0,115200 eue.targetsystmd.\│
+ │unit=resc                                                                   │
  │        initrd        /microcode.cpio /initrd.img-6.8.0-142-generic         │
  │                                                                            │
  │                                                                            │
                                                                               ┘</code></pre>
-<p>行が二重に見えるのは、先に見た描き直しの乱れである。<code>Ctrl+X</code> で起動して Enter を押し、入った root のシェルで、カーネルが受け取った引数を確かめる。</p>
-<pre data-where="外（lab@host）・練習機のコンソール（rescue.target の root のシェル）"><code>root@linuc:~# cat /proc/cmdline; systemctl is-active rescue.target
-BOOT_IMAGE=/vmlinuz-6.8.0-142-generic root=UUID=f89220a3-172e-48c4-9280-015dbb82
-8010 ro console=tty1 console=ttyS0,115200 systemd.unit=rescue.target
-active
-root@linuc:~#</code></pre>
-<p>この回は、足した語がそのままカーネルに渡り（<code>/proc/cmdline</code> の最後。80 桁で折り返して表示されている）、rescue.target に入った。
-折り返した画面では打ち間違えに気づきにくいので、長い語を足したら、入った後に <code>/proc/cmdline</code> で確かめる。この本の演習で短い語（<code>single</code>・<code>3</code>）を使うのはそのためである。</p>
+<p>打ったのは <code>systemd.unit=rescue.target</code> なのに、行末には <code>eue.targetsystmd.unit=resc</code> と、文字の順番が崩れて入っている。
+80 桁で折り返すところで、GRUB の描き直しと入力がずれたためである（行が二重に見えるのも同じ描き直しの乱れ）。このまま <code>Ctrl+X</code> で起動すると、こうなった。</p>
+<pre data-where="外（lab@host）・練習機のコンソール（起動した結果）"><code>[  OK  ] Reached target multi-user.target - Multi-User System.
+[  OK  ] Reached target graphical.target - Graphical Interface.
+         Starting systemd-update-utmp-runle…- Record Runlevel Change in UTMP...
+[  OK  ] Finished systemd-update-utmp-runle…e - Record Runlevel Change in UTMP.
+
+Ubuntu 24.04.5 LTS linuc ttyS0
+
+linuc login:</code></pre>
+<p>rescue.target には入らず、いつもどおり graphical.target まで起動して、ログインを待っている。崩れた語はどのプログラムにも通じないので、黙って無視された。
+同じ操作で崩れずに渡り、rescue.target に入った回もあった（著者の別の記録）。崩れるかどうかは、毎回同じではない。
+長い語を足したら、起動した後に <code>cat /proc/cmdline</code> で本当に渡ったかを確かめる。この本の演習で短い語（<code>single</code>・<code>3</code>）を使うのはそのためである。</p>
 <!-- /gen:LONGPARAM -->
 <div class="scroll"><table>
 <tr><th>シングルユーザモードへの入り方</th><th>書き方</th></tr>
@@ -199,6 +206,20 @@ root@linuc:~#</code></pre>
 <div class="note warn"><b>緊急モードは試さなくてよい</b>: この練習機のシリアルコンソールで <code>emergency</code> を足して起動すると、案内の2行目（<code>(or press Control-D to continue):</code>）が出ないまま止まり、
 Enter を押しても <code>exit</code> と打っても、400 秒待ってもシェルは出なかった（著者の実測。レスキューモードでは同じ操作でシェルが出た）。
 入ってしまったら、外で <code>virsh destroy linuc</code> と <code>virsh start linuc</code> を打って起動し直す。</div>
+<!-- gen:SULOGINRHEL -->
+<p><b>本家の sulogin と比べる</b>: root がロックされていても聞かずに通すのは、Ubuntu が sulogin（util-linux）に入れている改造である。
+本家の sulogin は、root がロックされているとシェルを渡さずに止まる。AlmaLinux 9.7 のコンテナで、root がロックされた状態（<code>*</code>）の sulogin を起動した記録を載せる。</p>
+<pre data-where="AlmaLinux 9.7 のコンテナ（比べるための記録。読者が打つものではない）"><code>$ grep '^root:' /etc/shadow | cut -d: -f1,2
+root:*
+$ script -qec sulogin /dev/null &lt; /dev/null
+
+Cannot open access to console, the root account is locked.
+See sulogin(8) man page for more details.
+
+Press Enter to continue.</code></pre>
+<p>本家の sulogin でも、root にパスワードがあれば、それを聞いて確かめる。root がロックされたままシェルを渡させるには、<code>--force</code>（systemd では環境変数 <code>SYSTEMD_SULOGIN_FORCE=1</code>）が要る。
+「パスワードを聞かずに root を渡す」のは、root がロックされた Ubuntu だけの振る舞いと覚えておく。</p>
+<!-- /gen:SULOGINRHEL -->
 <div class="analogy"><b>たとえ</b>: sulogin は、夜間に保守の人を通す<b>通用口の守衛</b>に近い。合い言葉（root のパスワード）があれば、それを聞いて確かめる。
 <br>ただし<b>崩れる点</b>: ふつうの守衛は合い言葉が決まっていなければ誰も通さないが、Ubuntu の sulogin は合い言葉が無いときに<b>全員を通す</b>。
 通用口（コンソール）にたどり着けた時点で、中に入れてしまう。</div>
@@ -248,7 +269,7 @@ linuc login:</code></pre>
 <p>A. <code>single</code>　B. <code>1</code>　C. <code>systemd.unit=rescue.target</code>　D. <code>runlevel=rescue</code></p>
 <details><summary>答え</summary>
 <p>A・B・C。systemd は <code>single</code> や <code>1</code> を rescue.target と読み替える。D のような引数は無い。
-（A は本文で、C はこの章の「長い語を足すとき」で実測した。B は試していない。）</p></details></div>
+（A は本文で実測した。C は、この練習機の 80 桁のコンソールでは、打った文字が崩れて効かなかった回と、効いた回があった。B は試していない。）</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>いま動いているシステムを、再起動せずにマルチユーザ（CUI）の状態に切り替えるコマンドはどれか。また、それは次の起動にも残るか。</p>
 <p>A. <code>systemctl set-default multi-user.target</code>　B. <code>systemctl isolate multi-user.target</code>　C. <code>systemctl enable multi-user.target</code></p>
@@ -264,7 +285,7 @@ linuc login:</code></pre>
 <p>root のパスワードがロックされた Ubuntu を、GRUB で <code>single</code> を足して起動した。何が起きるか。また、それを防ぐにはどうするか。</p>
 <details><summary>答え</summary>
 <p>「Press Enter for maintenance」と出て、Enter を押すとパスワード無しで root のシェルが出る（実測）。
-sulogin が「root にパスワードが無いなら確かめようがない」として通すためである。
+Ubuntu の sulogin が「root にパスワードが無いなら確かめようがない」として通すためである（Ubuntu の改造。本家の sulogin や RHEL 系では「Cannot open access to console, the root account is locked.」と出て、シェルは渡らない）。
 防ぐには GRUB にパスワードを掛けて引数の書き換えを禁じる、ディスクを暗号化する、コンソールに物理的に触れさせない、のいずれかが要る。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
@@ -276,8 +297,8 @@ sulogin が「root にパスワードが無いなら確かめようがない」�
 <li><code>init=/bin/bash</code> は systemd を飛ばして bash を PID 1 にする。ルートは読み取り専用で、systemd に頼むコマンドは動かない</li>
 <li>コンソールに触れられる人は root になれる。守るのは GRUB のパスワード・暗号化・物理的な管理</li>
 </ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
-<nav class="pager"><a href="/linuc-boot/theory/05-boot">← 5. ファームウェアが読めるのは、FAT の中の1ファイルだけ</a><a href="/linuc-boot/theory/07-shutdown">次: 7. halt では電源は切れない →</a></nav>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-boot/theory/05-boot">← 5. ファームウェアが必ず読めるのは、FAT の中のファイルだけ</a><a href="/linuc-boot/theory/07-shutdown">次: 7. halt では電源は切れない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>

@@ -16,7 +16,7 @@
 # ログは章ごとに logs/linuc-boot-NN-*.log へ書く（logs/linuc-boot-*.log が照合の対象）。
 set -u
 cd /home/shun/learning-labs || exit 1
-IMG=${IMG:-lab-linuc-boot:1.0.0}
+IMG=${IMG:-lab-linuc-boot:1.0.1}
 RUN=${RUN:-p1}
 FROM=${FROM:-0}
 ONLY=${ONLY:-}           # ONLY=4 → 第4章だけを、既にあるコンテナで取り直す（状態を変えない章の撮り直し用）
@@ -62,7 +62,7 @@ fi
 
 # =====================================================================================
 if want 1; then
-  start_log 01-virsh "第1章 virsh が触れるのは、電源とボタンだけ（1.01.2）"
+  start_log 01-virsh "第1章 virsh は電源を入れ、止まるよう頼むだけ（1.01.2）"
   [ "$FROM" -eq 1 ] && outer_shell
   tm_fresh a
   tm_run a 'virsh list'
@@ -131,8 +131,37 @@ if want 1; then
   tm_fresh a
   tm_run a 'virsh domstate linuc --reason'
   tm_record a "ログインの案内が出た後"
-  console_detach
+  # 前の起動（最初の virsh shutdown で止めた起動）は、どう止められたか。コンソールでログインして journal を読む
   [ "$(vm_state)" = running ] || { h 'virsh start linuc' >/dev/null; }
+  ensure_up
+  "${TM[@]}" clear-history -t con
+  tm_type con 'student'; tm_wait_last con 'Password:$' 30
+  tm_type con 'student'; tm_wait_last con 'student@linuc:~\$$' 60
+  tm_type con "journalctl -b -1 --no-pager | grep -E 'guest-shutdown|powering down|Power key'"; sleep 3; tm_wait_last con 'student@linuc:~\$$' 30
+  tm_keys con C-d; tm_wait_last con 'login:$' 30
+  sleep 1
+  tm_record con "前の起動の止まり方（virsh shutdown をそのまま打った）"
+  # --mode acpi で頼み方を ACPI の電源ボタンに固定する
+  tm_fresh a
+  tm_run a 'virsh shutdown --mode acpi linuc'
+  wait_off 180
+  tm_run a 'virsh domstate linuc --reason'
+  tm_record a "virsh shutdown --mode acpi"
+  for i in $(seq 1 30); do tm_last con | grep -qE '^\$$' && break; sleep 1; done
+  tm_last con | grep -qE '^\$$' || console_detach
+  tm_fresh con
+  tm_type con 'virsh start linuc --console'
+  tm_wait_last con 'login:$' 400
+  sleep 2
+  ensure_up
+  "${TM[@]}" clear-history -t con
+  tm_type con 'student'; tm_wait_last con 'Password:$' 30
+  tm_type con 'student'; tm_wait_last con 'student@linuc:~\$$' 60
+  tm_type con "journalctl -b -1 --no-pager | grep -E 'guest-shutdown|powering down|Power key'"; sleep 3; tm_wait_last con 'student@linuc:~\$$' 30
+  tm_keys con C-d; tm_wait_last con 'login:$' 30
+  sleep 1
+  tm_record con "前の起動の止まり方（--mode acpi）"
+  console_detach
   ensure_up
 
   # virsh destroy（電源を抜く）
@@ -148,6 +177,14 @@ if want 1; then
   tm_run a 'ls -l ~/.config/libvirt/qemu/autostart/'
   tm_run a 'virsh start linuc'
   tm_record a "自動起動の印と、もう一度電源を入れる"
+  ensure_up
+  # 一時停止と再開（中の OS は止まったことに気づかない）
+  tm_fresh a
+  tm_run a 'virsh suspend linuc'
+  tm_run a 'virsh domstate linuc --reason'
+  tm_run a 'virsh resume linuc'
+  tm_run a 'virsh domstate linuc --reason'
+  tm_record a "一時停止と再開"
 
   # コンソールの取り合い（端末を閉じてしまった）
   tm_close b; tm_open b 120 40; tm_type b "PS1='\$ '"; tm_wait_last b '^\$$' 10
@@ -211,12 +248,24 @@ if want 2; then
   tm_run a "ssh -v linuc true 2>&1 | grep -E 'identity file /home/lab/.ssh/id_[a-z0-9_]+ type|Offering|Authenticated'"
   tm_record a "鍵を登録して、パスワードなしで入る"
 
+  # ~/.ssh/config の Host linuc がしていることを、オプションで書く（-i・-p・-l）
+  tm_fresh a
+  tm_run a 'cat ~/.ssh/config'
+  tm_run a 'ssh -i ~/.ssh/id_rsa -p 2222 -l student 127.0.0.1 hostname'
+  tm_run a 'ssh -i ~/.ssh/id_rsa -p 2222 student@127.0.0.1 hostname'
+  tm_run a "ssh -v -i ~/.ssh/id_rsa -p 2222 -l student 127.0.0.1 true 2>&1 | grep -E 'Connecting to|Offering public key|Authenticated to'"
+  tm_run a 'ssh -l student 127.0.0.1 hostname'
+  tm_run a 'ssh-copy-id -i ~/.ssh/id_rsa linuc'     # .pub を付けずに渡す（送られるのは公開鍵。既にあるので何も足さない）
+  tm_record a "ssh の -i・-p・-l"
+
   # 受け取る側が鍵を断る（authorized_keys の権限）
-  #   group に書ける（664）だけなら、グループの中身が本人だけなので sshd は通す（OpenSSH の判断。実測）。
+  #   group に書ける（664）だけなら、グループの中身が本人だけなので sshd は通す。これは Debian / Ubuntu の改造で
+  #   （練習機の man ssh に但し書きがある）、本家の OpenSSH は断る（probe/linuc-boot-rhel-compare.sh）。
   #   other に書ける（666）と断り、パスワードを聞いてくる。
   tm_fresh a
   tm_run a "ssh linuc 'id; chmod 664 ~/.ssh/authorized_keys; ls -l ~/.ssh/authorized_keys'"
   tm_run a "ssh linuc 'echo 鍵で入れた; getent group student'"
+  tm_run a "ssh linuc \"man ssh | grep -B2 -A2 'group-writable'\""
   tm_run a "ssh linuc 'chmod 666 ~/.ssh/authorized_keys; ls -l ~/.ssh/authorized_keys'"
   tm_type a 'ssh linuc'
   tm_wait_last a 'password:$' 60; tm_type a 'student'
@@ -310,7 +359,7 @@ fi
 
 # =====================================================================================
 if want 5; then
-  start_log 05-boot "第5章 ファームウェアが読めるのは、FAT の中の1ファイルだけ（1.01.3 / 1.01.1）"
+  start_log 05-boot "第5章 ファームウェアが必ず読めるのは、FAT の中のファイルだけ（1.01.3 / 1.01.1）"
   [ "$FROM" -eq 5 ] && { outer_shell; guest_shell; }
   console_attach
   tm_fresh a
@@ -325,9 +374,11 @@ if want 5; then
   guest_shell
   for c in 'ls /sys/firmware/efi' 'sudo efibootmgr' 'lsblk -o NAME,FSTYPE,LABEL,UUID,MOUNTPOINTS /dev/vda' \
            'sudo fdisk -l /dev/vda' 'findmnt -n -o TARGET,FSTYPE,OPTIONS /boot/efi' \
+           "sudo blkid -p -o export /dev/vda15 | grep -E '^(TYPE|VERSION)='" \
            'ls /boot/efi' 'sudo ls -l /boot/efi/EFI/ubuntu' 'sudo cat /boot/efi/EFI/ubuntu/grub.cfg' 'ls -l /boot' 'cat /proc/cmdline' \
            "grep -E '^GRUB_(TIMEOUT|CMDLINE_LINUX_DEFAULT|TERMINAL|FORCE_PARTUUID)=' /etc/default/grub /etc/default/grub.d/*.cfg" \
-           "sudo grep -m2 -E '^\s+(linux|initrd)\s' /boot/grub/grub.cfg" 'systemd-analyze'; do
+           "sudo grep -m2 -E '^\s+(linux|initrd)\s' /boot/grub/grub.cfg" 'systemd-analyze' \
+           'dmesg | head -3' "sudo dmesg | grep -E 'Linux version|Command line|Run /init'"; do
     tm_run g "$c"
   done
   tm_record g "ブートの中継を、練習機の中から見る"
@@ -383,7 +434,7 @@ fi
 
 # =====================================================================================
 if want 6; then
-  start_log 06-target "第6章 シングルユーザモードは、パスワードを聞かずに root を渡す（1.01.3）"
+  start_log 06-target "第6章 Ubuntu では、root にパスワードが無いとシングルユーザモードは何も聞かない（1.01.3）"
   [ "$FROM" -eq 6 ] && { outer_shell; guest_shell; console_attach; }
   tm_fresh g
   for c in 'systemctl get-default' 'ls -l /usr/lib/systemd/system/runlevel?.target' \
@@ -394,7 +445,7 @@ if want 6; then
   tm_run g 'sudo systemctl isolate multi-user.target' 180; W 5
   tm_run g 'systemctl is-active graphical.target multi-user.target'
   tm_run g 'runlevel'
-  tm_run g 'sudo systemctl isolate graphical.target' 180; W 5
+  tm_run g 'sudo systemctl default' 180; W 5
   tm_run g 'runlevel'
   for c in 'sudo systemctl set-default multi-user.target' 'ls -l /etc/systemd/system/default.target' \
            'systemctl get-default' 'systemctl is-active graphical.target' \
@@ -431,6 +482,30 @@ if want 6; then
   tm_run g 'journalctl -b -u rescue.service --no-pager'
   tm_run g 'sudo grep -E "^root:" /etc/shadow | cut -d: -f1,2'
   tm_record g "rescue から抜けた後"
+
+  # 長い語を足すとき（systemd.unit=rescue.target は 80 桁の編集画面で折り返して表示される）
+  "${TM[@]}" clear-history -t con
+  tm_leave g 'sudo reboot'
+  grub_wait_menu 1200
+  grub_stop
+  grub_e; sleep 1
+  grub_add 'systemd.unit=rescue.target'
+  tm_shot con "linux の行末に systemd.unit=rescue.target を足した（折り返す）"
+  tm_keys con C-x
+  tm_wait_last con 'continue\):$|login:$' 400
+  sleep 2
+  if tm_screen con | grep -q 'rescue mode'; then
+    tm_keys con Enter; sleep 3
+    tm_type con 'cat /proc/cmdline; systemctl is-active rescue.target'; tm_wait_last con '#$' 30; sleep 1
+    tm_shot con "Enter を押した後（rescue.target の root のシェル）"
+    tm_type con 'exit'
+    tm_wait_last con 'login:$' 400
+    sleep 2
+  else
+    tm_shot con "rescue.target に入らなかった（足した語が崩れた可能性）"
+  fi
+  ensure_up
+  guest_shell
 
   # init=/bin/bash
   "${TM[@]}" clear-history -t con
@@ -473,18 +548,29 @@ if want 7; then
   W 5
   tm_run g 'sudo shutdown -c'
   W 3
+  # 時刻の 10 は「10 時」ではなく「10 分後」
+  tm_run g 'sudo shutdown -r 10'
+  tm_run g 'sudo shutdown -c'
+  W 3
+  # 時刻なしは 1 分後。外の端末（a）は開いておき、1 分以内に取り消す
   tm_run g 'sudo shutdown'
   W 3
   tm_run g 'cat /run/nologin'
   tm_record g "端末1: 予約する人"
   tm_fresh a
   tm_run a 'ssh linuc hostname'
+  tm_run a "ssh -v linuc hostname 2>&1 | grep -E 'Server accepts key|going down|Connection closed'"
   tm_record a "予約が5分以内に迫っているとき、外から入ろうとする"
   tm_fresh g
   tm_run g 'sudo shutdown -c'
   W 3
+  tm_run g "sudo journalctl -u ssh --no-pager -n 20 | grep 'Access denied'"
   tm_run g 'wall "これは wall の試験です"'
   W 3
+  # -k は知らせだけを送り、止めない
+  tm_run g 'sudo shutdown -k now'
+  W 3
+  tm_run g 'systemctl is-system-running'
   tm_record g "端末1: 取り消して、wall を送る"
   tm_record b "端末2: 入って待っていた人の画面"
   tm_leave b 'exit'
@@ -555,7 +641,9 @@ if want 8; then
   start_log 08-signal "第8章 kill は止めない。合図を送るだけ（1.01.4）"
   [ "$FROM" -eq 8 ] && { outer_shell; guest_shell; }
   tm_fresh g
-  for c in 'uptime' 'cat /proc/loadavg' 'ps aux | head -4' 'ps -ef | head -4' 'pstree -p student' \
+  for c in 'uptime' 'cat /proc/loadavg' 'ps aux | head -4' 'ps -ef | head -4' \
+           'ps -f' 'ps f' 'ps -H' 'ps -A | wc -l; ps -e | wc -l' 'ps e -o args= -p $$ | cut -c1-100' \
+           'pstree -p student' \
            'top -b -n 1 | head -12' 'pgrep -a lab-hog' 'pgrep -l -u student' \
            'ps -o pid,ppid,user,stat,etime,cmd -p $(pgrep -x lab-hog)'; do
     tm_run g "$c"
@@ -569,6 +657,12 @@ if want 8; then
     tm_run g "$c"
   done
   tm_record g "TERM を無視するプロセスに kill"
+  # シグナルの書き方（-s と番号、-SIG を付けた名前）
+  tm_fresh g
+  for c in 'sleep 801 &' 'kill -s 15 $!' 'sleep 802 &' 'kill -SIGKILL $!' 'jobs'; do
+    tm_run g "$c"
+  done
+  tm_record g "kill -s 15 と kill -SIGKILL"
   tm_fresh g
   for c in 'sleep 601 &' 'sleep 602 &' 'sleep 603 &' 'jobs' "pgrep -a -f 'sleep 60'" "pkill -f 'sleep 601'" 'jobs' \
            'killall sleep' 'jobs'; do
@@ -584,6 +678,15 @@ if want 8; then
   W 2
   tm_run g 'jobs'
   tm_record g "名前は 15 文字で切られる"
+  # killall は逆に、長い名前のまま探せる（15 文字に切った名前では見つからない）
+  tm_fresh g
+  for c in '/tmp/very-long-process-name 300 &' 'pgrep -l very-long-proce' \
+           'killall very-long-proce; echo "終了コード $?"' 'killall very-long-process-name; echo "終了コード $?"'; do
+    tm_run g "$c"
+  done
+  W 2
+  tm_run g 'jobs'
+  tm_record g "killall と長い名前"
 fi
 
 # =====================================================================================
@@ -600,6 +703,18 @@ if want 9; then
   tm_run b 'jobs'
   tm_leave b 'exit'
   tm_record b "フォアグラウンドとバックグラウンド"
+  # ジョブの番号の書き方（端末2で）: fg 2 と fg %1、kill %1
+  tm_fresh g
+  tm_run g 'sleep 701 &'
+  tm_run g 'sleep 702 &'
+  tm_run g 'jobs'
+  tm_type g 'fg 2'; sleep 1.5; tm_keys g C-c; tm_wait_last g '^\$$' 10
+  tm_type g 'fg %1'; sleep 1.5; tm_keys g C-c; tm_wait_last g '^\$$' 10
+  tm_run g 'jobs'
+  tm_run g 'sleep 703 &'
+  tm_run g 'kill %1'
+  tm_run g 'jobs'
+  tm_record g "fg 2 と fg %1"
   # & で動かして exit
   sess_b
   tm_login b

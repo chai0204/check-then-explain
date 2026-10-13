@@ -9,16 +9,16 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 13 19:28:04 2026 from 10.0.2.2
+Last login: Tue Oct 13 21:03:36 2026 from 10.0.2.2
 student@linuc:~$ PS1='$ '
 $ sleep 300
 ^Z
 [1]+  Stopped                 sleep 300
 $ jobs -l
-[1]+   747 Stopped                 sleep 300
+[1]+   766 Stopped                 sleep 300
 $ ps -o pid,stat,cmd -p $(pgrep -f "sleep 300")
     PID STAT CMD
-    747 T    sleep 300
+    766 T    sleep 300
 $ bg
 [1]+ sleep 300 &
 $ jobs
@@ -34,6 +34,30 @@ $
 
 # --- ここまで ---
 
+# --- 画面の写し: fg 2 と fg %1 ---
+$ sleep 701 &
+[1] 771
+$ sleep 702 &
+[2] 772
+$ jobs
+[1]-  Running                 sleep 701 &
+[2]+  Running                 sleep 702 &
+$ fg 2
+sleep 702
+^C
+$ fg %1
+sleep 701
+^C
+$ jobs
+$ sleep 703 &
+[1] 773
+$ kill %1
+$ jobs
+[1]+  Terminated              sleep 703
+$
+
+# --- ここまで ---
+
 # --- 画面の写し: & で動かして exit ---
 $ ssh linuc
 
@@ -41,12 +65,12 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 13 19:28:44 2026 from 10.0.2.2
+Last login: Tue Oct 13 21:04:33 2026 from 10.0.2.2
 student@linuc:~$ PS1='$ '
 $ sleep 1001 &
-[1] 766
+[1] 789
 $ jobs -l
-[1]+   766 Running                 sleep 1001 &
+[1]+   789 Running                 sleep 1001 &
 $ shopt huponexit
 huponexit      	off
 $ exit
@@ -58,7 +82,7 @@ $
 
 # --- 画面の写し: 別の端末から見る（exit の後） ---
 $ pgrep -a -f 'sleep 100'
-766 sleep 1001
+789 sleep 1001
 $
 
 # --- ここまで ---
@@ -70,10 +94,10 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 13 19:28:56 2026 from 10.0.2.2
+Last login: Tue Oct 13 21:04:55 2026 from 10.0.2.2
 student@linuc:~$ PS1='$ '
 $ sleep 1002 &
-[1] 785
+[1] 808
 $
 $ Connection to 127.0.0.1 closed.
 $
@@ -82,7 +106,7 @@ $
 
 # --- 画面の写し: 別の端末から見る（切断の後） ---
 $ pgrep -a -f 'sleep 100'
-766 sleep 1001
+789 sleep 1001
 $
 
 # --- ここまで ---
@@ -94,10 +118,10 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 13 19:29:03 2026 from 10.0.2.2
+Last login: Tue Oct 13 21:05:03 2026 from 10.0.2.2
 student@linuc:~$ PS1='$ '
 $ nohup sleep 1003 &
-[1] 803
+[1] 826
 $ nohup: ignoring input and appending output to 'nohup.out'
 
 $ grep SigIgn /proc/$!/status
@@ -110,10 +134,10 @@ $
 
 # --- 画面の写し: 別の端末から見る（nohup の後） ---
 $ pgrep -a -f 'sleep 100'
-766 sleep 1001
-803 sleep 1003
+789 sleep 1001
+826 sleep 1003
 $ cat ~/nohup.out; ls -l ~/nohup.out
--rw------- 1 student student 0 Oct 13 19:29 /home/student/nohup.out
+-rw------- 1 student student 0 Oct 13 21:05 /home/student/nohup.out
 $
 
 # --- ここまで ---
@@ -125,7 +149,7 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 13 19:29:09 2026 from 10.0.2.2
+Last login: Tue Oct 13 21:05:08 2026 from 10.0.2.2
 student@linuc:~$ PS1='$ '
 $ tmux new -s work
 [detached (from session work)]
@@ -137,9 +161,9 @@ $
 
 # --- 画面の写し: 別の端末から見る（tmux） ---
 $ tmux ls
-work: 1 windows (created Tue Oct 13 19:29:20 2026)
+work: 1 windows (created Tue Oct 13 21:05:19 2026)
 $ pgrep -a lab-count
-838 /bin/bash /usr/local/bin/lab-count
+861 /bin/bash /usr/local/bin/lab-count
 $
 
 # --- ここまで ---
@@ -158,6 +182,7 @@ student@linuc:~$ lab-count
 10
 11
 12
+13
 
 
 
@@ -183,8 +208,7 @@ student@linuc:~$ lab-count
 
 
 
-
-[work] 0:bash*                                                                                   "linuc" 19:29 13-Oct-26
+[work] 0:bash*                                                                                   "linuc" 21:05 13-Oct-26
 # --- ここまで ---
 
 # --- 画面の写し: tmux に戻って終わらせる ---
@@ -194,7 +218,7 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 13 19:29:19 2026 from 10.0.2.2
+Last login: Tue Oct 13 21:05:18 2026 from 10.0.2.2
 student@linuc:~$ PS1='$ '
 $ tmux attach -t work
 [exited]
@@ -212,13 +236,13 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 13 19:29:31 2026 from 10.0.2.2
+Last login: Tue Oct 13 21:05:31 2026 from 10.0.2.2
 student@linuc:~$ PS1='$ '
 $ screen -S job
-[detached from 888.job]
+[detached from 912.job]
 $ screen -ls
 There is a screen on:
-	888.job	(10/13/26 19:29:43)	(Detached)
+	912.job	(10/13/26 21:05:42)	(Detached)
 1 Socket in /run/screen/S-student.
 $
 $ Connection to 127.0.0.1 closed.
@@ -229,10 +253,10 @@ $
 # --- 画面の写し: 別の端末から見る（screen）と後片付け ---
 $ screen -ls
 There is a screen on:
-	888.job	(10/13/26 19:29:43)	(Detached)
+	912.job	(10/13/26 21:05:42)	(Detached)
 1 Socket in /run/screen/S-student.
 $ pgrep -a lab-count
-896 /bin/bash /usr/local/bin/lab-count
+920 /bin/bash /usr/local/bin/lab-count
 $ pkill lab-count; pkill -f "sleep 100"
 $
 

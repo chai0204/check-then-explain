@@ -22,7 +22,7 @@ jobs = f'''<p>端末を2つ使う。端末1は、外（lab@host）から <code>s
 <tr><td>末尾の <code>&amp;</code></td><td>はじめからバックグラウンドで起動する（次の節）</td></tr>
 </table></div>
 <p>ジョブが複数あるときは、番号で選ぶ。端末2（練習機の中）で試す。</p>
-{pre(T2, chunk('09b', 'fg 2 と fg %1'))}
+{pre(T2, chunk('09', 'fg 2 と fg %1'))}
 <p><code>fg 2</code> は2番のジョブ（<code>sleep 702</code>）を、<code>fg %1</code> は1番のジョブを前に戻した。番号の前の <code>%</code> は付けても付けなくてもよい（<code>bg</code> も同じ）。
 <code>kill %1</code> のように、ジョブ番号は <code>kill</code> にも渡せるが、そのときは <code>%</code> が要る（<code>%</code> を付けないと PID の意味になる）。
 ジョブはシェルごとの番号で、別の端末のシェルからは見えない（そちらでは PID を使う）。</p>

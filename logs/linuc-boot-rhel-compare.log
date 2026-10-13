@@ -1,0 +1,49 @@
+
+
+========== 0. 版 ==========
+
+$ cat /etc/almalinux-release
+AlmaLinux release 9.7 (Moss Jungle Cat)
+
+$ rpm -q openssh-server openssh-clients util-linux
+openssh-server-8.7p1-49.el9_7.alma.1.x86_64
+openssh-clients-8.7p1-49.el9_7.alma.1.x86_64
+util-linux-2.37.4-21.el9_7.x86_64
+
+
+========== 第2章 authorized_keys が group に書けるとき（本家に近い OpenSSH） ==========
+
+$ useradd -m alice
+
+$ su - alice -c 'ssh-keygen -q -t ed25519 -N "" -f ~/.ssh/id_ed25519 && cp ~/.ssh/id_ed25519.pub ~/.ssh/authorized_keys'
+
+$ chmod 664 /home/alice/.ssh/authorized_keys; ls -l /home/alice/.ssh/authorized_keys; getent group alice
+-rw-rw-r-- 1 alice alice 100 Oct 13 11:33 /home/alice/.ssh/authorized_keys
+alice:x:1000:
+
+$ su - alice -c 'ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes localhost true'; echo "終了コード $?"
+Warning: Permanently added 'localhost' (ED25519) to the list of known hosts.
+alice@localhost: Permission denied (publickey,gssapi-keyex,gssapi-with-mic,password).
+終了コード 255
+
+$ grep 'Authentication refused' /tmp/sshd.log
+Authentication refused: bad ownership or modes for file /home/alice/.ssh/authorized_keys
+
+$ chmod 600 /home/alice/.ssh/authorized_keys
+
+$ su - alice -c 'ssh -o BatchMode=yes localhost echo 鍵で入れた'
+鍵で入れた
+
+
+========== 第6章 root がロックされているときの sulogin（本家の util-linux） ==========
+
+$ grep '^root:' /etc/shadow | cut -d: -f1,2
+root:*
+
+$ script -qec sulogin /dev/null < /dev/null
+
+Cannot open access to console, the root account is locked.
+See sulogin(8) man page for more details.
+
+Press Enter to continue.
+

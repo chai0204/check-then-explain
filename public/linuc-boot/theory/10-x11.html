@@ -123,23 +123,24 @@ X11 forwarding request failed on channel 0</code></pre>
 <p>10章で、送った側の期待と、受け取った側の振る舞いが食い違う場面を10回見た。並べる。</p>
 <div class="scroll"><table>
 <tr><th>章</th><th>送ったもの（合図）</th><th>受け取った側</th><th>受け取った側が決めたこと</th></tr>
-<tr><td>1</td><td><code>virsh shutdown</code>（電源ボタン）</td><td>中の OS（GRUB の間は誰もいない）</td><td>聞く者がいない間に押されたボタンは消えた</td></tr>
+<tr><td>1</td><td><code>virsh shutdown</code>（止まってほしいという頼み）</td><td>中の OS（ゲストエージェント、いなければ ACPI の電源ボタンで受け取る。GRUB の間は誰もいない）</td><td>受け取る者がいない間の頼みは消えた</td></tr>
 <tr><td>2</td><td>ssh の公開鍵</td><td>相手の sshd と <code>authorized_keys</code></td><td>他人が書ける名簿の鍵は使わない</td></tr>
 <tr><td>3</td><td><code>docker stop</code>（TERM）</td><td>檻の起動スクリプト → 練習機</td><td>練習機を正常に止めてから終わる（猶予の中で）</td></tr>
 <tr><td>4</td><td>インストール時の選択</td><td>起動時の systemd（<code>default.target</code>）</td><td>GUI が無くても graphical.target まで進む</td></tr>
 <tr><td>5</td><td>ブート順（BootOrder）</td><td>起動された shim の fallback</td><td>書き換えたブート順を元に戻した</td></tr>
-<tr><td>6</td><td>カーネル引数 <code>single</code></td><td>sulogin</td><td>パスワードの無い root を、聞かずに渡した</td></tr>
+<tr><td>6</td><td>カーネル引数 <code>single</code></td><td>sulogin（Ubuntu の改造版）</td><td>パスワードの無い root を、聞かずに渡した</td></tr>
 <tr><td>7</td><td><code>halt</code></td><td>カーネル（と、電源を切る ACPI）</td><td>CPU は止めたが、電源は切らなかった</td></tr>
 <tr><td>8</td><td><code>kill</code>（TERM）</td><td>lab-hog</td><td>無視した。KILL だけは断れなかった</td></tr>
 <tr><td>9</td><td>回線の切断（SIGHUP）</td><td>シェルとそのジョブ</td><td>nohup・tmux の中のものは無視した</td></tr>
 <tr><td>10</td><td><code>ssh -X</code> の要求</td><td>手元の ssh と、相手の sshd</td><td>X サーバーも xauth も無いので、通り道を作らなかった</td></tr>
 </table></div>
-<div class="goal"><p><b>電源ボタンも、停止も、シグナルも、ログインも、相手に送る「合図」でしかない。どう振る舞うかは、受け取った側が決める。</b></p>
-<p>受け手に決めさせずに止められるのは、電源を抜く <code>virsh destroy</code> と <code>kill -9</code> だけで、どちらも後片付けの機会を奪う。
+<div class="goal"><p><b>停止の頼みも、シグナルも、ログインも、相手に送る「合図」でしかない。どう振る舞うかは、受け取った側が決める。</b></p>
+<p>受け手に決めさせずに終わらせられるのは、電源を抜く <code>virsh destroy</code> と <code>kill -9</code> だけで、どちらも後片付けの機会を奪う
+（一時停止なら <code>virsh suspend</code> と <code>kill -STOP</code> も断れないが、これは終わらせずに止めておくだけである）。
 試験に <code>shutdown</code> <code>halt</code> <code>poweroff</code> <code>reboot</code>、<code>kill</code> <code>pkill</code> <code>killall</code>、<code>nohup</code> <code>screen</code> <code>tmux</code> と似たものが並ぶのは、
 <b>送る合図と、受け取る相手が違うから</b>である。コマンドを覚えるときは「誰に、何を頼んでいるか」を一緒に覚えると、取り違えなくなる。</p></div>
 <div class="analogy"><b>たとえ</b>: この10章は、<b>郵便を出す</b>ことに似ている。差出人は封筒（合図）を出せるが、開けるか、従うか、捨てるかは受取人が決める。
-<br>ただし<b>崩れる点</b>: 郵便には「受け取りを拒否できない」書留のような強制は無いが、コンピュータには2つだけある。電源を抜くことと、KILL である。
+<br>ただし<b>崩れる点</b>: 郵便には「受け取りを拒否できない」書留のような強制は無いが、コンピュータには、相手を終わらせる強制が2つだけある。電源を抜くことと、KILL である。
 強制は確実だが、受取人に片付けの暇を与えない。だから最後の手段にする。</div>
 
 <div class="note try"><b>手を動かす</b>:
@@ -173,7 +174,7 @@ A の <code>xhost</code> は、ホスト単位で接続を許すかを X サー�
 <li><code>DISPLAY</code> は描きに行く先（<code>ホスト:ディスプレイ.スクリーン</code>）、<code>xauth</code> は接続の合い言葉を扱う</li>
 <li><code>ssh -X</code> には、手元の X サーバー（<code>DISPLAY</code>）と、相手の <code>xauth</code> の両方が要る。どちらかが無ければ、受け取る側が通り道を作らない</li>
 </ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-boot/theory/09-hup">← 9. exit では消えず、切断で消える</a><a href="/linuc-boot/theory/">理論編 目次 →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

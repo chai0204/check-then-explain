@@ -36,10 +36,10 @@ see = f'''<p>まず、練習機がどれくらい忙しいかを1行で見る。
 <tr><td>2文字目の <code>s</code></td><td>セッションの先頭（ログインシェルやデーモンの親）</td></tr>
 </table></div>
 <p>オプションの1文字の違いで、出るものが大きく変わる組がある。</p>
-{pre(G, chunk('08b', 'ps -f と ps f（と -A・e）'))}
+{pre(G, chunk('08', 'プロセスを見る', 'ps -f', 'ps e -o args= -p $$ | cut -c1-100'))}
 <p><code>-f</code>（ハイフンあり）は<b>列を増やす</b>だけで（フル形式。<code>UID</code>・<code>PPID</code>・<code>C</code>・<code>STIME</code> が付く）、親子の木は出さない。
-木を出すのはハイフンなしの <code>f</code>（<code>--forest</code> と同じ）で、<code>\\_</code> の線で子を字下げする。
-選ばれるプロセスの範囲も違う。ハイフンありの書き方はこの端末（<code>pts/1</code>）のものだけを、ハイフンなしの書き方は自分の、端末を持つプロセスすべてを出した（この記録は第10章まで進めた後に撮ったので、第9章で残す screen の中のシェル（<code>pts/3</code>）と、別の端末のシェル（<code>pts/0</code>）も写っている。順に進めてきた画面では、そのとき開いている端末の分だけが並ぶ）。
+木を出すのはハイフンなしの <code>f</code>（<code>--forest</code> と同じ）で、<code>\\_</code> の線で子を字下げする。ハイフンありの <code>-H</code> も、字下げで親子を見せる。
+選ばれるプロセスの範囲も違う。ハイフンありの書き方はこの端末のものだけを、ハイフンなしの書き方は自分の、端末を持つプロセスすべて（開いている別の端末のシェルも）を出した。
 <code>-A</code> は <code>-e</code> と同じ「全部」で、数えると同じ数になった。ハイフンなしの <code>e</code> は、コマンドの後ろに環境変数を並べる（上の最後の出力は <code>$$</code>、つまりこのシェル自身の分を 100 文字で切ったもの）。</p>
 <p>親子の関係は <code>pstree</code> が木で出す。<code>-p</code> で PID を添え、ユーザ名を付けるとそのユーザのプロセスだけを出す。</p>
 {pre(G, chunk('08', 'プロセスを見る', 'pstree -p student', 'pstree -p student'))}
@@ -72,7 +72,9 @@ lab-hog が自分で無視を決めたのは TERM・INT・HUP の3つで（<code
 <tr><th>番号</th><th>名前</th><th>いつ送られるか</th><th>受け手が無視できるか</th></tr>
 <tr><td>1</td><td>HUP</td><td>端末（回線）が切れたとき（第9章）。デーモンには「設定を読み直して」の意味で送ることが多い</td><td>できる</td></tr>
 <tr><td>2</td><td>INT</td><td>端末で <code>Ctrl+C</code> を押したとき</td><td>できる</td></tr>
+<tr><td>3</td><td>QUIT</td><td>端末で <code>Ctrl+\\</code> を押したとき（終わるときにコアを残すことがある）</td><td>できる</td></tr>
 <tr><td>9</td><td>KILL</td><td><code>kill -9</code>（<code>kill -KILL</code>）</td><td><b>できない</b></td></tr>
+<tr><td>14</td><td>ALRM</td><td>時間切れ（タイマー）の知らせ</td><td>できる</td></tr>
 <tr><td>15</td><td>TERM</td><td><code>kill</code>・<code>pkill</code>・<code>killall</code> の既定。<code>systemctl stop</code> も最初に送る</td><td>できる</td></tr>
 <tr><td>18</td><td>CONT</td><td>止まっているものを再開させる（<code>bg</code>・<code>fg</code> が送る）</td><td>再開そのものは断れない</td></tr>
 <tr><td>19</td><td>STOP</td><td>一時停止させる</td><td><b>できない</b></td></tr>
@@ -83,7 +85,7 @@ lab-hog が自分で無視を決めたのは TERM・INT・HUP の3つで（<code
 <p><code>pgrep</code> は何も見つけられず、終了コード 1 を返した。systemd は lab-hog の終わり方を「シグナル KILL で殺された（<code>code=killed, signal=KILL</code>）」と記録している。
 <code>kill -9 PID</code> と <code>kill -KILL PID</code> は同じ意味である（9番が KILL）。</p>
 <p>シグナルの指定のしかたは、ほかにもある。<code>-SIG</code> を付けた名前と、<code>-s</code> の後ろに名前か番号を書く形である。</p>
-{pre(G, chunk('08b', 'kill -s 15 と kill -SIGKILL'))}
+{pre(G, chunk('08', 'kill -s 15 と kill -SIGKILL'))}
 <p><code>kill -s 15</code> は TERM（<code>Terminated</code>）、<code>kill -SIGKILL</code> は KILL（<code>Killed</code>）を送った。<code>$!</code> は、直前に <code>&amp;</code> で起動したプロセスの PID である。
 つまり KILL は、<code>kill -9</code>・<code>kill -KILL</code>・<code>kill -SIGKILL</code>・<code>kill -s KILL</code>・<code>kill -s 9</code> のどれで書いてもよい。</p>
 <div class="analogy"><b>たとえ</b>: TERM は「閉店です、お帰りください」という<b>館内放送</b>で、KILL は<b>警備員が腕をつかんで外へ出す</b>ことに近い。放送は聞き流せるが、警備員は断れない。
@@ -91,7 +93,7 @@ lab-hog が自分で無視を決めたのは TERM・INT・HUP の3つで（<code
 開いていたファイルを閉じる、一時ファイルを消す、書きかけを保存する、といった後片付けは一切されない。だから KILL は、TERM で止まらないときの最後の手段にする。</div>'''
 
 names = f'''<p>PID を調べずに、名前や条件で選んで送るコマンドが2つある。<code>sleep</code> を3つ動かして試す（<code>&amp;</code> は第9章で扱う。後ろで動かす印）。</p>
-{pre(G, chunk('08', 'pkill と killall', 'sleep 601 &', 'jobs', raw=False))}
+{pre(G, chunk('08', 'pkill と killall'))}
 <p><code>pkill</code> は <code>pgrep</code> と同じ条件で選んで、シグナルを送る（既定は TERM）。<code>-f</code> を付けると、名前ではなく引数まで含めたコマンド行で照合するので、<code>sleep 601</code> の1つだけを選べた。
 <code>killall</code> は名前の完全一致で選ぶので、<code>sleep</code> という名前の残り2つが両方止まった。<code>pkill</code> の名前は正規表現で、名前の一部に一致すれば当たる。<code>killall</code> は名前全体が一致したものにだけ送る。</p>
 <p>名前で選ぶときには落とし穴が1つある。</p>
@@ -100,7 +102,7 @@ names = f'''<p>PID を調べずに、名前や条件で選んで送るコマン�
 <code>very-long-process-name</code>（22文字）は <code>very-long-proce</code> として記録され、それより長い名前で探すと <code>pgrep</code> は何も見つけられない（<code>pgrep</code> 自身がそう注意してくる）。
 長い名前のプロセスは、<code>-f</code> を付けてコマンド行全体で探す。</p>
 <p><code>killall</code> は、この点が逆になる。</p>
-{pre(G, chunk('08b', 'killall と長い名前'))}
+{pre(G, chunk('08', 'killall と長い名前'))}
 <p><code>pgrep</code> は 15 文字に切られた名前（<code>very-long-proce</code>）で見つけたが、<code>killall</code> はその名前では「無い」と答え、元の長い名前で止めた。
 <code>killall</code> は、名前がちょうど 15 文字で切れているプロセスについては、コマンド行のほうの名前と比べるからである。
 <b>短い名前で探すなら <code>pgrep</code>・<code>pkill</code>、長い名前のまま探すなら <code>killall</code> か <code>-f</code></b> と覚えると取り違えない。</p>

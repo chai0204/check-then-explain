@@ -3,7 +3,7 @@
 #   外側のコンテナ（lab@host）の中で、練習機（student@linuc）を読者が自分で virsh start する。
 #   電源・GRUB・ブートターゲット・停止・ssh の鍵・シグナルを、本物のカーネルと systemd で確かめる。
 #
-#   build: docker build -t lab-linuc-boot:1.0.0 containers/linuc-boot
+#   build: docker build -t lab-linuc-boot:1.0.1 containers/linuc-boot
 FROM lab-linuc-machine:1.0.0
 USER root
 
@@ -23,6 +23,6 @@ LABEL org.opencontainers.image.description="LinuC 主題1.01（起動・仮想�
 LABEL org.opencontainers.image.licenses=MIT
 
 # LAB_VM_AUTOSTART=0: 練習機の電源は読者が入れる（virsh start そのものが 1.01.2 の題材）
-ENV LAB_THEME=linuc-boot LAB_VERSION=1.0.0 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:boot-1.0.0 LAB_VM_AUTOSTART=0
+ENV LAB_THEME=linuc-boot LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:boot-1.0.1 LAB_VM_AUTOSTART=0
 USER lab

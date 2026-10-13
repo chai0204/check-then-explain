@@ -108,6 +108,9 @@ def main():
             body = html.unescape(m.group(2))
             lines = body.split('\n')
             new_lines, why = None, None
+            if 'AlmaLinux' in m.group(1):   # 比べるための記録（rhel-compare）は fill02.py / fill06.py が作る。ここでは見ない
+                out.append(m.group(0))
+                continue
             if any(l.startswith('$ ') for l in lines):
                 total += 1
                 bg = groups(lines)

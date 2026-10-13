@@ -19,7 +19,7 @@ ssh の信用は、どちらの向きも、<b>受け取る側に置いたファ�
 <ul><li><code>ssh-keygen</code> で鍵ペアを作り、<code>ssh-copy-id</code> で相手に登録して、パスワードなしで入れる</li>
 <li><code>~/.ssh/id_rsa</code>・<code>id_rsa.pub</code>・<code>authorized_keys</code>・<code>known_hosts</code> が、どちらの計算機に置かれ、誰が読むかを言える</li>
 <li><code>logout</code>・<code>exit</code>・<code>Ctrl+D</code> の違いを、出力で説明できる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: <code>~/.ssh/config</code> に書ける項目の細部（この章で使う <code>Host</code> <code>HostName</code> <code>Port</code> <code>User</code> 以外）、
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>~/.ssh/config</code> に書ける項目の細部（この章で使う <code>Host</code> <code>HostName</code> <code>Port</code> <code>User</code> 以外。主題1.10.3 の範囲なので、linuc-security のコースで扱う）、
 known_hosts をハッシュにする設定の名前、鍵の数学的な仕組み。
 なお、鍵の種類（rsa・ecdsa・ed25519）の違い・<code>ssh-agent</code>・ポート転送は出題範囲（主題1.10.3）に入っているので、そちらのコースで手を動かす。</div></div>
 
@@ -29,7 +29,7 @@ known_hosts をハッシュにする設定の名前、鍵の数学的な仕組�
 <pre data-where="外（lab@host）"><code>$ ls -la ~/.ssh
 total 12
 drwx------ 1 lab lab 4096 Oct 13 10:51 .
-drwxr-x--- 1 lab lab 4096 Oct 13 19:06 ..
+drwxr-x--- 1 lab lab 4096 Oct 13 20:40 ..
 -rw-r--r-- 1 lab lab  502 Oct 13 10:11 config
 $ cat ~/.ssh/config
 （略）
@@ -58,16 +58,16 @@ Connection to 127.0.0.1 closed.</code></pre>
 <code>yes</code> と答えると、その鍵が <code>~/.ssh/known_hosts</code> に書かれる（<code>Permanently added</code>）。次からは聞かれない。
 もし次に接続したとき相手の鍵が違っていたら、ssh は接続を止めて警告する。途中で誰かが相手になりすましているかもしれないからだ。</p>
 <pre data-where="外（lab@host）"><code>$ cut -c1-60 ~/.ssh/known_hosts
-|1|926QEiG/Qcn6sTFu3uTiykVvbFk=|xsekbwgJHfZAdFP533SGrB2yS1k=
-|1|J01hBi9mOc+DLr9vq69I9kxv3eg=|HYfFcc2m+Lysyi2a0tSc4Zcxw9c=
-|1|wXjvTMAfA61MsxyL/6uI2P0kiwI=|+hCYiGjxGFo50E4b3CA5QSJ9e+Q=
+|1|8BliHPcGMVBoZAF2cTfzCnwXP2w=|AO1eScacB70ijbpgRh9HRQV2EVw=
+|1|8Yyd3mWGtszczAPO/GWlcKi6AwU=|y/wH05bfLIleit7QtDp85ZnyZXU=
+|1|2Ml1lNiPxSWc4VP0A5tYcCgVo6A=|3InIktgKL6NULQrxuAyKgY+5NMA=
 $ ssh-keygen -F '[127.0.0.1]:2222' | cut -c1-60
 # Host [127.0.0.1]:2222 found: line 1
-|1|926QEiG/Qcn6sTFu3uTiykVvbFk=|xsekbwgJHfZAdFP533SGrB2yS1k=
+|1|8BliHPcGMVBoZAF2cTfzCnwXP2w=|AO1eScacB70ijbpgRh9HRQV2EVw=
 # Host [127.0.0.1]:2222 found: line 2
-|1|J01hBi9mOc+DLr9vq69I9kxv3eg=|HYfFcc2m+Lysyi2a0tSc4Zcxw9c=
+|1|8Yyd3mWGtszczAPO/GWlcKi6AwU=|y/wH05bfLIleit7QtDp85ZnyZXU=
 # Host [127.0.0.1]:2222 found: line 3
-|1|wXjvTMAfA61MsxyL/6uI2P0kiwI=|+hCYiGjxGFo50E4b3CA5QSJ9e+Q=
+|1|2Ml1lNiPxSWc4VP0A5tYcCgVo6A=|3InIktgKL6NULQrxuAyKgY+5NMA=
 $ ssh-keygen -F linuc; echo "終了コード $?"
 終了コード 1</code></pre>
 <p>known_hosts を開いても、相手の名前はどこにも書いていない。Ubuntu の ssh は名前を伏せて（ハッシュにして）記録するからだ。
@@ -92,10 +92,10 @@ Your public key has been saved in /home/lab/.ssh/id_ed25519.pub
 $ ls -l ~/.ssh
 total 20
 -rw-r--r-- 1 lab lab 502 Oct 13 10:11 config
--rw------- 1 lab lab 399 Oct 13 19:10 id_ed25519
--rw-r--r-- 1 lab lab  90 Oct 13 19:10 id_ed25519.pub
--rw------- 1 lab lab 978 Oct 13 19:10 known_hosts
--rw-r--r-- 1 lab lab 142 Oct 13 19:10 known_hosts.old</code></pre>
+-rw------- 1 lab lab 399 Oct 13 20:45 id_ed25519
+-rw-r--r-- 1 lab lab  90 Oct 13 20:45 id_ed25519.pub
+-rw------- 1 lab lab 978 Oct 13 20:45 known_hosts
+-rw-r--r-- 1 lab lab 142 Oct 13 20:45 known_hosts.old</code></pre>
 <div class="then"><b>だめな理由</b>: できたのは <code>id_ed25519</code> だった。鍵の種類の既定は OpenSSH 9.5 で RSA から Ed25519 に変わり、
 Ubuntu 24.04 の OpenSSH（9.6）はそれに従っている。<b>ファイル名は種類で決まる</b>ので、種類が変われば名前も変わる。
 試験の <code>id_rsa</code> は RSA の鍵の名前で、今は <code>-t rsa</code> と頼まないと作られない。
@@ -114,14 +114,14 @@ Your public key has been saved in /home/lab/.ssh/id_rsa.pub
 $ ls -l ~/.ssh
 total 28
 -rw-r--r-- 1 lab lab  502 Oct 13 10:11 config
--rw------- 1 lab lab  399 Oct 13 19:10 id_ed25519
--rw-r--r-- 1 lab lab   90 Oct 13 19:10 id_ed25519.pub
--rw------- 1 lab lab 2590 Oct 13 19:10 id_rsa
--rw-r--r-- 1 lab lab  562 Oct 13 19:10 id_rsa.pub
--rw------- 1 lab lab  978 Oct 13 19:10 known_hosts
--rw-r--r-- 1 lab lab  142 Oct 13 19:10 known_hosts.old
+-rw------- 1 lab lab  399 Oct 13 20:45 id_ed25519
+-rw-r--r-- 1 lab lab   90 Oct 13 20:45 id_ed25519.pub
+-rw------- 1 lab lab 2590 Oct 13 20:45 id_rsa
+-rw-r--r-- 1 lab lab  562 Oct 13 20:45 id_rsa.pub
+-rw------- 1 lab lab  978 Oct 13 20:45 known_hosts
+-rw-r--r-- 1 lab lab  142 Oct 13 20:45 known_hosts.old
 $ ssh-keygen -lf ~/.ssh/id_rsa.pub
-3072 SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ lab@host (RSA)</code></pre>
+3072 SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0 lab@host (RSA)</code></pre>
 <p>秘密鍵（拡張子なし）は <code>-rw-------</code>（本人だけが読める）、公開鍵（<code>.pub</code>）は <code>-rw-r--r--</code>（誰が読んでもよい）で作られた。
 RSA の鍵は 3072 ビットが既定である。</p>
 <div class="scroll"><table>
@@ -149,10 +149,10 @@ and check to make sure that only the key(s) you wanted were added.</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls -la ~/.ssh
 total 12
 drwx------ 2 student student 4096 Oct 13 09:46 .
-drwxr-x--- 4 student student 4096 Oct 13 19:07 ..
--rw------- 1 student student  562 Oct 13 19:10 authorized_keys
+drwxr-x--- 4 student student 4096 Oct 13 20:41 ..
+-rw------- 1 student student  562 Oct 13 20:45 authorized_keys
 $ cut -c1-60 ~/.ssh/authorized_keys
-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC4IlAncEkRAD0/GkedVP+J</code></pre>
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC/L0tputTKYbA5lh7bcvHS</code></pre>
 <p>練習機の <code>~/.ssh/authorized_keys</code> に、外の <code>id_rsa.pub</code> と同じ1行（<code>ssh-rsa AAAA…</code>）が入った。
 <code>ssh-copy-id</code> がしたのは、これを書き足すことだけである。手で <code>cat id_rsa.pub &gt;&gt; ~/.ssh/authorized_keys</code> しても同じになる。</p>
 <p>外の ssh が、どの鍵をどの順で見せたかを確かめる。</p>
@@ -164,7 +164,7 @@ debug1: identity file /home/lab/.ssh/id_ed25519 type 3
 debug1: identity file /home/lab/.ssh/id_ed25519_sk type -1
 debug1: identity file /home/lab/.ssh/id_xmss type -1
 debug1: identity file /home/lab/.ssh/id_dsa type -1
-debug1: Offering public key: /home/lab/.ssh/id_rsa RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ
+debug1: Offering public key: /home/lab/.ssh/id_rsa RSA SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0
 Authenticated to 127.0.0.1 ([127.0.0.1]:2222) using "publickey".</code></pre>
 <p>ssh は決まった名前（<code>id_rsa</code> → <code>id_ecdsa</code> → … → <code>id_ed25519</code>）を順に探し、ある鍵（<code>type</code> が -1 でないもの）を見せる。
 最初に見せた <code>id_rsa</code> を、練習機の sshd が名簿と照らして受け入れた。<b>鍵は「見せる」だけで、通すかどうかは受け取る側が決めている。</b></p>
@@ -190,7 +190,7 @@ $ ssh -i ~/.ssh/id_rsa -p 2222 student@127.0.0.1 hostname
 linuc
 $ ssh -v -i ~/.ssh/id_rsa -p 2222 -l student 127.0.0.1 true 2&gt;&amp;1 | grep -E 'Connecting to|Offering public key|Authenticated to'
 debug1: Connecting to 127.0.0.1 [127.0.0.1] port 2222.
-debug1: Offering public key: /home/lab/.ssh/id_rsa RSA SHA256:O53IJRUliZq46C9yhrx8cKWGMMvTBY45z/vhgKR/egQ explicit
+debug1: Offering public key: /home/lab/.ssh/id_rsa RSA SHA256:ZbSNblQ4MACaLhP0nO7H5HStxlCHSMGfY3tw0Wc9aS0 explicit
 Authenticated to 127.0.0.1 ([127.0.0.1]:2222) using "publickey".
 $ ssh -l student 127.0.0.1 hostname
 ssh: connect to host 127.0.0.1 port 22: Connection refused</code></pre>
@@ -200,8 +200,16 @@ ssh: connect to host 127.0.0.1 port 22: Connection refused</code></pre>
 <tr><td><code>-p ポート</code></td><td>接続先のポート。省くと 22 番（上の最後の行は 22 番に断られた）</td><td><code>Port</code></td></tr>
 <tr><td><code>-l ユーザ</code></td><td>ログインするユーザ。<code>ユーザ@ホスト</code> と書いても同じ</td><td><code>User</code></td></tr>
 </table></div>
-<p>紛らわしいのは <code>-i</code> である。<code>ssh -i</code> に渡すのは<b>秘密鍵</b>（<code>id_rsa</code>）で、<code>ssh-copy-id -i</code> に渡すのは相手に写す<b>公開鍵</b>（<code>id_rsa.pub</code>）だった。
-どちらも「鍵の組（identity）」を指す同じ文字だが、使う側が違うので、渡すファイルが違う。</p>
+<p>紛らわしいのは <code>-i</code> である。どちらも「鍵の組（identity）」を指す文字で、<code>ssh -i</code> には<b>秘密鍵</b>のファイルを渡す。
+<code>ssh-copy-id -i</code> には、この章では <code>id_rsa.pub</code> を渡したが、<code>.pub</code> を付けずに渡してもよい。</p>
+<pre data-where="外（lab@host）"><code>$ ssh-copy-id -i ~/.ssh/id_rsa linuc
+/usr/bin/ssh-copy-id: INFO: Source of key(s) to be installed: "/home/lab/.ssh/id_rsa.pub"
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+
+/usr/bin/ssh-copy-id: WARNING: All keys were skipped because they already exist on the remote system.
+		(if you think this is a mistake, you may want to use -f option)</code></pre>
+<p>名前が <code>.pub</code> で終わっていなければ <code>.pub</code> を足して読むので、相手に送られるのは常に<b>公開鍵</b>である（<code>Source of key(s)</code> の行）。
+ここでは同じ鍵が既に名簿にあったので、何も足さなかった。</p>
 <!-- /gen:SSHOPT -->
 
 <h2 id="modes">名簿を他人が書き換えられるなら、名簿ごと使わない</h2>
@@ -209,22 +217,45 @@ ssh: connect to host 127.0.0.1 port 22: Connection refused</code></pre>
 <p>鍵を登録したのに、ある日パスワードを聞かれるようになった——実務でよく起きる。練習機で、名簿（<code>authorized_keys</code>）の権限を緩めてみる。</p>
 <pre data-where="外（lab@host）"><code>$ ssh linuc 'id; chmod 664 ~/.ssh/authorized_keys; ls -l ~/.ssh/authorized_keys'
 uid=1000(student) gid=1000(student) groups=1000(student),4(adm),27(sudo)
--rw-rw-r-- 1 student student 562 Oct 13 19:10 /home/student/.ssh/authorized_keys
+-rw-rw-r-- 1 student student 562 Oct 13 20:45 /home/student/.ssh/authorized_keys
 $ ssh linuc 'echo 鍵で入れた; getent group student'
 鍵で入れた
 student:x:1000:</code></pre>
-<p>group に書ける（<code>664</code>）ようにしても、鍵で入れた。<code>student</code> グループのメンバー欄は空で、書けるのは本人だけだからである（sshd はそこまで見て判断する）。
-次は他人（other）にも書けるようにする。</p>
+<!-- gen:MODESUBUNTU -->
+<p>group に書ける（<code>664</code>）ようにしても、鍵で入れた。<code>student</code> グループのメンバー欄は空で、書けるのは本人だけである。
+ただし、これを許すのは <b>Debian / Ubuntu の sshd の改造</b>で、練習機の <code>man ssh</code> にも「本人だけのグループなら group に書けてもよい」という但し書きがある。</p>
+<pre data-where="外（lab@host）"><code>$ ssh linuc "man ssh | grep -B2 -A2 'group-writable'"
+troff:&lt;standard input&gt;:970: warning [p 8, 8.8i]: cannot adjust line
+               of  the potential for abuse, this file must have strict permis‐
+               sions: read/write for the user, and not writable by others.  It
+               may be group-writable provided that the group in question  con‐
+               tains only the user.</code></pre>
+<p>（<code>troff:</code> で始まる行は、端末を持たない ssh の中で man が文章を整形したときの警告で、中身とは関係ない。）本家の OpenSSH にはこの改造が無く、グループが本人だけでも、group に書けるだけで断る。比べるために、AlmaLinux 9.7 のコンテナで同じことをした記録を載せる。</p>
+<pre data-where="AlmaLinux 9.7 のコンテナ（比べるための記録。読者が打つものではない）"><code>$ chmod 664 /home/alice/.ssh/authorized_keys; ls -l /home/alice/.ssh/authorized_keys; getent group alice
+-rw-rw-r-- 1 alice alice 100 Oct 13 11:33 /home/alice/.ssh/authorized_keys
+alice:x:1000:
+$ su - alice -c 'ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes localhost true'; echo "終了コード $?"
+Warning: Permanently added 'localhost' (ED25519) to the list of known hosts.
+alice@localhost: Permission denied (publickey,gssapi-keyex,gssapi-with-mic,password).
+終了コード 255
+$ grep 'Authentication refused' /tmp/sshd.log
+Authentication refused: bad ownership or modes for file /home/alice/.ssh/authorized_keys
+$ chmod 600 /home/alice/.ssh/authorized_keys
+$ su - alice -c 'ssh -o BatchMode=yes localhost echo 鍵で入れた'
+鍵で入れた</code></pre>
+<p>試験では「<code>authorized_keys</code> は group にも other にも書けてはいけない（<code>600</code> にする）」と答える。</p>
+<!-- /gen:MODESUBUNTU -->
+<p>次は他人（other）にも書けるようにする。</p>
 <pre data-where="外（lab@host）"><code>$ ssh linuc 'chmod 666 ~/.ssh/authorized_keys; ls -l ~/.ssh/authorized_keys'
--rw-rw-rw- 1 student student 562 Oct 13 19:10 /home/student/.ssh/authorized_keys
+-rw-rw-rw- 1 student student 562 Oct 13 20:45 /home/student/.ssh/authorized_keys
 $ ssh linuc
 student@127.0.0.1's password:</code></pre>
 <p>パスワードを聞かれた。外の ssh は何も教えてくれない。理由は、受け取った側のログにだけ残る。パスワードで入って読む。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo journalctl -u ssh --no-pager -n 30 | grep -E 'refused|Accepted'
 （略）
-Oct 13 19:10:46 linuc sshd[767]: Authentication refused: bad ownership or modes for file /home/student/.ssh/authorized_keys
-Oct 13 19:10:46 linuc sshd[767]: Authentication refused: bad ownership or modes for file /home/student/.ssh/authorized_keys
-Oct 13 19:10:47 linuc sshd[767]: Accepted password for student from 10.0.2.2 port 45186 ssh2
+Oct 13 20:46:18 linuc sshd[802]: Authentication refused: bad ownership or modes for file /home/student/.ssh/authorized_keys
+Oct 13 20:46:18 linuc sshd[802]: Authentication refused: bad ownership or modes for file /home/student/.ssh/authorized_keys
+Oct 13 20:46:18 linuc sshd[802]: Accepted password for student from 10.0.2.2 port 60122 ssh2
 $ chmod 600 ~/.ssh/authorized_keys
 $ exit
 logout
@@ -279,7 +310,7 @@ A は接続<b>される</b>側に置く公開鍵の一覧、C は自分の公開
 <p>公開鍵認証でログインできるようにするため、クライアントで作った公開鍵をサーバ側のどのファイルに追記するか。また、それを1コマンドで行うものは何か。</p>
 <details><summary>答え</summary>
 <p>サーバ側のログインするユーザの <code>~/.ssh/authorized_keys</code>。1コマンドで行うのは <code>ssh-copy-id</code>（<code>-i</code> で公開鍵を指定する）。
-<code>-i</code> を省くと、<code>~/.ssh</code> の中で一番新しい公開鍵が送られる。</p></details></div>
+<code>-i</code> を省くと、<code>ssh-agent</code> に鍵が登録されていればその鍵が、無ければ <code>~/.ssh</code> の中で一番新しい公開鍵が送られる。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>ssh-keygen -t rsa</code> を既定のまま実行したとき、作られる秘密鍵と公開鍵のファイル名は何か。また、<code>-t</code> を付けずに実行するとどうなるか（OpenSSH 9.6）。</p>
 <details><summary>答え</summary>
@@ -298,8 +329,8 @@ A は接続<b>される</b>側に置く公開鍵の一覧、C は自分の公開
 <li>鍵は見せるだけ。通すかは受け取る側の sshd が名簿と権限を見て決める。断った理由は相手のログにしか出ない</li>
 <li><code>logout</code> はログインシェルでだけ。<code>exit</code> はどこでも。<code>Ctrl+D</code> は入力の終わり</li>
 </ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
-<nav class="pager"><a href="/linuc-boot/theory/01-virsh">← 1. virsh が触れるのは、電源とボタンだけ</a><a href="/linuc-boot/theory/03-container">次: 3. コンテナの中のカーネルは、ホストのもの →</a></nav>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-boot/theory/01-virsh">← 1. virsh は電源を入れ、止まるよう頼むだけ</a><a href="/linuc-boot/theory/03-container">次: 3. コンテナの中のカーネルは、ホストのもの →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>

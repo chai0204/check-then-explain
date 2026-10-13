@@ -30,10 +30,10 @@
 ^Z
 [1]+  Stopped                 sleep 300
 $ jobs -l
-[1]+   747 Stopped                 sleep 300
+[1]+   766 Stopped                 sleep 300
 $ ps -o pid,stat,cmd -p $(pgrep -f "sleep 300")
     PID STAT CMD
-    747 T    sleep 300
+    766 T    sleep 300
 $ bg
 [1]+ sleep 300 &amp;
 $ jobs
@@ -56,9 +56,9 @@ Connection to 127.0.0.1 closed.</code></pre>
 </table></div>
 <p>ジョブが複数あるときは、番号で選ぶ。端末2（練習機の中）で試す。</p>
 <pre data-where="練習機の中（student@linuc）・端末2（様子を見る）"><code>$ sleep 701 &amp;
-[1] 1009
+[1] 771
 $ sleep 702 &amp;
-[2] 1010
+[2] 772
 $ jobs
 [1]-  Running                 sleep 701 &amp;
 [2]+  Running                 sleep 702 &amp;
@@ -70,7 +70,7 @@ sleep 701
 ^C
 $ jobs
 $ sleep 703 &amp;
-[1] 1011
+[1] 773
 $ kill %1
 $ jobs
 [1]+  Terminated              sleep 703</code></pre>
@@ -89,26 +89,26 @@ $ jobs
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>末尾に <code>&amp;</code> を付けてバックグラウンドで動かしたジョブは、ログアウトすると一緒に消える。だから、ログアウトした後も動かし続けたいなら <code>nohup</code> が要る。</p>
 <pre data-where="端末1（外から ssh linuc で入る）"><code>$ sleep 1001 &amp;
-[1] 766
+[1] 789
 $ jobs -l
-[1]+   766 Running                 sleep 1001 &amp;
+[1]+   789 Running                 sleep 1001 &amp;
 $ shopt huponexit
 huponexit      	off
 $ exit
 logout
 Connection to 127.0.0.1 closed.</code></pre>
 <pre data-where="練習機の中（student@linuc）・端末2（様子を見る）"><code>$ pgrep -a -f 'sleep 100'
-766 sleep 1001</code></pre>
+789 sleep 1001</code></pre>
 <div class="then"><b>だめな理由</b>: <code>exit</code> でログアウトしても、<code>sleep 1001</code> は消えずに動いている。
 bash は、自分が終わるときにジョブへ SIGHUP（1番、「端末が無くなった」という合図）を配るかどうかを <code>huponexit</code> という設定で決めていて、これが <code>off</code> だった（Ubuntu の既定）。
 自分から <code>exit</code> したときは、ジョブに合図は届かない。</div></div>
 <p>今度は、回線が切れたときを再現する。ssh は、行の先頭で <code>~.</code>（チルダ、ピリオドの順）を打つと、その場で接続を切る。<code>~.</code> は画面に出ないので、<code>Enter</code> を押してから打つ。相手から見ると、回線が突然切れたのと同じである。</p>
 <pre data-where="端末1（外から ssh linuc で入る）"><code>$ sleep 1002 &amp;
-[1] 785
+[1] 808
 $
 $ Connection to 127.0.0.1 closed.</code></pre>
 <pre data-where="練習機の中（student@linuc）・端末2（様子を見る）"><code>$ pgrep -a -f 'sleep 100'
-766 sleep 1001</code></pre>
+789 sleep 1001</code></pre>
 <p><code>sleep 1002</code> は消えた（<code>sleep 1001</code> だけが残っている）。回線が切れると、練習機の sshd はログインに使っていた端末（擬似端末）を閉じ、ログインしていたシェルに SIGHUP が届く。
 bash は SIGHUP を受け取ると、自分のジョブにも SIGHUP を配ってから終わる。<code>sleep</code> は SIGHUP を無視していないので、既定の動き（終了）で終わった。
 「ログアウトするとジョブが消える」と言われるのは、端末のウィンドウを閉じる・回線が切れるといった、<b>この経路</b>のことである。</p>
@@ -126,7 +126,7 @@ bash の既定（<code>huponexit</code> が off）では、上で見たとおり
 <!-- gen:NOHUP -->
 <p><code>nohup</code> を付けて起動し、同じように <code>~.</code> で切断する。</p>
 <pre data-where="端末1（外から ssh linuc で入る）"><code>$ nohup sleep 1003 &amp;
-[1] 803
+[1] 826
 $ nohup: ignoring input and appending output to 'nohup.out'
 
 $ grep SigIgn /proc/$!/status
@@ -134,10 +134,10 @@ SigIgn:	0000000000000001
 $
 $ Connection to 127.0.0.1 closed.</code></pre>
 <pre data-where="練習機の中（student@linuc）・端末2（様子を見る）"><code>$ pgrep -a -f 'sleep 100'
-766 sleep 1001
-803 sleep 1003
+789 sleep 1001
+826 sleep 1003
 $ cat ~/nohup.out; ls -l ~/nohup.out
--rw------- 1 student student 0 Oct 13 19:29 /home/student/nohup.out</code></pre>
+-rw------- 1 student student 0 Oct 13 21:05 /home/student/nohup.out</code></pre>
 <p><code>sleep 1003</code> は切断の後も残った。<code>nohup</code> は、SIGHUP を無視する設定にしてから、指定したコマンドを起動する。
 <code>SigIgn</code> の右端（1番、HUP）が立っているのがその印で（第8章の読み方）、無視の設定は起動したコマンドに引き継がれる。だから SIGHUP が届いても何も起きない。</p>
 <p><code>nohup</code> はもう1つ、出力の行き先も変える。端末が消えた後に端末へ書こうとすると困るので、出力を <code>nohup.out</code>（カレントディレクトリ。書けなければホームディレクトリ）に足していく。
@@ -158,9 +158,9 @@ $ cat ~/nohup.out; ls -l ~/nohup.out
 $
 $ Connection to 127.0.0.1 closed.</code></pre>
 <pre data-where="練習機の中（student@linuc）・端末2（様子を見る）"><code>$ tmux ls
-work: 1 windows (created Tue Oct 13 19:29:20 2026)
+work: 1 windows (created Tue Oct 13 21:05:19 2026)
 $ pgrep -a lab-count
-838 /bin/bash /usr/local/bin/lab-count</code></pre>
+861 /bin/bash /usr/local/bin/lab-count</code></pre>
 <p>セッション <code>work</code> は残っていて、<code>lab-count</code> も動いている。端末1でもう一度練習機に入り、<code>tmux attach -t work</code> で戻る。</p>
 <pre data-where="端末1（外から ssh linuc で入る）（tmux attach -t work で戻った画面）"><code>student@linuc:~$ lab-count
 1
@@ -175,8 +175,9 @@ $ pgrep -a lab-count
 10
 11
 12
+13
 
-[work] 0:bash*                                                                                   "linuc" 19:29 13-Oct-26</code></pre>
+[work] 0:bash*                                                                                   "linuc" 21:05 13-Oct-26</code></pre>
 <p>切り離して、回線まで切っていた間も、<code>lab-count</code> は数え続けていた。戻った画面には、その間の表示がそのまま残っている。
 tmux の中のプログラムは、あなたの ssh のシェルではなく、練習機の中で動き続ける tmux（の server）の子として動いているので、回線が切れても SIGHUP は届かない。
 <code>Ctrl+C</code> で <code>lab-count</code> を止め、tmux の中のシェルを <code>exit</code> で終えると、セッションも終わる（<code>[exited]</code>）。</p>
@@ -187,19 +188,19 @@ logout
 Connection to 127.0.0.1 closed.</code></pre>
 <p><code>screen</code> も同じことをする。切り離すキーは <code>Ctrl+A</code> を押してから <code>d</code> である。</p>
 <pre data-where="端末1（外から ssh linuc で入る）"><code>$ screen -S job
-[detached from 888.job]
+[detached from 912.job]
 $ screen -ls
 There is a screen on:
-	888.job	(10/13/26 19:29:43)	(Detached)
+	912.job	(10/13/26 21:05:42)	(Detached)
 1 Socket in /run/screen/S-student.
 $
 $ Connection to 127.0.0.1 closed.</code></pre>
 <pre data-where="練習機の中（student@linuc）・端末2（様子を見る）"><code>$ screen -ls
 There is a screen on:
-	888.job	(10/13/26 19:29:43)	(Detached)
+	912.job	(10/13/26 21:05:42)	(Detached)
 1 Socket in /run/screen/S-student.
 $ pgrep -a lab-count
-896 /bin/bash /usr/local/bin/lab-count
+920 /bin/bash /usr/local/bin/lab-count
 $ pkill lab-count; pkill -f "sleep 100"</code></pre>
 <div class="scroll"><table>
 <tr><th>すること</th><th>tmux</th><th>screen</th></tr>
@@ -242,7 +243,7 @@ screen なら <code>Ctrl+A</code> → <code>d</code> で抜け、<code>screen -r
 <li><code>nohup</code> は SIGHUP を無視させてから起動する（SigIgn の 1番が立つ）。出力は <code>nohup.out</code></li>
 <li><code>tmux</code> / <code>screen</code> は端末ごと相手に残す。切断しても動き続け、後から画面ごと戻れる</li>
 </ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-boot/theory/08-signal">← 8. kill は止めない。合図を送るだけ</a><a href="/linuc-boot/theory/10-x11">次: 10. X では、画面の側がサーバー →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
