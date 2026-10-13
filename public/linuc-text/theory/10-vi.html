@@ -275,42 +275,41 @@ $ stat -c "%A %s %n" ro.txt
 <p>「どう書いたか」は i ノード番号で分かる。ハードリンク（同じ実体に付いた2つ目の名前。第6章）がある場合と比べた。</p>
 <pre><code>$ cp memo.txt ro3.txt; chmod 444 ro3.txt
 $ ls -i ro3.txt
-18370605 ro3.txt
+18371712 ro3.txt
 $ vim ro3.txt
 （打鍵: dd :w!⏎ :q⏎）
 $ ls -i ro3.txt
-18370608 ro3.txt
+18371801 ro3.txt
 $ stat -c "%A %s %n" ro3.txt
 -r--r--r-- 19 ro3.txt
 $ cp memo.txt ro4.txt; chmod 444 ro4.txt; ln ro4.txt ro4-link.txt
 $ ls -i ro4.txt ro4-link.txt
-18370609 ro4-link.txt
-18370609 ro4.txt
+18367884 ro4-link.txt  18367884 ro4.txt
 $ vim ro4.txt
 （打鍵: dd :w!⏎ :q⏎）
 $ ls -i ro4.txt ro4-link.txt
-18370609 ro4-link.txt
-18370609 ro4.txt
+18367884 ro4-link.txt  18367884 ro4.txt
 $ stat -c "%A %s %n" ro4.txt ro4-link.txt
 -r--r--r-- 19 ro4.txt
 -r--r--r-- 19 ro4-link.txt</code></pre>
 <p>ハードリンクの無い <code>ro3.txt</code> は i ノード番号が変わった（番号そのものは環境ごとに違う。見るのは変わったかどうか）。vim は元のファイルを脇へ退避して<b>新しいファイルを書き</b>、元と同じ権限を付けている。ハードリンクのある <code>ro4.txt</code> は番号が変わらず、もう1つの名前 <code>ro4-link.txt</code> からも書き換えた中身（19 バイト）が見える。こちらは同じ実体を<b>その場で書き換え</b>ていて、そのために一時的に書き込み権を足し、書き終えてから元の権限に戻している。どちらで書くかは、vim の設定 <code>backupcopy</code>（既定は <code>auto</code>）がファイルの状況を見て決める。</p>
 <p>Ex モード（<code>vim -es</code>）で同じことをすると、結果が変わった。</p>
 <pre><code>$ cp memo.txt ro2.txt; chmod 444 ro2.txt
-$ vim -es -c "normal! dd" -c "w!" -c q ro2.txt; echo "exit=$?"
+$ vim -es -c "normal! dd" -c "w!" -c "q!" ro2.txt; echo "exit=$?"
 exit=1
 $ cat ro2.txt
 apple
 banana
 cherry
 date
-$ vim -es -N -c "normal! dd" -c "w!" -c q ro2.txt; echo "exit=$?"
+$ vim -es -N -c "normal! dd" -c "w!" -c "q!" ro2.txt; echo "exit=$?"
 exit=0
 $ cat ro2.txt
 apple
 banana
 cherry</code></pre>
-<p><code>vim -es</code> は設定ファイルを読まないので、昔の vi に合わせた<b>互換モード</b>で動く。互換モードでは「読み取り専用のファイルは <code>:w!</code> でも上書きしない」という設定（<code>cpoptions</code> の <code>W</code>）が入っていて、書かずに失敗した。<code>-N</code>（互換モードを切る）を付けると書けた（Ex モードはカーソルが最後の行から始まるので、消えたのは <code>date</code>）。<b>同じ <code>:w!</code> でも、設定で振る舞いが変わる</b>。この章の記録を対話の vim でとり直したのは、このためである。</p>
+<p><code>vim -es</code> は設定ファイルを読まないので、昔の vi に合わせた<b>互換モード</b>で動く。互換モードでは「読み取り専用のファイルは <code>:w!</code> でも上書きしない」という設定（<code>cpoptions</code> の <code>W</code>）が入っていて、書かずに失敗した。<code>-N</code>（互換モードを切る）を付けると書けた（Ex モードはカーソルが最後の行から始まるので、消えたのは <code>date</code>）。<b>同じ <code>:w!</code> でも、設定で振る舞いが変わる</b>。この章の記録を対話の vim でとり直したのは、このためである。
+最後を <code>-c "q!"</code> にしているのは、<code>-c q</code> だと書けなかったときに <code>:q</code> も <code>E37</code> で断られ、<code>vim -es</code> が端末から次の命令を待って、何も出さずに止まって見えるからだ。</p>
 <p>もう1つ、対話の vim で気づきにくい振る舞いがある。開いたファイルの<b>前回のカーソル位置</b>を覚えていて、次に開いたときにそこへ戻る。</p>
 <pre><code>$ vim v1.txt
 （打鍵: :call writefile([line(".")], "/tmp/pos.txt")⏎ :q⏎）

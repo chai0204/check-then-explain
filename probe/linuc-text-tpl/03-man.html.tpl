@@ -66,8 +66,9 @@ $ man 5 passwd | grep -A1 "^NAME"
 @@</code></pre>
 <p><code>passwd</code> という名前のページは2つある。<code>passwd(1)</code> はパスワードを変えるコマンド、<code>passwd(5)</code> は <code>/etc/passwd</code> というファイルの書式だ。番号を付けずに <code>man passwd</code> と打つと、先に見つかったセクション1が開く。<code>/etc/passwd</code> の書式を読みたいなら <code>man 5 passwd</code> と番号を書く。<code>man -w</code> は、開くファイルの場所を出す。ディレクトリ名の <code>man1</code> <code>man5</code> がセクション番号である。</p>
 <pre><code>@@
-$ ls -d /usr/share/man/man[0-9]
+$ ls -1d /usr/share/man/man[0-9]
 @@</code></pre>
+<p class="detail"><code>-1</code> は1行に1つずつ並べる指定。付けずに端末で打つと、端末の幅に合わせて横にも並べる（ファイルやパイプに出すときは、付けなくても1行に1つ）。</p>
 <div class="scroll"><table>
 <tr><th>セクション</th><th>中身</th><th>例</th></tr>
 <tr><td>1</td><td>一般ユーザのコマンド</td><td><code>ls(1)</code> <code>passwd(1)</code> <code>grep(1)</code></td></tr>

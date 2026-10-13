@@ -138,6 +138,10 @@ $ set +o noclobber
 $ ls nosuch.txt; echo "exit=$?"
 $ ls fruits.txt; echo "exit=$?"
 @@</code></pre>
+<p>この章で <code>~/text</code> に作ったファイルは、ここで消して元に戻しておく。残すと、後の章で <code>~/text</code> の中を検索したり <code>*</code> で名前を並べたりしたときに、本文と違う結果になる。</p>
+<pre><code>@@
+$ rm out.txt err.txt both.txt only.txt amp.txt note.txt upper.txt greet.txt copy.txt
+@@</code></pre>
 <div class="quiz"><b>確認</b>
 <p>コマンド <code>backup.sh</code> の標準出力と標準エラー出力の両方を <code>result.log</code> に書きたい。正しいものを2つ選べ。</p>
 <p>A. <code>backup.sh 2&gt;&amp;1 &gt; result.log</code>　B. <code>backup.sh &gt; result.log 2&gt;&amp;1</code>　C. <code>backup.sh &amp;&gt; result.log</code>　D. <code>backup.sh 2&gt; result.log</code></p>

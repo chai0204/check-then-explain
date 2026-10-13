@@ -90,12 +90,13 @@ $ find files -name "*.tmp" | sort | xargs -n 1 echo
 $ find files -name "*.tmp" -print0 | sort -z | xargs -0 -n 1 echo
 @@</code></pre>
 <p><code>find -print0</code> は名前の区切りに改行ではなく <b>NUL 文字</b>（値が 0 のバイト）を使い、<code>xargs -0</code> は NUL だけを区切りとして扱う。ファイル名には NUL を入れられないので、どんな名前も1つの引数のまま届く（<code>sort -z</code> は NUL 区切りのまま並べる）。</p>
-<pre><code>@@
+<pre><code>@@seq
 $ find files -name "*.tmp" -print0 | sort -z | xargs -0 ls -l
 $ find files -name "*.tmp" -exec ls -l {} +
 $ printf "%s\n" "files/old data.tmp" | xargs -d "\n" ls -l
 @@</code></pre>
 <p><code>find -exec コマンド {} +</code> は <code>xargs</code> を通さず、<code>find</code> が名前を直接引数に並べる。<code>xargs -d "\n"</code> は「改行だけで区切る」という GNU の書き方である（改行を含む名前には効かない）。</p>
+<p class="detail">名前を囲む <code>'</code> は <code>ls</code> が付けた飾りで、名前の一部ではない。<code>ls</code> は出力先が端末のときだけ、空白などを含む名前を引用符で囲み、囲まない名前の前に空白を1つ足して桁をそろえる（パイプやファイルに出すときは囲まない）。</p>
 <p><code>xargs</code> は既定で<b>引用符</b>（<code>'</code> と <code>"</code>）も特別な文字として読む。名前にアポストロフィが1つあるだけで、対になる引用符が無いと言って止まる。<code>-0</code> か <code>-d</code> を付けると、引用符もただの文字として扱う。</p>
 <pre><code>@@+
 $ printf "%s\n" "it's.txt" | xargs echo; echo "exit=$?"

@@ -21,7 +21,16 @@
   ブロックを <pre><code>@@+ … @@</code></pre>、対話の記録を {{SESSION+ a-b}} と書く。
   試験対策の追加の記録（logs/linuc-text-probe-exam.log）からは <pre><code>@@exam … @@</code></pre> と
   {{SESSION@exam a-b}}。
+
+  通しの記録（logs/linuc-text-seq.log。読者と同じ起動の1つのシェルで第1章から順に打った記録）からは
+  <pre><code>@@seq … @@</code></pre>。端末に出したときだけ変わる表示（ls の段組みや、空白を含む名前の引用符）と、
+  前の章の状態がそろっていて初めて打てる行（章の終わりの後片付け）に使う。何回目の記録を使うかは、
+  その章の中で（どの記録から引くブロックも含めて）何回目に出てきたかで決める。通しの記録は本文から作るので、
+  @@seq に新しい行を足したときは LINUC_TEXT_SEQ_BOOTSTRAP=1 で一度作り（通しにまだ無い行は、ほかの記録に
+  同じコマンドがあればその出力を仮に置き、無ければ出力を空にする。vim の「打鍵」の行が通しの入力になるため）、
+  bash probe/linuc-text-run.sh seq で通しを取り直す（章も作り直される）。
 """
+import os
 import html, re, sys
 from pathlib import Path
 
@@ -29,6 +38,9 @@ REPO = Path(__file__).resolve().parent.parent
 LOG = REPO / "logs" / "linuc-text-probe.log"
 EXTRA = REPO / "logs" / "linuc-text-probe-extra.log"
 EXAM = REPO / "logs" / "linuc-text-probe-exam.log"
+SEQ = REPO / "logs" / "linuc-text-seq.log"
+BOOTSTRAP = os.environ.get("LINUC_TEXT_SEQ_BOOTSTRAP") == "1"
+FALLBACK = []        # 仮の版を作るときに使う、その章のほかの記録（main / extra / exam）
 SESSION_BEGIN = "--- ここから下は、端末（pty）の上で対話シェルを動かし、1行ずつ打鍵した記録 ---"
 SESSION_END = "--- 対話の記録ここまで ---"
 
@@ -88,8 +100,10 @@ def esc(s):
     return html.escape(s, quote=False)
 
 
-def render_block(body, recs, ch, seen):
+def render_block(body, recs, ch, seen, fixed_k=None):
+    """fixed_k: @@seq のとき、ブロックの中の各コマンドに使う記録の番号（章の中で何回目か）を順に入れたリスト。"""
     out = []
+    fixed_k = list(fixed_k) if fixed_k is not None else None
     for raw in body.split("\n"):
         if not raw.startswith("$ "):
             out.append(esc(raw))
@@ -113,10 +127,22 @@ def render_block(body, recs, ch, seen):
                 notes[int(n)] = t
             else:
                 sys.exit(f"第{ch}章: 不明な指定 {o}")
+        if fixed_k is not None:            # @@seq: 章の中で何回目か（どの記録から引くブロックも数える）
+            fk = fixed_k.pop(0)
+            k = k or fk
         if k is None:                      # 指定が無ければ、章の中で何回目に出てきたかで決める
             k = seen.get(cmd, 0) + 1
         seen[cmd] = max(seen.get(cmd, 0), k)
         hits = [r for r in recs if r[0] == cmd]
+        if len(hits) < k and fixed_k is not None and BOOTSTRAP:
+            # 通しを取り直すための仮の版。ほかの記録に同じコマンドがあればその出力を仮に置く
+            # （vim の「打鍵」の行は通しの入力になるので、ここで落とすと通しが打てない）
+            alt = [r for r in FALLBACK if r[0] == cmd]
+            print(f"第{ch}章: 通しの記録にまだ無い（{'ほかの記録の出力を仮に置いた' if alt else '出力を空のまま作った'}）: $ {cmd}",
+                  file=sys.stderr)
+            out.append(esc("$ " + cmd))
+            out.extend(esc(l) for l in (alt[0][1] if alt else []))
+            continue
         if len(hits) < k:
             sys.exit(f"第{ch}章: ログに無いコマンド（{k}回目）: $ {cmd}")
         _, o = hits[k - 1]
@@ -142,22 +168,43 @@ def main():
     secs = sections()
     xsecs = sections(EXTRA)
     esecs = sections(EXAM)
+    ssecs = sections(SEQ)
     for tpl in sys.argv[1:]:
         tpl = Path(tpl)
         ch = int(tpl.name[:2])
         recs, session = records(secs[ch])
         xrecs, xsession = records(xsecs.get(ch, []))
         erecs, esession = records(esecs.get(ch, []))
+        srecs, _ = records(ssecs.get(ch, []))
+        FALLBACK[:] = recs + xrecs + erecs
         src = tpl.read_text(encoding="utf-8")
 
-        src_recs = {"": (recs, {}), "+": (xrecs, {}), "exam": (erecs, {})}
+        src_recs = {"": (recs, {}), "+": (xrecs, {}), "exam": (erecs, {}), "seq": (srecs, {})}
         src_ses = {"": session, "+": xsession, "@exam": esession}
+
+        # 章の中のコマンドを、本文に出る順に数える（@@ のブロックと {{SESSION}} の "$ " 行）。@@seq の記録の番号に使う
+        chapter_seen, seq_ks = {}, []
+        tok = re.compile(r"<pre><code>@@(\+|exam|seq)?\n(.*?)\n@@</code></pre>|\{\{SESSION(\+|@exam)? (\d+)-(\d+)\}\}", re.S)
+        for m in tok.finditer(src):
+            if m.group(2) is not None:
+                cmds = [re.match(r"^\$ (.*?)(?: ⟪(.*)⟫)?$", l).group(1)
+                        for l in m.group(2).split("\n") if l.startswith("$ ")]
+            else:
+                lines = src_ses[m.group(3) or ""][int(m.group(4)) - 1:int(m.group(5))]
+                cmds = [l[2:] for l in lines if l.startswith("$ ")]
+            ks = []
+            for c in cmds:
+                chapter_seen[c] = chapter_seen.get(c, 0) + 1
+                ks.append(chapter_seen[c])
+            if m.group(1) == "seq":
+                seq_ks.append(ks)
 
         def blk(m):
             r, seen = src_recs[m.group(1) or ""]
-            return "<pre><code>" + render_block(m.group(2).strip("\n"), r, ch, seen) + "</code></pre>"
+            fixed = seq_ks.pop(0) if m.group(1) == "seq" else None
+            return "<pre><code>" + render_block(m.group(2).strip("\n"), r, ch, seen, fixed) + "</code></pre>"
 
-        src = re.sub(r"<pre><code>@@(\+|exam)?\n(.*?)\n@@</code></pre>", blk, src, flags=re.S)
+        src = re.sub(r"<pre><code>@@(\+|exam|seq)?\n(.*?)\n@@</code></pre>", blk, src, flags=re.S)
 
         def ses(m):
             lines = src_ses[m.group(1) or ""]

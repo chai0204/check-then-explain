@@ -1,0 +1,2312 @@
+# 本文の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run --rm -it --hostname linuc、
+# ボリューム2つ、PID 1 の bash -l、umask 022、TERM=xterm）の1つのシェルに、第1章から第10章まで通して打った記録。
+# 端末 200 桁 × 50 行。作り方: python3 -I probe/linuc-text-seq.py（イメージ lab-linuc-text:1.0.1）
+
+
+========== 1. 01-quote.html ==========
+
+$ cd ~/text
+
+$ echo $HOME
+/home/lab
+
+$ echo '$HOME'
+$HOME
+
+$ echo "$HOME"
+/home/lab
+
+$ echo \$HOME
+$HOME
+
+$ echo "私は $(whoami) です"
+私は lab です
+
+$ echo '私は $(whoami) です'
+私は $(whoami) です
+
+$ echo "私は `whoami` です"
+私は lab です
+
+$ echo a     b
+a b
+
+$ echo "a     b"
+a     b
+
+$ msg="a     b"
+
+$ echo $msg
+a b
+
+$ echo "$msg"
+a     b
+
+$ echo *.csv
+scores.csv
+
+$ echo "*.csv"
+*.csv
+
+$ echo -e 'a\tb'
+a	b
+
+$ echo 'a\tb'
+a\tb
+
+$ echo -n "改行なし"; echo "←ここまでが1行"
+改行なし←ここまでが1行
+
+$ cat child.sh
+#!/bin/bash
+echo "子のプロセスから見た GREETING=[$GREETING]"
+
+$ GREETING=hello
+
+$ echo "$GREETING"
+hello
+
+$ bash child.sh
+子のプロセスから見た GREETING=[]
+
+$ export GREETING
+
+$ bash child.sh
+子のプロセスから見た GREETING=[hello]
+
+$ env | grep GREETING
+GREETING=hello
+
+$ set | grep "^GREETING="
+GREETING=hello
+
+$ LOCAL_ONLY=here
+
+$ set | grep "^LOCAL_ONLY="
+LOCAL_ONLY=here
+
+$ env | grep "^LOCAL_ONLY="; echo "exit=$?"
+exit=1
+
+$ export -p | grep GREETING
+declare -x GREETING="hello"
+
+$ env | grep -c "^PATH="
+1
+
+$ set | grep -c "^PATH="
+1
+
+$ set | grep -c "^HISTSIZE="
+1
+
+$ env | grep -c "^HISTSIZE="
+0
+
+$ echo $SHLVL; bash -c "echo \$SHLVL"
+1
+2
+
+$ GREETING=bye bash child.sh
+子のプロセスから見た GREETING=[bye]
+
+$ echo "$GREETING"
+hello
+
+$ env GREETING=env-bye bash child.sh
+子のプロセスから見た GREETING=[env-bye]
+
+$ env -i bash child.sh
+子のプロセスから見た GREETING=[]
+
+$ unset GREETING
+
+$ echo "[$GREETING]"
+[]
+
+$ bash child.sh
+子のプロセスから見た GREETING=[]
+
+$ X=1 echo "[$X]"
+[]
+
+$ X=1; echo "[$X]"
+[1]
+
+$ set -o | grep -E "^(noclobber|xtrace|history) "
+history        	on
+noclobber      	off
+xtrace         	off
+
+$ bash -x child.sh
++ echo '子のプロセスから見た GREETING=[]'
+子のプロセスから見た GREETING=[]
+
+
+========== 2. 02-path.html ==========
+
+$ cd ~/text
+
+$ pwd
+/home/lab/text
+
+$ ls -l hello.sh cdtest.sh
+-rw-r--r-- 1 lab lab 48 Oct 13 09:00 cdtest.sh
+-rw-r--r-- 1 lab lab 33 Oct 13 09:00 hello.sh
+
+$ cat hello.sh
+#!/bin/bash
+echo "hello from $0"
+
+$ hello.sh; echo "exit=$?"
+bash: hello.sh: command not found
+exit=127
+
+$ echo "$PATH"
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+$ ./hello.sh; echo "exit=$?"
+bash: ./hello.sh: Permission denied
+exit=126
+
+$ bash hello.sh
+hello from hello.sh
+
+$ chmod +x hello.sh
+
+$ ./hello.sh
+hello from ./hello.sh
+
+$ ~/text/hello.sh
+hello from /home/lab/text/hello.sh
+
+$ /home/lab/text/hello.sh
+hello from /home/lab/text/hello.sh
+
+$ cd /tmp
+
+$ ../home/lab/text/hello.sh
+hello from ../home/lab/text/hello.sh
+
+$ cd ~/text
+
+$ ls -ld . ..
+drwxr-xr-x 1 lab lab 4096 Oct 13 09:00 .
+drwxr-x--- 1 lab lab 4096 Oct 13 09:00 ..
+
+$ cd ..; pwd
+/home/lab
+
+$ cd text; pwd
+/home/lab/text
+
+$ cd /usr/share; pwd
+/usr/share
+
+$ cd -
+/home/lab/text
+
+$ type ls
+ls is aliased to `ls --color=auto'
+
+$ type cd
+cd is a shell builtin
+
+$ type pwd
+pwd is a shell builtin
+
+$ type -a pwd
+pwd is a shell builtin
+pwd is /usr/bin/pwd
+pwd is /bin/pwd
+
+$ type hello.sh
+bash: type: hello.sh: not found
+
+$ which ls
+/usr/bin/ls
+
+$ cat cdtest.sh
+cd /tmp
+echo "スクリプトの中では $PWD"
+
+$ bash cdtest.sh
+スクリプトの中では /tmp
+
+$ pwd
+/home/lab/text
+
+$ . cdtest.sh
+スクリプトの中では /tmp
+
+$ pwd
+/tmp
+
+$ cd ~/text
+
+$ PATH="$PATH:$HOME/text"
+
+$ hello.sh
+hello from /home/lab/text/hello.sh
+
+$ type hello.sh
+hello.sh is hashed (/home/lab/text/hello.sh)
+
+$ cd /; hello.sh; cd ~/text
+hello from /home/lab/text/hello.sh
+
+$ grep -n HIST ~/.bashrc
+13:HISTCONTROL=ignoreboth
+18:# for setting history length see HISTSIZE and HISTFILESIZE in bash(1)
+19:HISTSIZE=1000
+20:HISTFILESIZE=2000
+
+$ echo "HISTFILE=$HISTFILE HISTSIZE=$HISTSIZE HISTFILESIZE=$HISTFILESIZE HISTCONTROL=$HISTCONTROL"
+HISTFILE=/home/lab/.bash_history HISTSIZE=1000 HISTFILESIZE=2000 HISTCONTROL=ignoreboth
+
+$ ls -l ~/.bash_history; echo "exit=$?"
+ls: cannot access '/home/lab/.bash_history': No such file or directory
+exit=2
+
+$ bash
+
+$ history -c
+
+$ echo 一行目
+一行目
+
+$ echo 二行目
+二行目
+
+$ history
+    1  echo 一行目
+    2  echo 二行目
+    3  history
+
+$ !1
+echo 一行目
+一行目
+
+$ !ec
+echo 一行目
+一行目
+
+$ !!
+echo 一行目
+一行目
+
+$  echo 先頭に空白を置いた
+先頭に空白を置いた
+
+$ echo 二行目
+二行目
+
+$ echo 二行目
+二行目
+
+$ history
+    1  echo 一行目
+    2  echo 二行目
+    3  history
+    4  echo 一行目
+    5  echo 二行目
+    6  history
+
+$ history 2
+    6  history
+    7  history 2
+
+$ tail -3 ~/.bash_history
+tail: cannot open '/home/lab/.bash_history' for reading: No such file or directory
+
+$ exit
+exit
+
+$ tail -5 ~/.bash_history
+echo 二行目
+history
+history 2
+tail -3 ~/.bash_history
+exit
+
+$ bash
+
+$ history -c
+
+$ echo one
+one
+
+$ echo two
+two
+
+$ echo three
+three
+
+$ history
+    1  echo one
+    2  echo two
+    3  echo three
+    4  history
+
+$ history -d 2
+
+$ history
+    1  echo one
+    2  echo three
+    3  history
+    4  history -d 2
+    5  history
+
+$ printf '%s\n' 'echo from-file-1' 'echo from-file-2' > /tmp/hist.txt
+
+$ history -r /tmp/hist.txt
+
+$ history 4
+    7  history -r /tmp/hist.txt
+    8  echo from-file-1
+    9  echo from-file-2
+   10  history 4
+
+$ history -c -w /tmp/hist.txt; wc -l /tmp/hist.txt
+0 /tmp/hist.txt
+
+$ exit
+exit
+
+
+========== 3. 03-man.html ==========
+
+$ man -f echo
+echo (1)             - display a line of text
+
+$ man echo | grep -A1 "^NAME"
+NAME
+       echo - display a line of text
+
+$ man echo | grep -E "^ +--version"
+       --version
+
+$ echo --version
+--version
+
+$ type echo
+echo is a shell builtin
+
+$ type -a echo
+echo is a shell builtin
+echo is /usr/bin/echo
+echo is /bin/echo
+
+$ /usr/bin/echo --version | head -1
+echo (GNU coreutils) 9.4
+
+$ help echo | head -3
+echo: echo [-neE] [arg ...]
+    Write arguments to the standard output.
+
+$ man cd; echo "exit=$?"
+No manual entry for cd
+exit=16
+
+$ man -f cd; echo "exit=$?"
+cd: nothing appropriate.
+exit=16
+
+$ type cd
+cd is a shell builtin
+
+$ help cd | head -3
+cd: cd [-L|[-P [-e]] [-@]] [dir]
+    Change the shell working directory.
+
+$ man bash | grep -E "^ +history \[n\]"
+       history [n]
+
+$ man -f passwd
+passwd (1)           - change user password
+passwd (5)           - the password file
+
+$ whatis passwd
+passwd (1)           - change user password
+passwd (5)           - the password file
+
+$ man -w passwd
+/usr/share/man/man1/passwd.1.gz
+
+$ man -w 5 passwd
+/usr/share/man/man5/passwd.5.gz
+
+$ man passwd | grep -A1 "^NAME"
+NAME
+       passwd - change user password
+
+$ man 5 passwd | grep -A1 "^NAME"
+NAME
+       passwd - the password file
+
+$ ls -1d /usr/share/man/man[0-9]
+/usr/share/man/man1
+/usr/share/man/man2
+/usr/share/man/man3
+/usr/share/man/man4
+/usr/share/man/man5
+/usr/share/man/man6
+/usr/share/man/man7
+/usr/share/man/man8
+
+$ ls /usr/share/man/man3 | wc -l
+20
+
+$ ls /usr/share/man/man3 | head -3
+filefuncs.3am.gz
+fnmatch.3am.gz
+fork.3am.gz
+
+$ man -f printf
+printf (1)           - format and print data
+
+$ man -w 3 printf; echo "exit=$?"
+No manual entry for printf in section 3
+exit=16
+
+$ man -k "^regex"
+regex (7)            - POSIX.2 regular expressions
+
+$ apropos "^regex"
+regex (7)            - POSIX.2 regular expressions
+
+$ man -f regex
+regex (7)            - POSIX.2 regular expressions
+
+$ man 7 regex | grep -A1 "^NAME"
+NAME
+       regex - POSIX.2 regular expressions
+
+$ man -k "regular expression" | sort
+re_format (7)        - POSIX.2 regular expressions
+regex (7)            - POSIX.2 regular expressions
+zegrep (1)           - search possibly compressed files for a regular expression
+zfgrep (1)           - search possibly compressed files for a regular expression
+zgrep (1)            - search possibly compressed files for a regular expression
+
+$ man ls | grep -E "^ +-l +"
+       -l     use a long listing format
+
+$ man ls | grep -A1 -E "^ +-a, --all"
+       -a, --all
+              do not ignore entries starting with .
+
+
+========== 4. 04-lines.html ==========
+
+$ cd ~/text
+
+$ cat fruits.txt
+banana
+apple
+cherry
+apple
+apple
+banana
+Durian
+
+$ cat -n fruits.txt
+     1	banana
+     2	apple
+     3	cherry
+     4	apple
+     5	apple
+     6	banana
+     7	Durian
+
+$ head -3 fruits.txt
+banana
+apple
+cherry
+
+$ tail -2 fruits.txt
+banana
+Durian
+
+$ tail -n +6 fruits.txt
+banana
+Durian
+
+$ head -n -5 fruits.txt
+banana
+apple
+
+$ head -c 12 fruits.txt
+banana
+apple
+
+$ wc fruits.txt
+ 7  7 46 fruits.txt
+
+$ wc -l fruits.txt
+7 fruits.txt
+
+$ wc -w -c fruits.txt
+ 7 46 fruits.txt
+
+$ wc -l < fruits.txt
+7
+
+$ cat fruits.txt | wc -l
+7
+
+$ cat notail.txt
+first line
+second line
+
+$ wc -l notail.txt
+1 notail.txt
+
+$ od -c notail.txt
+0000000   f   i   r   s   t       l   i   n   e  \n   s   e   c   o   n
+0000020   d       l   i   n   e
+0000026
+
+$ cat -A notail.txt
+first line$
+second line
+
+$ echo >> notail.txt; wc -l notail.txt
+2 notail.txt
+
+$ cat unix.txt
+line1
+line2
+
+$ cat win.txt
+line1
+line2
+
+$ wc -c unix.txt win.txt
+12 unix.txt
+14 win.txt
+26 total
+
+$ od -c unix.txt
+0000000   l   i   n   e   1  \n   l   i   n   e   2  \n
+0000014
+
+$ od -c win.txt
+0000000   l   i   n   e   1  \r  \n   l   i   n   e   2  \r  \n
+0000016
+
+$ cat -A win.txt
+line1^M$
+line2^M$
+
+$ od -An -tx1 unix.txt
+ 6c 69 6e 65 31 0a 6c 69 6e 65 32 0a
+
+$ od -t x1 -A d unix.txt
+0000000 6c 69 6e 65 31 0a 6c 69 6e 65 32 0a
+0000012
+
+$ cat blank.txt
+first
+
+third
+
+$ nl blank.txt
+     1	first
+       
+     2	third
+
+$ cat -n blank.txt
+     1	first
+     2	
+     3	third
+
+$ nl -b a blank.txt
+     1	first
+     2	
+     3	third
+
+$ nl -w 2 -s ": " fruits.txt
+ 1: banana
+ 2: apple
+ 3: cherry
+ 4: apple
+ 5: apple
+ 6: banana
+ 7: Durian
+
+$ less fruits.txt | head -3
+banana
+apple
+cherry
+
+$ seq 1 100 | less | tail -2
+99
+100
+
+$ printf "line %s\n" 1 2 3 > /tmp/watch.log
+
+$ timeout 2 tail -f /tmp/watch.log; echo "exit=$?"
+line 1
+line 2
+line 3
+exit=124
+
+$ (sleep 1; echo "あとから追記した行" >> /tmp/watch.log) | timeout 3 tail -n 1 -f /tmp/watch.log; echo "exit=$?"
+line 3
+あとから追記した行
+exit=124
+
+
+========== 5. 05-columns.html ==========
+
+$ cd ~/text
+
+$ cat scores.csv
+id,name,dept,score
+1,Sato,dev,72
+2,Suzuki,sales,9
+3,Takahashi,dev,100
+4,Tanaka,hr,85
+5,Ito,sales,85
+
+$ cut -d, -f2 scores.csv
+name
+Sato
+Suzuki
+Takahashi
+Tanaka
+Ito
+
+$ cut -d, -f2,4 scores.csv
+name,score
+Sato,72
+Suzuki,9
+Takahashi,100
+Tanaka,85
+Ito,85
+
+$ cut -d, -f2- scores.csv
+name,dept,score
+Sato,dev,72
+Suzuki,sales,9
+Takahashi,dev,100
+Tanaka,hr,85
+Ito,sales,85
+
+$ cut -c1-3 fruits.txt
+ban
+app
+che
+app
+app
+ban
+Dur
+
+$ cat -A tabs.txt
+name^Iage^Icity$
+alice^I23^Itokyo$
+bob^I7^Iosaka$
+
+$ cut -f2 tabs.txt
+age
+23
+7
+
+$ cut -d, -f2 tabs.txt
+name	age	city
+alice	23	tokyo
+bob	7	osaka
+
+$ cat spaces.txt
+alice   23  tokyo
+bob     7   osaka
+carol   41  nagoya
+
+$ cut -d" " -f2 spaces.txt | cat -A
+$
+$
+$
+
+$ cut -d" " -f4 spaces.txt
+23
+
+41
+
+$ tr -s " " < spaces.txt
+alice 23 tokyo
+bob 7 osaka
+carol 41 nagoya
+
+$ tr -s " " < spaces.txt | cut -d" " -f2
+23
+7
+41
+
+$ tr a-z A-Z < fruits.txt
+BANANA
+APPLE
+CHERRY
+APPLE
+APPLE
+BANANA
+DURIAN
+
+$ tr -d "a" < fruits.txt
+bnn
+pple
+cherry
+pple
+pple
+bnn
+Durin
+
+$ tr "," "\t" < scores.csv | cat -A | head -2
+id^Iname^Idept^Iscore$
+1^ISato^Idev^I72$
+
+$ tr a-z A-Z fruits.txt; echo "exit=$?"
+tr: extra operand ‘fruits.txt’
+Try 'tr --help' for more information.
+exit=1
+
+$ cat fruits.txt | tr a-z A-Z
+BANANA
+APPLE
+CHERRY
+APPLE
+APPLE
+BANANA
+DURIAN
+
+$ sort fruits.txt
+Durian
+apple
+apple
+apple
+banana
+banana
+cherry
+
+$ sort -r fruits.txt
+cherry
+banana
+banana
+apple
+apple
+apple
+Durian
+
+$ sort -f fruits.txt
+apple
+apple
+apple
+banana
+banana
+cherry
+Durian
+
+$ echo "B a A b" | tr " " "\n" | sort
+A
+B
+a
+b
+
+$ locale | head -3
+LANG=C.UTF-8
+LANGUAGE=
+LC_CTYPE="C.UTF-8"
+
+$ tail -n +2 scores.csv | sort -t, -k4
+3,Takahashi,dev,100
+1,Sato,dev,72
+4,Tanaka,hr,85
+5,Ito,sales,85
+2,Suzuki,sales,9
+
+$ tail -n +2 scores.csv | sort -t, -k4 -n
+2,Suzuki,sales,9
+1,Sato,dev,72
+4,Tanaka,hr,85
+5,Ito,sales,85
+3,Takahashi,dev,100
+
+$ tail -n +2 scores.csv | sort -t, -k4 -nr
+3,Takahashi,dev,100
+5,Ito,sales,85
+4,Tanaka,hr,85
+1,Sato,dev,72
+2,Suzuki,sales,9
+
+$ tail -n +2 scores.csv | sort -t, -k3,3 -k4,4nr
+3,Takahashi,dev,100
+1,Sato,dev,72
+4,Tanaka,hr,85
+5,Ito,sales,85
+2,Suzuki,sales,9
+
+$ uniq fruits.txt
+banana
+apple
+cherry
+apple
+banana
+Durian
+
+$ sort fruits.txt | uniq
+Durian
+apple
+banana
+cherry
+
+$ sort fruits.txt | uniq -c
+      1 Durian
+      3 apple
+      2 banana
+      1 cherry
+
+$ sort fruits.txt | uniq -c | sort -rn
+      3 apple
+      2 banana
+      1 cherry
+      1 Durian
+
+$ sort fruits.txt | uniq -d
+apple
+banana
+
+$ sort fruits.txt | uniq -u
+Durian
+cherry
+
+$ sort -u fruits.txt
+Durian
+apple
+banana
+cherry
+
+$ cat names.txt
+1 Sato
+2 Suzuki
+3 Takahashi
+
+$ cat mails.txt
+1 sato@example.com
+3 takahashi@example.com
+4 ito@example.com
+
+$ paste names.txt mails.txt
+1 Sato	1 sato@example.com
+2 Suzuki	3 takahashi@example.com
+3 Takahashi	4 ito@example.com
+
+$ paste -d, names.txt mails.txt
+1 Sato,1 sato@example.com
+2 Suzuki,3 takahashi@example.com
+3 Takahashi,4 ito@example.com
+
+$ paste -s -d, fruits.txt
+banana,apple,cherry,apple,apple,banana,Durian
+
+$ join names.txt mails.txt
+1 Sato sato@example.com
+3 Takahashi takahashi@example.com
+
+$ join -a1 names.txt mails.txt
+1 Sato sato@example.com
+2 Suzuki
+3 Takahashi takahashi@example.com
+
+$ join -v1 names.txt mails.txt
+2 Suzuki
+
+$ sort -r names.txt > /tmp/names-r.txt; cat /tmp/names-r.txt
+3 Takahashi
+2 Suzuki
+1 Sato
+
+$ join /tmp/names-r.txt mails.txt; echo "exit=$?"
+join: /tmp/names-r.txt:2: is not sorted: 2 Suzuki
+3 Takahashi takahashi@example.com
+join: input is not in sorted order
+exit=1
+
+
+========== 6. 06-sed.html ==========
+
+$ cd ~/text
+
+$ cat app.conf
+# app.conf - 練習用の設定ファイル
+host=localhost
+port=8080
+port_admin=8081
+# debug=true
+log_level=info
+url=http://localhost:8080/?lang=ja
+
+$ sed "s/8080/9090/" app.conf
+# app.conf - 練習用の設定ファイル
+host=localhost
+port=9090
+port_admin=8081
+# debug=true
+log_level=info
+url=http://localhost:9090/?lang=ja
+
+$ grep -c 9090 app.conf
+0
+
+$ sed "s/=/ = /" app.conf
+# app.conf - 練習用の設定ファイル
+host = localhost
+port = 8080
+port_admin = 8081
+# debug = true
+log_level = info
+url = http://localhost:8080/?lang=ja
+
+$ sed "s/=/ = /g" app.conf
+# app.conf - 練習用の設定ファイル
+host = localhost
+port = 8080
+port_admin = 8081
+# debug = true
+log_level = info
+url = http://localhost:8080/?lang = ja
+
+$ sed "s/port/PORT/" app.conf
+# app.conf - 練習用の設定ファイル
+host=localhost
+PORT=8080
+PORT_admin=8081
+# debug=true
+log_level=info
+url=http://localhost:8080/?lang=ja
+
+$ sed "s/^port=/PORT=/" app.conf
+# app.conf - 練習用の設定ファイル
+host=localhost
+PORT=8080
+port_admin=8081
+# debug=true
+log_level=info
+url=http://localhost:8080/?lang=ja
+
+$ sed "s|http://localhost|https://example.com|" app.conf | tail -1
+url=https://example.com:8080/?lang=ja
+
+$ sed -E "s/^([a-z_]+)=(.*)$/\1: \2/" app.conf
+# app.conf - 練習用の設定ファイル
+host: localhost
+port: 8080
+port_admin: 8081
+# debug=true
+log_level: info
+url: http://localhost:8080/?lang=ja
+
+$ sed "y/abc/ABC/" fruits.txt
+BAnAnA
+Apple
+Cherry
+Apple
+Apple
+BAnAnA
+DuriAn
+
+$ sed "s/^(port)=/\1: /" app.conf; echo "exit=$?"
+sed: -e expression #1, char 16: invalid reference \1 on `s' command's RHS
+exit=1
+
+$ sed "s/^\(port\)=/\1: /" app.conf | grep "^port:"
+port: 8080
+
+$ sed -E "s/^(port)=/\1: /" app.conf | grep "^port:"
+port: 8080
+
+$ sed -n "2,4p" app.conf
+host=localhost
+port=8080
+port_admin=8081
+
+$ sed -n "/port/p" app.conf
+port=8080
+port_admin=8081
+
+$ sed "/^#/d" app.conf
+host=localhost
+port=8080
+port_admin=8081
+log_level=info
+url=http://localhost:8080/?lang=ja
+
+$ sed "1d" app.conf
+host=localhost
+port=8080
+port_admin=8081
+# debug=true
+log_level=info
+url=http://localhost:8080/?lang=ja
+
+$ sed "\$d" app.conf
+# app.conf - 練習用の設定ファイル
+host=localhost
+port=8080
+port_admin=8081
+# debug=true
+log_level=info
+
+$ sed -n "\$p" app.conf
+url=http://localhost:8080/?lang=ja
+
+$ sed "3q" app.conf
+# app.conf - 練習用の設定ファイル
+host=localhost
+port=8080
+
+$ sed -e "/^#/d" -e "s/8080/9090/g" app.conf
+host=localhost
+port=9090
+port_admin=8081
+log_level=info
+url=http://localhost:9090/?lang=ja
+
+$ sed "2i\\# ここに挿入" app.conf | head -4
+# app.conf - 練習用の設定ファイル
+# ここに挿入
+host=localhost
+port=8080
+
+$ cp app.conf my.conf
+
+$ ls -i my.conf
+18367888 my.conf
+
+$ sed -i "s/^port=8080/port=9090/" my.conf
+
+$ ls -i my.conf
+18367903 my.conf
+
+$ grep ^port= my.conf
+port=9090
+
+$ sed -i.bak "/^#/d" my.conf
+
+$ ls -1 my.conf*
+my.conf
+my.conf.bak
+
+$ cat my.conf
+host=localhost
+port=9090
+port_admin=8081
+log_level=info
+url=http://localhost:8080/?lang=ja
+
+$ diff my.conf.bak my.conf
+1d0
+< # app.conf - 練習用の設定ファイル
+5d3
+< # debug=true
+
+$ ln my.conf hard.conf
+
+$ ls -i my.conf hard.conf
+18367888 hard.conf  18367888 my.conf
+
+$ sed -i "s/^port=9090/port=7070/" my.conf
+
+$ ls -i my.conf hard.conf
+18367888 hard.conf  18367906 my.conf
+
+$ grep ^port= my.conf hard.conf
+my.conf:port=7070
+hard.conf:port=9090
+
+$ cat -A tabs.txt
+name^Iage^Icity$
+alice^I23^Itokyo$
+bob^I7^Iosaka$
+
+$ expand tabs.txt | cat -A
+name    age     city$
+alice   23      tokyo$
+bob     7       osaka$
+
+$ expand -t 4 tabs.txt | cat -A
+name    age city$
+alice   23  tokyo$
+bob 7   osaka$
+
+$ cat -A indent.txt
+list:$
+^Iapple   red$
+^Ibanana  yellow$
+
+$ expand indent.txt | cat -A
+list:$
+        apple   red$
+        banana  yellow$
+
+$ expand indent.txt | unexpand | cat -A
+list:$
+^Iapple   red$
+^Ibanana  yellow$
+
+$ expand indent.txt | unexpand -a | cat -A
+list:$
+^Iapple^Ired$
+^Ibanana^Iyellow$
+
+$ cat poem.txt
+Text streams flow from one command to the next. Each filter reads its input, changes it a little, and writes the result for the next command.
+
+$ fmt -w 40 poem.txt
+Text streams flow from one command to
+the next. Each filter reads its input,
+changes it a little, and writes the
+result for the next command.
+
+$ fmt -w 40 poem.txt | wc -L
+38
+
+$ fmt -w 20 jp.txt
+日本語の文には単語の間に空白が無いので、どこで折り返せばよいかを
+fmt
+は知らない。
+
+$ pr fruits.txt | head -5
+
+
+2026-10-13 09:00                    fruits.txt                    Page 1
+
+$ pr -3 -t fruits.txt
+banana			apple			banana
+apple			apple			Durian
+cherry
+
+$ pr -l 12 fruits.txt | grep -c "Page"
+4
+
+$ seq 1 50 > fifty.txt
+
+$ pr -l 20 fifty.txt | grep -o "Page [0-9]*"
+Page 1
+Page 2
+Page 3
+Page 4
+Page 5
+
+$ pr -l 20 +1:3 fifty.txt | grep -o "Page [0-9]*"
+Page 1
+Page 2
+Page 3
+
+$ pr -l 20 --pages=2:3 fifty.txt | grep -o "Page [0-9]*"
+Page 2
+Page 3
+
+$ pr -l 20 +4 fifty.txt | grep -o "Page [0-9]*"
+Page 4
+Page 5
+
+$ pr -l 20 +1,3 fifty.txt | grep -c "Page"; echo "exit=${PIPESTATUS[0]}"
+pr: +1,3: No such file or directory
+5
+exit=1
+
+$ pr -l 20 -p 1:3 fifty.txt
+pr: invalid option -- 'p'
+Try 'pr --help' for more information.
+
+$ pr -l 20 --pages 1-3 fifty.txt
+pr: invalid page range ‘1-3’
+
+$ ls -l --time-style="+%Y-%m-%d %H:%M" fruits.txt
+-rw-r--r-- 1 lab lab 46 2026-10-13 09:00 fruits.txt
+
+$ pr fruits.txt | sed -n 3p
+2026-10-13 09:00                    fruits.txt                    Page 1
+
+$ seq 2500 > big.txt
+
+$ split big.txt
+
+$ wc -l xa*
+ 1000 xaa
+ 1000 xab
+  500 xac
+ 2500 total
+
+$ split -l 1000 -d big.txt part_
+
+$ wc -l part_*
+ 1000 part_00
+ 1000 part_01
+  500 part_02
+ 2500 total
+
+$ cat xa* | cmp - big.txt; echo "exit=$?"
+exit=0
+
+$ split -n 2 fruits.txt half_; wc -c half_*
+23 half_aa
+23 half_ab
+46 total
+
+$ cat half_aa; echo "<-- ここまでが half_aa"
+banana
+apple
+cherry
+app<-- ここまでが half_aa
+
+$ split -n l/2 fruits.txt line_; wc -l line_*
+ 4 line_aa
+ 3 line_ab
+ 7 total
+
+$ rm my.conf* hard.conf fifty.txt big.txt xa* part_* half_* line_*
+
+
+========== 7. 07-redirect.html ==========
+
+$ cd ~/text
+
+$ ls fruits.txt nosuch.txt
+ls: cannot access 'nosuch.txt': No such file or directory
+fruits.txt
+
+$ ls fruits.txt nosuch.txt > out.txt
+ls: cannot access 'nosuch.txt': No such file or directory
+
+$ cat out.txt
+fruits.txt
+
+$ ls fruits.txt nosuch.txt 2> err.txt
+fruits.txt
+
+$ cat err.txt
+ls: cannot access 'nosuch.txt': No such file or directory
+
+$ ls fruits.txt nosuch.txt > both.txt 2>&1
+
+$ cat both.txt
+ls: cannot access 'nosuch.txt': No such file or directory
+fruits.txt
+
+$ ls fruits.txt nosuch.txt 2>&1 > only.txt
+ls: cannot access 'nosuch.txt': No such file or directory
+
+$ cat only.txt
+fruits.txt
+
+$ ls fruits.txt nosuch.txt &> amp.txt
+
+$ cat amp.txt
+ls: cannot access 'nosuch.txt': No such file or directory
+fruits.txt
+
+$ echo first > note.txt
+
+$ echo second > note.txt
+
+$ cat note.txt
+second
+
+$ echo third >> note.txt
+
+$ cat note.txt
+second
+third
+
+$ ls nosuch.txt 2>> note.txt
+
+$ cat note.txt
+second
+third
+ls: cannot access 'nosuch.txt': No such file or directory
+
+$ ls fruits.txt nosuch.txt 2> /dev/null
+fruits.txt
+
+$ ls fruits.txt nosuch.txt > /dev/null
+ls: cannot access 'nosuch.txt': No such file or directory
+
+$ stat -c "%A %F" /dev/null
+crw-rw-rw- character special file
+
+$ wc -l < fruits.txt
+7
+
+$ tr a-z A-Z < fruits.txt > upper.txt
+
+$ cat upper.txt
+BANANA
+APPLE
+CHERRY
+APPLE
+APPLE
+BANANA
+DURIAN
+
+$ cat << EOF > greet.txt
+> hello, $HOME
+> EOF
+
+$ cat greet.txt
+hello, /home/lab
+
+$ cat << 'EOF'
+> hello, $HOME
+> EOF
+hello, $HOME
+
+$ tr a-z A-Z <<< "here string"
+HERE STRING
+
+$ cp fruits.txt copy.txt
+
+$ sort copy.txt > copy.txt
+
+$ wc -c copy.txt
+0 copy.txt
+
+$ cp fruits.txt copy.txt
+
+$ sort copy.txt -o copy.txt
+
+$ head -2 copy.txt
+Durian
+apple
+
+$ set -o noclobber
+
+$ echo again > note.txt
+bash: note.txt: cannot overwrite existing file
+
+$ echo again >| note.txt
+
+$ cat note.txt
+again
+
+$ set +o noclobber
+
+$ ls nosuch.txt; echo "exit=$?"
+ls: cannot access 'nosuch.txt': No such file or directory
+exit=2
+
+$ ls fruits.txt; echo "exit=$?"
+fruits.txt
+exit=0
+
+$ rm out.txt err.txt both.txt only.txt amp.txt note.txt upper.txt greet.txt copy.txt
+
+
+========== 8. 08-pipe.html ==========
+
+$ cd ~/text
+
+$ cut -d" " -f9 access.log | sort | uniq -c | sort -rn
+      4 200
+      3 404
+      1 500
+      1 403
+      1 302
+
+$ ls nosuch.txt | wc -l
+ls: cannot access 'nosuch.txt': No such file or directory
+0
+
+$ ls nosuch.txt 2>&1 | wc -l
+1
+
+$ ls nosuch.txt |& wc -l
+1
+
+$ false | true; echo "exit=$? PIPESTATUS=${PIPESTATUS[*]}"
+exit=0 PIPESTATUS=1 0
+
+$ echo a b c | xargs echo
+a b c
+
+$ echo a b c | xargs -n 1 echo
+a
+b
+c
+
+$ echo a b c | xargs -n 2 echo
+a b
+c
+
+$ printf "%s\n" apple banana | xargs -I{} echo "果物: {}"
+果物: apple
+果物: banana
+
+$ seq 1 300000 | xargs echo | wc -l
+16
+
+$ cd /tmp
+
+$ mkdir -p dir/d1 dir/d2 dir/d3; touch dir/d1/file1.txt dir/d2/file2.txt dir/d3/file3.txt
+
+$ find dir -type f | sort | xargs -t rm -f
+rm -f dir/d1/file1.txt dir/d2/file2.txt dir/d3/file3.txt
+
+$ find dir | sort
+dir
+dir/d1
+dir/d2
+dir/d3
+
+$ echo a b c | xargs -t -n 1 echo
+echo a
+a
+echo b
+b
+echo c
+c
+
+$ echo a b | xargs -p -n 1 echo
+echo a?...y
+a
+echo b?...n
+
+$ find dir -type f | xargs -c 'rm -f $0'
+xargs: invalid option -- 'c'
+Try 'xargs --help' for more information.
+
+$ find dir -type f | xargs -P rm -f
+xargs: invalid number "rm" for -P option
+Try 'xargs --help' for more information.
+
+$ cd ~/text
+
+$ find files -type f | sort
+files/cache.tmp
+files/memo.txt
+files/old data.tmp
+files/report 2026.txt
+files/sub/a b c.tmp
+files/sub/keep.txt
+
+$ find files -name "*.tmp" | sort
+files/cache.tmp
+files/old data.tmp
+files/sub/a b c.tmp
+
+$ find files -name "*.tmp" | sort | xargs ls -l
+ls: cannot access 'files/old': No such file or directory
+ls: cannot access 'data.tmp': No such file or directory
+ls: cannot access 'files/sub/a': No such file or directory
+ls: cannot access 'b': No such file or directory
+ls: cannot access 'c.tmp': No such file or directory
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/cache.tmp
+
+$ find files -name "*.tmp" | sort | xargs -n 1 echo
+files/cache.tmp
+files/old
+data.tmp
+files/sub/a
+b
+c.tmp
+
+$ find files -name "*.tmp" -print0 | sort -z | xargs -0 -n 1 echo
+files/cache.tmp
+files/old data.tmp
+files/sub/a b c.tmp
+
+$ find files -name "*.tmp" -print0 | sort -z | xargs -0 ls -l
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00  files/cache.tmp
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 'files/old data.tmp'
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 'files/sub/a b c.tmp'
+
+$ find files -name "*.tmp" -exec ls -l {} +
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00  files/cache.tmp
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 'files/old data.tmp'
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 'files/sub/a b c.tmp'
+
+$ printf "%s\n" "files/old data.tmp" | xargs -d "\n" ls -l
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 'files/old data.tmp'
+
+$ printf "%s\n" "it's.txt" | xargs echo; echo "exit=$?"
+xargs: unmatched single quote; by default quotes are special to xargs unless you use the -0 option
+exit=1
+
+$ printf "%s\n" "it's.txt" | xargs -d "\n" echo
+it's.txt
+
+$ find files -name "*.tmp" | sort | xargs rm; echo "exit=$?"
+rm: cannot remove 'files/old': No such file or directory
+rm: cannot remove 'data.tmp': No such file or directory
+rm: cannot remove 'files/sub/a': No such file or directory
+rm: cannot remove 'b': No such file or directory
+rm: cannot remove 'c.tmp': No such file or directory
+exit=123
+
+$ find files -name "*.tmp" | sort
+files/old data.tmp
+files/sub/a b c.tmp
+
+$ find files -name "*.tmp" -print0 | xargs -0 rm
+
+$ find files -name "*.tmp" | wc -l
+0
+
+$ cut -d" " -f1 access.log | sort | uniq -c | sort -rn | tee ip-count.txt | head -2
+      4 192.168.1.10
+      2 192.168.1.12
+
+$ cat ip-count.txt
+      4 192.168.1.10
+      2 192.168.1.12
+      2 192.168.1.11
+      1 192.168.1.14
+      1 192.168.1.13
+
+$ echo "追記" | tee -a ip-count.txt
+追記
+
+$ tail -2 ip-count.txt
+      1 192.168.1.13
+追記
+
+$ echo "ここは $(pwd)"
+ここは /home/lab/text
+
+$ echo "ここは `pwd`"
+ここは /home/lab/text
+
+$ echo "果物は $(wc -l < fruits.txt) 行"
+果物は 7 行
+
+$ wc -l $(find files -name "*.txt" | sort)
+0 files/memo.txt
+wc: files/report: No such file or directory
+wc: 2026.txt: No such file or directory
+0 files/sub/keep.txt
+0 total
+
+
+========== 9. 09-regex.html ==========
+
+$ cd ~/text
+
+$ cat ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+ip-10-0-0-5
+
+$ grep 10.0.0.5 ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+ip-10-0-0-5
+
+$ grep -F 10.0.0.5 ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+
+$ grep "10\.0\.0\.5" ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+
+$ grep -x "10\.0\.0\.5" ips.txt
+10.0.0.5
+
+$ grep -w 10.0.0.5 ips.txt
+10.0.0.5
+ip-10-0-0-5
+
+$ grep -Fx 10.0.0.5 ips.txt
+10.0.0.5
+
+$ cat server.log
+2026-10-13 09:00:01 INFO  server started on port 8080
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:00 INFO  user alice logged in
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:04:00 info  lowercase level from old client
+2026-10-13 09:05:00 WARNING deprecated option -x
+2026-10-13 09:06:00 INFO  peer 10.0.0.50 connected
+
+$ grep ERROR server.log
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+
+$ grep -c ERROR server.log
+3
+
+$ grep -n ERROR server.log
+3:2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+5:2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+6:2026-10-13 09:03:00 ERROR timeout after 30s
+
+$ grep -E "^[0-9-]+ [0-9:]+ ERROR" server.log
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:03:00 ERROR timeout after 30s
+
+$ grep -v INFO server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:04:00 info  lowercase level from old client
+2026-10-13 09:05:00 WARNING deprecated option -x
+
+$ grep -i info server.log
+2026-10-13 09:00:01 INFO  server started on port 8080
+2026-10-13 09:02:00 INFO  user alice logged in
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:04:00 info  lowercase level from old client
+2026-10-13 09:06:00 INFO  peer 10.0.0.50 connected
+
+$ grep WARN server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:05:00 WARNING deprecated option -x
+
+$ grep -w WARN server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+
+$ grep -l ERROR access.log server.log app.conf
+server.log
+
+$ grep -c 8080 access.log server.log app.conf
+access.log:0
+server.log:1
+app.conf:2
+
+$ grep -rl 8080 . | sort
+./app.conf
+./server.log
+
+$ grep -E "ERROR|WARN" server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:05:00 WARNING deprecated option -x
+
+$ grep "ERROR|WARN" server.log; echo "exit=$?"
+exit=1
+
+$ grep "ERROR\|WARN" server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:05:00 WARNING deprecated option -x
+
+$ grep "ap+le" fruits.txt; echo "exit=$?"
+exit=1
+
+$ grep -E "ap+le" fruits.txt
+apple
+apple
+apple
+
+$ grep "ap\+le" fruits.txt
+apple
+apple
+apple
+
+$ grep -E "[0-9]{3}" server.log | head -3
+2026-10-13 09:00:01 INFO  server started on port 8080
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+
+$ grep "[0-9]\{3\}" server.log | head -3
+2026-10-13 09:00:01 INFO  server started on port 8080
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+
+$ echo "12345 ddddd" | grep -oE "\d{5}"
+ddddd
+
+$ echo "12345 ddddd" | grep -oP "\d{5}"
+12345
+
+$ echo "12345 ddddd" | grep -oE "[0-9]{5}"
+12345
+
+$ egrep "ERROR|WARN" server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:05:00 WARNING deprecated option -x
+
+$ cat /usr/bin/egrep
+#!/bin/sh
+cmd=${0##*/}
+exec grep -E "$@"
+
+$ cat /usr/bin/fgrep
+#!/bin/sh
+cmd=${0##*/}
+exec grep -F "$@"
+
+$ fgrep 10.0.0.5 ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+
+$ zcat /usr/share/doc/grep/changelog.Debian.gz | grep -m1 disable-egrep
+  * Add 01-disable-egrep-fgrep-warnings.patch (Closes: #1019335)
+
+$ grep "^b" fruits.txt
+banana
+banana
+
+$ grep "a$" fruits.txt
+banana
+banana
+
+$ grep "^[A-Z]" fruits.txt
+Durian
+
+$ grep -E "^(apple|cherry)$" fruits.txt
+apple
+cherry
+apple
+apple
+
+$ grep -E "^.{6,}$" fruits.txt
+banana
+cherry
+banana
+Durian
+
+$ grep "an*a" fruits.txt
+banana
+banana
+
+$ grep -o "an*a" fruits.txt
+ana
+ana
+
+$ grep -c "" fruits.txt
+7
+
+$ grep -c "x*" fruits.txt
+7
+
+$ grep -v "^$" blank.txt
+first
+third
+
+$ grep "line1$" unix.txt win.txt
+unix.txt:line1
+
+$ echo grep a* fruits.txt
+grep access.log app.conf fruits.txt
+
+$ grep a* fruits.txt; echo "exit=$?"
+exit=1
+
+$ grep "a*" fruits.txt | head -3
+banana
+apple
+cherry
+
+$ sed -n "/^b/p" fruits.txt
+banana
+banana
+
+$ sed -E "s/^([0-9-]+) ([0-9:]+) /\2 /" server.log | head -2
+09:00:01 INFO  server started on port 8080
+09:00:05 WARN  disk usage 85%
+
+$ sed "s/[0-9]\{1,\}/N/g" ips.txt
+N.N.N.N
+N.N.N.N
+N.N.N.N
+ip-N-N-N-N
+
+$ man 7 regex | grep -A1 "^NAME"
+NAME
+       regex - POSIX.2 regular expressions
+
+$ man grep | grep -E "^ +-[EFGP], --"
+       -E, --extended-regexp
+       -F, --fixed-strings
+       -G, --basic-regexp
+       -P, --perl-regexp
+
+
+========== 10. 10-vi.html ==========
+
+$ cd ~/text
+
+$ cat memo.txt
+apple
+banana
+cherry
+date
+
+$ cp memo.txt v5.txt
+
+$ vim v5.txt
+（打鍵: o fig ESC :wq⏎）
+
+$ cat v5.txt
+apple
+fig
+banana
+cherry
+date
+
+$ cp memo.txt v6.txt
+
+$ vim v6.txt
+（打鍵: O fruits: ESC :wq⏎）
+
+$ cat v6.txt
+fruits:
+apple
+banana
+cherry
+date
+
+$ cp memo.txt v7.txt
+
+$ vim v7.txt
+（打鍵: i big␣ ESC :wq⏎）
+
+$ cat v7.txt
+big apple
+banana
+cherry
+date
+
+$ cp memo.txt v8.txt
+
+$ vim v8.txt
+（打鍵: a - ESC :wq⏎）
+
+$ cat v8.txt
+a-pple
+banana
+cherry
+date
+
+$ cp memo.txt v1.txt
+
+$ vim v1.txt
+（打鍵: j dd :wq⏎）
+
+$ cat v1.txt
+apple
+cherry
+date
+
+$ cp memo.txt v2.txt
+
+$ vim v2.txt
+（打鍵: yy p :wq⏎）
+
+$ cat v2.txt
+apple
+apple
+banana
+cherry
+date
+
+$ cp memo.txt v3.txt
+
+$ vim v3.txt
+（打鍵: j dd p :wq⏎）
+
+$ cat v3.txt
+apple
+cherry
+banana
+date
+
+$ cp memo.txt v4.txt
+
+$ vim v4.txt
+（打鍵: G yy k P :wq⏎）
+
+$ cat v4.txt
+apple
+banana
+date
+cherry
+date
+
+$ cp memo.txt v12.txt
+
+$ vim v12.txt
+（打鍵: j l l x :wq⏎）
+
+$ cat v12.txt
+apple
+baana
+cherry
+date
+
+$ cp memo.txt v13.txt
+
+$ vim v13.txt
+（打鍵: j $ h x :wq⏎）
+
+$ cat v13.txt
+apple
+banaa
+cherry
+date
+
+$ cp memo.txt v14.txt
+
+$ vim v14.txt
+（打鍵: j d$ :wq⏎）
+
+$ cat -A v14.txt
+apple$
+$
+cherry$
+date$
+
+$ cp memo.txt v15.txt
+
+$ vim v15.txt
+（打鍵: j yw P :wq⏎）
+
+$ cat v15.txt
+apple
+bananabanana
+cherry
+date
+
+$ cp memo.txt v16.txt
+
+$ vim v16.txt
+（打鍵: 2dd :wq⏎）
+
+$ cat v16.txt
+cherry
+date
+
+$ cp memo.txt v11.txt
+
+$ vim v11.txt
+（打鍵: jj cw CHERRY ESC :wq⏎）
+
+$ cat v11.txt
+apple
+banana
+CHERRY
+date
+
+$ cp memo.txt v9.txt
+
+$ vim v9.txt
+（打鍵: /an⏎ x :wq⏎）
+
+$ cat v9.txt
+apple
+bnana
+cherry
+date
+
+$ cp memo.txt v10.txt
+
+$ vim v10.txt
+（打鍵: G ?an⏎ x :wq⏎）
+
+$ cat v10.txt
+apple
+banna
+cherry
+date
+
+$ cp memo.txt q1.txt
+
+$ vim q1.txt
+（打鍵: dd :q⏎ :q!⏎）
+E37: No write since last change (add ! to override)
+
+$ cat q1.txt
+apple
+banana
+cherry
+date
+
+$ cp memo.txt q2.txt
+
+$ vim q2.txt
+（打鍵: dd dd :e!⏎ :wq⏎）
+
+$ cat q2.txt
+apple
+banana
+cherry
+date
+
+$ cp memo.txt v17.txt
+
+$ vim v17.txt
+（打鍵: dd ZZ）
+
+$ cat v17.txt
+banana
+cherry
+date
+
+$ cp memo.txt e1.txt; cp memo.txt e2.txt
+
+$ vim e1.txt
+（打鍵: dd :e e2.txt⏎ :e! e2.txt⏎ dd :wq⏎）
+E37: No write since last change (add ! to override)
+
+$ cat e1.txt
+apple
+banana
+cherry
+date
+
+$ cat e2.txt
+banana
+cherry
+date
+
+$ cp memo.txt ro.txt; chmod 444 ro.txt
+
+$ stat -c "%A %s %n" ro.txt
+-r--r--r-- 25 ro.txt
+
+$ echo kiwi >> ro.txt; echo "exit=$?"
+bash: ro.txt: Permission denied
+exit=1
+
+$ vim ro.txt
+（打鍵: dd :w⏎ :w!⏎ :q⏎）
+E45: 'readonly' option is set (add ! to override)
+
+$ cat ro.txt
+banana
+cherry
+date
+
+$ stat -c "%A %s %n" ro.txt
+-r--r--r-- 19 ro.txt
+
+$ cp memo.txt ro3.txt; chmod 444 ro3.txt
+
+$ ls -i ro3.txt
+18371713 ro3.txt
+
+$ vim ro3.txt
+（打鍵: dd :w!⏎ :q⏎）
+
+$ ls -i ro3.txt
+18371802 ro3.txt
+
+$ stat -c "%A %s %n" ro3.txt
+-r--r--r-- 19 ro3.txt
+
+$ cp memo.txt ro4.txt; chmod 444 ro4.txt; ln ro4.txt ro4-link.txt
+
+$ ls -i ro4.txt ro4-link.txt
+18371713 ro4-link.txt  18371713 ro4.txt
+
+$ vim ro4.txt
+（打鍵: dd :w!⏎ :q⏎）
+
+$ ls -i ro4.txt ro4-link.txt
+18371713 ro4-link.txt  18371713 ro4.txt
+
+$ stat -c "%A %s %n" ro4.txt ro4-link.txt
+-r--r--r-- 19 ro4.txt
+-r--r--r-- 19 ro4-link.txt
+
+$ cp memo.txt ro2.txt; chmod 444 ro2.txt
+
+$ vim -es -c "normal! dd" -c "w!" -c "q!" ro2.txt; echo "exit=$?"
+exit=1
+
+$ cat ro2.txt
+apple
+banana
+cherry
+date
+
+$ vim -es -N -c "normal! dd" -c "w!" -c "q!" ro2.txt; echo "exit=$?"
+exit=0
+
+$ cat ro2.txt
+apple
+banana
+cherry
+
+$ vim v1.txt
+（打鍵: :call writefile([line(".")], "/tmp/pos.txt")⏎ :q⏎）
+
+$ cat /tmp/pos.txt
+2
+
+$ grep -n -A3 "jump to the last known cursor" /usr/share/vim/vim91/defaults.vim
+93:    " When editing a file, always jump to the last known cursor position.
+94-    " Don't do it when the position is invalid, when inside an event handler
+95-    " (happens when dropping a file on gvim), for a commit or rebase message
+96-    " (likely a different one than last time), and when using xxd(1) to filter
+
+$ cp memo.txt n1.txt
+
+$ nano n1.txt
+（打鍵: ^K ^O ⏎ ^X）
+
+$ cat n1.txt
+banana
+cherry
+date
+
+$ cp memo.txt n2.txt
+
+$ nano n2.txt
+（打鍵: ^W cherry⏎ ^K ^X y ⏎）
+
+$ cat n2.txt
+apple
+banana
+date
+
+$ ls -l /usr/bin/vi /etc/alternatives/vi
+lrwxrwxrwx 1 root root 18 Aug 25 07:13 /etc/alternatives/vi -> /usr/bin/vim.basic
+lrwxrwxrwx 1 root root 20 Aug 25 07:13 /usr/bin/vi -> /etc/alternatives/vi
+
+$ ls -l /usr/bin/editor /etc/alternatives/editor
+lrwxrwxrwx 1 root root  9 Oct 13 09:27 /etc/alternatives/editor -> /bin/nano
+lrwxrwxrwx 1 root root 24 Aug 25 07:13 /usr/bin/editor -> /etc/alternatives/editor
+
+$ update-alternatives --display editor | head -4
+editor - auto mode
+  link best version is /bin/nano
+  link currently points to /bin/nano
+  link editor is /usr/bin/editor
+
+$ update-alternatives --display editor | grep priority
+/bin/nano - priority 40
+/usr/bin/vim.basic - priority 30
+
+$ editor --version | head -1
+ GNU nano, version 7.2
+
+$ echo "[$EDITOR]"
+[]
+
+$ EDITOR=vi sensible-editor --version | head -1
+VIM - Vi IMproved 9.1 (2024 Jan 02, compiled Aug 24 2026 22:13:04)
+
+$ EDITOR=nano sensible-editor --version | head -1
+ GNU nano, version 7.2
+
+$ EDITOR=vi
+
+$ bash -c "sensible-editor --version" < /dev/null | head -1
+ GNU nano, version 7.2
+
+$ export EDITOR
+
+$ bash -c "sensible-editor --version" | head -1
+VIM - Vi IMproved 9.1 (2024 Jan 02, compiled Aug 24 2026 22:13:04)
+
+$ env | grep "^EDITOR="
+EDITOR=vi
+
+$ unset EDITOR
+
+$ command -v emacs; echo "exit=$?"
+exit=1
+
+$ VISUAL=nano EDITOR=vi sensible-editor --version < /dev/null | head -1
+ GNU nano, version 7.2
+
+$ echo "[$EDITOR]"; ls ~/.selected_editor
+[]
+ls: cannot access '/home/lab/.selected_editor': No such file or directory
+
+$ sensible-editor --version
+
+Select an editor.  To change later, run 'select-editor'.
+  1. /bin/nano        <---- easiest
+  2. /usr/bin/vim.basic
+
+Choose 1-2 [1]: 2
+VIM - Vi IMproved 9.1 (2024 Jan 02, compiled Aug 24 2026 22:13:04)
+Included patches: 1-16, 647, 678, 697
+Modified by team+vim@tracker.debian.org
+Compiled by team+vim@tracker.debian.org
+Huge version without GUI.  Features included (+) or not (-):
++acl               +file_in_path      +mouse_urxvt       -tag_any_white
++arabic            +find_in_path      +mouse_xterm       -tcl
++autocmd           +float             +multi_byte        +termguicolors
++autochdir         +folding           +multi_lang        +terminal
+-autoservername    -footer            -mzscheme          +terminfo
+-balloon_eval      +fork()            +netbeans_intg     +termresponse
++balloon_eval_term +gettext           +num64             +textobjects
+-browse            -hangul_input      +packages          +textprop
+++builtin_terms    +iconv             +path_extra        +timers
++byte_offset       +insert_expand     -perl              +title
++channel           +ipv6              +persistent_undo   -toolbar
++cindent           +job               +popupwin          +user_commands
+-clientserver      +jumplist          +postscript        +vartabs
+-clipboard         +keymap            +printer           +vertsplit
++cmdline_compl     +lambda            +profile           +vim9script
++cmdline_hist      +langmap           -python            +viminfo
++cmdline_info      +libcall           +python3           +virtualedit
++comments          +linebreak         +quickfix          +visual
++conceal           +lispindent        +reltime           +visualextra
++cryptv            +listcmds          +rightleft         +vreplace
++cscope            +localmap          -ruby              +wildignore
++cursorbind        -lua               +scrollbind        +wildmenu
++cursorshape       +menu              +signs             +windows
++dialog_con        +mksession         +smartindent       +writebackup
++diff              +modify_fname      +sodium            -X11
++digraphs          +mouse             -sound             +xattr
+-dnd               -mouseshape        +spell             -xfontset
+-ebcdic            +mouse_dec         +startuptime       -xim
++emacs_tags        +mouse_gpm         +statusline        -xpm
++eval              -mouse_jsbterm     -sun_workshop      -xsmp
++ex_extra          +mouse_netterm     +syntax            -xterm_clipboard
++extra_search      +mouse_sgr         +tag_binary        -xterm_save
+-farsi             -mouse_sysmouse    -tag_old_static    
+   system vimrc file: "/etc/vim/vimrc"
+     user vimrc file: "$HOME/.vimrc"
+ 2nd user vimrc file: "~/.vim/vimrc"
+      user exrc file: "$HOME/.exrc"
+       defaults file: "$VIMRUNTIME/defaults.vim"
+  fall-back for $VIM: "/usr/share/vim"
+Compilation: gcc -c -I. -Iproto -DHAVE_CONFIG_H -Wdate-time -g -O2 -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -ffile-prefix-map=/build/vim-tepDcz/vim-9.1.0016=. -flto=auto -ffat-lto-objects -fstack-protector-strong -fstack-clash-protection -Wformat -Werror=format-security -fcf-protection -fdebug-prefix-map=/build/vim-tepDcz/vim-9.1.0016=/usr/src/vim-2:9.1.0016-1ubuntu7.20 -DSYS_VIMRC_FILE=\"/etc/vim/vimrc\" -DSYS_GVIMRC_FILE=\"/etc/vim/gvimrc\" -D_REENTRANT -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=1 
+Linking: gcc -Wl,-Bsymbolic-functions -flto=auto -ffat-lto-objects -Wl,-z,relro -Wl,-z,now -Wl,--as-needed -o vim -lm -ltinfo -lselinux -lsodium -lacl -lattr -lgpm -L/usr/lib/python3.12/config-3.12-x86_64-linux-gnu -lpython3.12 -ldl -lm 
+
+$ cat ~/.selected_editor
+# Generated by /usr/bin/select-editor
+SELECTED_EDITOR="/usr/bin/vim.basic"
+
+$ sensible-editor --version < /dev/null | head -1
+VIM - Vi IMproved 9.1 (2024 Jan 02, compiled Aug 24 2026 22:13:04)
+
+$ rm ~/.selected_editor
+
+$ sensible-editor --version < /dev/null | head -1
+ GNU nano, version 7.2
+
+$ sudo grep -n -E "env_reset|EDITOR" /etc/sudoers
+9:Defaults	env_reset
+23:#Defaults:%sudo env_keep += "EDITOR"
+
+$ export EDITOR=vi
+
+$ sudo env | grep "^EDITOR="; echo "exit=$?"
+exit=1
+
+$ sudo EDITOR=vi env | grep "^EDITOR="
+EDITOR=vi
+
+$ unset EDITOR

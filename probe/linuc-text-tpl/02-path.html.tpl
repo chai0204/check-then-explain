@@ -159,8 +159,8 @@ $ ls -l ~/.bash_history; echo "exit=$?"
 <p>試験でよく問われる <code>-d</code> <code>-r</code> <code>-c</code> も、端末の上で打って確かめた（同じように子の bash の中で打っている）。</p>
 <pre><code>{{SESSION@exam 2-21}}</code></pre>
 <p><code>history -d 2</code> は2番の1件（<code>echo two</code>）だけを消し、後ろの番号を詰め直した。消えたのは「最後の2件」ではない。</p>
-<pre><code>{{SESSION@exam 22-30}}</code></pre>
-<p><code>history -r</code> は、ファイルの2行を今の履歴の末尾（8番と9番）に読み込んだ。<code>history -c -w ファイル</code> は、履歴を空にしてから書くので、ファイルも空（0行）になった。「まだ書いていない分を足す」のは <code>-a</code> のほうである。</p>
+<pre><code>{{SESSION@exam 22-32}}</code></pre>
+<p><code>history -r</code> は、ファイルの2行を今の履歴の末尾（8番と9番）に読み込んだ。<code>history -c -w ファイル</code> は、履歴を空にしてから書くので、ファイルも空（0行）になった。「まだ書いていない分を足す」のは <code>-a</code> のほうである。最後の <code>exit</code> で子の bash を抜け、檻に入ったときのシェルに戻った（次の章からは、このシェルで続ける）。</p>
 <div class="analogy"><b>たとえ</b>: 会議の<b>議事録係</b>に近い。発言はその場でメモされる（<code>history</code> で見える）が、
 清書して共有フォルダ（<code>.bash_history</code>）に置くのは会議が終わってから。
 しかもこの係は「前置きの雑談（空白で始まる行）」と「同じことの繰り返し」をメモしない方針になっている。

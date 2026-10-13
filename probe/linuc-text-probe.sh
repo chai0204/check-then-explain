@@ -198,7 +198,8 @@ R 'apropos "^regex"'
 R 'man -f regex'
 R 'man 7 regex | grep -A1 "^NAME"'
 R 'man -k "regular expression" | sort'
-R 'ls -d /usr/share/man/man[0-9]'
+# -1: 端末で打つと ls は端末の幅に合わせて横にも並べる。幅で画面が変わらないように1行に1つにする（2026-10-13）
+R 'ls -1d /usr/share/man/man[0-9]'
 R 'man ls | grep -E "^ +-l +"'
 R 'man ls | grep -A1 -E "^ +-a, --all"'
 R 'man -f echo'
@@ -428,6 +429,8 @@ X
 R 'tr a-z A-Z <<< "here string"'
 R 'ls nosuch.txt; echo "exit=$?"'
 R 'ls fruits.txt; echo "exit=$?"'
+# 章の終わりの後片付け。読者は同じシェルのまま次の章へ進むので、残すと第9章の grep -rl や a* の結果が変わる（2026-10-13）
+R 'rm out.txt err.txt both.txt only.txt amp.txt note.txt upper.txt greet.txt copy.txt'
 fi
 
 if want 8; then
@@ -593,9 +596,12 @@ KEYS 'dd :w⏎ :w!⏎ :q⏎' 'vim ro.txt' 'dd' ':w\r' ':w!\r' ':q\r'
 R 'cat ro.txt'
 R 'stat -c "%A %s %n" ro.txt'
 R 'cp memo.txt ro2.txt; chmod 444 ro2.txt'
-R 'vim -es -c "normal! dd" -c "w!" -c q ro2.txt; echo "exit=$?"'
+# 終わりは -c "q!"。-c q だと、互換モードで :w! が失敗した後の :q も E37 で断られ、vim -es は標準入力から
+# 次の Ex コマンドを待つ。端末で打つ読者には、何も出ずに止まって見える（端末の無い probe では入力が空なので
+# すぐ終わり、気づかなかった。通しの記録 probe/linuc-text-seq.py で見つけた。2026-10-13）。
+R 'vim -es -c "normal! dd" -c "w!" -c "q!" ro2.txt; echo "exit=$?"'
 R 'cat ro2.txt'
-R 'vim -es -N -c "normal! dd" -c "w!" -c q ro2.txt; echo "exit=$?"'
+R 'vim -es -N -c "normal! dd" -c "w!" -c "q!" ro2.txt; echo "exit=$?"'
 R 'cat ro2.txt'
 R 'cp memo.txt n1.txt'
 KEYS '^K ^O ⏎ ^X' 'nano n1.txt' '\013' '\017' '\r' '\030'

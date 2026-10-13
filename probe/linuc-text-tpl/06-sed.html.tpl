@@ -105,7 +105,7 @@ $ diff my.conf.bak my.conf
 @@</code></pre>
 <p><code>-i.bak</code> は、作り直す前の中身を <code>my.conf.bak</code> として残す（<code>-i</code> と <code>.bak</code> の間に空白は入れない）。付け替える前の実体に、別の名前を残しておく仕組みだ。</p>
 <p>「作り直している」ことは、同じ実体に2つ目の名前（ハードリンク。主題1.02）を付けておくと、はっきり見える。</p>
-<pre><code>@@
+<pre><code>@@seq
 $ ln my.conf hard.conf
 $ ls -i my.conf hard.conf
 $ sed -i "s/^port=9090/port=7070/" my.conf
@@ -188,6 +188,10 @@ $ cat half_aa; echo "<-- ここまでが half_aa"
 $ split -n l/2 fruits.txt line_; wc -l line_*
 @@</code></pre>
 <p><code>-n 2</code> は<b>バイト数で</b>2等分するので、<code>apple</code> の途中で切れた。行の途中で切りたくなければ <code>-n l/2</code>（line）を使う。<code>-b 100k</code> のようにバイト数で分ける指定もある。</p>
+<p>この章で <code>~/text</code> に作ったファイルは、ここで消して元に戻しておく。<code>my.conf</code> などを残すと、第9章で <code>~/text</code> の中を検索したときに、本文より多くのファイルが見つかる。</p>
+<pre><code>@@seq
+$ rm my.conf* hard.conf fifty.txt big.txt xa* part_* half_* line_*
+@@</code></pre>
 <div class="quiz"><b>確認</b>
 <p><code>sed</code> でファイル <code>a.txt</code> のすべての <code>foo</code> を <code>bar</code> に置き換えて表示したい（1行に複数ある場合も全部）。正しいものはどれか。</p>
 <p>A. <code>sed 's/foo/bar/' a.txt</code>　B. <code>sed 's/foo/bar/g' a.txt</code>　C. <code>sed -n 's/foo/bar/' a.txt</code>　D. <code>sed 'y/foo/bar/' a.txt</code></p>

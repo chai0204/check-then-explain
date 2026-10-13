@@ -6,6 +6,9 @@
 #   bash probe/linuc-text-run.sh solve      solve-all だけ
 #   bash probe/linuc-text-run.sh extra      追加の記録（probe/linuc-text-probe-extra.sh。事実確認で直した箇所の裏付け）だけ
 #   bash probe/linuc-text-run.sh exam       試験対策の追加の記録（probe/linuc-text-probe-exam.sh。公式例題の監査で足した箇所）だけ
+#   bash probe/linuc-text-run.sh seq        通しの記録だけ（probe/linuc-text-seq.py。本文から作った入力を、読者と同じ
+#                                          docker run -it の1つのシェルに第1〜10章まで通して打つ。端末の幅 80 桁と 200 桁）。
+#                                          取り直したら章を作り直し（@@seq のブロックが追いつく）、本文と突き合わせる
 #
 # どちらも読者と同じ起動オプション（--hostname linuc と2つのボリューム）で起動したコンテナの中で走らせる。
 # ボリュームは名前を付けず、終わったら docker rm -v で消す（名前付きボリュームを残さないため）。
@@ -68,13 +71,29 @@ run_solve() {
   echo "solve-all: ✔ $(grep -c '^✔ 0' "$out") / ✗ $(grep -c '^✗ 0' "$out") → $out"
 }
 
+run_seq() {
+  # 2つの幅を同時に取る（コンテナは linuc-text-seq-80 / linuc-text-seq-200。--rm と名前の無いボリュームなので残らない）
+  python3 -I probe/linuc-text-seq.py --cols 80 --rows 24 &
+  python3 -I probe/linuc-text-seq.py --cols 200 --rows 50 --out logs/linuc-text-seq-wide.log
+  wait
+}
+
 case $what in
   probe) run_probe ;;
   solve) run_solve ;;
   extra) run_extra ;;
   exam)  run_exam ;;
+  seq)   run_seq ;;
   all)   run_probe; run_extra; run_exam; run_solve ;;
-  *) echo "使い方: bash probe/linuc-text-run.sh [all|probe|extra|exam|solve]"; exit 2 ;;
+  *) echo "使い方: bash probe/linuc-text-run.sh [all|probe|extra|exam|solve|seq]"; exit 2 ;;
 esac
 python3 -I probe/linuc-text-gen.py probe/linuc-text-tpl/*.tpl > /dev/null && echo "章を作り直した"
+if [ "$what" = all ]; then
+  # 通しの記録は描画済みの章から入力を作るので、章を作り直した後に取る
+  run_seq
+  python3 -I probe/linuc-text-gen.py probe/linuc-text-tpl/*.tpl > /dev/null && echo "章を作り直した（通しの記録から引くブロック）"
+fi
+if [ "$what" = all ] || [ "$what" = seq ]; then
+  python3 -I probe/linuc-text-seqcompare.py logs/linuc-text-seq.log logs/linuc-text-seq-wide.log
+fi
 node tools/logcheck.mjs linuc-text --strict

@@ -468,7 +468,7 @@ zegrep (1)           - search possibly compressed files for a regular expression
 zfgrep (1)           - search possibly compressed files for a regular expression
 zgrep (1)            - search possibly compressed files for a regular expression
 
-$ ls -d /usr/share/man/man[0-9]
+$ ls -1d /usr/share/man/man[0-9]
 /usr/share/man/man1
 /usr/share/man/man2
 /usr/share/man/man3
@@ -1169,12 +1169,12 @@ DuriAn
 $ cp app.conf my.conf
 
 $ ls -i my.conf
-18371087 my.conf
+18368214 my.conf
 
 $ sed -i "s/^port=8080/port=9090/" my.conf
 
 $ ls -i my.conf
-18371088 my.conf
+18368225 my.conf
 
 $ grep ^port= my.conf
 port=9090
@@ -1201,14 +1201,14 @@ $ diff my.conf.bak my.conf
 $ ln my.conf hard.conf
 
 $ ls -i my.conf hard.conf
-18371087 hard.conf
-18371087 my.conf
+18368214 hard.conf
+18368214 my.conf
 
 $ sed -i "s/^port=9090/port=7070/" my.conf
 
 $ ls -i my.conf hard.conf
-18371087 hard.conf
-18371089 my.conf
+18368214 hard.conf
+18368236 my.conf
 
 $ grep ^port= my.conf hard.conf
 my.conf:port=7070
@@ -1466,6 +1466,8 @@ exit=2
 $ ls fruits.txt; echo "exit=$?"
 fruits.txt
 exit=0
+
+$ rm out.txt err.txt both.txt only.txt amp.txt note.txt upper.txt greet.txt copy.txt
 
 ── lab-linuc-text 1.0.1 ────────────────────────────────────────
 lab-linuc-text  進捗 0/8
@@ -2138,7 +2140,7 @@ $ stat -c "%A %s %n" ro.txt
 
 $ cp memo.txt ro2.txt; chmod 444 ro2.txt
 
-$ vim -es -c "normal! dd" -c "w!" -c q ro2.txt; echo "exit=$?"
+$ vim -es -c "normal! dd" -c "w!" -c "q!" ro2.txt; echo "exit=$?"
 exit=1
 
 $ cat ro2.txt
@@ -2147,7 +2149,7 @@ banana
 cherry
 date
 
-$ vim -es -N -c "normal! dd" -c "w!" -c q ro2.txt; echo "exit=$?"
+$ vim -es -N -c "normal! dd" -c "w!" -c "q!" ro2.txt; echo "exit=$?"
 exit=0
 
 $ cat ro2.txt
