@@ -12,6 +12,13 @@ DOM=${LAB_VM_NAME:-linuc}
 
 mkdir -p "$HOME/vm" "$HOME/.lab" "$HOME/work" 2>/dev/null
 
+# コンテナの起動を、libvirt にとっての「ホストの起動」とみなす。
+# libvirt は実行時の状態（自動起動済みの印 autostarted、動いている仮想マシンの状態）を ~/.cache/libvirt/qemu/run に置く。
+# 実機ならここは再起動で消える場所だが、コンテナでは書き込み層に残るので、docker stop → start の後に
+# `virsh autostart` を付けた練習機が起動しなかった（実測 2026-10-13、linuc-boot の制作中に発見）。
+# この時点では libvirtd はまだ動いていないので、消しても壊れない。
+rm -rf "$HOME/.cache/libvirt/qemu/run"
+
 socat TCP-LISTEN:7777,bind=127.0.0.1,fork,reuseaddr EXEC:/usr/local/libexec/lab-remote 2>/dev/null &
 
 if [ "${LAB_VM_AUTOSTART:-0}" = "1" ]; then
@@ -29,10 +36,13 @@ if [ -f /etc/lab-vm/provision.sh ]; then
     done ) &
 fi
 
+# docker stop を受けたら練習機を正常に止める。TCG での正常停止は約 13 秒かかる（実測 12.6 秒）。
+# docker stop の既定の猶予は 10 秒で、間に合わずに SIGKILL され電源断になった（次の起動で ext4 の回復が走る）。
+# 読者の起動コマンドには --stop-timeout 30 を付ける。ここでは 25 秒待ち、それでも止まらなければ電源を切る。
 stop_vm() {
   if [ "$(virsh domstate "$DOM" 2>/dev/null | head -1)" = "running" ]; then
     virsh shutdown "$DOM" >/dev/null 2>&1
-    for _ in $(seq 1 40); do
+    for _ in $(seq 1 50); do
       [ "$(virsh domstate "$DOM" 2>/dev/null | head -1)" = "shut off" ] && break
       sleep 0.5
     done

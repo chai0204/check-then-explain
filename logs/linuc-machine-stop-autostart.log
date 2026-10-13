@@ -1,0 +1,31 @@
+== 1. docker stop（--stop-timeout 30）で練習機が正常に止まるか
+起動から ssh まで: 33 秒
+active
+docker stop: 5 秒 / 終了コード 0
+再開から ssh まで: 29 秒
+-- 前回の起動の最後（正常停止なら Power-Off まで記録がある）
+[   33.275395] linuc systemd-shutdown[1]: Syncing filesystems and block devices.
+[   33.330778] linuc systemd-shutdown[1]: Sending SIGTERM to remaining processes...
+[   33.375163] linuc systemd-journald[127]: Received SIGTERM from PID 1 (systemd-shutdow).
+[   33.349913] linuc systemd-journald[127]: Journal stopped
+-- 今回の起動で ext4 の回復が走ったか（何も出なければ走っていない）
+(回復なし)
+
+== 2. virsh autostart が docker stop / start をまたいで効くか（自動起動なしのコース）
+ Id   Name    State
+------------------------
+ -    linuc   shut off
+
+Domain 'linuc' marked as autostarted
+
+Autostart:      enable
+Domain 'linuc' started
+
+virsh start から ssh まで: 28 秒
+docker stop: 7 秒 / 終了コード 0
+docker start の後、何もしないで ssh まで: 34 秒
+ Id   Name    State
+-----------------------
+ 1    linuc   running
+
+== 終了
