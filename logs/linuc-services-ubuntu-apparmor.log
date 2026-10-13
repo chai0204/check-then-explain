@@ -1,0 +1,618 @@
+========== 1.09 の檻を、AppArmor が有効な Ubuntu 24.04.5 で起動する（2026-10-14・lab の仮想マシン） ==========
+台本: 実践編の起動コマンドをそのまま／docker に --security-opt apparmor=unconfined を足す／podman（rootless）。各節の $ 行が打ったコマンド、[exit=N] が終了コード。
+
+
+$ cloud-init status --wait
+status: done
+[exit=0]
+
+$ cat /etc/os-release
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.5 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+[exit=0]
+
+$ uname -a
+Linux svc-aa 6.8.0-142-generic #142-Ubuntu SMP PREEMPT_DYNAMIC Wed Sep  2 14:24:27 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+[exit=0]
+
+$ cat /proc/cmdline
+BOOT_IMAGE=/vmlinuz-6.8.0-142-generic root=LABEL=cloudimg-rootfs ro console=tty1 console=ttyS0
+[exit=0]
+
+$ cat /sys/module/apparmor/parameters/enabled
+Y
+[exit=0]
+
+$ sudo aa-status
+apparmor module is loaded.
+117 profiles are loaded.
+23 profiles are in enforce mode.
+   /usr/bin/man
+   /usr/lib/snapd/snap-confine
+   lsb_release
+   man_filter
+   man_groff
+   nvidia_modprobe
+   nvidia_modprobe//kmod
+   plasmashell
+   plasmashell//QtWebEngineProcess
+   rsyslogd
+   tcpdump
+   ubuntu_pro_apt_news
+   ubuntu_pro_esm_cache
+   ubuntu_pro_esm_cache//apt_methods
+   ubuntu_pro_esm_cache//apt_methods_gpgv
+   ubuntu_pro_esm_cache//cloud_id
+   ubuntu_pro_esm_cache//dpkg
+   ubuntu_pro_esm_cache//ps
+   ubuntu_pro_esm_cache//ubuntu_distro_info
+   ubuntu_pro_esm_cache_systemctl
+   ubuntu_pro_esm_cache_systemd_detect_virt
+   unix-chkpwd
+   unprivileged_userns
+4 profiles are in complain mode.
+   transmission-cli
+   transmission-daemon
+   transmission-gtk
+   transmission-qt
+0 profiles are in prompt mode.
+0 profiles are in kill mode.
+90 profiles are in unconfined mode.
+   1password
+   Discord
+   MongoDB Compass
+   QtWebEngineProcess
+   balena-etcher
+   brave
+   buildah
+   cam
+   ch-checkns
+   ch-run
+   chrome
+   crun
+   devhelp
+   element-desktop
+   epiphany
+   evolution
+   firefox
+   flatpak
+   foliate
+   geary
+   github-desktop
+   goldendict
+   ipa_verify
+   kchmviewer
+   keybase
+   lc-compliance
+   libcamerify
+   linux-sandbox
+   loupe
+   lxc-attach
+   lxc-create
+   lxc-destroy
+   lxc-execute
+   lxc-stop
+   lxc-unshare
+   lxc-usernsexec
+   mmdebstrap
+   msedge
+   nautilus
+   notepadqq
+   obsidian
+   opam
+   opera
+   pageedit
+   podman
+   polypane
+   privacybrowser
+   qcam
+   qmapshack
+   qutebrowser
+   rootlesskit
+   rpm
+   rssguard
+   runc
+   sbuild
+   sbuild-abort
+   sbuild-adduser
+   sbuild-apt
+   sbuild-checkpackages
+   sbuild-clean
+   sbuild-createchroot
+   sbuild-destroychroot
+   sbuild-distupgrade
+   sbuild-hold
+   sbuild-shell
+   sbuild-unhold
+   sbuild-update
+   sbuild-upgrade
+   scide
+   signal-desktop
+   slack
+   slirp4netns
+   steam
+   stress-ng
+   surfshark
+   systemd-coredump
+   thunderbird
+   toybox
+   trinity
+   tup
+   tuxedo-control-center
+   userbindmount
+   uwsgi-core
+   vdens
+   virtiofsd
+   vivaldi-bin
+   vpnns
+   vscode
+   wike
+   wpcom
+1 processes have profiles defined.
+1 processes are in enforce mode.
+   /usr/sbin/rsyslogd (850) rsyslogd
+0 processes are in complain mode.
+0 processes are in prompt mode.
+0 processes are in kill mode.
+0 processes are unconfined but have a profile defined.
+0 processes are in mixed mode.
+[exit=0]
+
+$ cat /sys/kernel/security/lsm
+lockdown,capability,landlock,yama,apparmor[exit=0]
+
+$ free -m
+               total        used        free      shared  buff/cache   available
+Mem:            1967         321        1461           1         333        1646
+Swap:              0           0           0
+[exit=0]
+
+$ df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1        19G  1.7G   17G   9% /
+[exit=0]
+
+=== docker: 実践編の起動コマンド ===
+
+$ sudo docker pull ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 | tail -3
+Digest: sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2
+Status: Downloaded newer image for ghcr.io/chai0204/lab-linuc-services@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2
+ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2
+[exit=0]
+
+$ sudo docker run -d -t --name lab-linuc --hostname linuc --cap-add SYS_ADMIN -v lab-linuc-services-state:/root/.lab ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2
+4ad065472f1374bfee49b7af2d64e0eda51f40fdf6cdbd4c29da3a066b175fb5
+[exit=0]
+(待ち: 約2秒目で State=exited)
+
+$ sudo docker ps
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+[exit=0]
+
+$ sudo docker ps -a
+CONTAINER ID   IMAGE                                       COMMAND                  CREATED         STATUS                     PORTS     NAMES
+4ad065472f13   ghcr.io/chai0204/lab-linuc-services:1.0.2   "/usr/local/sbin/lab…"   4 seconds ago   Exited (3) 3 seconds ago             lab-linuc
+[exit=0]
+
+$ sudo docker inspect -f 'Status={{.State.Status}} ExitCode={{.State.ExitCode}} Error={{.State.Error}} AppArmorProfile={{.AppArmorProfile}}' lab-linuc
+Status=exited ExitCode=3 Error= AppArmorProfile=docker-default
+[exit=0]
+
+$ sudo docker logs lab-linuc 2>&1 | tail -20
+
+✗ この環境では systemd を起動できません（読者の操作ミスではありません）
+
+  観測 : /sys/fs/cgroup が読み取り専用で、書き込みに戻せなかった
+  理由 : docker は cgroup を ro でマウントする。戻すには CAP_SYS_ADMIN が要る
+
+  docker の場合 : 起動コマンドに --cap-add SYS_ADMIN があるか確認してください
+  podman の場合 : --systemd=always を付けてください
+
+  この教材の入口に、動作確認済みの起動コマンドをそのまま置いてあります。
+    https://check-then-explain.junxiaosong508-de2.workers.dev/linuc-services/
+
+[exit=0]
+
+$ sudo docker inspect -f 'ExitCode={{.State.ExitCode}}' lab-linuc
+ExitCode=3
+[exit=0]
+
+=== 補足: 切り分け（同じイメージを systemd を起こさずに動かし、中から見る） ===
+
+$ sudo docker run --rm --cap-add SYS_ADMIN --entrypoint bash $IMG -c 'echo "label=$(cat /proc/self/attr/current)"; grep CapEff /proc/self/status; findmnt -no FSTYPE,OPTIONS /sys/fs/cgroup; mount -o remount,rw /sys/fs/cgroup; echo "remount-exit=$?"; findmnt -no OPTIONS /sys/fs/cgroup'
+label=docker-default (enforce)
+CapEff:	00000000a82425fb
+cgroup2 ro,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot
+mount: /sys/fs/cgroup: cannot remount cgroup read-write, is write-protected.
+       dmesg(1) may have more information after failed mount system call.
+remount-exit=32
+ro,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot
+[exit=0]
+
+$ sudo docker run --rm --cap-add SYS_ADMIN --security-opt apparmor=unconfined --entrypoint bash $IMG -c 'echo "label=$(cat /proc/self/attr/current)"; grep CapEff /proc/self/status; findmnt -no FSTYPE,OPTIONS /sys/fs/cgroup; mount -o remount,rw /sys/fs/cgroup; echo "remount-exit=$?"; findmnt -no OPTIONS /sys/fs/cgroup'
+label=unconfined
+CapEff:	00000000a82425fb
+cgroup2 ro,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot
+remount-exit=0
+rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot
+[exit=0]
+
+$ sudo docker run --rm --entrypoint grep $IMG CapEff /proc/1/status    # --cap-add なしの基準
+CapEff:	00000000a80425fb
+[exit=0]
+
+$ sudo journalctl -k --no-pager | grep -i apparmor | tail -10
+Oct 13 19:42:59 ubuntu kernel: audit: type=1400 audit(1791920579.215:5): apparmor="STATUS" operation="profile_load" profile="unconfined" name="QtWebEngineProcess" pid=509 comm="apparmor_parser"
+Oct 13 19:42:59 ubuntu kernel: audit: type=1400 audit(1791920579.216:6): apparmor="STATUS" operation="profile_load" profile="unconfined" name="balena-etcher" pid=511 comm="apparmor_parser"
+Oct 13 19:42:59 ubuntu kernel: audit: type=1400 audit(1791920579.216:7): apparmor="STATUS" operation="profile_load" profile="unconfined" name="brave" pid=512 comm="apparmor_parser"
+Oct 13 19:42:59 ubuntu kernel: audit: type=1400 audit(1791920579.217:8): apparmor="STATUS" operation="profile_load" profile="unconfined" name="buildah" pid=513 comm="apparmor_parser"
+Oct 13 19:42:59 ubuntu kernel: audit: type=1400 audit(1791920579.218:9): apparmor="STATUS" operation="profile_load" profile="unconfined" name="cam" pid=514 comm="apparmor_parser"
+Oct 13 19:42:59 ubuntu kernel: audit: type=1400 audit(1791920579.218:10): apparmor="STATUS" operation="profile_load" profile="unconfined" name="ch-checkns" pid=515 comm="apparmor_parser"
+Oct 13 19:43:04 svc-aa kernel: audit: type=1400 audit(1791920584.004:119): apparmor="STATUS" operation="profile_replace" info="same as current profile, skipping" profile="unconfined" name="rsyslogd" pid=826 comm="apparmor_parser"
+Oct 13 19:43:04 svc-aa kernel: audit: type=1400 audit(1791920584.410:120): apparmor="STATUS" operation="profile_replace" profile="unconfined" name="/usr/lib/snapd/snap-confine" pid=994 comm="apparmor_parser"
+Oct 13 19:44:20 svc-aa kernel: audit: type=1400 audit(1791920660.641:121): apparmor="STATUS" operation="profile_load" profile="unconfined" name="passt" pid=2057 comm="apparmor_parser"
+Oct 13 19:44:23 svc-aa kernel: audit: type=1400 audit(1791920663.401:122): apparmor="STATUS" operation="profile_load" profile="unconfined" name="docker-default" pid=2668 comm="apparmor_parser"
+[exit=0]
+
+$ sudo grep -n -E 'mount|/sys/fs' /etc/apparmor.d/docker-default 2>/dev/null || echo '(docker-default はファイルではなく dockerd が直接読み込む)'
+(docker-default はファイルではなく dockerd が直接読み込む)
+[exit=0]
+
+=== docker: 実践編の2行をそのまま打ったときに読者が見るもの（1 の再現） ===
+
+$ sudo docker run -d -t --name lab-linuc --hostname linuc --cap-add SYS_ADMIN -v lab-linuc-services-state:/root/.lab $IMG
+c7a9558ddd7930470647f3461a2332a77312e98f22b71bf0d6eb2bd8290f7392
+[exit=0]
+
+$ docker exec -it lab-linuc bash -l
+Error response from daemon: container c7a9558ddd7930470647f3461a2332a77312e98f22b71bf0d6eb2bd8290f7392 is not running
+[exit=1]
+
+$ sudo docker ps -a --format '{{.Names}}  {{.Status}}'
+lab-linuc  Exited (3) 2 seconds ago
+[exit=0]
+
+$ sudo docker rm -f lab-linuc; sudo docker volume rm lab-linuc-services-state
+lab-linuc
+lab-linuc-services-state
+[exit=0]
+
+$ sudo docker ps -a; podman ps -a --format '{{.Names}}  {{.Status}}'
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+lab-linuc  Up 50 seconds
+[exit=0]
+
+=== docker: 実践編の起動コマンド + --security-opt apparmor=unconfined ===
+
+$ sudo docker pull ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 | tail -3
+Digest: sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2
+Status: Image is up to date for ghcr.io/chai0204/lab-linuc-services@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2
+ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2
+[exit=0]
+
+$ sudo docker run -d -t --name lab-linuc --hostname linuc --cap-add SYS_ADMIN --security-opt apparmor=unconfined -v lab-linuc-services-state:/root/.lab ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2
+56ade1efde7d3cd6b900f06da6cd9bb3e05d40b094df24e9b6cf430ee24d3e4d
+[exit=0]
+(待ち: 約4秒目で is-system-running=running)
+
+$ sudo docker ps
+CONTAINER ID   IMAGE                                       COMMAND                  CREATED         STATUS         PORTS     NAMES
+56ade1efde7d   ghcr.io/chai0204/lab-linuc-services:1.0.2   "/usr/local/sbin/lab…"   6 seconds ago   Up 5 seconds             lab-linuc
+[exit=0]
+
+$ sudo docker ps -a
+CONTAINER ID   IMAGE                                       COMMAND                  CREATED         STATUS         PORTS     NAMES
+56ade1efde7d   ghcr.io/chai0204/lab-linuc-services:1.0.2   "/usr/local/sbin/lab…"   6 seconds ago   Up 5 seconds             lab-linuc
+[exit=0]
+
+$ sudo docker inspect -f 'Status={{.State.Status}} ExitCode={{.State.ExitCode}} Error={{.State.Error}} AppArmorProfile={{.AppArmorProfile}}' lab-linuc
+Status=running ExitCode=0 Error= AppArmorProfile=unconfined
+[exit=0]
+
+$ sudo docker exec lab-linuc systemctl is-system-running
+running
+[exit=0]
+
+$ sudo docker exec lab-linuc systemctl --failed --no-pager
+  UNIT LOAD ACTIVE SUB DESCRIPTION
+
+0 loaded units listed.
+[exit=0]
+
+$ docker exec -it lab-linuc bash -l     # 入ったときの表示（script で端末を用意し、exit を流す）
+exit
+exit
+exit
+
+── lab-linuc-services 1.0.2 ────────────────────────────────────────
+[1mlab-linuc-services[0m  進捗 0/6
+  次 → 01 「時刻の表示を3箇所で揃える」 [2m(目安 10分 / 影響度 B)[0m
+  [2mlab start 01 で課題を開く[0m
+  [2m進捗の保存先: /root/.lab/progress.json（消すには docker volume rm lab-linuc-services-state）[0m
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+[?2004h]0;root@linuc: ~root@linuc:~# exit
+[?2004llogout
+[exit=0]
+
+$ sudo docker exec lab-linuc bash -l -c lab
+lab-linuc-services  進捗 0/6
+  次 → 01 「時刻の表示を3箇所で揃える」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /root/.lab/progress.json（消すには docker volume rm lab-linuc-services-state）
+[exit=0]
+
+$ sudo docker exec lab-linuc bash -l -c 'lab start 01' | head -40
+
+演習 01 — 時刻の表示を3箇所で揃える                                影響度 B / 目安 10分
+
+  この演習はシステム全体を触ります。作業場所は /etc です。
+
+【いまの状態を見てください】
+
+    date
+    timedatectl
+    cat /etc/timezone
+
+  3つが同じ場所を指していません。どれも嘘をついてはいません。
+  3つは別々の場所を読んでいます。
+
+【やること】
+
+  この3つが全部 Asia/Tokyo（date は JST）になるようにしてください。
+
+    date        の %Z が     JST
+    timedatectl の Time zone が Asia/Tokyo
+    /etc/timezone の中身が    Asia/Tokyo
+
+  コマンド1つでは終わりません。どれが何を読んでいるかを突き止めてください。
+
+【ヒント代わりの問い】
+
+  ・timedatectl set-timezone を打った後、ls -l /etc/localtime は何になりましたか
+  ・そのとき /etc/timezone は変わりましたか
+  ・date は環境変数を見ていませんか（env | grep -i tz）
+
+【できたら】
+
+    lab check 01
+
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+
+[exit=0]
+
+$ sudo docker exec lab-linuc bash -l -c 'lab check 01'
+✗ 01 未達
+  判定 : 観測型（3箇所の実効値をそのまま読む）
+  観測 : date +%Z                  = JST
+         timedatectl の Time zone  = Etc/UTC
+         /etc/localtime のリンク先 = Etc/UTC
+         /etc/timezone の中身      = Etc/UTC
+         → timedatectl が Asia/Tokyo ではない
+         → /etc/localtime が Asia/Tokyo を指していない
+         → /etc/timezone が Asia/Tokyo ではない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+[exit=1]
+
+$ sudo docker exec lab-linuc grep CapEff /proc/1/status
+CapEff:	00000000a82425fb
+[exit=0]
+
+$ sudo docker exec lab-linuc cat /proc/1/attr/current; echo
+unconfined
+
+[exit=0]
+
+$ sudo docker exec lab-linuc cat /proc/1/attr/apparmor/current; echo
+unconfined
+
+[exit=0]
+
+$ sudo docker exec lab-linuc bash -l -c 'lab env'
+テーマ    : lab-linuc-services 1.0.2
+イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.2
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 6.8.0-142-generic
+アーキ    : x86_64
+ランタイム: docker
+PID1      : /sbin/init
+systemd   : running
+cgroup    : rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot
+journal   : 8.0M in the file system.
+特権      : CapEff=00000000a82425fb CapBnd=00000000a82425fb
+[exit=0]
+
+$ sudo cat /proc/3879/attr/current; echo    # 母艦（VM）側から見た檻の PID 1（host pid 3879）のラベル
+unconfined
+
+[exit=0]
+
+$ ps -o pid,label,args -p 3879
+    PID LABEL                           COMMAND
+   3879 unconfined                      /sbin/init
+[exit=0]
+
+=== podman（rootless・student）: 実践編の podman の起動コマンド ===
+
+$ id; echo XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR
+uid=1000(student) gid=1000(student) groups=1000(student)
+XDG_RUNTIME_DIR=/run/user/1000
+[exit=0]
+
+$ sudo loginctl enable-linger student && loginctl show-user student -p Linger
+Linger=yes
+[exit=0]
+
+$ podman pull $IMG 2>&1 | tail -4
+Copying blob sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1
+Copying config sha256:cf8771813f9bff74faf16d9975f5992a16c26cd3eccb3ed88085642601712357
+Writing manifest to image destination
+cf8771813f9bff74faf16d9975f5992a16c26cd3eccb3ed88085642601712357
+[exit=0]
+
+$ podman run -d -t --name lab-linuc --hostname linuc --systemd=always -v lab-linuc-services-state:/root/.lab $IMG
+951de5d1f1670220caf642fb17548e268cfa4dd85dcdc12435fbf006dd8824e5
+[exit=0]
+(待ち: 約4秒目で is-system-running=running)
+
+$ podman ps
+CONTAINER ID  IMAGE                                                                                                        COMMAND     CREATED        STATUS        PORTS       NAMES
+951de5d1f167  ghcr.io/chai0204/lab-linuc-services@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2              5 seconds ago  Up 6 seconds              lab-linuc
+[exit=0]
+
+$ podman ps -a
+CONTAINER ID  IMAGE                                                                                                        COMMAND     CREATED        STATUS        PORTS       NAMES
+951de5d1f167  ghcr.io/chai0204/lab-linuc-services@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2              5 seconds ago  Up 6 seconds              lab-linuc
+[exit=0]
+
+$ podman inspect -f 'Status={{.State.Status}} ExitCode={{.State.ExitCode}} Error={{.State.Error}} AppArmorProfile={{.AppArmorProfile}}' lab-linuc
+Status=running ExitCode=0 Error= AppArmorProfile=
+[exit=0]
+
+$ podman exec lab-linuc systemctl is-system-running
+running
+[exit=0]
+
+$ podman exec lab-linuc systemctl --failed --no-pager
+  UNIT LOAD ACTIVE SUB DESCRIPTION
+
+0 loaded units listed.
+[exit=0]
+
+$ podman exec -it lab-linuc bash -l     # 入ったときの表示（script で端末を用意し、exit を流す）
+exit
+exit
+
+── lab-linuc-services 1.0.2 ────────────────────────────────────────
+[1mlab-linuc-services[0m  進捗 0/6
+  次 → 01 「時刻の表示を3箇所で揃える」 [2m(目安 10分 / 影響度 B)[0m
+  [2mlab start 01 で課題を開く[0m
+  [2m進捗の保存先: /root/.lab/progress.json（消すには docker volume rm lab-linuc-services-state）[0m
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+[?2004h]0;root@linuc: ~root@linuc:~# exit
+[?2004llogout
+[exit=0]
+
+$ podman exec lab-linuc bash -l -c lab
+lab-linuc-services  進捗 0/6
+  次 → 01 「時刻の表示を3箇所で揃える」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /root/.lab/progress.json（消すには docker volume rm lab-linuc-services-state）
+[exit=0]
+
+$ podman exec lab-linuc bash -l -c 'lab start 01' | head -40
+
+演習 01 — 時刻の表示を3箇所で揃える                                影響度 B / 目安 10分
+
+  この演習はシステム全体を触ります。作業場所は /etc です。
+
+【いまの状態を見てください】
+
+    date
+    timedatectl
+    cat /etc/timezone
+
+  3つが同じ場所を指していません。どれも嘘をついてはいません。
+  3つは別々の場所を読んでいます。
+
+【やること】
+
+  この3つが全部 Asia/Tokyo（date は JST）になるようにしてください。
+
+    date        の %Z が     JST
+    timedatectl の Time zone が Asia/Tokyo
+    /etc/timezone の中身が    Asia/Tokyo
+
+  コマンド1つでは終わりません。どれが何を読んでいるかを突き止めてください。
+
+【ヒント代わりの問い】
+
+  ・timedatectl set-timezone を打った後、ls -l /etc/localtime は何になりましたか
+  ・そのとき /etc/timezone は変わりましたか
+  ・date は環境変数を見ていませんか（env | grep -i tz）
+
+【できたら】
+
+    lab check 01
+
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+
+[exit=0]
+
+$ podman exec lab-linuc bash -l -c 'lab check 01'
+✗ 01 未達
+  判定 : 観測型（3箇所の実効値をそのまま読む）
+  観測 : date +%Z                  = JST
+         timedatectl の Time zone  = Etc/UTC
+         /etc/localtime のリンク先 = Etc/UTC
+         /etc/timezone の中身      = Etc/UTC
+         → timedatectl が Asia/Tokyo ではない
+         → /etc/localtime が Asia/Tokyo を指していない
+         → /etc/timezone が Asia/Tokyo ではない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+[exit=1]
+
+$ podman exec lab-linuc grep CapEff /proc/1/status
+CapEff:	00000000800405fb
+[exit=0]
+
+$ podman exec lab-linuc cat /proc/1/attr/current; echo
+podman (unconfined)
+
+[exit=0]
+
+$ podman exec lab-linuc cat /proc/1/attr/apparmor/current; echo
+podman (unconfined)
+
+[exit=0]
+
+$ podman exec lab-linuc bash -l -c 'lab env'
+テーマ    : lab-linuc-services 1.0.2
+イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.2
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 6.8.0-142-generic
+アーキ    : x86_64
+ランタイム: podman
+PID1      : /sbin/init
+systemd   : running
+cgroup    : rw,relatime,nsdelegate,memory_recursiveprot
+journal   : 8.0M in the file system.
+特権      : CapEff=00000000800405fb CapBnd=00000000800405fb
+[exit=0]
+
+$ sudo cat /proc/4999/attr/current; echo    # 母艦（VM）側から見た檻の PID 1（host pid 4999）のラベル
+podman (unconfined)
+
+[exit=0]
+
+$ ps -o pid,label,args -p 4999
+    PID LABEL                           COMMAND
+   4999 podman (unconfined)             /sbin/init
+[exit=0]
+
+$ podman inspect -f 'OCIRuntime={{.OCIRuntime}} CgroupManager={{.HostConfig.CgroupManager}} Systemd={{.Config.SystemdMode}}' lab-linuc
+OCIRuntime=runc CgroupManager=systemd Systemd=true
+[exit=0]
+
+$ podman exec lab-linuc findmnt -no FSTYPE,OPTIONS /sys/fs/cgroup
+cgroup2 rw,relatime,nsdelegate,memory_recursiveprot
+[exit=0]
+

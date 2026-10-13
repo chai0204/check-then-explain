@@ -62,6 +62,21 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 docker exec -it lab-linuc bash -l</code></pre>
 
 <div class="note warn">
+<p><b>Ubuntu・Debian などの docker では、このままでは起動しません</b>（2026-10-14 追記）</p>
+<p>AppArmor が有効な PC では、docker が既定で付ける AppArmor の規則（<code>docker-default</code>）が、檻の中で <code>/sys/fs/cgroup</code> を書き込みに戻す操作を断ります。
+<code>CAP_SYS_ADMIN</code> があっても断られるので systemd が起動できず、檻はすぐに止まります（終了コード 3）。
+<code>docker run -d</code> は ID を返して成功したように見え、次の <code>docker exec</code> が「container … is not running」で断られて、止まっていることが分かります。
+<code>docker logs lab-linuc</code> には「起動コマンドに --cap-add SYS_ADMIN があるか確認してください」と出ますが、付けていても同じ表示になります。原因は AppArmor です。
+著者の PC（NixOS）には AppArmor が無く、公開のときにこれを確かめていませんでした。</p>
+<p>AppArmor が有効な PC では、次のどちらかで起動してください。どちらも Ubuntu 24.04.5 で、起動から <code>lab check</code> まで動くことを確かめました（記録: <code>logs/linuc-services-ubuntu-apparmor.log</code>）。</p>
+<ul>
+<li><b>podman（rootless）で起動する（勧めます）。</b>下にある podman の起動コマンドのままで動きます（podman 4.9.3）。権限を1つも渡しません。</li>
+<li><b>docker のまま、起動コマンドに <code>--security-opt apparmor=unconfined</code> を足す。</b>起動します（docker.io 29.1.3）。ただしこれは、この檻に対する AppArmor の閉じ込めそのものを外します。<code>CapEff</code> は変わりませんが、渡すものは下の「1ビット」より多くなります。</li>
+</ul>
+<p>本文の画面は著者の PC（AppArmor なし）で取った記録です。Ubuntu では、入ったときの表示と <code>lab check 01</code> の判定が同じに動くところまでを確かめています。</p>
+</div>
+
+<div class="note warn">
 <p><b><code>--cap-add SYS_ADMIN</code> を打たせている理由</b>（この教材で唯一、読者に権限を渡してもらう箇所です）</p>
 <p>この主題は <code>timedatectl</code> と <code>journalctl</code> と <code>systemctl</code> を扱います。
 どれも <b>systemd が PID 1 で動いていないと1つも試せません</b>。
@@ -74,7 +89,7 @@ Failed to allocate manager object.
 <p><code>--cgroupns=host</code> でも <code>--security-opt systempaths=unconfined</code> でも読み取り専用のままでした。
 書き込みに戻すには <code>CAP_SYS_ADMIN</code> が必要で、無いまま remount を試すと
 <code>mount: /sys/fs/cgroup: permission denied</code> になります。</p>
-<p><b>増える権限は1ビットだけです。</b>渡す前と後を自分で比べられます。</p>
+<p><b>AppArmor の無い PC では、増える権限は1ビットだけです。</b>渡す前と後を自分で比べられます。</p>
 <pre><code>$ docker run --rm ubuntu:24.04 grep CapEff /proc/1/status
 CapEff:	00000000a80425fb
 $ docker exec lab-linuc grep CapEff /proc/1/status
@@ -91,6 +106,7 @@ cgroup を書き込み可でマウントするので、専用のオプション1
 podman exec -it lab-linuc bash -l</code></pre>
 <p>podman 5.8.6（rootless・uid 1100）で、起動と演習6本の完走を確認しました。
 <code>--cap-add</code> は要りません。この違いそのものが、出題範囲 1.01.2「仮想マシン・コンテナの概念」の実物です。</p>
+<p>podman で入っても、<code>lab</code> の表示の「消すには docker volume rm lab-linuc-services-state」は docker のままです。podman では <code>podman volume rm lab-linuc-services-state</code> と読み替えてください。</p>
 <p>もう1つ違いがあります。<code>podman exec</code> で入ったシェルは <code>umask</code> が <code>0022</code> で、<code>docker exec</code> の <code>0000</code> と違います（2026-10-13 実測）。そのため第6章の1つ目の拒否（設定ファイルの権限）と、第7章の <code>.forward</code> の拒否が、podman では起きません。該当する箇所に、podman で何が出るかを書いてあります。演習のヒントと模範解答も、どちらの入り方でも通るように書いてあります（どちらでも模範解答どおりに全問 ✔ になることを確認済み）。</p>
 </div>
 
