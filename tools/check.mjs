@@ -63,7 +63,8 @@ const stripScripts = (h) => h.replace(/(<script\b[^>]*>)[\s\S]*?<\/script>/g, "$
 for (const f of htmls) {
   const theme = relative(ROOT, f).split("/")[0];
   const html = stripScripts(readFileSync(f, "utf8"));
-  for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
+  // タグの属性の href / src だけを拾う（コードの文字として書いた src="…" はリンクではない）
+  for (const m of html.matchAll(/<[a-zA-Z][^>]*?\s(?:href|src)="([^"]+)"/g)) {
     const href = m[1];
     if (/^(https?:|mailto:|#|data:)/.test(href)) {
       if (href.startsWith("#")) {
@@ -307,41 +308,62 @@ for (const f of htmls.filter((f) => /glossary\.html$/.test(f))) {
 }
 
 // ---- 4g. 読者に打たせてはいけないもの（憲章 §3） ----
-// 読者が見るページの docker run / podman run だけを対象にする。
-// README（著者向け）は対象外。
+// 読者の PC で打つ docker / podman のコマンドだけを対象にする。README（著者向け）は対象外。
+// 練習機（仮想マシン）の中で打つブロック（data-where に「練習機の中」）は読者の PC に触れないので外す
+// （docker・podman の記事は、練習機の中でバインドマウントや -p を正当に使う）。
+// ブロックの中でも、docker / podman の論理行（行末の \ でつないだ1つのコマンド）だけを見る
+// （同じブロックの mkdir -p・systemctl show -p などを拾わない。2026-10-14 に docker の記事で誤報）。
+const unescapeHtml = (s) => s.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+  .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+const unquote = (s) => s.replace(/["']/g, "");
 for (const f of htmls) {
   const h = readFileSync(f, "utf8");
-  for (const m of h.matchAll(/<pre\b[^>]*><code>([\s\S]*?)<\/code><\/pre>/g)) {
-    const cmd = m[1];
-    if (!/\b(docker|podman)\s+run\b/.test(cmd)) continue;
-
-    if (/--privileged/.test(cmd)) err(f, "読者のコマンドに --privileged がある");
-
-    // cap を渡させるなら、何がどれだけ増えるかを本文で測って見せる（憲章 §3）。
-    // 「必要な cap を個別列挙し、なぜ要るかを本文に書く」を機械で担保する。
-    // 判定は文字列の有無なので誤報しない。
-    for (const cm of cmd.matchAll(/--cap-add[= ]([A-Za-z_]+)/g)) {
-      // 要求する綴りは CAP_ 付き（CAP_SYS_ADMIN）にする。
-      // 当初は素の名前（SYS_ADMIN）の有無を見ていたが、それは
-      // **起動コマンド自身が満たしてしまう**ので、どう壊しても鳴らない空の検査だった
-      // （2026-10-12 に壊して確認して判明）。CAP_ 付きはコマンドには書かれないので、
-      // 本文で説明したときだけ通る。
-      const cap = "CAP_" + cm[1].toUpperCase().replace(/^CAP_/, "");
-      if (!h.includes(cap)) err(f, `読者のコマンドに --cap-add ${cm[1]} があるのに、本文に ${cap} の説明が無い`);
-      if (!h.includes("CapEff")) err(f, `読者のコマンドに --cap-add ${cm[1]} があるのに、本文に CapEff の実測が無い（どれだけ増えるかを示す）`);
+  for (const m of h.matchAll(/<pre\b([^>]*)><code>([\s\S]*?)<\/code><\/pre>/g)) {
+    const where = (m[1].match(/data-where="([^"]*)"/) || [, ""])[1];
+    if (where.includes("練習機の中")) continue;
+    const logical = [];
+    let cur = "";
+    for (const line of unescapeHtml(m[2]).split("\n")) {
+      const t = line.replace(/^(\$|>) /, "");
+      cur += (cur ? " " : "") + t.replace(/\\\s*$/, "");
+      if (!/\\\s*$/.test(t)) { logical.push(cur); cur = ""; }
     }
+    if (cur) logical.push(cur);
 
-    // bind mount は使わない（ホストを書き換える経路を構造的に作らない）。
-    // 名前付きボリュームは先頭が英数字なので、/ . $ ~ で始まるものだけを拾う。
-    for (const v of cmd.matchAll(/-v\s+([^\s:]+):/g)) {
-      if (/^[/.$~]/.test(v[1])) err(f, `読者のコマンドに bind mount がある: -v ${v[1]}:`);
-    }
+    for (const cmd of logical.filter((l) => /\b(docker|podman)\s+[a-z]/.test(l)))
+      if (/(^|\s)--privileged\b/.test(cmd)) err(f, "読者のコマンドに --privileged がある");
 
-    // publish は待ち受け IP を書く。-p 8080:8080 はホストの firewall を貫通して LAN に出る。
-    for (const pm of cmd.matchAll(/-p\s+(\S+)/g)) {
-      const spec = pm[1];
-      if (!/^\d{1,3}(\.\d{1,3}){3}:/.test(spec) && !/^\[/.test(spec))
-        err(f, `読者のコマンドの -p ${spec} に待ち受け IP が無い（LAN に出る）`);
+    for (const cmd of logical.filter((l) => /\b(docker|podman)\s+(run|create)\b/.test(l))) {
+      // cap を渡させるなら、何がどれだけ増えるかを本文で測って見せる（憲章 §3）。
+      // 「必要な cap を個別列挙し、なぜ要るかを本文に書く」を機械で担保する。
+      // 判定は文字列の有無なので誤報しない。
+      for (const cm of cmd.matchAll(/--cap-add[= ]([A-Za-z_]+)/g)) {
+        // 要求する綴りは CAP_ 付き（CAP_SYS_ADMIN）にする。
+        // 当初は素の名前（SYS_ADMIN）の有無を見ていたが、それは
+        // **起動コマンド自身が満たしてしまう**ので、どう壊しても鳴らない空の検査だった
+        // （2026-10-12 に壊して確認して判明）。CAP_ 付きはコマンドには書かれないので、
+        // 本文で説明したときだけ通る。
+        const cap = "CAP_" + cm[1].toUpperCase().replace(/^CAP_/, "");
+        if (!h.includes(cap)) err(f, `読者のコマンドに --cap-add ${cm[1]} があるのに、本文に ${cap} の説明が無い`);
+        if (!h.includes("CapEff")) err(f, `読者のコマンドに --cap-add ${cm[1]} があるのに、本文に CapEff の実測が無い（どれだけ増えるかを示す）`);
+      }
+
+      // bind mount は使わない（ホストを書き換える経路を構造的に作らない）。
+      // 名前付きボリュームは先頭が英数字なので、/ . $ ~ で始まるものだけを拾う。引用符は外して見る
+      // （-v "$HOME/x":/y がすり抜けていた）。--mount type=bind も拾う。
+      for (const v of cmd.matchAll(/(?:^|\s)(?:-v|--volume)(?:=|\s+)(\S+)/g)) {
+        if (/^[/.$~]/.test(unquote(v[1]).split(":")[0])) err(f, `読者のコマンドに bind mount がある: -v ${v[1]}`);
+      }
+      for (const mm of cmd.matchAll(/(?:^|\s)--mount(?:=|\s+)(\S+)/g)) {
+        if (/(^|,)type=bind(,|$)/.test(unquote(mm[1]))) err(f, `読者のコマンドに bind mount がある: --mount ${mm[1]}`);
+      }
+
+      // publish は待ち受け IP を書く。-p 8080:8080 はホストの firewall を貫通して LAN に出る。
+      for (const pm of cmd.matchAll(/(?:^|\s)(?:-p|--publish)(?:=|\s+)(\S+)/g)) {
+        const spec = unquote(pm[1]);
+        if (!/^\d{1,3}(\.\d{1,3}){3}:/.test(spec) && !/^\[/.test(spec))
+          err(f, `読者のコマンドの -p ${spec} に待ち受け IP が無い（LAN に出る）`);
+      }
     }
   }
 }

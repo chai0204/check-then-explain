@@ -48,6 +48,9 @@ PAIRS=(
   "linuc-admin     lab-linuc-admin:1.0.1         $REPO:admin-1.0.1"
   "linuc-security  lab-linuc-security:1.0.1      $REPO:security-1.0.1"
   "kvm             lab-kvm:1.0.0                 $TOOLS:kvm-1.0.0"
+  "qemu            lab-qemu:1.0.0                $TOOLS:qemu-1.0.0"
+  "docker          lab-docker:1.0.0              $TOOLS:docker-1.0.0"
+  "podman          lab-podman:1.0.0              $TOOLS:podman-1.0.0"
 )
 
 for line in "${PAIRS[@]}"; do
