@@ -21,11 +21,17 @@ REPO=ghcr.io/chai0204/lab-linuc
 # 主題1.09 だけは最初に公開した別パッケージ（lab-linuc-services、public 済み）に版を足す。
 PAIRS=(
   "linuc-services  lab-linuc-services:1.0.1      ghcr.io/chai0204/lab-linuc-services:1.0.1"
+  "linuc-services  lab-linuc-services:1.0.2      ghcr.io/chai0204/lab-linuc-services:1.0.2"
+  "linuc-files     lab-linuc-files:1.0.1         $REPO:files-1.0.1"
+  "linuc-text      lab-linuc-text:1.0.1          $REPO:text-1.0.1"
+  "linuc-shell     lab-linuc-shell:1.0.1         $REPO:shell-1.0.1"
   "linuc-files     lab-linuc-files:1.0.0         $REPO:files-1.0.0"
   "linuc-text      lab-linuc-text:1.0.0          $REPO:text-1.0.0"
   "linuc-shell     lab-linuc-shell:1.0.0         $REPO:shell-1.0.0"
   "linuc-packages  lab-linuc-packages-deb:1.0.0  $REPO:packages-deb-1.0.0"
   "linuc-packages  lab-linuc-packages-rpm:1.0.0  $REPO:packages-rpm-1.0.0"
+  "linuc-packages  lab-linuc-packages-deb:1.0.1  $REPO:packages-deb-1.0.1"
+  "linuc-packages  lab-linuc-packages-rpm:1.0.1  $REPO:packages-rpm-1.0.1"
   "linuc-boot      lab-linuc-boot:1.0.0          $REPO:boot-1.0.0"
   "linuc-disks     lab-linuc-disks:1.0.0         $REPO:disks-1.0.0"
   "linuc-network   lab-linuc-network:1.0.0       $REPO:network-1.0.0"
