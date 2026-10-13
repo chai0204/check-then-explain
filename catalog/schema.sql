@@ -15,8 +15,9 @@ CREATE TABLE article (
   difficulty  TEXT NOT NULL CHECK (difficulty IN ('入門', '初級', '中級', '上級')),
   method      TEXT NOT NULL CHECK (method IN ('読むだけ', '演習あり（コンテナ）', '演習あり（仮想マシン）')),
   created     TEXT NOT NULL CHECK (created GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+                                                      -- 公開日 = 初めてサイトに出した日。トップの既定の並び（確認済みを先に、次にこの新しい順）の鍵
   updated     TEXT NOT NULL CHECK (updated GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' AND updated >= created),
-                                                      -- 最終更新日 = 中身（本文・演習）を直した日。並べ替えの既定の鍵
+                                                      -- 最終更新日 = 中身（本文・演習）を直した日
   summary     TEXT NOT NULL,                          -- 概要（2〜3文）
   audience    TEXT NOT NULL,                          -- 想定読者
   outcomes    TEXT NOT NULL,                          -- 得られるもの（1行に1つ）
@@ -25,7 +26,7 @@ CREATE TABLE article (
 
 CREATE TABLE article_domain (                         -- 関連領域（1記事に複数）
   slug    TEXT NOT NULL REFERENCES article(slug),
-  domain  TEXT NOT NULL CHECK (domain IN ('サーバー', 'ネットワーク', 'セキュリティ', 'DB', 'ウェブ', 'OSS')),
+  domain  TEXT NOT NULL CHECK (domain IN ('サーバー', 'ネットワーク', 'セキュリティ', 'DB', 'ウェブ', 'OSS', '仮想化')),
   PRIMARY KEY (slug, domain)
 );
 

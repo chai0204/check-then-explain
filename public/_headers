@@ -28,3 +28,12 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Cross-Origin-Opener-Policy: same-origin
+
+# ───── トップ（/）だけ CSP を広げる理由（2026-10-13） ─────
+# トップの「SQL で引く」は、ブラウザの中で SQLite（sql.js。WebAssembly）を動かし、台帳 /catalog/catalog.sql を読む。
+#   WebAssembly のコンパイル → script-src に 'wasm-unsafe-eval'（JavaScript の eval は許さないまま）
+#   sql-wasm.wasm と catalog.sql の取得 → connect-src 'self'
+# 他のページは上の厳しい CSP のまま。「!」で上の規則の CSP を外してから、トップ用のものを付け直す（2つ並ぶと両方が効いて狭いほうになる）。
+/
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://giscus.app; style-src 'self' https://giscus.app; img-src 'self'; frame-src https://giscus.app; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'

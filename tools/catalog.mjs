@@ -57,12 +57,24 @@ for (const a of arts) {
     const f = pub(...c.url.replace(/^\//, "").split("/")) + ".html";
     if (!existsSync(f)) { problem(`${a.slug}: chapters.js の ${c.url} が無い`); continue; }
     const h = readFileSync(f, "utf8");
-    a.theoryMin += +(h.match(/所要\s*(\d+)\s*分/)?.[1] ?? 0);
+    c.minutes = +(h.match(/所要\s*(\d+)\s*分/)?.[1] ?? 0);
+    // 検索の手がかり: 節の見出し（コメント欄とまとめは除く）
+    c.heads = [...h.matchAll(/<h2 id="(?!comments|wrap)[^"]*">([\s\S]*?)<\/h2>/g)].map((m) => m[1].replace(/<[^>]+>/g, "").trim());
+    a.theoryMin += c.minutes;
     for (const m of h.matchAll(/出題範囲\s*(1\.\d\d\.\d)/g)) a.topics.add(m[1]);
   }
+  // 検索の手がかり: 用語辞書の語と別名（コマンド名やファイル名が多い）
+  const tj = pub(a.slug, "theory", "terms.js");
+  a.terms = existsSync(tj) ? [...readFileSync(tj, "utf8").matchAll(/\bt:\s*"([^"]+)"(?:,\s*alt:\s*\[([^\]]*)\])?/g)]
+    .flatMap((m) => [m[1], ...[...(m[2] ?? "").matchAll(/"([^"]+)"/g)].map((x) => x[1])]) : [];
   const metas = (CAGES[a.slug] || [a.slug]).flatMap((d) => walk(join(repo, "containers", d, "lab", "verify")))
     .filter((p) => /\/\d\d\.meta$/.test(p));
   a.exercises = metas.length;
+  a.exerciseRows = metas.sort().map((p) => {
+    const t = readFileSync(p, "utf8");
+    const cage = (CAGES[a.slug] || [a.slug]).find((d) => p.includes(`/containers/${d}/`)) ?? a.slug;
+    return { n: p.match(/(\d\d)\.meta$/)[1], cage: cage.split("/").pop(), title: t.match(/^title=(.*)$/m)?.[1] ?? "", minutes: +(t.match(/^est_min=(\d+)/m)?.[1] ?? 0) };
+  });
   a.practiceMin = metas.reduce((s, p) => s + +(readFileSync(p, "utf8").match(/^est_min=(\d+)/m)?.[1] ?? 0), 0);
   a.minutes = a.theoryMin + a.practiceMin;
   if (a.method !== "読むだけ" && a.exercises === 0) problem(`${a.slug}: 学習方式が「${a.method}」なのに演習（verify/NN.meta）が無い`);
@@ -86,8 +98,9 @@ const neighbors = (a) => { const s = certSeq(a); const i = s.indexOf(a); return 
 const certLabel = (a) => a.cert ? `${a.cert}${a.cert_exam ? ` ${a.cert_exam}` : ""} 主題${a.cert_order}` : "";
 const statusTag = (s) => `<span class="tag ${s === "確認済み" ? "real" : s === "ドラフト" ? "draft" : "rev"}">${s}</span>`;
 
-// 既定の並び: 最終更新の新しい順 → 資格の順 → 記事名
-const order = [...arts].sort((x, y) => y.updated.localeCompare(x.updated)
+// 既定の並び（オーナーの指定 2026-10-13）: 確認済みを先に → 公開日の新しい順 → 資格の順 → 記事名
+const verified = (a) => (a.status === "確認済み" ? 0 : 1);
+const order = [...arts].sort((x, y) => verified(x) - verified(y) || y.created.localeCompare(x.created)
   || (x.cert_order ?? "~").localeCompare(y.cert_order ?? "~") || x.title.localeCompare(y.title, "ja"));
 
 // ---- 道しるべ（全ページ共通の形） ----
@@ -250,7 +263,7 @@ ${a.related.length ? `
 ${a.related.map((s) => bySlug[s]).map((r) => `<li><a href="/${r.slug}/">${esc(r.title)}</a>${r.cert ? `（${esc(certLabel(r))}）` : ""}</li>`).join("\n")}
 </ul>` : ""}
 
-<p class="detail">作成 ${a.created} ／ 最終更新 ${a.updated} ／ 関連領域: ${a.domains.map(esc).join("・")}</p>
+<p class="detail">公開 ${a.created} ／ 最終更新 ${a.updated} ／ 関連領域: ${a.domains.map(esc).join("・")}</p>
 
 ${comments}
 ${footer(a)}
@@ -265,12 +278,13 @@ ${footer(a)}
 const opt = (v, label = v) => `<option value="${esc(v)}">${esc(label)}</option>`;
 const certs = [...new Set(arts.map((a) => a.cert).filter(Boolean))];
 const rows = order.filter((a) => a.chapters).map((a) => {
-  const q = [a.title, a.summary, a.cert ?? "", a.cert_order ?? "", a.domains.join(" "), a.method, ...a.chapters.map((c) => c.t)].join(" ");
-  return `<tr data-slug="${a.slug}" data-status="${esc(a.status)}" data-cert="${esc(a.cert ?? "")}" data-cert-order="${esc(a.cert_order ?? "")}" data-domain="${esc(a.domains.join(" "))}" data-method="${esc(a.method)}" data-diff="${esc(a.difficulty)}" data-created="${a.created}" data-updated="${a.updated}" data-min="${a.minutes}" data-title="${esc(a.title)}" data-q="${esc(q)}">
+  const q = [a.title, a.summary, a.cert ?? "", a.cert_order ?? "", a.domains.join(" "), a.method, ...a.chapters.flatMap((c) => [c.t, ...(c.heads ?? [])]),
+    ...[...a.topics].map((id) => topicInfo[id]?.title ?? ""), ...a.terms].join(" ");
+  return `<tr data-slug="${a.slug}" data-status="${esc(a.status)}" data-cert="${esc(a.cert ?? "")}" data-cert-order="${esc(a.cert_order ?? "")}" data-domain="${esc(a.domains.join(" "))}" data-method="${esc(a.method)}" data-diff="${esc(a.difficulty)}" data-verified="${a.status === "確認済み" ? 1 : 0}" data-created="${a.created}" data-updated="${a.updated}" data-min="${a.minutes}" data-title="${esc(a.title)}" data-q="${esc(q)}">
   <td class="ttl"><a href="/${a.slug}/">${esc(a.title)}</a><span class="sum">${esc(a.summary.split("。")[0])}。</span></td>
   <td data-label="状態">${statusTag(a.status)}</td>
   <td data-label="関連資格">${a.cert ? `${esc(a.cert)}${a.cert_exam ? ` <span class="cx">${esc(a.cert_exam)}・主題${esc(a.cert_order)}</span>` : ""}` : "—"}</td>
-  <td data-label="作成日">${a.created}</td>
+  <td data-label="公開日">${a.created}</td>
   <td data-label="最終更新日">${a.updated}</td>
   <td data-label="難易度">${esc(a.difficulty)}</td>
   <td data-label="完了推定時間">${hm(a.minutes)}</td>
@@ -302,7 +316,8 @@ const top = `${head("確かめて説明する — 出力を根拠に、仕組み
 </div>
 
 <h2 id="articles">記事の一覧</h2>
-<p>いま読めるものを、最終更新の新しい順に並べています。記事名から、その記事のホーム（概要・想定読者・進め方）へ進みます。</p>
+<p>著者が読者として通した<b>確認済み</b>のものを先に、次に<b>公開日の新しい順</b>に並べています。最初は10件で、「さらに表示」で10件ずつ増えます。
+   記事名から、その記事のホーム（概要・想定読者・進め方）へ進みます。</p>
 <form class="catalog-controls" hidden>
   <input type="search" id="cq" placeholder="記事名・概要・章の題・コマンドで探す" aria-label="記事を探す">
   <select id="c-status" aria-label="状態">${opt("", "状態: すべて")}${["確認済み", "ドラフト", "修正中"].map((s) => opt(s)).join("")}</select>
@@ -310,15 +325,28 @@ const top = `${head("確かめて説明する — 出力を根拠に、仕組み
   <select id="c-domain" aria-label="関連領域">${opt("", "領域: すべて")}${DOMAINS.filter((d) => arts.some((a) => a.domains.includes(d))).map((d) => opt(d)).join("")}</select>
   <select id="c-method" aria-label="学習方式">${opt("", "方式: すべて")}${["読むだけ", "演習あり（コンテナ）", "演習あり（仮想マシン）"].map((m) => opt(m)).join("")}</select>
   <select id="c-diff" aria-label="難易度">${opt("", "難易度: すべて")}${["入門", "初級", "中級", "上級"].filter((d) => arts.some((a) => a.difficulty === d)).map((d) => opt(d)).join("")}</select>
-  <select id="c-sort" aria-label="並べ方">${opt("updated", "新しい順")}${opt("cert", "資格の順")}${opt("time", "短い順")}${opt("title", "記事名の順")}</select>
+  <select id="c-sort" aria-label="並べ方">${opt("rec", "確認済み→公開日の新しい順")}${opt("created", "公開日の新しい順")}${opt("updated", "最終更新の新しい順")}${opt("cert", "資格の順")}${opt("time", "短い順")}${opt("title", "記事名の順")}</select>
+  <label class="sqltoggle"><input type="checkbox" id="c-sqlmode"> SQL で引く</label>
 </form>
+<div id="c-sqlbox" class="sqlbox" hidden>
+  <p class="detail">この一覧の台帳（SQLite）を、ブラウザの中で SQL で引けます。受け付けるのは <code>SELECT</code> 文と <code>.schema 表名</code> だけで、台帳は書き換えられません（読み取り専用）。
+     表: <code>article</code>（記事）・<code>article_domain</code>（関連領域）・<code>article_related</code>（関連記事）・<code>cert</code>（資格）・<code>chapter</code>（章）・<code>exercise</code>（演習）。</p>
+  <textarea id="c-sql" rows="4" spellcheck="false" aria-label="SQL">SELECT title, status, created, updated FROM article ORDER BY created DESC;</textarea>
+  <p class="sqlbtns"><button type="button" id="c-run">実行</button>
+     <button type="button" class="ex" data-sql=".schema article">.schema article</button>
+     <button type="button" class="ex" data-sql="SELECT a.title, count(c.n) AS 章, sum(c.minutes) AS 理論の分 FROM article a JOIN chapter c USING (slug) GROUP BY a.slug ORDER BY 理論の分 DESC;">章の数と時間</button>
+     <button type="button" class="ex" data-sql="SELECT a.title, c.n, c.title FROM chapter c JOIN article a USING (slug) WHERE c.title LIKE '%ssh%' OR c.title LIKE '%root%';">章の題で探す</button>
+     <button type="button" class="ex" data-sql="SELECT d.domain, count(*) AS 記事 FROM article_domain d GROUP BY d.domain ORDER BY 記事 DESC;">領域ごとの数</button></p>
+  <div id="c-sqlout" class="sqlout"></div>
+</div>
 <p id="c-count" class="detail"></p>
 <div class="catalog-wide scroll"><table class="catalog">
-<thead><tr><th>記事名</th><th>状態</th><th>関連資格</th><th>作成日</th><th>最終更新日</th><th>難易度</th><th>完了推定時間</th><th>学習方式</th><th>関連領域</th></tr></thead>
+<thead><tr><th>記事名</th><th>状態</th><th>関連資格</th><th>公開日</th><th>最終更新日</th><th>難易度</th><th>完了推定時間</th><th>学習方式</th><th>関連領域</th></tr></thead>
 <tbody>
 ${rows}
 </tbody>
 </table></div>
+<p class="more"><button type="button" id="c-more" hidden>さらに表示</button></p>
 
 <h3>状態の意味</h3>
 <ul class="detail">
@@ -336,6 +364,43 @@ ${comments}
 </body></html>
 `;
 emit(pub("index.html"), top);
+
+// ---- SQL モードが読む台帳の写し（public/catalog/catalog.sql） ----
+// 正本の SQL（schema + articles）に、実物から数えた章と演習の表を足したもの。ブラウザの中の SQLite（sql.js）が読み込む。
+const sqlq = (v) => v === null || v === undefined ? "NULL" : typeof v === "number" ? String(v) : "'" + String(v).replace(/'/g, "''") + "'";
+const chapterRows = arts.filter((a) => a.chapters).flatMap((a) => a.chapters.map((c) =>
+  `INSERT INTO chapter (slug, n, title, url, minutes) VALUES (${[a.slug, c.n, c.t, c.url, c.minutes ?? 0].map(sqlq).join(", ")});`));
+const exerciseRows = arts.filter((a) => a.exerciseRows).flatMap((a) => a.exerciseRows.map((e) =>
+  `INSERT INTO exercise (slug, cage, n, title, minutes) VALUES (${[a.slug, e.cage, e.n, e.title, e.minutes].map(sqlq).join(", ")});`));
+const catalogSql = `-- 記事の台帳の写し。tools/catalog.mjs が catalog/schema.sql と catalog/articles.sql（正本）と、実物から数えた章・演習から作る。手で編集しない。
+-- トップの「SQL で引く」が、ブラウザの中の SQLite（sql.js）に読み込んで、SELECT と .schema だけを受け付ける。
+
+${readFileSync(join(repo, "catalog", "schema.sql"), "utf8").trim()}
+
+CREATE TABLE chapter (                                -- 章（実物の chapters.js と各章の「所要 N分」から）
+  slug     TEXT NOT NULL REFERENCES article(slug),
+  n        INTEGER NOT NULL,                          -- 章の番号
+  title    TEXT NOT NULL,
+  url      TEXT NOT NULL,
+  minutes  INTEGER NOT NULL,                          -- 所要時間（分）
+  PRIMARY KEY (slug, n)
+);
+CREATE TABLE exercise (                               -- 演習（檻の verify/NN.meta から）
+  slug     TEXT NOT NULL REFERENCES article(slug),
+  cage     TEXT NOT NULL,                             -- 檻（1つの記事に檻が2つあるものは deb / rpm など）
+  n        TEXT NOT NULL,                             -- 演習の番号（01 など）
+  title    TEXT NOT NULL,
+  minutes  INTEGER NOT NULL,                          -- 目安の時間（分）
+  PRIMARY KEY (slug, cage, n)
+);
+
+${readFileSync(join(repo, "catalog", "articles.sql"), "utf8").trim()}
+
+${chapterRows.join("\n")}
+
+${exerciseRows.join("\n")}
+`;
+emit(pub("catalog", "catalog.sql"), catalogSql);
 
 // ---- 結果 ----
 if (problems.length) { console.log(`✗ 台帳と実物のずれ ${problems.length} 件`); for (const p of problems) console.log("  " + p); }

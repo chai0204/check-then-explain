@@ -1,5 +1,5 @@
 -- 記事の台帳（行）。形は catalog/schema.sql。書き換えたら node tools/catalog.mjs で、トップと記事ホームと道しるべを作り直す。
--- 最終更新日（updated）は中身（本文・演習）を直した日。道しるべだけの変更では動かさない。
+-- 公開日（created）は初めてサイトに出した日。最終更新日（updated）は中身（本文・演習）を直した日で、道しるべだけの変更では動かさない。
 
 INSERT INTO cert (name, map_url) VALUES ('LinuC レベル1', '/linuc/');
 
@@ -116,7 +116,7 @@ GPL の義務が配るときに生まれることを、条文の convey の定�
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-oss', 'OSS');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'sqlite', 'SQLite', '確認済み', NULL, NULL, NULL, '中級', '演習あり（コンテナ）', '2026-09-30', '2026-10-08',
+  'sqlite', 'SQLite', '確認済み', NULL, NULL, NULL, '中級', '演習あり（コンテナ）', '2026-10-08', '2026-10-08',
   'サーバのいないデータベースが、どこまで普通のファイルなのかを手で確かめる5章。ヘッダのバイト列とプロセス一覧から始め、型、トランザクションの速さ、同時書き込みのロック、ディレクトリの権限の順に、コンテナの中で起きることを見る。SQLite はサーバではなくライブラリで、DB を読み書きしているのは、いま起動したそのプロセス自身だ。',
   'sqlite3 を打てて SQL も書けるが、「なぜ落ちたのか」を人に説明できない人。読むだけなら準備は要らず、演習は docker を動かせることが前提。',
   'DB がファイル1個であることを、ヘッダのバイト列とプロセス一覧で示せる
@@ -126,7 +126,7 @@ SQLite を選ぶ場面と選ばない場面を、自分の言葉で言える
 INSERT INTO article_domain (slug, domain) VALUES ('sqlite', 'DB');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'wasm', 'WebAssembly（WASM）', 'ドラフト', NULL, NULL, NULL, '中級', '演習あり（コンテナ）', '2026-09-30', '2026-10-08',
+  'wasm', 'WebAssembly（WASM）', 'ドラフト', NULL, NULL, NULL, '中級', '演習あり（コンテナ）', '2026-10-08', '2026-10-08',
   '41バイトのバイナリを手で書いて、それが何もできないことを確かめる5章。WAT を手で書いて .wasm にし、wasmtime と node の2つのホストで走らせ、最後は配布されたバイナリを実行せずに調べる。WASM は外の世界を一切知らず、できることは全部、ホストが import として手渡したものだけだ。',
   'JavaScript が読めて、WASM が速いらしいことは知っているが、「なぜサンドボックスなのか」を説明できない人。Rust も C も使わず、演習は docker で動かす。',
   'WAT を手で書いて .wasm にし、関数を呼び出せる
