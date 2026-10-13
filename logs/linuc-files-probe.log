@@ -1,0 +1,1584 @@
+
+
+========== 0. 環境 ==========
+
+$ lab env
+テーマ    : lab-linuc-files 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:files-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+$ id; umask
+uid=1000(lab) gid=1000(lab) groups=1000(lab)
+0022
+
+$ bash -lic true 2>/dev/null
+
+── lab-linuc-files 1.0.0 ────────────────────────────────────────
+lab-linuc-files  進捗 0/8
+  次 → 01 「一覧は見せずに、1つのファイルだけ読ませる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-files-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 1. 名前と中身は、別の場所にある（1.02.1） ==========
+
+$ mkdir -p ~/work/ch1; cd ~/work/ch1
+
+$ echo "メモ" > memo.txt
+
+$ mkdir box
+
+$ ls -l memo.txt
+-rw-r--r-- 1 lab lab 7 Oct 13 11:09 memo.txt
+
+$ ls -ld box
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 box
+
+$ echo "持ち主だけが読めない" > /tmp/owner.txt
+
+$ chmod 044 /tmp/owner.txt
+
+$ ls -l /tmp/owner.txt
+----r--r-- 1 lab lab 31 Oct 13 11:09 /tmp/owner.txt
+
+$ cat /tmp/owner.txt
+cat: /tmp/owner.txt: Permission denied
+
+$ sudo -u alice cat /tmp/owner.txt
+持ち主だけが読めない
+
+$ ls -l /dev/null /dev/tty /dev/zero /dev/urandom
+crw-rw-rw- 1 root root 1, 3 Oct 13 11:09 /dev/null
+crw-rw-rw- 1 root root 5, 0 Oct 13 11:09 /dev/tty
+crw-rw-rw- 1 root root 1, 9 Oct 13 11:09 /dev/urandom
+crw-rw-rw- 1 root root 1, 5 Oct 13 11:09 /dev/zero
+
+$ file /dev/null /dev/tty
+/dev/null: character special (1/3)
+/dev/tty:  character special (5/0)
+
+$ echo "どこにも残らない" > /dev/null
+
+$ head -c 8 /dev/zero | od -c
+0000000  \0  \0  \0  \0  \0  \0  \0  \0
+0000010
+
+$ mkfifo pipe
+
+$ ls -l pipe
+prw-r--r-- 1 lab lab 0 Oct 13 11:09 pipe
+
+$ file pipe
+pipe: fifo (named pipe)
+
+$ ls -l /dev | grep -c "^b"
+0
+
+$ find / -xdev -type s 2>/dev/null | wc -l
+0
+
+$ echo "中身" > box/known.txt
+
+$ echo "別の中身" > box/other.txt
+
+$ ls -l box
+total 8
+-rw-r--r-- 1 lab lab  7 Oct 13 11:09 known.txt
+-rw-r--r-- 1 lab lab 13 Oct 13 11:09 other.txt
+
+$ echo "--- r だけ残して x を外す ---"
+--- r だけ残して x を外す ---
+
+$ chmod u-x box
+
+$ ls -ld box
+drw-r-xr-x 2 lab lab 4096 Oct 13 11:09 box
+
+$ ls box
+ls: cannot access 'box/known.txt': Permission denied
+ls: cannot access 'box/other.txt': Permission denied
+known.txt  other.txt
+
+$ ls -l box
+ls: cannot access 'box/known.txt': Permission denied
+ls: cannot access 'box/other.txt': Permission denied
+total 0
+-????????? ? ? ? ?            ? known.txt
+-????????? ? ? ? ?            ? other.txt
+
+$ cat box/known.txt
+cat: box/known.txt: Permission denied
+
+$ echo "--- x だけ残して r を外す ---"
+--- x だけ残して r を外す ---
+
+$ chmod u=x box
+
+$ ls -ld box
+d--xr-xr-x 2 lab lab 4096 Oct 13 11:09 box
+
+$ ls box
+ls: cannot open directory 'box': Permission denied
+
+$ cat box/known.txt
+中身
+
+$ cd box && pwd && cd ..
+/home/lab/work/ch1/box
+
+$ chmod 755 box
+
+$ echo "--- 消せるかどうか ---"
+--- 消せるかどうか ---
+
+$ echo "残す" > ro.txt
+
+$ chmod 444 ro.txt
+
+$ ls -l ro.txt
+-r--r--r-- 1 lab lab 7 Oct 13 11:09 ro.txt
+
+$ echo "追記" >> ro.txt
+bash: ro.txt: Permission denied
+
+$ rm ro.txt
+rm: remove write-protected regular file 'ro.txt'? y
+
+$ ls -l ro.txt
+ls: cannot access 'ro.txt': No such file or directory
+
+$ sudo touch rootfile
+
+$ ls -l rootfile
+-rw-r--r-- 1 root root 0 Oct 13 11:09 rootfile
+
+$ rm rootfile
+rm: remove write-protected regular empty file 'rootfile'? y
+
+$ ls -l rootfile
+ls: cannot access 'rootfile': No such file or directory
+
+$ chmod u-w box
+
+$ ls -ld box
+dr-xr-xr-x 2 lab lab 4096 Oct 13 11:09 box
+
+$ rm box/other.txt
+rm: cannot remove 'box/other.txt': Permission denied
+
+$ ls -l box/other.txt
+-rw-r--r-- 1 lab lab 13 Oct 13 11:09 box/other.txt
+
+$ chmod u+w box
+
+$ echo "--- root と 000 ---"
+--- root と 000 ---
+
+$ echo "ひみつ" > secret.txt
+
+$ chmod 000 secret.txt
+
+$ ls -l secret.txt
+---------- 1 lab lab 10 Oct 13 11:09 secret.txt
+
+$ cat secret.txt
+cat: secret.txt: Permission denied
+
+$ sudo cat secret.txt
+ひみつ
+
+$ printf "#!/bin/bash\necho 動いた\n" > run.sh
+
+$ chmod 000 run.sh
+
+$ sudo ./run.sh
+sudo: ./run.sh: command not found
+
+$ sudo bash -c ./run.sh
+bash: line 1: ./run.sh: Permission denied
+
+$ chmod 100 run.sh
+
+$ ls -l run.sh
+---x------ 1 lab lab 27 Oct 13 11:09 run.sh
+
+$ ./run.sh
+/bin/bash: ./run.sh: Permission denied
+
+$ sudo ./run.sh
+動いた
+
+$ chmod 700 run.sh
+
+$ ./run.sh
+動いた
+
+$ chmod 000 box
+
+$ ls -ld box
+d--------- 2 lab lab 4096 Oct 13 11:09 box
+
+$ ls box
+ls: cannot open directory 'box': Permission denied
+
+$ sudo ls box
+known.txt  other.txt
+
+$ sudo cat box/known.txt
+中身
+
+$ chmod 755 box
+
+
+========== 2. umask はマスクであって、引き算ではない（1.02.1） ==========
+
+$ mkdir -p ~/work/ch2; cd ~/work/ch2
+
+$ touch f.txt
+
+$ chmod 640 f.txt
+
+$ ls -l f.txt
+-rw-r----- 1 lab lab 0 Oct 13 11:09 f.txt
+
+$ chmod u=rwx,g=rx,o= f.txt
+
+$ ls -l f.txt
+-rwxr-x--- 1 lab lab 0 Oct 13 11:09 f.txt
+
+$ chmod g+w,o+r f.txt
+
+$ ls -l f.txt
+-rwxrwxr-- 1 lab lab 0 Oct 13 11:09 f.txt
+
+$ chmod a-x f.txt
+
+$ ls -l f.txt
+-rw-rw-r-- 1 lab lab 0 Oct 13 11:09 f.txt
+
+$ stat -c "%a %A %n" f.txt
+664 -rw-rw-r-- f.txt
+
+$ mkdir -p tree/sub; touch tree/a tree/sub/b
+
+$ chmod -R go-rwx tree
+
+$ stat -c "%A %n" tree tree/a tree/sub tree/sub/b
+drwx------ tree
+-rw------- tree/a
+drwx------ tree/sub
+-rw------- tree/sub/b
+
+$ echo "--- umask ---"
+--- umask ---
+
+$ umask
+0022
+
+$ umask -S
+u=rwx,g=rx,o=rx
+
+$ touch new.txt
+
+$ mkdir new.d
+
+$ ls -ld new.txt new.d
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 new.d
+-rw-r--r-- 1 lab lab    0 Oct 13 11:09 new.txt
+
+$ umask 033
+
+$ touch u033.txt
+
+$ mkdir u033.d
+
+$ ls -ld u033.txt u033.d
+drwxr--r-- 2 lab lab 4096 Oct 13 11:09 u033.d
+-rw-r--r-- 1 lab lab    0 Oct 13 11:09 u033.txt
+
+$ stat -c "%a %n" u033.txt u033.d
+644 u033.txt
+744 u033.d
+
+$ umask 027
+
+$ touch u027.txt; mkdir u027.d
+
+$ stat -c "%a %n" u027.txt u027.d
+640 u027.txt
+750 u027.d
+
+$ umask 077
+
+$ touch u077.txt; mkdir u077.d
+
+$ stat -c "%a %n" u077.txt u077.d
+600 u077.txt
+700 u077.d
+
+$ echo "--- chmod と umask ---"
+--- chmod と umask ---
+
+$ chmod 777 u077.txt
+
+$ stat -c "%a %n" u077.txt
+777 u077.txt
+
+$ umask 022
+
+$ chmod 444 f.txt
+
+$ chmod +w f.txt
+
+$ ls -l f.txt
+-rw-r--r-- 1 lab lab 0 Oct 13 11:09 f.txt
+
+$ chmod a+w f.txt
+
+$ ls -l f.txt
+-rw-rw-rw- 1 lab lab 0 Oct 13 11:09 f.txt
+
+$ chmod -w f.txt
+chmod: f.txt: new permissions are r--rw-rw-, not r--r--r--
+
+$ ls -l f.txt
+-r--rw-rw- 1 lab lab 0 Oct 13 11:09 f.txt
+
+$ chmod a-w f.txt
+
+$ ls -l f.txt
+-r--r--r-- 1 lab lab 0 Oct 13 11:09 f.txt
+
+$ echo "--- umask はどこから来るか ---"
+--- umask はどこから来るか ---
+
+$ umask 027
+
+$ bash -c umask
+0027
+
+$ umask 022
+
+$ bash -c umask
+0022
+
+$ sudo -u alice bash -c umask
+0002
+
+$ grep -E "^(UMASK|USERGROUPS_ENAB)" /etc/login.defs
+UMASK		022
+USERGROUPS_ENAB yes
+
+$ grep -n umask ~/.profile
+7:# the default umask is set in /etc/profile; for setting the umask
+8:# for ssh logins, install and configure the libpam-umask package.
+9:#umask 022
+
+$ grep -n bashrc ~/.profile
+13:    # include .bashrc if it exists
+14:    if [ -f "$HOME/.bashrc" ]; then
+15:	. "$HOME/.bashrc"
+
+
+========== 3. 特殊なビット（1.02.1） ==========
+
+$ mkdir -p ~/work/ch3; cd ~/work/ch3
+
+$ ls -l /usr/bin/passwd /etc/shadow
+-rw-r----- 1 root shadow   578 Oct 13 09:43 /etc/shadow
+-rwsr-xr-x 1 root root   64152 May 30  2024 /usr/bin/passwd
+
+$ printf "#!/bin/bash\nid -un\n" > whoami.sh
+
+$ sudo chown root:root whoami.sh
+
+$ sudo chmod 4755 whoami.sh
+
+$ ls -l whoami.sh
+-rwsr-xr-x 1 root root 19 Oct 13 11:09 whoami.sh
+
+$ ./whoami.sh
+lab
+
+$ sudo cp /usr/bin/id ./myid
+
+$ sudo chmod 4755 myid
+
+$ ls -l myid
+-rwsr-xr-x 1 root root 39432 Oct 13 11:09 myid
+
+$ ./myid
+uid=1000(lab) gid=1000(lab) euid=0(root) groups=1000(lab)
+
+$ id
+uid=1000(lab) gid=1000(lab) groups=1000(lab)
+
+$ file whoami.sh myid
+whoami.sh: setuid Bourne-Again shell script, ASCII text executable
+myid:      setuid ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=26e732a61e6fabef4bafe3165cb7b9fa31438cd2, for GNU/Linux 3.2.0, stripped
+
+$ echo "--- 文字の読み方 ---"
+--- 文字の読み方 ---
+
+$ touch s.txt
+
+$ chmod 4755 s.txt; ls -l s.txt
+-rwsr-xr-x 1 lab lab 0 Oct 13 11:09 s.txt
+
+$ chmod 4644 s.txt; ls -l s.txt
+-rwSr--r-- 1 lab lab 0 Oct 13 11:09 s.txt
+
+$ chmod 2755 s.txt; ls -l s.txt
+-rwxr-sr-x 1 lab lab 0 Oct 13 11:09 s.txt
+
+$ chmod 2644 s.txt; ls -l s.txt
+-rw-r-Sr-- 1 lab lab 0 Oct 13 11:09 s.txt
+
+$ mkdir t
+
+$ chmod 1777 t; ls -ld t
+drwxrwxrwt 2 lab lab 4096 Oct 13 11:09 t
+
+$ chmod 1770 t; ls -ld t
+drwxrwx--T 2 lab lab 4096 Oct 13 11:09 t
+
+$ chmod 755 s.txt; chmod u+s s.txt; ls -l s.txt
+-rwsr-xr-x 1 lab lab 0 Oct 13 11:09 s.txt
+
+$ chmod g+s,o+t t; ls -ld t
+drwxrws--T 2 lab lab 4096 Oct 13 11:09 t
+
+$ stat -c "%a %A %n" s.txt t
+4755 -rwsr-xr-x s.txt
+3770 drwxrws--T t
+
+$ echo "--- /tmp のスティッキービット ---"
+--- /tmp のスティッキービット ---
+
+$ ls -ld /tmp
+drwxrwxrwt 1 root root 4096 Oct 13 11:09 /tmp
+
+$ sudo -u alice touch /tmp/alice.txt
+
+$ ls -l /tmp/alice.txt
+-rw-rw-r-- 1 alice alice 0 Oct 13 11:09 /tmp/alice.txt
+
+$ sudo -u bob rm -f /tmp/alice.txt
+rm: cannot remove '/tmp/alice.txt': Operation not permitted
+
+$ rm -f /tmp/alice.txt
+rm: cannot remove '/tmp/alice.txt': Operation not permitted
+
+$ sudo rm /tmp/alice.txt
+
+$ ls -l /tmp/alice.txt
+ls: cannot access '/tmp/alice.txt': No such file or directory
+
+$ echo "--- chown と chgrp ---"
+--- chown と chgrp ---
+
+$ touch g.txt
+
+$ ls -l g.txt
+-rw-r--r-- 1 lab lab 0 Oct 13 11:09 g.txt
+
+$ chgrp devs g.txt
+chgrp: changing group of 'g.txt': Operation not permitted
+
+$ chown alice g.txt
+chown: changing ownership of 'g.txt': Operation not permitted
+
+$ chgrp lab g.txt; echo "exit=$?"
+exit=0
+
+$ sudo chgrp devs g.txt; ls -l g.txt
+-rw-r--r-- 1 lab devs 0 Oct 13 11:09 g.txt
+
+$ sudo chown alice:devs g.txt; ls -l g.txt
+-rw-r--r-- 1 alice devs 0 Oct 13 11:09 g.txt
+
+$ sudo chown bob g.txt; ls -l g.txt
+-rw-r--r-- 1 bob devs 0 Oct 13 11:09 g.txt
+
+$ sudo chown :lab g.txt; ls -l g.txt
+-rw-r--r-- 1 bob lab 0 Oct 13 11:09 g.txt
+
+$ sudo chown carol: g.txt; ls -l g.txt
+-rw-r--r-- 1 carol carol 0 Oct 13 11:09 g.txt
+
+$ sudo chown bob:lab g.txt; ls -l g.txt
+-rw-r--r-- 1 bob lab 0 Oct 13 11:09 g.txt
+
+$ sudo chown carol. g.txt; ls -l g.txt
+chown: warning: '.' should be ':': ‘carol.’
+-rw-r--r-- 1 carol carol 0 Oct 13 11:09 g.txt
+
+$ getent group devs
+devs:x:1001:alice,bob
+
+$ echo "--- SGID のディレクトリ ---"
+--- SGID のディレクトリ ---
+
+$ sudo mkdir /srv/team
+
+$ sudo chgrp devs /srv/team
+
+$ sudo chmod 2775 /srv/team
+
+$ ls -ld /srv/team
+drwxrwsr-x 2 root devs 4096 Oct 13 11:09 /srv/team
+
+$ sudo -u alice touch /srv/team/plan.txt
+
+$ sudo -u alice mkdir /srv/team/docs
+
+$ ls -l /srv/team
+total 4
+drwxrwsr-x 2 alice devs 4096 Oct 13 11:09 docs
+-rw-rw-r-- 1 alice devs    0 Oct 13 11:09 plan.txt
+
+$ sudo -u alice touch /tmp/plan.txt
+
+$ ls -l /tmp/plan.txt
+-rw-rw-r-- 1 alice alice 0 Oct 13 11:09 /tmp/plan.txt
+
+$ sudo -u bob sh -c "echo bob も書ける >> /srv/team/plan.txt"
+
+$ cat /srv/team/plan.txt
+bob も書ける
+
+$ sudo -u bob rm /srv/team/plan.txt
+
+$ ls -l /srv/team
+total 4
+drwxrwsr-x 2 alice devs 4096 Oct 13 11:09 docs
+
+
+========== 4. コピーは中身を作り直し、移動は名前を書き換える（1.02.2） ==========
+
+$ mkdir -p ~/work/ch4; cd ~/work/ch4
+
+$ echo "元の中身" > orig.txt
+
+$ chmod 664 orig.txt
+
+$ touch -d "2025-04-01 09:00" orig.txt
+
+$ ls -l --time-style=long-iso orig.txt
+-rw-rw-r-- 1 lab lab 13 2025-04-01 09:00 orig.txt
+
+$ cp orig.txt copy.txt
+
+$ ls -l --time-style=long-iso orig.txt copy.txt
+-rw-r--r-- 1 lab lab 13 2026-10-13 11:09 copy.txt
+-rw-rw-r-- 1 lab lab 13 2025-04-01 09:00 orig.txt
+
+$ cp -p orig.txt keep.txt
+
+$ ls -l --time-style=long-iso orig.txt keep.txt
+-rw-rw-r-- 1 lab lab 13 2025-04-01 09:00 keep.txt
+-rw-rw-r-- 1 lab lab 13 2025-04-01 09:00 orig.txt
+
+$ sudo cp orig.txt rootcopy.txt
+
+$ ls -l --time-style=long-iso rootcopy.txt
+-rw-r--r-- 1 root root 13 2026-10-13 11:09 rootcopy.txt
+
+$ cp rootcopy.txt mine.txt
+
+$ ls -l --time-style=long-iso mine.txt
+-rw-r--r-- 1 lab lab 13 2026-10-13 11:09 mine.txt
+
+$ cp -p rootcopy.txt mine-p.txt; echo "exit=$?"
+exit=0
+
+$ ls -l --time-style=long-iso mine-p.txt
+-rw-r--r-- 1 lab lab 13 2026-10-13 11:09 mine-p.txt
+
+$ cp -i copy.txt keep.txt
+cp: overwrite 'keep.txt'? n
+
+$ echo "--- mv ---"
+--- mv ---
+
+$ ls -i orig.txt
+18127232 orig.txt
+
+$ mv orig.txt renamed.txt
+
+$ ls -i renamed.txt
+18127232 renamed.txt
+
+$ ls -l --time-style=long-iso renamed.txt
+-rw-rw-r-- 1 lab lab 13 2025-04-01 09:00 renamed.txt
+
+$ mv renamed.txt ~/renamed.txt
+
+$ ls -i ~/renamed.txt
+18369915 /home/lab/renamed.txt
+
+$ mv ~/renamed.txt ~/work/ch4/
+
+$ df --output=target ~/work ~
+Mounted on
+/home/lab/work
+/
+
+$ echo "--- mkdir / rmdir / rm ---"
+--- mkdir / rmdir / rm ---
+
+$ mkdir a/b/c
+mkdir: cannot create directory ‘a/b/c’: No such file or directory
+
+$ mkdir -p a/b/c
+
+$ touch a/b/c/file
+
+$ rmdir a/b/c
+rmdir: failed to remove 'a/b/c': Directory not empty
+
+$ rm a
+rm: cannot remove 'a': Is a directory
+
+$ rm -r a
+
+$ mkdir -p x/y/z
+
+$ rmdir -p x/y/z
+
+$ ls -d a x
+ls: cannot access 'a': No such file or directory
+ls: cannot access 'x': No such file or directory
+
+$ mkdir -p src/sub
+
+$ echo 1 > src/one; echo 2 > src/sub/two
+
+$ cp src dst
+cp: -r not specified; omitting directory 'src'
+
+$ cp -r src dst
+
+$ ls -R dst
+dst:
+one  sub
+
+dst/sub:
+two
+
+$ cp -r src dst
+
+$ ls -R dst
+dst:
+one  src  sub
+
+dst/src:
+one  sub
+
+dst/src/sub:
+two
+
+dst/sub:
+two
+
+$ echo "--- touch ---"
+--- touch ---
+
+$ touch -t 202001020304.05 t.txt
+
+$ ls -l --time-style=full-iso t.txt
+-rw-r--r-- 1 lab lab 0 2020-01-02 03:04:05.000000000 +0900 t.txt
+
+$ touch t.txt
+
+$ ls -l --time-style=full-iso t.txt
+-rw-r--r-- 1 lab lab 0 2026-10-13 11:09:20.096820889 +0900 t.txt
+
+$ echo "--- file ---"
+--- file ---
+
+$ file renamed.txt /usr/bin/passwd /bin /dev/null
+renamed.txt:     Unicode text, UTF-8 text
+/usr/bin/passwd: setuid ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=2344480b478a675609210ed886207d6cbdc8cdd7, for GNU/Linux 3.2.0, stripped
+/bin:            symbolic link to usr/bin
+/dev/null:       character special (1/3)
+
+$ echo "ただの文字" > photo.jpg
+
+$ cp /usr/bin/ls notes.txt
+
+$ file photo.jpg notes.txt
+photo.jpg: Unicode text, UTF-8 text
+notes.txt: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=44900829b39271d878615772bb2a6ffa422f0891, for GNU/Linux 3.2.0, stripped
+
+$ echo "--- ワイルドカード ---"
+--- ワイルドカード ---
+
+$ mkdir glob; cd glob
+
+$ touch a.txt b.txt c.log .hidden.txt data1 data2 data10 Data3
+
+$ echo *
+Data3 a.txt b.txt c.log data1 data10 data2
+
+$ echo *.txt
+a.txt b.txt
+
+$ echo data?
+data1 data2
+
+$ echo data*
+data1 data10 data2
+
+$ echo data[12]
+data1 data2
+
+$ echo [a-c]*
+a.txt b.txt c.log
+
+$ echo [!a]*
+Data3 b.txt c.log data1 data10 data2
+
+$ echo .*
+.hidden.txt
+
+$ echo *.csv
+*.csv
+
+$ ls *.csv
+ls: cannot access '*.csv': No such file or directory
+
+$ echo {a,b}.txt {x,y}.md
+a.txt b.txt x.md y.md
+
+$ rm -v *
+removed 'Data3'
+removed 'a.txt'
+removed 'b.txt'
+removed 'c.log'
+removed 'data1'
+removed 'data10'
+removed 'data2'
+
+$ ls -A
+.hidden.txt
+
+
+========== 5. find（1.02.2 / 1.02.4） ==========
+
+$ mkdir -p ~/work/ch5/logs/old; cd ~/work/ch5
+
+$ touch logs/today.log
+
+$ touch -d "36 hours ago" logs/yesterday.log
+
+$ touch -d "60 hours ago" logs/twodays.log
+
+$ touch -d "10 days ago" logs/old/ancient.log
+
+$ date "+%F %H:%M"
+2026-10-13 11:09
+
+$ ls -l --time-style=long-iso logs/*.log logs/old/*.log
+-rw-r--r-- 1 lab lab 0 2026-10-03 11:09 logs/old/ancient.log
+-rw-r--r-- 1 lab lab 0 2026-10-13 11:09 logs/today.log
+-rw-r--r-- 1 lab lab 0 2026-10-10 23:09 logs/twodays.log
+-rw-r--r-- 1 lab lab 0 2026-10-11 23:09 logs/yesterday.log
+
+$ find logs -name "*.log" | sort
+logs/old/ancient.log
+logs/today.log
+logs/twodays.log
+logs/yesterday.log
+
+$ find . -type d | sort
+.
+./logs
+./logs/old
+
+$ find logs -type f -name "t*" | sort
+logs/today.log
+logs/twodays.log
+
+$ echo "--- -mtime ---"
+--- -mtime ---
+
+$ find logs -mtime +1 | sort
+logs/old/ancient.log
+logs/twodays.log
+
+$ find logs -mtime 1
+logs/yesterday.log
+
+$ find logs -type f -mtime -1
+logs/today.log
+
+$ find logs -mtime +2
+logs/old/ancient.log
+
+$ find logs -type f -mmin -60
+logs/today.log
+
+$ find logs -type f -newer logs/yesterday.log
+logs/today.log
+
+$ echo "--- 引用符 ---"
+--- 引用符 ---
+
+$ mkdir docs; touch top.txt docs/a.txt docs/b.txt
+
+$ find . -name "*.txt" | sort
+./docs/a.txt
+./docs/b.txt
+./top.txt
+
+$ find . -name *.txt
+./top.txt
+
+$ echo find . -name *.txt
+find . -name top.txt
+
+$ touch second.txt
+
+$ find . -name *.txt
+find: paths must precede expression: `top.txt'
+find: possible unquoted pattern after predicate `-name'?
+
+$ echo find . -name *.txt
+find . -name second.txt top.txt
+
+$ echo "--- -size ---"
+--- -size ---
+
+$ head -c 1 /dev/zero > one.bin; head -c 1024 /dev/zero > k1.bin; head -c 1025 /dev/zero > k1plus.bin; : > empty.bin
+
+$ ls -l *.bin
+-rw-r--r-- 1 lab lab    0 Oct 13 11:09 empty.bin
+-rw-r--r-- 1 lab lab 1024 Oct 13 11:09 k1.bin
+-rw-r--r-- 1 lab lab 1025 Oct 13 11:09 k1plus.bin
+-rw-r--r-- 1 lab lab    1 Oct 13 11:09 one.bin
+
+$ find . -name "*.bin" -size -1k
+./empty.bin
+
+$ find . -name "*.bin" -size 1k | sort
+./k1.bin
+./one.bin
+
+$ find . -name "*.bin" -size +1k
+./k1plus.bin
+
+$ find . -name "*.bin" -size -1025c | sort
+./empty.bin
+./k1.bin
+./one.bin
+
+$ find . -name "*.bin" -size -1M
+./empty.bin
+
+$ echo "--- 所有者と権限 ---"
+--- 所有者と権限 ---
+
+$ sudo chown alice logs/yesterday.log
+
+$ find logs -user alice
+logs/yesterday.log
+
+$ find . -name "*.log" ! -user lab
+./logs/yesterday.log
+
+$ chmod 600 k1.bin; chmod 755 k1plus.bin
+
+$ find . -name "*.bin" -perm 600
+./k1.bin
+
+$ find . -name "*.bin" -perm -u+x
+./k1plus.bin
+
+$ find . -name "*.bin" -perm /111
+./k1plus.bin
+
+$ find /usr/bin -perm -4000 | sort
+/usr/bin/chfn
+/usr/bin/chsh
+/usr/bin/gpasswd
+/usr/bin/mount
+/usr/bin/newgrp
+/usr/bin/passwd
+/usr/bin/su
+/usr/bin/sudo
+/usr/bin/umount
+
+$ find /home/alice -name ".bashrc"
+find: ‘/home/alice’: Permission denied
+
+$ find /home -name ".bashrc" 2>/dev/null
+/home/lab/.bashrc
+
+$ echo "--- 見つけて操作する ---"
+--- 見つけて操作する ---
+
+$ find logs -type f -exec echo {} \; | wc -l
+4
+
+$ find logs -type f -exec echo {} + | wc -l
+1
+
+$ find logs -name "*.log" -mtime +1 -exec ls -l --time-style=long-iso {} +
+-rw-r--r-- 1 lab lab 0 2026-10-03 11:09 logs/old/ancient.log
+-rw-r--r-- 1 lab lab 0 2026-10-10 23:09 logs/twodays.log
+
+$ find logs -name "*.log" -mtime +1 -delete
+
+$ find logs -type f | sort
+logs/today.log
+logs/yesterday.log
+
+
+========== 6. tar と圧縮（1.02.2） ==========
+
+$ mkdir -p ~/work/ch6; cd ~/work/ch6
+
+$ echo hello > a.txt; echo world > b.txt
+
+$ ls -l a.txt b.txt
+-rw-r--r-- 1 lab lab 6 Oct 13 11:09 a.txt
+-rw-r--r-- 1 lab lab 6 Oct 13 11:09 b.txt
+
+$ tar -cvf small.tar a.txt b.txt
+a.txt
+b.txt
+
+$ ls -l small.tar
+-rw-r--r-- 1 lab lab 10240 Oct 13 11:09 small.tar
+
+$ tar -tvf small.tar
+-rw-r--r-- lab/lab           6 2026-10-13 11:09 a.txt
+-rw-r--r-- lab/lab           6 2026-10-13 11:09 b.txt
+
+$ tar tvf small.tar
+-rw-r--r-- lab/lab           6 2026-10-13 11:09 a.txt
+-rw-r--r-- lab/lab           6 2026-10-13 11:09 b.txt
+
+$ echo "--- gzip ---"
+--- gzip ---
+
+$ seq 1 2000 > num.txt
+
+$ ls -l num.txt
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+
+$ gzip num.txt
+
+$ ls -l num.txt*
+-rw-r--r-- 1 lab lab 4226 Oct 13 11:09 num.txt.gz
+
+$ gzip -l num.txt.gz
+         compressed        uncompressed  ratio uncompressed_name
+               4226                8893  52.8% num.txt
+
+$ gunzip num.txt.gz
+
+$ ls -l num.txt*
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+
+$ gzip -k num.txt
+
+$ ls -l num.txt*
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+-rw-r--r-- 1 lab lab 4226 Oct 13 11:09 num.txt.gz
+
+$ zcat num.txt.gz | tail -1
+2000
+
+$ gzip num.txt
+gzip: num.txt.gz already exists; do you wish to overwrite (y or n)? n
+	not overwritten
+
+$ bzip2 -k num.txt; xz -k num.txt
+
+$ ls -l num.txt*
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+-rw-r--r-- 1 lab lab 2140 Oct 13 11:09 num.txt.bz2
+-rw-r--r-- 1 lab lab 4226 Oct 13 11:09 num.txt.gz
+-rw-r--r-- 1 lab lab  948 Oct 13 11:09 num.txt.xz
+
+$ bzcat num.txt.bz2 | tail -1; xzcat num.txt.xz | tail -1
+2000
+2000
+
+$ rm num.txt num.txt.gz
+
+$ bunzip2 num.txt.bz2
+
+$ ls -l num.txt*
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+-rw-r--r-- 1 lab lab  948 Oct 13 11:09 num.txt.xz
+
+$ rm num.txt
+
+$ unxz num.txt.xz
+
+$ ls -l num.txt*
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+
+$ mkdir -p notes/2026; cp num.txt notes/2026/log.txt
+
+$ gzip notes
+gzip: notes is a directory -- ignored
+
+$ echo "--- tar の z / j / J ---"
+--- tar の z / j / J ---
+
+$ tar -czvf notes.tar.gz notes
+notes/
+notes/2026/
+notes/2026/log.txt
+
+$ tar -cjf notes.tar.bz2 notes
+
+$ tar -cJf notes.tar.xz notes
+
+$ ls -l notes.tar.*
+-rw-r--r-- 1 lab lab 2467 Oct 13 11:09 notes.tar.bz2
+-rw-r--r-- 1 lab lab 4469 Oct 13 11:09 notes.tar.gz
+-rw-r--r-- 1 lab lab 1124 Oct 13 11:09 notes.tar.xz
+
+$ file notes.tar.gz notes.tar.bz2 notes.tar.xz
+notes.tar.gz:  gzip compressed data, from Unix, original size modulo 2^32 20480
+notes.tar.bz2: bzip2 compressed data, block size = 900k
+notes.tar.xz:  XZ compressed data, checksum CRC64
+
+$ tar -tzf notes.tar.gz
+notes/
+notes/2026/
+notes/2026/log.txt
+
+$ tar -tjf notes.tar.bz2
+notes/
+notes/2026/
+notes/2026/log.txt
+
+$ tar -tJf notes.tar.xz
+notes/
+notes/2026/
+notes/2026/log.txt
+
+$ tar -tzf notes.tar.xz
+
+gzip: stdin: not in gzip format
+tar: Child returned status 1
+tar: Error is not recoverable: exiting now
+
+$ tar -tf notes.tar.xz
+notes/
+notes/2026/
+notes/2026/log.txt
+
+$ mkdir out
+
+$ tar -xzvf notes.tar.gz -C out
+notes/
+notes/2026/
+notes/2026/log.txt
+
+$ ls -R out
+out:
+notes
+
+out/notes:
+2026
+
+out/notes/2026:
+log.txt
+
+$ mkdir out2
+
+$ tar -xjf notes.tar.bz2 -C out2
+
+$ cat out2/notes/2026/log.txt | wc -l
+2000
+
+$ echo "誰でも書ける" > shared.txt
+
+$ chmod 666 shared.txt
+
+$ sudo chown alice shared.txt
+
+$ ls -l shared.txt
+-rw-rw-rw- 1 alice lab 19 Oct 13 11:09 shared.txt
+
+$ tar -cf shared.tar shared.txt
+
+$ tar -tvf shared.tar
+-rw-rw-rw- alice/lab        19 2026-10-13 11:09 shared.txt
+
+$ mkdir x1 x2 x3
+
+$ tar -xf shared.tar -C x1
+
+$ tar -xpf shared.tar -C x2
+
+$ sudo tar -xf shared.tar -C x3
+
+$ ls -l x1/shared.txt x2/shared.txt x3/shared.txt
+-rw-r--r-- 1 lab   lab 19 Oct 13 11:09 x1/shared.txt
+-rw-rw-rw- 1 lab   lab 19 Oct 13 11:09 x2/shared.txt
+-rw-rw-rw- 1 alice lab 19 Oct 13 11:09 x3/shared.txt
+
+$ tar -czf abs.tar.gz ~/work/ch6/a.txt
+tar: Removing leading `/' from member names
+
+$ tar -tzf abs.tar.gz
+home/lab/work/ch6/a.txt
+
+$ echo "--- dd ---"
+--- dd ---
+
+$ dd if=/dev/zero of=zero.img bs=1M count=4
+4+0 records in
+4+0 records out
+4194304 bytes (4.2 MB, 4.0 MiB) copied, 0.00129568 s, 3.2 GB/s
+
+$ ls -l zero.img
+-rw-r--r-- 1 lab lab 4194304 Oct 13 11:09 zero.img
+
+$ dd if=num.txt of=head.bin bs=512 count=1
+1+0 records in
+1+0 records out
+512 bytes copied, 2.1792e-05 s, 23.5 MB/s
+
+$ ls -l head.bin
+-rw-r--r-- 1 lab lab 512 Oct 13 11:09 head.bin
+
+$ head -3 head.bin
+1
+2
+3
+
+$ echo hello | dd conv=ucase 2>/dev/null
+HELLO
+
+
+========== 7. リンク（1.02.3） ==========
+
+$ mkdir -p ~/work/ch7; cd ~/work/ch7
+
+$ echo "第1版" > memo.txt
+
+$ ln memo.txt hard.txt
+
+$ ln -s memo.txt soft.txt
+
+$ ls -li memo.txt hard.txt soft.txt
+18128118 -rw-r--r-- 2 lab lab 8 Oct 13 11:09 hard.txt
+18128118 -rw-r--r-- 2 lab lab 8 Oct 13 11:09 memo.txt
+18128120 lrwxrwxrwx 1 lab lab 8 Oct 13 11:09 soft.txt -> memo.txt
+
+$ echo "追記" >> hard.txt
+
+$ cat memo.txt
+第1版
+追記
+
+$ rm memo.txt
+
+$ ls -li hard.txt soft.txt
+18128118 -rw-r--r-- 1 lab lab 15 Oct 13 11:09 hard.txt
+18128120 lrwxrwxrwx 1 lab lab  8 Oct 13 11:09 soft.txt -> memo.txt
+
+$ cat hard.txt
+第1版
+追記
+
+$ cat soft.txt
+cat: soft.txt: No such file or directory
+
+$ file soft.txt
+soft.txt: broken symbolic link to memo.txt
+
+$ echo "新しい memo" > memo.txt
+
+$ cat soft.txt
+新しい memo
+
+$ ls -li memo.txt hard.txt
+18128118 -rw-r--r-- 1 lab lab 15 Oct 13 11:09 hard.txt
+18128122 -rw-r--r-- 1 lab lab 15 Oct 13 11:09 memo.txt
+
+$ ls -F
+hard.txt  memo.txt  soft.txt@
+
+$ ls -i hard.txt
+18128118 hard.txt
+
+$ echo "--- lrwxrwxrwx ---"
+--- lrwxrwxrwx ---
+
+$ touch target; chmod 600 target; ln -s target lnk
+
+$ ls -l target lnk
+lrwxrwxrwx 1 lab lab 6 Oct 13 11:09 lnk -> target
+-rw------- 1 lab lab 0 Oct 13 11:09 target
+
+$ chmod 644 lnk
+
+$ ls -l target lnk
+lrwxrwxrwx 1 lab lab 6 Oct 13 11:09 lnk -> target
+-rw-r--r-- 1 lab lab 0 Oct 13 11:09 target
+
+$ echo "--- ハードリンクにできないこと ---"
+--- ハードリンクにできないこと ---
+
+$ mkdir d
+
+$ ln d dlink
+ln: d: hard link not allowed for directory
+
+$ ln -s d dsoft
+
+$ ls -ld d dsoft
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 d
+lrwxrwxrwx 1 lab lab    1 Oct 13 11:09 dsoft -> d
+
+$ ln ~/.bashrc bashrc-link
+ln: failed to create hard link 'bashrc-link' => '/home/lab/.bashrc': Invalid cross-device link
+
+$ ln -s ~/.bashrc bashrc-link
+
+$ ls -l bashrc-link
+lrwxrwxrwx 1 lab lab 17 Oct 13 11:09 bashrc-link -> /home/lab/.bashrc
+
+$ df --output=target ~/work/ch7 ~/.bashrc
+Mounted on
+/home/lab/work
+/
+
+$ stat -c "%h %n" d
+2 d
+
+$ mkdir d/a d/b d/c; touch d/f
+
+$ stat -c "%h %n" d
+5 d
+
+$ stat -c "%h %n" /etc ~
+1 /etc
+1 /home/lab
+
+$ echo "--- 相対パスのリンク ---"
+--- 相対パスのリンク ---
+
+$ mkdir sub
+
+$ ln -s memo.txt sub/bad
+
+$ ls -l sub/bad
+lrwxrwxrwx 1 lab lab 8 Oct 13 11:09 sub/bad -> memo.txt
+
+$ cat sub/bad
+cat: sub/bad: No such file or directory
+
+$ ln -s ../memo.txt sub/good
+
+$ cat sub/good
+新しい memo
+
+$ ln -sr memo.txt sub/auto
+
+$ ls -l sub/auto
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 sub/auto -> ../memo.txt
+
+$ echo "--- 版の切り替え ---"
+--- 版の切り替え ---
+
+$ mkdir -p releases/v1 releases/v2; echo 1.0 > releases/v1/VERSION; echo 2.0 > releases/v2/VERSION
+
+$ ln -s releases/v1 current
+
+$ cat current/VERSION
+1.0
+
+$ ln -sf releases/v2 current; echo "exit=$?"
+exit=0
+
+$ ls -l current
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 current -> releases/v1
+
+$ ls -l releases/v1
+total 4
+-rw-r--r-- 1 lab lab  4 Oct 13 11:09 VERSION
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 v2 -> releases/v2
+
+$ rm releases/v1/v2
+
+$ ln -sfn releases/v2 current
+
+$ ls -l current
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 current -> releases/v2
+
+$ cat current/VERSION
+2.0
+
+$ echo "--- システムの中のリンク ---"
+--- システムの中のリンク ---
+
+$ ls -l /bin /sbin /lib
+lrwxrwxrwx 1 root root 7 Apr 22  2024 /bin -> usr/bin
+lrwxrwxrwx 1 root root 7 Apr 22  2024 /lib -> usr/lib
+lrwxrwxrwx 1 root root 8 Apr 22  2024 /sbin -> usr/sbin
+
+$ ls -li /bin/ls /usr/bin/ls
+1859260 -rwxr-xr-x 1 root root 142312 Aug 26 00:09 /bin/ls
+1859260 -rwxr-xr-x 1 root root 142312 Aug 26 00:09 /usr/bin/ls
+
+$ ls -l /usr/bin/vi /etc/alternatives/vi
+lrwxrwxrwx 1 root root 18 Aug 25 07:13 /etc/alternatives/vi -> /usr/bin/vim.basic
+lrwxrwxrwx 1 root root 20 Aug 25 07:13 /usr/bin/vi -> /etc/alternatives/vi
+
+$ readlink -f /usr/bin/vi
+/usr/bin/vim.basic
+
+$ ls -li /usr/bin/gunzip /usr/bin/uncompress
+1859225 -rwxr-xr-x 2 root root 2346 Jul  3 20:53 /usr/bin/gunzip
+1859225 -rwxr-xr-x 2 root root 2346 Jul  3 20:53 /usr/bin/uncompress
+
+$ file /usr/bin/gunzip
+/usr/bin/gunzip: POSIX shell script, ASCII text executable
+
+$ grep -n "exec gzip" /usr/bin/gunzip
+57:exec gzip -d "$@"
+
+$ ls -li /usr/bin/bzip2 /usr/bin/bunzip2 /usr/bin/bzcat
+18229064 -rwxr-xr-x 3 root root 39296 Aug 27 13:05 /usr/bin/bunzip2
+18229064 -rwxr-xr-x 3 root root 39296 Aug 27 13:05 /usr/bin/bzcat
+18229064 -rwxr-xr-x 3 root root 39296 Aug 27 13:05 /usr/bin/bzip2
+
+$ ls -l /usr/bin/xz /usr/bin/unxz /usr/bin/xzcat
+lrwxrwxrwx 1 root root     2 May 29 01:06 /usr/bin/unxz -> xz
+-rwxr-xr-x 1 root root 89008 May 29 01:06 /usr/bin/xz
+lrwxrwxrwx 1 root root     2 May 29 01:06 /usr/bin/xzcat -> xz
+
+
+========== 8. locate と FHS（1.02.4） ==========
+
+$ cd ~
+
+$ ls -l /var/lib/plocate/plocate.db
+-rw-r----- 1 root plocate 413088 Oct 13 11:09 /var/lib/plocate/plocate.db
+
+$ locate bashrc
+/etc/bash.bashrc
+/etc/skel/.bashrc
+/home/lab/.bashrc
+/usr/share/dot.bashrc
+/usr/share/base-files/dot.bashrc
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/bash.bashrc
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel/dot.bashrc
+
+$ touch ~/work/new-note.txt
+
+$ locate new-note; echo "exit=$?"
+exit=1
+
+$ updatedb
+/var/lib/plocate/: Permission denied
+
+$ sudo updatedb
+
+$ locate new-note
+/home/lab/work/new-note.txt
+
+$ rm ~/work/new-note.txt
+
+$ locate new-note
+/home/lab/work/new-note.txt
+
+$ locate -e new-note; echo "exit=$?"
+exit=1
+
+$ sudo -u alice touch /home/alice/alice-note.txt
+
+$ sudo updatedb
+
+$ locate alice-note; echo "exit=$?"
+exit=1
+
+$ sudo locate alice-note
+/home/alice/alice-note.txt
+
+$ ls -ld /home/alice
+drwxr-x--- 1 alice alice 4096 Oct 13 11:09 /home/alice
+
+$ touch /tmp/tmp-note.txt
+
+$ sudo updatedb
+
+$ locate tmp-note; echo "exit=$?"
+exit=1
+
+$ cat /etc/updatedb.conf
+PRUNE_BIND_MOUNTS="yes"
+# PRUNENAMES=".git .bzr .hg .svn"
+PRUNEPATHS="/tmp /var/spool /media /var/lib/os-prober /var/lib/ceph /home/.ecryptfs /var/lib/schroot"
+PRUNEFS="NFS afs autofs binfmt_misc ceph cgroup cgroup2 cifs coda configfs curlftpfs debugfs devfs devpts devtmpfs ecryptfs ftpfs fuse.ceph fuse.cryfs fuse.encfs fuse.glusterfs fuse.gocryptfs fuse.gvfsd-fuse fuse.mfs fuse.rclone fuse.rozofs fuse.sshfs fusectl fusesmb hugetlbfs iso9660 lustre lustre_lite mfs mqueue ncpfs nfs nfs4 ocfs ocfs2 proc pstore rpc_pipefs securityfs shfs smbfs sysfs tmpfs tracefs udev udf usbfs"
+
+$ ls -l /usr/bin/locate /etc/alternatives/locate
+lrwxrwxrwx 1 root root 16 Apr 19  2024 /etc/alternatives/locate -> /usr/bin/plocate
+lrwxrwxrwx 1 root root 24 Apr 19  2024 /usr/bin/locate -> /etc/alternatives/locate
+
+$ cat /etc/cron.daily/plocate
+#! /bin/sh
+
+set -e
+
+UPDATEDB=/usr/sbin/updatedb.plocate
+
+# Skip if systemd timer is available.
+if [ -d /run/systemd/system ]; then
+    exit 0
+fi
+
+[ -x $UPDATEDB ] || exit 0
+
+if which on_ac_power >/dev/null 2>&1; then
+    ON_BATTERY=0
+    on_ac_power >/dev/null 2>&1 || ON_BATTERY=$?
+    if [ "$ON_BATTERY" -eq 1 ]; then
+        exit 0
+    fi
+fi
+
+# See ionice(1).
+IONICE=
+if [ -x /usr/bin/ionice ] &&
+    /usr/bin/ionice -c3 true 2>/dev/null; then
+    IONICE="/usr/bin/ionice -c3"
+fi
+
+# See nocache(1).
+NOCACHE=
+if [ -x /usr/bin/nocache ]; then
+    NOCACHE="/usr/bin/nocache"
+fi
+
+flock --nonblock /run/plocate.daily.lock $NOCACHE $IONICE nice $UPDATEDB
+
+$ cat /usr/lib/systemd/system/plocate-updatedb.timer
+[Unit]
+Description=Update the plocate database daily
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=12h
+AccuracySec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+
+$ echo "--- which / type / whereis ---"
+--- which / type / whereis ---
+
+$ echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+$ which ls
+/usr/bin/ls
+
+$ which -a ls
+/usr/bin/ls
+/bin/ls
+
+$ which cd; echo "exit=$?"
+exit=1
+
+$ type ls
+ls is aliased to `ls --color=auto'
+
+$ type -a ls
+ls is aliased to `ls --color=auto'
+ls is /usr/bin/ls
+ls is /bin/ls
+
+$ type ll
+ll is aliased to `ls -alF'
+
+$ type cd
+cd is a shell builtin
+
+$ type type
+type is a shell builtin
+
+$ type if
+if is a shell keyword
+
+$ whereis ls
+ls: /usr/bin/ls /usr/share/man/man1/ls.1.gz
+
+$ whereis -b ls
+ls: /usr/bin/ls
+
+$ whereis passwd
+passwd: /usr/bin/passwd /etc/passwd /usr/share/man/man5/passwd.5.gz /usr/share/man/man1/passwd.1.gz
+
+$ whereis cd
+cd:
+
+$ echo "--- FHS ---"
+--- FHS ---
+
+$ echo /*
+/bin /boot /dev /etc /home /lab /lib /lib64 /media /mnt /opt /proc /root /run /sbin /srv /sys /tmp /usr /var
+
+$ ls -ld /bin /sbin /lib /lib64
+lrwxrwxrwx 1 root root 7 Apr 22  2024 /bin -> usr/bin
+lrwxrwxrwx 1 root root 7 Apr 22  2024 /lib -> usr/lib
+lrwxrwxrwx 1 root root 9 Apr 22  2024 /lib64 -> usr/lib64
+lrwxrwxrwx 1 root root 8 Apr 22  2024 /sbin -> usr/sbin
+
+$ ls -ld /tmp /var/tmp
+drwxrwxrwt 1 root root 4096 Oct 13 11:09 /tmp
+drwxrwxrwt 2 root root 4096 Sep 11 11:10 /var/tmp
+
+$ ls -d /var/log /var/spool /var/lib /usr/local/bin /usr/share/man /etc/skel
+/etc/skel  /usr/local/bin  /usr/share/man  /var/lib  /var/log  /var/spool
+
+$ man -w hier
+/usr/share/man/man7/hier.7.gz
+
+$ whatis hier
+hier (7)             - description of the filesystem hierarchy
+
+
+========== 9. 版 ==========
+
+$ dpkg-query -W -f="\${Package} \${Version}\n" coreutils findutils tar gzip bzip2 xz-utils plocate file bash util-linux | sort
+bash 5.2.21-2ubuntu4
+bzip2 1.0.8-5.1ubuntu0.1
+coreutils 9.4-3ubuntu6.3
+file 1:5.45-3build1
+findutils 4.9.0-5build1
+gzip 1.12-1ubuntu3.2
+plocate 1.1.19-2ubuntu2
+tar 1.35+dfsg-3ubuntu0.4
+util-linux 2.39.3-9ubuntu6.6
+xz-utils 5.6.1+really5.4.5-1ubuntu0.3
+
+$ lab env
+テーマ    : lab-linuc-files 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:files-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb

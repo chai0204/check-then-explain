@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5. find は名前をたどり、中身の属性で選ぶ — 確かめて説明する LinuC 主題1.02</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="5" data-theme="linuc-files">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-files/theory/">理論編</a> › 第5章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/">詳しく</a></p>
+</div>
+<h1>5. find は名前をたどり、中身の属性で選ぶ</h1>
+<p class="lead">36時間前に更新したファイルは <code>find -mtime +1</code> に引っかからない。<code>find</code> はディレクトリの名前をたどって1つずつ中身の属性を確かめるが、日数は24時間単位に切り捨て、大きさは単位に切り上げてから比べる。しかも <code>find</code> に渡る前に、シェルがパターンを書き換えてしまうことがある。</p>
+<div class="badges"><span>前提: 第4章まで読了</span><span>前提: 檻が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.02.2（重要度3）</span><span>出題範囲 1.02.4（重要度2）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>名前・種類・大きさ・時刻・所有者・権限の条件を組み合わせて <code>find</code> を書ける</li><li><code>-mtime</code> と <code>-size</code> の数字の意味を、切り捨て・切り上げの規則から説明できる</li><li>見つけたものに <code>-exec</code> で操作し、<code>\;</code> と <code>+</code> の違いを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>-printf</code> の書式、<code>-regex</code>、<code>-prune</code> による枝刈り、<code>xargs</code> との組み合わせ、<code>-atime</code> と <code>-ctime</code> の細かい違いは扱わない。<code>-atime</code>（読んだ時刻）と <code>-ctime</code>（属性を変えた時刻）は、<code>-mtime</code> と同じ数え方をすると分かれば足りる。</div></div>
+
+<h2 id="basic">find の形 — どこから、どんな条件で</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>find</code> の書き方の骨格と、結果の並び順。</div>
+<p>この章は <code>~/work/ch5</code> で作業する。更新時刻をずらしたログを4つ作る。</p>
+<pre><code>$ mkdir -p ~/work/ch5/logs/old
+$ cd ~/work/ch5
+$ touch logs/today.log
+$ touch -d "36 hours ago" logs/yesterday.log
+$ touch -d "60 hours ago" logs/twodays.log
+$ touch -d "10 days ago" logs/old/ancient.log
+$ date "+%F %H:%M"
+2026-10-13 11:09
+$ ls -l --time-style=long-iso logs/*.log logs/old/*.log
+-rw-r--r-- 1 lab lab 0 2026-10-03 11:09 logs/old/ancient.log
+-rw-r--r-- 1 lab lab 0 2026-10-13 11:09 logs/today.log
+-rw-r--r-- 1 lab lab 0 2026-10-10 23:09 logs/twodays.log
+-rw-r--r-- 1 lab lab 0 2026-10-11 23:09 logs/yesterday.log</code></pre>
+<p><code>find</code> は「どこから」の後に「どんな条件で」を並べる。条件を並べると「かつ」になる。</p>
+<pre><code>$ find logs -name "*.log" | sort
+logs/old/ancient.log
+logs/today.log
+logs/twodays.log
+logs/yesterday.log
+$ find . -type d | sort
+.
+./logs
+./logs/old
+$ find logs -type f -name "t*" | sort
+logs/today.log
+logs/twodays.log</code></pre>
+<p>この教材では <code>find</code> の結果を <code>sort</code> に通している。<code>find</code> は名前を、ディレクトリの表に書かれている順に出す。その順はファイルシステムが決めていて（ext4 では名前から計算した値の順）、あなたの環境では違う順になりうる。<code>ls</code> は自分で名前順に並べ直してから出すので、この差が見えない。</p>
+<div class="scroll"><table>
+<tr><th>条件</th><th>意味</th></tr>
+<tr><td><code>-name "*.log"</code></td><td>名前がパターンに一致する（大文字小文字を区別。<code>-iname</code> なら区別しない）</td></tr>
+<tr><td><code>-type f</code> / <code>d</code> / <code>l</code></td><td>通常ファイル / ディレクトリ / シンボリックリンク</td></tr>
+<tr><td><code>-maxdepth 1</code></td><td>何段下までたどるか</td></tr>
+<tr><td><code>! 条件</code></td><td>条件の否定</td></tr>
+<tr><td><code>条件 -o 条件</code></td><td>または（並べるだけなら「かつ」）</td></tr>
+</table></div>
+<p><code>find</code> のパターンは、シェルのワイルドカードと違って先頭の <code>.</code> にも一致する。隠しファイルも拾う。</p>
+<div class="analogy"><b>たとえ</b>: 倉庫の棚を端から順に歩き、品物の札を1枚ずつ確かめていく係に近い。
+名前・種類・大きさ・日付と、札に書いてあることなら何でも条件にできる。
+<br>ただし<b>崩れる点</b>: 係が歩く順は、倉庫の棚の並び（ファイルシステムの都合）で、品名の五十音順ではない。
+名前順が欲しければ、報告を受けてから自分で並べ替える（<code>| sort</code>）。</div>
+
+<h2 id="mtime">-mtime は24時間単位に切り捨てて数える</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>-mtime +1</code> が、どの古さのファイルを指すか。</div>
+<p><code>-mtime</code> は更新時刻（<b>mtime</b>）を日数で比べる条件である。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>-mtime +1</code> は「1日より古い」ファイルを探す。36時間前（1日半前）の <code>yesterday.log</code> は1日より古いので、
+<code>twodays.log</code> と <code>ancient.log</code> と一緒に見つかるはずだ。</p>
+<pre><code>$ find logs -mtime +1 | sort
+logs/old/ancient.log
+logs/twodays.log</code></pre>
+<div class="then"><b>だめな理由</b>: <code>yesterday.log</code> が出ない。<code>find</code> は経過時間を24時間で割って<b>小数点以下を切り捨てた日数</b>で比べる。
+36時間は 1.5日 → 1日、60時間は 2.5日 → 2日になる。<code>+1</code> は「1 より大きい」なので、2日以上（48時間以上前）だけが当たる。
+1.5日前のファイルは「ちょうど1」に入る。</div></div>
+<pre><code>$ find logs -mtime 1
+logs/yesterday.log
+$ find logs -type f -mtime -1
+logs/today.log
+$ find logs -mtime +2
+logs/old/ancient.log</code></pre>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>切り捨てた日数</th><th>経過時間で言うと</th><th>実測で当たったもの</th></tr>
+<tr><td><code>-mtime -1</code></td><td>0（1 未満）</td><td>24時間以内</td><td>today.log</td></tr>
+<tr><td><code>-mtime 1</code></td><td>ちょうど 1</td><td>24〜48時間前</td><td>yesterday.log（36時間前）</td></tr>
+<tr><td><code>-mtime +1</code></td><td>2 以上</td><td>48時間以上前</td><td>twodays.log（60時間前）・ancient.log</td></tr>
+<tr><td><code>-mtime +2</code></td><td>3 以上</td><td>72時間以上前</td><td>ancient.log だけ</td></tr>
+</table></div>
+<p>試験の「7日より前に更新されたファイル」は <code>-mtime +7</code> と書くのが定番だが、正確には「切り捨てて 8日以上」である。分単位で比べる <code>-mmin</code> と、あるファイルより新しいかを比べる <code>-newer</code> もある。</p>
+<pre><code>$ find logs -type f -mmin -60
+logs/today.log
+$ find logs -type f -newer logs/yesterday.log
+logs/today.log</code></pre>
+<div class="analogy"><b>たとえ</b>: 満年齢に近い。1歳半の子は「1歳」で、「1歳より上」と言われたら2歳からになる。
+<br>ただし<b>崩れる点</b>: 満年齢は誕生日の日付で繰り上がるが、<code>find</code> の日数はカレンダーの日付を見ない。
+いまの時刻から24時間ずつ区切って数えるので、「昨日の朝」でも24時間たっていなければ 0日である。</div>
+
+<h2 id="quote">パターンを引用符で囲む理由</h2>
+<div class="sgoal"><b>この節で分かること</b>: 引用符を忘れたとき、<code>find</code> に何が渡っているか。</div>
+<pre><code>$ mkdir docs; touch top.txt docs/a.txt docs/b.txt
+$ find . -name "*.txt" | sort
+./docs/a.txt
+./docs/b.txt
+./top.txt
+$ find . -name *.txt
+./top.txt</code></pre>
+<p>引用符を外すと、<code>docs</code> の下の2つが消えた。しかもエラーは出ていない。<code>echo</code> を前に付けて、<code>find</code> が実際に受け取った引数を見る。</p>
+<pre><code>$ echo find . -name *.txt
+find . -name top.txt</code></pre>
+<p>第4章のとおり、ワイルドカードを広げるのはシェルで、しかも<b>いまのディレクトリの名前で</b>広げる。カレントに <code>top.txt</code> が1つあったので、<code>find</code> が受け取ったのは <code>-name top.txt</code> だった。もう1つ増やすと、今度はエラーになる。</p>
+<pre><code>$ touch second.txt
+$ find . -name *.txt
+find: paths must precede expression: `top.txt'
+find: possible unquoted pattern after predicate `-name'?
+$ echo find . -name *.txt
+find . -name second.txt top.txt</code></pre>
+<p>一番危ないのは1つだけ一致した場合で、何も言わずに少なく返す。<code>find</code> に渡すパターンは、<b>必ず引用符で囲む</b>。囲めばシェルは広げず、<code>find</code> が自分でたどりながら照らし合わせる。</p>
+
+<h2 id="size">-size は単位に切り上げてから比べる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>-size -1k</code> が何に当たるか。</div>
+<pre><code>$ head -c 1 /dev/zero &gt; one.bin; head -c 1024 /dev/zero &gt; k1.bin; head -c 1025 /dev/zero &gt; k1plus.bin; : &gt; empty.bin
+$ ls -l *.bin
+-rw-r--r-- 1 lab lab    0 Oct 13 11:09 empty.bin
+-rw-r--r-- 1 lab lab 1024 Oct 13 11:09 k1.bin
+-rw-r--r-- 1 lab lab 1025 Oct 13 11:09 k1plus.bin
+-rw-r--r-- 1 lab lab    1 Oct 13 11:09 one.bin
+$ find . -name "*.bin" -size -1k
+./empty.bin
+$ find . -name "*.bin" -size 1k | sort
+./k1.bin
+./one.bin
+$ find . -name "*.bin" -size +1k
+./k1plus.bin
+$ find . -name "*.bin" -size -1M
+./empty.bin</code></pre>
+<p>1バイトのファイルは「1KiB（1024 バイト）未満」のはずなのに、<code>-size -1k</code> に当たったのは空のファイルだけだった。<code>-size</code> は大きさを単位（<code>k</code> なら 1024 バイト）に<b>切り上げて</b>から比べる。1バイトも 1024 バイトも「1k」になり、「1 未満」は 0k、つまり空のファイルしか無い。<code>-size -1M</code> も同じ理由で空のファイルだけになる。</p>
+<div class="scroll"><table>
+<tr><th>大きさ</th><th>k に切り上げ</th><th><code>-size -1k</code></th><th><code>-size 1k</code></th><th><code>-size +1k</code></th></tr>
+<tr><td>0 バイト</td><td>0</td><td>当たる</td><td>—</td><td>—</td></tr>
+<tr><td>1 バイト</td><td>1</td><td>—</td><td>当たる</td><td>—</td></tr>
+<tr><td>1024 バイト</td><td>1</td><td>—</td><td>当たる</td><td>—</td></tr>
+<tr><td>1025 バイト</td><td>2</td><td>—</td><td>—</td><td>当たる</td></tr>
+</table></div>
+<p>バイト単位で正確に比べたいときは <code>c</code> を付ける。</p>
+<pre><code>$ find . -name "*.bin" -size -1025c | sort
+./empty.bin
+./k1.bin
+./one.bin</code></pre>
+<p>単位は <code>c</code>（バイト）・<code>k</code>（KiB = 1024 バイト）・<code>M</code>（MiB = 1048576 バイト）・<code>G</code>（GiB）。試験や日常では「1KB」「1MB」と書かれるが、<code>find</code> の <code>k</code> と <code>M</code> は 1000 ではなく 1024 の倍数である。何も付けないと 512 バイトのブロック単位になるので、数字だけを書かない。</p>
+<div class="analogy"><b>たとえ</b>: 郵便料金の重さの区分に近い。1グラムでも区分を超えれば、次の区分の料金になる。
+<code>-size</code> の「1k」は「1KiB 以下の区分」で、0 グラムの封筒だけが「1k 未満」に入る。
+<br>ただし<b>崩れる点</b>: 郵便の区分は上限で区切るだけだが、<code>-size</code> は「ちょうど」も比べられる。
+<code>-size 1k</code> は「切り上げてちょうど 1」なので、1 バイトから 1024 バイトまでが全部当たる。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-files/">演習05</a>は、深い階層まで含めて「1KB より大きい .tmp ファイル」だけを消す課題である。
+ちょうど 1024 バイトのもの、ディレクトリの <code>big.tmp</code>、大文字の <code>.TMP</code>、隠しファイルが混ぜてある。
+判定は、消えるべきものと残るべきものを1つずつ確かめる。</div>
+
+<h2 id="owner">持ち主と権限で探す</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>-user</code> と <code>-perm</code> の3つの書き方。</div>
+<pre><code>$ sudo chown alice logs/yesterday.log
+$ find logs -user alice
+logs/yesterday.log
+$ find . -name "*.log" ! -user lab
+./logs/yesterday.log
+$ chmod 600 k1.bin; chmod 755 k1plus.bin
+$ find . -name "*.bin" -perm 600
+./k1.bin
+$ find . -name "*.bin" -perm -u+x
+./k1plus.bin
+$ find . -name "*.bin" -perm /111
+./k1plus.bin</code></pre>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>意味</th></tr>
+<tr><td><code>-perm 600</code></td><td>権限がちょうど 600 のもの</td></tr>
+<tr><td><code>-perm -4000</code>（<code>-perm -u+s</code>）</td><td>指定したビットが<b>全部</b>立っているもの（他のビットは問わない）</td></tr>
+<tr><td><code>-perm /111</code></td><td>指定したビットの<b>どれか1つ</b>が立っているもの</td></tr>
+<tr><td><code>-user alice</code> / <code>-group devs</code></td><td>所有者 / グループ</td></tr>
+</table></div>
+<p>試験でよく問われるのは、第3章の SUID が付いたファイルを探す形である。</p>
+<pre><code>$ find /usr/bin -perm -4000 | sort
+/usr/bin/chfn
+/usr/bin/chsh
+/usr/bin/gpasswd
+/usr/bin/mount
+/usr/bin/newgrp
+/usr/bin/passwd
+/usr/bin/su
+/usr/bin/sudo
+/usr/bin/umount</code></pre>
+<p>システム全体（<code>/</code>）から探すと、一般ユーザでは入れないディレクトリで <code>Permission denied</code> が出る。<code>find</code> は、ディレクトリの中の名前を読むのに r を、その先へ進むのに x を使う（第1章）。<code>/home/alice</code>（<code>drwxr-x---</code>）は、lab から見てその他の欄が <code>---</code> で、どちらも無い。</p>
+<pre><code>$ find /home/alice -name ".bashrc"
+find: ‘/home/alice’: Permission denied
+$ find /home -name ".bashrc" 2&gt;/dev/null
+/home/lab/.bashrc</code></pre>
+<p>エラーだけを捨てるには <code>2&gt;/dev/null</code> を付ける。全部を見たいなら <code>sudo find / -perm -4000 -type f</code> のように root で打つ。</p>
+
+<h2 id="exec">見つけて操作する — -exec と -delete</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>-exec ... \;</code> と <code>-exec ... +</code> の違い。</div>
+<p><code>-exec</code> は見つけたものにコマンドを実行する。<code>{}</code> が見つけたパスに置き換わり、終わりの印が2種類ある。</p>
+<pre><code>$ find logs -type f -exec echo {} \; | wc -l
+4
+$ find logs -type f -exec echo {} + | wc -l
+1</code></pre>
+<p><code>\;</code> は<b>1件ごとに1回</b>コマンドを実行するので、<code>echo</code> は4回走って4行を出した。<code>+</code> は<b>まとめて1回</b>実行するので、4つの名前を並べた1行になった。<code>;</code> の前の <code>\</code> は、<code>;</code> をシェルの区切りとして読ませないためのものである。</p>
+<pre><code>$ find logs -name "*.log" -mtime +1 -exec ls -l --time-style=long-iso {} +
+-rw-r--r-- 1 lab lab 0 2026-10-03 11:09 logs/old/ancient.log
+-rw-r--r-- 1 lab lab 0 2026-10-10 23:09 logs/twodays.log
+$ find logs -name "*.log" -mtime +1 -delete
+$ find logs -type f | sort
+logs/today.log
+logs/yesterday.log</code></pre>
+<p>消す前に、同じ条件で一覧を出して確かめる。確かめた条件の最後を <code>-delete</code>（または <code>-exec rm {} \;</code>）に替えれば、確かめたものだけが消える。1件ずつ確認しながら実行したいときは、<code>-exec</code> の代わりに <code>-ok</code> を使う。</p>
+<div class="analogy"><b>たとえ</b>: 見つけた相手への連絡のしかたに近い。<code>\;</code> は1人ずつ電話をかけ、<code>+</code> は全員を宛先に並べてメールを1通送る。
+<br>ただし<b>崩れる点</b>: メールの宛先には上限が無いように思えるが、コマンドの引数の長さには上限がある。
+<code>+</code> は上限を超えそうになると、自動で何回かに分けて実行する。</div>
+<div class="quiz"><b>確認</b>
+<p>ルートディレクトリ以下から、SUID が設定された通常ファイルを探すコマンドを書け。</p>
+<details><summary>答え</summary>
+<p><code>find / -perm -4000 -type f</code>（<code>-perm -u+s</code> でもよい）。<code>-</code> は「指定したビットが全部立っている」。
+一般ユーザで打つと入れないディレクトリでエラーが出るので、<code>2&gt;/dev/null</code> を付けるか root で打つ。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>find /var/log -mtime +7</code> で見つかるファイルはどれか。<br>
+a. 更新から7日以内のもの　b. ちょうど7日前に更新したもの　c. 更新から8日以上たったもの　d. 更新から7日以上たったもの</p>
+<details><summary>答え</summary>
+<p>c。経過時間を24時間で割って切り捨てた日数が 7 より大きいもの、つまり 8 以上。
+実測でも、36時間前のファイルは <code>-mtime +1</code> に入らず <code>-mtime 1</code> に入った。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>find . -name "*.tmp" -exec rm {} \;</code> の <code>{}</code> と <code>\;</code> は、それぞれ何を表すか。</p>
+<details><summary>答え</summary>
+<p><code>{}</code> は見つかったファイルのパスに置き換わる。<code>\;</code> は <code>-exec</code> に渡すコマンドの終わりで、
+1件ごとにコマンドを1回実行する（<code>\</code> はシェルに <code>;</code> を解釈させないため）。<code>+</code> で終えると、まとめて1回実行する。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>1MB（<code>find</code> の単位では 1MiB）を超えるファイルを探す条件と、空のファイルを探す条件を書け。</p>
+<details><summary>答え</summary>
+<p><code>-size +1M</code> と <code>-empty</code>（または <code>-size 0</code>）。<code>+1M</code> は 1048576 バイトを超えるもの。<code>-size -1M</code> は「1MiB 未満」に見えるが、
+MiB 単位に切り上げると 1 未満は 0 だけなので、空のファイルにしか当たらない（実測）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>find 場所 条件…</code>。条件を並べると「かつ」、<code>!</code> で否定、<code>-o</code> で「または」</li><li>結果はディレクトリの表の順に出る。名前順が欲しければ <code>| sort</code></li><li><code>-mtime</code> は24時間単位に切り捨て。<code>+1</code> は48時間以上前、<code>1</code> は24〜48時間前、<code>-1</code> は24時間以内</li><li><code>-size</code> は単位に切り上げ。<code>-size -1k</code> は空のファイルだけ。正確には <code>c</code>（バイト）で</li><li><code>-perm 600</code> はちょうど、<code>-perm -4000</code> は全部、<code>-perm /111</code> はどれか</li><li>パターンは必ず引用符で囲む。囲まないとシェルがカレントの名前で広げ、黙って少なく返すことがある</li><li><code>-exec cmd {} \;</code> は1件ずつ、<code>-exec cmd {} +</code> はまとめて。消すのは一覧で確かめてから</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-files/theory/04-cp-mv-rm">← 4. コピーは中身を作り直し、移動は名前を書き換える</a><a href="/linuc-files/theory/06-tar">次: 6. tar は束ねるだけで、縮めるのは別のプログラム →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-files/chapters.js"></script>
+<script src="/linuc-files/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

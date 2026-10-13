@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>8. locate が探すのは、索引を作った時点の写真 — 確かめて説明する LinuC 主題1.02</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="8" data-theme="linuc-files">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-files/theory/">理論編</a> › 第8章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/">詳しく</a></p>
+</div>
+<h1>8. locate が探すのは、索引を作った時点の写真</h1>
+<p class="lead">作ったばかりのファイルを <code>locate</code> は見つけず、消したばかりのファイルは見つけ続ける。<code>locate</code> はディスクを探していない。<code>updatedb</code> が作った名前の一覧（索引）を引いているだけで、その索引は作った瞬間の写真である。最後に、この主題の8章を1本につなげる。</p>
+<div class="badges"><span>前提: 第7章まで読了</span><span>前提: sudo が打てる</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.02.4（重要度2）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>locate</code> の結果が実際のディスクとずれる理由を、<code>updatedb</code> と <code>/etc/updatedb.conf</code> から説明できる</li><li><code>which</code>・<code>type</code>・<code>whereis</code> の違いを、何を探しているかで言い分けられる</li><li>FHS の主なディレクトリに、何が置かれるかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: plocate と mlocate・slocate の実装の違い、索引ファイルの形式、<code>locate -r</code> の正規表現、<code>hash</code> コマンド、FHS の版ごとの差分は扱わない。この檻の <code>locate</code> の実体は plocate で、試験で問われる使い方（<code>locate</code> / <code>updatedb</code> / <code>/etc/updatedb.conf</code>）はどの実装でも同じである。</div></div>
+
+<h2 id="locate">locate は索引を引くだけ</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>locate</code> の結果が、いつの時点のものか。</div>
+<p>この章はホームで作業する。<code>locate</code> は名前の一部を渡すと、一致するパスを並べる。</p>
+<pre><code>$ cd ~
+$ ls -l /var/lib/plocate/plocate.db
+-rw-r----- 1 root plocate 413088 Oct 13 11:09 /var/lib/plocate/plocate.db
+$ locate bashrc
+/etc/bash.bashrc
+/etc/skel/.bashrc
+/home/lab/.bashrc
+/usr/share/dot.bashrc
+/usr/share/base-files/dot.bashrc
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/bash.bashrc
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel/dot.bashrc</code></pre>
+<p>速い。<code>find</code> のように1つずつたどっていない。<code>/var/lib/plocate/plocate.db</code> が引いている<b>索引</b>で、日付はこの檻のイメージを作った時刻である。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>locate</code> は名前でファイルを探すコマンドなのだから、いまあるファイルなら見つかり、消したファイルは見つからないはずだ。</p>
+<pre><code>$ touch ~/work/new-note.txt
+$ locate new-note; echo "exit=$?"
+exit=1
+$ updatedb
+/var/lib/plocate/: Permission denied
+$ sudo updatedb
+$ locate new-note
+/home/lab/work/new-note.txt
+$ rm ~/work/new-note.txt
+$ locate new-note
+/home/lab/work/new-note.txt</code></pre>
+<div class="then"><b>だめな理由</b>: 作った直後は見つからず、<code>updatedb</code> の後で見つかり、消した後も見つかり続けた。
+<code>locate</code> はディスクを見ていない。<code>updatedb</code> がディスクをたどって作った<b>名前の一覧</b>を引いているだけで、
+一覧はその瞬間の写真である。写真の後に作ったものは写っておらず、消したものは写ったまま残る。
+<code>updatedb</code> は一覧をシステム全体の場所（<code>/var/lib/plocate/</code>）に書くので、一般ユーザでは打てない。</div></div>
+<pre><code>$ locate -e new-note; echo "exit=$?"
+exit=1</code></pre>
+<p><code>-e</code> を付けると、写真に写っているものが<b>いまも存在するか</b>を1つずつ確かめてから出す。実機では <code>updatedb</code> は1日1回、自動で呼ばれる（次の節）。この檻ではそれが動かないので、イメージを作った時刻の写真が残り続けている。</p>
+<div class="analogy"><b>たとえ</b>: 毎晩作り直す、図書館の蔵書カード目録に近い。
+今日入った本はまだカードが無く、今日除籍した本はカードが残っている。目録をめくるのは書庫を歩くよりずっと速い。
+<br>ただし<b>崩れる点</b>: 図書館の目録は誰が見ても同じだが、<code>locate</code> の目録は<b>見る人によって</b>出てくるカードが変わる（次の節）。</div>
+
+<h2 id="hidden">索引に載っていても、見えないものがある</h2>
+<div class="sgoal"><b>この節で分かること</b>: 一般ユーザの <code>locate</code> に出てこないものがある理由。</div>
+<pre><code>$ sudo -u alice touch /home/alice/alice-note.txt
+$ sudo updatedb
+$ locate alice-note; echo "exit=$?"
+exit=1
+$ sudo locate alice-note
+/home/alice/alice-note.txt
+$ ls -ld /home/alice
+drwxr-x--- 1 alice alice 4096 Oct 13 11:09 /home/alice</code></pre>
+<p>索引には載っているのに、lab の <code>locate</code> には出ず、root には出た。<code>/home/alice</code> は <code>drwxr-x---</code> で、lab には x が無い。第1章のとおり、x の無いディレクトリの先へは進めない。<code>locate</code> は結果を出す前に、呼んだ人が<b>親ディレクトリすべてに r と x を持っているか</b>を確かめ、持っていないものは出さない（<code>man plocate</code> にそう書いてある）。索引そのものも <code>-rw-r----- root plocate</code> で一般ユーザには直接読めず、<code>locate</code> だけが読める作りになっている。他人の持ち物の<b>名前</b>が漏れないようにしているのである。</p>
+
+<h2 id="conf">/etc/updatedb.conf — 索引から外す場所</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>updatedb</code> がどこを索引に入れないか、どこで決まっているか。</div>
+<pre><code>$ touch /tmp/tmp-note.txt
+$ sudo updatedb
+$ locate tmp-note; echo "exit=$?"
+exit=1
+$ cat /etc/updatedb.conf
+PRUNE_BIND_MOUNTS="yes"
+# PRUNENAMES=".git .bzr .hg .svn"
+PRUNEPATHS="/tmp /var/spool /media /var/lib/os-prober /var/lib/ceph /home/.ecryptfs /var/lib/schroot"
+PRUNEFS="NFS afs autofs binfmt_misc ceph cgroup cgroup2 cifs coda configfs curlftpfs debugfs devfs devpts devtmpfs ecryptfs ftpfs fuse.ceph fuse.cryfs fuse.encfs fuse.glusterfs fuse.gocryptfs fuse.gvfsd-fuse fuse.mfs fuse.rclone fuse.rozofs fuse.sshfs fusectl fusesmb hugetlbfs iso9660 lustre lustre_lite mfs mqueue ncpfs nfs nfs4 ocfs ocfs2 proc pstore rpc_pipefs securityfs shfs smbfs sysfs tmpfs tracefs udev udf usbfs"</code></pre>
+<p><code>updatedb</code> を打った後でも、<code>/tmp</code> のファイルは出なかった。<code>/tmp</code> は <b>PRUNEPATHS</b> に入っていて、最初から索引に入れない場所だからである。すぐ消える一時ファイルを毎晩記録しても意味が無い。</p>
+<div class="scroll"><table>
+<tr><th>設定</th><th>意味</th><th>この檻の値</th></tr>
+<tr><td><code>PRUNEPATHS</code></td><td>索引に入れないディレクトリ</td><td><code>/tmp</code> <code>/var/spool</code> <code>/media</code> など</td></tr>
+<tr><td><code>PRUNEFS</code></td><td>索引に入れないファイルシステムの種類</td><td><code>proc</code> <code>sysfs</code> <code>tmpfs</code> <code>nfs</code> など</td></tr>
+<tr><td><code>PRUNENAMES</code></td><td>索引に入れない名前</td><td>（コメントアウトされている。例は <code>.git</code>）</td></tr>
+<tr><td><code>PRUNE_BIND_MOUNTS</code></td><td>bind mount を入れないか</td><td><code>"yes"</code></td></tr>
+</table></div>
+<p><code>locate</code> という名前も、第7章の仕組みで実体につながっている。</p>
+<pre><code>$ ls -l /usr/bin/locate /etc/alternatives/locate
+lrwxrwxrwx 1 root root 16 Apr 19  2024 /etc/alternatives/locate -&gt; /usr/bin/plocate
+lrwxrwxrwx 1 root root 24 Apr 19  2024 /usr/bin/locate -&gt; /etc/alternatives/locate
+$ cat /usr/lib/systemd/system/plocate-updatedb.timer
+[Unit]
+Description=Update the plocate database daily
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=12h
+AccuracySec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target</code></pre>
+<p>実機では、systemd のタイマー（<code>OnCalendar=daily</code>）が1日1回 <code>updatedb</code> を呼ぶ。systemd が動いていない環境のために <code>/etc/cron.daily/plocate</code> も置かれていて、こちらは中で「タイマーが使えるなら何もしない」と確かめてから動く。タイマーは呼ぶ時刻を最大12時間ずらす（<code>RandomizedDelaySec=12h</code>）ので、索引はふだん1日前後、長いと1日半ほど古い。この檻の中では systemd も cron のデーモンも動いていないので、どちらも起動しない。索引は、自分で <code>sudo updatedb</code> を打つまで変わらない。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-files/">演習08</a>は、<code>locate</code> で見つからない2つのファイルを見つかるようにする課題である。
+2つは見つからない理由が違い、片方は <code>/etc/updatedb.conf</code> を直さないと出てこない。
+判定は <code>locate needle.txt</code> を実際に引いて確かめる。</div>
+
+<h2 id="which">which・type・whereis — コマンドの居場所</h2>
+<div class="sgoal"><b>この節で分かること</b>: 3つのコマンドが、それぞれ何を手がかりに探しているか。</div>
+<p>コマンドの名前を打ったとき、シェルは環境変数 <b>PATH</b> に並んだディレクトリを左から順に探す。</p>
+<pre><code>$ echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+$ which ls
+/usr/bin/ls
+$ which -a ls
+/usr/bin/ls
+/bin/ls
+$ which cd; echo "exit=$?"
+exit=1</code></pre>
+<p><code>which</code> は PATH を順に探して、最初に見つかったファイルを出す。<code>-a</code> なら全部出す。<code>/bin/ls</code> も出たのは、第7章のとおり <code>/bin</code> が <code>usr/bin</code> へのリンクだからである。そして <code>cd</code> は見つからなかった。<code>cd</code> はファイルではなく、シェルに組み込まれた命令だからである。シェルの目で答えるのが <code>type</code> である。</p>
+<pre><code>$ type ls
+ls is aliased to `ls --color=auto'
+$ type -a ls
+ls is aliased to `ls --color=auto'
+ls is /usr/bin/ls
+ls is /bin/ls
+$ type ll
+ll is aliased to `ls -alF'
+$ type cd
+cd is a shell builtin
+$ type type
+type is a shell builtin
+$ type if
+if is a shell keyword</code></pre>
+<p>あなたが打つ <code>ls</code> は、実は <code>ls --color=auto</code> という<b>エイリアス</b>だった（Ubuntu の <code>~/.bashrc</code> が定義している）。<code>which</code> はファイルしか探さないので、この事実を知らない。<code>type</code> はシェル自身に聞くので、その名前がエイリアス・予約語・関数・<b>組み込みコマンド</b>・PATH 上のファイルのどれに当たるかを答える。<code>-a</code> を付けると、当たるものを全部、シェルが優先する順に並べる。打ったときに実際に動くのは、その先頭である。</p>
+<pre><code>$ whereis ls
+ls: /usr/bin/ls /usr/share/man/man1/ls.1.gz
+$ whereis -b ls
+ls: /usr/bin/ls
+$ whereis passwd
+passwd: /usr/bin/passwd /etc/passwd /usr/share/man/man5/passwd.5.gz /usr/share/man/man1/passwd.1.gz
+$ whereis cd
+cd:</code></pre>
+<p><code>whereis</code> は Linux の標準の場所（と PATH・MANPATH）を探して、実行ファイル・マニュアル（・ソース）をまとめて出す。<code>-b</code> は実行ファイルだけ。<code>passwd</code> では、同じ名前の設定ファイル <code>/etc/passwd</code> と、その書式を説明する5章のマニュアルまで並んだ。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>何を探すか</th><th><code>ls</code> の答え</th><th><code>cd</code> の答え</th></tr>
+<tr><td><code>which</code></td><td>PATH の上の実行ファイル</td><td><code>/usr/bin/ls</code></td><td>何も出ない（終了コード 1）</td></tr>
+<tr><td><code>type</code></td><td>シェルが実際に何を動かすか</td><td>エイリアス</td><td><code>shell builtin</code></td></tr>
+<tr><td><code>whereis</code></td><td>標準の場所の実行ファイル・マニュアル・ソース</td><td>本体とマニュアル</td><td><code>cd:</code>（空）</td></tr>
+<tr><td><code>locate</code></td><td>索引に載った名前（パスの一部一致）</td><td>（名前に ls を含むパスが大量に出る）</td><td>—</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: <code>which</code> は駅の路線図だけを見て駅を探す人、<code>type</code> はこの駅の駅員に聞く人に近い。
+路線図には載っていない「駅員の手持ちの近道」（エイリアスや組み込み）を知っているのは駅員だけである。
+<br>ただし<b>崩れる点</b>: 駅員はどの駅でも同じ答えを返すが、<code>type</code> の答えはシェルごとに違う。
+エイリアスは対話シェルが <code>~/.bashrc</code> を読んで作るので、スクリプトの中では <code>type ls</code> がファイルを答える。</div>
+
+<h2 id="fhs">FHS — どこに何を置くかの約束</h2>
+<div class="sgoal"><b>この節で分かること</b>: 主なディレクトリの役割と、いまの Linux での形。</div>
+<pre><code>$ echo /*
+/bin /boot /dev /etc /home /lab /lib /lib64 /media /mnt /opt /proc /root /run /sbin /srv /sys /tmp /usr /var
+$ ls -ld /bin /sbin /lib /lib64
+lrwxrwxrwx 1 root root 7 Apr 22  2024 /bin -&gt; usr/bin
+lrwxrwxrwx 1 root root 7 Apr 22  2024 /lib -&gt; usr/lib
+lrwxrwxrwx 1 root root 9 Apr 22  2024 /lib64 -&gt; usr/lib64
+lrwxrwxrwx 1 root root 8 Apr 22  2024 /sbin -&gt; usr/sbin
+$ ls -ld /tmp /var/tmp
+drwxrwxrwt 1 root root 4096 Oct 13 11:09 /tmp
+drwxrwxrwt 2 root root 4096 Sep 11 11:10 /var/tmp
+$ ls -d /var/log /var/spool /var/lib /usr/local/bin /usr/share/man /etc/skel
+/etc/skel  /usr/local/bin  /usr/share/man  /var/lib  /var/log  /var/spool</code></pre>
+<p><b>FHS</b>（Filesystem Hierarchy Standard）は、どのディレクトリに何を置くかの約束である。約束なので、外れても動く。<code>/lab</code> はこの教材が置いたもので、FHS には無い。そして FHS では <code>/bin</code> と <code>/usr/bin</code> は別の場所として説明されるが、いまの Ubuntu では <code>/bin</code> は <code>usr/bin</code> へのリンクで、中身は1つにまとめられている。試験は FHS の役割分担で答える。</p>
+<div class="scroll"><table>
+<tr><th>ディレクトリ</th><th>置くもの</th></tr>
+<tr><td><code>/bin</code> <code>/usr/bin</code></td><td>一般ユーザも使うコマンド</td></tr>
+<tr><td><code>/sbin</code> <code>/usr/sbin</code></td><td>管理用のコマンド</td></tr>
+<tr><td><code>/lib</code> <code>/usr/lib</code></td><td>共有ライブラリ</td></tr>
+<tr><td><code>/etc</code></td><td>そのマシンの設定ファイル（<code>/etc/skel</code> は新しいユーザのホームの雛形）</td></tr>
+<tr><td><code>/home</code> / <code>/root</code></td><td>一般ユーザのホーム / root のホーム</td></tr>
+<tr><td><code>/var</code></td><td>変化し続けるデータ。<code>/var/log</code> ログ、<code>/var/spool</code> メールや印刷の待ち行列、<code>/var/lib</code> プログラムの状態（<code>locate</code> の索引もここ）</td></tr>
+<tr><td><code>/tmp</code> / <code>/var/tmp</code></td><td>一時ファイル。<code>/tmp</code> は再起動で消えてよく、<code>/var/tmp</code> は再起動後も残す。どちらもスティッキービット付き</td></tr>
+<tr><td><code>/usr</code></td><td>読み取り専用で共有できるもの。<code>/usr/share/man</code> マニュアル、<code>/usr/local</code> 管理者が自分で入れたもの</td></tr>
+<tr><td><code>/opt</code></td><td>追加のアプリケーションを、パッケージごとのディレクトリで</td></tr>
+<tr><td><code>/boot</code></td><td>カーネルとブートローダのファイル</td></tr>
+<tr><td><code>/dev</code></td><td>デバイスファイル（第1章のスペシャルファイル）</td></tr>
+<tr><td><code>/proc</code> <code>/sys</code></td><td>カーネルが見せる仮想のファイル（ディスクには無い）</td></tr>
+<tr><td><code>/mnt</code> / <code>/media</code></td><td>一時的なマウント先 / USB メモリなど取り外せる媒体のマウント先</td></tr>
+<tr><td><code>/srv</code></td><td>このマシンが提供するサービスのデータ（第3章で <code>/srv/team</code> を作った）</td></tr>
+<tr><td><code>/run</code></td><td>起動してからの実行時のデータ（再起動で消える）</td></tr>
+</table></div>
+<pre><code>$ man -w hier
+/usr/share/man/man7/hier.7.gz
+$ whatis hier
+hier (7)             - description of the filesystem hierarchy</code></pre>
+<p>この表は手元でも読める。<code>man 7 hier</code> が、このシステムのディレクトリの説明である。</p>
+<div class="analogy"><b>たとえ</b>: 町の住居表示の決まりに近い。役所は何丁目、病院は何丁目と決めておけば、初めての町でも迷わない。
+<br>ただし<b>崩れる点</b>: 住居表示は法律で決まるが、FHS は約束にすぎない。
+いまの Ubuntu のように、2つの町（<code>/bin</code> と <code>/usr/bin</code>）を1つにまとめて、古い住所には案内板（シンボリックリンク）だけを残すこともある。</div>
+
+<h2 id="spine">8章を1つにまとめる</h2>
+<div class="sgoal"><b>この節で分かること</b>: この主題の8章が、同じ1つの事実から出ていること。</div>
+<p>ここまでの8章は、全部同じ事実の上にあった。</p>
+<div class="goal">
+<p><b>ファイルの名前は、ディレクトリの中に書かれた1行にすぎない。権限・所有者・時刻・中身は、名前ではなく inode の側にある。コマンドがどちらを触るかで、結果が決まる。</b></p>
+</div>
+<div class="scroll"><table>
+<tr><th>章</th><th>名前の側（ディレクトリの表）で起きたこと</th><th>中身の側（inode）で起きたこと</th></tr>
+<tr><td>1</td><td>r で名前が読め、w で名前を足し引きできる。消せるかどうかはここで決まる</td><td>権限・所有者・大きさ・時刻はこちら。x が無いと <code>?</code> になる</td></tr>
+<tr><td>2</td><td>—</td><td>umask は、中身が作られる瞬間の権限を決める</td></tr>
+<tr><td>3</td><td>スティッキービットは、名前を外せる人を絞る。SGID はグループを受け継がせる</td><td>SUID は中身に付いた印。それをどう扱うかはカーネルが決める</td></tr>
+<tr><td>4</td><td><code>mv</code> は名前の行を書き換える。ワイルドカードは名前の一覧から広がる</td><td><code>cp</code> は新しい中身を作る（時刻・権限・所有者が新しくなる）</td></tr>
+<tr><td>5</td><td><code>find</code> は名前をたどる。並び順は表の順</td><td><code>-mtime</code>・<code>-size</code>・<code>-perm</code>・<code>-user</code> は中身の属性</td></tr>
+<tr><td>6</td><td><code>tar</code> は名前を、渡したパスのまま記録する</td><td>権限・所有者・時刻も一緒に記録する</td></tr>
+<tr><td>7</td><td>ハードリンクは名前を増やし、<code>rm</code> は名前を外す</td><td>中身はリンク数が 0 になったときに片づけられる</td></tr>
+<tr><td>8</td><td><code>locate</code> は名前の一覧（索引）を引くだけ</td><td>中身がいまあるかは確かめない（<code>-e</code> で確かめる）</td></tr>
+</table></div>
+<p>出題範囲では <code>ls -i</code> や「ハードリンク」と、<code>chmod</code>・<code>find</code>・<code>tar</code> が同じ主題に並んでいる。ばらばらに見えるが、どれもこの構造で説明できる。どのコマンドも、名前と中身のどちらかを触っている。迷ったら「いま触っているのは名前か、中身か」と問えば、たいていの結果は打つ前に予想できる。</p>
+<div class="quiz"><b>確認</b>
+<p><code>locate</code> が使うデータベースを、手動で最新にするコマンドはどれか。また、誰の権限で実行するか。</p>
+<details><summary>答え</summary>
+<p><code>updatedb</code>。システム全体の索引（<code>/var/lib/plocate/plocate.db</code>）を書き換えるので root で実行する
+（一般ユーザでは <code>Permission denied</code>）。実機では1日1回、タイマーか cron が呼ぶ。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>updatedb</code> が検索の対象から外すディレクトリを指定する、設定ファイルと変数の名前を答えよ。</p>
+<details><summary>答え</summary>
+<p><code>/etc/updatedb.conf</code> の <code>PRUNEPATHS</code>。ファイルシステムの種類で外すのは <code>PRUNEFS</code>、名前で外すのは <code>PRUNENAMES</code>。
+Ubuntu の既定では <code>/tmp</code> が <code>PRUNEPATHS</code> に入っている（実測）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>コマンド <code>ll</code> が、エイリアス・シェルの組み込み・外部コマンドのどれなのかを調べるコマンドはどれか。<br>
+a. <code>which</code>　b. <code>whereis</code>　c. <code>type</code>　d. <code>locate</code></p>
+<details><summary>答え</summary>
+<p>c。<code>type</code> はシェル自身に聞くので、エイリアス（<code>ll is aliased to `ls -alF'</code>）や組み込み（<code>cd is a shell builtin</code>）も答える。
+<code>which</code> は PATH 上のファイルしか探さない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>FHS で、次のものを置くディレクトリを答えよ。（1）システムのログ　（2）再起動しても消えない一時ファイル　（3）管理者が自分で入れたプログラム</p>
+<details><summary>答え</summary>
+<p>（1）<code>/var/log</code>　（2）<code>/var/tmp</code>（<code>/tmp</code> は再起動で消えてよい）　（3）<code>/usr/local</code>（実行ファイルは <code>/usr/local/bin</code>）。
+パッケージ単位の追加アプリケーションなら <code>/opt</code>。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>locate</code> は <code>updatedb</code> が作った索引を引くだけ。作った直後は出ず、消した後も出る（<code>-e</code> で実在を確かめる）</li><li><code>updatedb</code> は root で打つ。実機ではタイマーか <code>/etc/cron.daily</code> が1日1回呼ぶ</li><li><code>/etc/updatedb.conf</code> の <code>PRUNEPATHS</code>・<code>PRUNEFS</code>・<code>PRUNENAMES</code> が索引から外す。<code>/tmp</code> は最初から外れている</li><li>一般ユーザの <code>locate</code> には、親ディレクトリに r と x を持たない場所のものは出ない</li><li><code>which</code> は PATH 上のファイル、<code>type</code> はシェルが実際に動かすもの、<code>whereis</code> は実行ファイルとマニュアルの標準の場所</li><li>FHS は置き場所の約束。<code>/etc</code> 設定、<code>/var/log</code> ログ、<code>/tmp</code> と <code>/var/tmp</code> 一時、<code>/usr/local</code> 自分で入れたもの。いまの Ubuntu では <code>/bin</code> は <code>usr/bin</code> へのリンク</li><li>この主題の全部が「名前はディレクトリに、それ以外は inode に」の上にある</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / bash 5.2.21 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-files/theory/07-links">← 7. ハードリンクは名前を増やし、シンボリックリンクは道順を書く</a><a href="/linuc-files/">実践編へ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-files/chapters.js"></script>
+<script src="/linuc-files/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

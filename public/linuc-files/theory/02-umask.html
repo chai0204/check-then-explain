@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. umask は引き算ではなく、ビットを落とす印 — 確かめて説明する LinuC 主題1.02</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="2" data-theme="linuc-files">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-files/theory/">理論編</a> › 第2章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/">詳しく</a></p>
+</div>
+<h1>2. umask は引き算ではなく、ビットを落とす印</h1>
+<p class="lead"><code>umask 033</code> のもとで作ったファイルは、666 − 033 = 633 にはならず 644 で作られる。umask は「新しく作るときに落とすビット」の印で、数の引き算ではない。そして作られた後の <code>chmod</code> には、1つの書き方を除いて効かない。</p>
+<div class="badges"><span>前提: 第1章まで読了</span><span>前提: 檻が起動している</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.02.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>chmod</code> の数値の書き方と記号の書き方を、相互に読み替えられる</li><li>umask の値から、新しいファイルとディレクトリのパーミッションをビットで求められる</li><li>umask がどこで決まり、どこに書けば次のシェルでも効くかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>pam_umask</code> の細かいオプション、ACL の既定値（default ACL）、<code>mount</code> の <code>umask=</code> オプション（FAT など Linux の権限を持たないファイルシステム用）は扱わない。umask の中身を2進数で暗記する必要もない。1桁ずつ rwx に分けて読めれば足りる。</div></div>
+
+<h2 id="chmod">chmod の2つの書き方</h2>
+<div class="sgoal"><b>この節で分かること</b>: 数値（640）と記号（u=rw,g=r）が同じものを指す仕組み。</div>
+<p>この章は <code>~/work/ch2</code> で作業する。<code>chmod</code> には、全部を数で言い切る書き方と、差分を記号で言う書き方がある。</p>
+<pre><code>$ mkdir -p ~/work/ch2
+$ cd ~/work/ch2
+$ touch f.txt
+$ chmod 640 f.txt
+$ ls -l f.txt
+-rw-r----- 1 lab lab 0 Oct 13 11:09 f.txt
+$ chmod u=rwx,g=rx,o= f.txt
+$ ls -l f.txt
+-rwxr-x--- 1 lab lab 0 Oct 13 11:09 f.txt
+$ chmod g+w,o+r f.txt
+$ ls -l f.txt
+-rwxrwxr-- 1 lab lab 0 Oct 13 11:09 f.txt
+$ chmod a-x f.txt
+$ ls -l f.txt
+-rw-rw-r-- 1 lab lab 0 Oct 13 11:09 f.txt
+$ stat -c "%a %A %n" f.txt
+664 -rw-rw-r-- f.txt</code></pre>
+<p>数値は 8 進数で、1桁が rwx の3ビットに当たる。r=4、w=2、x=1 を足したものが1桁になる。</p>
+<pre><code>-rw-r-----  →  rw- r-- ---  →  4+2+0  4+0+0  0+0+0  →  640
+-rwxr-x---  →  rwx r-x ---  →  4+2+1  4+0+1  0+0+0  →  750</code></pre>
+<div class="scroll"><table>
+<tr><th>記号の部品</th><th>意味</th></tr>
+<tr><td><code>u</code> <code>g</code> <code>o</code> <code>a</code></td><td>所有者 / グループ / その他 / 全員</td></tr>
+<tr><td><code>+</code> <code>-</code> <code>=</code></td><td>足す / 外す / ちょうどこれにする（指定した相手の rwx を、書いたものだけにする）</td></tr>
+<tr><td><code>r</code> <code>w</code> <code>x</code></td><td>読む / 書く / 実行（ディレクトリなら通り抜け）</td></tr>
+<tr><td><code>,</code></td><td>複数の指定を並べる（<code>u=rwx,g=rx,o=</code>）</td></tr>
+</table></div>
+<p><code>-R</code> を付けると、ディレクトリの下にあるもの全部に同じ変更をかける。</p>
+<pre><code>$ mkdir -p tree/sub
+$ touch tree/a tree/sub/b
+$ chmod -R go-rwx tree
+$ stat -c "%A %n" tree tree/a tree/sub tree/sub/b
+drwx------ tree
+-rw------- tree/a
+drwx------ tree/sub
+-rw------- tree/sub/b</code></pre>
+<div class="analogy"><b>たとえ</b>: 数値は「全部の欄を書き直す申請書」、記号は「訂正したい欄だけ書く訂正届」に近い。
+<code>chmod 640</code> は元が何であっても 640 にし、<code>chmod g+w</code> はグループの w だけを足して残りに触らない。
+<br>ただし<b>崩れる点</b>: 役所は申請書も訂正届も同じ規則で処理するが、<code>chmod</code> は違う。
+記号の書き方で「誰に」を省くと、その人の umask を見て結果を変える（2つ先の節）。数値の書き方には、この例外が無い。</div>
+
+<h2 id="umask">umask は落とすビットの印</h2>
+<div class="sgoal"><b>この節で分かること</b>: 新しく作られるファイルの権限が、どこから来ているか。</div>
+<pre><code>$ umask
+0022
+$ umask -S
+u=rwx,g=rx,o=rx
+$ touch new.txt
+$ mkdir new.d
+$ ls -ld new.txt new.d
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 new.d
+-rw-r--r-- 1 lab lab    0 Oct 13 11:09 new.txt</code></pre>
+<p>作るプログラム（<code>touch</code> や <code>mkdir</code>）は、ファイルなら 666、ディレクトリなら 777 を要求する。そこから umask に立っているビットが落とされて、644 と 755 になった。<code>umask -S</code> は、落とした後に<b>残る</b>ほうを記号で見せる。</p>
+<p>666 − 022 = 644、777 − 022 = 755。引き算と同じ答えなので、こう覚えている人は多い。値を変えて試す。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>umask は、666（ディレクトリなら 777）から引く数である。umask を 033 にすれば、
+ファイルは 666 − 033 = 633、ディレクトリは 777 − 033 = 744 で作られるはずだ。</p>
+<pre><code>$ umask 033
+$ touch u033.txt
+$ mkdir u033.d
+$ ls -ld u033.txt u033.d
+drwxr--r-- 2 lab lab 4096 Oct 13 11:09 u033.d
+-rw-r--r-- 1 lab lab    0 Oct 13 11:09 u033.txt
+$ stat -c "%a %n" u033.txt u033.d
+644 u033.txt
+744 u033.d</code></pre>
+<div class="then"><b>だめな理由</b>: ディレクトリは予想どおり 744 だが、ファイルは 633 ではなく 644 になった。
+umask は数ではなく<b>「このビットは渡さない」という印</b>で、桁ごとに rwx を照らし合わせて、印のあるビットを落とす。
+3 は <code>-wx</code> なので、グループとその他から w と x を落とす。ファイルの 6（<code>rw-</code>）には最初から x が無いので、
+落とせるのは w だけで、残りは <code>r--</code> = 4 になる。引き算は「無いものまで引いて」しまうので答えがずれる。</div></div>
+<pre><code>ファイル     6 = rw-      ディレクトリ  7 = rwx
+umask の桁   3 = -wx      umask の桁    3 = -wx
+残る         4 = r--      残る          4 = r--</code></pre>
+<p>よく使う3つの値も、同じ規則で決まる。</p>
+<pre><code>$ umask 027
+$ touch u027.txt
+$ mkdir u027.d
+$ stat -c "%a %n" u027.txt u027.d
+640 u027.txt
+750 u027.d
+$ umask 077
+$ touch u077.txt
+$ mkdir u077.d
+$ stat -c "%a %n" u077.txt u077.d
+600 u077.txt
+700 u077.d</code></pre>
+<div class="scroll"><table>
+<tr><th>umask</th><th>ファイル（666 から）</th><th>ディレクトリ（777 から）</th><th>引き算で考えると</th></tr>
+<tr><td><code>022</code></td><td>644 <code>rw-r--r--</code></td><td>755 <code>rwxr-xr-x</code></td><td>644 / 755（偶然一致）</td></tr>
+<tr><td><code>027</code></td><td>640 <code>rw-r-----</code></td><td>750 <code>rwxr-x---</code></td><td>ファイルの最後の桁が 6 − 7 で破綻</td></tr>
+<tr><td><code>077</code></td><td>600 <code>rw-------</code></td><td>700 <code>rwx------</code></td><td>ファイルが 6 − 7 で破綻</td></tr>
+<tr><td><code>033</code></td><td>644 <code>rw-r--r--</code></td><td>744 <code>rwxr--r--</code></td><td>633 と外れる</td></tr>
+</table></div>
+<p>試験では「umask が 027 のとき作られるファイル」のように問われる。迷ったら1桁ずつ rwx に開いて、印のあるビットを消せばよい。</p>
+<div class="analogy"><b>たとえ</b>: 型紙に貼るマスキングテープに近い。
+666 という色を吹き付けるとき、テープを貼った場所（umask のビット）には色が付かない。
+もともと色を吹かない場所（ファイルの x）にテープを貼っても、何も起きない。
+<br>ただし<b>崩れる点</b>: テープは吹き付ける瞬間にしか効かない。乾いた後に <code>chmod</code> で塗り直せば、
+テープの位置に関係なく色が付く（次の節）。</div>
+
+<h2 id="chmod-umask">chmod は umask を見ない。ただし1つの書き方だけ見る</h2>
+<div class="sgoal"><b>この節で分かること</b>: umask が作った後の変更に効く場合と、効かない場合。</div>
+<p>umask が 077 のまま、数値で 777 にする。</p>
+<pre><code>$ chmod 777 u077.txt
+$ stat -c "%a %n" u077.txt
+777 u077.txt</code></pre>
+<p>umask は関係なく 777 になった。数値の <code>chmod</code> は言われたとおりに書く。ところが umask を 022 に戻し、記号で「誰に」を省くと様子が変わる。</p>
+<pre><code>$ umask 022
+$ chmod 444 f.txt
+$ chmod +w f.txt
+$ ls -l f.txt
+-rw-r--r-- 1 lab lab 0 Oct 13 11:09 f.txt
+$ chmod a+w f.txt
+$ ls -l f.txt
+-rw-rw-rw- 1 lab lab 0 Oct 13 11:09 f.txt</code></pre>
+<p><code>chmod +w</code> は「全員に w」ではなく、所有者にしか足さなかった。<code>u</code> <code>g</code> <code>o</code> <code>a</code> を書かないと、chmod は <code>a</code> と書いたつもりで動きつつ、<b>umask に立っているビットには触らない</b>（man chmod に書いてある規則）。umask 022 はグループとその他の w を落とす印なので、触れたのは所有者の w だけである。全員に足したいなら <code>a+w</code> と書く。外すほうも同じである。</p>
+<pre><code>$ chmod -w f.txt
+chmod: f.txt: new permissions are r--rw-rw-, not r--r--r--
+$ ls -l f.txt
+-r--rw-rw- 1 lab lab 0 Oct 13 11:09 f.txt
+$ chmod a-w f.txt
+$ ls -l f.txt
+-r--r--r-- 1 lab lab 0 Oct 13 11:09 f.txt</code></pre>
+<p><code>chmod -w</code> は所有者の w しか外さず、<code>chmod</code> 自身が「r--r--r-- にはならず r--rw-rw- になった」と警告した。グループとその他の w は umask に守られて残っている。試験で「全員の書き込みを禁止する」を問われたら、<code>a-w</code>（か <code>ugo-w</code>）と「誰に」を書いたものを選ぶ。</p>
+
+<h2 id="where">umask はどこから来るか</h2>
+<div class="sgoal"><b>この節で分かること</b>: umask がプロセスごとの値であり、どこに書けば次のシェルでも効くか。</div>
+<p>umask はファイルの属性ではなく、<b>動いているプロセスが持つ値</b>で、子のプロセスにそのまま受け継がれる。</p>
+<pre><code>$ umask 027
+$ bash -c umask
+0027
+$ umask 022
+$ bash -c umask
+0022</code></pre>
+<p>いまのシェルで変えた値は、そこから起動したシェルにも渡る。逆に言えば、いまのシェルで打った <code>umask 027</code> は、ログインし直したシェル（親から受け継がないシェル）には効かない。ログインのたびに決め直されるからである。</p>
+<pre><code>$ sudo -u alice bash -c umask
+0002
+$ grep -E "^(UMASK|USERGROUPS_ENAB)" /etc/login.defs
+UMASK		022
+USERGROUPS_ENAB yes</code></pre>
+<p>sudo で alice として動かしたシェルは 0002 だった。sudo はログインと同じく PAM を通り、<code>pam_umask</code> が <code>/etc/login.defs</code> の <code>UMASK 022</code> を使う。さらに <code>USERGROUPS_ENAB yes</code> なので、ユーザ名と同じ名前の主グループを持つユーザ（alice の主グループ alice には、alice 1人しかいない）には、グループの w を残した 0002 を設定する。自分専用のグループなら、グループに書かせても困らないからである。</p>
+<p>自分のシェルで毎回同じ umask にしたいときは、起動時に読まれるファイルに書く。</p>
+<pre><code>$ grep -n umask ~/.profile
+7:# the default umask is set in /etc/profile; for setting the umask
+8:# for ssh logins, install and configure the libpam-umask package.
+9:#umask 022
+$ grep -n bashrc ~/.profile
+13:    # include .bashrc if it exists
+14:    if [ -f "$HOME/.bashrc" ]; then
+15:	. "$HOME/.bashrc"</code></pre>
+<div class="scroll"><table>
+<tr><th>書く場所</th><th>効く範囲</th></tr>
+<tr><td><code>~/.bashrc</code></td><td>自分の対話シェル（起動するたびに読まれる）</td></tr>
+<tr><td><code>~/.profile</code>（<code>~/.bash_profile</code>）</td><td>自分のログインシェル。Ubuntu の <code>~/.profile</code> は中で <code>~/.bashrc</code> も読む</td></tr>
+<tr><td><code>/etc/profile</code></td><td>全ユーザのログインシェル</td></tr>
+<tr><td><code>/etc/login.defs</code> の <code>UMASK</code></td><td>PAM（<code>pam_umask</code>）がログイン時に設定する既定値</td></tr>
+</table></div>
+<p>この檻で umask が 0022 なのは、<code>docker run</code> がコンテナの最初のプロセスに 0022 を与えるからで、PAM を通っていない。著者が確かめたところ、別の端末から <code>docker exec</code> で同じコンテナに入ったシェルは <b>umask が 0000</b> で、<code>touch</code> したファイルが <code>-rw-rw-rw-</code> になった（docker 29.8.0）。この教材は2つ目の端末を使わない前提で記録してある。開くなら、最初に <code>umask 022</code> を打ってほしい。</p>
+<div class="analogy"><b>たとえ</b>: 家ごとに受け継がれる家訓に近い。
+子は親の家訓をそのまま持って家を出て、自分の家で書き換えてもよいが、親の家訓は変えられない。
+<br>ただし<b>崩れる点</b>: 家訓は口で伝わるが、umask は書かれた場所（<code>~/.bashrc</code> など）から読み直されることもある。
+ログインし直したシェルは親から受け継がず、そのファイルを読んで決め直す。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-files/">演習02</a>は、「次に開くシェルでも」ファイルが 640、ディレクトリが 750 で作られるようにする課題である。
+判定は umask を 0022 に戻してから新しいログインシェルを起動し、その中で実際に作って確かめる。
+いまのシェルで <code>umask 027</code> と打つだけでは通らない。</div>
+<div class="quiz"><b>確認</b>
+<p>umask が <code>027</code> のとき、<code>touch</code> で作られるファイルと、<code>mkdir</code> で作られるディレクトリのパーミッションを答えよ。</p>
+<details><summary>答え</summary>
+<p>ファイルは 640（<code>-rw-r-----</code>）、ディレクトリは 750（<code>drwxr-x---</code>）。
+666 と 777 から、グループの w（2）とその他の rwx（7）を落とす。実測の記録どおりである。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>chmod u=rwx,g=rx,o=r file</code> と同じ結果になる数値の指定はどれか。<br>
+a. 751　b. 754　c. 755　d. 764</p>
+<details><summary>答え</summary>
+<p>b。u=rwx は 4+2+1=7、g=rx は 4+1=5、o=r は 4。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>umask が <code>022</code> のシェルで、<code>-r--r--r--</code> のファイルに <code>chmod +w</code> を打った。結果はどうなるか。</p>
+<details><summary>答え</summary>
+<p><code>-rw-r--r--</code>。「誰に」を省いた記号指定は、umask に立っているビット（グループとその他の w）に触らない（<code>chmod -w</code> で外すときも同じ）。
+全員に足すなら <code>chmod a+w</code> と書く。数値の <code>chmod 666</code> も umask に関係なく 666 になる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>いまのシェルで <code>umask 077</code> と打った。この設定を、次にログインしたときにも効かせるにはどうするか。</p>
+<details><summary>答え</summary>
+<p><code>~/.bashrc</code> か <code>~/.profile</code> に <code>umask 077</code> を書く（全ユーザなら <code>/etc/profile</code>）。
+umask はプロセスごとの値で、ログインし直したシェルは起動時に読むファイルから決め直すので、
+打っただけの値は残らない。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>chmod</code> の数値は r=4・w=2・x=1 の足し算を3桁並べたもの。記号は <code>u g o a</code> × <code>+ - =</code> × <code>r w x</code></li><li>新しいファイルは 666、ディレクトリは 777 から、umask に立っているビットを落として作られる</li><li>引き算ではない。<code>umask 033</code> のファイルは 633 ではなく 644（実測）</li><li><code>umask</code> で値を、<code>umask -S</code> で残る権限を記号で見る</li><li>数値の <code>chmod</code> は umask を見ない。「誰に」を省いた記号指定（<code>chmod +w</code>・<code>chmod -w</code>）だけは、umask に立っているビットに触らない</li><li>umask はプロセスの値で、子に受け継がれる。毎回効かせるなら <code>~/.bashrc</code>・<code>~/.profile</code>・<code>/etc/profile</code>（PAM なら <code>/etc/login.defs</code> の <code>UMASK</code>）</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-files/theory/01-permissions">← 1. 名前と中身は、別の場所にある</a><a href="/linuc-files/theory/03-special-bits">次: 3. 特殊なビットは「誰として動くか」と「誰が消せるか」を変える →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-files/chapters.js"></script>
+<script src="/linuc-files/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

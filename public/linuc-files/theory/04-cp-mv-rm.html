@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. コピーは中身を作り直し、移動は名前を書き換える — 確かめて説明する LinuC 主題1.02</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="linuc-files">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-files/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/">詳しく</a></p>
+</div>
+<h1>4. コピーは中身を作り直し、移動は名前を書き換える</h1>
+<p class="lead"><code>cp</code> で作った写しは、中身が同じでも権限は 664 から 644 に、時刻は写した瞬間に変わった。<code>cp</code> は新しい中身を1つ作る操作で、<code>mv</code> は同じファイルシステムの中なら名前の行を書き換えるだけだからだ。ワイルドカードも同じ目で見ると、広げているのが誰なのかが分かる。</p>
+<div class="badges"><span>前提: 第3章まで読了</span><span>前提: 檻が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.02.2（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>cp</code> の写しで変わるもの（所有者・権限・時刻）と、それを保つオプションを言える</li><li><code>mv</code> が中身を動かさない場合と、動かす場合を区別できる</li><li>ワイルドカードを広げているのがシェルだと分かり、一致しないときの動きを予想できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>rsync</code>、<code>cp --reflink</code>、<code>install</code> コマンド、<code>shopt</code> でグロブの挙動を変える方法（<code>dotglob</code>・<code>nullglob</code>・<code>extglob</code>）は扱わない。正規表現（<code>grep</code> のパターン）はワイルドカードとは別物で、主題1.03 の範囲である。</div></div>
+
+<h2 id="cp">cp は新しいファイルを作る</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>cp</code> の写しで、何が元と変わるか。</div>
+<p>この章は <code>~/work/ch4</code> で作業する。権限と時刻にはっきりした印を付けた元ファイルを作る。</p>
+<pre><code>$ mkdir -p ~/work/ch4
+$ cd ~/work/ch4
+$ echo "元の中身" &gt; orig.txt
+$ chmod 664 orig.txt
+$ touch -d "2025-04-01 09:00" orig.txt
+$ ls -l --time-style=long-iso orig.txt
+-rw-rw-r-- 1 lab lab 13 2025-04-01 09:00 orig.txt</code></pre>
+<p><code>--time-style=long-iso</code> は時刻を年から表示させるだけのオプションで、意味は変わらない。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>cp</code> はファイルを複製するコマンドだから、写しは元と同じもの（中身も、権限も、時刻も）になるはずだ。</p>
+<pre><code>$ cp orig.txt copy.txt
+$ ls -l --time-style=long-iso orig.txt copy.txt
+-rw-r--r-- 1 lab lab 13 2026-10-13 11:09 copy.txt
+-rw-rw-r-- 1 lab lab 13 2025-04-01 09:00 orig.txt</code></pre>
+<div class="then"><b>だめな理由</b>: 中身は同じだが、時刻は写した瞬間になり、権限は <code>rw-rw-r--</code> から <code>rw-r--r--</code> に減った。
+<code>cp</code> は元を見ながら<b>新しいファイルを1つ作る</b>。新しく作るので、時刻は作った時刻になり、
+権限は「元の権限から umask のビットを落としたもの」になる（第2章の規則がここでも効く。umask 022 がグループの w を落とした）。
+「同じものを作る」のではなく「同じ中身の新しいものを作る」と読む。</div></div>
+<p>元の時刻と権限を写したいときは <code>-p</code>（preserve）を付ける。</p>
+<pre><code>$ cp -p orig.txt keep.txt
+$ ls -l --time-style=long-iso orig.txt keep.txt
+-rw-rw-r-- 1 lab lab 13 2025-04-01 09:00 keep.txt
+-rw-rw-r-- 1 lab lab 13 2025-04-01 09:00 orig.txt</code></pre>
+<p>所有者はどうか。root のファイルを一般ユーザが写す。</p>
+<pre><code>$ sudo cp orig.txt rootcopy.txt
+$ ls -l --time-style=long-iso rootcopy.txt
+-rw-r--r-- 1 root root 13 2026-10-13 11:09 rootcopy.txt
+$ cp rootcopy.txt mine.txt
+$ ls -l --time-style=long-iso mine.txt
+-rw-r--r-- 1 lab lab 13 2026-10-13 11:09 mine.txt
+$ cp -p rootcopy.txt mine-p.txt; echo "exit=$?"
+exit=0
+$ ls -l --time-style=long-iso mine-p.txt
+-rw-r--r-- 1 lab lab 13 2026-10-13 11:09 mine-p.txt</code></pre>
+<p>写しの所有者は、写した人（lab）になる。<code>-p</code> を付けても所有者だけは写せず、しかもエラーにならない（終了コード 0）。所有者を変えられるのは root だけだからである（第3章）。</p>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>写しの時刻</th><th>写しの権限</th><th>写しの所有者</th></tr>
+<tr><td><code>cp a b</code></td><td>写した時刻</td><td>元の権限から umask を落としたもの</td><td>写した人</td></tr>
+<tr><td><code>cp -p a b</code></td><td>元と同じ</td><td>元と同じ</td><td>root なら元と同じ。一般ユーザは自分</td></tr>
+<tr><td><code>cp -a a b</code></td><td>元と同じ</td><td>元と同じ</td><td><code>-p</code> と同じ。加えてディレクトリを再帰し、リンクはリンクのまま写す</td></tr>
+</table></div>
+<p>上書きの前に確認させるのが <code>-i</code> である（<code>n</code> は自分で打つ）。</p>
+<pre><code>$ cp -i copy.txt keep.txt
+cp: overwrite 'keep.txt'? n</code></pre>
+<div class="analogy"><b>たとえ</b>: 原本を見ながら、新しい用紙に書き写す作業に近い。
+写しは新しい紙なので、受付印（時刻）も持ち主も新しくなる。<code>-p</code> は「原本の日付印も写す」指示である。
+<br>ただし<b>崩れる点</b>: 紙の写しなら誰の名義にでもできるが、ファイルの写しは写した人のものにしかならない。
+原本の持ち主の名義まで写せるのは root だけである。</div>
+
+<h2 id="mv">mv は名前を書き換えるだけ（同じファイルシステムなら）</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>mv</code> が中身を動かさない場合と、動かす場合。</div>
+<p>第1章で、名前の先にある実体には番号があると言った。<code>ls -i</code> でその番号（inode 番号）が見える。</p>
+<pre><code>$ ls -i orig.txt
+18127232 orig.txt
+$ mv orig.txt renamed.txt
+$ ls -i renamed.txt
+18127232 renamed.txt
+$ ls -l --time-style=long-iso renamed.txt
+-rw-rw-r-- 1 lab lab 13 2025-04-01 09:00 renamed.txt</code></pre>
+<p>番号も時刻も権限も変わらない。<code>mv</code> はディレクトリの表で名前の行を書き換えただけで、実体には触れていない。ディレクトリを変えても同じファイルシステムの中なら、表の行を別の表へ移すだけである。番号そのものはあなたの環境では違う値になる。同じ番号のまま残ることが要点である。</p>
+<p>ところが、ホームへ移すと番号が変わる。</p>
+<pre><code>$ mv renamed.txt ~/renamed.txt
+$ ls -i ~/renamed.txt
+18369915 /home/lab/renamed.txt
+$ mv ~/renamed.txt ~/work/ch4/
+$ df --output=target ~/work ~
+Mounted on
+/home/lab/work
+/</code></pre>
+<p><code>~/work</code> は起動コマンドの <code>-v</code> で付けたボリュームで、ホーム（<code>/</code> と同じファイルシステム）とは別のファイルシステムである。名前の表は1つのファイルシステムの中でしか番号を指せないので、<code>mv</code> は黙って「新しい側に写してから元を消す」に切り替える。外から見ると同じ <code>mv</code> でも、中で起きていることが違う。</p>
+<div class="analogy"><b>たとえ</b>: 同じ建物の中で、部屋の表札を付け替える作業に近い。住人（実体）は1歩も動かない。
+<br>ただし<b>崩れる点</b>: 別の建物（別のファイルシステム）へ移るときは表札を付け替えられず、
+新しい建物に住人を作り直して、古い建物から消す。名前は同じでも、番号は新しい建物のものになる。</div>
+
+<h2 id="dirs">mkdir・rmdir・rm と、ディレクトリのコピー</h2>
+<div class="sgoal"><b>この節で分かること</b>: ディレクトリを作る・消す・写すときに必要なオプション。</div>
+<pre><code>$ mkdir a/b/c
+mkdir: cannot create directory ‘a/b/c’: No such file or directory
+$ mkdir -p a/b/c
+$ touch a/b/c/file
+$ rmdir a/b/c
+rmdir: failed to remove 'a/b/c': Directory not empty
+$ rm a
+rm: cannot remove 'a': Is a directory
+$ rm -r a
+$ mkdir -p x/y/z
+$ rmdir -p x/y/z
+$ ls -d a x
+ls: cannot access 'a': No such file or directory
+ls: cannot access 'x': No such file or directory</code></pre>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>できること</th><th>できないこと</th></tr>
+<tr><td><code>mkdir -p a/b/c</code></td><td>途中のディレクトリもまとめて作る</td><td>（<code>-p</code> なしは途中が無いと失敗）</td></tr>
+<tr><td><code>rmdir dir</code></td><td>空のディレクトリを消す</td><td>中身があると失敗する</td></tr>
+<tr><td><code>rmdir -p x/y/z</code></td><td>z・y・x の順に、空なら親もたどって消す</td><td>中身があると止まる</td></tr>
+<tr><td><code>rm dir</code></td><td>—</td><td>ディレクトリは消せない（<code>Is a directory</code>）</td></tr>
+<tr><td><code>rm -r dir</code></td><td>中身ごと再帰的に消す（<code>-f</code> を足すと確認も出さない）</td><td>—</td></tr>
+</table></div>
+<p>ディレクトリを写すには <code>-r</code> が要る。そして、同じコマンドを2回打つと結果が変わる。</p>
+<pre><code>$ mkdir -p src/sub
+$ echo 1 &gt; src/one; echo 2 &gt; src/sub/two
+$ cp src dst
+cp: -r not specified; omitting directory 'src'
+$ cp -r src dst
+$ ls -R dst
+dst:
+one  sub
+
+dst/sub:
+two
+$ cp -r src dst
+$ ls -R dst
+dst:
+one  src  sub
+
+dst/src:
+one  sub
+
+dst/src/sub:
+two
+
+dst/sub:
+two</code></pre>
+<p>1回目は <code>dst</code> が無かったので「<code>src</code> を <code>dst</code> という名前で写す」になり、2回目は <code>dst</code> が既にあるので「<code>dst</code> の<b>中へ</b> <code>src</code> を写す」になった。最後の引数が既存のディレクトリかどうかで意味が変わる。<code>mv</code> も同じ規則で動く。</p>
+
+<h2 id="touch-file">touch と file — 時刻と、中身の種類</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>touch</code> が時刻を書き換え、<code>file</code> が名前ではなく中身を見ること。</div>
+<pre><code>$ touch -t 202001020304.05 t.txt
+$ ls -l --time-style=full-iso t.txt
+-rw-r--r-- 1 lab lab 0 2020-01-02 03:04:05.000000000 +0900 t.txt
+$ touch t.txt
+$ ls -l --time-style=full-iso t.txt
+-rw-r--r-- 1 lab lab 0 2026-10-13 11:09:20.096820889 +0900 t.txt</code></pre>
+<p><code>touch</code> は、無ければ空のファイルを作り、あれば更新時刻をいまにする。<code>-t [[CC]YY]MMDDhhmm[.ss]</code> か <code>-d "日時"</code> で好きな時刻にもできる。時刻は inode が持っている情報なので、データ（ファイルの中身）に1バイトも触れずに書き換えられる。</p>
+<pre><code>$ file renamed.txt /usr/bin/passwd /bin /dev/null
+renamed.txt:     Unicode text, UTF-8 text
+/usr/bin/passwd: setuid ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=2344480b478a675609210ed886207d6cbdc8cdd7, for GNU/Linux 3.2.0, stripped
+/bin:            symbolic link to usr/bin
+/dev/null:       character special (1/3)
+$ echo "ただの文字" &gt; photo.jpg
+$ cp /usr/bin/ls notes.txt
+$ file photo.jpg notes.txt
+photo.jpg: Unicode text, UTF-8 text
+notes.txt: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=44900829b39271d878615772bb2a6ffa422f0891, for GNU/Linux 3.2.0, stripped</code></pre>
+<p><code>file</code> は拡張子を見ない。中身の先頭にある特徴的なバイト列（マジックナンバー）で判定するので、<code>.jpg</code> という名前の文字ファイルは文字と、<code>.txt</code> という名前のプログラムはプログラムと答える。Linux では、拡張子は人間のための目印にすぎない。</p>
+
+<h2 id="glob">ワイルドカードを広げているのはシェル</h2>
+<div class="sgoal"><b>この節で分かること</b>: ワイルドカードが誰に、いつ、どう広げられるか。</div>
+<p>名前を並べたディレクトリを作り、<code>echo</code> で広がり方を見る。<code>echo</code> は受け取った引数を並べるだけなので、シェルが何を渡したかがそのまま見える。</p>
+<pre><code>$ mkdir glob; cd glob
+$ touch a.txt b.txt c.log .hidden.txt data1 data2 data10 Data3
+$ echo *
+Data3 a.txt b.txt c.log data1 data10 data2
+$ echo *.txt
+a.txt b.txt
+$ echo data?
+data1 data2
+$ echo data*
+data1 data10 data2
+$ echo data[12]
+data1 data2
+$ echo [a-c]*
+a.txt b.txt c.log
+$ echo [!a]*
+Data3 b.txt c.log data1 data10 data2
+$ echo .*
+.hidden.txt</code></pre>
+<div class="scroll"><table>
+<tr><th>パターン</th><th>一致するもの</th><th>実測</th></tr>
+<tr><td><code>*</code></td><td>0文字以上の任意の文字列（先頭の <code>.</code> を除く）</td><td><code>.hidden.txt</code> は出ない</td></tr>
+<tr><td><code>?</code></td><td>任意の1文字</td><td><code>data?</code> に <code>data10</code> は入らない</td></tr>
+<tr><td><code>[12]</code> <code>[a-c]</code></td><td>括弧の中のどれか1文字（範囲も書ける）</td><td><code>data[12]</code> → <code>data1 data2</code></td></tr>
+<tr><td><code>[!a]</code></td><td>括弧の中以外の1文字（<code>[^a]</code> とも書ける）</td><td><code>a.txt</code> だけが外れる</td></tr>
+<tr><td><code>.*</code></td><td><code>.</code> で始まる名前（隠しファイル）</td><td><code>.hidden.txt</code></td></tr>
+</table></div>
+<p>大文字と小文字は区別する（<code>Data3</code> は <code>data*</code> に入らない）。並びは名前の順に整えられる。そして <code>.</code> で始まる名前、つまり<b>隠しファイル</b>は、<code>.</code> から書き始めたパターンにしか一致しない。bash 5.2 の <code>.*</code> は <code>.</code> と <code>..</code> を拾わないが、古い bash やほかのシェルでは <code>.*</code> が <code>.</code>（いまの場所）と <code>..</code>（親）にも一致するので、<code>.*</code> を消す操作に使うときは必ず <code>echo .*</code> で先に確かめる。</p>
+<p>一致する名前が1つも無いときが大事である。</p>
+<pre><code>$ echo *.csv
+*.csv
+$ ls *.csv
+ls: cannot access '*.csv': No such file or directory</code></pre>
+<p>シェルは一致しないパターンを、<b>そのままの文字列で</b>コマンドに渡す。<code>ls</code> は <code>*.csv</code> という名前のファイルを探して見つからなかった、と言っている。エラーを出したのはシェルではなく <code>ls</code> である。ワイルドカードを広げるのはコマンドではなくシェルで、コマンドが受け取るのは広げた後の名前の並び（か、広がらなかった文字列そのもの）だけなのである。</p>
+<pre><code>$ echo {a,b}.txt {x,y}.md
+a.txt b.txt x.md y.md
+$ rm -v *
+removed 'Data3'
+removed 'a.txt'
+removed 'b.txt'
+removed 'c.log'
+removed 'data1'
+removed 'data10'
+removed 'data2'
+$ ls -A
+.hidden.txt</code></pre>
+<p><code>{a,b}</code> は<b>ブレース展開</b>で、ワイルドカードとは別物である。名前を「探す」のではなく「作る」ので、存在しない <code>x.md</code> も並ぶ。最後の <code>rm -v *</code> は、<code>*</code> が隠しファイルを拾わないので <code>.hidden.txt</code> を残した。<code>rm</code> に <code>*</code> を渡すのは、いまいる場所の全部を渡すのと同じなので、打つ前に <code>pwd</code> で場所を確かめる（ここでは <code>~/work/ch4/glob</code>）。<code>ls -A</code> は <code>.</code> と <code>..</code> を除いて隠しファイルも見せるオプションである。</p>
+<div class="analogy"><b>たとえ</b>: 宛名ラベルを作る係（シェル）に近い。
+「渋谷区の全員」という指示を受け取ると、係が名簿から該当者のラベルを刷り、配達員（コマンド）にはラベルの束だけを渡す。
+<br>ただし<b>崩れる点</b>: 該当者が1人もいないとき、この係は「渋谷区の全員」と書いた紙を1枚そのまま渡してしまう。
+配達員はその名前の人を探して「いません」と言う。それが <code>ls: cannot access '*.csv'</code> である。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-files/">演習04</a>は、隠しファイルを含む <code>.conf</code> を、時刻ごと backup/ に写す課題である。
+判定は元と写しの中身・更新時刻（ナノ秒まで）・権限を比べる。<code>*</code> と <code>cp</code> の両方で1回ずつ引っかかる作りになっている。</div>
+<div class="quiz"><b>確認</b>
+<p>ディレクトリ <code>src</code> を中身ごと <code>backup</code> にコピーしたい。パーミッションと更新時刻も保つには、どのオプションを付けるか。</p>
+<details><summary>答え</summary>
+<p><code>cp -rp src backup</code> か <code>cp -a src backup</code>。<code>-r</code>（<code>-R</code>）が無いとディレクトリは写らず
+（<code>-r not specified; omitting directory</code>）、<code>-p</code> が無いと時刻は写した時刻に、権限は umask を落としたものになる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>中にファイルが残っているディレクトリ <code>old</code> を、中身ごと削除するコマンドはどれか。<br>
+a. <code>rmdir old</code>　b. <code>rm old</code>　c. <code>rm -r old</code>　d. <code>rmdir -p old</code></p>
+<details><summary>答え</summary>
+<p>c。<code>rmdir</code> は空のディレクトリしか消せず（<code>Directory not empty</code>）、<code>-r</code> の無い <code>rm</code> はディレクトリを消さない（<code>Is a directory</code>）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>カレントディレクトリに <code>a.txt</code>・<code>b.txt</code>・<code>.c.txt</code>・<code>d10.txt</code> がある。<code>ls *.txt</code> と <code>ls ?.txt</code> で表示されるファイルを、それぞれすべて答えよ。</p>
+<details><summary>答え</summary>
+<p><code>ls *.txt</code> は <code>a.txt</code>・<code>b.txt</code>・<code>d10.txt</code>。<code>.c.txt</code> は先頭が <code>.</code> なので <code>*</code> に一致しない（隠しファイル）。<code>ls ?.txt</code> は <code>a.txt</code> と <code>b.txt</code> だけで、<code>?</code> は任意の1文字なので <code>d10.txt</code> は長さで外れる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>同じファイルシステムの中で <code>mv a.txt b.txt</code> を実行した。<code>ls -i</code> で見た inode 番号と、更新時刻はどうなるか。</p>
+<details><summary>答え</summary>
+<p>どちらも変わらない。<code>mv</code> は名前の行を書き換えるだけで、中身には触れない。
+別のファイルシステムへの <code>mv</code> だけは、写してから元を消すので inode 番号が変わる（実測: <code>~/work</code> からホームへ移したとき）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>cp</code> は新しいファイルを作る。時刻は写した時刻、権限は umask を落としたもの、所有者は写した人になる</li><li><code>-p</code> で時刻と権限を写す。<code>-a</code> はそれに加えて再帰し、リンクをリンクのまま写す。所有者まで写せるのは root だけ</li><li><code>mv</code> は同じファイルシステムなら名前を書き換えるだけ（inode 番号も時刻も変わらない）。別のファイルシステムへは写して消す</li><li>ディレクトリは <code>mkdir -p</code> でまとめて作り、<code>rmdir</code>（空だけ）か <code>rm -r</code> で消す。<code>cp -r</code> の行き先が既にあると、その中へ写す</li><li><code>touch</code> は時刻を書き換え、<code>file</code> は拡張子ではなく中身で種類を判定する</li><li>ワイルドカード（<code>*</code> <code>?</code> <code>[...]</code>）を広げるのはシェル。<code>*</code> は隠しファイルに一致せず、一致しないとパターンがそのまま渡る</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / bash 5.2.21 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-files/theory/03-special-bits">← 3. 特殊なビットは「誰として動くか」と「誰が消せるか」を変える</a><a href="/linuc-files/theory/05-find">次: 5. find は名前をたどり、中身の属性で選ぶ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-files/chapters.js"></script>
+<script src="/linuc-files/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>7. ハードリンクは名前を増やし、シンボリックリンクは道順を書く — 確かめて説明する LinuC 主題1.02</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="7" data-theme="linuc-files">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-files/theory/">理論編</a> › 第7章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/">詳しく</a></p>
+</div>
+<h1>7. ハードリンクは名前を増やし、シンボリックリンクは道順を書く</h1>
+<p class="lead"><code>rm memo.txt</code> の後も、<code>hard.txt</code> から同じ中身が読めた。<code>rm</code> が消すのは名前1つで、中身は最後の名前が消えるまで残る。ハードリンクは同じ中身にもう1つ名前を付け、シンボリックリンクは「この道順で行け」と書いた別のファイルを置く。第1章で見つけた「名前と中身は別の場所にある」が、ここで正面から使える。</p>
+<div class="badges"><span>前提: 第6章まで読了</span><span>前提: 檻が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.02.3（重要度2）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>ls -li</code> と <code>ls -F</code> の表示から、ハードリンクとシンボリックリンクを見分けられる</li><li>元のファイルを消したとき・別のファイルシステムをまたぐとき・ディレクトリのとき、それぞれどちらが使えるかを言える</li><li>シンボリックリンクで「いま使う版」を切り替える手順を、<code>ln -sfn</code> の意味とともに書ける</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: inode の中の構造（データブロックへのポインタ）、<code>debugfs</code>、<code>update-alternatives</code> の操作、<code>readlink</code> と <code>realpath</code> の細かい違いは扱わない。<code>update-alternatives</code> は「シンボリックリンクを2段つないで実体を切り替えている」と分かれば足りる。</div></div>
+
+<h2 id="hard">ハードリンクは、同じ中身のもう1つの名前</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>ln</code> で作った名前が、元の名前と何を共有しているか。</div>
+<p>この章は <code>~/work/ch7</code> で作業する。1つのファイルに、2種類のリンクを作る。</p>
+<pre><code>$ mkdir -p ~/work/ch7
+$ cd ~/work/ch7
+$ echo "第1版" &gt; memo.txt
+$ ln memo.txt hard.txt
+$ ln -s memo.txt soft.txt
+$ ls -li memo.txt hard.txt soft.txt
+18128118 -rw-r--r-- 2 lab lab 8 Oct 13 11:09 hard.txt
+18128118 -rw-r--r-- 2 lab lab 8 Oct 13 11:09 memo.txt
+18128120 lrwxrwxrwx 1 lab lab 8 Oct 13 11:09 soft.txt -&gt; memo.txt</code></pre>
+<p><code>ls -i</code> の <code>-i</code> は、行頭に <b>inode</b> 番号を出す。第1章で「名前の先にある実体の番号」と呼んだものである。<code>memo.txt</code> と <code>hard.txt</code> は同じ番号を指していて、3列目（<b>リンク数</b>）が 2 になっている。「この中身を指している名前が2つある」という意味である。番号そのものは環境ごとに違う値になる。2つが同じであることが要点である。</p>
+<pre><code>$ echo "追記" &gt;&gt; hard.txt
+$ cat memo.txt
+第1版
+追記</code></pre>
+<p><code>hard.txt</code> に足したものが <code>memo.txt</code> から読める。<b>ハードリンク</b>は写しではなく、同じ中身に付いた2つ目の名前なので、どちらから書いても同じ1つが変わる。どちらが元でどちらがリンクかという区別も無い。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>rm memo.txt</code> でファイルを消せば、その中身はディスクから消える。
+<code>hard.txt</code> も同じ中身を指していたのだから、一緒に読めなくなるはずだ。</p>
+<pre><code>$ rm memo.txt
+$ ls -li hard.txt soft.txt
+18128118 -rw-r--r-- 1 lab lab 15 Oct 13 11:09 hard.txt
+18128120 lrwxrwxrwx 1 lab lab  8 Oct 13 11:09 soft.txt -&gt; memo.txt
+$ cat hard.txt
+第1版
+追記</code></pre>
+<div class="then"><b>だめな理由</b>: 中身は残っていて、<code>hard.txt</code> から全部読める。変わったのはリンク数が 2 から 1 になったことだけである。
+<code>rm</code> は「ディレクトリの表から名前を1行消す」操作で（第1章）、中身はリンク数が 0 になったときに初めて片づけられる。
+<code>rm</code> の正体は「消す」ではなく「名前を1つ外す」である。</div></div>
+<div class="analogy"><b>たとえ</b>: 1人の人が、名簿に本名と通称の2行で載っている状態に近い。
+どちらの名前で呼んでも同じ1人に届き、片方の行を名簿から消しても、その人はもう1つの名前で呼べる。
+<br>ただし<b>崩れる点</b>: 人には本名と通称の区別があるが、ハードリンクの名前はすべて対等で、どれが「元」かは記録されていない。
+そして名簿から最後の1行が消えた時点で、その人（中身）も片づけられる。</div>
+
+<h2 id="soft">シンボリックリンクは、道順を書いた別のファイル</h2>
+<div class="sgoal"><b>この節で分かること</b>: シンボリックリンクが何を中身に持ち、元が消えるとどうなるか。</div>
+<p>同じ <code>rm</code> の後で、<code>soft.txt</code> を読む。</p>
+<pre><code>$ cat soft.txt
+cat: soft.txt: No such file or directory
+$ file soft.txt
+soft.txt: broken symbolic link to memo.txt</code></pre>
+<p><code>soft.txt</code> は自分の inode 番号を持つ、別のファイルである。中身は <code>memo.txt</code> という<b>道順（パス）の文字列</b>だけで、大きさの 8 は「memo.txt」の8文字である。<b>シンボリックリンク</b>を開くと、カーネルがその道順をたどり直す。道の先の名前が消えたので、壊れたリンクになった。同じ名前でファイルを作り直すと、どうなるか。</p>
+<pre><code>$ echo "新しい memo" &gt; memo.txt
+$ cat soft.txt
+新しい memo
+$ ls -li memo.txt hard.txt
+18128118 -rw-r--r-- 1 lab lab 15 Oct 13 11:09 hard.txt
+18128122 -rw-r--r-- 1 lab lab 15 Oct 13 11:09 memo.txt</code></pre>
+<p><code>soft.txt</code> は新しい <code>memo.txt</code> を読むようになった。道順は名前で書かれているので、その名前に何があるかしか見ない。一方 <code>hard.txt</code> は古い中身（番号 18128118）を指したままで、新しい <code>memo.txt</code> とは別のファイルである。</p>
+<pre><code>$ ls -F
+hard.txt  memo.txt  soft.txt@
+$ ls -i hard.txt
+18128118 hard.txt</code></pre>
+<p><code>ls -F</code> は名前の後ろに種類の印を付ける。<code>@</code> はシンボリックリンク、<code>/</code> はディレクトリ、<code>*</code> は実行できるファイルである。ハードリンクには印が付かない。普通のファイルと見分けが付かないのが、ハードリンクの性質そのものである（見分けるにはリンク数か inode 番号を見る）。</p>
+<p>シンボリックリンクの権限は、いつも <code>lrwxrwxrwx</code> と表示される。</p>
+<pre><code>$ touch target; chmod 600 target; ln -s target lnk
+$ ls -l target lnk
+lrwxrwxrwx 1 lab lab 6 Oct 13 11:09 lnk -&gt; target
+-rw------- 1 lab lab 0 Oct 13 11:09 target
+$ chmod 644 lnk
+$ ls -l target lnk
+lrwxrwxrwx 1 lab lab 6 Oct 13 11:09 lnk -&gt; target
+-rw-r--r-- 1 lab lab 0 Oct 13 11:09 target</code></pre>
+<p>リンクに <code>chmod</code> をかけたのに、変わったのは行き先の <code>target</code> だった。リンク自身の権限は使われず、読み書きできるかどうかは行き先の権限で決まる。<code>lrwxrwxrwx</code> は「誰でも読み書きできる」という意味ではない。</p>
+<div class="analogy"><b>たとえ</b>: 「この書類は 3階の B 棚へ」と書いた案内の付箋に近い。
+付箋そのものは書類ではなく、行き方が書いてあるだけ。書類が別の棚へ移されると、付箋は嘘になる。
+<br>ただし<b>崩れる点</b>: 付箋は誰が見ても読めるが、たどった先の書類を読めるかどうかは書類の側の鍵で決まる。
+<code>lrwxrwxrwx</code> は付箋の見た目で、書類の鍵ではない。</div>
+
+<h2 id="limits">ハードリンクにできないこと</h2>
+<div class="sgoal"><b>この節で分かること</b>: ハードリンクが作れない2つの場合と、その理由。</div>
+<pre><code>$ mkdir d
+$ ln d dlink
+ln: d: hard link not allowed for directory
+$ ln -s d dsoft
+$ ls -ld d dsoft
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 d
+lrwxrwxrwx 1 lab lab    1 Oct 13 11:09 dsoft -&gt; d
+$ ln ~/.bashrc bashrc-link
+ln: failed to create hard link 'bashrc-link' =&gt; '/home/lab/.bashrc': Invalid cross-device link
+$ ln -s ~/.bashrc bashrc-link
+$ ls -l bashrc-link
+lrwxrwxrwx 1 lab lab 17 Oct 13 11:09 bashrc-link -&gt; /home/lab/.bashrc
+$ df --output=target ~/work/ch7 ~/.bashrc
+Mounted on
+/home/lab/work
+/</code></pre>
+<p>ディレクトリにハードリンクは作れない。木の形が崩れて、たどると同じところを回り続ける道ができてしまうからである。そして、<b>別のファイルシステム</b>にあるものにも作れない。inode 番号は1つのファイルシステムの中でしか意味を持たず、<code>~/work</code>（ボリューム）の表から <code>/</code> 側の番号は指せないからである（第4章で <code>mv</code> が番号を変えたのと同じ理由）。シンボリックリンクは道順を文字で書くだけなので、どちらも作れる。</p>
+<p>ディレクトリは、ハードリンクを自分で作れない代わりに、システムが自動で名前を足している。</p>
+<pre><code>$ stat -c "%h %n" d
+2 d
+$ mkdir d/a d/b d/c; touch d/f
+$ stat -c "%h %n" d
+5 d</code></pre>
+<p>空のディレクトリのリンク数は 2（親の表にある <code>d</code> と、自分の中の <code>.</code>）で、サブディレクトリを1つ作るごとに、その中の <code>..</code> の分だけ 1 増える。ファイル（<code>f</code>）は数えない。だから ext4 では「リンク数 − 2 ＝ サブディレクトリの数」になる。ただしこれはファイルシステムの流儀で、法則ではない。</p>
+<pre><code>$ stat -c "%h %n" /etc ~
+1 /etc
+1 /home/lab</code></pre>
+<p>檻の <code>/</code> 側は、イメージの層を重ねて見せる overlay というファイルシステムで、複数の層にまたがるディレクトリ（<code>/etc</code> やホームのように、イメージの層と書き込み層の両方に中身があるもの）のリンク数を 1 と報告する。btrfs はすべてのディレクトリで 1 と報告する。あなたの作業ボリュームが btrfs の上にあれば、<code>d</code> も 1 と出る。試験では「2 ＋ サブディレクトリ数」で答えてよい。</p>
+<div class="scroll"><table>
+<tr><th></th><th>ハードリンク（<code>ln</code>）</th><th>シンボリックリンク（<code>ln -s</code>）</th><th>根拠にした記録</th></tr>
+<tr><td>inode 番号</td><td>元と同じ</td><td>自分の番号を持つ</td><td><code>ls -li</code> の1列目</td></tr>
+<tr><td><code>ls -l</code> の見た目</td><td>元と同じ種類。リンク数が増える</td><td>種類 <code>l</code>、<code>-&gt;</code> 行き先</td><td>リンク数の欄が 2（<code>ls -li</code> では inode 番号の分だけ右へずれる）/ <code>soft.txt -&gt; memo.txt</code></td></tr>
+<tr><td><code>ls -F</code></td><td>印なし</td><td><code>@</code></td><td><code>soft.txt@</code></td></tr>
+<tr><td>元の名前を消すと</td><td>中身は残る</td><td>壊れる</td><td><code>cat hard.txt</code> は読め、<code>soft.txt</code> は No such file</td></tr>
+<tr><td>ディレクトリ</td><td>作れない</td><td>作れる</td><td><code>hard link not allowed for directory</code></td></tr>
+<tr><td>別のファイルシステム</td><td>作れない</td><td>作れる</td><td><code>Invalid cross-device link</code></td></tr>
+<tr><td>権限</td><td>中身と共有（同じもの）</td><td><code>lrwxrwxrwx</code>。行き先の権限が効く</td><td><code>chmod 644 lnk</code> で target が変わった</td></tr>
+</table></div>
+
+<h2 id="relative">相対パスのリンクは、リンクの置き場所から読む</h2>
+<div class="sgoal"><b>この節で分かること</b>: 相対パスのシンボリックリンクが、どこを起点にたどられるか。</div>
+<pre><code>$ mkdir sub
+$ ln -s memo.txt sub/bad
+$ ls -l sub/bad
+lrwxrwxrwx 1 lab lab 8 Oct 13 11:09 sub/bad -&gt; memo.txt
+$ cat sub/bad
+cat: sub/bad: No such file or directory
+$ ln -s ../memo.txt sub/good
+$ cat sub/good
+新しい memo
+$ ln -sr memo.txt sub/auto
+$ ls -l sub/auto
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 sub/auto -&gt; ../memo.txt</code></pre>
+<p><code>ln -s memo.txt sub/bad</code> は、<code>sub/bad</code> に「memo.txt」という文字をそのまま書く。たどるときの起点は<b>リンクが置かれた場所</b>（<code>sub/</code>）なので、<code>sub/memo.txt</code> を探して見つからない。打ったときにいた場所（<code>~/work/ch7</code>）ではない。<code>../memo.txt</code> と書くか、<code>-r</code> を付けて <code>ln</code> に<b>相対パス</b>を計算させる。<b>絶対パス</b>（<code>/home/lab/...</code>）で書けば起点の問題は無くなるが、ディレクトリごと移したときに壊れる。</p>
+
+<h2 id="version">バージョン管理 — current を付け替える</h2>
+<div class="sgoal"><b>この節で分かること</b>: 版の切り替えにシンボリックリンクを使う方法と、<code>ln -sfn</code> が要る理由。</div>
+<p>版ごとのディレクトリを並べておき、「いま使う版」をシンボリックリンクで指す形は、ソフトウェアの<b>バージョン管理</b>でよく使われる。切り替えはリンク1本の書き換えで済み、戻すのも同じ1行である。</p>
+<pre><code>$ mkdir -p releases/v1 releases/v2; echo 1.0 &gt; releases/v1/VERSION; echo 2.0 &gt; releases/v2/VERSION
+$ ln -s releases/v1 current
+$ cat current/VERSION
+1.0
+$ ln -sf releases/v2 current; echo "exit=$?"
+exit=0
+$ ls -l current
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 current -&gt; releases/v1
+$ ls -l releases/v1
+total 4
+-rw-r--r-- 1 lab lab  4 Oct 13 11:09 VERSION
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 v2 -&gt; releases/v2</code></pre>
+<p><code>-f</code>（あれば消してから作る）を付けたのに、<code>current</code> は v1 のままで、<code>releases/v1</code> の中に <code>v2</code> というリンクができていた。終了コードは 0 である。<code>ln</code> は最後の引数がディレクトリなら「その中に作れ」と解釈し（<code>cp</code> と同じ規則）、<code>current</code> はディレクトリを指すリンクなので、たどった先のディレクトリとして扱われた。リンクそのものとして扱わせるのが <code>-n</code> である。</p>
+<pre><code>$ rm releases/v1/v2
+$ ln -sfn releases/v2 current
+$ ls -l current
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 current -&gt; releases/v2
+$ cat current/VERSION
+2.0</code></pre>
+<p>システムの中も、この仕組みであふれている。</p>
+<pre><code>$ ls -l /bin /sbin /lib
+lrwxrwxrwx 1 root root 7 Apr 22  2024 /bin -&gt; usr/bin
+lrwxrwxrwx 1 root root 7 Apr 22  2024 /lib -&gt; usr/lib
+lrwxrwxrwx 1 root root 8 Apr 22  2024 /sbin -&gt; usr/sbin
+$ ls -li /bin/ls /usr/bin/ls
+1859260 -rwxr-xr-x 1 root root 142312 Aug 26 00:09 /bin/ls
+1859260 -rwxr-xr-x 1 root root 142312 Aug 26 00:09 /usr/bin/ls
+$ ls -l /usr/bin/vi /etc/alternatives/vi
+lrwxrwxrwx 1 root root 18 Aug 25 07:13 /etc/alternatives/vi -&gt; /usr/bin/vim.basic
+lrwxrwxrwx 1 root root 20 Aug 25 07:13 /usr/bin/vi -&gt; /etc/alternatives/vi
+$ readlink -f /usr/bin/vi
+/usr/bin/vim.basic</code></pre>
+<p><code>/bin</code> は <code>usr/bin</code> へのシンボリックリンクで、<code>/bin/ls</code> と <code>/usr/bin/ls</code> は同じ1つのファイルである（リンク数は 1。ハードリンクではなく、道が2本あるだけ）。<code>vi</code> は <code>/etc/alternatives/vi</code> を経由する2段のリンクで、真ん中の1本を付け替えると、<code>vi</code> と打ったときに動くエディタが変わる。Debian 系の alternatives という仕組みで、<code>current</code> と同じ考え方である。</p>
+<pre><code>$ ls -li /usr/bin/gunzip /usr/bin/uncompress
+1859225 -rwxr-xr-x 2 root root 2346 Jul  3 20:53 /usr/bin/gunzip
+1859225 -rwxr-xr-x 2 root root 2346 Jul  3 20:53 /usr/bin/uncompress
+$ file /usr/bin/gunzip
+/usr/bin/gunzip: POSIX shell script, ASCII text executable
+$ grep -n "exec gzip" /usr/bin/gunzip
+57:exec gzip -d "$@"
+$ ls -li /usr/bin/bzip2 /usr/bin/bunzip2 /usr/bin/bzcat
+18229064 -rwxr-xr-x 3 root root 39296 Aug 27 13:05 /usr/bin/bunzip2
+18229064 -rwxr-xr-x 3 root root 39296 Aug 27 13:05 /usr/bin/bzcat
+18229064 -rwxr-xr-x 3 root root 39296 Aug 27 13:05 /usr/bin/bzip2
+$ ls -l /usr/bin/xz /usr/bin/unxz /usr/bin/xzcat
+lrwxrwxrwx 1 root root     2 May 29 01:06 /usr/bin/unxz -&gt; xz
+-rwxr-xr-x 1 root root 89008 May 29 01:06 /usr/bin/xz
+lrwxrwxrwx 1 root root     2 May 29 01:06 /usr/bin/xzcat -&gt; xz</code></pre>
+<p>第6章の圧縮コマンドにも、1つの中身に複数の名前が付いている。<code>gunzip</code> は最後に <code>gzip -d</code> を呼ぶだけの小さなシェルスクリプトで、<code>uncompress</code> はそれへのハードリンク（リンク数 2）である。<code>bzip2</code>・<code>bunzip2</code>・<code>bzcat</code> は1つのプログラムにハードリンクで3つの名前（リンク数 3）、<code>unxz</code> と <code>xzcat</code> は <code>xz</code> へのシンボリックリンクで、この2組は呼ばれた名前を見て動きを変える。名前を増やすだけなら、2種類のリンクのどちらでもできる。</p>
+<div class="analogy"><b>たとえ</b>: 受付に掛けた「本日の担当: 田中」の札に近い。
+担当が替わるときは札の名前を書き換えるだけで、田中さんの席も鈴木さんの席も動かさない。
+<br>ただし<b>崩れる点</b>: 人間は札を掛け替えるとき迷わないが、<code>ln</code> は札（<code>current</code>）が指している先を「部屋」と見なして、
+部屋の中に新しい札を置いてしまう。札そのものを掛け替えさせるには <code>-n</code> で「札は札として扱え」と言う必要がある。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-files/">演習07</a>は、<code>current</code> を <code>releases/v2</code> に切り替える課題である。
+判定は <code>current</code> がリンクのままか、どこへ辿り着くか、<code>releases/</code> の中に余計なリンクができていないかを見る。</div>
+<div class="quiz"><b>確認</b>
+<p>ハードリンクの説明として正しいものを2つ選べ。<br>
+a. 元のファイルを削除すると、ハードリンクからも内容を読めなくなる<br>
+b. 元のファイルと同じ inode 番号を持つ<br>
+c. 別のファイルシステムのファイルに対しても作成できる<br>
+d. ディレクトリに対しては作成できない</p>
+<details><summary>答え</summary>
+<p>b と d。ハードリンクは同じ中身へのもう1つの名前なので、inode 番号が同じで、元の名前を消しても中身は残る。
+ディレクトリ（<code>hard link not allowed for directory</code>）と、別のファイルシステム（<code>Invalid cross-device link</code>）には作れない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>ln -s /etc/hosts myhosts</code> で作ったリンクについて、<code>ls -l myhosts</code> の先頭10文字と、
+<code>/etc/hosts</code> が消えたときに <code>cat myhosts</code> がどうなるかを答えよ。</p>
+<details><summary>答え</summary>
+<p>先頭は <code>lrwxrwxrwx</code>。元が消えると <code>No such file or directory</code> になる（壊れたリンク）。
+リンクの中身は道順の文字列だけで、その名前の先に何も無ければたどれない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>ls -F</code> で名前の後ろに付く <code>@</code>・<code>/</code>・<code>*</code> は、それぞれ何を表すか。また、ハードリンクを見分けるには何を見るか。</p>
+<details><summary>答え</summary>
+<p><code>@</code> はシンボリックリンク、<code>/</code> はディレクトリ、<code>*</code> は実行できるファイル。ハードリンクには印が付かないので、
+<code>ls -l</code> のリンク数（2 以上か）か、<code>ls -i</code> の inode 番号が他と同じかで見分ける。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>ext4 上のディレクトリ <code>proj</code> に、サブディレクトリが3つとファイルが5つある。<code>ls -ld proj</code> のリンク数はいくつか。</p>
+<details><summary>答え</summary>
+<p>5。自分の名前（親の表の <code>proj</code>）と自分の中の <code>.</code> で 2、サブディレクトリの <code>..</code> が1つずつで 3。ファイルは数えない。
+実測でも、サブディレクトリ3つとファイル1つで 5 になった。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>ハードリンク（<code>ln</code>）は同じ inode へのもう1つの名前。リンク数が増え、どの名前も対等</li><li><code>rm</code> は名前を1つ外すだけ。中身はリンク数が 0 になったときに片づけられる</li><li>シンボリックリンク（<code>ln -s</code>）は道順を中身に持つ別のファイル。元が消えると壊れ、<code>ls -F</code> では <code>@</code>、<code>ls -l</code> では <code>lrwxrwxrwx ... -&gt;</code></li><li>ハードリンクはディレクトリと別のファイルシステムには作れない。シンボリックリンクは作れる</li><li>相対パスのリンクは、リンクの置き場所から読まれる（<code>ln -sr</code> で計算させられる）</li><li>版の切り替えは <code>ln -sfn 新しい版 current</code>。<code>-n</code> が無いと、古い版の中にリンクができる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-files/theory/06-tar">← 6. tar は束ねるだけで、縮めるのは別のプログラム</a><a href="/linuc-files/theory/08-locate">次: 8. locate が探すのは、索引を作った時点の写真 →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-files/chapters.js"></script>
+<script src="/linuc-files/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

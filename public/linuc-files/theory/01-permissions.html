@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. 名前と中身は、別の場所にある — 確かめて説明する LinuC 主題1.02</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="1" data-theme="linuc-files">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-files/theory/">理論編</a> › 第1章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/">詳しく</a></p>
+</div>
+<h1>1. 名前と中身は、別の場所にある</h1>
+<p class="lead">ディレクトリに r を残して x だけを外すと、<code>ls</code> には名前が並ぶのに、<code>ls -l</code> の残りの欄は全部 <code>?</code> になり、<code>ls</code> 自身もファイルごとに「入れない」と言う。名前を持っているのはディレクトリで、権限も所有者も大きさも、名前の先にある別の場所が持っているからだ。この章は、その「別の場所」を見つけるところから始める。</p>
+<div class="badges"><span>前提: 檻が起動している</span><span>前提: cd と ls が打てる</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.02.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>ls -l</code> の先頭10文字を、種類・所有者・グループ・その他に分けて読める</li><li>ディレクトリにとっての r・w・x が、それぞれ何を許すかを言える</li><li>「消せるかどうか」をファイルではなくディレクトリの権限から判断できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: ACL（<code>getfacl</code> / <code>setfacl</code>）、SELinux や AppArmor のような権限の外側にある仕組み、ケーパビリティの一覧は扱わない。<code>ls -l</code> の2列目（リンク数）は第7章で扱うので、ここでは「数字が1つある」と分かれば足りる。</div></div>
+
+<h2 id="ten">ls -l の10文字</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>ls -l</code> の1行が、どの欄で何を表しているか。</div>
+<p>この章は <code>~/work/ch1</code> で作業する。ファイルとディレクトリを1つずつ作って並べる。</p>
+<pre><code>$ mkdir -p ~/work/ch1
+$ cd ~/work/ch1
+$ echo "メモ" &gt; memo.txt
+$ mkdir box
+$ ls -l memo.txt
+-rw-r--r-- 1 lab lab 7 Oct 13 11:09 memo.txt
+$ ls -ld box
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 box</code></pre>
+<p>先頭の10文字が<b>パーミッション</b>（と種類）である。1文字目が種類で、残りの9文字は3文字ずつ「所有者」「グループ」「その他」に分かれる。</p>
+<pre><code>-  rw-  r--  r--   1  lab  lab   7  Oct 13 10:11  memo.txt
+^  ^^^  ^^^  ^^^   ^  ^^^  ^^^   ^  ^^^^^^^^^^^^  ^^^^^^^^
+種類 所有者 グループ その他  リンク数 所有者 グループ 大きさ 更新時刻  名前</code></pre>
+<div class="scroll"><table>
+<tr><th>1文字目</th><th>種類</th><th>この檻で見られる例</th></tr>
+<tr><td><code>-</code></td><td>通常ファイル</td><td><code>memo.txt</code></td></tr>
+<tr><td><code>d</code></td><td>ディレクトリ</td><td><code>box</code></td></tr>
+<tr><td><code>l</code></td><td>シンボリックリンク</td><td><code>/bin</code>（第7章）</td></tr>
+<tr><td><code>c</code></td><td>キャラクタデバイス</td><td><code>/dev/null</code>（次の節）</td></tr>
+<tr><td><code>b</code></td><td>ブロックデバイス</td><td>無い（次の節）</td></tr>
+<tr><td><code>p</code></td><td>名前付きパイプ</td><td><code>mkfifo</code> で作れる（次の節）</td></tr>
+<tr><td><code>s</code></td><td>ソケット</td><td>無い（プロセス同士の通信口。次の節で数える）</td></tr>
+</table></div>
+<p>残りの9文字は、どれも r（読む）・w（書く）・x（実行する）の3つの並びで、無い権限は <code>-</code> になる。<code>memo.txt</code> は「所有者 lab は読み書きでき、グループ lab とその他は読むだけ」と読む。ファイルを作るときこの組み合わせが選ばれた理由は第2章で見る。</p>
+<p>3つの欄のうち、使われるのは<b>1つだけ</b>である。所有者なら所有者の欄、そうでなくグループの一員ならグループの欄、どちらでもなければその他の欄を見て、そこで決まる。足し合わせはしない。</p>
+<pre><code>$ echo "持ち主だけが読めない" &gt; /tmp/owner.txt
+$ chmod 044 /tmp/owner.txt
+$ ls -l /tmp/owner.txt
+----r--r-- 1 lab lab 31 Oct 13 11:09 /tmp/owner.txt
+$ cat /tmp/owner.txt
+cat: /tmp/owner.txt: Permission denied
+$ sudo -u alice cat /tmp/owner.txt
+持ち主だけが読めない</code></pre>
+<p>持ち主の lab は所有者の欄（<code>---</code>）で断られ、その他の欄（<code>r--</code>）は使われない。他人の alice には、その他の欄が使われて読めた。</p>
+<p>大事なのは、<b>この1行の中でファイル名だけが別の出どころを持つ</b>ことである。これがこの章の結論なので、先に覚えておいてほしい。確かめるのは「ディレクトリの r と x は別の権限」の節である。</p>
+<div class="analogy"><b>たとえ</b>: 社員名簿と、本人が持つ社員証の関係に近い。
+名簿には名前と社員番号だけが書いてあり、所属・権限・入社日は社員証のほうに書いてある。
+<code>ls -l</code> は名簿で名前を引き、その番号の社員証を1枚ずつ見に行って、1行にまとめて見せている。
+<br>ただし<b>崩れる点</b>: 社員証は本人と一緒に動くが、ファイルの「社員証」は1か所に置かれたまま動かない。
+名簿の側の名前を書き換えても、社員証は何も変わらない（第4章の <code>mv</code>）。</div>
+
+<h2 id="special">スペシャルファイル — 大きさの欄に数字が2つある</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/dev</code> の下のファイルが何で、大きさの欄に何が入っているか。</div>
+<pre><code>$ ls -l /dev/null /dev/tty /dev/zero /dev/urandom
+crw-rw-rw- 1 root root 1, 3 Oct 13 11:09 /dev/null
+crw-rw-rw- 1 root root 5, 0 Oct 13 11:09 /dev/tty
+crw-rw-rw- 1 root root 1, 9 Oct 13 11:09 /dev/urandom
+crw-rw-rw- 1 root root 1, 5 Oct 13 11:09 /dev/zero
+$ file /dev/null /dev/tty
+/dev/null: character special (1/3)
+/dev/tty:  character special (5/0)</code></pre>
+<p>種類が <code>c</code> で、大きさの欄に <code>1, 3</code> のような数字が2つ並ぶ。これは大きさではなく「どのドライバの何番か」を表す<b>メジャー番号とマイナー番号</b>である。こうした、中身の代わりに装置への入口を持つファイルを<b>スペシャルファイル</b>（デバイスファイル）と呼ぶ。読み書きはディスクではなく、カーネルのドライバに届く。</p>
+<pre><code>$ echo "どこにも残らない" &gt; /dev/null
+$ head -c 8 /dev/zero | od -c
+0000000  \0  \0  \0  \0  \0  \0  \0  \0
+0000010</code></pre>
+<p><code>/dev/null</code> は書いたものを捨て、<code>/dev/zero</code> は読むたびに 0 のバイトを返し続ける。<code>/dev/tty</code> はいま使っている端末そのものである。どれも <code>rw-rw-rw-</code> で誰でも使える。</p>
+<p>パイプ（<code>|</code>）に名前を付けてファイルとして置いたものが<b>名前付きパイプ</b>（FIFO）で、種類は <code>p</code> になる。</p>
+<pre><code>$ mkfifo pipe
+$ ls -l pipe
+prw-r--r-- 1 lab lab 0 Oct 13 11:09 pipe
+$ file pipe
+pipe: fifo (named pipe)</code></pre>
+<p>ディスクのようにブロック単位で読み書きする装置は<b>ブロックデバイス</b>（種類 <code>b</code>）になる。実機なら <code>/dev/sda</code> や <code>/dev/nvme0n1</code> がそうだが、この檻には1つも無い。</p>
+<pre><code>$ ls -l /dev | grep -c "^b"
+0
+$ find / -xdev -type s 2&gt;/dev/null | wc -l
+0</code></pre>
+<p>コンテナには、ディスクの装置そのものが渡されないからである。檻のファイルはホストの上に重ねたファイルシステムの中にあり、檻の中からディスクに直接触る経路は無い。ソケット（<code>s</code>）も、この檻のファイルシステムには1つも無かった。試験では <code>b</code> と <code>s</code> の意味と、<code>/dev/sda</code> のような例だけを覚えておけばよい。</p>
+
+<h2 id="dir">ディレクトリの r と x は別の権限</h2>
+<div class="sgoal"><b>この節で分かること</b>: ディレクトリにとって r と x が、それぞれ何を許しているか。</div>
+<p><code>box</code> にファイルを2つ入れる。</p>
+<pre><code>$ echo "中身" &gt; box/known.txt
+$ echo "別の中身" &gt; box/other.txt
+$ ls -l box
+total 8
+-rw-r--r-- 1 lab lab  7 Oct 13 11:09 known.txt
+-rw-r--r-- 1 lab lab 13 Oct 13 11:09 other.txt</code></pre>
+<p>ここから <code>box</code> の権限を1つずつ外していく。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>ディレクトリの r（読む）を残しておけば、中のファイルの一覧も、<code>ls -l</code> の詳しい情報も見られるはずだ。
+x は「実行」の権限だから、プログラムではないディレクトリには関係ないだろう。</p>
+<pre><code>$ chmod u-x box
+$ ls -ld box
+drw-r-xr-x 2 lab lab 4096 Oct 13 11:09 box
+$ ls box
+ls: cannot access 'box/known.txt': Permission denied
+ls: cannot access 'box/other.txt': Permission denied
+known.txt  other.txt
+$ ls -l box
+ls: cannot access 'box/known.txt': Permission denied
+ls: cannot access 'box/other.txt': Permission denied
+total 0
+-????????? ? ? ? ?            ? known.txt
+-????????? ? ? ? ?            ? other.txt
+$ cat box/known.txt
+cat: box/known.txt: Permission denied</code></pre>
+<div class="then"><b>だめな理由</b>: 名前は2つとも出た。しかし <code>ls</code> は名前ごとに <code>Permission denied</code> と言い、
+<code>ls -l</code> の残りの欄は全部 <code>?</code> で、中身も読めない。
+ディレクトリの中に書かれているのは<b>名前と、その実体の番号の対応表だけ</b>だからである。
+r はこの表を読む権限で、名前が出るところまでしか届かない。
+権限・所有者・大きさ・時刻は、番号の先にある実体（<b>inode</b>）の側に書いてあり、
+そこへ進むには<b>表を引いて先へ進む権限</b>が要る。ディレクトリにとって、それが x である。
+<code>ls</code> まで断られたのは、この檻の <code>ls</code> が <code>ls --color=auto</code>（<code>~/.bashrc</code> の設定）で、
+色を決めるために名前の先の種類や権限を見に行ったからである。</div></div>
+<p>逆に、x だけを残して r を外す。</p>
+<pre><code>$ chmod u=x box
+$ ls -ld box
+d--xr-xr-x 2 lab lab 4096 Oct 13 11:09 box
+$ ls box
+ls: cannot open directory 'box': Permission denied
+$ cat box/known.txt
+中身
+$ cd box
+$ pwd
+/home/lab/work/ch1/box
+$ cd ..
+$ chmod 755 box</code></pre>
+<p>今度は一覧が出ないのに、<b>名前を知っている</b> <code>known.txt</code> は読める。<code>cd</code> もできる。表を読めなくても、名前を自分で知っていれば表を引いて先へ進めるからである。</p>
+<div class="scroll"><table>
+<tr><th>権限</th><th>通常ファイルに対して</th><th>ディレクトリに対して</th></tr>
+<tr><td>r</td><td>中身を読める</td><td>名前の一覧を読める（<code>ls</code>）</td></tr>
+<tr><td>w</td><td>中身を書き換えられる</td><td>名前を作る・消す・変える（x も一緒に要る）</td></tr>
+<tr><td>x</td><td>プログラムとして実行できる</td><td>名前を引いて先へ進める（<code>cd</code>・<code>cat dir/名前</code>・<code>ls -l</code> の詳細）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 鍵の掛かった部屋の前に貼られた名簿に近い。
+r は「名簿を読める」、x は「名前を言えば中に通してもらえる」で、2つは別々に渡せる。
+x だけの人は、名簿を見ることはできないが、会いたい人の名前を知っていれば会える。
+<br>ただし<b>崩れる点</b>: 部屋は1つだが、パスは何段にも重なる。<code>/home/lab/work/ch1/box/known.txt</code> を開くには、
+途中のディレクトリ全部で「通してもらう」必要があり、1段でも x が欠けるとそこで止まる。</div>
+
+<h2 id="delete">消せるかどうかは、ディレクトリが決める</h2>
+<div class="sgoal"><b>この節で分かること</b>: 書き込めないファイルが消せて、書き込めるファイルが消せない場合があること。</div>
+<p>書き込み禁止のファイルを1つ作る。</p>
+<pre><code>$ echo "残す" &gt; ro.txt
+$ chmod 444 ro.txt
+$ ls -l ro.txt
+-r--r--r-- 1 lab lab 7 Oct 13 11:09 ro.txt
+$ echo "追記" &gt;&gt; ro.txt
+bash: ro.txt: Permission denied
+$ rm ro.txt
+rm: remove write-protected regular file 'ro.txt'? y
+$ ls -l ro.txt
+ls: cannot access 'ro.txt': No such file or directory</code></pre>
+<p>中身には1文字も足せないのに、<code>rm</code> は確認を1回聞いただけで消した（<code>y</code> は自分で打つ）。他人のファイルでも同じである。</p>
+<pre><code>$ sudo touch rootfile
+$ ls -l rootfile
+-rw-r--r-- 1 root root 0 Oct 13 11:09 rootfile
+$ rm rootfile
+rm: remove write-protected regular empty file 'rootfile'? y
+$ ls -l rootfile
+ls: cannot access 'rootfile': No such file or directory</code></pre>
+<p>root のファイルを、一般ユーザの lab が消せた。消すという操作は「ディレクトリの表から名前を1行消す」ことで、書き換わるのはファイルではなく<b>ディレクトリ</b>だからである。だから問われるのは、ディレクトリの w（と、中へ進むための x）になる。逆向きも確かめる。</p>
+<pre><code>$ chmod u-w box
+$ ls -ld box
+dr-xr-xr-x 2 lab lab 4096 Oct 13 11:09 box
+$ rm box/other.txt
+rm: cannot remove 'box/other.txt': Permission denied
+$ ls -l box/other.txt
+-rw-r--r-- 1 lab lab 13 Oct 13 11:09 box/other.txt
+$ chmod u+w box</code></pre>
+<p>自分のファイルで、自分は書き込めるのに、消せない。表のほうに w が無いからである。<code>rm</code> が聞いてくる「write-protected」は親切な警告にすぎず、可否を決めているのはディレクトリの w と x である（第3章のスティッキービットが付いていれば、もう1つ条件が増える）。</p>
+<div class="analogy"><b>たとえ</b>: 図書館の蔵書目録から1行消す作業に近い。
+本そのものに「貸出禁止」の札が付いていても、目録を編集する権限がある人は目録から行を消せる。
+逆に、本の書き込みを許されていても、目録を触れない人は本を目録から外せない。
+<br>ただし<b>崩れる点</b>: 目録から消された本は棚に残るが、ファイルは名前が全部なくなった時点で実体も片づけられる。
+名前がいくつあると片づけられないかは、第7章で数える。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-files/">演習01</a>は、ディレクトリの r と x を別々に渡して、
+alice に「一覧は見せないが、1つのファイルだけは読ませる」状態を作る課題である。
+判定は alice として実際に <code>cat</code> と <code>ls</code> を打って確かめる。</div>
+
+<h2 id="root">root はこの表をほとんど見ない</h2>
+<div class="sgoal"><b>この節で分かること</b>: root が r・w とディレクトリの x を無視し、ファイルの実行だけは x を見ること。</div>
+<pre><code>$ echo "ひみつ" &gt; secret.txt
+$ chmod 000 secret.txt
+$ ls -l secret.txt
+---------- 1 lab lab 10 Oct 13 11:09 secret.txt
+$ cat secret.txt
+cat: secret.txt: Permission denied
+$ sudo cat secret.txt
+ひみつ</code></pre>
+<p><code>----------</code> は所有者自身も読めないが、root には読める。root はパーミッションの表を見ずに読み書きを通すからである（コンテナの中の root も、この権限は持っている）。</p>
+<p>ただし実行だけは違う。</p>
+<pre><code>$ printf "#!/bin/bash\necho 動いた\n" &gt; run.sh
+$ chmod 000 run.sh
+$ sudo ./run.sh
+sudo: ./run.sh: command not found
+$ sudo bash -c ./run.sh
+bash: line 1: ./run.sh: Permission denied
+$ chmod 100 run.sh
+$ ls -l run.sh
+---x------ 1 lab lab 27 Oct 13 11:09 run.sh
+$ ./run.sh
+/bin/bash: ./run.sh: Permission denied
+$ sudo ./run.sh
+動いた
+$ chmod 700 run.sh
+$ ./run.sh
+動いた</code></pre>
+<p>3つのことが同時に起きている。</p>
+<ul>
+<li>x が1つも無いと、root でも実行しない。<code>sudo ./run.sh</code> の <code>command not found</code> は、<code>sudo</code> が自分で x の有無を見て出した文言で、
+root のシェル（<code>sudo bash -c</code>）から打つと、カーネルが <code>Permission denied</code> で断る。誰かが実行してよいと示した印が無いものを、勝手にプログラムとして扱わないためである</li>
+<li>x が1つでもあれば、root は r の有無に関係なく動かせる</li>
+<li>所有者は <code>--x</code> だけでは自分のスクリプトを動かせない。スクリプトは <code>/bin/bash</code> が中身を<b>読んで</b>実行するので、r も要る。行頭の <code>/bin/bash:</code> は、中身を読もうとして断られたインタプリタの名前である</li>
+</ul>
+<p>ディレクトリの x は、root にとっては壁にならない。</p>
+<pre><code>$ chmod 000 box
+$ ls -ld box
+d--------- 2 lab lab 4096 Oct 13 11:09 box
+$ ls box
+ls: cannot open directory 'box': Permission denied
+$ sudo ls box
+known.txt  other.txt
+$ sudo cat box/known.txt
+中身
+$ chmod 755 box</code></pre>
+<p>root は r も x も無いディレクトリを一覧し、通り抜けて中を読んだ。root が見るのは、通常ファイルを実行するときの x だけである。</p>
+<div class="analogy"><b>たとえ</b>: 合鍵を持った管理人に近い。
+どの部屋の鍵も開けて中の書類を読めるし、書き込みもできる。
+<br>ただし<b>崩れる点</b>: 管理人でも、「実行してよい」と誰も印を付けていない書類を手順書として扱うことはしない。
+合鍵は扉を開けるだけで、ファイルの性質（実行できるものかどうか）までは変えない。</div>
+<div class="quiz"><b>確認</b>
+<p><code>ls -l</code> の出力が <code>crw-rw-rw- 1 root root 1, 3 Oct 13 11:09 /dev/null</code> だった。
+このファイルの種類は何か。また <code>1, 3</code> は何を表すか。</p>
+<details><summary>答え</summary>
+<p>キャラクタデバイス（スペシャルファイル）。<code>1, 3</code> は大きさではなく、メジャー番号とマイナー番号で、
+どのドライバのどの装置かを表す。<code>b</code> ならブロックデバイス、<code>p</code> なら名前付きパイプ、<code>l</code> ならシンボリックリンク。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>所有者の権限が <code>r--</code> のディレクトリ <code>dir</code> がある（x が無い）。所有者が
+<code>ls dir</code> と <code>cat dir/a.txt</code> を打つとどうなるか。</p>
+<details><summary>答え</summary>
+<p><code>ls dir</code> は名前の一覧を出す（色付きの <code>ls</code> では、ファイルごとに <code>Permission denied</code> も出る。<code>ls -l dir</code> では名前以外が <code>?</code> になる）。
+<code>cat dir/a.txt</code> は <code>Permission denied</code> になる。名前の先へ進むにはディレクトリの x が要る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>自分のディレクトリ（<code>drwxr-xr-x</code>）の中に、root が所有する <code>-rw-r--r--</code> のファイルがある。
+一般ユーザの自分は、このファイルを <code>rm</code> で消せるか。</p>
+<details><summary>答え</summary>
+<p>消せる（端末では「write-protected」と確認を聞かれる）。消すのはディレクトリの表から名前を外す操作なので、
+見られるのはディレクトリの w と x である。ファイル自身の権限や所有者は関係ない。
+他人のファイルを消せないようにする仕組みは第3章のスティッキービットである。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>パーミッションが <code>----------</code>（000）のシェルスクリプトを、root で <code>./run.sh</code> として実行できるか。</p>
+<details><summary>答え</summary>
+<p>できない。root は r と w（とディレクトリの x）を無視するが、通常ファイルの実行は x がどこかに1つ立っていないと許さない
+（実測では root のシェルから <code>bash: line 1: ./run.sh: Permission denied</code>。<code>sudo ./run.sh</code> なら sudo が先に <code>command not found</code> と言う）。
+x が1つでもあれば、root は r が無くても実行できる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>ls -l</code> の先頭10文字は「種類1文字 ＋ 所有者・グループ・その他の rwx」</li><li>種類: <code>-</code> 通常 / <code>d</code> ディレクトリ / <code>l</code> シンボリックリンク / <code>c</code> キャラクタデバイス / <code>b</code> ブロックデバイス / <code>p</code> 名前付きパイプ / <code>s</code> ソケット</li><li>ディレクトリの中身は「名前 → 実体の番号」の表。r は表を読む、x は表を引いて先へ進む、w は表を書き換える</li><li>r だけのディレクトリでは名前しか見えず、<code>ls -l</code> の残りは <code>?</code> になる。権限も大きさも名前の先（inode）にあるから</li><li>3つの欄のうち使われるのは1つだけ（所有者 → グループ → その他の順に、最初に当てはまった欄）</li><li>ファイルを消せるかどうかはディレクトリの w と x が決める。ファイル自身の w ではない</li><li>root は r・w とディレクトリの x を無視するが、x が1つも無い通常ファイルは実行しない</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-files/theory/">← 理論編 目次</a><a href="/linuc-files/theory/02-umask">次: 2. umask は引き算ではなく、ビットを落とす印 →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-files/chapters.js"></script>
+<script src="/linuc-files/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

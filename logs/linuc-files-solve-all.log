@@ -1,0 +1,815 @@
+
+
+########## A. 何もしていない状態で lab check（全部 ✗ か ⚠ になるはず） ##########
+
+$ lab check; echo "exit=$?"
+⚠ 01 この環境では判定できません
+  前提不足: /home/lab/work/01/memo.txt がありません（課題の最初の echo を打ってください）
+✗ 02 未達
+  判定 : 観測型（umask を起動時の 0022 に戻して新しいログインシェルを起動し、その中で1つずつ作った）
+  観測 : いまのシェルの umask           = 0022
+         新しいシェルの umask           = 0022
+         新しいシェルで作ったファイル     = 644
+         新しいシェルで作ったディレクトリ = 755
+         → ファイルが 640 で作られていない
+         → ディレクトリが 750 で作られていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+✗ 03 未達
+  判定 : 観測型（alice・bob・carol として実際にファイルを作り、消し、一覧しようとした）
+  観測 : /srv/share が存在しない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+⚠ 04 この環境では判定できません
+  前提不足: /home/lab/work/04 に配布ファイルがありません（lab start 04 で配られます）
+⚠ 05 この環境では判定できません
+  前提不足: /home/lab/work/05 がありません（lab start 05 で配られます）
+⚠ 06 この環境では判定できません
+  前提不足: /home/lab/work/06/project がありません（lab start 06 で配られます）
+⚠ 07 この環境では判定できません
+  前提不足: /home/lab/work/07/releases がありません（lab start 07 で配られます）
+⚠ 08 この環境では判定できません
+  前提不足: /home/lab/work/08/needle.txt と /tmp/needle.txt を先に作ってください（課題の最初の touch）
+exit=2
+
+
+########## B. 演習01 — 一覧は見せずに、1つのファイルだけ読ませる ##########
+
+$ lab start 01 >/dev/null; echo "alice へ: 鍵は2番の棚" > ~/work/01/memo.txt; ls -l ~/work/01/memo.txt
+-rw-r--r-- 1 lab lab 28 Oct 13 11:09 /home/lab/work/01/memo.txt
+
+$ sudo -u alice cat /home/lab/work/01/memo.txt; echo "exit=$?"
+cat: /home/lab/work/01/memo.txt: Permission denied
+exit=1
+
+$ ls -ld /home/lab /home/lab/work /home/lab/work/01
+drwxr-x--- 1 lab lab 4096 Sep 30 19:32 /home/lab
+drwxr-xr-x 4 lab lab 4096 Oct 13 11:09 /home/lab/work
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 /home/lab/work/01
+
+$ lab check 01; echo "exit=$?"
+✗ 01 未達
+  判定 : 観測型（alice として実際に読み、一覧しようとした）
+  観測 : 経路の権限
+           drwxr-x--- lab:lab  /home/lab
+           drwxr-xr-x lab:lab  /home/lab/work
+           drwxr-xr-x lab:lab  /home/lab/work/01
+           -rw-r--r-- lab:lab  /home/lab/work/01/memo.txt
+         alice が cat /home/lab/work/01/memo.txt  → 読めない
+         alice が ls /home/lab                    → 一覧できない
+         alice が ls /home/lab/work/01            → 一覧できない
+         → alice が memo.txt を読めない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+exit=1
+
+$ echo "--- 誤答: ホームを 755 にする（読めるが、一覧も見えてしまう） ---"
+--- 誤答: ホームを 755 にする（読めるが、一覧も見えてしまう） ---
+
+$ chmod 755 ~; sudo -u alice cat /home/lab/work/01/memo.txt; sudo -u alice ls /home/lab
+alice へ: 鍵は2番の棚
+work
+
+$ lab check 01; echo "exit=$?"
+✗ 01 未達
+  判定 : 観測型（alice として実際に読み、一覧しようとした）
+  観測 : 経路の権限
+           drwxr-xr-x lab:lab  /home/lab
+           drwxr-xr-x lab:lab  /home/lab/work
+           drwxr-xr-x lab:lab  /home/lab/work/01
+           -rw-r--r-- lab:lab  /home/lab/work/01/memo.txt
+         alice が cat /home/lab/work/01/memo.txt  → 読めた
+         alice が ls /home/lab                    → 一覧できた
+         alice が ls /home/lab/work/01            → 一覧できた
+         → alice が /home/lab の一覧を見られる
+         → alice が /home/lab/work/01 の一覧を見られる
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+exit=1
+
+$ echo "--- 模範解答: その他に x だけ渡す ---"
+--- 模範解答: その他に x だけ渡す ---
+
+$ chmod 750 ~; chmod o+x ~; chmod o-r ~/work/01; ls -ld /home/lab /home/lab/work/01
+drwxr-x--x 1 lab lab 4096 Sep 30 19:32 /home/lab
+drwxr-x--x 2 lab lab 4096 Oct 13 11:09 /home/lab/work/01
+
+$ sudo -u alice cat /home/lab/work/01/memo.txt; sudo -u alice ls /home/lab; sudo -u alice ls /home/lab/work/01
+alice へ: 鍵は2番の棚
+ls: cannot open directory '/home/lab': Permission denied
+ls: cannot open directory '/home/lab/work/01': Permission denied
+
+$ lab check 01; echo "exit=$?"
+✔ 01 達成
+  判定 : 観測型（alice として実際に読み、一覧しようとした）
+  観測 : 経路の権限
+           drwxr-x--x lab:lab  /home/lab
+           drwxr-xr-x lab:lab  /home/lab/work
+           drwxr-x--x lab:lab  /home/lab/work/01
+           -rw-r--r-- lab:lab  /home/lab/work/01/memo.txt
+         alice が cat /home/lab/work/01/memo.txt  → 読めた
+         alice が ls /home/lab                    → 一覧できない
+         alice が ls /home/lab/work/01            → 一覧できない
+         名前を知っている memo.txt は読めて、2つのディレクトリはどちらも一覧できない
+         → ディレクトリの x は「通り抜け」、r は「名前の一覧」で、別々に渡せる
+exit=0
+
+
+########## C. 演習02 — 次に開くシェルでも 640 と 750 ##########
+
+$ lab start 02 >/dev/null; cd ~/work/02; umask; touch before.txt; mkdir before.d; ls -ld before.txt before.d
+0022
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 before.d
+-rw-r--r-- 1 lab lab    0 Oct 13 11:09 before.txt
+
+$ lab check 02; echo "exit=$?"
+✗ 02 未達
+  判定 : 観測型（umask を起動時の 0022 に戻して新しいログインシェルを起動し、その中で1つずつ作った）
+  観測 : いまのシェルの umask           = 0022
+         新しいシェルの umask           = 0022
+         新しいシェルで作ったファイル     = 644
+         新しいシェルで作ったディレクトリ = 755
+         → ファイルが 640 で作られていない
+         → ディレクトリが 750 で作られていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+exit=1
+
+$ echo "--- 誤答: いまのシェルでだけ umask を変える ---"
+--- 誤答: いまのシェルでだけ umask を変える ---
+
+$ umask 027; touch now.txt; mkdir now.d; ls -ld now.txt now.d
+drwxr-x--- 2 lab lab 4096 Oct 13 11:09 now.d
+-rw-r----- 1 lab lab    0 Oct 13 11:09 now.txt
+
+$ bash -lic "umask" 2>/dev/null | tail -1
+0027
+
+$ lab check 02; echo "exit=$?"
+✗ 02 未達
+  判定 : 観測型（umask を起動時の 0022 に戻して新しいログインシェルを起動し、その中で1つずつ作った）
+  観測 : いまのシェルの umask           = 0027
+         新しいシェルの umask           = 0022
+         新しいシェルで作ったファイル     = 644
+         新しいシェルで作ったディレクトリ = 755
+         → ファイルが 640 で作られていない
+         → ディレクトリが 750 で作られていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+exit=1
+
+$ umask 022; umask
+0022
+
+$ echo "--- 模範解答: ~/.bashrc に書く ---"
+--- 模範解答: ~/.bashrc に書く ---
+
+$ echo 'umask 027' >> ~/.bashrc; tail -1 ~/.bashrc
+umask 027
+
+$ bash -lic "umask" 2>/dev/null | tail -1
+0027
+
+$ lab check 02; echo "exit=$?"
+✔ 02 達成
+  判定 : 観測型（umask を起動時の 0022 に戻して新しいログインシェルを起動し、その中で1つずつ作った）
+  観測 : いまのシェルの umask           = 0022
+         新しいシェルの umask           = 0027
+         新しいシェルで作ったファイル     = 640
+         新しいシェルで作ったディレクトリ = 750
+         新しいシェルでも、作られた瞬間に 640 / 750 になった
+         → umask はシェルごとの値で、起動時に読む設定ファイルから決まる
+exit=0
+
+$ cd ~
+
+
+########## D. 演習03 — devs の共有ディレクトリ ##########
+
+$ getent group devs; id alice; id bob; id carol
+devs:x:1001:alice,bob
+uid=1001(alice) gid=1002(alice) groups=1002(alice),1001(devs)
+uid=1002(bob) gid=1003(bob) groups=1003(bob),1001(devs)
+uid=1003(carol) gid=1004(carol) groups=1004(carol)
+
+$ ls -ld /srv /srv/share
+ls: cannot access '/srv/share': No such file or directory
+drwxr-xr-x 2 root root 4096 Sep 11 11:03 /srv
+
+$ lab check 03; echo "exit=$?"
+✗ 03 未達
+  判定 : 観測型（alice・bob・carol として実際にファイルを作り、消し、一覧しようとした）
+  観測 : /srv/share が存在しない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+exit=1
+
+$ echo "--- 誤答: SGID だけ付けて 2775 にする ---"
+--- 誤答: SGID だけ付けて 2775 にする ---
+
+$ sudo mkdir /srv/share; sudo chgrp devs /srv/share; sudo chmod 2775 /srv/share; ls -ld /srv/share
+drwxrwsr-x 2 root devs 4096 Oct 13 11:09 /srv/share
+
+$ lab check 03; echo "exit=$?"
+✗ 03 未達
+  判定 : 観測型（alice・bob・carol として実際にファイルを作り、消し、一覧しようとした）
+  観測 : /srv/share  drwxrwsr-x root:devs
+         alice がファイルを作る        → 作れた（グループ devs）
+         bob がファイルを作る          → 作れた
+         bob が alice のファイルを消す → 消せた
+         bob が自分のファイルを消す    → 消せた
+         carol が一覧する              → できた
+         → bob が alice のファイルを消せる、または試せない
+         → carol が中を一覧できる
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+exit=1
+
+$ echo "--- 模範解答: SGID とスティッキービット、その他には何も渡さない ---"
+--- 模範解答: SGID とスティッキービット、その他には何も渡さない ---
+
+$ sudo chmod 3770 /srv/share; ls -ld /srv/share
+drwxrws--T 2 root devs 4096 Oct 13 11:09 /srv/share
+
+$ sudo -u alice touch /srv/share/a.txt; sudo ls -l /srv/share; sudo -u bob rm /srv/share/a.txt; sudo -u carol ls /srv/share
+total 0
+-rw-rw-r-- 1 alice devs 0 Oct 13 11:09 a.txt
+rm: cannot remove '/srv/share/a.txt': Operation not permitted
+ls: cannot open directory '/srv/share': Permission denied
+
+$ sudo rm -f /srv/share/a.txt
+
+$ lab check 03; echo "exit=$?"
+✔ 03 達成
+  判定 : 観測型（alice・bob・carol として実際にファイルを作り、消し、一覧しようとした）
+  観測 : /srv/share  drwxrws--T root:devs
+         alice がファイルを作る        → 作れた（グループ devs）
+         bob がファイルを作る          → 作れた
+         bob が alice のファイルを消す → 消せなかった
+         bob が自分のファイルを消す    → 消せた
+         carol が一覧する              → できなかった
+         グループは自動で devs になり、他人のファイルは消せず、部外者は覗けない
+         → SGID（グループを受け継ぐ）とスティッキービット（消せるのは持ち主だけ）が両方効いている
+exit=0
+
+
+########## E. 演習04 — 設定ファイルを、時刻ごと控えておく ##########
+
+$ lab start 04 >/dev/null; cd ~/work/04; ls -la
+total 28
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 .
+drwxr-xr-x 5 lab lab 4096 Oct 13 11:09 ..
+-rw-r--r-- 1 lab lab   21 Oct 13 11:09 .secret.conf
+-rw-r--r-- 1 lab lab   26 Oct 13 11:09 app.conf
+-rw-r--r-- 1 lab lab   24 Oct 13 11:09 app.conf.bak
+-rw-r--r-- 1 lab lab   29 Oct 13 11:09 db.conf
+-rw-r--r-- 1 lab lab   49 Oct 13 11:09 notes.txt
+
+$ lab check 04; echo "exit=$?"
+✗ 04 未達
+  判定 : 観測型（元のファイルと backup/ の同名ファイルの中身・更新時刻・権限を比べた）
+  観測 : /home/lab/work/04/backup が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+exit=1
+
+$ echo "--- 誤答: * で拾って、-p を付けずにコピーする ---"
+--- 誤答: * で拾って、-p を付けずにコピーする ---
+
+$ echo *.conf
+app.conf db.conf
+
+$ mkdir backup; cp *.conf backup/; ls -la backup
+total 16
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 .
+drwxr-xr-x 3 lab lab 4096 Oct 13 11:09 ..
+-rw-r--r-- 1 lab lab   26 Oct 13 11:09 app.conf
+-rw-r--r-- 1 lab lab   29 Oct 13 11:09 db.conf
+
+$ lab check 04; echo "exit=$?"
+✗ 04 未達
+  判定 : 観測型（元のファイルと backup/ の同名ファイルの中身・更新時刻・権限を比べた）
+  観測 : backup/ の中身 = app.conf db.conf
+         → .secret.conf が backup/ に無い
+         → app.conf の更新時刻が違う（元 2026-10-13 11:09:14.063777972 / 写し 2026-10-13 11:09:14.089581049）
+         → db.conf の更新時刻が違う（元 2026-10-13 11:09:14.063823693 / 写し 2026-10-13 11:09:14.089606328）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+exit=1
+
+$ echo "--- 模範解答: 隠しファイルのパターンを足し、-p で時刻と権限を保つ ---"
+--- 模範解答: 隠しファイルのパターンを足し、-p で時刻と権限を保つ ---
+
+$ echo .*.conf
+.secret.conf
+
+$ cp -p *.conf .*.conf backup/; ls -la --time-style=full-iso app.conf backup/app.conf
+-rw-r--r-- 1 lab lab 26 2026-10-13 11:09:14.063777972 +0900 app.conf
+-rw-r--r-- 1 lab lab 26 2026-10-13 11:09:14.063777972 +0900 backup/app.conf
+
+$ lab check 04; echo "exit=$?"
+✔ 04 達成
+  判定 : 観測型（元のファイルと backup/ の同名ファイルの中身・更新時刻・権限を比べた）
+  観測 : backup/ の中身 = .secret.conf app.conf db.conf
+         .conf で終わる 3 個（隠しファイル .secret.conf を含む）が、中身・更新時刻・権限とも元と同じ
+         → * が拾わない隠しファイルも渡り、cp が新しく作った中身に元の時刻が写されている
+exit=0
+
+$ cd ~
+
+
+########## F. 演習05 — 大きな .tmp だけを、深いところまで消す ##########
+
+$ lab start 05 >/dev/null; cd ~/work/05; find . -type f -printf "%s %p\n" | sort -k2
+3000 ./cache/a.tmp
+500 ./cache/b.tmp
+10 ./cache/big.tmp/inner.txt
+5000 ./cache/deep/.e.tmp
+2048 ./cache/deep/c.tmp
+1024 ./cache/deep/d.tmp
+4000 ./cache/keep.txt
+1025 ./f.tmp
+3000 ./g.TMP
+
+$ lab check 05; echo "exit=$?"
+✗ 05 未達
+  判定 : 観測型（消えているべきもの 4 個・残っているべきもの 5 個を1つずつ見た）
+  観測 :
+           残っている  f.tmp                    1025 バイト
+         → f.tmp が消えていない
+           残っている  cache/a.tmp              3000 バイト
+         → cache/a.tmp が消えていない
+           残っている  cache/deep/c.tmp         2048 バイト
+         → cache/deep/c.tmp が消えていない
+           残っている  cache/deep/.e.tmp        5000 バイト
+         → cache/deep/.e.tmp が消えていない
+           残っている  g.TMP                    3000 バイト
+           残っている  cache/b.tmp              500 バイト
+           残っている  cache/keep.txt           4000 バイト
+           残っている  cache/deep/d.tmp         1024 バイト
+           残っている  cache/big.tmp/inner.txt  10 バイト
+           残っている  cache/big.tmp/（ディレクトリ）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+exit=1
+
+$ echo "--- 引用符を忘れると、シェルが先に広げる ---"
+--- 引用符を忘れると、シェルが先に広げる ---
+
+$ find . -name *.tmp
+./f.tmp
+
+$ find . -name "*.tmp" | sort
+./cache/a.tmp
+./cache/b.tmp
+./cache/big.tmp
+./cache/deep/.e.tmp
+./cache/deep/c.tmp
+./cache/deep/d.tmp
+./f.tmp
+
+$ echo "--- 誤答: 1000 バイトで切り、種類で絞らない ---"
+--- 誤答: 1000 バイトで切り、種類で絞らない ---
+
+$ find . -name "*.tmp" -size +1000c -delete; echo "exit=$?"
+find: cannot delete ‘./cache/big.tmp’: Directory not empty
+exit=1
+
+$ lab check 05; echo "exit=$?"
+✗ 05 未達
+  判定 : 観測型（消えているべきもの 4 個・残っているべきもの 5 個を1つずつ見た）
+  観測 :
+           消えた      f.tmp
+           消えた      cache/a.tmp
+           消えた      cache/deep/c.tmp
+           消えた      cache/deep/.e.tmp
+           残っている  g.TMP                    3000 バイト
+           残っている  cache/b.tmp              500 バイト
+           残っている  cache/keep.txt           4000 バイト
+           消えた      cache/deep/d.tmp
+         → cache/deep/d.tmp は条件に当てはまらないのに消えている
+           残っている  cache/big.tmp/inner.txt  10 バイト
+           残っている  cache/big.tmp/（ディレクトリ）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+exit=1
+
+$ echo "--- lab reset だけで配り直し、書き込めることを確かめる（seed を 0644/0755 にした理由） ---"
+--- lab reset だけで配り直し、書き込めることを確かめる（seed を 0644/0755 にした理由） ---
+
+$ cd ~; lab reset 05; cd ~/work/05
+演習 05 を初期状態に戻しました（~/work/05）
+
+$ ls -ld . cache cache/deep; ls -l f.tmp cache/a.tmp
+drwxr-xr-x 3 lab lab 4096 Oct 13 11:09 .
+drwxr-xr-x 4 lab lab 4096 Oct 13 11:09 cache
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 cache/deep
+-rw-r--r-- 1 lab lab 3000 Oct 13 11:09 cache/a.tmp
+-rw-r--r-- 1 lab lab 1025 Oct 13 11:09 f.tmp
+
+$ echo "--- 模範解答: 一覧で確かめてから消す ---"
+--- 模範解答: 一覧で確かめてから消す ---
+
+$ find . -type f -name "*.tmp" -size +1k | sort
+./cache/a.tmp
+./cache/deep/.e.tmp
+./cache/deep/c.tmp
+./f.tmp
+
+$ find . -type f -name "*.tmp" -size +1k -delete; find . -type f | sort
+./cache/b.tmp
+./cache/big.tmp/inner.txt
+./cache/deep/d.tmp
+./cache/keep.txt
+./g.TMP
+
+$ lab check 05; echo "exit=$?"
+✔ 05 達成
+  判定 : 観測型（消えているべきもの 4 個・残っているべきもの 5 個を1つずつ見た）
+  観測 :
+           消えた      f.tmp
+           消えた      cache/a.tmp
+           消えた      cache/deep/c.tmp
+           消えた      cache/deep/.e.tmp
+           残っている  g.TMP                    3000 バイト
+           残っている  cache/b.tmp              500 バイト
+           残っている  cache/keep.txt           4000 バイト
+           残っている  cache/deep/d.tmp         1024 バイト
+           残っている  cache/big.tmp/inner.txt  10 バイト
+           残っている  cache/big.tmp/（ディレクトリ）
+         1024 バイトより大きい .tmp ファイルだけが、深さ・隠しファイルに関係なく消えた
+         → -type f・-name "*.tmp"・-size +1k の3条件が、どれも効いている
+exit=0
+
+$ cd ~
+
+
+########## G. 演習06 — project を tar.xz にまとめる ##########
+
+$ lab start 06 >/dev/null; cd ~/work/06; ls -lR project
+project:
+total 12
+-rw-r--r-- 1 lab lab   42 Oct 13 11:09 README.md
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 docs
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 src
+
+project/docs:
+total 12
+-rw-r--r-- 1 lab lab 11640 Oct 13 11:09 guide.txt
+
+project/src:
+total 4
+-rw-r--r-- 1 lab lab 38 Oct 13 11:09 main.sh
+
+$ lab check 06; echo "exit=$?"
+✗ 06 未達
+  判定 : 観測型（アーカイブを実際に検査・展開して、元の project/ と比べた）
+  観測 : /home/lab/work/06/project.tar.xz が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+exit=1
+
+$ echo "--- 誤答1: 名前だけ .xz（中身は gzip） ---"
+--- 誤答1: 名前だけ .xz（中身は gzip） ---
+
+$ tar -czf project.tar.xz project; file project.tar.xz
+project.tar.xz: gzip compressed data, from Unix, original size modulo 2^32 20480
+
+$ lab check 06; echo "exit=$?"
+✗ 06 未達
+  判定 : 観測型（アーカイブを実際に検査・展開して、元の project/ と比べた）
+  観測 : file の判定 = gzip compressed data
+         → xz として展開できない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+exit=1
+
+$ echo "--- 誤答2: 絶対パスで渡す ---"
+--- 誤答2: 絶対パスで渡す ---
+
+$ tar -cJf project.tar.xz ~/work/06/project; tar -tJf project.tar.xz | head -3
+tar: Removing leading `/' from member names
+home/lab/work/06/project/
+home/lab/work/06/project/README.md
+home/lab/work/06/project/src/
+
+$ lab check 06; echo "exit=$?"
+✗ 06 未達
+  判定 : 観測型（アーカイブを実際に検査・展開して、元の project/ と比べた）
+  観測 : file の判定 = XZ compressed data
+         中の項目 6 個（先頭 home/lab/work/06/project/）
+         → project/ で始まらないパスがある: home/lab/work/06/project/ home/lab/work/06/project/README.md home/lab/work/06/project/src/ 
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+exit=1
+
+$ echo "--- 模範解答: 相対パスで渡して J で xz ---"
+--- 模範解答: 相対パスで渡して J で xz ---
+
+$ tar -cJvf project.tar.xz project; file project.tar.xz; tar -tJf project.tar.xz
+project/
+project/README.md
+project/src/
+project/src/main.sh
+project/docs/
+project/docs/guide.txt
+project.tar.xz: XZ compressed data, checksum CRC64
+project/
+project/README.md
+project/src/
+project/src/main.sh
+project/docs/
+project/docs/guide.txt
+
+$ lab check 06; echo "exit=$?"
+✔ 06 達成
+  判定 : 観測型（アーカイブを実際に検査・展開して、元の project/ と比べた）
+  観測 : file の判定 = XZ compressed data
+         中の項目 6 個（先頭 project/）
+         xz として壊れておらず、展開すると project/ と同じ中身が出てくる
+         → tar が束ね、xz が縮めた。中のパスは tar に渡した project のまま
+exit=0
+
+$ cd ~
+
+
+########## H. 演習07 — current を v2 に切り替える ##########
+
+$ lab start 07 >/dev/null; cd ~/work/07; ls -l; ls -l releases; cat current/VERSION
+total 4
+lrwxrwxrwx 1 lab lab   11 Oct 13 11:09 current -> releases/v1
+drwxr-xr-x 4 lab lab 4096 Oct 13 11:09 releases
+total 8
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 v1
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 v2
+1.0
+
+$ lab check 07; echo "exit=$?"
+✗ 07 未達
+  判定 : 観測型（current が何で、どこに辿り着き、何が読めるかを見た）
+  観測 : current         = シンボリックリンク（中身 = releases/v1）
+         辿り着く先      = /home/lab/work/07/releases/v1
+         current/VERSION = 1.0
+         → current の行き先が releases/v2 ではない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+exit=1
+
+$ echo "--- 誤答: ln -sf で上書きしたつもり ---"
+--- 誤答: ln -sf で上書きしたつもり ---
+
+$ ln -sf releases/v2 current; echo "exit=$?"; ls -l current; ls -l releases/v1
+exit=0
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 current -> releases/v1
+total 8
+-rw-r--r-- 1 lab lab  4 Oct 13 11:09 VERSION
+-rw-r--r-- 1 lab lab 15 Oct 13 11:09 app.sh
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 v2 -> releases/v2
+
+$ lab check 07; echo "exit=$?"
+✗ 07 未達
+  判定 : 観測型（current が何で、どこに辿り着き、何が読めるかを見た）
+  観測 : current         = シンボリックリンク（中身 = releases/v1）
+         辿り着く先      = /home/lab/work/07/releases/v1
+         current/VERSION = 1.0
+         releases/ の中のリンク:
+           releases/v1/v2 -> releases/v2
+         → current の行き先が releases/v2 ではない
+         → releases/ の中にリンクができている
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+exit=1
+
+$ echo "--- 模範解答: できてしまったリンクを消し、-n を足す ---"
+--- 模範解答: できてしまったリンクを消し、-n を足す ---
+
+$ rm releases/v1/v2; ln -sfn releases/v2 current; ls -l current; cat current/VERSION
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 current -> releases/v2
+2.0
+
+$ lab check 07; echo "exit=$?"
+✔ 07 達成
+  判定 : 観測型（current が何で、どこに辿り着き、何が読めるかを見た）
+  観測 : current         = シンボリックリンク（中身 = releases/v2）
+         辿り着く先      = /home/lab/work/07/releases/v2
+         current/VERSION = 2.0
+         current はリンクのまま、行き先だけが releases/v2 に変わった
+         → リンクは「道順を書いた別のファイル」。付け替えても版の中身には触れない
+exit=0
+
+$ cd ~
+
+
+########## I. 演習08 — locate で見つからない2つ ##########
+
+$ lab start 08 >/dev/null; touch ~/work/08/needle.txt /tmp/needle.txt; ls -l ~/work/08/needle.txt /tmp/needle.txt
+-rw-r--r-- 1 lab lab 0 Oct 13 11:09 /home/lab/work/08/needle.txt
+-rw-r--r-- 1 lab lab 0 Oct 13 11:09 /tmp/needle.txt
+
+$ locate needle.txt; echo "exit=$?"
+exit=1
+
+$ lab check 08; echo "exit=$?"
+✗ 08 未達
+  判定 : 観測型（locate needle.txt を実際に引いた）
+  観測 : locate needle.txt の結果:
+           （何も出ない）
+         索引の更新時刻   = 2026-10-13 11:09:11
+         needle.txt の作成 = 2026-10-13 11:09:14（~/work/08）
+         PRUNEPATHS       = "/tmp /var/spool /media /var/lib/os-prober /var/lib/ceph /home/.ecryptfs /var/lib/schroot"
+         → /home/lab/work/08/needle.txt が出ない
+         → /tmp/needle.txt が出ない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 08
+exit=1
+
+$ echo "--- 索引を作り直す（一般ユーザでは書けない） ---"
+--- 索引を作り直す（一般ユーザでは書けない） ---
+
+$ updatedb; echo "exit=$?"
+/var/lib/plocate/: Permission denied
+exit=1
+
+$ sudo updatedb; locate needle.txt
+/home/lab/work/08/needle.txt
+
+$ lab check 08; echo "exit=$?"
+✗ 08 未達
+  判定 : 観測型（locate needle.txt を実際に引いた）
+  観測 : locate needle.txt の結果:
+           /home/lab/work/08/needle.txt
+         索引の更新時刻   = 2026-10-13 11:09:14
+         needle.txt の作成 = 2026-10-13 11:09:14（~/work/08）
+         PRUNEPATHS       = "/tmp /var/spool /media /var/lib/os-prober /var/lib/ceph /home/.ecryptfs /var/lib/schroot"
+         → /tmp/needle.txt が出ない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 08
+exit=1
+
+$ echo "--- /tmp は PRUNEPATHS で外されている ---"
+--- /tmp は PRUNEPATHS で外されている ---
+
+$ grep PRUNEPATHS /etc/updatedb.conf
+PRUNEPATHS="/tmp /var/spool /media /var/lib/os-prober /var/lib/ceph /home/.ecryptfs /var/lib/schroot"
+
+$ sudo sed -i 's#^PRUNEPATHS="/tmp #PRUNEPATHS="#' /etc/updatedb.conf; grep PRUNEPATHS /etc/updatedb.conf
+PRUNEPATHS="/var/spool /media /var/lib/os-prober /var/lib/ceph /home/.ecryptfs /var/lib/schroot"
+
+$ sudo updatedb; locate needle.txt
+/home/lab/work/08/needle.txt
+/tmp/needle.txt
+
+$ lab check 08; echo "exit=$?"
+✔ 08 達成
+  判定 : 観測型（locate needle.txt を実際に引いた）
+  観測 : locate needle.txt の結果:
+           /home/lab/work/08/needle.txt
+           /tmp/needle.txt
+         索引の更新時刻   = 2026-10-13 11:09:14
+         needle.txt の作成 = 2026-10-13 11:09:14（~/work/08）
+         PRUNEPATHS       = "/var/spool /media /var/lib/os-prober /var/lib/ceph /home/.ecryptfs /var/lib/schroot"
+         2つとも locate の結果に出た
+         → locate は索引を引くだけ。索引を作り直し、/tmp を外す設定を消したので両方が載った
+
+  ════════════════════════════════════════
+   確かめて説明する LinuC 主題1.02 — 全8演習クリア
+  ════════════════════════════════════════
+
+  自分の手で確かめたこと
+
+   ✔ 01  ディレクトリに x だけ渡すと、名前を知っているファイルだけが読めること
+   ✔ 02  umask 027 で 640 / 750 になり、umask はシェルごとの値であること
+   ✔ 03  SGID がグループを受け継がせ、スティッキービットが他人のファイルの削除を止めること
+   ✔ 04  * は隠しファイルに一致せず、cp は -p が無いと時刻を写さないこと
+   ✔ 05  -size +1k は 1024 バイトより大きいものだけで、ちょうど 1KB は含まないこと
+   ✔ 06  tar -cJf で xz 形式になり、渡したパスがそのまま中のパスになること
+   ✔ 07  ディレクトリを指すリンクは ln -sf では置き換わらず、-n が要ること
+   ✔ 08  locate は索引を引くだけで、/tmp は /etc/updatedb.conf で最初から外されていること
+
+  この8つは全部、1つの事実から出ていました。
+
+      ファイルの名前は、ディレクトリの中に書かれた1行にすぎない。
+      権限・所有者・時刻・中身は、名前ではなく inode の側にある。
+      コマンドがどちらを触るかで、結果が決まる。
+
+  理論編の最終章に、それぞれがどう繋がるかを書いてあります → /linuc-files/theory/08-locate
+
+exit=0
+
+
+########## J. 全問通した状態で lab check（完走メッセージが出るはず） ##########
+
+$ lab check; echo "exit=$?"
+✔ 01 達成
+  判定 : 観測型（alice として実際に読み、一覧しようとした）
+  観測 : 経路の権限
+           drwxr-x--x lab:lab  /home/lab
+           drwxr-xr-x lab:lab  /home/lab/work
+           drwxr-x--x lab:lab  /home/lab/work/01
+           -rw-r--r-- lab:lab  /home/lab/work/01/memo.txt
+         alice が cat /home/lab/work/01/memo.txt  → 読めた
+         alice が ls /home/lab                    → 一覧できない
+         alice が ls /home/lab/work/01            → 一覧できない
+         名前を知っている memo.txt は読めて、2つのディレクトリはどちらも一覧できない
+         → ディレクトリの x は「通り抜け」、r は「名前の一覧」で、別々に渡せる
+✔ 02 達成
+  判定 : 観測型（umask を起動時の 0022 に戻して新しいログインシェルを起動し、その中で1つずつ作った）
+  観測 : いまのシェルの umask           = 0022
+         新しいシェルの umask           = 0027
+         新しいシェルで作ったファイル     = 640
+         新しいシェルで作ったディレクトリ = 750
+         新しいシェルでも、作られた瞬間に 640 / 750 になった
+         → umask はシェルごとの値で、起動時に読む設定ファイルから決まる
+✔ 03 達成
+  判定 : 観測型（alice・bob・carol として実際にファイルを作り、消し、一覧しようとした）
+  観測 : /srv/share  drwxrws--T root:devs
+         alice がファイルを作る        → 作れた（グループ devs）
+         bob がファイルを作る          → 作れた
+         bob が alice のファイルを消す → 消せなかった
+         bob が自分のファイルを消す    → 消せた
+         carol が一覧する              → できなかった
+         グループは自動で devs になり、他人のファイルは消せず、部外者は覗けない
+         → SGID（グループを受け継ぐ）とスティッキービット（消せるのは持ち主だけ）が両方効いている
+✔ 04 達成
+  判定 : 観測型（元のファイルと backup/ の同名ファイルの中身・更新時刻・権限を比べた）
+  観測 : backup/ の中身 = .secret.conf app.conf db.conf
+         .conf で終わる 3 個（隠しファイル .secret.conf を含む）が、中身・更新時刻・権限とも元と同じ
+         → * が拾わない隠しファイルも渡り、cp が新しく作った中身に元の時刻が写されている
+✔ 05 達成
+  判定 : 観測型（消えているべきもの 4 個・残っているべきもの 5 個を1つずつ見た）
+  観測 :
+           消えた      f.tmp
+           消えた      cache/a.tmp
+           消えた      cache/deep/c.tmp
+           消えた      cache/deep/.e.tmp
+           残っている  g.TMP                    3000 バイト
+           残っている  cache/b.tmp              500 バイト
+           残っている  cache/keep.txt           4000 バイト
+           残っている  cache/deep/d.tmp         1024 バイト
+           残っている  cache/big.tmp/inner.txt  10 バイト
+           残っている  cache/big.tmp/（ディレクトリ）
+         1024 バイトより大きい .tmp ファイルだけが、深さ・隠しファイルに関係なく消えた
+         → -type f・-name "*.tmp"・-size +1k の3条件が、どれも効いている
+✔ 06 達成
+  判定 : 観測型（アーカイブを実際に検査・展開して、元の project/ と比べた）
+  観測 : file の判定 = XZ compressed data
+         中の項目 6 個（先頭 project/）
+         xz として壊れておらず、展開すると project/ と同じ中身が出てくる
+         → tar が束ね、xz が縮めた。中のパスは tar に渡した project のまま
+✔ 07 達成
+  判定 : 観測型（current が何で、どこに辿り着き、何が読めるかを見た）
+  観測 : current         = シンボリックリンク（中身 = releases/v2）
+         辿り着く先      = /home/lab/work/07/releases/v2
+         current/VERSION = 2.0
+         current はリンクのまま、行き先だけが releases/v2 に変わった
+         → リンクは「道順を書いた別のファイル」。付け替えても版の中身には触れない
+✔ 08 達成
+  判定 : 観測型（locate needle.txt を実際に引いた）
+  観測 : locate needle.txt の結果:
+           /home/lab/work/08/needle.txt
+           /tmp/needle.txt
+         索引の更新時刻   = 2026-10-13 11:09:14
+         needle.txt の作成 = 2026-10-13 11:09:14（~/work/08）
+         PRUNEPATHS       = "/var/spool /media /var/lib/os-prober /var/lib/ceph /home/.ecryptfs /var/lib/schroot"
+         2つとも locate の結果に出た
+         → locate は索引を引くだけ。索引を作り直し、/tmp を外す設定を消したので両方が載った
+exit=0
+
+$ lab ls
+演習一覧
+  ✔ 01  一覧は見せずに、1つのファイルだけ読ませる 10分 / 影響度 B
+  ✔ 02  次に開くシェルでも 640 と 750 で作られるようにする 10分 / 影響度 B
+  ✔ 03  devs の共有ディレクトリを作る    12分 / 影響度 B
+  ✔ 04  設定ファイルを、時刻ごと控えておく 10分 / 影響度 B
+  ✔ 05  大きな .tmp だけを、深いところまで消す 12分 / 影響度 B
+  ✔ 06  project を tar.xz にまとめる           10分 / 影響度 B
+  ✔ 07  current を v2 に切り替える            10分 / 影響度 B
+  ✔ 08  locate で見つからない2つを、見つかるようにする 12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+
+########## K. ヒントと解答の表示 ##########
+
+$ lab hint 05
+
+ヒント 1 段目
+
+find は「どこから」と「どんな条件で」を1行に並べます。まず、消さずに一覧してください。
+
+    cd ~/work/05
+    find . -name "*.tmp"
+
+"*.tmp" は引用符で囲んでください。囲まないと、find に渡る前にシェルが
+いまのディレクトリにある名前へ広げてしまいます（ここには f.tmp が1つあるので、
+find は f.tmp という名前だけを探すことになります）。
+
+まだ足りなければ lab hint 05（次の段）
+
+$ lab solve 07 | head -12
+
+模範解答 07
+
+current を、ディレクトリとして辿らずにリンクそのものとして置き換えます。
+
+    cd ~/work/07
+    ln -sfn releases/v2 current
+    ls -l current
+    #=> lrwxrwxrwx 1 lab lab 11 … current -> releases/v2
+    cat current/VERSION
+    #=> 2.0
+
+
+
+########## L. 最終環境 ##########
+
+$ lab env
+テーマ    : lab-linuc-files 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:files-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb

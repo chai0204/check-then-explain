@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. 特殊なビットは「誰として動くか」と「誰が消せるか」を変える — 確かめて説明する LinuC 主題1.02</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="linuc-files">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-files/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/">詳しく</a></p>
+</div>
+<h1>3. 特殊なビットは「誰として動くか」と「誰が消せるか」を変える</h1>
+<p class="lead">root が持ち主で SUID を付けたシェルスクリプトを動かすと、名乗るのは root ではなく lab のままだった。同じ印を付けた <code>id</code> の複製は <code>euid=0(root)</code> と名乗る。特殊なビットは中身（inode）に付いた印にすぎず、その印をどう扱うかはカーネルが決めている。</p>
+<div class="badges"><span>前提: 第2章まで読了</span><span>前提: sudo が打てる</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.02.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>SUID・SGID・スティッキービットを、<code>ls -l</code> の表示と <code>chmod</code> の先頭の桁（4桁で書いたときの左端）の両方で読み書きできる</li><li>3つの特殊なビットが、ファイルとディレクトリでそれぞれ何を変えるかを言える</li><li><code>chown</code> と <code>chgrp</code> を誰がどこまで使えるかを、実測の結果から説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: ケーパビリティ（<code>setcap</code>）、<code>nosuid</code> マウント、SUID のプログラムを安全に書く方法、<code>newgrp</code> や <code>sg</code> でグループを切り替える方法は扱わない。ユーザやグループの作り方（<code>useradd</code>・<code>groupadd</code>）は主題1.08 の範囲なので、この檻では alice・bob・carol とグループ devs を最初から用意してある。</div></div>
+
+<h2 id="suid">SUID — 誰として動くか</h2>
+<div class="sgoal"><b>この節で分かること</b>: SUID が付いたプログラムが、誰の権限で動くか。</div>
+<p>この章は <code>~/work/ch3</code> で作業する。まず、一般ユーザが自分のパスワードを変えられる仕組みを見る。</p>
+<pre><code>$ mkdir -p ~/work/ch3
+$ cd ~/work/ch3
+$ ls -l /usr/bin/passwd /etc/shadow
+-rw-r----- 1 root shadow   578 Oct 13 09:43 /etc/shadow
+-rwsr-xr-x 1 root root   64152 May 30  2024 /usr/bin/passwd</code></pre>
+<p>パスワードが入っている <code>/etc/shadow</code> は、root しか書けない。それでも一般ユーザが <code>passwd</code> を打てば書き換わるのは、<code>passwd</code> の所有者の x の位置が <code>s</code> になっているからである。これが <b>SUID</b>（set-user-ID）で、付いているプログラムは<b>打った人ではなく、ファイルの所有者として</b>動く。</p>
+<p>同じことを自分で作って確かめる。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>root が持ち主のファイルに SUID を付ければ、それは root として動く。
+<code>passwd</code> がそうなのだから、自分で書いたスクリプトでも同じはずだ。</p>
+<pre><code>$ printf "#!/bin/bash\nid -un\n" &gt; whoami.sh
+$ sudo chown root:root whoami.sh
+$ sudo chmod 4755 whoami.sh
+$ ls -l whoami.sh
+-rwsr-xr-x 1 root root 19 Oct 13 11:09 whoami.sh
+$ ./whoami.sh
+lab</code></pre>
+<div class="then"><b>だめな理由</b>: 表示は <code>passwd</code> と同じ <code>-rwsr-xr-x root root</code> なのに、名乗ったのは lab だった。
+Linux のカーネルは、<code>#!</code> で始まる<b>スクリプトの SUID を無視する</b>。
+スクリプトは中身を別のプログラム（<code>/bin/bash</code>）が読んで動かすので、
+読み込むまでの間にすり替えられる隙があり、root の権限を渡すと危ないからである。
+SUID が効くのは、カーネルが直接実行する機械語のプログラムだけである。</div></div>
+<pre><code>$ sudo cp /usr/bin/id ./myid
+$ sudo chmod 4755 myid
+$ ls -l myid
+-rwsr-xr-x 1 root root 39432 Oct 13 11:09 myid
+$ ./myid
+uid=1000(lab) gid=1000(lab) euid=0(root) groups=1000(lab)
+$ id
+uid=1000(lab) gid=1000(lab) groups=1000(lab)
+$ file whoami.sh myid
+whoami.sh: setuid Bourne-Again shell script, ASCII text executable
+myid:      setuid ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=26e732a61e6fabef4bafe3165cb7b9fa31438cd2, for GNU/Linux 3.2.0, stripped</code></pre>
+<p>機械語（ELF）の <code>id</code> の複製は <code>euid=0(root)</code> を名乗った。<code>uid</code> は打った人（lab）のまま残り、権限の判定に使われる<b>実効ユーザ ID</b>（euid）だけが所有者に変わる。<code>file</code> は2つとも「setuid」と報告するので、印そのものは両方に付いている。違うのは、カーネルが印を見るかどうかである。</p>
+<div class="analogy"><b>たとえ</b>: 社長の印鑑を押した委任状に近い。
+窓口（カーネル）は委任状を持ってきた人を、その用件に限って社長として扱う。<code>passwd</code> は「パスワードの変更」という用件だけを持った委任状である。
+<br>ただし<b>崩れる点</b>: 人間の窓口は書類の種類で扱いを変えないが、カーネルは変える。
+同じ印鑑でも、中身を別の人（インタプリタ）が読み上げる形の書類（スクリプト）は、委任状として受け付けない。</div>
+
+<h2 id="letters">s・S・t・T の読み方</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>chmod</code> の先頭の桁と、<code>ls -l</code> に出る文字の対応。</div>
+<p>特殊なビットは3つあり、<code>chmod</code> の数値では先頭にもう1桁足して書く。表示は x の位置に重ねて出る。</p>
+<pre><code>$ touch s.txt
+$ chmod 4755 s.txt; ls -l s.txt
+-rwsr-xr-x 1 lab lab 0 Oct 13 11:09 s.txt
+$ chmod 4644 s.txt; ls -l s.txt
+-rwSr--r-- 1 lab lab 0 Oct 13 11:09 s.txt
+$ chmod 2755 s.txt; ls -l s.txt
+-rwxr-sr-x 1 lab lab 0 Oct 13 11:09 s.txt
+$ chmod 2644 s.txt; ls -l s.txt
+-rw-r-Sr-- 1 lab lab 0 Oct 13 11:09 s.txt
+$ mkdir t
+$ chmod 1777 t; ls -ld t
+drwxrwxrwt 2 lab lab 4096 Oct 13 11:09 t
+$ chmod 1770 t; ls -ld t
+drwxrwx--T 2 lab lab 4096 Oct 13 11:09 t</code></pre>
+<p>小文字は「印 ＋ x あり」、大文字は「印はあるが x が無い」である。<b>ファイル</b>の <code>-rwSr--r--</code> は、印は付いているのに実行できないので、SUID が働く場面が無い。一方、<b>ディレクトリ</b>の <code>S</code>（SGID）と <code>T</code>（スティッキービット）は、x が無くても効く。演習03 の模範解答 <code>drwxrws--T</code> では、<code>T</code> のおかげで bob は alice のファイルを消せなかった（判定の記録）。記号でも付けられる。</p>
+<pre><code>$ chmod 755 s.txt; chmod u+s s.txt; ls -l s.txt
+-rwsr-xr-x 1 lab lab 0 Oct 13 11:09 s.txt
+$ chmod g+s,o+t t; ls -ld t
+drwxrws--T 2 lab lab 4096 Oct 13 11:09 t
+$ stat -c "%a %A %n" s.txt t
+4755 -rwsr-xr-x s.txt
+3770 drwxrws--T t</code></pre>
+<div class="scroll"><table>
+<tr><th>ビット</th><th>先頭の桁</th><th>記号</th><th>表示の位置</th><th>ファイルに付けると</th><th>ディレクトリに付けると</th></tr>
+<tr><td>SUID</td><td>4</td><td><code>u+s</code></td><td>所有者の x → <code>s</code> / <code>S</code></td><td>所有者として動く（機械語のみ）</td><td>（Linux では意味を持たない）</td></tr>
+<tr><td>SGID</td><td>2</td><td><code>g+s</code></td><td>グループの x → <code>s</code> / <code>S</code></td><td>グループの権限で動く</td><td>中に作ったものがディレクトリのグループを受け継ぐ</td></tr>
+<tr><td>スティッキービット</td><td>1</td><td><code>o+t</code></td><td>その他の x → <code>t</code> / <code>T</code></td><td>（いまの Linux では意味を持たない）</td><td>中のファイルを消せるのは、その持ち主・ディレクトリの持ち主・root だけ</td></tr>
+</table></div>
+<p>先頭の桁は足し算で組み合わせる。<code>3770</code> は SGID（2）とスティッキービット（1）の両方で、<code>stat</code> の <code>%a</code> もそう報告した。</p>
+
+<h2 id="sticky">/tmp のスティッキービット — 誰が消せるか</h2>
+<div class="sgoal"><b>この節で分かること</b>: 誰でも書けるディレクトリで、他人のファイルが消えない仕組み。</div>
+<pre><code>$ ls -ld /tmp
+drwxrwxrwt 1 root root 4096 Oct 13 11:09 /tmp
+$ sudo -u alice touch /tmp/alice.txt
+$ ls -l /tmp/alice.txt
+-rw-rw-r-- 1 alice alice 0 Oct 13 11:09 /tmp/alice.txt
+$ sudo -u bob rm -f /tmp/alice.txt
+rm: cannot remove '/tmp/alice.txt': Operation not permitted
+$ rm -f /tmp/alice.txt
+rm: cannot remove '/tmp/alice.txt': Operation not permitted
+$ sudo rm /tmp/alice.txt
+$ ls -l /tmp/alice.txt
+ls: cannot access '/tmp/alice.txt': No such file or directory</code></pre>
+<p><code>/tmp</code> は <code>rwxrwxrwt</code> で、誰でも名前を作れる。第1章の規則なら、w を持つ全員が他人の名前も消せるはずだが、bob も lab も <code>-f</code>（確認を聞かない）を付けて断られた。最後の <code>t</code> が<b>スティッキービット</b>で、「消す・名前を変える」をファイルの持ち主（とディレクトリの持ち主・root）だけに絞る。root は消せた。</p>
+<div class="analogy"><b>たとえ</b>: 誰でも貼れる共用の掲示板に近い。
+貼るのは自由だが、はがせるのは貼った本人と掲示板の管理者だけ、という決まりが付いている。
+<br>ただし<b>崩れる点</b>: 掲示板の決まりは「はがす」だけを縛るが、スティッキービットは「名前を変える」も縛る。
+一方で、他人のファイルの<b>中身</b>を書き換えられるかどうかは、そのファイル自身の権限が決める（この印は関係しない）。</div>
+
+<h2 id="owner">chown と chgrp — 所有者を変えられるのは root だけ</h2>
+<div class="sgoal"><b>この節で分かること</b>: 一般ユーザが所有者とグループをどこまで変えられるか。</div>
+<pre><code>$ touch g.txt
+$ ls -l g.txt
+-rw-r--r-- 1 lab lab 0 Oct 13 11:09 g.txt
+$ chgrp devs g.txt
+chgrp: changing group of 'g.txt': Operation not permitted
+$ chown alice g.txt
+chown: changing ownership of 'g.txt': Operation not permitted
+$ chgrp lab g.txt; echo "exit=$?"
+exit=0</code></pre>
+<p>自分のファイルでも、所有者を他人に変えることはできない。<code>chgrp</code> は、<b>自分が属しているグループ</b>へなら変えられる（lab は devs に入っていない）。他人に押し付けたり、入っていないグループの名義を名乗ったりできないようにしているのである。root はどちらもできる。</p>
+<pre><code>$ sudo chgrp devs g.txt; ls -l g.txt
+-rw-r--r-- 1 lab devs 0 Oct 13 11:09 g.txt
+$ sudo chown alice:devs g.txt; ls -l g.txt
+-rw-r--r-- 1 alice devs 0 Oct 13 11:09 g.txt
+$ sudo chown bob g.txt; ls -l g.txt
+-rw-r--r-- 1 bob devs 0 Oct 13 11:09 g.txt
+$ sudo chown :lab g.txt; ls -l g.txt
+-rw-r--r-- 1 bob lab 0 Oct 13 11:09 g.txt
+$ sudo chown carol: g.txt; ls -l g.txt
+-rw-r--r-- 1 carol carol 0 Oct 13 11:09 g.txt
+$ sudo chown bob:lab g.txt; ls -l g.txt
+-rw-r--r-- 1 bob lab 0 Oct 13 11:09 g.txt
+$ sudo chown carol. g.txt; ls -l g.txt
+chown: warning: '.' should be ':': ‘carol.’
+-rw-r--r-- 1 carol carol 0 Oct 13 11:09 g.txt</code></pre>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>変わるもの</th></tr>
+<tr><td><code>chown alice file</code></td><td>所有者だけ</td></tr>
+<tr><td><code>chown alice:devs file</code></td><td>所有者とグループ</td></tr>
+<tr><td><code>chown :lab file</code></td><td>グループだけ（<code>chgrp lab file</code> と同じ）</td></tr>
+<tr><td><code>chown carol: file</code></td><td>所有者を carol に、グループを carol の主グループに</td></tr>
+<tr><td><code>chown -R alice dir</code></td><td>ディレクトリの下全部（<code>chgrp -R</code> も同じ）</td></tr>
+</table></div>
+<p><code>carol:</code> のようにグループを空けると、グループはそのユーザの主グループになる。区切りに <code>.</code> を使う古い書き方（<code>carol.</code>）も同じ結果になるが、警告が出る。ユーザ名に <code>.</code> を含められるようになったため、区切りは <code>:</code> に一本化されつつある。試験で <code>.</code> 区切りが出ても、意味は <code>:</code> と同じと読めばよい。</p>
+
+<h2 id="sgid">SGID のディレクトリ — グループを受け継ぐ</h2>
+<div class="sgoal"><b>この節で分かること</b>: グループで共有するディレクトリに、SGID が必要な理由。</div>
+<pre><code>$ getent group devs
+devs:x:1001:alice,bob
+$ sudo mkdir /srv/team
+$ sudo chgrp devs /srv/team
+$ sudo chmod 2775 /srv/team
+$ ls -ld /srv/team
+drwxrwsr-x 2 root devs 4096 Oct 13 11:09 /srv/team
+$ sudo -u alice touch /srv/team/plan.txt
+$ sudo -u alice mkdir /srv/team/docs
+$ ls -l /srv/team
+total 4
+drwxrwsr-x 2 alice devs 4096 Oct 13 11:09 docs
+-rw-rw-r-- 1 alice devs    0 Oct 13 11:09 plan.txt
+$ sudo -u alice touch /tmp/plan.txt
+$ ls -l /tmp/plan.txt
+-rw-rw-r-- 1 alice alice 0 Oct 13 11:09 /tmp/plan.txt</code></pre>
+<p>同じ alice が作ったのに、<code>/srv/team</code> の中ではグループが <code>devs</code>、<code>/tmp</code> では <code>alice</code> になった。SGID の付いたディレクトリの中で作ったものは、作った人の主グループではなく、<b>ディレクトリのグループ</b>を受け継ぐ。中に作ったディレクトリ <code>docs</code> にも <code>s</code> が付いて、印そのものも下へ受け継がれている。</p>
+<pre><code>$ sudo -u bob sh -c "echo bob も書ける &gt;&gt; /srv/team/plan.txt"
+$ cat /srv/team/plan.txt
+bob も書ける
+$ sudo -u bob rm /srv/team/plan.txt
+$ ls -l /srv/team
+total 4
+drwxrwsr-x 2 alice devs 4096 Oct 13 11:09 docs</code></pre>
+<p>グループが devs で、権限が <code>rw-rw-r--</code> なので、bob は alice のファイルに書き足せた。ところが bob は alice のファイルを<b>消せてしまった</b>。ディレクトリにグループの w があるからである（第1章）。共有ディレクトリで「仲間は書けるが、他人のファイルは消せない」にするには、<code>/tmp</code> の節で見たスティッキービットも要る。</p>
+<div class="analogy"><b>たとえ</b>: 部署の共有キャビネットに入れた書類が、自動で部署の持ち物として登録される仕組みに近い。
+誰が入れても「総務部」の札が付くので、部署の全員が手に取れる。
+<br>ただし<b>崩れる点</b>: 札（グループ）は自動で付くが、書き込めるかどうかは入れた人の umask が決める。
+alice のファイルが <code>rw-rw-r--</code> になったのは、sudo で動いた alice の umask が 0002 だったからで（第2章）、
+umask が 022 の人が入れた書類は、札が付いても仲間は書き込めない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-files/">演習03</a>は、SGID とスティッキービットを組み合わせて、
+devs の共有ディレクトリ <code>/srv/share</code> を作る課題である。
+判定は alice・bob・carol として実際にファイルを作り、消し、一覧しようとして確かめる。</div>
+<div class="quiz"><b>確認</b>
+<p><code>chmod 4755 /usr/local/bin/tool</code> を実行した。<code>ls -l</code> の先頭10文字はどうなるか。</p>
+<details><summary>答え</summary>
+<p><code>-rwsr-xr-x</code>。4 は SUID で、所有者の x の位置に <code>s</code> が出る。x が無い <code>4644</code> なら <code>-rwSr--r--</code> と大文字になる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>パーミッションが <code>drwxrwxrwt</code> のディレクトリで、一般ユーザ bob は alice のファイルを削除できるか。<code>rm -f</code> ならどうか。</p>
+<details><summary>答え</summary>
+<p>どちらもできない（<code>Operation not permitted</code>）。スティッキービット（<code>t</code>）が付いたディレクトリの中のファイルを消せるのは、
+そのファイルの持ち主、ディレクトリの持ち主、root だけである。<code>-f</code> は確認を聞かないだけで、権限は変えない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>ディレクトリに SGID を設定するコマンドと、その効果を答えよ。</p>
+<details><summary>答え</summary>
+<p><code>chmod g+s dir</code>（または <code>chmod 2775 dir</code> のように、4桁で書いたときの先頭を 2 にする）。
+中に新しく作ったファイルとディレクトリのグループが、作った人の主グループではなくディレクトリのグループになる。
+中に作ったディレクトリにも SGID が付く。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>一般ユーザが、自分の所有するファイルに対してできることはどれか。2つ選べ。<br>
+a. <code>chown</code> で所有者を他のユーザにする<br>
+b. <code>chgrp</code> で、自分が属しているグループに変える<br>
+c. <code>chgrp</code> で、自分が属していないグループに変える<br>
+d. <code>chmod</code> でパーミッションを変える</p>
+<details><summary>答え</summary>
+<p>b と d。所有者を変えられるのは root だけで、<code>chgrp</code> は自分が属するグループへだけ変えられる
+（実測では <code>chgrp devs</code> も <code>chown alice</code> も <code>Operation not permitted</code>）。
+<code>chmod</code> は所有者なら自由にできる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>SUID（4・<code>u+s</code>）は所有者として、SGID（2・<code>g+s</code>）はグループとして動かす印。<code>/usr/bin/passwd</code> は <code>-rwsr-xr-x</code></li><li>Linux はスクリプトの SUID を無視する。効くのは機械語のプログラムだけ（実測: スクリプトは lab、<code>id</code> の複製は <code>euid=0(root)</code>）</li><li>スティッキービット（1・<code>o+t</code>）を付けたディレクトリでは、消せるのは持ち主・ディレクトリの持ち主・root だけ。<code>/tmp</code> は <code>drwxrwxrwt</code></li><li>小文字 <code>s</code> <code>t</code> は x あり、大文字 <code>S</code> <code>T</code> は x なし</li><li>SGID のディレクトリの中で作ったものは、ディレクトリのグループを受け継ぐ</li><li>所有者を変えられるのは root だけ。一般ユーザの <code>chgrp</code> は、自分が属するグループへだけ</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-files/theory/02-umask">← 2. umask は引き算ではなく、ビットを落とす印</a><a href="/linuc-files/theory/04-cp-mv-rm">次: 4. コピーは中身を作り直し、移動は名前を書き換える →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-files/chapters.js"></script>
+<script src="/linuc-files/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6. tar は束ねるだけで、縮めるのは別のプログラム — 確かめて説明する LinuC 主題1.02</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="6" data-theme="linuc-files">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-files/theory/">理論編</a> › 第6章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/">詳しく</a></p>
+</div>
+<h1>6. tar は束ねるだけで、縮めるのは別のプログラム</h1>
+<p class="lead">6バイトのファイル2つを <code>tar</code> で1つにまとめると、10240 バイトになった。<code>tar</code> は名前と属性と中身を1本に並べるだけで、縮めはしない。縮めるのは gzip・bzip2・xz で、そのうえ <code>gzip</code> は元のファイルを消して置き換える。</p>
+<div class="badges"><span>前提: 第5章まで読了</span><span>前提: 檻が起動している</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.02.2（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>tar</code> のオプション（c・x・t・z・j・J・v・f・C）を組み合わせて、作る・一覧する・展開するを書ける</li><li>gzip・bzip2・xz の圧縮・展開・中を見るコマンドを、対応表なしで言える</li><li><code>dd</code> が何をどの単位で写すかを、出力の読み方とともに説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>cpio</code>、<code>zip</code>/<code>unzip</code>、<code>zstd</code>、tar の増分バックアップ（<code>-g</code>）、圧縮率と速度の細かい比較は扱わない。<code>dd</code> でディスクそのものを写す手順は、この檻にディスクが無いので理論として読むだけでよい。</div></div>
+
+<h2 id="tar">tar は縮めない</h2>
+<div class="sgoal"><b>この節で分かること</b>: tar が作る1本のファイルに、何が入っているか。</div>
+<p>この章は <code>~/work/ch6</code> で作業する。6バイトのファイルを2つ作って、<code>tar</code> でまとめる。</p>
+<pre><code>$ mkdir -p ~/work/ch6
+$ cd ~/work/ch6
+$ echo hello &gt; a.txt; echo world &gt; b.txt
+$ ls -l a.txt b.txt
+-rw-r--r-- 1 lab lab 6 Oct 13 11:09 a.txt
+-rw-r--r-- 1 lab lab 6 Oct 13 11:09 b.txt</code></pre>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>tar</code> は「まとめて小さくする」ためのコマンドだ。2つで 12 バイトなら、まとめれば 12 バイト以下になるはずだ。</p>
+<pre><code>$ tar -cvf small.tar a.txt b.txt
+a.txt
+b.txt
+$ ls -l small.tar
+-rw-r--r-- 1 lab lab 10240 Oct 13 11:09 small.tar</code></pre>
+<div class="then"><b>だめな理由</b>: 12 バイトが 10240 バイトになった。<code>tar</code> は圧縮しない。ファイル1つごとに 512 バイトの見出し（名前・権限・所有者・大きさ・時刻）を付け、
+中身を 512 バイト単位に詰めて並べ、最後に 10240 バイト単位に切りそろえる。
+「たくさんのファイルを、属性ごと1本のファイルにする」のが <code>tar</code> の仕事で、縮めるのは別のプログラムである。</div></div>
+<pre><code>$ tar -tvf small.tar
+-rw-r--r-- lab/lab           6 2026-10-13 11:09 a.txt
+-rw-r--r-- lab/lab           6 2026-10-13 11:09 b.txt</code></pre>
+<p><code>-t</code> で中を一覧すると、<code>ls -l</code> とほとんど同じ情報が並ぶ。権限・所有者・時刻は、第1章で見た「名前の先」にある情報で、<code>tar</code> はそれを名前と一緒に記録している。ただし展開したときに記録どおりに戻るかどうかは、誰が展開するかで変わる（この章の後半で確かめる）。</p>
+<p>ハイフンを省いた古い書き方も、GNU tar では同じ意味で通る。試験の選択肢にもこの形で出る。</p>
+<pre><code>$ tar tvf small.tar
+-rw-r--r-- lab/lab           6 2026-10-13 11:09 a.txt
+-rw-r--r-- lab/lab           6 2026-10-13 11:09 b.txt</code></pre>
+<div class="scroll"><table>
+<tr><th>オプション</th><th>意味</th></tr>
+<tr><td><code>c</code> / <code>t</code> / <code>x</code></td><td>作る（create）/ 一覧する（list）/ 展開する（extract）。どれか1つ</td></tr>
+<tr><td><code>f アーカイブ名</code></td><td>アーカイブのファイル名。<b>直後に名前が来る</b>ので、まとめて書くときは最後に置く（<code>-cvf small.tar</code>）</td></tr>
+<tr><td><code>v</code></td><td>処理した名前を表示する（<code>t</code> と組むと <code>ls -l</code> 風になる）</td></tr>
+<tr><td><code>z</code> / <code>j</code> / <code>J</code></td><td>gzip / bzip2 / xz を通す（次の次の節）</td></tr>
+<tr><td><code>C ディレクトリ</code></td><td>そのディレクトリに移ってから処理する（展開先の指定に使う）</td></tr>
+<tr><td><code>p</code></td><td>展開するとき、記録された権限をそのまま戻す（root では最初からそう動く。後の節）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 引っ越しの段ボールに、荷札を付けて品物を詰める作業に近い。
+荷札には品名だけでなく、持ち主や取り扱い注意の印も書く。箱と荷札の分だけ、荷物は少し重くなる。
+<br>ただし<b>崩れる点</b>: 段ボールは品物の数に合わせて大きさを選べるが、<code>tar</code> の箱は 10240 バイト単位でしか作れない。
+6 バイトの品物2つでも、最小の箱1つ分の大きさになる。</div>
+
+<h2 id="gzip">gzip は元のファイルを置き換える</h2>
+<div class="sgoal"><b>この節で分かること</b>: 圧縮コマンドが元のファイルをどう扱うか。</div>
+<pre><code>$ seq 1 2000 &gt; num.txt
+$ ls -l num.txt
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+$ gzip num.txt
+$ ls -l num.txt*
+-rw-r--r-- 1 lab lab 4226 Oct 13 11:09 num.txt.gz
+$ gzip -l num.txt.gz
+         compressed        uncompressed  ratio uncompressed_name
+               4226                8893  52.8% num.txt</code></pre>
+<p><code>gzip</code> の後には <code>num.txt.gz</code> しか無い。元の <code>num.txt</code> は消えた。<code>gzip</code> は「圧縮した写しを作る」のではなく、<b>圧縮したものに置き換える</b>。展開する <code>gunzip</code> も同じで、<code>.gz</code> を消して元の名前に戻す。</p>
+<pre><code>$ gunzip num.txt.gz
+$ ls -l num.txt*
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+$ gzip -k num.txt
+$ ls -l num.txt*
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+-rw-r--r-- 1 lab lab 4226 Oct 13 11:09 num.txt.gz
+$ zcat num.txt.gz | tail -1
+2000
+$ gzip num.txt
+gzip: num.txt.gz already exists; do you wish to overwrite (y or n)? n
+	not overwritten</code></pre>
+<p>元を残したいときは <code>-k</code>（keep）を付けるか、<code>gzip -c num.txt &gt; num.txt.gz</code> のように標準出力へ出して自分で受ける。<code>zcat</code> は展開した中身を画面に出すだけで、ファイルは変えない。すでに <code>.gz</code> があると、上書きしてよいかを聞いてくる（<code>n</code> は自分で打つ）。</p>
+<p>bzip2 と xz も、使い方は同じ形である。</p>
+<pre><code>$ bzip2 -k num.txt; xz -k num.txt
+$ ls -l num.txt*
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+-rw-r--r-- 1 lab lab 2140 Oct 13 11:09 num.txt.bz2
+-rw-r--r-- 1 lab lab 4226 Oct 13 11:09 num.txt.gz
+-rw-r--r-- 1 lab lab  948 Oct 13 11:09 num.txt.xz
+$ bzcat num.txt.bz2 | tail -1; xzcat num.txt.xz | tail -1
+2000
+2000
+$ rm num.txt num.txt.gz
+$ bunzip2 num.txt.bz2
+$ ls -l num.txt*
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+-rw-r--r-- 1 lab lab  948 Oct 13 11:09 num.txt.xz
+$ rm num.txt
+$ unxz num.txt.xz
+$ ls -l num.txt*
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt</code></pre>
+<div class="scroll"><table>
+<tr><th>形式</th><th>圧縮</th><th>展開</th><th>中を見る</th><th>拡張子</th><th>tar の文字</th><th>8893 バイトが（実測）</th></tr>
+<tr><td>gzip</td><td><code>gzip</code></td><td><code>gunzip</code> / <code>gzip -d</code></td><td><code>zcat</code></td><td><code>.gz</code></td><td><code>z</code></td><td>4226</td></tr>
+<tr><td>bzip2</td><td><code>bzip2</code></td><td><code>bunzip2</code> / <code>bzip2 -d</code></td><td><code>bzcat</code></td><td><code>.bz2</code></td><td><code>j</code></td><td>2140</td></tr>
+<tr><td>xz</td><td><code>xz</code></td><td><code>unxz</code> / <code>xz -d</code></td><td><code>xzcat</code></td><td><code>.xz</code></td><td><code>J</code></td><td>948</td></tr>
+</table></div>
+<p>どれも1つのファイルを1つの圧縮ファイルにするだけで、ディレクトリは扱えない。</p>
+<pre><code>$ mkdir -p notes/2026; cp num.txt notes/2026/log.txt
+$ gzip notes
+gzip: notes is a directory -- ignored</code></pre>
+<p>だから「束ねる <code>tar</code>」と「縮める gzip など」は組で使われる。</p>
+<div class="analogy"><b>たとえ</b>: 衣類を真空パックの袋に詰め替える作業に近い。
+詰め替えた後に、元の畳んだ衣類が棚に残っているわけではない。中身は袋の中に移っている。
+<br>ただし<b>崩れる点</b>: 真空パックは中身を出せば袋が空で残るが、<code>gunzip</code> は袋（<code>.gz</code>）ごと消して元に戻す。
+どちらの向きも「置き換え」で、両方を残すには <code>-k</code> が要る。</div>
+
+<h2 id="tarz">tar の z・j・J — 束ねて縮めるを1回で</h2>
+<div class="sgoal"><b>この節で分かること</b>: 圧縮つきのアーカイブの作り方・確かめ方・展開のしかた。</div>
+<pre><code>$ tar -czvf notes.tar.gz notes
+notes/
+notes/2026/
+notes/2026/log.txt
+$ tar -cjf notes.tar.bz2 notes
+$ tar -cJf notes.tar.xz notes
+$ ls -l notes.tar.*
+-rw-r--r-- 1 lab lab 2467 Oct 13 11:09 notes.tar.bz2
+-rw-r--r-- 1 lab lab 4469 Oct 13 11:09 notes.tar.gz
+-rw-r--r-- 1 lab lab 1124 Oct 13 11:09 notes.tar.xz
+$ file notes.tar.gz notes.tar.bz2 notes.tar.xz
+notes.tar.gz:  gzip compressed data, from Unix, original size modulo 2^32 20480
+notes.tar.bz2: bzip2 compressed data, block size = 900k
+notes.tar.xz:  XZ compressed data, checksum CRC64</code></pre>
+<p><code>file</code> が言う「original size 20480」が、縮める前の <code>tar</code> の大きさである。<code>tar</code> の中には作った時刻が入るので、あなたが作ると圧縮後の大きさは少し違う（著者が記録を取り直すたびに、数十バイトずつ変わった）。一覧は <code>t</code> に同じ文字を添える。</p>
+<pre><code>$ tar -tzf notes.tar.gz
+notes/
+notes/2026/
+notes/2026/log.txt
+$ tar -tjf notes.tar.bz2
+notes/
+notes/2026/
+notes/2026/log.txt
+$ tar -tJf notes.tar.xz
+notes/
+notes/2026/
+notes/2026/log.txt
+$ tar -tzf notes.tar.xz
+
+gzip: stdin: not in gzip format
+tar: Child returned status 1
+tar: Error is not recoverable: exiting now
+$ tar -tf notes.tar.xz
+notes/
+notes/2026/
+notes/2026/log.txt</code></pre>
+<p>文字を間違えると、<code>tar</code> は言われたとおり gzip を呼び、gzip が「gzip 形式ではない」と断る。一方、文字を省くと GNU tar は中身を見て形式を自分で判断した。<b>読むとき（<code>t</code>・<code>x</code>）だけ</b>のことで、作るとき（<code>c</code>）は文字を書かないと圧縮されない。試験では z・j・J を書き分ける形で問われる。</p>
+<pre><code>$ mkdir out
+$ tar -xzvf notes.tar.gz -C out
+notes/
+notes/2026/
+notes/2026/log.txt
+$ ls -R out
+out:
+notes
+
+out/notes:
+2026
+
+out/notes/2026:
+log.txt
+$ mkdir out2
+$ tar -xjf notes.tar.bz2 -C out2
+$ cat out2/notes/2026/log.txt | wc -l
+2000</code></pre>
+<p><code>-C</code> は展開先を決める。中に記録されているパス（<code>notes/...</code>）が、展開先の下にそのまま掘られる。では、作るときに絶対パスを渡すとどうなるか。</p>
+<pre><code>$ tar -czf abs.tar.gz ~/work/ch6/a.txt
+tar: Removing leading `/' from member names
+$ tar -tzf abs.tar.gz
+home/lab/work/ch6/a.txt</code></pre>
+<p>先頭の <code>/</code> だけが外され、残りのパスがそのまま記録された。外さないと、展開した人のシステムの <code>/home/...</code> を上書きしかねないからである。代わりに、展開すると展開先に <code>home/lab/work/ch6/</code> が掘られる。アーカイブの中のパスは、作るときに<b>どう渡したか</b>で決まる。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-files/">演習06</a>は、<code>project/</code> を xz で圧縮した <code>project.tar.xz</code> にまとめる課題である。
+判定はアーカイブを <code>xz -t</code> で実際に検査し、一覧と展開をして元のディレクトリと比べる。
+名前だけ <code>.xz</code> にしたものや、中のパスが <code>home/lab/...</code> で始まるものは通らない。</div>
+
+<h2 id="restore">展開したとき、権限と所有者は戻るか</h2>
+<div class="sgoal"><b>この節で分かること</b>: 一般ユーザと root で、展開した結果の権限と所有者が違うこと。</div>
+<p>誰でも書ける（666）alice のファイルを束ねて、3通りに展開する。</p>
+<pre><code>$ echo "誰でも書ける" &gt; shared.txt
+$ chmod 666 shared.txt
+$ sudo chown alice shared.txt
+$ ls -l shared.txt
+-rw-rw-rw- 1 alice lab 19 Oct 13 11:09 shared.txt
+$ tar -cf shared.tar shared.txt
+$ tar -tvf shared.tar
+-rw-rw-rw- alice/lab        19 2026-10-13 11:09 shared.txt
+$ mkdir x1 x2 x3
+$ tar -xf shared.tar -C x1
+$ tar -xpf shared.tar -C x2
+$ sudo tar -xf shared.tar -C x3
+$ ls -l x1/shared.txt x2/shared.txt x3/shared.txt
+-rw-r--r-- 1 lab   lab 19 Oct 13 11:09 x1/shared.txt
+-rw-rw-rw- 1 lab   lab 19 Oct 13 11:09 x2/shared.txt
+-rw-rw-rw- 1 alice lab 19 Oct 13 11:09 x3/shared.txt</code></pre>
+<p>アーカイブには 666 と alice が記録されているのに、一般ユーザの lab が <code>-xf</code> で展開すると 644 になった。展開は「ファイルを新しく作る」操作なので、第2章の umask がかかる（第4章の <code>cp</code> と同じ理由）。<code>-p</code>（<code>--preserve-permissions</code>）を足すと、記録された 666 がそのまま戻った。所有者はどちらも lab のままで、alice に戻ったのは root で展開したときだけである。root では権限の復元も所有者の復元も最初から有効で、一般ユーザは所有者を他人にできない（第3章）。</p>
+<div class="scroll"><table>
+<tr><th>展開のしかた</th><th>権限</th><th>所有者</th><th>実測</th></tr>
+<tr><td>一般ユーザが <code>tar -xf</code></td><td>記録から umask を落としたもの</td><td>展開した自分</td><td><code>x1</code>: 644・lab</td></tr>
+<tr><td>一般ユーザが <code>tar -xpf</code></td><td>記録どおり</td><td>展開した自分</td><td><code>x2</code>: 666・lab</td></tr>
+<tr><td>root が <code>tar -xf</code></td><td>記録どおり</td><td>記録どおり</td><td><code>x3</code>: 666・alice</td></tr>
+</table></div>
+<p>更新時刻は、どの場合も記録された時刻で戻すのが GNU tar の既定である（ここでは作った直後に展開したので、見分けは付かない）。バックアップを戻すときに「権限が変わった」と言われたら、まず誰が <code>-p</code> 無しで展開したかを疑う。</p>
+
+<h2 id="dd">dd はバイト列をそのまま写す</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>dd</code> の if・of・bs・count と、出力の読み方。</div>
+<pre><code>$ dd if=/dev/zero of=zero.img bs=1M count=4
+4+0 records in
+4+0 records out
+4194304 bytes (4.2 MB, 4.0 MiB) copied, 0.00129568 s, 3.2 GB/s
+$ ls -l zero.img
+-rw-r--r-- 1 lab lab 4194304 Oct 13 11:09 zero.img
+$ dd if=num.txt of=head.bin bs=512 count=1
+1+0 records in
+1+0 records out
+512 bytes copied, 2.1792e-05 s, 23.5 MB/s
+$ ls -l head.bin
+-rw-r--r-- 1 lab lab 512 Oct 13 11:09 head.bin
+$ head -3 head.bin
+1
+2
+3</code></pre>
+<p><code>dd</code> は <code>if=</code>（入力）から <code>bs=</code>（1回に読む大きさ）ずつ <code>count=</code> 回読んで、<code>of=</code>（出力）へ書く。中身の意味を一切解釈せず、バイト列を区切りどおりに写す。<code>4+0 records in</code> は「満杯のブロックを4回、端数のブロックを0回読んだ」という意味である。最後の行の秒数と速度は、打つたびに変わる。</p>
+<p>中身を解釈しないので、<code>dd</code> はファイルシステムを持たない相手、つまり第1章のブロックデバイスを丸ごと写すのに使われる。</p>
+<pre><code>dd if=/dev/sda of=mbr.img bs=512 count=1     ディスクの先頭 512 バイト（MBR）を写し取る
+dd if=/dev/sda of=disk.img bs=4M             ディスク全体をイメージファイルにする
+dd if=disk.img of=/dev/sdb bs=4M             イメージを別のディスクに書き戻す（相手の中身は全部消える）</code></pre>
+<p>この檻にはディスクの装置が無いので、これらは打てない（第1章で <code>b</code> が 0 個だった）。<code>of=</code> に装置を書くと、確認なしで中身を上書きする。実機で試すときは、<code>if=</code> と <code>of=</code> を取り違えていないかを必ず読み返す。変換もできる。</p>
+<pre><code>$ echo hello | dd conv=ucase 2&gt;/dev/null
+HELLO</code></pre>
+<div class="analogy"><b>たとえ</b>: 原稿を読まずに、決まった枚数ずつ機械的に写すコピー機に近い。
+何が書いてあるかを理解しないので、白紙でも、読めない文字でも、同じように写す。
+<br>ただし<b>崩れる点</b>: コピー機は原稿を傷めないが、<code>dd</code> は出力先を確認なしで上書きする。
+入力と出力を取り違えると、写したかった原本のほうが消える。</div>
+<div class="quiz"><b>確認</b>
+<p>bzip2 で圧縮された <code>backup.tar.bz2</code> を、<code>/tmp</code> の下に展開するコマンドを書け。
+また、一般ユーザが展開するときに、アーカイブに記録された権限どおりに戻すには、何を足すか。</p>
+<details><summary>答え</summary>
+<p><code>tar -xjf backup.tar.bz2 -C /tmp</code>。<code>x</code> で展開、<code>j</code> で bzip2、<code>f</code> の直後にアーカイブ名、<code>-C</code> で展開先。
+gzip なら <code>z</code>、xz なら <code>J</code>（大文字）。記録どおりの権限にするには <code>p</code> を足す（<code>tar -xjpf backup.tar.bz2 -C /tmp</code>）。
+足さないと umask を落とした権限になる（実測: 666 が 644 になった）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>アーカイブ <code>data.tar.gz</code> を展開せずに、中のファイルを権限や大きさ付きで一覧するには。</p>
+<details><summary>答え</summary>
+<p><code>tar -tvzf data.tar.gz</code>（<code>-tzvf</code> などの順でもよいが、<code>f</code> の直後はアーカイブ名）。
+<code>t</code> が一覧、<code>v</code> が詳しく。読むときは GNU tar が形式を判断するので <code>tar -tvf data.tar.gz</code> でも読める。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>gzip report.txt</code> を実行した後、カレントディレクトリにあるのはどれか。<br>
+a. <code>report.txt</code> だけ　b. <code>report.txt.gz</code> だけ　c. 両方　d. どちらも無い</p>
+<details><summary>答え</summary>
+<p>b。<code>gzip</code> は元のファイルを圧縮したものに置き換える（実測）。両方残すには <code>gzip -k report.txt</code> か
+<code>gzip -c report.txt &gt; report.txt.gz</code>。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>中身が全部 0 の、1MiB × 10 個ぶん（10MiB）のファイル <code>blank.img</code> を作る <code>dd</code> のコマンドを書け。</p>
+<details><summary>答え</summary>
+<p><code>dd if=/dev/zero of=blank.img bs=1M count=10</code>。<code>/dev/zero</code> は第1章のスペシャルファイルで、読むと 0 を返し続ける。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>tar</code> は束ねるだけで縮めない。名前と一緒に権限・所有者・時刻を記録する（6バイト×2が 10240 バイトになった）</li><li><code>tar</code> は c（作る）・t（一覧）・x（展開）のどれか ＋ f（直後にアーカイブ名）。v で詳しく、C で場所を指定</li><li>z = gzip、j = bzip2、J = xz。読むときは GNU tar が形式を判断するが、作るときは文字が要る</li><li><code>gzip</code>・<code>bzip2</code>・<code>xz</code> は元のファイルを置き換える。残すなら <code>-k</code>。展開は <code>gunzip</code>・<code>bunzip2</code>・<code>unxz</code>（または <code>-d</code>）、中を見るのは <code>zcat</code>・<code>bzcat</code>・<code>xzcat</code></li><li>アーカイブの中のパスは、作るときの渡し方で決まる。先頭の <code>/</code> は外される</li><li>一般ユーザが展開すると権限に umask がかかる。記録どおりに戻すには <code>-p</code>。所有者まで戻るのは root で展開したときだけ</li><li><code>dd</code> は <code>if</code> から <code>bs</code> ずつ <code>count</code> 回読んで <code>of</code> へ写す。中身を解釈しないので、ディスクの装置をそのまま写せる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-files/theory/05-find">← 5. find は名前をたどり、中身の属性で選ぶ</a><a href="/linuc-files/theory/07-links">次: 7. ハードリンクは名前を増やし、シンボリックリンクは道順を書く →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-files/chapters.js"></script>
+<script src="/linuc-files/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

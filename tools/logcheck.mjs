@@ -21,13 +21,19 @@
 //   - コマンドの引用符は ' と " を同じものとして比べる（シェルの意味が同じで、本文で揃えることがあるため）。
 //   - "> " で始まる行は直前のコマンドの続き（複数行のコマンド）。"> " を除いた中身がログの行にあればよい。
 //
+// --strict を付けると、さらに「出力行が、直前の $ 行と同じコマンドのログ項目の出力の中に、順番どおりにある」ことを見る。
+//   行がログのどこかにあるだけでは、別のコマンドの出力を取り違えても通ってしまう（取り直しの書き換えで実際に起きた。
+//   linuc-files の制作中に発見、2026-10-13）。本文の「コマンド＋直後の出力」の組ごとに、コマンドが一致するログ項目の
+//   どれか1つの出力に、その出力行が順番どおりに含まれていればよい（ログが複数あっても、章の順とログの順が違っても判定できる）。
+//
 // 終了コード: 不一致が1件でもあれば 1。
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const [theme, ...logArgs] = process.argv.slice(2);
+const STRICT = process.argv.includes("--strict");
+const [theme, ...logArgs] = process.argv.slice(2).filter((a) => a !== "--strict");
 if (!theme) {
   console.error("使い方: node tools/logcheck.mjs <theme> [ログ ...]");
   process.exit(2);
@@ -47,14 +53,28 @@ const norm = (s) => s.replace(/\s+$/, "").replace(/^\s+/, "");
 const q = (s) => s.replace(/"/g, "'");
 const logLines = new Set();
 const logCmds = [];
+const entries = [];   // --strict 用: { cmd, outs[] }（ログの "$ " 行ごとの項目）
 for (const p of logs) {
+  let cur = null;
   for (const raw of readFileSync(p, "utf8").split("\n")) {
     const l = norm(raw);
+    if (raw.startsWith("$ ")) {
+      cur = { cmd: q(raw.slice(2).trim()), outs: [] };
+      entries.push(cur);
+    } else if (cur && l) {
+      cur.outs.push(l);
+    }
     if (!l) continue;
     logLines.add(l);
     if (raw.startsWith("$ ")) logCmds.push(q(raw.slice(2).trim()));
   }
 }
+// 出力行の並び outs が、ログ項目の出力の中に順番どおりにあるか（部分列）
+const isSubseq = (outs, hay) => {
+  let i = 0;
+  for (const h of hay) if (i < outs.length && h === outs[i]) i++;
+  return i === outs.length;
+};
 
 const unescape = (s) =>
   s.replace(/<[^>]+>/g, "")
@@ -80,6 +100,27 @@ for (const f of readdirSync(dir).filter((f) => f.endsWith(".html")).sort()) {
     const lines = unescape(m[1]).split("\n");
     if (!lines.some((l) => l.startsWith("$ "))) continue;
     blocks++;
+    if (STRICT) {
+      // 「コマンド＋直後の出力」の組に分ける
+      const groups = [];
+      for (const raw of lines) {
+        if (raw.startsWith("$ ")) { groups.push({ cmd: q(raw.slice(2).trim()), outs: [] }); continue; }
+        if (raw.startsWith("> ")) continue;
+        const l = norm(dropNote(raw));
+        if (!l || skipLine(l) || !groups.length) continue;
+        groups[groups.length - 1].outs.push(l);
+      }
+      for (const g of groups) {
+        if (!g.outs.length) continue;
+        const cands = entries.filter((e) => e.cmd === g.cmd || e.cmd.includes(g.cmd));
+        if (cands.length && !cands.some((e) => isSubseq(g.outs, e.outs))) {
+          // どの行から崩れるかを示す（いちばん長く一致した候補で）
+          let best = 0;
+          for (const e of cands) { let i = 0; for (const h of e.outs) if (i < g.outs.length && h === g.outs[i]) i++; best = Math.max(best, i); }
+          bad.push(`${f}: [$ ${g.cmd}] の出力に順番どおりに無い（${best + 1} 行目から）: ${g.outs[best]}`);
+        }
+      }
+    }
     for (const raw of lines) {
       const l = norm(dropNote(raw));
       if (!l || skipLine(l)) continue;
@@ -101,7 +142,7 @@ for (const f of readdirSync(dir).filter((f) => f.endsWith(".html")).sort()) {
   }
 }
 
-console.log(`${theme}: 端末ブロック ${blocks} / コマンド ${cmds} 行 / 出力 ${outs} 行 を ${logs.length} 本のログと照合`);
+console.log(`${theme}: 端末ブロック ${blocks} / コマンド ${cmds} 行 / 出力 ${outs} 行 を ${logs.length} 本のログと照合${STRICT ? "（厳密: 出力は同じコマンドの出力の中に順番どおり）" : ""}`);
 if (bad.length) {
   console.log(`✗ 不一致 ${bad.length} 件`);
   for (const b of bad) console.log("  " + b);

@@ -252,8 +252,9 @@ $ env -u TZ date -d @1790812800
 Thu Oct  1 00:00:00 UTC 2026
 $ sudo debconf-show tzdata
 ...
-  tzdata/Areas: Etc
   tzdata/Zones/Etc: UTC
+...
+  tzdata/Areas: Etc
 ...</code></pre>
 <p>（<code>env -u TZ</code> は、この檻が環境変数 <code>TZ=Asia/Tokyo</code> を持っているので、それを外して <code>/etc/localtime</code> の効き目だけを見るためである。<code>debconf-show</code> の行の順番は、打つたびに変わる。）</p>
 <p>質問をもう一度してもらうのが <code>dpkg-reconfigure</code> である。画面で <code>sudo dpkg-reconfigure tzdata</code> と打つと、地域の一覧が出るので矢印キーで <code>Asia</code> を選んで Enter、次の一覧で <code>Tokyo</code> を選んで Enter を押す。ここでは同じ質問を文字だけの形（<code>-f teletype</code>）で出させ、番号を流し込んで記録した。</p>
@@ -281,9 +282,9 @@ $ env -u TZ date -d @1790812800
 Thu Oct  1 09:00:00 JST 2026
 $ sudo debconf-show tzdata
 ...
-* tzdata/Areas: Asia
-...
 * tzdata/Zones/Asia: Tokyo
+...
+* tzdata/Areas: Asia
 ...</code></pre>
 <p><code>dpkg-reconfigure</code> は、パッケージを入れたときの「質問して設定する」手順を、入れ直さずにもう一度走らせる。答えは debconf の記録に残り（<code>*</code> が今回答えた印）、tzdata の設定の手順がその答えで <code>/etc/timezone</code> と <code>/etc/localtime</code> を書き直した。設定ファイルを手で直す代わりに、パッケージ自身に直させる方法である。</p>
 <div class="analogy"><b>たとえ</b>: 家電の「初期設定をやり直す」メニューに近い。
