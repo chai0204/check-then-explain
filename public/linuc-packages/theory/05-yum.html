@@ -16,7 +16,7 @@
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>yum</code> と <code>dnf</code>、<code>/etc/yum.conf</code> と <code>/etc/dnf/dnf.conf</code> の関係を <code>ls -l</code> で示せる</li><li><code>/etc/yum.repos.d/</code> の .repo ファイルの主な項目（<code>[repo id]</code> <code>name</code> <code>baseurl</code> <code>enabled</code> <code>gpgcheck</code> <code>gpgkey</code>）を読み書きできる</li><li>yum の <code>list</code> / <code>info</code>（<code>installed</code> / <code>available</code> / <code>updates</code>）/ <code>search</code> / <code>provides</code> / <code>repoquery -l</code> / <code>deplist</code> / <code>install</code> / <code>remove</code> / <code>update</code> / <code>check-update</code> を使い分けられる</li><li><code>yumdownloader</code> でパッケージを入れずに取ってこられる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: モジュール（<code>dnf module</code>）、グループ（<code>yum groupinstall</code>）の中身、<code>yum history undo</code>、次の世代の dnf5、RHEL のサブスクリプション登録。<code>Last metadata expiration check</code> の行は「目録を最後に確かめた時刻」とだけ読めれば足りる（時刻は読者ごとに違う）。</div></div>
-<p>この章からは RPM 系の檻を使う。出力は、<b>RPM 系の檻を起動し直した直後</b>から打ったものである（起動のしかたは<a href="/linuc-packages/">実践編</a>）。</p>
+<p>この章からは RPM 系の檻を使う。出力は、<b>RPM 系の檻を起動し直した直後</b>から打ったものである（起動のしかたは<a href="/linuc-packages/">実践編</a>）。端末の大きさは 80 桁 × 24 行で、幅が違うと <code>ls</code> の並べ方や dnf の折り返しが変わる。</p>
 
 <h2 id="whois">yum と打つと、dnf が動く</h2>
 <div class="sgoal"><b>この節で分かること</b>: 試験に出る yum と、いまの RHEL 系の実物との関係。</div>
@@ -131,7 +131,7 @@ labhello.noarch                            1.0-1                            @lab
 Available Packages
 labhello.noarch                            1.1-1                            lab</code></pre>
 <p>右端の欄に2冊の帳簿が見える。<code>@lab</code> と <code>@</code> が付いているのは<b>台帳</b>の行で、「lab から入った」という意味である。<code>@</code> の無い <code>lab</code> は<b>目録</b>の行で、「lab から入れられる」という意味である。<code>list installed</code> だけは目録を読まないので、<code>Last metadata expiration check</code>（目録を最後に確かめた時刻）の行が出ない。</p>
-<p>名前を付けなければ、入っているもの全部が並ぶ。<code>info</code> も <code>list</code> と同じく <code>installed</code> / <code>available</code> / <code>updates</code> を付けられ、1つずつ詳しく出す（別の檻で記録した。全部は長いので <code>head</code> で頭だけ見る）。</p>
+<p>名前を付けなければ、入っているもの全部が並ぶ。<code>info</code> も <code>list</code> と同じく <code>installed</code> / <code>available</code> / <code>updates</code> を付けられ、1つずつ詳しく出す（全部は長いので <code>head</code> で頭だけ見る）。</p>
 <pre><code>$ yum list installed | head -4
 Installed Packages
 acl.x86_64                            2.3.1-4.el9                     @baseos
@@ -205,15 +205,17 @@ error: file /usr/bin/dig: No such file or directory
 exit=1
 $ yum provides /usr/bin/dig
 ...
-bind-utils-32:9.16.23-34.el9_7.1.x86_64 : Utilities for querying DNS name servers
+bind-utils-32:9.16.23-34.el9_7.1.x86_64 : Utilities for querying DNS name
+                                        : servers
 Repo        : appstream
 Matched from:
 Filename    : /usr/bin/dig
 ...
-bind9.18-utils-32:9.18.29-5.el9_7.4.x86_64 : Utilities for querying DNS name servers
+bind9.18-utils-32:9.18.29-5.el9_7.4.x86_64 : Utilities for querying DNS name
+                                           : servers
 ...</code></pre>
 <p>台帳しか読まない <code>rpm -qf</code> は、入っていないファイルに答えられない。<code>yum provides</code> は入っていないパッケージのファイルまで答える。<b>Debian 系の apt-file にあたることを、yum は追加の道具なしでできる</b>。dnf の目録には最初からファイルの一覧（filelists）が入っているからである。パスの一部しか分からなければ <code>'*/liblab.sh'</code> のようにワイルドカードを使う（シェルに展開されないよう引用符で囲む）。</p>
-<p>逆向き（パッケージの中身の一覧）も、入れる前に目録から引ける。<code>yum repoquery -l</code> である（別の檻で記録した）。</p>
+<p>逆向き（パッケージの中身の一覧）も、入れる前に目録から引ける。<code>yum repoquery -l</code> である。</p>
 <pre><code>$ rpm -q labtool; echo "exit=$?"
 package labtool is not installed
 exit=1
@@ -273,8 +275,11 @@ exit=2
 $ grep clean_requirements_on_remove /etc/yum.conf
 clean_requirements_on_remove=True</code></pre>
 <p>入れるときに依存（<code>Installing dependencies</code>）を足すのは apt と同じだが、<b>消すときに依存も一緒に消した</b>（<code>Removing unused dependencies</code>）。<code>/etc/yum.conf</code> の <code>clean_requirements_on_remove=True</code> がそれを指示している。apt では <code>remove</code> のあとに <code>autoremove</code> を別に打った（第2章）。dnf も「どれを依存のために入れたか」を自分の記録に持っていて、それを見て判断している。<b>これは dnf（RHEL 8 以降）の既定</b>で、RHEL 7 の yum は <code>clean_requirements_on_remove</code> の既定が <code>False</code> なので、<code>yum remove</code> は依存を残す。</p>
-<p>名前を付けた <code>yum autoremove 名前</code> も、dnf（この檻）では名前を付けたものを依存ごと消す（別の檻で、labapp を入れ直してから記録した）。ただし<b>試験で「パッケージを削除するコマンド」を問われたら、答えは <code>remove</code></b> である。</p>
-<pre><code>$ sudo yum autoremove -y labapp
+<p>名前を付けた <code>yum autoremove 名前</code> も、dnf（この檻）では名前を付けたものを依存ごと消す（上で消した labapp を入れ直してから打つ）。ただし<b>試験で「パッケージを削除するコマンド」を問われたら、答えは <code>remove</code></b> である。</p>
+<pre><code>$ sudo yum install -y labapp
+...
+Complete!
+$ sudo yum autoremove -y labapp
 Dependencies resolved.
 ...
 Removing:
@@ -344,12 +349,15 @@ lab-extra                       lab extra (LinuC 1.04)</code></pre>
 <pre><code>$ ls -ld /var/cache/dnf
 lrwxrwxrwx 1 root root 22 Oct 13 10:08 /var/cache/dnf -&gt; /var/tmp/dnf-lab-cache
 $ ls /var/cache/dnf/
-appstream-69125d5665712457
-...
-lab-extra-87753e023cd3c28c
-lab-extra-filenames.solvx
-lab-extra.solv
-...</code></pre>
+appstream-69125d5665712457  dnf.log                     lab-extra.solv
+appstream-filenames.solvx   dnf.rpm.log                 lab-f54269022358d74c
+appstream-updateinfo.solvx  expired_repos.json          lab-filenames.solvx
+appstream.solv              extras-6ca639b91115fc97     lab.solv
+baseos-a0068bac1404caa3     extras-filenames.solvx      locks
+baseos-filenames.solvx      extras.solv                 packages.db
+baseos-updateinfo.solvx     hawkey.log                  tempfiles.json
+baseos.solv                 lab-extra-87753e023cd3c28c
+dnf.librepo.log             lab-extra-filenames.solvx</code></pre>
 <p>さっき取りに行った lab-extra の写し（<code>lab-extra-…</code>）が増えている。</p>
 <div class="analogy"><b>たとえ</b>: 取引先の住所を住所録に書き足すと、次に注文するとき、店員が気を利かせて先にカタログを取りに行ってくれる店に近い。
 カタログに「有効期限」が書いてあり、期限が過ぎていても取り直してくる。
@@ -359,6 +367,7 @@ lab-extra.solv
 <h2 id="update">更新する — check-update は終了コードでも答える</h2>
 <div class="sgoal"><b>この節で分かること</b>: 更新の有無を調べるコマンドと、その答え方。</div>
 <pre><code>$ yum check-update; echo "exit=$?"
+Last metadata expiration check: 0:00:03 ago on Tue Oct 13 21:26:10 2026.
 
 labhello.noarch                            1.1-1                             lab
 exit=100
@@ -376,7 +385,7 @@ $ yum check-update; echo "exit=$?"
 ...
 exit=0</code></pre>
 <p><code>check-update</code> は「台帳の版より新しい版が目録にあるもの」を並べ、<b>あれば終了コード 100、無ければ 0</b> を返す（失敗なら 1）。スクリプトで「更新があるか」を判定するのに使われる。<code>yum update</code> は名前を付ければそれだけ、付けなければ全部を上げる。dnf では <code>update</code> と <code>upgrade</code> は同じものである。AlmaLinux 本体のパッケージが1つも出ないのは、vault の 9.7 が凍結されていて、檻がその最終の状態で作られているからだ。</p>
-<p>試験の例題には、<code>update</code> を「インストール済みのパッケージを最新版にする」、<code>upgrade</code> を「システム全体を最新にする」と別のものとして書いたものがあり、この形で出うる。dnf で同じものだと分かるのは使い方の表示で、<code>update</code> と打っても <code>upgrade</code> と出る（別の檻で記録した）。</p>
+<p>試験の例題には、<code>update</code> を「インストール済みのパッケージを最新版にする」、<code>upgrade</code> を「システム全体を最新にする」と別のものとして書いたものがあり、この形で出うる。dnf で同じものだと分かるのは使い方の表示で、<code>update</code> と打っても <code>upgrade</code> と出る。</p>
 <pre><code>$ yum update --help | head -1
 usage: yum upgrade [-c CONFIG_FILE] [-q] [-v] [--version] [--installroot PATH]</code></pre>
 

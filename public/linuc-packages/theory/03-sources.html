@@ -96,12 +96,13 @@ apt は、利用者が「取りに行け」と言うまで、書き足した住�
 <pre><code>$ echo 'deb file:/srv/lab-extra extra main' | sudo tee /etc/apt/sources.list.d/lab-extra.list
 deb file:/srv/lab-extra extra main
 $ apt-cache policy labextra
+N: Unable to locate package labextra
 $ sudo apt install -y labextra; echo "exit=$?"
 ...
 E: Unable to locate package labextra
 exit=100</code></pre>
-<div class="then"><b>だめな理由</b>: <code>apt-cache policy</code> は1行も返さず、<code>apt install</code> は
-「そんなパッケージは見つからない」で止まった。apt が引くのは <code>sources.list</code> ではなく、
+<div class="then"><b>だめな理由</b>: <code>apt-cache policy</code> は「見つからない（<code>Unable to locate package</code>）」と言うだけで、<code>apt install</code> も
+同じ理由で止まった。apt が引くのは <code>sources.list</code> ではなく、
 <code>/var/lib/apt/lists/</code> に置いた<b>目録の写し</b>である。<code>sources.list</code> は
 「どこへ取りに行くか」の表にすぎず、書いただけでは何も取りに行かない。
 写しを作り直すのが <code>apt update</code> で、それまで apt は新しいリポジトリの中身を1つも知らない。</div></div>
@@ -119,40 +120,40 @@ snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_universe_binary-amd64_Pa
 <h2 id="update">取りに行く。ただし、署名の無い目録は受け取らない</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>apt update</code> の出力の読み方と、<code>[trusted=yes]</code> が何をしているか。</div>
 <pre><code>$ sudo apt update; echo "exit=$?"
-...
 Get:1 file:/srv/lab-repo lab InRelease
 Ign:1 file:/srv/lab-repo lab InRelease
-Get:2 file:/srv/lab-extra extra InRelease
-Ign:2 file:/srv/lab-extra extra InRelease
-Get:3 file:/srv/lab-repo lab Release [1983 B]
-Get:4 file:/srv/lab-extra extra Release [1991 B]
 ...
-Get:6 file:/srv/lab-extra extra Release.gpg
 Ign:6 file:/srv/lab-extra extra Release.gpg
+...
 Hit:7 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
 Hit:8 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
 Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
-Reading package lists...
+Reading package lists... Done
 E: The repository 'file:/srv/lab-extra extra Release' is not signed.
+N: Updating from such a repository can't be done securely, and is therefore disabled by default.
+N: See apt-secure(8) manpage for repository creation and user configuration details.
 exit=100
 $ ls -1 /var/lib/apt/lists/ | grep lab-extra; echo "exit=$?"
 exit=1</code></pre>
+<p><code>Get</code> と <code>Ign</code> の行は、2つの file: リポジトリの分が入り混じって出る。並びは打つたびに少し入れ替わり、同じ番号の <code>Get</code> が2回出ることもあるので、途中を略した。</p>
 <p>取りには行ったが、受け取らなかった。<code>Release.gpg</code>（Release への署名）が無く、<code>is not signed</code>（署名されていない）として捨てている。写しは1つも増えていない。apt は「誰が作った目録か確かめられないもの」を既定では信用しない。Ubuntu 本体の行にある <code>Signed-By:</code> は、その確かめに使う鍵を指定している。</p>
 <p>この練習用リポジトリには署名をしていないので、確認を外す印 <code>[trusted=yes]</code> を付ける。<b>本物のリポジトリではこれを付けない</b>。偽物の目録を区別する手段を自分で捨てることになるからだ。</p>
 <pre><code>$ echo 'deb [trusted=yes] file:/srv/lab-extra extra main' | sudo tee /etc/apt/sources.list.d/lab-extra.list
 deb [trusted=yes] file:/srv/lab-extra extra main
 $ sudo apt update
+Get:1 file:/srv/lab-repo lab InRelease
+Ign:1 file:/srv/lab-repo lab InRelease
 ...
-Get:6 file:/srv/lab-extra extra Release.gpg
-Ign:6 file:/srv/lab-extra extra Release.gpg
 Get:7 file:/srv/lab-extra extra/main amd64 Packages [448 B]
+...
 Get:8 file:/srv/lab-extra extra/main amd64 Contents (deb) [44 B]
+...
 Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
 Hit:10 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
 Hit:11 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
-Reading package lists...
-Building dependency tree...
-Reading state information...
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
 3 packages can be upgraded. Run 'apt list --upgradable' to see them.
 $ ls -1 /var/lib/apt/lists/ | grep lab-extra
 _srv_lab-extra_dists_extra_Release
@@ -183,12 +184,15 @@ labextra 1.0 (/srv/lab-extra から入った)</code></pre>
 </table></div>
 <p>Ubuntu 本体の3行が <code>Hit</code> なのは、この檻が最初から目録の写しを持っていて、snapshot（2026-09-29 で止めた Ubuntu の写し）がそれから変わっていないからである。<b>ネットにつながっていない環境では、この3行が <code>Err</code> や <code>Ign</code> になり、警告が出る</b>。それでも手元の古い写しが残るので、檻の中の練習用リポジトリは同じように使える。</p>
 <p>リポジトリの1行を書き換えたら、<code>apt update</code> までが1組の作業である。<code>apt edit-sources</code> と打つと <code>sources.list</code> をエディタで開けるが、これも書き換えるだけで、取りには行かない。</p>
-<p><code>apt update</code> は目録の写し（<code>/var/lib/apt/lists/</code>）を書き換えるので、root が要る。<code>sudo</code> を付け忘れると、写しの置き場に鍵を掛けられずに止まる（別の檻で記録した）。</p>
+<p><code>apt update</code> は目録の写し（<code>/var/lib/apt/lists/</code>）を書き換えるので、root が要る。<code>sudo</code> を付け忘れると、写しの置き場に鍵を掛けられずに止まる。</p>
 <pre><code>$ apt update; echo "exit=$?"
-...
+Reading package lists... Done
 E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
 E: Unable to lock directory /var/lib/apt/lists/
+W: Problem unlinking the file /var/cache/apt/pkgcache.bin - RemoveCaches (13: Permission denied)
+W: Problem unlinking the file /var/cache/apt/srcpkgcache.bin - RemoveCaches (13: Permission denied)
 exit=100</code></pre>
+<p><code>W:</code> の2行は、目録の写しから作った索引（<code>pkgcache.bin</code> など）を消そうとして、権限が無くて消せなかったという警告である。</p>
 <div class="analogy"><b>たとえ</b>: 差出人の印が押された封書だけを受け取る受付に近い。
 印の無い封書は、中身を読む前に送り返す。<code>Signed-By:</code> は「この印鑑なら本物」という見本の登録で、
 <code>[trusted=yes]</code> は「この差出人からは印が無くても受け取る」という例外の指示である。
@@ -232,17 +236,22 @@ Get:1 file:/srv/lab-repo lab InRelease
 Ign:1 file:/srv/lab-repo lab InRelease
 ...
 Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
-Reading package lists...</code></pre>
-<p>出力が <code>apt update</code> とそっくりなのは、<code>apt-file update</code> が <code>apt update</code>（端末につながっていなければ <code>apt-get update</code>）をそのまま呼んでいるだけだからである。Contents だけを取り直すのではなく、Packages も含めて全部の目録を取り直す。man にそう書いてある（別の檻で記録した）。</p>
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+3 packages can be upgraded. Run 'apt list --upgradable' to see them.</code></pre>
+<p>出力が <code>apt update</code> とそっくりなのは、<code>apt-file update</code> が <code>apt update</code>（端末につながっていなければ <code>apt-get update</code>）をそのまま呼んでいるだけだからである。Contents だけを取り直すのではなく、Packages も含めて全部の目録を取り直す。man にそう書いてある。</p>
 <pre><code>$ MANWIDTH=80 man apt-file | sed -n "/^ *update$/,/on whether a tty is available/p"
        update
            This action that just calls apt update or apt-get update (depending
            on whether a tty is available).</code></pre>
 <p>だから一般ユーザで打つと、<code>apt update</code> と同じく root が無くて止まる。</p>
 <pre><code>$ apt-file update; echo "exit=$?"
-Reading package lists...
+Reading package lists... Done
 E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
 E: Unable to lock directory /var/lib/apt/lists/
+W: Problem unlinking the file /var/cache/apt/pkgcache.bin - RemoveCaches (13: Permission denied)
+W: Problem unlinking the file /var/cache/apt/srcpkgcache.bin - RemoveCaches (13: Permission denied)
 exit=100</code></pre>
 <div class="analogy"><b>たとえ</b>: 本の目次と巻末の索引に近い。目次（Packages）では章の題名（パッケージ名と説明）しか分からないが、
 巻末の索引（Contents）を引けば、ある言葉（ファイル名）がどの章にあるかが分かる。

@@ -16,7 +16,7 @@
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>パッケージのファイルが「中身」と「名前・版・依存関係などの情報」の2つでできていることを、コマンドで示せる</li><li>「入っているか」を答えているのがディスクではなく台帳だと説明できる</li><li>リポジトリが「中身の置き場」と「目録」でできていることを、ディレクトリを見て言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: パッケージの作り方（<code>dpkg-deb --build</code> や <code>rpmbuild</code> の spec ファイル）、.deb の中の ar 形式や .rpm の中の cpio 形式の細部、zstd などの圧縮形式。この檻のパッケージがどう作られたかは配布元のリポジトリの <code>containers/linuc-packages/</code> に置いてあるが、試験の範囲外である。</div></div>
-<p>この章の出力は、Debian 系の檻を<b>起動し直した直後</b>から打ったものです。前の章で入れたものがあると、出力が変わります。檻は <code>exit</code> で抜けてもう一度 <code>docker run</code> すれば、最初の状態に戻ります（起動のしかたは<a href="/linuc-packages/">実践編</a>）。</p>
+<p>この章の出力は、Debian 系の檻を<b>起動し直した直後</b>から打ったものです。前の章で入れたものがあると、出力が変わります。檻は <code>exit</code> で抜けてもう一度 <code>docker run</code> すれば、最初の状態に戻ります（起動のしかたは<a href="/linuc-packages/">実践編</a>）。端末の大きさは 80 桁 × 24 行で打っています。幅が違うと、<code>ls</code> の並べ方や、画面に収まらない行の出方が変わります。</p>
 
 <h2 id="anatomy">パッケージは1つのファイルで、2つのものが入っている</h2>
 <div class="sgoal"><b>この節で分かること</b>: .deb ファイルの中に何が入っているか。</div>
@@ -106,15 +106,16 @@ Desired=Unknown/Install/Remove/Purge/Hold
 | Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
 |/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
 ||/ Name           Version      Architecture Description
-+++-==============-============-============-====================================
-ii  liblab         1.0          all          small shell library for lab programs
++++-==============-============-============-==================================&gt;
+ii  liblab         1.0          all          small shell library for lab progra&gt;
+（打鍵: q）
 $ dpkg -S /usr/lib/liblab/liblab.sh
 liblab: /usr/lib/liblab/liblab.sh</code></pre>
 <p>置かれたファイルは同じなのに、答えが変わった。<code>dpkg -i</code> がやったことは、展開（Unpacking）と設定（Setting up）と、<b>その間に台帳へ書き込むこと</b>である。最初の行の <code>(Reading database ...)</code> は、台帳を読み込んでいるところだ。</p>
+<p><code>dpkg -l</code> は、端末に出すときは <code>less</code>（ページャ）を通して見せる。80 桁の端末では行が画面に収まらないので、右端を <code>&gt;</code> で切り、最下行に <code>lines 1-6/6 (END)</code> と出して止まる。<code>q</code> で抜けると、上の画面が残る。幅が 81 桁以上ある端末なら、行が収まるので止まらずにそのまま出る。この先は、パッケージの行だけを <code>| tail</code> で見ることが多い。パイプにつなぐと <code>less</code> は使われず、行も切られない。</p>
 <p>台帳の中身を直接見る。</p>
 <pre><code>$ ls /var/lib/dpkg/info/liblab.*
-/var/lib/dpkg/info/liblab.list
-/var/lib/dpkg/info/liblab.md5sums
+/var/lib/dpkg/info/liblab.list  /var/lib/dpkg/info/liblab.md5sums
 $ cat /var/lib/dpkg/info/liblab.list
 /.
 /usr
@@ -153,7 +154,7 @@ $ grep -c '^Package: ' /var/lib/dpkg/status
 <h2 id="rpm">RPM 系でも、同じことが起きる</h2>
 <div class="sgoal"><b>この節で分かること</b>: RPM 系の台帳の場所と、同じ確かめ方。</div>
 <p>RPM 系の檻に入って、同じことをする。.rpm にも情報と中身が入っている。</p>
-<pre><code>$ file /srv/lab-rpm/labapp-1.0-1.noarch.rpm
+<pre data-cage="rpm"><code>$ file /srv/lab-rpm/labapp-1.0-1.noarch.rpm
 /srv/lab-rpm/labapp-1.0-1.noarch.rpm: RPM v3.0 bin i386/x86_64 labapp-1.0-1
 $ rpm -qpi /srv/lab-rpm/labapp-1.0-1.noarch.rpm
 Name        : labapp
@@ -163,6 +164,7 @@ Architecture: noarch
 Install Date: (not installed)
 ...
 Summary     : sample application that needs liblab
+...
 $ rpm -qpl /srv/lab-rpm/labapp-1.0-1.noarch.rpm
 /etc/labapp.conf
 /usr/bin/labapp
@@ -176,8 +178,8 @@ rpmlib(FileDigests) &lt;= 4.6.0-1
 rpmlib(PayloadFilesHavePrefix) &lt;= 4.0-1
 rpmlib(PayloadIsZstd) &lt;= 5.4.18-1</code></pre>
 <p><code>-q</code> は問い合わせ（query）、<code>p</code> は「台帳ではなく、このパッケージファイルに聞け」、<code>i</code> が情報・<code>l</code> がファイル一覧・<code>R</code> が依存関係（requires）である。<code>liblab &gt;= 1.0</code> が Debian の <code>Depends:</code> にあたる。</p>
-<p><code>Install Date: (not installed)</code> は「入っていない」という台帳の答えではない。<code>-qp</code> はファイルの中を読むだけで、ファイルの中には入れた日時が書かれていないので、いつもこう出る。檻に最初から入っている labhello で比べると分かる（別の檻で記録した）。</p>
-<pre><code>$ rpm -q labhello
+<p><code>Install Date: (not installed)</code> は「入っていない」という台帳の答えではない。<code>-qp</code> はファイルの中を読むだけで、ファイルの中には入れた日時が書かれていないので、いつもこう出る。檻に最初から入っている labhello で比べると分かる。</p>
+<pre data-cage="rpm"><code>$ rpm -q labhello
 labhello-1.0-1.noarch
 $ rpm -qpi /srv/lab-rpm/labhello-1.0-1.noarch.rpm | grep -E '^(Name|Version|Install Date)'
 Name        : labhello
@@ -189,7 +191,7 @@ Version     : 1.0
 Install Date: Tue Oct 13 10:08:56 2026</code></pre>
 <p>入っているのに、ファイルに聞くと <code>(not installed)</code>、台帳に聞くと入れた日時が出た。入っているかどうかは、名前で台帳に聞く（<code>rpm -q 名前</code>）。</p>
 <p>中身だけを広げる道具は <code>rpm2cpio</code> である（.rpm の中身を cpio 形式で取り出し、<code>cpio</code> が展開する）。</p>
-<pre><code>$ cd / &amp;&amp; rpm2cpio /srv/lab-rpm/liblab-1.0-1.noarch.rpm | sudo cpio -idmv
+<pre data-cage="rpm"><code>$ cd / &amp;&amp; rpm2cpio /srv/lab-rpm/liblab-1.0-1.noarch.rpm | sudo cpio -idmv
 ./usr/lib/liblab/liblab.sh
 1 block
 $ ls -l /usr/lib/liblab/liblab.sh
@@ -201,18 +203,16 @@ $ rpm -qf /usr/lib/liblab/liblab.sh; echo "exit=$?"
 file /usr/lib/liblab/liblab.sh is not owned by any package
 exit=1
 $ sudo rpm -ivh /srv/lab-rpm/liblab-1.0-1.noarch.rpm
-Verifying...                          ########################################
-Preparing...                          ########################################
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
 Updating / installing...
-liblab-1.0-1                          ########################################
+   1:liblab-1.0-1                     ################################# [100%]
 $ rpm -q liblab
 liblab-1.0-1.noarch
 $ rpm -qf /usr/lib/liblab/liblab.sh
 liblab-1.0-1.noarch
 $ ls /var/lib/rpm/
-rpmdb.sqlite
-rpmdb.sqlite-shm
-rpmdb.sqlite-wal</code></pre>
+rpmdb.sqlite  rpmdb.sqlite-shm  rpmdb.sqlite-wal</code></pre>
 <p>答え方まで同じである。RPM 系の台帳は <code>/var/lib/rpm/</code> のデータベースで、dpkg と違ってテキストではない。この檻（AlmaLinux 9・rpm 4.16）は SQLite（<code>rpmdb.sqlite</code>）で、RHEL 9 からこの形になった。RHEL 7・8 は Berkeley DB で、<code>Packages</code> などのファイルが並ぶ。どちらでも中を見るときは <code>rpm -q</code> を通す。</p>
 <div class="scroll"><table>
 <tr><th>聞きたいこと</th><th>Debian 系</th><th>RPM 系</th></tr>
@@ -276,7 +276,7 @@ exit=1</code></pre>
 <pre><code>手元に入ったものの台帳   /var/lib/dpkg/       … dpkg が書き、dpkg が読む（dpkg -l / -S / -L）
 リポジトリにあるものの目録 /var/lib/apt/lists/  … apt が取ってきて、apt が読む（apt-cache policy / show）</code></pre>
 <p>RPM 系でも同じで、リポジトリには <code>repodata/</code> という目録の置き場がある。</p>
-<pre><code>$ find /srv/lab-rpm -type f | sort
+<pre data-cage="rpm"><code>$ find /srv/lab-rpm -type f | sort
 /srv/lab-rpm/labapp-1.0-1.noarch.rpm
 /srv/lab-rpm/labhello-1.0-1.noarch.rpm
 /srv/lab-rpm/labhello-1.1-1.noarch.rpm

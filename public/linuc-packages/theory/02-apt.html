@@ -44,6 +44,7 @@ Size: 1076
 ...
 Description: sample application that needs liblab
  Prints a greeting. The greeting is read from /etc/labapp.conf.
+...
 $ apt-cache depends labapp
 labapp
   Depends: liblab
@@ -74,7 +75,7 @@ apt
 <tr><td><code>Conflicts:</code> / <code>Breaks:</code></td><td>一緒には入れられない（入れるなら片方を消す）</td></tr>
 <tr><td><code>Replaces:</code></td><td>相手のファイルを上書きしてよい（置き換える）</td></tr>
 </table></div>
-<p>依存を出すサブコマンドはもう1つある。<code>showpkg</code> は、目録にある版・逆向きの依存・版ごとの依存を、1つの出力にまとめて出す（別の檻で記録した）。</p>
+<p>依存を出すサブコマンドはもう1つある。<code>showpkg</code> は、目録にある版・逆向きの依存・版ごとの依存を、1つの出力にまとめて出す。</p>
 <pre><code>$ apt-cache showpkg labapp
 Package: labapp
 Versions:
@@ -137,7 +138,9 @@ tree:
 <h2 id="install">入れる — 依存関係は apt がたどる</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>apt install</code> が名前1つから何をしたか。</div>
 <pre><code>$ sudo apt install -y labapp
-...
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
 The following additional packages will be installed:
   liblab
 The following NEW packages will be installed:
@@ -148,6 +151,7 @@ After this operation, 106 kB of additional disk space will be used.
 Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
 Get:2 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
 Selecting previously unselected package liblab.
+(Reading database ... 12824 files and directories currently installed.)
 Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
 Unpacking liblab (1.0) ...
 Selecting previously unselected package labapp.
@@ -158,7 +162,7 @@ Setting up labapp (1.0) ...
 $ labapp
 liblab: hello from labapp 1.0</code></pre>
 <p>頼んだのは labapp だけだが、目録の <code>Depends: liblab (&gt;= 1.0)</code> を読んで liblab も足した（<code>additional packages</code>）。そして liblab を先に設定している。<code>-y</code> は「よろしいですか（<code>Do you want to continue? [Y/n]</code>）」に自動で yes と答えるオプションで、付けなければここで1回止まって尋ねられる。</p>
-<p>画面で打つと、最初に <code>Reading package lists... Done</code> の3行と進み具合の表示が出る。本文の記録はパイプで取ったので、その部分を「...」で略している。</p>
+<p>最初の3行（<code>Reading package lists... Done</code> など）は、目録と台帳を読み込んでいるところである。入れている間は画面の最下行に進み具合が出て、終わると消える。本文に載せているのは、終わったあとに画面に残るものである。</p>
 <p>apt は、どちらを利用者が名指ししたかも覚えている。</p>
 <pre><code>$ apt-mark showauto | grep lab
 labsvc-common
@@ -175,7 +179,9 @@ labsvc</code></pre>
 <p><code>apt remove</code> で消せば、パッケージは跡形なく消える。
 設定ファイルも、一緒に入ってきた liblab も、まとめて片付くはずだ。</p>
 <pre><code>$ sudo apt remove -y labapp
-...
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
 The following package was automatically installed and is no longer required:
   liblab
 Use 'sudo apt autoremove' to remove it.
@@ -183,13 +189,9 @@ The following packages will be REMOVED:
   labapp
 0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
 After this operation, 69.6 kB disk space will be freed.
+(Reading database ... 12830 files and directories currently installed.)
 Removing labapp (1.0) ...
-$ dpkg -l labapp
-Desired=Unknown/Install/Remove/Purge/Hold
-| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
-|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
-||/ Name           Version      Architecture Description
-+++-==============-============-============-====================================
+$ dpkg -l labapp | tail -1
 rc  labapp         1.0          all          sample application that needs liblab
 $ ls -l /etc/labapp.conf
 -rw-r--r-- 1 root root 93 Oct  1 09:00 /etc/labapp.conf
@@ -210,6 +212,7 @@ The following packages will be REMOVED:
   labapp*
 0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
 After this operation, 0 B of additional disk space will be used.
+(Reading database ... 12827 files and directories currently installed.)
 Purging configuration files for labapp (1.0) ...
 $ dpkg -l labapp; echo "exit=$?"
 dpkg-query: no packages found matching labapp
@@ -218,8 +221,7 @@ $ ls -l /etc/labapp.conf; echo "exit=$?"
 ls: cannot access '/etc/labapp.conf': No such file or directory
 exit=2</code></pre>
 <p><code>labapp*</code> の <code>*</code> が「設定ファイルも消す」印である。台帳の行も消えた。次に、自動で入って、もう誰にも必要とされていないものを消す。</p>
-<pre><code>$ dpkg -l liblab
-...
+<pre><code>$ dpkg -l liblab | tail -1
 ii  liblab         1.0          all          small shell library for lab programs
 $ sudo apt autoremove -y
 ...
@@ -227,22 +229,26 @@ The following packages will be REMOVED:
   liblab
 0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
 After this operation, 36.9 kB disk space will be freed.
+(Reading database ... 12826 files and directories currently installed.)
 Removing liblab (1.0) ...
 $ dpkg -l liblab; echo "exit=$?"
 dpkg-query: no packages found matching liblab
 exit=1</code></pre>
 <p>名前を渡さない <code>autoremove</code> は、「auto の印があり、もう誰も依存していないもの」を apt が自分で探して消す。前の節の <code>apt-mark showauto</code> の印がここで使われた。liblab には設定ファイル（conffile）が無いので、<code>rc</code> も残さず台帳から行ごと消えている（<code>no packages found</code>）。<b>remove が <code>rc</code> を残すのは、conffile を持つパッケージだけ</b>である。</p>
-<p><code>autoremove</code> には名前を渡すこともできる。渡したパッケージを <code>remove</code> し、それで要らなくなった自動の依存も一緒に消す。檻を起動し直して labapp をもう一度 <code>sudo apt install -y labapp</code> で入れてから打った記録である。</p>
-<pre><code>$ sudo apt autoremove -y labapp
+<p><code>autoremove</code> には名前を渡すこともできる。渡したパッケージを <code>remove</code> し、それで要らなくなった自動の依存も一緒に消す。labapp をもう一度入れてから打ってみる。</p>
+<pre><code>$ sudo apt install -y labapp
+...
+Setting up labapp (1.0) ...
+$ sudo apt autoremove -y labapp
 ...
 The following packages will be REMOVED:
   labapp liblab
 0 upgraded, 0 newly installed, 2 to remove and 3 not upgraded.
 After this operation, 106 kB disk space will be freed.
+(Reading database ... 12830 files and directories currently installed.)
 Removing labapp (1.0) ...
 Removing liblab (1.0) ...
-$ dpkg -l labapp
-...
+$ dpkg -l labapp | tail -1
 rc  labapp         1.0          all          sample application that needs liblab
 $ ls -l /etc/labapp.conf
 -rw-r--r-- 1 root root 93 Oct  1 09:00 /etc/labapp.conf</code></pre>
@@ -255,7 +261,19 @@ $ ls -l /etc/labapp.conf
 <tr><td><code>apt autoremove 名前</code></td><td colspan="4">その名前を remove し（設定ファイルは残って <code>rc</code>）、それで要らなくなった自動の依存も消す</td></tr>
 <tr><td><code>apt purge --autoremove 名前</code></td><td colspan="4">purge と autoremove を1回で</td></tr>
 </table></div>
-<p>すでに <code>rc</code> になったものにも <code>purge</code> は効く。<code>apt-get</code> でも同じ名前のサブコマンドがある（<code>apt-get remove</code> / <code>purge</code> / <code>autoremove</code>）。</p>
+<p>すでに <code>rc</code> になったものにも <code>purge</code> は効く。いま <code>rc</code> で残っている labapp を消しておく。</p>
+<pre><code>$ sudo apt purge -y labapp
+...
+The following packages will be REMOVED:
+  labapp*
+0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
+After this operation, 0 B of additional disk space will be used.
+(Reading database ... 12825 files and directories currently installed.)
+Purging configuration files for labapp (1.0) ...
+$ dpkg -l labapp; echo "exit=$?"
+dpkg-query: no packages found matching labapp
+exit=1</code></pre>
+<p><code>apt-get</code> でも同じ名前のサブコマンドがある（<code>apt-get remove</code> / <code>purge</code> / <code>autoremove</code>）。</p>
 <div class="analogy"><b>たとえ</b>: 賃貸の部屋を引き払うときに近い。<code>remove</code> は家具を運び出すだけで、
 自分で替えたカーテンと、管理会社の名簿の名前は残る。<code>purge</code> はカーテンも外して名簿からも消す。
 <code>autoremove</code> は、引っ越しのときに一緒に借りたトランクルームを、使う人がいなくなったので返す作業である。
@@ -265,20 +283,17 @@ $ ls -l /etc/labapp.conf
 <h2 id="upgrade">更新する — 目録の版と、台帳の版を比べる</h2>
 <div class="sgoal"><b>この節で分かること</b>: 「更新できる」が何と何の比較で決まっているか。</div>
 <pre><code>$ apt list --upgradable
-
-WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-
-Listing...
+Listing... Done
 labhello/lab 1.1 all [upgradable from: 1.0]
 libaudit-common/noble-updates 1:3.1.2-2.1ubuntu0.1 all [upgradable from: 1:3.1.2-2.1build1.1]
 libaudit1/noble-updates 1:3.1.2-2.1ubuntu0.1 amd64 [upgradable from: 1:3.1.2-2.1build1.1]</code></pre>
 <p>3つ出た。どれも「目録の版（1.1）」と「台帳の版（<code>upgradable from: 1.0</code>）」が違うものである。下の2つは本物の Ubuntu のパッケージで、檻の土台が作られた時点より目録のほうが新しい。</p>
 <p><code>apt upgrade</code> はこれを全部上げるが、下の2つはネットから取ってくる必要がある。<code>-s</code>（simulate）を付けると、何をするかだけ表示して実際には何もしない。</p>
 <pre><code>$ sudo apt-get -s upgrade
-Reading package lists...
-Building dependency tree...
-Reading state information...
-Calculating upgrade...
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Calculating upgrade... Done
 The following packages will be upgraded:
   labhello libaudit-common libaudit1
 3 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
@@ -299,6 +314,7 @@ The following packages will be upgraded:
 Need to get 0 B/620 B of archives.
 After this operation, 0 B of additional disk space will be used.
 Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.1 [620 B]
+(Reading database ... 12824 files and directories currently installed.)
 Preparing to unpack .../labhello/labhello_1.1_all.deb ...
 Unpacking labhello (1.1) over (1.0) ...
 Setting up labhello (1.1) ...
@@ -323,7 +339,7 @@ labhello:
 <tr><td><code>apt full-upgrade</code>（= <code>apt-get dist-upgrade</code>）</td><td>上げるために必要なら、新しく入れることも<b>消すこと</b>もする</td></tr>
 <tr><td><code>apt install 名前</code></td><td>入っていなければ入れ、入っていて新しい版があれば上げる</td></tr>
 </table></div>
-<p><b><code>apt upgrade</code> と <code>apt-get upgrade</code> は同じではない</b>。この檻の練習用リポジトリには「上げるのに新しい依存が要る版」が無いので、違いは man の記述で確かめる（別の檻で記録した。<code>MANWIDTH=80</code> は折り返しの幅を本文と揃えるため）。</p>
+<p><b><code>apt upgrade</code> と <code>apt-get upgrade</code> は同じではない</b>。この檻の練習用リポジトリには「上げるのに新しい依存が要る版」が無いので、違いは man の記述で確かめる（<code>MANWIDTH=80</code> は折り返しの幅を本文と揃えるため）。</p>
 <pre><code>$ MANWIDTH=80 man apt | sed -n "/^ *upgrade (apt-get(8))/,/^ *full-upgrade/p"
        upgrade (apt-get(8))
            upgrade is used to install available upgrades of all packages
@@ -368,15 +384,13 @@ Version: 1.0
 $ apt show labhello 2&gt;/dev/null | grep -E "^(Package|Version):"
 Package: labhello
 Version: 1.1</code></pre>
-<p><code>apt-cache show</code> は目録にある版を全部出し、<code>apt show</code> は Candidate の1つだけを出す。そして <code>apt</code> は、画面以外に出力すると警告を出す。</p>
-<pre><code>$ apt show labapp
-
+<p><code>apt-cache show</code> は目録にある版を全部出し、<code>apt show</code> は Candidate の1つだけを出す。そして <code>apt</code> は、出力の行き先が画面（端末）ではなくパイプやファイルだと、警告を出す。</p>
+<pre><code>$ apt show labapp | head -3
 WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-
 Package: labapp
 Version: 1.0
-...</code></pre>
-<p>「apt のコマンドの形は変わりうるので、スクリプトでは注意して使え」という意味である。<b><code>apt</code> は人が画面で打つための入口</b>で、出力を見やすく整えるかわりに形を保証しない。スクリプトに書くなら、形を変えない <code>apt-get</code> と <code>apt-cache</code> を使う。</p>
+Priority: optional</code></pre>
+<p><code>| head</code> を付けずに画面へ直接出すと、この警告は出ない。「apt のコマンドの形は変わりうるので、スクリプトでは注意して使え」という意味で、パイプの先はスクリプトかもしれないから出している。<b><code>apt</code> は人が画面で打つための入口</b>で、出力を見やすく整えるかわりに形を保証しない。スクリプトに書くなら、形を変えない <code>apt-get</code> と <code>apt-cache</code> を使う。</p>
 <div class="scroll"><table>
 <tr><th>apt（人向け）</th><th>apt-get / apt-cache（スクリプト向け）</th><th>読む・書く帳簿</th></tr>
 <tr><td><code>apt update</code></td><td><code>apt-get update</code></td><td>目録を書き直す</td></tr>
@@ -388,15 +402,13 @@ Version: 1.0
 <tr><td><code>apt download 名前</code></td><td><code>apt-get download 名前</code></td><td>目録を読んで .deb を取ってくるだけ（入れない）</td></tr>
 <tr><td><code>apt clean</code></td><td><code>apt-get clean</code></td><td><code>/var/cache/apt/archives/</code> の取ってきた .deb を消す</td></tr>
 </table></div>
-<p>下の3行は、apt の man では「apt-cache と apt-get の説明に任せる」とまとめて1行ずつ書かれているだけだが、apt でもそのまま打てる（別の檻で記録した）。</p>
+<p>下の3行は、apt の man では「apt-cache と apt-get の説明に任せる」とまとめて1行ずつ書かれているだけだが、apt でもそのまま打てる。</p>
 <pre><code>$ apt depends labapp
-...
 labapp
   Depends: liblab (&gt;= 1.0)
 $ apt policy labhello
-...
 labhello:
-  Installed: 1.0
+  Installed: 1.1
   Candidate: 1.1
 ...
 $ MANWIDTH=80 man apt | sed -n "/^ *showsrc, depends, rdepends, policy/,/(summarised in apt-get(8))/p"
@@ -414,8 +426,7 @@ $ dpkg -l liblab; echo "exit=$?"
 dpkg-query: no packages found matching liblab
 exit=1
 $ ls /var/cache/apt/archives/
-lock
-partial</code></pre>
+lock  partial</code></pre>
 <p>ファイルは取れたが、台帳には載っていない。<code>/var/cache/apt/archives/</code> は、<code>apt install</code> がネットから取ってきた .deb を置いておく場所で、<code>apt-get clean</code> がここを空にする。この檻の練習用リポジトリは <code>file:</code> なので、apt はそこから直接読み、ここにはコピーしない。</p>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-packages/">演習01</a>は、最初から入っている labsvc を「跡形なく」消す課題である。

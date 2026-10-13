@@ -21,19 +21,19 @@
 <div class="sgoal"><b>この節で分かること</b>: rpm が依存関係をどこまで扱うか。dpkg との違い。</div>
 <pre><code>$ sudo rpm -ivh /srv/lab-rpm/labapp-1.0-1.noarch.rpm; echo "exit=$?"
 error: Failed dependencies:
-	liblab &gt;= 1.0 is needed by labapp-1.0-1.noarch
+        liblab &gt;= 1.0 is needed by labapp-1.0-1.noarch
 exit=1
 $ sudo rpm -ivh /srv/lab-rpm/liblab-1.0-1.noarch.rpm /srv/lab-rpm/labapp-1.0-1.noarch.rpm
-Verifying...                          ########################################
-Preparing...                          ########################################
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
 Updating / installing...
-liblab-1.0-1                          ########################################
-labapp-1.0-1                          ########################################</code></pre>
+   1:liblab-1.0-1                     ################################# [ 50%]
+   2:labapp-1.0-1                     ################################# [100%]</code></pre>
 <p><code>-i</code> は install、<code>v</code> は経過を表示、<code>h</code> は進み具合を <code>#</code> で表示する。rpm も依存関係を読めるが、取りに行かない。第4章の <code>dpkg -i</code> と違うのは、<b>足りないと分かった時点で1つも入れずに止まる</b>ことである（dpkg は展開まで進めて <code>iU</code> を残した）。必要なファイルを全部並べて渡せば、rpm が順番（liblab が先）を決めて1回で入れる。</p>
 <p>消すときも依存関係を守る。</p>
 <pre><code>$ sudo rpm -e liblab; echo "exit=$?"
 error: Failed dependencies:
-	liblab &gt;= 1.0 is needed by (installed) labapp-1.0-1.noarch
+        liblab &gt;= 1.0 is needed by (installed) labapp-1.0-1.noarch
 exit=1
 $ sudo rpm -e --nodeps liblab
 $ labapp; echo "exit=$?"
@@ -41,14 +41,14 @@ $ labapp; echo "exit=$?"
 exit=1
 $ rpm -V labapp; echo "exit=$?"
 Unsatisfied dependencies for labapp-1.0-1.noarch:
-	liblab &gt;= 1.0 is needed by (installed) labapp-1.0-1.noarch
+        liblab &gt;= 1.0 is needed by (installed) labapp-1.0-1.noarch
 exit=1</code></pre>
 <p><code>-e</code>（erase）は、ほかのパッケージが必要としているものを消すのを拒む。<code>--nodeps</code> を付けると依存関係を確かめずに消し、黙って成功する。そして labapp は動かなくなった。<code>rpm -V</code> は、ファイルだけでなく<b>依存関係が台帳の上で満たされているか</b>も確かめていて、壊れた組み合わせを報告した。<code>--nodeps</code> は台帳の整合を自分で崩すオプションで、使ったら後始末も自分でする。</p>
 <pre><code>$ sudo rpm -ivh /srv/lab-rpm/liblab-1.0-1.noarch.rpm
-Verifying...                          ########################################
-Preparing...                          ########################################
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
 Updating / installing...
-liblab-1.0-1                          ########################################
+   1:liblab-1.0-1                     ################################# [100%]
 $ sudo rpm -e labapp liblab
 $ rpm -q labapp liblab; echo "exit=$?"
 package labapp is not installed
@@ -68,9 +68,9 @@ labhello-1.0-1.noarch
 package labtool-data is not installed
 exit=1
 $ sudo rpm -ivh /srv/lab-rpm/labhello-1.1-1.noarch.rpm; echo "exit=$?"
-Verifying...                          ########################################
-Preparing...                          ########################################
-	file /usr/bin/labhello from install of labhello-1.1-1.noarch conflicts with file from package labhello-1.0-1.noarch
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
+        file /usr/bin/labhello from install of labhello-1.1-1.noarch conflicts with file from package labhello-1.0-1.noarch
 exit=1
 $ sudo rpm -Fvh /srv/lab-rpm/labtool-data-1.0-1.noarch.rpm; echo "exit=$?"
 exit=0
@@ -78,17 +78,17 @@ $ rpm -q labtool-data; echo "exit=$?"
 package labtool-data is not installed
 exit=1
 $ sudo rpm -Fvh /srv/lab-rpm/labhello-1.1-1.noarch.rpm
-Verifying...                          ########################################
-Preparing...                          ########################################
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
 Updating / installing...
-labhello-1.1-1                        ########################################
+   1:labhello-1.1-1                   ################################# [ 50%]
 Cleaning up / removing...
-labhello-1.0-1                        ########################################
+   2:labhello-1.0-1                   ################################# [100%]
 $ sudo rpm -Uvh /srv/lab-rpm/labtool-data-1.0-1.noarch.rpm
-Verifying...                          ########################################
-Preparing...                          ########################################
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
 Updating / installing...
-labtool-data-1.0-1                    ########################################
+   1:labtool-data-1.0-1               ################################# [100%]
 $ rpm -q labhello labtool-data
 labhello-1.1-1.noarch
 labtool-data-1.0-1.noarch</code></pre>
@@ -160,17 +160,17 @@ $ rpm -Kv /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm
 <p>labnosig には <code>Signature</code> の行が1つも無い。lab-mathtools の <code>NOKEY</code> は「鍵 484bd981 の署名があるが、その鍵を持っていない」で、改ざんを見つけたという意味ではない（改ざんなら <code>BAD</code> と出る。すぐ後で確かめる）。tree は AlmaLinux の鍵 b86b3716 で確かめられた。</p>
 <p>rpm が「持っている鍵」は、台帳に入っている。鍵は <code>gpg-pubkey</code> という名前の、ファイルを持たないパッケージとして記録される。</p>
 <pre><code>$ rpm -q gpg-pubkey --qf '%{NAME}-%{VERSION}-%{RELEASE}\t%{SUMMARY}\n'
-gpg-pubkey-b86b3716-61e69f29	AlmaLinux OS 9 &lt;packager@almalinux.org&gt; public key
-gpg-pubkey-93f77b82-6acd849f	lab packages &lt;lab@example.invalid&gt; public key
+gpg-pubkey-b86b3716-61e69f29    AlmaLinux OS 9 &lt;packager@almalinux.org&gt; public key
+gpg-pubkey-93f77b82-6acd849f    lab packages &lt;lab@example.invalid&gt; public key
 $ head -3 /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQGNBGrNhJ8BDACs4CZvLuZBw9OXnQ8OZ7QlK2pVIlW1nNDyBJD8XBlDHAEU6M7G
 $ sudo rpm --import /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
 $ rpm -q gpg-pubkey --qf '%{NAME}-%{VERSION}-%{RELEASE}\t%{SUMMARY}\n'
-gpg-pubkey-b86b3716-61e69f29	AlmaLinux OS 9 &lt;packager@almalinux.org&gt; public key
-gpg-pubkey-93f77b82-6acd849f	lab packages &lt;lab@example.invalid&gt; public key
-gpg-pubkey-484bd981-6acd849f	lab tools &lt;tools@example.invalid&gt; public key
+gpg-pubkey-b86b3716-61e69f29    AlmaLinux OS 9 &lt;packager@almalinux.org&gt; public key
+gpg-pubkey-93f77b82-6acd849f    lab packages &lt;lab@example.invalid&gt; public key
+gpg-pubkey-484bd981-6acd849f    lab tools &lt;tools@example.invalid&gt; public key
 $ rpm -K /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm; echo "exit=$?"
 /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm: digests signatures OK
 exit=0</code></pre>
@@ -201,10 +201,10 @@ $ rpm -Kv ~/work/tree-copy.rpm
 <p>表記は rpm の版で違う。この教材の記録は RHEL 8 以降（rpm 4.14 以降）の表記で、RHEL 7 の rpm 4.11 は <code>digests</code> / <code>signatures</code> という語を出さない（RHEL 7 の列は、別の環境で確かめられた出方である）。<b>読み方は共通している。署名の語（RHEL 8 以降は <code>signatures</code>、RHEL 7 は <code>rsa</code>・<code>pgp</code>）が小文字で、最後が OK のときだけ、署名が確かめられている。大文字の語は、その確かめが失敗したことを表す</b>。署名の無いものは、署名の語がそもそも出ずに OK になる。</p>
 <p>そして rpm は、署名が無くても入れる。</p>
 <pre><code>$ sudo rpm -ivh /srv/lab-files/labnosig-1.0-1.noarch.rpm
-Verifying...                          ########################################
-Preparing...                          ########################################
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
 Updating / installing...
-labnosig-1.0-1                        ########################################
+   1:labnosig-1.0-1                   ################################# [100%]
 $ rpm -q --qf '%{NAME}: %{RSAHEADER:pgpsig}\n' labnosig labhello
 labnosig: (none)
 labhello: RSA/SHA256, Tue Oct 13 10:08:48 2026, Key ID 0ba6fe4393f77b82</code></pre>

@@ -37,12 +37,7 @@ dpkg: error processing package labapp (--install):
 Errors were encountered while processing:
  labapp
 exit=1
-$ dpkg -l labapp liblab
-Desired=Unknown/Install/Remove/Purge/Hold
-| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
-|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
-||/ Name           Version      Architecture Description
-+++-==============-============-============-====================================
+$ dpkg -l labapp liblab | tail -2
 iU  labapp         1.0          all          sample application that needs liblab
 un  liblab         &lt;none&gt;       &lt;none&gt;       (no description available)
 $ labapp; echo "exit=$?"
@@ -54,7 +49,7 @@ exit=2</code></pre>
 <code>/usr/bin/labapp</code> は置かれているので、打つと動きかけて、liblab のファイルが無いところで失敗する。
 dpkg は control の <code>Depends:</code> を読めるので「足りない」とは分かる。
 しかし<b>どこへ取りに行けばいいかを知らない</b>。リポジトリの目録を持っているのは apt のほうである。</div></div>
-<p>liblab の <code>un</code>（知らない／入っていない）は、台帳に liblab の行ができたという意味ではない。同じ状態を作って台帳を直接見ると、liblab の行は1つも無い（別の檻で記録した）。</p>
+<p>liblab の <code>un</code>（知らない／入っていない）は、台帳に liblab の行ができたという意味ではない。台帳を直接見ると、liblab の行は1つも無い。</p>
 <pre><code>$ grep -c '^Package: liblab$' /var/lib/dpkg/status
 0
 $ dpkg -s labapp | grep -E '^(Status|Depends):'
@@ -85,14 +80,13 @@ Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
 ...
 Setting up liblab (1.0) ...
 Setting up labapp (1.0) ...
-$ dpkg -l labapp liblab
-...
+$ dpkg -l labapp liblab | tail -2
 ii  labapp         1.0          all          sample application that needs liblab
 ii  liblab         1.0          all          small shell library for lab programs
 $ labapp
 liblab: hello from labapp 1.0</code></pre>
 <p><code>1 not fully installed or removed.</code> が labapp の <code>iU</code> のことで、apt が目録から liblab を取ってきて入れ、続けて labapp の設定（Setting up）を済ませた。<code>apt --fix-broken install</code> は <code>apt-get -f install</code> とも書く（<code>-f</code> = fix-broken）。</p>
-<p>断られた原因は <code>iU</code> そのものではなく、満たされない依存関係のほうである。依存関係が満たされている <code>iU</code> なら、apt は断らずに、次の操作のついでに設定を済ませる。<code>dpkg --unpack</code>（展開だけして設定しない）で依存の無い labhello を <code>iU</code> にしてから、別のパッケージを入れた記録である（別の檻）。</p>
+<p>断られた原因は <code>iU</code> そのものではなく、満たされない依存関係のほうである。依存関係が満たされている <code>iU</code> なら、apt は断らずに、次の操作のついでに設定を済ませる。<code>dpkg --unpack</code>（展開だけして設定しない）で依存の無い labhello を <code>iU</code> にしてから、apt に別のパッケージ（liblab）を頼んでみる。liblab はもう入っているので何も入れないが、ついでに labhello の設定（<code>Setting up labhello (1.1)</code>）を済ませる。</p>
 <pre><code>$ sudo dpkg --unpack /srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
 ...
 Unpacking labhello (1.1) over (1.0) ...
@@ -100,10 +94,11 @@ $ dpkg -l labhello | tail -1
 iU  labhello       1.1          all          prints its own version
 $ sudo apt install -y liblab
 ...
+liblab is already the newest version (1.0).
+...
 1 not fully installed or removed.
 ...
 Setting up labhello (1.1) ...
-Setting up liblab (1.0) ...
 $ dpkg -l labhello | tail -1
 ii  labhello       1.1          all          prints its own version</code></pre>
 <div class="scroll"><table>
@@ -130,13 +125,12 @@ Desired=Unknown/Install/Remove/Purge/Hold
 ii  apt                         2.8.3                             amd64        commandline package manager
 ii  apt-file                    3.3                               all          search for files within Debian packages (command-line interface)
 ii  apt-utils                   2.8.3                             amd64        package management related utility programs
-$ dpkg -l 'lab*'
-...
+$ dpkg -l 'lab*' | tail -n +6
 ii  labapp         1.0          all          sample application that needs liblab
-ii  labhello       1.0          all          prints its own version
+ii  labhello       1.1          all          prints its own version
 ii  labsvc         1.0          all          sample service tool with a config file
 ii  labsvc-common  1.0          all          data files for labsvc</code></pre>
-<p><code>dpkg -l</code> は台帳の一覧（<code>--list</code>）で、名前を渡すとワイルドカードで絞れる。行頭の2文字（3文字目はエラーの印）は、見出しの3行に書いてある凡例の頭文字である。</p>
+<p><code>dpkg -l</code> は台帳の一覧（<code>--list</code>）で、名前を渡すとワイルドカードで絞れる（<code>| tail -n +6</code> は見出しの5行を飛ばす。labhello が 1.1 なのは、上の <code>dpkg --unpack</code> で入れ替えたから）。行頭の2文字（3文字目はエラーの印）は、見出しの3行に書いてある凡例の頭文字である。</p>
 <div class="scroll"><table>
 <tr><th>記号</th><th>1文字目（どうしたいか）</th><th>2文字目（いまどうなっているか）</th><th>この教材で出た場面</th></tr>
 <tr><td><code>ii</code></td><td>Install（入れたい）</td><td>Installed（入っていて設定済み）</td><td>ふつうの状態</td></tr>
@@ -220,7 +214,7 @@ exit=0</code></pre>
 <p>入れ直すと、中身は台帳どおりに戻る。ただし設定ファイルは戻らない。</p>
 <pre><code>$ sudo apt install -y --reinstall labapp
 ...
-0 upgraded, 0 newly installed, 1 reinstalled, 0 to remove and 3 not upgraded.
+0 upgraded, 0 newly installed, 1 reinstalled, 0 to remove and 2 not upgraded.
 ...
 Unpacking labapp (1.0) over (1.0) ...
 Setting up labapp (1.0) ...
@@ -312,7 +306,7 @@ $ sudo debconf-show tzdata | sort
        items in the debconf database owned by a given package, and their
        current values.  Questions that have been asked already are prefixed
        with an '*'.</code></pre>
-<p><code>*</code> は「今回答えたもの」ではなく「すでに尋ねられた質問」の印である（別の檻で記録した）。tzdata は Areas と Zones/Asia の2問を尋ねたので、その2行に付いた。</p>
+<p><code>*</code> は「今回答えたもの」ではなく「すでに尋ねられた質問」の印である。tzdata は Areas と Zones/Asia の2問を尋ねたので、その2行に付いた。</p>
 <div class="analogy"><b>たとえ</b>: 家電の「初期設定をやり直す」メニューに近い。
 買ったときに答えた質問（地域・言語）にもう一度答えると、本体の設定が書き換わる。
 <br>ただし<b>崩れる点</b>: 家電は設定画面を出し直すだけだが、dpkg-reconfigure はパッケージの設定の手順を丸ごと走らせ直す。

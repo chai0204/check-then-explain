@@ -43,6 +43,7 @@ Source RPM  : labhello-1.0-1.src.rpm
 Build Date  : Thu Oct  1 09:00:00 2026
 ...
 Summary     : prints its own version
+...
 $ rpm -ql labhello
 /usr/bin/labhello
 $ rpm -qf /usr/bin/labhello
@@ -89,7 +90,7 @@ Name        : labtool
 Version     : 1.0
 Release     : 1
 Architecture: noarch</code></pre>
-<p>なお、この檻の rpm は、<code>p</code> を付けなくても末尾が <code>.rpm</code> の引数をファイルとして読む（別の檻で記録した）。</p>
+<p>なお、この檻の rpm は、<code>p</code> を付けなくても末尾が <code>.rpm</code> の引数をファイルとして読む。</p>
 <pre><code>$ rpm -ql /srv/lab-rpm/labtool-1.0-1.noarch.rpm; echo "exit=$?"
 /usr/bin/labtool
 exit=0
@@ -188,15 +189,18 @@ warning: /etc/labapp.conf saved as /etc/labapp.conf.rpmsave
 $ ls -l /etc/labapp.conf*
 -rw-r--r-- 1 root root 118 Oct 13 11:38 /etc/labapp.conf.rpmsave</code></pre>
 <p>同じ版を入れ直すとき、書き換えた設定ファイル（<code>%config</code> の印が付いたもの）は上書きされずに残る。だから書き足した 118 バイトのままだった。そして消したとき（<code>rpm -e</code>）は、捨てずに <code>.rpmsave</code> という名前で取っておいた。<b>書き換えた設定を勝手に捨てない</b>という考え方は、Debian の <code>rc</code>（第2章）と同じで、残し方が違う。</p>
-<p>書き換えていなければ、消すときに一緒に消える。檻を起動し直して、labapp を入れてすぐ消した記録である（別の檻）。</p>
-<pre><code>$ rpm -V labapp; echo "exit=$?"
+<p>書き換えていなければ、消すときに一緒に消える。labapp を入れ直して、すぐ消してみる。</p>
+<pre><code>$ sudo yum install -y labapp
+...
+Complete!
+$ rpm -V labapp; echo "exit=$?"
 exit=0
 $ sudo rpm -e labapp; echo "exit=$?"
 exit=0
 $ ls -l /etc/labapp.conf*; echo "exit=$?"
-ls: cannot access '/etc/labapp.conf*': No such file or directory
-exit=2</code></pre>
-<p>Debian の conffile は、書き換えていなくても <code>remove</code> で必ず残る（第2章）。RPM 系は「書き換えたかどうか」で分ける。</p>
+-rw-r--r-- 1 root root 118 Oct 13 21:26 /etc/labapp.conf.rpmsave
+exit=0</code></pre>
+<p>今度は <code>warning</code> が出ず、残っているのはさっきの <code>.rpmsave</code>（118 バイト）だけである。書き換えていない <code>/etc/labapp.conf</code> は、labapp と一緒に消えた。Debian の conffile は、書き換えていなくても <code>remove</code> で必ず残る（第2章）。RPM 系は「書き換えたかどうか」で分ける。</p>
 <p>labapp の設定ファイルには <code>%config(noreplace)</code> という印が付いている。ただ、同じ版の入れ直しで残ったのはこの印のせいではない（印が <code>%config</code> だけでも残る）。<code>noreplace</code> の違いが出るのは、設定ファイルの中身が変わった新しい版に<b>上げるとき</b>である。この檻の練習用パッケージには上げる版が無いので、表で示す。</p>
 <div class="scroll"><table>
 <tr><th>書き換えた設定ファイルがある状態で版を上げると</th><th>残るもの</th></tr>
@@ -238,8 +242,8 @@ missing     /usr/share/i18n/locales
 <h2 id="rpm2cpio">入れずに中身を取り出す — rpm2cpio</h2>
 <div class="sgoal"><b>この節で分かること</b>: .rpm の中のファイルを、台帳に触らずに取り出す方法。</div>
 <pre><code>$ rpm2cpio /srv/lab-rpm/labtool-1.0-1.noarch.rpm | cpio -t
-1 block
 ./usr/bin/labtool
+1 block
 $ cd ~/work &amp;&amp; rpm2cpio /srv/lab-rpm/labtool-1.0-1.noarch.rpm | cpio -idmv
 ./usr/bin/labtool
 1 block
