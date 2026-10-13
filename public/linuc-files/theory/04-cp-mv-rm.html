@@ -93,6 +93,46 @@ Mounted on
 <div class="analogy"><b>たとえ</b>: 同じ建物の中で、部屋の表札を付け替える作業に近い。住人（実体）は1歩も動かない。
 <br>ただし<b>崩れる点</b>: 別の建物（別のファイルシステム）へ移るときは表札を付け替えられず、
 新しい建物に住人を作り直して、古い建物から消す。名前は同じでも、番号は新しい建物のものになる。</div>
+<p><code>mv</code> の主なオプションも確かめておく。試験には「<code>mv</code> に無いオプション」を選ばせる問題が出る。</p>
+<pre><code>$ mkdir -p ~/work/ch4/mvdemo
+$ cd ~/work/ch4/mvdemo
+$ mkdir backup docs; echo 1 &gt; test.txt; echo 2 &gt; docs/a.txt
+$ mv -r test.txt backup/
+mv: invalid option -- 'r'
+Try 'mv --help' for more information.
+$ mv docs backup/
+$ ls -R backup
+backup:
+docs
+
+backup/docs:
+a.txt
+$ mv -t backup test.txt
+$ ls backup
+docs  test.txt
+$ echo 3 &gt; test.txt
+$ mv -i test.txt backup/
+mv: overwrite 'backup/test.txt'? n
+$ mv -n test.txt backup/; echo "exit=$?"
+mv: not replacing 'backup/test.txt'
+exit=1
+$ cat backup/test.txt; ls test.txt
+1
+test.txt
+$ mv -f test.txt backup/
+$ cat backup/test.txt; ls test.txt
+3
+ls: cannot access 'test.txt': No such file or directory
+$ cd ~/work/ch4</code></pre>
+<p><code>mv</code> に <code>-r</code> は<b>無い</b>（<code>invalid option</code>）。ディレクトリも名前の書き換えで動かすので、再帰の指定が要らないからである（<code>docs</code> は <code>-r</code> 無しで中身ごと移った）。</p>
+<div class="scroll"><table>
+<tr><th>オプション</th><th>意味</th><th>実測</th></tr>
+<tr><td><code>-i</code></td><td>上書きする前に確認する</td><td><code>overwrite 'backup/test.txt'?</code>（<code>n</code> は自分で打つ）</td></tr>
+<tr><td><code>-n</code></td><td>既にあれば上書きしない</td><td><code>not replacing</code>。中身は 1 のまま（この版の coreutils は終了コード 1 を返す）</td></tr>
+<tr><td><code>-f</code></td><td>確認せずに上書きする</td><td>中身が 3 に替わり、元の <code>test.txt</code> は消えた</td></tr>
+<tr><td><code>-t ディレクトリ</code></td><td>移動先を先に書く</td><td><code>mv -t backup test.txt</code> で <code>backup/</code> に入った</td></tr>
+<tr><td><code>-r</code></td><td><b>無い</b></td><td><code>mv: invalid option -- 'r'</code></td></tr>
+</table></div>
 
 <h2 id="dirs">mkdir・rmdir・rm と、ディレクトリのコピー</h2>
 <div class="sgoal"><b>この節で分かること</b>: ディレクトリを作る・消す・写すときに必要なオプション。</div>
@@ -117,6 +157,7 @@ ls: cannot access 'x': No such file or directory</code></pre>
 <tr><td><code>rmdir -p x/y/z</code></td><td>z・y・x の順に、空なら親もたどって消す</td><td>中身があると止まる</td></tr>
 <tr><td><code>rm dir</code></td><td>—</td><td>ディレクトリは消せない（<code>Is a directory</code>）</td></tr>
 <tr><td><code>rm -r dir</code></td><td>中身ごと再帰的に消す（<code>-f</code> を足すと確認も出さない）</td><td>—</td></tr>
+<tr><td><code>ls -R</code> / <code>-r</code> / <code>-t</code> / <code>-1</code></td><td>再帰的に一覧 / 逆順 / 更新時刻の新しい順 / 1行に1つ</td><td>（<code>-r</code> は逆順で、再帰ではない。下の実測）</td></tr>
 </table></div>
 <p>ディレクトリを写すには <code>-r</code> が要る。そして、同じコマンドを2回打つと結果が変わる。</p>
 <pre><code>$ mkdir -p src/sub
@@ -143,7 +184,30 @@ two
 
 dst/sub:
 two</code></pre>
-<p>1回目は <code>dst</code> が無かったので「<code>src</code> を <code>dst</code> という名前で写す」になり、2回目は <code>dst</code> が既にあるので「<code>dst</code> の<b>中へ</b> <code>src</code> を写す」になった。最後の引数が既存のディレクトリかどうかで意味が変わる。<code>mv</code> も同じ規則で動く。</p>
+<p>1回目は <code>dst</code> が無かったので「<code>src</code> を <code>dst</code> という名前で写す」になり、2回目は <code>dst</code> が既にあるので「<code>dst</code> の<b>中へ</b> <code>src</code> を写す」になった。最後の引数が既存のディレクトリかどうかで意味が変わる。この「最後の引数」の規則は <code>mv</code> も同じである（ただし <code>mv</code> はディレクトリも <code>-r</code> 無しで動かす）。</p>
+<p><code>ls -R</code> の <code>-R</code> は大文字で「再帰」である。小文字の <code>-r</code> は「逆順」で、意味がまったく違う。並び順を変えるオプションを、時刻をずらした3つのファイルで確かめる。</p>
+<pre><code>$ mkdir -p ~/work/ch4/lsdemo
+$ cd ~/work/ch4/lsdemo
+$ touch -d "2026-01-03 00:00" a.txt; touch -d "2026-01-01 00:00" b.txt; touch -d "2026-01-02 00:00" c.txt
+$ ls
+a.txt  b.txt  c.txt
+$ ls -r
+c.txt  b.txt  a.txt
+$ ls -t
+a.txt  c.txt  b.txt
+$ ls -tr
+b.txt  c.txt  a.txt
+$ ls -1
+a.txt
+b.txt
+c.txt
+$ ls -lt --time-style=long-iso
+total 0
+-rw-r--r-- 1 lab lab 0 2026-01-03 00:00 a.txt
+-rw-r--r-- 1 lab lab 0 2026-01-02 00:00 c.txt
+-rw-r--r-- 1 lab lab 0 2026-01-01 00:00 b.txt
+$ cd ~/work/ch4</code></pre>
+<p><code>-r</code> は名前の逆順、<code>-t</code> は更新時刻の新しい順、<code>-tr</code> は古い順、<code>-1</code> は1行に1つ。<code>ls -lt</code> で時刻を並べると、<code>-t</code> の順が更新時刻で決まっていることが分かる。</p>
 
 <h2 id="touch-file">touch と file — 時刻と、中身の種類</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>touch</code> が時刻を書き換え、<code>file</code> が名前ではなく中身を見ること。</div>

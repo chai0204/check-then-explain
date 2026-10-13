@@ -1,0 +1,200 @@
+
+
+========== 0. 環境 ==========
+
+$ lab env
+テーマ    : lab-linuc-files 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:files-1.0.1
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+
+========== 4. ls のオプション（1344） ==========
+
+$ mkdir -p ~/work/ch4/lsdemo; cd ~/work/ch4/lsdemo
+
+$ touch -d "2026-01-03 00:00" a.txt; touch -d "2026-01-01 00:00" b.txt; touch -d "2026-01-02 00:00" c.txt
+
+$ ls
+a.txt  b.txt  c.txt
+
+$ ls -r
+c.txt  b.txt  a.txt
+
+$ ls -t
+a.txt  c.txt  b.txt
+
+$ ls -tr
+b.txt  c.txt  a.txt
+
+$ ls -1
+a.txt
+b.txt
+c.txt
+
+$ ls -lt --time-style=long-iso
+total 0
+-rw-r--r-- 1 lab lab 0 2026-01-03 00:00 a.txt
+-rw-r--r-- 1 lab lab 0 2026-01-02 00:00 c.txt
+-rw-r--r-- 1 lab lab 0 2026-01-01 00:00 b.txt
+
+$ cd ~/work/ch4
+
+
+========== 4. mv のオプション（4326） ==========
+
+$ mkdir -p ~/work/ch4/mvdemo; cd ~/work/ch4/mvdemo
+
+$ mkdir backup docs; echo 1 > test.txt; echo 2 > docs/a.txt
+
+$ mv -r test.txt backup/
+mv: invalid option -- 'r'
+Try 'mv --help' for more information.
+
+$ mv docs backup/
+
+$ ls -R backup
+backup:
+docs
+
+backup/docs:
+a.txt
+
+$ mv -t backup test.txt
+
+$ ls backup
+docs  test.txt
+
+$ echo 3 > test.txt
+
+$ mv -i test.txt backup/
+mv: overwrite 'backup/test.txt'? n
+
+$ mv -n test.txt backup/; echo "exit=$?"
+mv: not replacing 'backup/test.txt'
+exit=1
+
+$ cat backup/test.txt; ls test.txt
+1
+test.txt
+
+$ mv -f test.txt backup/
+
+$ cat backup/test.txt; ls test.txt
+3
+ls: cannot access 'test.txt': No such file or directory
+
+$ cd ~/work/ch4
+
+
+========== 8. locate のオプション（2594） ==========
+
+$ cd ~
+
+$ locate -c bashrc
+7
+
+$ locate -l 2 bashrc
+/etc/bash.bashrc
+/etc/skel/.bashrc
+
+$ locate skel
+/etc/skel
+/etc/skel/.bash_logout
+/etc/skel/.bashrc
+/etc/skel/.profile
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel.other
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel/dot.bash_logout
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel/dot.bash_profile
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel/dot.bashrc
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel.other/index.html
+/usr/share/nano/haskell.nanorc
+/usr/share/nano/extra/haskell.nanorc
+/usr/share/vim/vim91/autoload/haskellcomplete.vim
+/usr/share/vim/vim91/ftplugin/haskell.vim
+/usr/share/vim/vim91/syntax/chaskell.vim
+/usr/share/vim/vim91/syntax/haskell.vim
+/usr/share/vim/vim91/syntax/lhaskell.vim
+
+$ locate -b skel
+/etc/skel
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel.other
+/usr/share/nano/haskell.nanorc
+/usr/share/nano/extra/haskell.nanorc
+/usr/share/vim/vim91/autoload/haskellcomplete.vim
+/usr/share/vim/vim91/ftplugin/haskell.vim
+/usr/share/vim/vim91/syntax/chaskell.vim
+/usr/share/vim/vim91/syntax/haskell.vim
+/usr/share/vim/vim91/syntax/lhaskell.vim
+
+$ locate -i DOT.BASHRC
+/usr/share/dot.bashrc
+/usr/share/base-files/dot.bashrc
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel/dot.bashrc
+
+$ locate -q bashrc; echo "exit=$?"
+locate: invalid option -- 'q'
+exit=1
+
+$ mkdir -p ~/work/dbdemo; touch ~/work/dbdemo/only-here.txt
+
+$ updatedb -l 0 -U ~/work/dbdemo -o ~/work/dbdemo.db; echo "exit=$?"
+exit=0
+
+$ locate only-here; echo "exit=$?"
+exit=1
+
+$ locate -d ~/work/dbdemo.db only-here
+/home/lab/work/dbdemo/only-here.txt
+
+
+========== 8. whereis の検索先（5675） ==========
+
+$ whereis -l | grep "^bin:"
+bin: /usr/bin
+bin: /usr/sbin
+bin: /usr/lib/x86_64-linux-gnu
+bin: /usr/lib
+bin: /usr/lib64
+bin: /etc
+bin: /usr/games
+bin: /usr/local/bin
+bin: /usr/local/sbin
+bin: /usr/local/etc
+bin: /usr/local/lib
+bin: /usr/local/games
+bin: /usr/include
+bin: /usr/local
+bin: /usr/libexec
+bin: /usr/share
+
+$ whereis -b passwd
+passwd: /usr/bin/passwd /etc/passwd
+
+$ whereis -m passwd
+passwd: /usr/share/man/man5/passwd.5.gz /usr/share/man/man1/passwd.1.gz
+
+$ whereis -s ls
+ls:
+
+$ whereis bash
+bash: /usr/bin/bash /usr/share/man/man1/bash.1.gz
+
+
+========== 9. 版 ==========
+
+$ lab env
+テーマ    : lab-linuc-files 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:files-1.0.1
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb

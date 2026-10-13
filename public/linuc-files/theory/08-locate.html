@@ -52,6 +52,57 @@ $ locate new-note
 <pre><code>$ locate -e new-note; echo "exit=$?"
 exit=1</code></pre>
 <p><code>-e</code> を付けると、写真に写っているものが<b>いまも存在するか</b>を1つずつ確かめてから出す。実機では <code>updatedb</code> は1日1回、自動で呼ばれる（次の節）。この檻ではそれが動かないので、イメージを作った時刻の写真が残り続けている。</p>
+<p>試験に出る <code>locate</code> のオプションを、まとめて打っておく。</p>
+<pre><code>$ locate -c bashrc
+7
+$ locate -l 2 bashrc
+/etc/bash.bashrc
+/etc/skel/.bashrc
+$ locate skel
+/etc/skel
+/etc/skel/.bash_logout
+/etc/skel/.bashrc
+/etc/skel/.profile
+（略）
+/usr/share/vim/vim91/syntax/lhaskell.vim
+$ locate -b skel
+/etc/skel
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel.other
+/usr/share/nano/haskell.nanorc
+/usr/share/nano/extra/haskell.nanorc
+/usr/share/vim/vim91/autoload/haskellcomplete.vim
+/usr/share/vim/vim91/ftplugin/haskell.vim
+/usr/share/vim/vim91/syntax/chaskell.vim
+/usr/share/vim/vim91/syntax/haskell.vim
+/usr/share/vim/vim91/syntax/lhaskell.vim
+$ locate -i DOT.BASHRC
+/usr/share/dot.bashrc
+/usr/share/base-files/dot.bashrc
+/usr/share/doc/adduser/examples/adduser.local.conf.examples/skel/dot.bashrc
+$ locate -q bashrc; echo "exit=$?"
+locate: invalid option -- 'q'
+exit=1</code></pre>
+<p><code>locate skel</code> はパスのどこかに skel を含むものを全部出す（<code>/etc/skel/.bashrc</code> も、名前に skel を含む <code>haskell.vim</code> も）。<code>-b</code> は名前の最後の部分（ベース名）だけで照合するので、<code>/etc/skel</code> の下のファイルは消え、<code>haskell</code> は残った。<code>-d</code> は既定以外の索引を使う指定で、自分で作った索引で確かめられる。</p>
+<pre><code>$ mkdir -p ~/work/dbdemo; touch ~/work/dbdemo/only-here.txt
+$ updatedb -l 0 -U ~/work/dbdemo -o ~/work/dbdemo.db; echo "exit=$?"
+exit=0
+$ locate only-here; echo "exit=$?"
+exit=1
+$ locate -d ~/work/dbdemo.db only-here
+/home/lab/work/dbdemo/only-here.txt</code></pre>
+<p><code>updatedb</code> の <code>-U</code> は索引を作る起点、<code>-o</code> は書き出す先、<code>-l 0</code> は「見る人が辿り着けるか」の確かめを外す指定（自分専用の索引なので）である。システムの索引には載っていない <code>only-here.txt</code> が、<code>-d</code> で渡した索引からは出た。</p>
+<div class="scroll"><table>
+<tr><th>オプション</th><th>意味</th><th>実測</th></tr>
+<tr><td><code>-b</code></td><td>名前の最後の部分（ベース名）だけで照合する</td><td><code>locate -b skel</code></td></tr>
+<tr><td><code>-c</code></td><td>一致した件数だけを出す</td><td><code>7</code></td></tr>
+<tr><td><code>-d 索引</code></td><td>既定以外の索引を使う</td><td><code>locate -d ~/work/dbdemo.db</code></td></tr>
+<tr><td><code>-e</code></td><td>いま実在するものだけを出す</td><td>前の <code>locate -e new-note</code></td></tr>
+<tr><td><code>-i</code></td><td>大文字小文字を区別しない</td><td><code>locate -i DOT.BASHRC</code></td></tr>
+<tr><td><code>-l 数</code></td><td>出す件数の上限</td><td><code>locate -l 2</code> で2件</td></tr>
+<tr><td><code>-q</code></td><td>mlocate の「索引の読み込みエラーを出さない」。この檻の plocate 1.1.19 には無い</td><td><code>invalid option -- 'q'</code></td></tr>
+</table></div>
+<p>試験の解説は mlocate（以前の Ubuntu や Red Hat 系の locate）を前提にしていることがある。<code>-q</code> が選択肢に出たら、mlocate の「読み込みエラーを出さない」として読む。</p>
 <div class="analogy"><b>たとえ</b>: 毎晩作り直す、図書館の蔵書カード目録に近い。
 今日入った本はまだカードが無く、今日除籍した本はカードが残っている。目録をめくるのは書庫を歩くよりずっと速い。
 <br>ただし<b>崩れる点</b>: 図書館の目録は誰が見ても同じだが、<code>locate</code> の目録は<b>見る人によって</b>出てくるカードが変わる（次の節）。</div>
@@ -146,6 +197,30 @@ passwd: /usr/bin/passwd /etc/passwd /usr/share/man/man5/passwd.5.gz /usr/share/m
 $ whereis cd
 cd:</code></pre>
 <p><code>whereis</code> は Linux の標準の場所（と PATH・MANPATH）を探して、実行ファイル・マニュアル（・ソース）をまとめて出す。<code>-b</code> は実行ファイルだけ。<code>passwd</code> では、同じ名前の設定ファイル <code>/etc/passwd</code> と、その書式を説明する5章のマニュアルまで並んだ。</p>
+<pre><code>$ whereis -l | grep "^bin:"
+bin: /usr/bin
+bin: /usr/sbin
+bin: /usr/lib/x86_64-linux-gnu
+bin: /usr/lib
+bin: /usr/lib64
+bin: /etc
+bin: /usr/games
+bin: /usr/local/bin
+bin: /usr/local/sbin
+bin: /usr/local/etc
+bin: /usr/local/lib
+bin: /usr/local/games
+bin: /usr/include
+bin: /usr/local
+bin: /usr/libexec
+bin: /usr/share
+$ whereis -b passwd
+passwd: /usr/bin/passwd /etc/passwd
+$ whereis -m passwd
+passwd: /usr/share/man/man5/passwd.5.gz /usr/share/man/man1/passwd.1.gz
+$ whereis -s ls
+ls:</code></pre>
+<p><code>whereis</code> が探すのは、実行ファイル（<code>-b</code>）・マニュアル（<code>-m</code>）・ソース（<code>-s</code>）の<b>3種類だけ</b>である。<code>/etc/passwd</code> が出たのは、<code>whereis -l</code> が示すとおり <code>/etc</code> が「実行ファイルを探す場所」の一覧に入っているからで、設定ファイルを探したわけではない。試験で「<code>whereis</code> で出せないもの」を問われたら、答えは設定ファイルである。ソースはこの檻に入れていないので、<code>-s</code> は空になった。</p>
 <div class="scroll"><table>
 <tr><th>コマンド</th><th>何を探すか</th><th><code>ls</code> の答え</th><th><code>cd</code> の答え</th></tr>
 <tr><td><code>which</code></td><td>PATH の上の実行ファイル</td><td><code>/usr/bin/ls</code></td><td>Ubuntu では何も出ない（終了コード 1）</td></tr>

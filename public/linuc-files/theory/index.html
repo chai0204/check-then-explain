@@ -41,7 +41,7 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <code>rm</code> は名前を外すだけで、ハードリンクがあれば中身は残る。<code>locate</code> は名前の一覧を引くだけなので、消したファイルも出す。
 主題1.02 に並ぶ <code>chmod</code> と <code>find</code> と <code>tar</code> と <code>ln</code> は、<b>全部この1つの構造で説明できます</b>。</p>
 <div class="skip"><b>ここで覚えなくていいこと</b>:
-ACL（<code>getfacl</code> / <code>setfacl</code>）、ファイルシステムの作り方（<code>mkfs</code>、主題1.04 の範囲）、inode の内部構造、
+ACL（<code>getfacl</code> / <code>setfacl</code>）、ファイルシステムの作り方（<code>mkfs</code>、主題1.05 の範囲）、inode の内部構造、
 SELinux。どれも主題1.02 の範囲外で、この8章には出てきません。</div>
 </div>
 
@@ -83,7 +83,7 @@ SELinux。どれも主題1.02 の範囲外で、この8章には出てきませ�
 <p>出題範囲の語ごとに、一行の意味と、説明している章の場所です。一行で思い出せない語だけ、リンク先を読み返してください。</p>
 <div class="scroll"><table>
 <tr><th>語</th><th>一行で</th><th>章</th></tr>
-<tr><td><code>ls</code></td><td><code>-l</code> 種類と権限、<code>-d</code> ディレクトリ自身、<code>-a</code>/<code>-A</code> 隠しファイルも、<code>-i</code> inode 番号、<code>-F</code> 種類の印</td><td><a href="/linuc-files/theory/01-permissions#ten">1</a></td></tr>
+<tr><td><code>ls</code></td><td><code>-l</code> 種類と権限、<code>-d</code> ディレクトリ自身、<code>-a</code>/<code>-A</code> 隠しファイルも、<code>-i</code> inode 番号、<code>-F</code> 種類の印、<code>-R</code> 再帰、<code>-r</code> 逆順、<code>-t</code> 更新時刻の新しい順、<code>-1</code> 1行に1つ</td><td><a href="/linuc-files/theory/01-permissions#ten">1</a></td></tr>
 <tr><td>スペシャルファイル</td><td><code>c</code> キャラクタデバイス（<code>/dev/null</code>）、<code>b</code> ブロックデバイス（<code>/dev/sda</code>）。大きさの欄はメジャー・マイナー番号</td><td><a href="/linuc-files/theory/01-permissions#special">1</a></td></tr>
 <tr><td><code>chmod</code></td><td>数値（r4 w2 x1 を3桁）か記号（<code>u g o a</code> × <code>+ - =</code> × <code>r w x</code>）で権限を変える。<code>-R</code> で再帰</td><td><a href="/linuc-files/theory/02-umask#chmod">2</a></td></tr>
 <tr><td><code>umask</code></td><td>作るときに落とすビット。022 → 644/755、027 → 640/750、077 → 600/700。引き算ではない</td><td><a href="/linuc-files/theory/02-umask#umask">2</a></td></tr>
@@ -93,7 +93,7 @@ SELinux。どれも主題1.02 の範囲外で、この8章には出てきませ�
 <tr><td><code>chown</code></td><td>所有者を変える（<code>user:group</code> で両方、<code>:group</code> でグループだけ）。所有者の変更は root だけ。グループだけなら、所有者が自分の属するグループへ変えられる</td><td><a href="/linuc-files/theory/03-special-bits#owner">3</a></td></tr>
 <tr><td><code>chgrp</code></td><td>グループを変える。一般ユーザは自分が属するグループへだけ</td><td><a href="/linuc-files/theory/03-special-bits#owner">3</a></td></tr>
 <tr><td><code>cp</code></td><td>新しいファイルを作る。<code>-r</code> 再帰、<code>-p</code> 時刻と権限を保つ、<code>-a</code> 全部保って再帰、<code>-i</code> 上書き確認</td><td><a href="/linuc-files/theory/04-cp-mv-rm#cp">4</a></td></tr>
-<tr><td><code>mv</code></td><td>同じファイルシステムなら名前の書き換え（inode は変わらない）</td><td><a href="/linuc-files/theory/04-cp-mv-rm#mv">4</a></td></tr>
+<tr><td><code>mv</code></td><td>同じファイルシステムなら名前の書き換え（inode は変わらない）。ディレクトリも <code>-r</code> 無しで動かす（<code>-r</code> は無い）。<code>-i</code> 確認、<code>-n</code> 上書きしない、<code>-f</code> 確認せず上書き、<code>-t</code> 移動先を先に書く</td><td><a href="/linuc-files/theory/04-cp-mv-rm#mv">4</a></td></tr>
 <tr><td><code>rm</code></td><td>名前を外す。<code>-r</code> ディレクトリごと、<code>-f</code> 確認しない、<code>-i</code> 確認する</td><td><a href="/linuc-files/theory/04-cp-mv-rm#dirs">4</a></td></tr>
 <tr><td><code>mkdir</code> / <code>rmdir</code></td><td><code>mkdir -p</code> で途中も作る。<code>rmdir</code> は空のときだけ、<code>-p</code> で親もたどる</td><td><a href="/linuc-files/theory/04-cp-mv-rm#dirs">4</a></td></tr>
 <tr><td><code>touch</code></td><td>アクセス時刻と更新時刻の両方をいまに（<code>-a</code> はアクセス時刻だけ、<code>-m</code> は更新時刻だけ）。無ければ空で作る。<code>-t YYYYMMDDhhmm</code> / <code>-d</code> で指定</td><td><a href="/linuc-files/theory/04-cp-mv-rm#touch-file">4</a></td></tr>
@@ -110,12 +110,12 @@ SELinux。どれも主題1.02 の範囲外で、この8章には出てきませ�
 <tr><td><code>ls -i</code> / inode</td><td>名前以外の全部（権限・所有者・時刻・中身の場所）を持つ実体と、その番号</td><td><a href="/linuc-files/theory/07-links#hard">7</a></td></tr>
 <tr><td><code>ls -F</code></td><td><code>@</code> シンボリックリンク、<code>/</code> ディレクトリ、<code>*</code> 実行可能。ハードリンクには印が無い</td><td><a href="/linuc-files/theory/07-links#soft">7</a></td></tr>
 <tr><td>バージョン管理</td><td>版ごとのディレクトリを <code>current</code> で指し、<code>ln -sfn 新しい版 current</code> で付け替える</td><td><a href="/linuc-files/theory/07-links#version">7</a></td></tr>
-<tr><td><code>locate</code></td><td>索引（名前の一覧）を引くだけ。新しいものは出ず、消したものは出る。<code>-e</code> で実在を確かめる</td><td><a href="/linuc-files/theory/08-locate#locate">8</a></td></tr>
+<tr><td><code>locate</code></td><td>索引（名前の一覧）を引くだけ。新しいものは出ず、消したものは出る。<code>-e</code> 実在するものだけ、<code>-b</code> ベース名で照合、<code>-c</code> 件数、<code>-d</code> 索引を指定、<code>-i</code> 大文字小文字を無視、<code>-l</code> 件数の上限（<code>-q</code> は mlocate のもの）</td><td><a href="/linuc-files/theory/08-locate#locate">8</a></td></tr>
 <tr><td><code>updatedb</code></td><td>索引を作り直す（root）。実機では1日1回、タイマーか cron が呼ぶ</td><td><a href="/linuc-files/theory/08-locate#locate">8</a></td></tr>
 <tr><td><code>/etc/updatedb.conf</code></td><td><code>PRUNEPATHS</code>（外すディレクトリ。<code>/tmp</code> 入り）・<code>PRUNEFS</code>・<code>PRUNENAMES</code></td><td><a href="/linuc-files/theory/08-locate#conf">8</a></td></tr>
 <tr><td><code>which</code></td><td>PATH 上の実行ファイルを探す。Ubuntu ではエイリアスも組み込みも知らない（Red Hat 系はエイリアスも出す）。組み込みかどうかは <code>type</code> で</td><td><a href="/linuc-files/theory/08-locate#which">8</a></td></tr>
 <tr><td><code>type</code></td><td>シェルが実際に何を動かすか（エイリアス・予約語・組み込み・ファイル）</td><td><a href="/linuc-files/theory/08-locate#which">8</a></td></tr>
-<tr><td><code>whereis</code></td><td>実行ファイル・マニュアル・ソースの場所。<code>-b</code> で実行ファイルだけ</td><td><a href="/linuc-files/theory/08-locate#which">8</a></td></tr>
+<tr><td><code>whereis</code></td><td>実行ファイル（<code>-b</code>）・マニュアル（<code>-m</code>）・ソース（<code>-s</code>）の3種類だけを探す。設定ファイルは探さない（<code>/etc</code> は実行ファイルの検索先に入っているので、<code>/etc/passwd</code> は出る）。<code>-l</code> で検索先の一覧</td><td><a href="/linuc-files/theory/08-locate#which">8</a></td></tr>
 <tr><td>FHS</td><td><code>/etc</code> 設定、<code>/var/log</code> ログ、<code>/tmp</code> と <code>/var/tmp</code> 一時、<code>/usr/local</code> 自分で入れたもの、<code>/opt</code> 追加アプリ。<code>man 7 hier</code></td><td><a href="/linuc-files/theory/08-locate#fhs">8</a></td></tr>
 </table></div>
 
