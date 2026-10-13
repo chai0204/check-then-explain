@@ -23,17 +23,16 @@
 # 新しいテーマで画像やフォントを足したら img-src / font-src も足す。
 # 足し忘れると、そのテーマだけ画像が出ない。
 
+# ───── 'wasm-unsafe-eval' と connect-src 'self' を足した理由（2026-10-13） ─────
+# トップの「SQL で引く」は、ブラウザの中で SQLite（sql.js。WebAssembly）を動かし、台帳 /catalog/catalog.sql を読む。
+#   WebAssembly のコンパイル → script-src に 'wasm-unsafe-eval'（JavaScript の eval は許さないまま）
+#   sql-wasm.wasm と catalog.sql の取得 → connect-src 'self'（同じサイトだけ。外へは出せない）
+# 最初はトップ（/）だけに付けようとして、/ の規則で「! Content-Security-Policy」を書いて /* の CSP を外そうとしたが、
+# 本番では2つの CSP が並んで返った（ドキュメント上は外せるはず。2つ並ぶと両方が効いて狭いほうになり、SQL モードが動かない）。
+# 静的なページだけのサイトで読者の入力も受けないので、全ページに付けても影響は無視できる。1つの規則にまとめた。
+
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'self' https://giscus.app; style-src 'self' https://giscus.app; img-src 'self'; frame-src https://giscus.app; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://giscus.app; style-src 'self' https://giscus.app; img-src 'self'; frame-src https://giscus.app; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Cross-Origin-Opener-Policy: same-origin
-
-# ───── トップ（/）だけ CSP を広げる理由（2026-10-13） ─────
-# トップの「SQL で引く」は、ブラウザの中で SQLite（sql.js。WebAssembly）を動かし、台帳 /catalog/catalog.sql を読む。
-#   WebAssembly のコンパイル → script-src に 'wasm-unsafe-eval'（JavaScript の eval は許さないまま）
-#   sql-wasm.wasm と catalog.sql の取得 → connect-src 'self'
-# 他のページは上の厳しい CSP のまま。「!」で上の規則の CSP を外してから、トップ用のものを付け直す（2つ並ぶと両方が効いて狭いほうになる）。
-/
-  ! Content-Security-Policy
-  Content-Security-Policy: default-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://giscus.app; style-src 'self' https://giscus.app; img-src 'self'; frame-src https://giscus.app; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
