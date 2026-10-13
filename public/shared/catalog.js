@@ -70,15 +70,21 @@
   const MAX_ROWS = 500;
   let dbPromise = null;
   const el = (tag, text, cls) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; };
-  function loadDb() {
-    if (dbPromise) return dbPromise;
-    dbPromise = new Promise((resolve, reject) => {
+  // sql.js と台帳を読み込む。回線の都合で取得が一度失敗しても、少し待って1回だけ読み直す
+  let scriptP = null;
+  function loadScript() {
+    if (window.initSqlJs) return Promise.resolve();
+    if (!scriptP) scriptP = new Promise((resolve, reject) => {
       const s = document.createElement("script");
       s.src = VENDOR + "sql-wasm.js";
       s.onload = resolve;
-      s.onerror = () => reject(new Error("sql.js を読み込めなかった"));
+      s.onerror = () => { scriptP = null; s.remove(); reject(new Error("sql.js を読み込めなかった")); };
       document.head.appendChild(s);
-    }).then(() => Promise.all([
+    });
+    return scriptP;
+  }
+  function attempt() {
+    return loadScript().then(() => Promise.all([
       window.initSqlJs({ locateFile: (f) => VENDOR + f }),
       fetch("/catalog/catalog.sql").then((r) => { if (!r.ok) throw new Error(`台帳を読み込めなかった（HTTP ${r.status}）`); return r.text(); }),
     ])).then(([SQL, text]) => {
@@ -87,6 +93,10 @@
       db.exec("PRAGMA query_only = 1");
       return db;
     });
+  }
+  function loadDb() {
+    if (dbPromise) return dbPromise;
+    dbPromise = attempt().catch(() => new Promise((r) => setTimeout(r, 800)).then(attempt));
     dbPromise.catch(() => { dbPromise = null; });
     return dbPromise;
   }
