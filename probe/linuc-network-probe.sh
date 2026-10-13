@@ -3,7 +3,7 @@
 #
 #   docker run -d --name linuc-network-probe --hostname host \
 #     -v linuc-network-probe-vm:/home/lab/vm -v linuc-network-probe-state:/home/lab/.lab \
-#     lab-linuc-network:1.0.0                       （読者と同じ起動オプション。KVM なし）
+#     --stop-timeout 30 lab-linuc-network:1.0.1     （読者と同じ起動オプション。KVM なし）
 #   （練習機の初回の準備 ~/vm/.provisioned ができるまで待つ）
 #   docker cp probe/linuc-network-probe.sh linuc-network-probe:/tmp/probe.sh
 #   docker exec -u lab -w /home/lab linuc-network-probe bash /tmp/probe.sh > logs/linuc-network-probe.log 2>&1
@@ -58,6 +58,7 @@ G 'ipcalc -b 127.0.0.1/8'
 
 section "2. NIC を手で設定する（02-interface）"
 G 'ip link show'
+G 'sudo ip netns exec sw ip link show p-linuc'
 G "ifconfig | grep '^[a-z]'"
 G "ifconfig -a | grep '^[a-z]'"
 G 'ip addr show enp0s17'
@@ -77,13 +78,19 @@ G "ifconfig | grep '^[a-z]'"
 G 'ifconfig enp0s17:1'
 G 'sudo ifconfig enp0s17 10.0.3.60 netmask 255.255.255.0'
 G 'ip -4 addr show enp0s17'
+G 'sysctl net.ipv4.conf.enp0s17.promote_secondaries'
 G 'sudo ifconfig enp0s17 10.0.3.50 netmask 255.255.255.0'
 G 'ip -4 addr show enp0s17'
+G 'ip addr enp0s17'
+G 'ip a show enp0s17'
+G 'ip -s link show enp0s17'
 G 'sudo ip link set enp0s17 down'
-G 'ip -4 addr show enp0s17'
+G 'ip addr show enp0s17'
+G 'sysctl net.ipv6.conf.enp0s17.keep_addr_on_down'
 G 'ip route'
 G 'sudo ip link set enp0s17 up'
 Q 'sleep 3'
+G 'ip -6 addr show enp0s17'
 G 'ip route'
 G 'ping -c 1 10.0.3.2'
 
@@ -125,6 +132,12 @@ G "sudo nmcli connection modify lab-dhcp ipv4.method auto ipv4.addresses ''"
 G 'sudo nmcli connection up lab-dhcp'
 G 'ip -4 addr show enp0s18'
 G 'nmcli -g ipv4.method,connection.autoconnect connection show lab-dhcp'
+G 'nmcli --help'
+G 'nmcli general help'
+G 'nmcli general status'
+G 'nmcli general hostname'
+G 'nmcli general monitor'
+G 'nmcli networking'
 G 'networkctl'
 G 'sudo cat /etc/netplan/01-lab-mgmt.yaml'
 G 'sudo nmcli device connect enp0s17'
@@ -146,11 +159,19 @@ G 'sudo ip route add default via 192.168.10.1'
 G 'ip route show default'
 G 'ping -c 2 172.16.20.10'
 G 'route -n'
+G 'sudo ip route add default via 192.168.10.254'
+G 'sudo route add default gw 192.168.10.254'
+G 'ip route show default'
+G 'ip route get 172.16.20.10'
+G 'ping -c 1 172.16.20.10'
+G 'sudo route del default gw 192.168.10.254'
+G 'ip route show default'
 G 'sudo route add -host 203.0.113.5 gw 192.168.10.254'
 G 'route -n'
 G 'ip route get 203.0.113.5'
 G 'ping -c 1 203.0.113.5'
 G 'sudo route del -host 203.0.113.5 gw 192.168.10.254'
+G 'ip -r route'
 G 'sudo ifdown lab0'
 G 'sudo ifup lab0'
 settle6
@@ -172,6 +193,11 @@ G 'sudo tcpdump -l -n -t -i lab0 -c 4 "udp or icmp" 2>/dev/null & sleep 2; trace
 G 'ping -c 1 -t 1 172.16.20.10'
 G 'ping -c 1 -t 2 172.16.20.10'
 G 'traceroute -I -n 172.16.20.10'
+G 'sysctl net.ipv4.ping_group_range'
+G 'getcap /usr/bin/ping'
+G "sudo sysctl -w net.ipv4.ping_group_range='0 2147483647'"
+G 'traceroute -I -n 172.16.20.10'
+G "sudo sysctl -w net.ipv4.ping_group_range='1 0'"
 G 'sudo traceroute -I -n 172.16.20.10'
 G 'sudo traceroute -I -n -N 1 172.16.20.10'
 G 'tracepath -n 172.16.20.10'
@@ -206,9 +232,14 @@ G 'ping6 -c 1 ip6-localhost'
 
 section "7. プロトコルとポート（07-ports）"
 G "grep -wE '^(ssh|smtp|domain|http|ntp|https)' /etc/services"
+G "grep -E '^(pop3|imap2|snmp|snmp-trap|ldap|syslog)[[:space:]]' /etc/services"
 G 'ss -tuln'
 G 'sudo ss -tulnp'
 G 'sudo netstat -tulnp'
+G 'netstat -tn'
+G 'netstat -tan'
+G 'timeout 2 netstat -tcp; echo $?'
+G "ncat -lk 9000 & sleep 1; ss -tlnp | grep -E 'State|8080|9000'; kill %1; wait"
 G 'curl -s http://127.0.0.1:8080/'
 G 'nc -zv 127.0.0.1 8080'
 G 'nc -zv 192.168.10.2 8080'
@@ -264,6 +295,11 @@ G 'dig +short server.lab.example'
 G 'host server'
 G 'dig +short server'
 G 'dig +short +search server'
+G "printf 'nameserver 172.16.20.10\nsearch lab.example\nsearch nosuch.lab.example\n' | sudo tee /etc/resolv.conf"
+G 'host server'
+G "printf 'nameserver 172.16.20.10\nsearch nosuch.lab.example lab.example\n' | sudo tee /etc/resolv.conf"
+G 'host server'
+G "printf 'nameserver 172.16.20.10\nsearch lab.example\n' | sudo tee /etc/resolv.conf"
 G 'host www.lab.example'
 G 'dig +short -x 172.16.20.10'
 G 'host 172.16.20.10'
@@ -273,6 +309,13 @@ G 'dig +short AAAA server.lab.example'
 G 'dig +noall +answer web.lab.example'
 G 'host nosuch.lab.example'
 G 'host example.com'
+G 'dig server.lab.example | grep SERVER'
+G 'dig +tcp server.lab.example | grep SERVER'
+G 'dig +vc server.lab.example | grep SERVER'
+G 'dig --tcp server.lab.example'
+G 'dig +t server.lab.example'
+G 'dig -t MX +short lab.example'
+G 'dig -p 53 +short @172.16.20.10 server.lab.example'
 G 'traceroute 172.16.20.10'
 G 'sudo systemctl restart systemd-resolved'
 G 'cat /etc/resolv.conf'
@@ -283,25 +326,33 @@ G 'dig +short www.lab.example'
 G 'ping -c 1 www.lab.example'
 G 'curl -s -m 3 http://www.lab.example/; echo $?'
 G "grep '^hosts' /etc/nsswitch.conf"
-G 'getent hosts www.lab.example'
+G 'getent ahosts www.lab.example'
 G 'cat /etc/hosts'
 G "sudo sed -i '/www.lab.example/d' /etc/hosts"
-G 'getent hosts www.lab.example'
+G 'getent ahosts www.lab.example'
 G 'ping -c 1 www.lab.example'
 G 'curl -s http://www.lab.example/'
 G "echo '172.16.20.88 ns.lab.example' | sudo tee -a /etc/hosts"
-G 'getent hosts ns.lab.example'
+G 'getent ahosts ns.lab.example'
 G "sudo sed -i 's/^hosts:.*/hosts:          dns files/' /etc/nsswitch.conf"
 G "grep '^hosts' /etc/nsswitch.conf"
-G 'getent hosts ns.lab.example'
+G 'getent ahosts ns.lab.example'
 G "sudo sed -i 's/^hosts:.*/hosts:          files dns/' /etc/nsswitch.conf"
 G "sudo sed -i '/172.16.20.88/d' /etc/hosts"
 G 'getent hosts server.lab.example'
 G 'getent ahosts server.lab.example'
+G "echo '172.16.20.77 server.lab.example' | sudo tee -a /etc/hosts"
+G 'getent hosts server.lab.example'
+G 'getent ahosts server.lab.example'
+G 'ping -c 1 server.lab.example'
+G "sudo sed -i '/172.16.20.77/d' /etc/hosts"
 G 'hostname'
 G 'cat /etc/hostname'
 G 'grep 127.0.1.1 /etc/hosts'
 G 'hostname -I'
+G 'hostname -s'
+G 'hostname -i'
+G 'hostname -f'
 G 'sudo hostname web01'
 G 'hostname'
 G 'cat /etc/hostname'
@@ -324,6 +375,14 @@ G 'sudo true'
 G 'sudo hostnamectl set-hostname linuc'
 G 'sudo true'
 G 'cat /etc/hostname'
+G 'sudo nmcli general hostname web03'
+G 'cat /etc/hostname'
+G 'sudo nmcli general hostname linuc'
+G 'cat /etc/hostname'
+G 'sudo hostname -b web02'
+G 'hostname'
+G 'sudo hostname -F /etc/hostname'
+G 'hostname'
 
 section "付録. ifupdown の dhcp（最後に試す: dhcpcd が enp0s17 の IPv6 の設定を書き換えて戻さないため）"
 G 'sysctl net.ipv6.conf.enp0s17.addr_gen_mode net.ipv4.conf.enp0s17.promote_secondaries'

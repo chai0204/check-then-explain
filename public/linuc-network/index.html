@@ -58,14 +58,14 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <pre><code>docker run -d --name lab-linuc-network --hostname host --stop-timeout 30 \
   -v lab-linuc-network-vm:/home/lab/vm \
   -v lab-linuc-network-state:/home/lab/.lab \
-  ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:a313bee9879c93ce7e87f6f58dcbebb2f753fd671235af9355b1607c484e909c
+  ghcr.io/chai0204/lab-linuc:network-1.0.1@sha256:__DIGEST__
 
 docker exec -it lab-linuc-network bash -l</code></pre>
 <p>入ると外のコンテナ（プロンプト <code>lab@host</code>）にいます。現在地が出ます。</p>
 <pre><code>練習機 linuc: running（エージェント 応答あり / ssh 待ち受け中）
   vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
 
-── lab-linuc-network 1.0.0 ────────────────────────────────────────
+── lab-linuc-network 1.0.1 ────────────────────────────────────────
 lab-linuc-network  進捗 0/7
   次 → 01 「enp0s17 にアドレスを手で付ける」 (目安 10分 / 影響度 B)
   lab start 01 で課題を開く
@@ -86,6 +86,8 @@ lab-linuc-network  進捗 0/7
 <p><code>docker stop</code> は既定で 10 秒待って強制終了します。練習機の正常な停止には KVM なしで約 13 秒かかるので、
 10 秒では電源を抜いたのと同じになり、次の起動でディスクの回復が走ります。30 秒待たせれば正常に止まります。
 付けずに作ったコンテナは <code>docker stop -t 30 lab-linuc-network</code> で止めてください。</p>
+<p>podman（5.8.6・rootless）でも、同じ起動オプションのまま <code>docker</code> を <code>podman</code> に読み替えて動きます
+（仮想マシン型の檻に共通の土台で確かめてあります。本文の出力は docker で取ったものです）。</p>
 <p><b>読者に渡してもらう権限は1つもありません</b>（<code>--cap-add</code> も <code>--privileged</code> も無し）。
 練習機は QEMU の完全エミュレーション（TCG）で動き、ホストの特権を借りずに本物のカーネルを動かします。
 Linux で速くしたい人だけ <code>--device /dev/kvm</code> を足せますが、本文の出力は KVM なしで取ったものです。</p>
@@ -130,8 +132,8 @@ Linux で速くしたい人だけ <code>--device /dev/kvm</code> を足せます
 <li><code>lab env</code> の全文（外のコンテナで打つ）</li>
 </ol>
 <pre><code>$ lab env
-テーマ    : lab-linuc-network 1.0.0
-イメージ  : ghcr.io/chai0204/lab-linuc:network-1.0.0
+テーマ    : lab-linuc-network 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:network-1.0.1
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -153,7 +155,7 @@ docker volume rm lab-linuc-network-state     # 進捗も消す場合</code></pre
 <p>イメージは <code>docker rmi</code> で消せます。
 母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。</p>
 
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:a313bee9879c93ce7e87f6f58dcbebb2f753fd671235af9355b1607c484e909c / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / ifupdown 0.8.41 / network-manager 1.46.0 / net-tools 2.10 / iputils 20240117 / traceroute 2.1.5 / netcat-openbsd 1.226 / ncat 7.94 / bind9-dnsutils 9.18.39 / dnsmasq-base 2.91 / ipcalc 0.51 / systemd 255.4 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で演習7本を完走 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / ifupdown 0.8.41 / network-manager 1.46.0 / net-tools 2.10 / iputils 20240117 / traceroute 2.1.5 / netcat-openbsd 1.226 / ncat 7.94 / bind9-dnsutils 9.18.39 / dnsmasq-base 2.91 / ipcalc 0.51 / systemd 255.4 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で演習7本を完走 / 検証日 2026-10-13</div>
 
 <section id="comments">
 <h2>コメント</h2>

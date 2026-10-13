@@ -12,7 +12,7 @@
 </div>
 <h1>8. resolv.conf に書いた1行は、消される</h1>
 <p class="lead"><code>/etc/resolv.conf</code> に <code>nameserver 172.16.20.10</code> を1行足すと、名前が引けるようになる。ところが <code>systemd-resolved</code> を再起動すると、その行は跡形もなく消えている。書き込んだ先は <code>/etc</code> ではなく、systemd-resolved が起動のたびに作り直す <code>/run</code> の中のファイルだった。</p>
-<div class="badges"><span>前提: 第4章を終えている（172.16.20.10 に届く）</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.4（重要度2）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="badges"><span>前提: 第4章を終えている（172.16.20.10 に届く）</span><span>所要 19分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.4（重要度2）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>/etc/resolv.conf</code> の書き方（<code>nameserver</code> / <code>search</code>）と、Ubuntu での実体（127.0.0.53 の systemd-resolved）を説明できる</li><li><code>host</code> と <code>dig</code> で決まった DNS サーバに問い合わせ、答えの種類（NOERROR / NXDOMAIN / SERVFAIL / REFUSED）を読める</li><li>問い合わせ先の DNS サーバと検索ドメインを、再起動しても消えない形で設定できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: DNS サーバ側の設定（ゾーンファイル・再帰の仕組み。LinuC レベル2の範囲）、DNSSEC や DNS over TLS、<code>resolved.conf</code> の細かい項目（<code>DNS=</code> と <code>Domains=</code> だけで足りる）。クライアントとして「どこに聞くか」を決めるところまでを扱う。</div></div>
@@ -63,7 +63,7 @@ $ getent hosts server.lab.example; echo $?
 ; (1 server found)
 ;; global options: +cmd
 ;; Got answer:
-;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 40342
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 48758
 ;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
 
 ;; OPT PSEUDOSECTION:
@@ -74,9 +74,9 @@ $ getent hosts server.lab.example; echo $?
 ;; ANSWER SECTION:
 server.lab.example.	300	IN	A	172.16.20.10
 
-;; Query time: 5 msec
+;; Query time: 15 msec
 ;; SERVER: 172.16.20.10#53(172.16.20.10) (UDP)
-;; WHEN: Tue Oct 13 11:40:53 JST 2026
+;; WHEN: Tue Oct 13 19:27:29 JST 2026
 ;; MSG SIZE  rcvd: 63</code></pre>
 <div class="scroll"><table>
 <tr><th>部分</th><th>読み方</th></tr>
@@ -95,7 +95,8 @@ Aliases:
 
 server.lab.example has address 172.16.20.10
 server.lab.example has IPv6 address fd00:20::10</code></pre>
-<p><code>host</code> は種類を指定しないと IPv4（A）・IPv6（AAAA）・メールの受け先（MX）をまとめて聞き、あったものだけを表示する。<code>dig</code> は何も指定しなければ A だけを聞く。</p>
+<p><code>host</code> は種類を指定しないと IPv4（A）・IPv6（AAAA）・メールの受け先（MX）をまとめて聞き、あったものだけを表示する。<code>dig</code> は何も指定しなければ A だけを聞く。
+（古い解説には「host も種類を省くと A だけ」と書かれていることがある。この練習機の host（bind9-dnsutils 9.18）は、上の記録のとおり IPv6（AAAA）の答えも出している。）</p>
 
 <h2 id="append">1行足すと引けるようになり、そして消える</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>/etc/resolv.conf</code> に書き込んだ先が、どこだったか。</div>
@@ -155,11 +156,11 @@ $ printf 'nameserver 172.16.20.10\nsearch lab.example\n' | sudo tee /etc/resolv.
 nameserver 172.16.20.10
 search lab.example
 $ ls -l /etc/resolv.conf
--rw-r--r-- 1 root root 43 Oct 13 11:41 /etc/resolv.conf</code></pre>
+-rw-r--r-- 1 root root 43 Oct 13 19:27 /etc/resolv.conf</code></pre>
 <div class="scroll"><table>
 <tr><th>書き方</th><th>意味</th></tr>
-<tr><td><code>nameserver 172.16.20.10</code></td><td>問い合わせ先の DNS サーバ。3つまで書け、上から順に試す</td></tr>
-<tr><td><code>search lab.example</code></td><td>短い名前に付け足して試すドメイン（検索ドメイン）。複数並べられる</td></tr>
+<tr><td><code>nameserver 172.16.20.10</code></td><td>問い合わせ先の DNS サーバ。1行に1つ書き、3行まで書ける。上から順に試す</td></tr>
+<tr><td><code>search lab.example</code></td><td>短い名前に付け足して試すドメイン（検索ドメイン）。複数なら1行に空白で区切って並べる（2行に分けると後の行だけが効く。次の節で確かめる）</td></tr>
 <tr><td><code>domain lab.example</code></td><td>search の古い形（1つだけ）。search と両方書くと後に書いた方が効く</td></tr>
 <tr><td><code>options …</code></td><td>待ち時間や試す回数などの細かい指定（<code>timeout:</code> <code>attempts:</code> など）</td></tr>
 </table></div>
@@ -189,6 +190,25 @@ $ dig +short +search server
 <code>+search</code> を付けると search を使う。「dig で引けないから DNS に無い」とは限らない。</p>
 <div class="analogy"><b>たとえ</b>: 社内で「鈴木さん」と言えば同じ部の鈴木さんと分かる（host）が、外線の交換手（dig）は「鈴木さんという方は何社の？」と聞き返さず、そのまま「該当なし」と答える。
 <br>ただし<b>崩れる点</b>: 人は聞き返してくれることもあるが、dig は <code>+search</code> を付けない限り決して付け足さない。道具の決まりで、文脈は関係ない。</div>
+<p><code>search</code> に複数のドメインを書くときは、1行に空白で区切って並べる。行を分けて2行にすると、<b>後の行だけが効く</b>（<code>domain</code> の行と同じ決まりで、resolv.conf(5) に書いてある）。
+わざと2行に分けて確かめ、最後に元に戻す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ printf 'nameserver 172.16.20.10\nsearch lab.example\nsearch nosuch.lab.example\n' | sudo tee /etc/resolv.conf
+nameserver 172.16.20.10
+search lab.example
+search nosuch.lab.example
+$ host server
+Host server not found: 5(REFUSED)
+$ printf 'nameserver 172.16.20.10\nsearch nosuch.lab.example lab.example\n' | sudo tee /etc/resolv.conf
+nameserver 172.16.20.10
+search nosuch.lab.example lab.example
+$ host server
+server.lab.example has address 172.16.20.10
+server.lab.example has IPv6 address fd00:20::10
+$ printf 'nameserver 172.16.20.10\nsearch lab.example\n' | sudo tee /etc/resolv.conf
+nameserver 172.16.20.10
+search lab.example</code></pre>
+<p>2行のときは、2行目の nosuch.lab.example だけが使われ、1行目の lab.example は試されずに見つからなかった（<code>REFUSED</code> の意味は次の節で扱う。ここでは「引けなかった」と読めばよい）。
+1行に並べると前から順に試し、2つ目の lab.example で見つかった。<code>nameserver</code> はこれと違い、1行に1つずつ書く（3行まで。上から順に聞く）。</p>
 
 <h2 id="records">DNS の答えを読む</h2>
 <div class="sgoal"><b>この節で分かること</b>: 逆引き・MX・AAAA・CNAME と、答えが無いときの種類。</div>
@@ -214,6 +234,8 @@ Host example.com not found: 5(REFUSED)</code></pre>
 <tr><td><code>dig -x アドレス</code> / <code>host アドレス</code></td><td><b>逆引き</b>（アドレスから名前。<code>in-addr.arpa</code> の PTR レコード）</td></tr>
 <tr><td><code>dig MX</code> / <code>host -t MX</code></td><td>そのドメイン宛てのメールを受ける機械（数が小さいほど優先）</td></tr>
 <tr><td><code>dig AAAA</code></td><td>IPv6 アドレス（A は IPv4）</td></tr>
+<tr><td><code>dig -t 種類</code></td><td>種類を <code>-t</code> で指定する形（<code>dig -t MX</code> は <code>dig MX</code> と同じ）</td></tr>
+<tr><td><code>dig +tcp</code>（<code>+vc</code>）</td><td>TCP で聞く（既定は UDP）。<code>-p 番号</code> は問い合わせ先のポート番号</td></tr>
 <tr><td>CNAME</td><td>別名。web.lab.example は www.lab.example の別名で、dig は行き先の A まで一緒に返した</td></tr>
 <tr><td><code>3(NXDOMAIN)</code></td><td>その名前は存在しない（確かな答え）</td></tr>
 <tr><td><code>2(SERVFAIL)</code></td><td>サーバが答えを用意できなかった（この練習機では中継の先が無かった）</td></tr>
@@ -223,11 +245,31 @@ Host example.com not found: 5(REFUSED)</code></pre>
 「こちらではお答えできません」（REFUSED）。名前が無いと言っているのは1つ目だけである。
 <br>ただし<b>崩れる点</b>: 人の窓口は理由を添えて話してくれるが、DNS は番号1つしか返さない。
 SERVFAIL の理由（この練習機では中継の先が空だったこと）は、<code>resolvectl status</code> のように別の道具で調べるしかない。</div>
+<p>dig のオプションには2つの系統がある。<code>+</code> で始まるもの（聞き方の指定: <code>+short</code>・<code>+search</code>・<code>+tcp</code> など）と、
+<code>-</code> で始まるもの（<code>-t</code> 種類、<code>-p</code> ポート番号、<code>-x</code> 逆引き）である。DNS は既定で UDP を使い、<code>+tcp</code>（古い書き方は <code>+vc</code>）で TCP にできる。
+どちらで聞いたかは、答えの最後の <code>SERVER:</code> の行に出る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ dig server.lab.example | grep SERVER
+;; SERVER: 172.16.20.10#53(172.16.20.10) (UDP)
+$ dig +tcp server.lab.example | grep SERVER
+;; SERVER: 172.16.20.10#53(172.16.20.10) (TCP)
+$ dig +vc server.lab.example | grep SERVER
+;; SERVER: 172.16.20.10#53(172.16.20.10) (TCP)
+$ dig --tcp server.lab.example
+Invalid option: --tcp
+...
+$ dig +t server.lab.example
+Invalid option: +t
+...
+$ dig -t MX +short lab.example
+10 mail.lab.example.
+$ dig -p 53 +short @172.16.20.10 server.lab.example
+172.16.20.10</code></pre>
+<p><code>--tcp</code> や <code>+t</code> という形は無く、<code>Invalid option</code> で断られた。<code>-t MX</code> は <code>MX</code> と書くのと同じ、<code>-p 53</code> は問い合わせ先のポート番号（既定の 53）を指定している。</p>
 <p>名前が引けるようになったので、第5章の traceroute の表示も変わる。名前はアドレスの逆引きで、DNS サーバが答えている。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ traceroute 172.16.20.10
 traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
- 1  router.lab.example (192.168.10.1)  4.036 ms  0.231 ms  0.230 ms
- 2  server.lab.example (172.16.20.10)  0.609 ms  0.183 ms  0.185 ms</code></pre>
+ 1  router.lab.example (192.168.10.1)  2.152 ms  0.148 ms  0.093 ms
+ 2  server.lab.example (172.16.20.10)  0.242 ms  0.073 ms  0.058 ms</code></pre>
 <p>第5章では1番目が <code>_gateway</code>（systemd-resolved が付けた名前）、2番目は名前が付かなかった。答えている表が変わると、同じ道具の表示が変わる。</p>
 <div class="quiz"><b>確認</b>
 <p><code>/etc/resolv.conf</code> が次の内容のとき、<code>ping web</code> を打つと最初に問い合わせる名前はどれか（/etc/hosts には web の行が無いものとする）。</p>
@@ -249,7 +291,7 @@ host なら <code>host www.example.com 192.168.1.53</code>（サーバは2つ目
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/etc/resolv.conf</code> の <code>nameserver</code> は問い合わせ先（3つまで）、<code>search</code> は短い名前に付け足すドメイン</li><li>Ubuntu の既定では resolv.conf は /run へのリンクで、<code>127.0.0.53</code> は中継役の systemd-resolved。本当の問い合わせ先は <code>resolvectl status</code></li><li>リンクの先に書いた行は systemd-resolved が消す。残すなら resolv.conf をふつうのファイルにするか、resolved.conf に書く（<code>resolvectl</code> は再起動で消える）</li><li><code>dig @サーバ 名前</code>（<code>+short</code> / <code>-x</code> / <code>MX</code> / <code>AAAA</code>）と <code>host 名前 サーバ</code>（<code>-t MX</code>）。dig は search を使わない</li><li>NXDOMAIN は「無い」、SERVFAIL は「答えられない」、REFUSED は「断る」。引けないことと名前が無いことは別</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:a313bee9879c93ce7e87f6f58dcbebb2f753fd671235af9355b1607c484e909c / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ systemd 255.4（systemd-resolved）/ bind9-dnsutils 9.18.39（dig / host）/ dnsmasq-base 2.91（社内 DNS）/ traceroute 2.1.5 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ systemd 255.4（systemd-resolved）/ bind9-dnsutils 9.18.39（dig / host）/ dnsmasq-base 2.91（社内 DNS）/ traceroute 2.1.5 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-network/theory/07-ports">← 7. LISTEN していても、外からは入れない</a><a href="/linuc-network/theory/09-names">次: 9. dig と ping は、別の表を引いている →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

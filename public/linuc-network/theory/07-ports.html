@@ -12,9 +12,9 @@
 </div>
 <h1>7. LISTEN していても、外からは入れない</h1>
 <p class="lead"><code>ss</code> で見ると、練習機の 8080 番は <code>LISTEN</code> している。<code>curl http://127.0.0.1:8080/</code> には返事が来る。ところが同じ練習機の中から <code>192.168.10.2:8080</code> に接続すると、<code>Connection refused</code> で断られる。待っているのは「8080 番」ではなく「127.0.0.1 の 8080 番」だった。</p>
-<div class="badges"><span>前提: 第4章を終えている（サーバ 172.16.20.10 に届く）</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.1（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="badges"><span>前提: 第4章を終えている（サーバ 172.16.20.10 に届く）</span><span>所要 19分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.1（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>22・25・53・80・123・443 番が、どのサービスで TCP か UDP かを言える</li><li><code>ss</code> と <code>netstat</code> の待ち受けの表から、どのアドレスの何番で誰が待っているかを読める</li><li><code>nc</code> / <code>ncat</code> で TCP と UDP の待ち受けを確かめ、TCP（RST）と UDP（ICMP）の断られ方の違いを説明できる</li></ul>
+<ul><li>22・25・53・80・123・443 番が、どのサービスで TCP か UDP かを言える</li><li><code>ss</code> と <code>netstat</code> の待ち受けの表から、どのアドレスの何番で誰が待っているかを読める</li><li><code>nc</code> / <code>ncat</code> で TCP と UDP の待ち受けを確かめ、TCP（コネクション型。RST で断る）と UDP（コネクションレス型。ICMP で断られる）の違いを説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: TCP の状態の移り変わり全体（TIME_WAIT など）、<code>ss</code> の絞り込みの式（<code>sport = :8080</code> など）、ファイアウォールでの遮断（主題1.10）。待ち受けの表の読み方と、つながるかの確かめ方だけで足りる。</div></div>
 
 <h2 id="ports">番号の表と、待ち受けの表は別物</h2>
@@ -39,6 +39,18 @@ https		443/udp				# HTTP/3
 <tr><td>123</td><td>NTP（時刻合わせ）</td><td>UDP</td><td>サーバには無い（断られる）</td></tr>
 <tr><td>443</td><td>HTTPS（暗号化した Web）</td><td>TCP（HTTP/3 は UDP）</td><td>サーバには無い（断られる）</td></tr>
 </table></div>
+<p>出題範囲の6つのほかに、試験の選択肢によく並ぶ番号がある（範囲の外）。見て迷わないように、同じ辞書で引いておく。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ grep -E '^(pop3|imap2|snmp|snmp-trap|ldap|syslog)[[:space:]]' /etc/services
+pop3		110/tcp		pop-3		# POP version 3
+imap2		143/tcp		imap		# Interim Mail Access P 2 and 4
+snmp		161/tcp				# Simple Net Mgmt Protocol
+snmp		161/udp
+snmp-trap	162/tcp		snmptrap	# Traps for SNMP
+snmp-trap	162/udp		snmptrap
+ldap		389/tcp			# Lightweight Directory Access Protocol
+ldap		389/udp
+syslog		514/udp</code></pre>
+<p>110 POP3・143 IMAP（どちらもメールの受け取り。辞書の名前は imap2）、161 / 162 SNMP（機器の監視と、機器からの知らせ）、389 LDAP（利用者の名簿）、514 syslog（ログの転送。UDP）。</p>
 <p><code>/etc/services</code> は名前の辞書で、<b>そのポートが開いているかとは関係ない</b>。実際に待ち受けているものは <code>ss</code> で見る。
 <code>-t</code> TCP、<code>-u</code> UDP、<code>-l</code> 待ち受け（listen）だけ、<code>-n</code> 番号のまま、の組み合わせがよく出る。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ss -tuln
@@ -46,33 +58,73 @@ Netid State  Recv-Q Send-Q       Local Address:Port   Peer Address:Port Process
 udp   UNCONN 0      0               127.0.0.54:53          0.0.0.0:*
 udp   UNCONN 0      0            127.0.0.53%lo:53          0.0.0.0:*
 udp   UNCONN 0      0        10.0.2.15%enp0s16:68          0.0.0.0:*
-tcp   LISTEN 0      4096               0.0.0.0:22          0.0.0.0:*
 tcp   LISTEN 0      4096            127.0.0.54:53          0.0.0.0:*
-tcp   LISTEN 0      10               127.0.0.1:8080        0.0.0.0:*
 tcp   LISTEN 0      4096         127.0.0.53%lo:53          0.0.0.0:*
+tcp   LISTEN 0      10               127.0.0.1:8080        0.0.0.0:*
+tcp   LISTEN 0      4096               0.0.0.0:22          0.0.0.0:*
 tcp   LISTEN 0      4096                  [::]:22             [::]:*</code></pre>
 <p>大事なのは <b>Local Address:Port</b> の列である。<code>0.0.0.0:22</code> は「この機械の IPv4 のどのアドレス宛てでも 22 番で受ける」、<code>[::]:22</code> は IPv6 の同じ意味。
 <code>127.0.0.53%lo:53</code> は systemd-resolved（第8章）で、ループバックにしか開いていない。UDP の 68 番は DHCP クライアント。
-行の並び順は毎回変わることがあり、列の間隔は端末の幅で変わる（この記録は 80 桁の端末）。誰が待っているかは <code>-p</code> で出るが、他人のプロセスを見るので root が要る。</p>
+行の並び順は毎回変わることがあり、列の間隔は端末の幅で変わる（この記録は 80 桁の端末）。誰が待っているかは <code>-p</code> で出る。
+ここで待っているのは root やシステムのユーザが動かしているプロセスなので、見るには root が要る（<code>sudo</code>）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo ss -tulnp
 Netid  State   Recv-Q  Send-Q         Local Address:Port     Peer Address:Port  Process
-udp    UNCONN  0       0                 127.0.0.54:53            0.0.0.0:*      users:(("systemd-resolve",pid=917,fd=16))
-udp    UNCONN  0       0              127.0.0.53%lo:53            0.0.0.0:*      users:(("systemd-resolve",pid=917,fd=14))
-udp    UNCONN  0       0          10.0.2.15%enp0s16:68            0.0.0.0:*      users:(("systemd-network",pid=205,fd=23))
-tcp    LISTEN  0       4096                 0.0.0.0:22            0.0.0.0:*      users:(("sshd",pid=661,fd=3),("systemd",pid=1,fd=155))
-tcp    LISTEN  0       4096              127.0.0.54:53            0.0.0.0:*      users:(("systemd-resolve",pid=917,fd=17))
-tcp    LISTEN  0       10                 127.0.0.1:8080          0.0.0.0:*      users:(("ncat",pid=830,fd=3))
-tcp    LISTEN  0       4096           127.0.0.53%lo:53            0.0.0.0:*      users:(("systemd-resolve",pid=917,fd=15))
-tcp    LISTEN  0       4096                    [::]:22               [::]:*      users:(("sshd",pid=661,fd=4),("systemd",pid=1,fd=156))
+udp    UNCONN  0       0                 127.0.0.54:53            0.0.0.0:*      users:(("systemd-resolve",pid=920,fd=16))
+udp    UNCONN  0       0              127.0.0.53%lo:53            0.0.0.0:*      users:(("systemd-resolve",pid=920,fd=14))
+udp    UNCONN  0       0          10.0.2.15%enp0s16:68            0.0.0.0:*      users:(("systemd-network",pid=209,fd=23))
+tcp    LISTEN  0       4096              127.0.0.54:53            0.0.0.0:*      users:(("systemd-resolve",pid=920,fd=17))
+tcp    LISTEN  0       4096           127.0.0.53%lo:53            0.0.0.0:*      users:(("systemd-resolve",pid=920,fd=15))
+tcp    LISTEN  0       10                 127.0.0.1:8080          0.0.0.0:*      users:(("ncat",pid=832,fd=3))
+tcp    LISTEN  0       4096                 0.0.0.0:22            0.0.0.0:*      users:(("sshd",pid=530,fd=3),("systemd",pid=1,fd=165))
+tcp    LISTEN  0       4096                    [::]:22               [::]:*      users:(("sshd",pid=530,fd=4),("systemd",pid=1,fd=166))
 $ sudo netstat -tulnp
 Active Internet connections (only servers)
 Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name
-tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      1/init
 ...
-tcp        0      0 127.0.0.1:8080          0.0.0.0:*               LISTEN      830/ncat
+tcp        0      0 127.0.0.1:8080          0.0.0.0:*               LISTEN      832/ncat
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      1/init
 ...</code></pre>
 <p>22 番には sshd と systemd（PID 1）の2つが並ぶ。Ubuntu 24.04 は ssh をソケット起動にしていて、待ち受けの口を systemd が開け、接続が来たら sshd に渡している。
 <code>netstat</code> は1つしか出さず、<code>1/init</code>（PID 1 の名前）と表示した。同じ表でも、道具によって見せ方が違う（PID の番号はあなたの画面では違う）。</p>
+<p><code>netstat</code> も <code>ss</code> も、<code>-l</code> なら待ち受けだけ、<code>-a</code>（all）なら待ち受けと接続中の全部、<b>どちらも付けなければ接続中だけ</b>を出す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ netstat -tn
+Active Internet connections (w/o servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State
+tcp        0      0 10.0.2.15:22            10.0.2.2:57324          ESTABLISHED
+$ netstat -tan
+Active Internet connections (servers and established)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State
+tcp        0      0 127.0.0.54:53           0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.1:8080          0.0.0.0:*               LISTEN
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN
+tcp        0      0 10.0.2.15:22            10.0.2.2:57354          ESTABLISHED
+tcp6       0      0 :::22                   :::*                    LISTEN</code></pre>
+<p>接続中の1本は、いま打っている ssh そのもの（10.0.2.2 は外のコンテナ。相手側の番号は接続のたびに変わる）。
+短いオプションは束ねて書ける。<code>-tan</code> は <code>-t -a -n</code> である。だから <code>-tcp</code> は「TCP」ではなく、<code>-t -c -p</code> の3つになる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ timeout 2 netstat -tcp; echo $?
+(No info could be read for "-p": geteuid()=1000 but you should be root.)
+Active Internet connections (w/o servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name
+tcp        0    260 linuc:ssh               10.0.2.2:36294          ESTABLISHED -
+(No info could be read for "-p": geteuid()=1000 but you should be root.)
+Active Internet connections (w/o servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name
+tcp        0      0 linuc:ssh               10.0.2.2:36294          ESTABLISHED -
+124</code></pre>
+<p><code>-c</code>（continuous）が入ったので、1秒ごとに表を出し続けた（Ctrl+C まで終わらない。ここでは <code>timeout</code> で2秒で止めたので、終了コードが 124）。
+<code>-p</code> も入ったが、root でないので「プロセスの情報を読めない」と言っている。TCP だけを出す長い形は <code>--tcp</code>（<code>-t</code> と同じ）。<code>-n</code> が無いので、アドレスと番号が名前（<code>linuc:ssh</code>）に置き換わっている（相手側の番号と Send-Q の数は打つたびに違う）。</p>
+<p><code>-p</code> に root が要るのは、<b>ほかのユーザのプロセス</b>を見るときだけである。自分で動かしたプロセスなら、sudo なしでも出る。
+自分で 9000 番の待ち受けを1つ作って（<code>ncat -lk 9000 &amp;</code>）、sudo なしで比べる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ncat -lk 9000 &amp; sleep 1; ss -tlnp | grep -E 'State|8080|9000'; kill %1; wait
+[1] 4125
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+LISTEN 0      10         127.0.0.1:8080      0.0.0.0:*
+LISTEN 0      10           0.0.0.0:9000      0.0.0.0:*    users:(("ncat",pid=4125,fd=4))
+LISTEN 0      10              [::]:9000         [::]:*    users:(("ncat",pid=4125,fd=3))
+[1]+  Terminated              ncat -lk 9000</code></pre>
+<p>自分の ncat（9000 番）には <code>users:((&quot;ncat&quot;,…))</code> が付き、root が動かしている掲示板（8080 番）には付かない。
+<code>[1] …</code> と <code>Terminated</code> の行は、bash が裏で動かしたジョブの始まりと終わりを知らせたもの（番号は毎回違う）。</p>
 <div class="analogy"><b>たとえ</b>: <code>/etc/services</code> は電話帳の「部署名と内線番号の一覧」、<code>ss -l</code> は「いま実際に電話機がつながっている内線」の一覧に近い。
 電話帳に載っていても、電話機が無ければ誰も出ない。
 <br>ただし<b>崩れる点</b>: 内線は誰がかけても同じ電話機が鳴るが、待ち受けは<b>どのアドレス宛てに来たか</b>まで決まっている。次の節がそれである。</div>
@@ -133,12 +185,12 @@ lab-board: no news today</code></pre>
 <p>サーバ（172.16.20.10）が待ち受けているものを、サーバの中で見る。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo ip netns exec server ss -tulnp
 Netid   State    Recv-Q   Send-Q     Local Address:Port     Peer Address:Port   Process
-udp     UNCONN   0        0           172.16.20.10:53            0.0.0.0:*       users:(("dnsmasq",pid=828,fd=4))
-udp     UNCONN   0        0          [fd00:20::10]:53               [::]:*       users:(("dnsmasq",pid=828,fd=6))
-tcp     LISTEN   0        10               0.0.0.0:80            0.0.0.0:*       users:(("ncat",pid=829,fd=4))
-tcp     LISTEN   0        32          172.16.20.10:53            0.0.0.0:*       users:(("dnsmasq",pid=828,fd=5))
-tcp     LISTEN   0        32         [fd00:20::10]:53               [::]:*       users:(("dnsmasq",pid=828,fd=7))
-tcp     LISTEN   0        10                  [::]:80               [::]:*       users:(("ncat",pid=829,fd=3))</code></pre>
+udp     UNCONN   0        0           172.16.20.10:53            0.0.0.0:*       users:(("dnsmasq",pid=830,fd=4))
+udp     UNCONN   0        0          [fd00:20::10]:53               [::]:*       users:(("dnsmasq",pid=830,fd=6))
+tcp     LISTEN   0        10               0.0.0.0:80            0.0.0.0:*       users:(("ncat",pid=831,fd=4))
+tcp     LISTEN   0        32          172.16.20.10:53            0.0.0.0:*       users:(("dnsmasq",pid=830,fd=5))
+tcp     LISTEN   0        10                  [::]:80               [::]:*       users:(("ncat",pid=831,fd=3))
+tcp     LISTEN   0        32         [fd00:20::10]:53               [::]:*       users:(("dnsmasq",pid=830,fd=7))</code></pre>
 <p>DNS（53）は UDP と TCP の両方、Web（80）は TCP。<code>nc -z</code> で外から確かめる（<code>-z</code> は接続だけ試してデータを送らない、<code>-v</code> は結果を言う）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ nc -zv 172.16.20.10 80
 Connection to 172.16.20.10 80 port [tcp/http] succeeded!
@@ -168,22 +220,22 @@ Ncat: Connection refused.</code></pre>
 <p>誰もいない UDP の 123 番に対して、<code>nc</code> は<b>何も表示せず</b>終了コード 1 で終わった。<code>ncat</code> は「Connected（つながった）」と言ってから「Connection refused」と言い直した。
 UDP には接続というものが無いので、送った時点では断られたか分からない。何が起きているかをパケットで見る。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo tcpdump -l -n -t -i lab0 -c 2 "tcp port 25" 2&gt;/dev/null &amp; sleep 2; nc -zv 172.16.20.10 25; wait
-[1] 3942
+[1] 4357
 nc: connect to 172.16.20.10 port 25 (tcp) failed: Connection refused
-IP 192.168.10.2.39238 &gt; 172.16.20.10.25: Flags [S], seq 1717338176, win 64240, options [mss 1460,sackOK,TS val 4041209353 ecr 0,nop,wscale 7], length 0
-IP 172.16.20.10.25 &gt; 192.168.10.2.39238: Flags [R.], seq 0, ack 1717338177, win 0, length 0
+IP 192.168.10.2.39746 &gt; 172.16.20.10.25: Flags [S], seq 1877148124, win 64240, options [mss 1460,sackOK,TS val 1756137218 ecr 0,nop,wscale 7], length 0
+IP 172.16.20.10.25 &gt; 192.168.10.2.39746: Flags [R.], seq 0, ack 1877148125, win 0, length 0
 [1]+  Done                    sudo tcpdump -l -n -t -i lab0 -c 2 "tcp port 25" 2&gt; /dev/null
 $ sudo tcpdump -l -n -t -i lab0 -c 2 "port 123 or icmp" 2&gt;/dev/null &amp; sleep 2; nc -zuv 172.16.20.10 123; wait
-[1] 3959
-IP 192.168.10.2.49972 &gt; 172.16.20.10.123: NTPv3, unspecified, length 1
+[1] 4374
+IP 192.168.10.2.45100 &gt; 172.16.20.10.123: NTPv3, unspecified, length 1
 IP 172.16.20.10 &gt; 192.168.10.2: ICMP 172.16.20.10 udp port 123 unreachable, length 37
 [1]+  Done                    sudo tcpdump -l -n -t -i lab0 -c 2 "port 123 or icmp" 2&gt; /dev/null
 $ sudo tcpdump -l -n -t -i lab0 -c 3 "tcp port 80" 2&gt;/dev/null &amp; sleep 2; nc -zv 172.16.20.10 80; wait
-[1] 3976
+[1] 4391
 Connection to 172.16.20.10 80 port [tcp/http] succeeded!
-IP 192.168.10.2.54568 &gt; 172.16.20.10.80: Flags [S], seq 1582733727, win 64240, options [mss 1460,sackOK,TS val 4041216602 ecr 0,nop,wscale 7], length 0
-IP 172.16.20.10.80 &gt; 192.168.10.2.54568: Flags [S.], seq 3013205994, ack 1582733728, win 65160, options [mss 1460,sackOK,TS val 3476493701 ecr 4041216602,nop,wscale 7], length 0
-IP 192.168.10.2.54568 &gt; 172.16.20.10.80: Flags [.], ack 1, win 502, options [nop,nop,TS val 4041216608 ecr 3476493701], length 0
+IP 192.168.10.2.35608 &gt; 172.16.20.10.80: Flags [S], seq 1622968839, win 64240, options [mss 1460,sackOK,TS val 1756144014 ecr 0,nop,wscale 7], length 0
+IP 172.16.20.10.80 &gt; 192.168.10.2.35608: Flags [S.], seq 2592296506, ack 1622968840, win 65160, options [mss 1460,sackOK,TS val 577590927 ecr 1756144014,nop,wscale 7], length 0
+IP 192.168.10.2.35608 &gt; 172.16.20.10.80: Flags [.], ack 1, win 502, options [nop,nop,TS val 1756144016 ecr 577590927], length 0
 [1]+  Done                    sudo tcpdump -l -n -t -i lab0 -c 3 "tcp port 80" 2&gt; /dev/null</code></pre>
 <p>（ポート番号・seq・TS の数は毎回変わる。行の順番も前後することがある。<code>[1] …</code> と <code>[1]+ Done …</code> は、裏に回した tcpdump の始まりと終わりを bash が知らせる行で、tcpdump の出力ではない。第5章と同じ。）</p>
 <ul><li><b>TCP の 25 番</b>: 接続の申し込み（<code>[S]</code> = SYN）に、サーバのカーネルが <code>[R.]</code>（RST = お断り）を返した。<code>nc</code> の Connection refused はこれ</li>
@@ -192,12 +244,15 @@ UDP 自身には断る仕組みが無く、断りは ICMP が運ぶ</li>
 <li><b>TCP の 80 番</b>: SYN → SYN+ACK（<code>[S.]</code>）→ ACK（<code>[.]</code>）の3通で接続ができた（<b>3ウェイハンドシェイク</b>）。<code>-z</code> はここで切る</li></ul>
 <div class="scroll"><table>
 <tr><th></th><th>TCP</th><th>UDP</th><th>ICMP</th></tr>
-<tr><td>接続</td><td>3ウェイハンドシェイクで作る</td><td>無い（1通ずつ投げる）</td><td>無い</td></tr>
-<tr><td>届いたかの確認・順番</td><td>する（再送・並べ替え）</td><td>しない</td><td>しない</td></tr>
+<tr><td>接続</td><td><b>コネクション型</b>。3ウェイハンドシェイクで接続を作ってから送る</td><td><b>コネクションレス型</b>。接続を作らず1通ずつ投げる</td><td>無い</td></tr>
+<tr><td>届いたかの確認・順番</td><td>する（届いたかの確認・再送・順番の並べ替え・フロー制御）。<b>信頼性</b>が高い</td><td>しない。確かめを省くぶん遅れが小さく、<b>リアルタイム性</b>が高い</td><td>しない</td></tr>
+<tr><td>ブロードキャスト・マルチキャスト</td><td>できない（相手は接続した1台）</td><td>できる（DHCP はブロードキャストで DHCP サーバを探す）</td><td>—</td></tr>
 <tr><td>ポート番号</td><td>ある</td><td>ある</td><td><b>無い</b></td></tr>
 <tr><td>誰もいない番号に送ると</td><td>RST で即座に断られる</td><td>ICMP port unreachable が返る（返らないこともある）</td><td>—</td></tr>
-<tr><td>使う例</td><td>SSH・SMTP・HTTP・HTTPS</td><td>DNS・NTP・DHCP</td><td>ping、届かないことの知らせ（第4・5章）</td></tr>
+<tr><td>使う例</td><td>SSH・SMTP・HTTP・HTTPS</td><td>DNS・NTP・DHCP・音声通話</td><td>ping、届かないことの知らせ（第4・5章）</td></tr>
 </table></div>
+<p>試験では「TCP はコネクション型で信頼性が高い、UDP はコネクションレス型でリアルタイム性が高い」「ブロードキャストやマルチキャストができるのは UDP」の形で問われる。
+この節の記録の言葉で言い直すと、TCP は接続を作る3通（SYN → SYN+ACK → ACK）を交わしてから送り、UDP はいきなり1通を投げていた。</p>
 <p>UDP の「返らないこともある」が大事である。断りの ICMP をファイアウォールが止めていると、閉じた番号でも何も返らず、<code>nc -zu</code> は開いているのと区別できない。
 UDP の待ち受けを確かめるいちばん確かな方法は、相手の機械で <code>ss -uln</code> を見ることである。</p>
 <div class="analogy"><b>たとえ</b>: TCP は電話、UDP はハガキに近い。電話は相手が出なければその場で分かるが、ハガキは投函した時点では届いたか分からない。
@@ -214,8 +269,8 @@ SSH・SMTP・HTTP は TCP。HTTPS（443）は TCP で、HTTP/3 だけは UDP を
 判定は、判定の中で router から <code>http://192.168.10.2:8080/</code> を実際に取りに行く。</div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>22 SSH / 25 SMTP / 80 HTTP / 443 HTTPS は TCP、123 NTP は UDP、53 DNS は UDP と TCP の両方</li><li><code>/etc/services</code> は番号の辞書。開いているかは <code>ss -tuln</code>（<code>netstat -tuln</code>）で見る。<code>-p</code> でプロセス（root が要る）</li><li>Local Address が <code>127.0.0.1</code> なら、その機械の中からしか入れない。<code>0.0.0.0</code> / <code>[::]</code> なら全部のアドレスで受ける</li><li>TCP の閉じた番号は RST で即座に断られる。UDP の閉じた番号は ICMP の port unreachable でしか分からない（<code>nc -zu</code> は何も言わない）</li><li>ICMP にはポートが無い。ping は ICMP なので、ping が通ってもポートが開いているとは限らない</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:a313bee9879c93ce7e87f6f58dcbebb2f753fd671235af9355b1607c484e909c / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / net-tools 2.10 / netcat-openbsd 1.226 / ncat 7.94 / dnsmasq-base 2.91 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>22 SSH / 25 SMTP / 80 HTTP / 443 HTTPS は TCP、123 NTP は UDP、53 DNS は UDP と TCP の両方</li><li><code>/etc/services</code> は番号の辞書。開いているかは <code>ss -tuln</code>（<code>netstat -tuln</code>）で見る。<code>-p</code> でプロセス（自分のプロセスは sudo なしでも出る。他のユーザのものまで見るには root）</li><li>TCP はコネクション型（信頼性）、UDP はコネクションレス型（リアルタイム性。ブロードキャスト・マルチキャストもできる）</li><li>Local Address が <code>127.0.0.1</code> なら、その機械の中からしか入れない。<code>0.0.0.0</code> / <code>[::]</code> なら全部のアドレスで受ける</li><li>TCP の閉じた番号は RST で即座に断られる。UDP の閉じた番号は ICMP の port unreachable でしか分からない（<code>nc -zu</code> は何も言わない）</li><li>ICMP にはポートが無い。ping は ICMP なので、ping が通ってもポートが開いているとは限らない</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / net-tools 2.10 / netcat-openbsd 1.226 / ncat 7.94 / dnsmasq-base 2.91 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-network/theory/06-ipv6">← 6. IPv6 のアドレスは、頼まなくても付いている</a><a href="/linuc-network/theory/08-dns">次: 8. resolv.conf に書いた1行は、消される →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

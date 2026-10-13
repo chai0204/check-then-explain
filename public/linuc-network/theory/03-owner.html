@@ -12,10 +12,10 @@
 </div>
 <h1>3. ifup は、自分が付けたものしか知らない</h1>
 <p class="lead">第2章で手で付けた 10.0.3.50/24 を、そのまま設定ファイルに書いて <code>ifup</code> する。ファイルの中身と今の状態はまったく同じなのに、<code>ifup</code> は失敗し、<code>ifdown</code> は「設定されていない」と言う。ifupdown が見ているのは NIC ではなく、自分の作業記録だからだ。NIC には「持ち主」がいて、持ち主の道具でしか設定は残らない。</p>
-<div class="badges"><span>前提: 第2章を終えている（enp0s17 に 10.0.3.50/24 が付いている）</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.2（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="badges"><span>前提: 第2章を終えている（enp0s17 に 10.0.3.50/24 が付いている）</span><span>所要 21分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.2（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>/etc/network/interfaces</code> の書式（<code>auto</code> / <code>iface … inet static</code> / <code>address</code> / <code>gateway</code> / <code>inet dhcp</code>）を読み書きし、<code>ifup</code> / <code>ifdown</code> で反映できる</li><li><code>nmcli</code> で接続（プロファイル）を作り、DHCP による自動の設定と固定の設定を切り替えられる</li><li>NIC ごとの持ち主（ifupdown / NetworkManager / systemd-networkd）を見分け、持ち主に合った道具を選べる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: NetworkManager の画面の道具（<code>nmtui</code> や GUI）、Wi-Fi・ボンディング・VLAN の設定、netplan の YAML の細かい書き方、RHEL の古い <code>ifcfg-*</code> ファイル。持ち主の見分け方と、ifupdown・nmcli の基本の操作だけで足りる。</div></div>
+<ul><li><code>/etc/network/interfaces</code> の書式（<code>auto</code> / <code>iface … inet static</code> / <code>address</code> / <code>gateway</code> / <code>inet dhcp</code>）を読み書きし、<code>ifup</code> / <code>ifdown</code> で反映できる。RHEL 系の <code>ifcfg-名前</code> の書き方と対応させられる</li><li><code>nmcli</code> で接続（プロファイル）を作り、DHCP による自動の設定と固定の設定を切り替えられる</li><li>NIC ごとの持ち主（ifupdown / NetworkManager / systemd-networkd）を見分け、持ち主に合った道具を選べる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: NetworkManager の画面の道具（<code>nmtui</code> や GUI）、Wi-Fi・ボンディング・VLAN の設定、netplan の YAML の細かい書き方。持ち主の見分け方と、ifupdown・nmcli の基本の操作、RHEL 系の ifcfg ファイルとの対応だけで足りる。</div></div>
 
 <h2 id="file">ifupdown は、設定ファイルを読んで実行する</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>/etc/network/interfaces</code> の読み方と、<code>ifup</code> が何を読むか。</div>
@@ -45,7 +45,7 @@ iface lab0 inet6 auto
 <div class="scroll"><table>
 <tr><th>行</th><th>意味</th></tr>
 <tr><td><code>source /etc/network/interfaces.d/*</code></td><td>このディレクトリのファイルも、ここに書いたものとして読む</td></tr>
-<tr><td><code>auto lab0</code></td><td>起動時（<code>networking.service</code> が打つ <code>ifup -a</code>）に上げる NIC</td></tr>
+<tr><td><code>auto lab0</code></td><td>起動時（<code>networking.service</code> が打つ <code>ifup -a</code>）に上げる NIC。<code>allow-hotplug lab0</code> と書くと、NIC が見つかったとき（起動時も含む）に上げる</td></tr>
 <tr><td><code>iface lab0 inet static</code></td><td>lab0 の IPv4 を固定（static）で設定する。DHCP なら <code>inet dhcp</code></td></tr>
 <tr><td><code>address 192.168.10.2/24</code></td><td>付けるアドレス（<code>netmask 255.255.255.0</code> と分けて書く形もある）</td></tr>
 <tr><td><code>gateway 192.168.10.254</code></td><td>デフォルトルートの行き先（第4章で、これが問題になる）</td></tr>
@@ -113,11 +113,11 @@ $ ip addr show enp0s17
 $ sudo ifup enp0s17
 $ ping -c 1 10.0.3.2
 PING 10.0.3.2 (10.0.3.2) 56(84) bytes of data.
-64 bytes from 10.0.3.2: icmp_seq=1 ttl=255 time=4.30 ms
+64 bytes from 10.0.3.2: icmp_seq=1 ttl=255 time=3.35 ms
 
 --- 10.0.3.2 ping statistics ---
 1 packets transmitted, 1 received, 0% packet loss, time 0ms
-rtt min/avg/max/mdev = 4.297/4.297/4.297/0.000 ms</code></pre>
+rtt min/avg/max/mdev = 3.349/3.349/3.349/0.000 ms</code></pre>
 <p>これで enp0s17 は再起動しても 10.0.3.50/24 になる。起動時に <code>networking.service</code> が <code>ifup -a</code> を打ち、<code>auto</code> の付いた NIC を上げるからである。</p>
 <div class="analogy"><b>たとえ</b>: 手順書どおりに作業し、作業日誌を付ける作業員に近い。
 <code>ifup</code> は手順書（<code>/etc/network/interfaces</code>）の作業をして日誌に「enp0s17 済」と書き、<code>ifdown</code> は日誌に書いた作業だけを片付ける。
@@ -141,6 +141,20 @@ enp0s17: adding route to 10.0.3.0/24
 <p>DHCP サーバ（10.0.3.2）から 10.0.3.15 を 86400 秒（1日）借りた。<code>ifup</code> の出力は dhcpcd のものである。
 試すなら全章を終えてからにし、終わったら外で <code>vm reset --yes</code> で練習機を戻せる。</p>
 
+<h3 id="ifcfg">RHEL 系の ifup は、ifcfg ファイルを読む</h3>
+<p><code>ifup</code> / <code>ifdown</code> という名前のコマンドは RHEL・CentOS にもある。ただし読むファイルが違い、
+<code>/etc/sysconfig/network-scripts/ifcfg-&lt;NIC の名前&gt;</code> に、1つの NIC を1つのファイルで「名前=値」の形で書く
+（RHEL 8 以降の <code>ifup</code> / <code>ifdown</code> は、中で nmcli を呼んでこのファイルを読ませる形に変わった）。
+この練習機（Ubuntu）にはこのファイルが無いので記録は無いが、試験には両方の形が出る。同じ設定を並べる。</p>
+<div class="scroll"><table>
+<tr><th>Debian 系（/etc/network/interfaces）</th><th>RHEL 系（ifcfg-enp0s17）</th><th>意味</th></tr>
+<tr><td><code>auto enp0s17</code></td><td><code>ONBOOT=yes</code></td><td>起動時に上げる</td></tr>
+<tr><td><code>iface enp0s17 inet static</code></td><td><code>BOOTPROTO=none</code>（<code>static</code> とも書く）</td><td>IPv4 を固定で設定する</td></tr>
+<tr><td><code>iface enp0s17 inet dhcp</code></td><td><code>BOOTPROTO=dhcp</code></td><td>DHCP で借りる</td></tr>
+<tr><td><code>address 10.0.3.50/24</code></td><td><code>IPADDR=10.0.3.50</code> と <code>PREFIX=24</code>（または <code>NETMASK=255.255.255.0</code>）</td><td>付けるアドレスとマスク</td></tr>
+<tr><td><code>gateway 10.0.3.2</code></td><td><code>GATEWAY=10.0.3.2</code>（機械全体の既定は <code>/etc/sysconfig/network</code> にも書ける）</td><td>デフォルトルートの行き先</td></tr>
+</table></div>
+
 <h2 id="nm">NetworkManager は、持っている NIC にしか効かない</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>nmcli</code> の device と connection、自動（DHCP）と固定の切り替え。</div>
 <p>enp0s18 は NetworkManager の持ち物である。NetworkManager に、知っている NIC を聞く。</p>
@@ -162,7 +176,7 @@ $ nmcli connection show</code></pre>
 nmcli では、NIC（device）に「接続」という設定のひとまとまり（プロファイル）を作って当てはめ、それを有効にする（up）。
 アドレスの方式を指定しなければ DHCP（<code>ipv4.method auto</code>）になる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo nmcli connection add type ethernet ifname enp0s18 con-name lab-dhcp
-Connection 'lab-dhcp' (585c3a5c-f14b-45bc-8a9c-2f3829d58102) successfully added.
+Connection 'lab-dhcp' (05dc1bbb-f1bd-45e9-a3d3-7372556b74fe) successfully added.
 $ nmcli -f NAME,TYPE,DEVICE connection show
 NAME      TYPE      DEVICE
 lab-dhcp  ethernet  enp0s18
@@ -178,7 +192,7 @@ lo       loopback  unmanaged  --
 $ ip -4 addr show enp0s18
 4: enp0s18: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
     inet 10.0.4.15/24 brd 10.0.4.255 scope global dynamic noprefixroute enp0s18
-       valid_lft 86397sec preferred_lft 86397sec</code></pre>
+       valid_lft 86398sec preferred_lft 86398sec</code></pre>
 <p>DHCP サーバから 10.0.4.15/24 を借りた（<code>dynamic</code> と、減っていく残り時間 <code>valid_lft</code>。UUID と秒数はあなたの画面では違う）。
 NetworkManager は DHCP クライアントを自分の中に持っている。何を受け取ったかは nmcli で見られる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ nmcli -f IP4 device show enp0s18
@@ -192,7 +206,7 @@ DHCP で「つながった」からといって、デフォルトルートや DN
 $ ip -4 addr show enp0s18
 4: enp0s18: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
     inet 10.0.4.15/24 brd 10.0.4.255 scope global dynamic noprefixroute enp0s18
-       valid_lft 86387sec preferred_lft 86387sec
+       valid_lft 86389sec preferred_lft 86389sec
 $ sudo nmcli connection up lab-dhcp
 Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/3)
 $ ip -4 addr show enp0s18
@@ -212,9 +226,10 @@ auto
 yes</code></pre>
 <p><code>connection.autoconnect</code> が <code>yes</code> なので、再起動すれば NetworkManager がこの接続を自動で上げる。設定はどこに残ったか。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls /etc/netplan/
-01-lab-mgmt.yaml  90-NM-585c3a5c-f14b-45bc-8a9c-2f3829d58102.yaml</code></pre>
+01-lab-mgmt.yaml  90-NM-05dc1bbb-f1bd-45e9-a3d3-7372556b74fe.yaml</code></pre>
 <p>Ubuntu の NetworkManager は、nmcli で作った接続を netplan の YAML（<code>90-NM-&lt;UUID&gt;.yaml</code>）として保存する。
-RHEL 系なら <code>/etc/NetworkManager/system-connections/</code> に置かれる。どちらでも、nmcli から見れば同じ接続である。</p>
+RHEL 9 以降の既定では <code>/etc/NetworkManager/system-connections/</code> に置かれ、RHEL 8 までは前の節の <code>ifcfg-&lt;名前&gt;</code> のファイルとして置かれる。
+どれでも、nmcli から見れば同じ接続である。</p>
 <div class="analogy"><b>たとえ</b>: 車のメモリーシートに近い。座席や鏡の位置を「プロファイル」として覚えさせ、ボタン1つで呼び出す。
 <code>connection add</code> が覚えさせる操作、<code>connection up</code> が呼び出す操作である。
 <br>ただし<b>崩れる点</b>: メモリーシートは記憶を書き換えた瞬間に座席が動くことが多いが、<code>nmcli connection modify</code> は記憶を書き換えるだけで、
@@ -229,6 +244,49 @@ D. <code>/etc/network/interfaces</code> に書いて <code>ifup office</code></p
 <p>B。<code>modify</code> は接続の設定を書き換えるだけなので、<code>up</code> し直して反映させる。
 <code>ipv4.method</code> を <code>manual</code> にしないと、DHCP（auto）のまま固定のアドレスが足される形になる。
 D は ifupdown の方法で、NetworkManager の持ち物の NIC には使わない。</p></details></div>
+
+<h3 id="nmcli-objects">nmcli の最初の語（オブジェクト）</h3>
+<p>nmcli も ip と同じく <code>nmcli [オプション] オブジェクト コマンド</code> の形で打つ。ここまで使ったのは <code>device</code> と <code>connection</code> の2つで、全部で7つある。nmcli 自身に聞ける。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ nmcli --help
+Usage: nmcli [OPTIONS] OBJECT { COMMAND | help }
+...
+OBJECT
+  g[eneral]       NetworkManager's general status and operations
+  n[etworking]    overall networking control
+  r[adio]         NetworkManager radio switches
+  c[onnection]    NetworkManager's connections
+  d[evice]        devices managed by NetworkManager
+  a[gent]         NetworkManager secret agent or polkit agent
+  m[onitor]       monitor NetworkManager changes</code></pre>
+<div class="scroll"><table>
+<tr><th>オブジェクト</th><th>扱うもの</th><th>例</th></tr>
+<tr><td><code>general</code></td><td>NetworkManager 全体の状態・ホスト名・権限・ログ</td><td><code>nmcli general status</code> / <code>nmcli general hostname 名前</code></td></tr>
+<tr><td><code>networking</code></td><td>NetworkManager が持つ NIC 全部の有効・無効</td><td><code>nmcli networking off</code></td></tr>
+<tr><td><code>radio</code></td><td>無線（Wi-Fi・携帯の回線）のスイッチ</td><td><code>nmcli radio wifi off</code></td></tr>
+<tr><td><code>connection</code></td><td>接続（プロファイル）</td><td><code>add</code> / <code>up</code> / <code>down</code> / <code>modify</code> / <code>show</code></td></tr>
+<tr><td><code>device</code></td><td>NIC</td><td><code>status</code> / <code>show</code> / <code>connect</code> / <code>disconnect</code></td></tr>
+<tr><td><code>agent</code></td><td>パスワードを尋ねる係（Wi-Fi の鍵など）</td><td>—</td></tr>
+<tr><td><code>monitor</code></td><td>状態の変化を見張って表示し続ける（Ctrl+C で止める）</td><td><code>nmcli monitor</code></td></tr>
+</table></div>
+<p><code>general</code> の後ろに置けるコマンドは5つある。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ nmcli general help
+Usage: nmcli general { COMMAND | help }
+
+COMMAND := { status | hostname | permissions | logging | reload }
+...
+$ nmcli general status
+STATE      CONNECTIVITY  WIFI-HW  WIFI     WWAN-HW  WWAN
+connected  limited       missing  enabled  missing  enabled
+$ nmcli general hostname
+linuc
+$ nmcli general monitor
+Error: argument 'monitor' not understood. Try passing --help instead.
+$ nmcli networking
+enabled</code></pre>
+<p><code>status</code> は全体の状態（<code>CONNECTIVITY</code> は外とのつながりの見立てで、外に出ないこの練習機では <code>limited</code>）、
+<code>hostname</code> はホスト名の表示と変更（変えると <code>/etc/hostname</code> に書く。第9章）、<code>permissions</code> は自分に許された操作の一覧、<code>logging</code> はログの細かさ、<code>reload</code> は設定の読み直し。
+<code>monitor</code> は general のコマンドではなくオブジェクトなので、<code>nmcli general monitor</code> は上のとおり断られる（正しくは <code>nmcli monitor</code>）。
+最後の <code>nmcli networking</code> は、NetworkManager が持つ NIC 全体が有効（<code>enabled</code>）かを答えた。</p>
 
 <h2 id="owners">持ち主は3人いる</h2>
 <div class="sgoal"><b>この節で分かること</b>: NIC ごとの持ち主の見分け方と、持ち主の違う道具がどう振る舞うか。</div>
@@ -304,8 +362,8 @@ network:
 手で付けたままでは通らない。この章の「断られる」を一度踏むことになる。</div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>ifup</code> は <code>/etc/network/interfaces</code> の手順をそのまま実行する。すでにあるアドレスとぶつかると失敗する</li><li><code>ifdown</code> は ifupdown 自身の記録（<code>ifquery --state</code>）にある NIC しか下げない。手で付けたものは手で外す</li><li><code>auto</code> の付いた NIC だけが起動時に上がる（<code>ifup -a</code>）。<code>inet static</code> / <code>inet dhcp</code> で方式を選ぶ</li><li><code>nmcli connection add</code> で接続を作り、<code>up</code> で反映。<code>modify</code> しただけでは変わらない</li><li>NIC には持ち主（ifupdown / NetworkManager / systemd-networkd）がいて、持ち主でない道具は <code>unmanaged</code> と言うか、断る</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:a313bee9879c93ce7e87f6f58dcbebb2f753fd671235af9355b1607c484e909c / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ ifupdown 0.8.41 / network-manager 1.46.0 / systemd 255.4 / dhcpcd 10.0.6 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>ifup</code> は <code>/etc/network/interfaces</code> の手順をそのまま実行する。すでにあるアドレスとぶつかると失敗する</li><li><code>ifdown</code> は ifupdown 自身の記録（<code>ifquery --state</code>）にある NIC しか下げない。手で付けたものは手で外す</li><li>起動時に上がるのは <code>auto</code>（<code>ifup -a</code> が上げる）か <code>allow-hotplug</code>（NIC が見つかったときに上げる）の付いた NIC。<code>inet static</code> / <code>inet dhcp</code> で方式を選ぶ</li><li>RHEL 系の ifup / ifdown は <code>/etc/sysconfig/network-scripts/ifcfg-名前</code> を読む（<code>ONBOOT=yes</code>・<code>BOOTPROTO=none</code> / <code>dhcp</code>・<code>IPADDR</code> と <code>PREFIX</code>・<code>GATEWAY</code>）</li><li><code>nmcli connection add</code> で接続を作り、<code>up</code> で反映。<code>modify</code> しただけでは変わらない</li><li>NIC には持ち主（ifupdown / NetworkManager / systemd-networkd）がいて、持ち主でない道具は <code>unmanaged</code> と言うか、断る</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ ifupdown 0.8.41 / network-manager 1.46.0 / systemd 255.4 / dhcpcd 10.0.6 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-network/theory/02-interface">← 2. ifconfig に見えないアドレスがある</a><a href="/linuc-network/theory/04-route">次: 4. 返事をしたのは、相手ではなかった →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

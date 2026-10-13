@@ -19,5 +19,5 @@ ng=0
 grep -q '^hello from www.lab.example' <<<"$body" || { echo "       → www.lab.example の Web の応答が返らない"; ng=1; }
 [ "$lh" = 127.0.0.1 ] || { echo "       → localhost が 127.0.0.1 にならない（/etc/hosts の他の行まで消えていないか）"; ng=1; }
 [ $ng = 0 ] || exit 1
-echo "       ping も curl も使う名前解決（getent）が、DNS と同じ 172.16.20.10 を返した"
+echo "       ping も curl も使う名前解決（getent ahostsv4 で同じ引き方をした）が、DNS と同じ 172.16.20.10 を返した"
 exit 0

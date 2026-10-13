@@ -75,7 +75,9 @@ H lab check 06
 
 section "演習 07"
 H lab check 07
+G 'getent ahosts www.lab.example'
 G "sudo sed -i '/www.lab.example/d' /etc/hosts"
+G 'getent ahosts www.lab.example'
 H lab check 07
 
 section "全体"

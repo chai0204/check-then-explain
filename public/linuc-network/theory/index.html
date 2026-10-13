@@ -44,7 +44,7 @@ ifconfig と ip、ifup と nmcli、dig と ping は、同じものを別々の�
 試験が「どの道具が何を読むか」を問うているからです。</p>
 <div class="skip"><b>ここで覚えなくていいこと</b>:
 IP ヘッダのフィールドの並び（TTL だけは第5章で使う）、DNS サーバ側の設定（ゾーンファイルや再帰の仕組み。レベル2の範囲）、
-ルーティングプロトコル（OSPF / BGP。主題1.07 が扱う経路はデフォルトルートを手で入れるところまで）、ファイアウォール（主題1.10）。
+ルーティングプロトコル（OSPF / BGP。経路をルータ同士で自動でやり取りする仕組み。主題1.07 が扱うのは、経路表を手で読み、デフォルトルート・ネットワーク宛て・1台宛ての行を足し引きするところまで）、ファイアウォール（主題1.10）。
 この9章には出てきません。</div>
 </div>
 
@@ -81,18 +81,18 @@ IP ヘッダのフィールドの並び（TTL だけは第5章で使う）、DNS
 <tr><th>副題</th><th>重要度</th><th>章</th><th>この教材で実際に打つもの</th></tr>
 <tr><td rowspan="4">1.07.1 インターネットプロトコルの基礎</td><td rowspan="4">4</td>
     <td><a href="/linuc-network/theory/01-address">1</a></td>
-    <td><code>ipcalc</code>（マスク・CIDR・サブネット化・プライベート／パブリック）<code>ip route get</code></td></tr>
+    <td><code>ipcalc</code>（マスク・CIDR・サブネット化・クラス・プライベート／パブリック）<code>ip route get</code></td></tr>
 <tr><td><a href="/linuc-network/theory/05-trace">5</a></td>
     <td>ICMP の Time Exceeded と Port Unreachable を <code>tcpdump</code> で見る</td></tr>
 <tr><td><a href="/linuc-network/theory/06-ipv6">6</a></td>
-    <td>リンクローカル・ULA・SLAAC・EUI-64・マルチキャスト（<code>ip -6 addr</code> <code>ping6 ff02::1%lab0</code>）</td></tr>
+    <td>ユニキャスト（リンクローカル・ULA）・エニーキャスト・マルチキャスト、SLAAC・EUI-64（<code>ip -6 addr</code> <code>ping6 ff02::1%lab0</code>）</td></tr>
 <tr><td><a href="/linuc-network/theory/07-ports">7</a></td>
-    <td><code>/etc/services</code> の 22 / 25 / 53 / 80 / 123 / 443、TCP と UDP と ICMP の断り方の違い</td></tr>
+    <td><code>/etc/services</code> の 22 / 25 / 53 / 80 / 123 / 443、TCP（コネクション型）と UDP（コネクションレス型）と ICMP の断り方の違い</td></tr>
 <tr><td rowspan="4">1.07.2 基本的なネットワーク構成</td><td rowspan="4">4</td>
     <td><a href="/linuc-network/theory/02-interface">2</a></td>
     <td><code>ip link</code> <code>ip addr add / del / flush</code> <code>ifconfig</code>（手作業の設定）</td></tr>
 <tr><td><a href="/linuc-network/theory/03-owner">3</a></td>
-    <td><code>/etc/network/interfaces</code> <code>ifup</code> <code>ifdown</code> <code>ifquery</code> <code>nmcli</code>（自動の設定: DHCP）<code>netplan</code></td></tr>
+    <td><code>/etc/network/interfaces</code> <code>ifup</code> <code>ifdown</code> <code>ifquery</code> <code>nmcli</code>（自動の設定: DHCP）<code>netplan</code>、RHEL 系の <code>ifcfg-*</code> との対応表</td></tr>
 <tr><td><a href="/linuc-network/theory/04-route">4</a></td>
     <td><code>ip route</code> <code>route</code> <code>netstat -rn</code> <code>ping</code>（デフォルトルートの設定）</td></tr>
 <tr><td><a href="/linuc-network/theory/09-names">9</a></td>
@@ -101,7 +101,7 @@ IP ヘッダのフィールドの並び（TTL だけは第5章で使う）、DNS
     <td><a href="/linuc-network/theory/02-interface">2</a>・<a href="/linuc-network/theory/03-owner">3</a></td>
     <td>NIC の追加・起動・停止・再設定（<code>ifconfig</code> <code>ifup</code> <code>ifdown</code>）</td></tr>
 <tr><td><a href="/linuc-network/theory/04-route">4</a></td>
-    <td>不適切なデフォルトルートを手で訂正する（<code>ip route</code> <code>route</code>）</td></tr>
+    <td>経路表を参照・変更し、不適切なデフォルトルートを手で訂正する（<code>ip route</code> <code>route</code>。ネットワーク宛て・1台宛ての経路も）</td></tr>
 <tr><td><a href="/linuc-network/theory/05-trace">5</a></td>
     <td><code>traceroute</code> <code>tracepath</code> <code>ping -t</code></td></tr>
 <tr><td><a href="/linuc-network/theory/06-ipv6">6</a></td>
@@ -129,21 +129,23 @@ IP ヘッダのフィールドの並び（TTL だけは第5章で使う）、DNS
 <tr><td colspan="3"><b>1.07.1 インターネットプロトコルの基礎</b></td></tr>
 <tr><td>ネットワークマスク</td><td>アドレスのどこまでがネットワーク部か。255.255.255.0 は /24</td><td><a href="/linuc-network/theory/01-address">1</a></td></tr>
 <tr><td>CIDR</td><td>マスクを /24 のようにビット数で書く。クラス（A/B/C）に縛られない</td><td><a href="/linuc-network/theory/01-address">1</a></td></tr>
+<tr><td>クラス</td><td>先頭の数で決める昔の区分。A 0〜127（/8）・B 128〜191（/16）・C 192〜223（/24）。付けたマスクとは関係ない</td><td><a href="/linuc-network/theory/01-address">1</a></td></tr>
 <tr><td>サブネット化</td><td>マスクを長くして分ける。N 個に分けると使えるアドレスが (N−1)×2 減る（/24→/25×2 で 254→252）</td><td><a href="/linuc-network/theory/01-address">1</a></td></tr>
-<tr><td>プライベートアドレス</td><td>10/8・172.16/12（172.16〜31）・192.168/16。外へは NAT で出る</td><td><a href="/linuc-network/theory/01-address">1</a></td></tr>
-<tr><td>パブリックアドレス</td><td>インターネットで一意。プライベート以外（172.32.0.1 はパブリック）</td><td><a href="/linuc-network/theory/01-address">1</a></td></tr>
+<tr><td>プライベートアドレス</td><td>クラス A 10/8・B 172.16/12（172.16〜31）・C 192.168/16。外へは NAT で出る</td><td><a href="/linuc-network/theory/01-address">1</a></td></tr>
+<tr><td>パブリックアドレス</td><td>インターネットで一意（グローバルアドレスとも言う。172.32.0.1 はパブリック）。ループバック・リンクローカルなどの特別な範囲はどちらでもない</td><td><a href="/linuc-network/theory/01-address">1</a></td></tr>
 <tr><td>22 / 25 / 53 / 80 / 123 / 443</td><td>SSH / SMTP / DNS（UDP と TCP）/ HTTP / NTP（UDP）/ HTTPS</td><td><a href="/linuc-network/theory/07-ports">7</a></td></tr>
-<tr><td>TCP</td><td>接続してから送る（SYN→SYN+ACK→ACK）。閉じた番号は RST で即座に断られる</td><td><a href="/linuc-network/theory/07-ports">7</a></td></tr>
-<tr><td>UDP</td><td>接続せずに1通ずつ。閉じた番号は ICMP の Port Unreachable でしか分からない</td><td><a href="/linuc-network/theory/07-ports">7</a></td></tr>
+<tr><td>よく見る番号（範囲外）</td><td>110 POP3 / 143 IMAP / 161・162 SNMP / 389 LDAP / 514 syslog（UDP）。選択肢に混ざっても迷わないように</td><td><a href="/linuc-network/theory/07-ports">7</a></td></tr>
+<tr><td>TCP</td><td>コネクション型。接続してから送り（SYN→SYN+ACK→ACK）、確認・再送・順番の並べ替え・フロー制御をする＝信頼性。閉じた番号は RST で即座に断られる</td><td><a href="/linuc-network/theory/07-ports">7</a></td></tr>
+<tr><td>UDP</td><td>コネクションレス型。接続せずに1通ずつ＝遅れが小さくリアルタイム性（音声・DNS・NTP・DHCP）。ブロードキャスト・マルチキャストができるのは UDP だけ。閉じた番号は ICMP の Port Unreachable でしか分からない</td><td><a href="/linuc-network/theory/07-ports">7</a></td></tr>
 <tr><td>ICMP</td><td>ping（echo）と、エラーの知らせ（Net Unreachable・Time Exceeded・Port Unreachable）。ポートは無い</td><td><a href="/linuc-network/theory/04-route">4</a>・<a href="/linuc-network/theory/05-trace">5</a></td></tr>
 <tr><td>IPv4 と IPv6 の違い</td><td>32 / 128 ビット。ARP / NDP。ブロードキャスト / マルチキャスト。経路表も別</td><td><a href="/linuc-network/theory/06-ipv6">6</a></td></tr>
-<tr><td>IPv6 の基本機能</td><td>リンクローカル（fe80::）が必ず付く。ルータ広告から自分でアドレスを作る（SLAAC）</td><td><a href="/linuc-network/theory/06-ipv6">6</a></td></tr>
+<tr><td>IPv6 の基本機能</td><td>リンクローカル（fe80::）が必ず付く。ルータ広告から自分でアドレスを作る（SLAAC）。送り方はユニキャスト・エニーキャスト・マルチキャスト（ブロードキャストは無い）</td><td><a href="/linuc-network/theory/06-ipv6">6</a></td></tr>
 <tr><td colspan="3"><b>1.07.2 基本的なネットワーク構成</b></td></tr>
 <tr><td>/etc/hostname</td><td>起動時に読むホスト名。hostname コマンドで変えても書き換わらない</td><td><a href="/linuc-network/theory/09-names">9</a></td></tr>
 <tr><td>ifconfig</td><td>古い道具。上がっていない NIC は -a が要る。ラベルの無い2つ目のアドレスは見えない</td><td><a href="/linuc-network/theory/02-interface">2</a></td></tr>
-<tr><td>ifup / ifdown</td><td>/etc/network/interfaces を実行する。ifdown は自分で上げた NIC しか下げない</td><td><a href="/linuc-network/theory/03-owner">3</a></td></tr>
-<tr><td>nmcli</td><td>NetworkManager の操作。connection を add → up。modify したら up し直す</td><td><a href="/linuc-network/theory/03-owner">3</a></td></tr>
-<tr><td>ip addr</td><td>アドレスの表示と add / del / flush。足す（ifconfig は置き換える）</td><td><a href="/linuc-network/theory/02-interface">2</a></td></tr>
+<tr><td>ifup / ifdown</td><td>設定ファイルを読んで NIC を上げ下げする。Debian 系は /etc/network/interfaces（auto・iface … inet static / dhcp）、RHEL 系は /etc/sysconfig/network-scripts/ifcfg-名前（ONBOOT=yes・BOOTPROTO=none / dhcp）。Debian 系の ifdown は自分で上げた NIC しか下げない</td><td><a href="/linuc-network/theory/03-owner">3</a></td></tr>
+<tr><td>nmcli</td><td>NetworkManager の操作。connection を add → up。modify したら up し直す。オブジェクトは general・networking・radio・connection・device・agent・monitor（general monitor は無い。monitor は nmcli monitor）。nmcli general hostname でホスト名の表示と変更</td><td><a href="/linuc-network/theory/03-owner">3</a></td></tr>
+<tr><td>ip addr</td><td>アドレスの表示と add / del / flush。足す（ifconfig は置き換える）。書式は ip [オプション] オブジェクト [コマンド]。省略形 ip a・ip l・ip r。NIC 名を付けるなら show が要る（ip addr show eth0。ip addr eth0 はエラー）。-s は統計、-r は名前を引く</td><td><a href="/linuc-network/theory/02-interface">2</a></td></tr>
 <tr><td>/etc/hosts</td><td>名前とアドレスの表。nsswitch.conf の files がこれ</td><td><a href="/linuc-network/theory/09-names">9</a></td></tr>
 <tr><td>/etc/nsswitch.conf</td><td>名前をどの表からどの順に引くか（hosts: files dns）</td><td><a href="/linuc-network/theory/09-names">9</a></td></tr>
 <tr><td>ping</td><td>ICMP echo。-c 回数、-t TTL。From は返事（エラー）を送ってきた機械</td><td><a href="/linuc-network/theory/04-route">4</a></td></tr>
@@ -151,43 +153,43 @@ IP ヘッダのフィールドの並び（TTL だけは第5章で使う）、DNS
 <tr><td>デフォルトルート</td><td>どの行にも当てはまらない宛先の行き先（0.0.0.0/0）。直結の相手には効かない</td><td><a href="/linuc-network/theory/04-route">4</a></td></tr>
 <tr><td colspan="3"><b>1.07.3 基本的なネットワークの問題解決</b></td></tr>
 <tr><td>host</td><td>DNS に聞いて1行の文で答える。search を使う</td><td><a href="/linuc-network/theory/08-dns">8</a></td></tr>
-<tr><td>dig</td><td>DNS の答えの全体。@サーバ、+short、-x（逆引き）、MX。search は +search のときだけ</td><td><a href="/linuc-network/theory/08-dns">8</a></td></tr>
+<tr><td>dig</td><td>DNS の答えの全体。@サーバ、+short、-x（逆引き）、-t 種類（MX など）、-p ポート。既定は UDP、+tcp（+vc）で TCP（--tcp や +t は無い）。search は +search のときだけ</td><td><a href="/linuc-network/theory/08-dns">8</a></td></tr>
 <tr><td>ping6</td><td>IPv6 の ping。リンクローカル宛ては %NIC 名が要る</td><td><a href="/linuc-network/theory/06-ipv6">6</a></td></tr>
 <tr><td>nc（netcat）</td><td>-z で接続だけ試す、-u で UDP、-v で結果を言う。閉じた UDP には何も言わない</td><td><a href="/linuc-network/theory/07-ports">7</a></td></tr>
 <tr><td>ncat</td><td>nmap の netcat。UDP で Connected と言ってから Connection refused と言い直す</td><td><a href="/linuc-network/theory/07-ports">7</a></td></tr>
-<tr><td>netstat</td><td>古い道具。-tulnp で待ち受け、-rn で経路表</td><td><a href="/linuc-network/theory/07-ports">7</a></td></tr>
-<tr><td>ss</td><td>待ち受けの表。Local Address が 127.0.0.1 なら外からは入れない。-p は root</td><td><a href="/linuc-network/theory/07-ports">7</a></td></tr>
-<tr><td>traceroute</td><td>UDP（33434〜）を TTL を増やして送る。-n 名前を引かない、-I ICMP（root）</td><td><a href="/linuc-network/theory/05-trace">5</a></td></tr>
+<tr><td>netstat</td><td>古い道具。-tulnp で待ち受け、-rn で経路表。-a は待ち受けと接続中の全部、-l も -a も無ければ接続中だけ。-tcp は --tcp ではなく -t -c -p（-c で出し続ける）</td><td><a href="/linuc-network/theory/07-ports">7</a></td></tr>
+<tr><td>ss</td><td>待ち受けの表。Local Address が 127.0.0.1 なら外からは入れない。-p でプロセス（自分のものは一般ユーザでも出る。他のユーザのものは root で）</td><td><a href="/linuc-network/theory/07-ports">7</a></td></tr>
+<tr><td>traceroute</td><td>UDP（33434〜）を TTL を増やして送る。-n 名前を引かない、-I ICMP（Ubuntu の既定では root が要る）</td><td><a href="/linuc-network/theory/05-trace">5</a></td></tr>
 <tr><td>traceroute6</td><td>traceroute の IPv6 版（traceroute -6 と同じ）</td><td><a href="/linuc-network/theory/06-ipv6">6</a></td></tr>
 <tr><td>tracepath</td><td>root 不要。経路の MTU（pmtu）も出す</td><td><a href="/linuc-network/theory/05-trace">5</a></td></tr>
 <tr><td>tracepath6</td><td>tracepath の IPv6 版。Ubuntu 24.04 には無く tracepath -6 を使う</td><td><a href="/linuc-network/theory/06-ipv6">6</a></td></tr>
-<tr><td>hostname</td><td>いまのホスト名の表示と一時的な変更。-I で自分のアドレス全部</td><td><a href="/linuc-network/theory/09-names">9</a></td></tr>
+<tr><td>hostname</td><td>いまのホスト名の表示と一時的な変更。-s 短い名前、-f 完全な名前、-i 名前から引いたアドレス、-I 自分のアドレス（ループバックとリンクローカルは出ない）、-b 名前・-F ファイルで設定</td><td><a href="/linuc-network/theory/09-names">9</a></td></tr>
 <tr><td colspan="3"><b>1.07.4 クライアント側の DNS 設定</b></td></tr>
-<tr><td>/etc/resolv.conf</td><td>nameserver（問い合わせ先・3つまで）と search。Ubuntu では 127.0.0.53 へのリンク</td><td><a href="/linuc-network/theory/08-dns">8</a></td></tr>
-<tr><td>getent</td><td>NSS を通して引く＝ping と同じ引き方。hosts は IPv6 を先に聞く</td><td><a href="/linuc-network/theory/09-names">9</a></td></tr>
+<tr><td>/etc/resolv.conf</td><td>nameserver（問い合わせ先。1行に1つ・3つまで）と search（1行に空白で並べる。2行書くと後の行だけ効く）。Ubuntu では 127.0.0.53 へのリンク</td><td><a href="/linuc-network/theory/08-dns">8</a></td></tr>
+<tr><td>getent</td><td>NSS を通して引く。ping と同じ引き方は getent ahosts（IPv4 だけなら ahostsv4）。getent hosts は IPv6 を先に聞くので、ping と答えが違うことがある</td><td><a href="/linuc-network/theory/09-names">9</a></td></tr>
 </table></div>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
 <ol>
 <li><a href="/linuc-network/theory/01-address">アドレスは、分けるたびに減る</a> —
-    <span class="detail">/24 を2つに分けると 254 台ではなく 252 台。ネットワークアドレスとブロードキャストを ipcalc で数える（12分）</span></li>
+    <span class="detail">/24 を2つに分けると 254 台ではなく 252 台。ネットワークアドレスとブロードキャストを ipcalc で数える（14分）</span></li>
 <li><a href="/linuc-network/theory/02-interface">ifconfig に見えないアドレスがある</a> —
-    <span class="detail">ip addr add で足した2つ目が ifconfig には出ない。ifconfig で付けると全部入れ替わる（14分）</span></li>
+    <span class="detail">ip addr add で足した2つ目が ifconfig には出ない。ifconfig で付けると全部入れ替わる（16分）</span></li>
 <li><a href="/linuc-network/theory/03-owner">ifup は、自分が付けたものしか知らない</a> —
-    <span class="detail">手で付けたアドレスがあると ifup が失敗し、ifdown は not configured と言う。nmcli と netplan の持ち物（18分）</span></li>
+    <span class="detail">手で付けたアドレスがあると ifup が失敗し、ifdown は not configured と言う。nmcli と netplan の持ち物（21分）</span></li>
 <li><a href="/linuc-network/theory/04-route">返事をしたのは、相手ではなかった</a> —
-    <span class="detail">ping の From は旧ルータ。IPv6 では届いている。経路表の1行を直し、ファイルにも残す（16分）</span></li>
+    <span class="detail">ping の From は旧ルータ。IPv6 では届いている。経路表の1行を直し、ファイルにも残す（18分）</span></li>
 <li><a href="/linuc-network/theory/05-trace">traceroute は、断られた返事で道を知る</a> —
-    <span class="detail">UDP の 33434 番へ送り、ICMP の「時間切れ」と「その番号は無い」で道順を知る。* は止まった印ではない（14分）</span></li>
+    <span class="detail">UDP の 33434 番へ送り、ICMP の「時間切れ」と「その番号は無い」で道順を知る。* は止まった印ではない（16分）</span></li>
 <li><a href="/linuc-network/theory/06-ipv6">IPv6 のアドレスは、頼まなくても付いている</a> —
     <span class="detail">MAC から作られた fd00:10:: のアドレス。%lab0 を付けないと別の NIC から出ていく（14分）</span></li>
 <li><a href="/linuc-network/theory/07-ports">LISTEN していても、外からは入れない</a> —
-    <span class="detail">127.0.0.1:8080 は自分の 192.168.10.2 宛てでも断る。TCP は RST で、UDP は ICMP で断られる（16分）</span></li>
+    <span class="detail">127.0.0.1:8080 は自分の 192.168.10.2 宛てでも断る。TCP は RST で、UDP は ICMP で断られる（19分）</span></li>
 <li><a href="/linuc-network/theory/08-dns">resolv.conf に書いた1行は、消される</a> —
-    <span class="detail">nameserver 127.0.0.53 の正体。systemd-resolved が書き直すファイルと、残す2つの方法（16分）</span></li>
+    <span class="detail">nameserver 127.0.0.53 の正体。systemd-resolved が書き直すファイルと、残す2つの方法（19分）</span></li>
 <li><a href="/linuc-network/theory/09-names">dig と ping は、別の表を引いている</a> —
-    <span class="detail">dig は .10、ping は .99。/etc/hosts と nsswitch.conf の順番、そしてホスト名の3つの置き場所（14分）</span></li>
+    <span class="detail">dig は .10、ping は .99。/etc/hosts と nsswitch.conf の順番、そしてホスト名の3つの置き場所（18分）</span></li>
 </ol>
 </div>
 <p><a href="/linuc-network/theory/glossary">用語辞書</a> —
@@ -207,8 +209,8 @@ IP ヘッダのフィールドの並び（TTL だけは第5章で使う）、DNS
     <td>ip で直したものはその場限り。残すのは持ち主（ifupdown / NetworkManager / netplan）の設定ファイル</td>
     <td>持ち主が違う NIC は、その持ち主の道具でしか直せない（nmcli は unmanaged の NIC に効かない）</td><td>3・4</td></tr>
 <tr><td>名前で接続すると別のサーバに行く</td>
-    <td>getent が ping と同じ引き方をするので、/etc/hosts と DNS のどちらが答えたか分かる</td>
-    <td>dig で正しくても ping が正しいとは限らない。Ubuntu の 127.0.0.53 経由だと host にも /etc/hosts が混ざる</td><td>8・9</td></tr>
+    <td>getent ahosts が ping と同じ引き方をするので、/etc/hosts と DNS のどちらが答えたか分かる</td>
+    <td>dig で正しくても ping が正しいとは限らない。getent hosts は IPv6 を先に聞くので、ping とは違う答えを出すことがある。Ubuntu の 127.0.0.53 経由だと host にも /etc/hosts が混ざる</td><td>8・9</td></tr>
 </table></div>
 <p><b>この主題の道具だけで足りない場面</b>も1つあります。
 コンテナ（Docker など）の中から外へつながらない場合です。コンテナは自分の名前空間と経路表を持ち、

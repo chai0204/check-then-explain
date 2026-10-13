@@ -14,7 +14,7 @@
 <p class="lead">lab0 の IPv6 について、設定ファイルには <code>inet6 auto</code> としか書いていない。アドレスはどこにも無い。それでも lab0 には <code>fd00:10::5054:ff:fe0a:2</code> が付いている。後半の <code>5054:ff:fe0a:2</code> は、lab0 の MAC アドレス <code>52:54:00:0a:00:02</code> から作られた番号である。IPv6 の機械は、ルータの広告を聞いて自分でアドレスを名乗る。</p>
 <div class="badges"><span>前提: 第4章まで読了</span><span>所要 14分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.07.1（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>IPv6 アドレスの種類（リンクローカル・ユニークローカル・グローバル・マルチキャスト・ループバック）を、先頭の数で見分けられる</li><li>アドレスが SLAAC と EUI-64 でどう作られたかを、MAC アドレスから説明できる</li><li><code>ping6</code>・<code>traceroute6</code>・<code>tracepath -6</code> で IPv6 の到達を確かめられる（リンクローカル宛ての <code>%NIC</code> を含めて）</li></ul>
+<ul><li>IPv6 アドレスを送り方でユニキャスト・エニーキャスト・マルチキャストの3種類に分けられ（ブロードキャストは無い）、ユニキャストのうちループバック・リンクローカル・ユニークローカル・グローバルと、マルチキャストを先頭の数で見分けられる</li><li>アドレスが SLAAC と EUI-64 でどう作られたかを、MAC アドレスから説明できる</li><li><code>ping6</code>・<code>traceroute6</code>・<code>tracepath -6</code> で IPv6 の到達を確かめられる（リンクローカル宛ての <code>%NIC</code> を含めて）</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: IPv4 と IPv6 を共存させる仕組み（トンネルや変換）の細部、IPv6 ヘッダの拡張ヘッダの種類、プライバシー拡張（一時アドレス）の設定値。違いと基本の機能は、この章の表に挙げたものを押さえれば足りる。</div></div>
 
 <h2 id="auto">設定していないのに、付いている</h2>
@@ -69,17 +69,20 @@ fe80::/64 dev enp0s16 proto kernel metric 256 pref medium
 fe80::/64 dev enp0s17 proto kernel metric 256 pref medium
 fe80::/64 dev lab0 proto kernel metric 256 pref medium
 fe80::/64 dev enp0s18 proto kernel metric 1024 pref medium
-default via fe80::5054:ff:fe0a:1 dev lab0 proto ra metric 1024 expires 1758sec hoplimit 64 pref medium</code></pre>
+default via fe80::5054:ff:fe0a:1 dev lab0 proto ra metric 1024 expires 1743sec hoplimit 64 pref medium</code></pre>
 <p>enp0s17 にはリンクローカルしか無い。経路表を見ると、IPv6 のデフォルトルートもルータ広告から来ている（<code>proto ra</code>。行き先は router のリンクローカル <code>fe80::5054:ff:fe0a:1</code>。<code>expires</code> の秒数は見るたびに減る）。
 第4章で IPv4 が壊れていた間も IPv6 で届いたのは、IPv6 の経路はルータ自身が教えてくれていたからである。</p>
 <div class="scroll"><table>
-<tr><th>先頭</th><th>種類</th><th>この練習機の例</th><th>IPv4 で近いもの</th></tr>
-<tr><td><code>::1</code></td><td>ループバック</td><td><code>::1</code>（lo）</td><td>127.0.0.1</td></tr>
-<tr><td><code>fe80::/10</code></td><td>リンクローカル（同じリンクの中だけ。必ず付く）</td><td><code>fe80::5054:ff:fe0a:2</code></td><td>169.254.0.0/16</td></tr>
-<tr><td><code>fc00::/7</code>（実際は <code>fd</code>）</td><td>ユニークローカル（ULA。組織の中だけ）</td><td><code>fd00:10::5054:ff:fe0a:2</code></td><td>プライベートアドレス</td></tr>
-<tr><td><code>2000::/3</code></td><td>グローバルユニキャスト（インターネットで一意）</td><td>—（この練習機はインターネットに出ない）</td><td>パブリックアドレス</td></tr>
-<tr><td><code>ff00::/8</code></td><td>マルチキャスト（グループ宛て）</td><td><code>ff02::1</code>（リンク上の全員）</td><td>ブロードキャスト（IPv6 には無い）</td></tr>
+<tr><th>先頭</th><th>種類</th><th>送り方</th><th>この練習機の例</th><th>IPv4 で近いもの</th></tr>
+<tr><td><code>::1</code></td><td>ループバック</td><td>ユニキャスト</td><td><code>::1</code>（lo）</td><td>127.0.0.1</td></tr>
+<tr><td><code>fe80::/10</code></td><td>リンクローカル（同じリンクの中だけ。必ず付く）</td><td>ユニキャスト</td><td><code>fe80::5054:ff:fe0a:2</code></td><td>169.254.0.0/16</td></tr>
+<tr><td><code>fc00::/7</code>（実際は <code>fd</code>）</td><td>ユニークローカル（ULA。組織の中だけ）</td><td>ユニキャスト</td><td><code>fd00:10::5054:ff:fe0a:2</code></td><td>プライベートアドレス</td></tr>
+<tr><td><code>2000::/3</code></td><td>グローバルユニキャスト（インターネットで一意）</td><td>ユニキャスト</td><td>—（この練習機はインターネットに出ない）</td><td>パブリックアドレス</td></tr>
+<tr><td><code>ff00::/8</code></td><td>マルチキャスト（グループ宛て）</td><td>マルチキャスト</td><td><code>ff02::1</code>（リンク上の全員）</td><td>ブロードキャスト（IPv6 には無い）</td></tr>
 </table></div>
+<p>送り方で分けると、IPv6 のアドレスは3種類である。<b>ユニキャスト</b>（1台宛て）、<b>エニーキャスト</b>（同じアドレスを持つ複数の機械のうち、いちばん近い1台宛て）、
+<b>マルチキャスト</b>（グループの全員宛て）。<b>ブロードキャストは無い</b>。ループバックもリンクローカルも、1台を指すのでユニキャストに入る。
+エニーキャストには専用の範囲が無く、ユニキャストの範囲から割り当てるので、アドレスの形だけでは見分けられない（この練習機には無い）。</p>
 <div class="analogy"><b>たとえ</b>: 町内の掲示板に貼られた「この町は○○町です」を見て、自分の番地を誕生日から作って名乗るようなものだ。
 町名（前半 64 ビット）はルータが掲示し、番地（後半 64 ビット）は自分で作る。役所（DHCP サーバ）に届け出る必要がない。
 <br>ただし<b>崩れる点</b>: 人の番地なら役所が重複を防ぐが、SLAAC では本人が近所に「この番地の人はいますか」と聞いて確かめる（DAD）。
@@ -96,22 +99,22 @@ From fe80::5054:ff:fe12:3456%enp0s16 icmp_seq=1 Destination unreachable: Address
 1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
 $ ping6 -c 1 fe80::5054:ff:fe0a:1%lab0
 PING fe80::5054:ff:fe0a:1%lab0 (fe80::5054:ff:fe0a:1%lab0) 56 data bytes
-64 bytes from fe80::5054:ff:fe0a:1%lab0: icmp_seq=1 ttl=64 time=7.52 ms
+64 bytes from fe80::5054:ff:fe0a:1%lab0: icmp_seq=1 ttl=64 time=0.953 ms
 
 --- fe80::5054:ff:fe0a:1%lab0 ping statistics ---
 1 packets transmitted, 1 received, 0% packet loss, time 0ms
-rtt min/avg/max/mdev = 7.518/7.518/7.518/0.000 ms</code></pre>
+rtt min/avg/max/mdev = 0.953/0.953/0.953/0.000 ms</code></pre>
 <p>NIC の名前を付けないと、<b>管理用の enp0s16 から</b>送られて <code>Address unreachable</code> になった（From の <code>%enp0s16</code>）。
 経路表には <code>fe80::/64</code> の行が NIC の数だけあり、どれも同じ長さで一致する。宛先だけではどのリンクか区別できないので、カーネルは表の最初の行（enp0s16）を選んだ。
 リンクローカルは「どのリンクの fe80 か」まで言わないと相手が決まらない。<code>%lab0</code> の部分をゾーン（スコープ ID）と呼ぶ。
 <code>ping6</code> は <code>ping</code> への別名で、<code>ping</code> に IPv6 アドレスを渡しても同じように動く。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ping -c 1 fe80::5054:ff:fe0a:1%lab0
 PING fe80::5054:ff:fe0a:1%lab0 (fe80::5054:ff:fe0a:1%lab0) 56 data bytes
-64 bytes from fe80::5054:ff:fe0a:1%lab0: icmp_seq=1 ttl=64 time=0.314 ms
+64 bytes from fe80::5054:ff:fe0a:1%lab0: icmp_seq=1 ttl=64 time=0.351 ms
 
 --- fe80::5054:ff:fe0a:1%lab0 ping statistics ---
 1 packets transmitted, 1 received, 0% packet loss, time 0ms
-rtt min/avg/max/mdev = 0.314/0.314/0.314/0.000 ms</code></pre>
+rtt min/avg/max/mdev = 0.351/0.351/0.351/0.000 ms</code></pre>
 <div class="analogy"><b>たとえ</b>: どのフロアにも「101号室」がある建物で、「101号室へ」とだけ言われた配達員に近い。どのフロアの101号室か分からないので、最初に見たフロアへ行ってしまう。
 <br>ただし<b>崩れる点</b>: 配達員なら着いてから「違うフロアだった」と気づいて戻れるが、カーネルは別の NIC へ送って「届かない」と言うだけで、別のフロアを試さない。</div>
 
@@ -119,13 +122,13 @@ rtt min/avg/max/mdev = 0.314/0.314/0.314/0.000 ms</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: IPv6 で「全員」に送る方法と、ARP の代わりのもの。</div>
 <pre data-where="練習機の中（student@linuc）"><code>$ ping6 -c 2 -w 3 ff02::1%lab0
 PING ff02::1%lab0 (ff02::1%lab0) 56 data bytes
-64 bytes from fe80::5054:ff:fe0a:2%lab0: icmp_seq=1 ttl=64 time=1.19 ms
-64 bytes from fe80::5054:ff:fe0a:1%lab0: icmp_seq=1 ttl=64 time=1.87 ms
-64 bytes from fe80::5054:ff:fe0a:2%lab0: icmp_seq=2 ttl=64 time=0.597 ms
+64 bytes from fe80::5054:ff:fe0a:2%lab0: icmp_seq=1 ttl=64 time=1.06 ms
+64 bytes from fe80::5054:ff:fe0a:1%lab0: icmp_seq=1 ttl=64 time=1.70 ms
+64 bytes from fe80::5054:ff:fe0a:2%lab0: icmp_seq=2 ttl=64 time=0.425 ms
 
 --- ff02::1%lab0 ping statistics ---
-2 packets transmitted, 2 received, +1 duplicates, 0% packet loss, time 1002ms
-rtt min/avg/max/mdev = 0.597/1.218/1.866/0.518 ms
+2 packets transmitted, 2 received, +1 duplicates, 0% packet loss, time 1003ms
+rtt min/avg/max/mdev = 0.425/1.062/1.704/0.522 ms
 $ ip -6 neigh show dev lab0
 fe80::5054:ff:fe0a:1 lladdr 52:54:00:0a:00:01 router DELAY</code></pre>
 <p><code>ff02::1</code> は「このリンクの IPv6 の全ノード」というマルチキャストアドレスで、自分（<code>…:2</code>）と router（<code>…:1</code>）が答えた。
@@ -142,11 +145,11 @@ ff02::2 ip6-allrouters
 ff02::3 ip6-allhosts
 $ ping6 -c 1 ip6-localhost
 PING ip6-localhost (::1) 56 data bytes
-64 bytes from ip6-localhost (::1): icmp_seq=1 ttl=64 time=0.225 ms
+64 bytes from ip6-localhost (::1): icmp_seq=1 ttl=64 time=15.8 ms
 
 --- ip6-localhost ping statistics ---
-1 packets transmitted, 1 received, 0% packet loss, time 0ms
-rtt min/avg/max/mdev = 0.225/0.225/0.225/0.000 ms</code></pre>
+1 packets transmitted, 1 received, 0% packet loss, time 1ms
+rtt min/avg/max/mdev = 15.804/15.804/15.804/0.000 ms</code></pre>
 <div class="analogy"><b>たとえ</b>: 校内放送（ブロードキャスト）をやめて、部活ごとの連絡網（マルチキャスト）だけにした学校に近い。
 「全校生徒」という連絡網（ff02::1）を作れば、校内放送と同じことができる。
 <br>ただし<b>崩れる点</b>: 部活は自分で入部するが、ff02::1 には IPv6 を話す機械が自動で入っている。
@@ -156,21 +159,21 @@ rtt min/avg/max/mdev = 0.225/0.225/0.225/0.000 ms</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: IPv6 版の到達確認の道具と、IPv4 との違い。</div>
 <pre data-where="練習機の中（student@linuc）"><code>$ ping6 -c 2 fd00:20::10
 PING fd00:20::10 (fd00:20::10) 56 data bytes
-64 bytes from fd00:20::10: icmp_seq=1 ttl=63 time=0.640 ms
-64 bytes from fd00:20::10: icmp_seq=2 ttl=63 time=0.767 ms
+64 bytes from fd00:20::10: icmp_seq=1 ttl=63 time=0.801 ms
+64 bytes from fd00:20::10: icmp_seq=2 ttl=63 time=0.576 ms
 
 --- fd00:20::10 ping statistics ---
-2 packets transmitted, 2 received, 0% packet loss, time 1002ms
-rtt min/avg/max/mdev = 0.640/0.703/0.767/0.063 ms
+2 packets transmitted, 2 received, 0% packet loss, time 1004ms
+rtt min/avg/max/mdev = 0.576/0.688/0.801/0.112 ms
 $ traceroute6 -n fd00:20::10
 traceroute to fd00:20::10 (fd00:20::10), 30 hops max, 80 byte packets
- 1  fd00:10::1  2.312 ms  0.129 ms  0.080 ms
- 2  fd00:20::10  0.448 ms  0.064 ms  0.055 ms
+ 1  fd00:10::1  1.391 ms  0.234 ms  0.071 ms
+ 2  fd00:20::10  0.540 ms  0.078 ms  0.064 ms
 $ tracepath -6 -n fd00:20::10
- 1?: [LOCALHOST]                        0.417ms pmtu 1500
- 1:  fd00:10::1                                            1.189ms
- 1:  fd00:10::1                                            0.142ms
- 2:  fd00:20::10                                           0.132ms reached
+ 1?: [LOCALHOST]                        0.629ms pmtu 1500
+ 1:  fd00:10::1                                            1.663ms
+ 1:  fd00:10::1                                            0.325ms
+ 2:  fd00:20::10                                           0.186ms reached
      Resume: pmtu 1500 hops 2 back 2
 $ tracepath6 fd00:20::10
 bash: tracepath6: command not found</code></pre>
@@ -204,8 +207,8 @@ iputils が tracepath6 をやめて <code>tracepath -6</code> に一本化した
 同じサーバに IPv4 では届かず IPv6 では届く。IPv4 と IPv6 が別々の経路表を持つことを、壊れた状態で確かめられるのは演習04 を解く前だけである。</div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>NIC を上げるとリンクローカル（fe80::/10）が必ず付く。ルータ広告があれば SLAAC でもう1つ（ここでは ULA の fd00:10::/64）が付く</li><li>EUI-64 は MAC の真ん中に ff:fe を挟み、先頭の 7 ビット目を反転して後半 64 ビットを作る</li><li>リンクローカル宛てには <code>%NIC名</code> が要る。付けないと別の NIC から出て Address unreachable になる</li><li>IPv6 にブロードキャストは無い。全員宛ては ff02::1（マルチキャスト）、ARP の代わりは NDP</li><li><code>ping6</code> / <code>traceroute6</code> / <code>tracepath -6</code>。Ubuntu 24.04 には <code>tracepath6</code> が無い</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:a313bee9879c93ce7e87f6f58dcbebb2f753fd671235af9355b1607c484e909c / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / iputils 20240117 / traceroute 2.1.5 / ifupdown 0.8.41 / dnsmasq-base 2.91（ルータ広告）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>NIC を上げるとリンクローカル（fe80::/10）が必ず付く。ルータ広告があれば SLAAC でもう1つ（ここでは ULA の fd00:10::/64）が付く</li><li>EUI-64 は MAC の真ん中に ff:fe を挟み、先頭の 7 ビット目を反転して後半 64 ビットを作る</li><li>リンクローカル宛てには <code>%NIC名</code> が要る。付けないと別の NIC から出て Address unreachable になる</li><li>送り方はユニキャスト・エニーキャスト・マルチキャストの3種類。ループバックとリンクローカルもユニキャスト</li><li>IPv6 にブロードキャストは無い。全員宛ては ff02::1（マルチキャスト）、ARP の代わりは NDP</li><li><code>ping6</code> / <code>traceroute6</code> / <code>tracepath -6</code>。Ubuntu 24.04 には <code>tracepath6</code> が無い</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / iputils 20240117 / traceroute 2.1.5 / ifupdown 0.8.41 / dnsmasq-base 2.91（ルータ広告）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-network/theory/05-trace">← 5. traceroute は、断られた返事で道を知る</a><a href="/linuc-network/theory/07-ports">次: 7. LISTEN していても、外からは入れない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

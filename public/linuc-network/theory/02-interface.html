@@ -12,7 +12,7 @@
 </div>
 <h1>2. ifconfig に見えないアドレスがある</h1>
 <p class="lead">NIC にアドレスを2つ付ける。<code>ip addr</code> には2つ並ぶのに、<code>ifconfig</code> には1つしか出ない。どちらかが壊れているのではない。<code>ifconfig</code> は「1つの名前に1つのアドレス」という古い表を読んでいて、その表には2つ目の欄が無い。</p>
-<div class="badges"><span>前提: 第1章まで読了</span><span>所要 14分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.2（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="badges"><span>前提: 第1章まで読了</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.2（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>ip link</code>・<code>ip addr</code>・<code>ifconfig</code> の出力から、NIC が上がっているか、どのアドレスが付いているかを読める</li><li>NIC を手で上げ下げし、アドレスを付け外しできる（<code>ip link set</code> / <code>ip addr add</code>・<code>del</code>・<code>flush</code> / <code>ifconfig</code>）</li><li><code>ifconfig</code> と <code>ip</code> が違う答えを返す理由を、見ている表の違いとして説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>ip</code> のトンネルやブリッジを作るサブコマンド、<code>ip neigh</code> の状態の語（REACHABLE / STALE など）の細かい意味、<code>ifconfig</code> で MAC アドレスを変える操作。ここで付けた設定は再起動で消える。残す方法（ifupdown と NetworkManager）は第3章で扱う。</div></div>
@@ -33,9 +33,16 @@
     link/ether 52:54:00:0a:00:02 brd ff:ff:ff:ff:ff:ff link-netns sw</code></pre>
 <p>山かっこの中の <code>UP</code> は「上げてある（使う設定になっている）」、<code>LOWER_UP</code> は「ケーブルの先がつながっている」。
 <code>enp0s17</code> にはどちらも無く、<code>state DOWN</code> である。誰もまだ上げていない。
-<code>link/ether</code> の後ろが MAC アドレス。<code>lab0@if3 … link-netns sw</code> は、lab0 がケーブル（veth）の片端で、
-もう片端がスイッチ（名前空間 sw）の3番の口にささっていることを示している。</p>
-<p>同じことを <code>ifconfig</code> で見る。行の先頭が NIC 名なので、その行だけ抜き出す。</p>
+<code>link/ether</code> の後ろが MAC アドレス。<code>lab0@if3 … link-netns sw</code> は、lab0 が仮想のケーブル（veth）の片端で、
+もう片端が名前空間 sw（スイッチ役の区画）の中にあり、そこでの NIC の番号（ifindex）が 3 であることを示している。
+<code>@if3</code> はスイッチの口の番号ではなく、<b>相手側の NIC の番号</b>である。sw の中で打って確かめる
+（<code>ip netns exec sw …</code> は「sw の中で打つ」と読む。名前空間は第5章でもう一度使う）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ip netns exec sw ip link show p-linuc
+3: p-linuc@if5: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc noqueue master br0 state UP mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:ff:00:02 brd ff:ff:ff:ff:ff:ff link-netnsid 0</code></pre>
+<p>sw の中の3番は p-linuc という NIC で、その相手（<code>@if5</code>）は練習機の5番、つまり lab0 である。
+<code>master br0</code> は、p-linuc がスイッチの本体（ブリッジ br0）につながっていることを示す。</p>
+<p>練習機の NIC の一覧を、こんどは <code>ifconfig</code> で見る。行の先頭が NIC 名なので、その行だけ抜き出す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ifconfig | grep '^[a-z]'
 enp0s16: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
 enp0s18: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
@@ -78,12 +85,12 @@ $ ip -4 addr show enp0s17
        valid_lft forever preferred_lft forever
 $ ping -c 2 10.0.3.2
 PING 10.0.3.2 (10.0.3.2) 56(84) bytes of data.
-64 bytes from 10.0.3.2: icmp_seq=1 ttl=255 time=5.37 ms
-64 bytes from 10.0.3.2: icmp_seq=2 ttl=255 time=0.898 ms
+64 bytes from 10.0.3.2: icmp_seq=1 ttl=255 time=8.46 ms
+64 bytes from 10.0.3.2: icmp_seq=2 ttl=255 time=0.430 ms
 
 --- 10.0.3.2 ping statistics ---
-2 packets transmitted, 2 received, 0% packet loss, time 1003ms
-rtt min/avg/max/mdev = 0.898/3.133/5.369/2.235 ms</code></pre>
+2 packets transmitted, 2 received, 0% packet loss, time 1004ms
+rtt min/avg/max/mdev = 0.430/4.444/8.459/4.014 ms</code></pre>
 <p>10.0.3.2 は、この練習用ネットワークで待っている相手（QEMU が作る仮想のゲートウェイ）である。
 同じ /24 の中にいるので、付けた直後から直接話せる（時間の ms はあなたの画面では違う）。
 直接話す相手の MAC アドレスは ARP で調べ、表に残っている。</p>
@@ -149,10 +156,12 @@ enp0s17:1: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
 $ ip -4 addr show enp0s17
 3: enp0s17: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
     inet 10.0.3.60/24 brd 10.0.3.255 scope global enp0s17
-       valid_lft forever preferred_lft forever</code></pre>
+       valid_lft forever preferred_lft forever
+$ sysctl net.ipv4.conf.enp0s17.promote_secondaries
+net.ipv4.conf.enp0s17.promote_secondaries = 0</code></pre>
 <p>3つとも消えて、10.0.3.60 だけになった。<code>ifconfig 名前 アドレス</code> は「この名前のアドレスを<b>これにする</b>」という命令で、足すのではなく置き換える。
-1つ目（primary）のアドレスが消えると、同じネットワークの2つ目以降（secondary）も一緒に消える
-（この練習機の既定。<code>sysctl net.ipv4.conf.enp0s17.promote_secondaries</code> が 1 の機械では、2つ目が1つ目に繰り上がって残る）。
+1つ目（primary）のアドレスが消えると、同じネットワークの2つ目以降（secondary）も一緒に消える。
+これは Ubuntu の既定（上の <code>promote_secondaries = 0</code>）での動きで、RHEL 9 などは既定が 1 になっており、2つ目が1つ目に繰り上がって残る。
 <code>ifconfig</code> で付けると、ブロードキャスト（<code>brd 10.0.3.255</code>）はマスクから自動で計算される。元に戻しておく。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo ifconfig enp0s17 10.0.3.50 netmask 255.255.255.0
 $ ip -4 addr show enp0s17
@@ -169,6 +178,29 @@ $ ip -4 addr show enp0s17
 <tr><td>見えるアドレス</td><td>全部（secondary も）</td><td>名前ごとに1つ</td></tr>
 </table></div>
 <p>Ubuntu 24.04 や RHEL 9 の最小構成には <code>ifconfig</code> が入っていないこともある（net-tools は古い道具として別パッケージ）。試験では両方の形が問われる。</p>
+<h3 id="ip-syntax">ip の書き方</h3>
+<p><code>ip</code> の書式は <code>ip [オプション] オブジェクト [コマンド] [dev 名前]</code> である。オブジェクトは <code>link</code>（リンク）・<code>addr</code>（アドレス）・<code>route</code>（経路）・<code>neigh</code>（隣の MAC アドレスの表）など、コマンドは <code>show</code>・<code>add</code>・<code>del</code> など。
+どちらも短く書ける（<code>ip a</code> は <code>ip addr</code>、<code>ip l</code> は <code>ip link</code>、<code>ip r</code> は <code>ip route</code>）。コマンドを省くと <code>show</code> になる（<code>ip addr</code> だけで一覧が出る）。
+ただし、NIC の名前を付けるときは <code>show</code> を省けない。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ip addr enp0s17
+Command "enp0s17" is unknown, try "ip address help".
+$ ip a show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
+    inet 10.0.3.50/24 brd 10.0.3.255 scope global enp0s17
+       valid_lft forever preferred_lft forever
+    inet6 fe80::5054:ff:fe12:3457/64 scope link
+       valid_lft forever preferred_lft forever
+$ ip -s link show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast
+           260       3      0       0       0       0
+    TX:  bytes packets errors dropped carrier collsns
+           964      12      0       0       0       0</code></pre>
+<p><code>ip addr enp0s17</code> は、enp0s17 をコマンドの名前として読もうとして断られた。<code>show</code> を挟めば通る。
+オプションはオブジェクトの前に置く。<code>-s</code>（statistics）は送受信の数を足して出す（RX が受信、TX が送信。数は打つたびに違う）。
+<code>-4</code> / <code>-6</code> は IPv4 / IPv6 だけに絞り、<code>-r</code>（resolve）はアドレスを名前に引いて出す（第4章）。</p>
 <div class="quiz"><b>確認</b>
 <p>eth0 に IPv4 アドレス 192.168.1.10/24 を<b>追加</b>するコマンドとして正しいものはどれか。</p>
 <p>A. <code>ip link add 192.168.1.10/24 dev eth0</code>　B. <code>ip addr add 192.168.1.10/24 dev eth0</code>　C. <code>ip route add 192.168.1.10/24 dev eth0</code>　D. <code>ifconfig eth0 add 192.168.1.10/24</code></p>
@@ -176,21 +208,30 @@ $ ip -4 addr show enp0s17
 <p>B。<code>ip addr</code>（address）がアドレス、<code>ip link</code> がリンク、<code>ip route</code> が経路を扱う。
 <code>ifconfig eth0 192.168.1.10 netmask 255.255.255.0</code> でも付くが、それは「追加」ではなく、元のアドレスとの置き換えになる。</p></details></div>
 
-<h2 id="down">下げても、アドレスは消えない</h2>
+<h2 id="down">下げても、IPv4 のアドレスは消えない</h2>
 <div class="sgoal"><b>この節で分かること</b>: リンクを下げたときに消えるものと残るもの。</div>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo ip link set enp0s17 down
-$ ip -4 addr show enp0s17
+$ ip addr show enp0s17
 3: enp0s17: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc fq_codel state DOWN group default qlen 1000
+    link/ether 52:54:00:12:34:57 brd ff:ff:ff:ff:ff:ff
     inet 10.0.3.50/24 brd 10.0.3.255 scope global enp0s17
        valid_lft forever preferred_lft forever
+$ sysctl net.ipv6.conf.enp0s17.keep_addr_on_down
+net.ipv6.conf.enp0s17.keep_addr_on_down = 0
 $ ip route
 default via 192.168.10.254 dev lab0 onlink
 10.0.2.0/24 dev enp0s16 proto kernel scope link src 10.0.2.15 metric 100
 192.168.10.0/24 dev lab0 proto kernel scope link src 192.168.10.2</code></pre>
-<p>下げてもアドレスは残る（<code>state DOWN</code> のまま <code>inet</code> の行がある）。消えたのは経路表の <code>10.0.3.0/24</code> の行である。
+<p>下げても IPv4 のアドレスは残る（<code>state DOWN</code> のまま <code>inet</code> の行がある）。一方、<b>IPv6 のアドレスは消えた</b>（上げたときに付いた <code>inet6 fe80::…</code> の行が無い）。
+IPv6 はリンクを下げるとアドレスを外すのが既定である（<code>keep_addr_on_down = 0</code>。手で付けた IPv6 のアドレスも外れる）。
+もう1つ消えたのが、経路表の <code>10.0.3.0/24</code> の行である。
 アドレスとマスクを付けると「そのネットワークへは、この NIC から直接」という行（直結の経路、<code>proto kernel scope link</code>）がカーネルに自動で足され、
-リンクが下がっている間は使えないので外される。上げ直すと戻る。</p>
+リンクが下がっている間は使えないので外される。上げ直すと、経路表の行も、IPv6 のリンクローカル（<code>fe80::</code>）も、カーネルが付け直す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo ip link set enp0s17 up
+$ ip -6 addr show enp0s17
+3: enp0s17: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet6 fe80::5054:ff:fe12:3457/64 scope link
+       valid_lft forever preferred_lft forever
 $ ip route
 default via 192.168.10.254 dev lab0 onlink
 10.0.2.0/24 dev enp0s16 proto kernel scope link src 10.0.2.15 metric 100
@@ -198,13 +239,13 @@ default via 192.168.10.254 dev lab0 onlink
 192.168.10.0/24 dev lab0 proto kernel scope link src 192.168.10.2
 $ ping -c 1 10.0.3.2
 PING 10.0.3.2 (10.0.3.2) 56(84) bytes of data.
-64 bytes from 10.0.3.2: icmp_seq=1 ttl=255 time=3.32 ms
+64 bytes from 10.0.3.2: icmp_seq=1 ttl=255 time=2.71 ms
 
 --- 10.0.3.2 ping statistics ---
 1 packets transmitted, 1 received, 0% packet loss, time 0ms
-rtt min/avg/max/mdev = 3.322/3.322/3.322/0.000 ms</code></pre>
+rtt min/avg/max/mdev = 2.708/2.708/2.708/0.000 ms</code></pre>
 <p>この表の1行目（<code>default via 192.168.10.254</code>）は、第4章で直すことになる。</p>
-<div class="analogy"><b>たとえ</b>: 店のシャッターに近い。シャッターを下ろしても（<code>down</code>）看板（アドレス）は掛かったままだが、
+<div class="analogy"><b>たとえ</b>: 店のシャッターに近い。シャッターを下ろしても（<code>down</code>）看板（IPv4 のアドレス）は掛かったままだが、
 地図アプリの「営業中の店」の一覧（経路表）からは外れる。
 <br>ただし<b>崩れる点</b>: 店ならシャッターを上げれば客は自分で戻ってくるが、経路表の行はカーネルが付け直さないと戻らない。
 付け直すのは「アドレスとマスクから」なので、アドレスを外して上げても行は戻らない。</div>
@@ -219,8 +260,8 @@ rtt min/avg/max/mdev = 3.322/3.322/3.322/0.000 ms</code></pre>
 判定は enp0s17 の状態を読み、判定の中で 10.0.3.2 に ping を1回打って確かめる。ここで付けた設定は再起動で消えるので、第3章と演習02 で残し方を扱う。</div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>ifconfig</code> は上がっている NIC しか一覧に出さない。全部見るなら <code>ifconfig -a</code> か <code>ip link show</code></li><li>リンクを上げる（<code>ip link set … up</code>）とアドレスを付ける（<code>ip addr add</code>）は別の操作。下げてもアドレスは残り、直結の経路だけ消える</li><li><code>ip addr add</code> は足す。<code>ifconfig 名前 アドレス</code> は置き換える（2つ目以降も消える）</li><li><code>ifconfig</code> はラベルの無い2つ目（secondary）のアドレスを表示しない。<code>ip addr</code> は全部出す</li><li><code>ip addr add</code> で <code>brd</code> を省くとブロードキャストが付かない（<code>ifconfig</code> に <code>broadcast 0.0.0.0</code>）</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:a313bee9879c93ce7e87f6f58dcbebb2f753fd671235af9355b1607c484e909c / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / net-tools 2.10 / iputils 20240117 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>ifconfig</code> は上がっている NIC しか一覧に出さない。全部見るなら <code>ifconfig -a</code> か <code>ip link show</code></li><li>リンクを上げる（<code>ip link set … up</code>）とアドレスを付ける（<code>ip addr add</code>）は別の操作。下げても IPv4 のアドレスは残る（IPv6 のアドレスは消える）。直結の経路は消える</li><li><code>ip addr add</code> は足す。<code>ifconfig 名前 アドレス</code> は置き換える（Ubuntu の既定では2つ目以降も消える）</li><li><code>ifconfig</code> はラベルの無い2つ目（secondary）のアドレスを表示しない。<code>ip addr</code> は全部出す</li><li><code>ip addr add</code> で <code>brd</code> を省くとブロードキャストが付かない（<code>ifconfig</code> に <code>broadcast 0.0.0.0</code>）</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / net-tools 2.10 / iputils 20240117 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-network/theory/01-address">← 1. アドレスは、分けるたびに減る</a><a href="/linuc-network/theory/03-owner">次: 3. ifup は、自分が付けたものしか知らない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

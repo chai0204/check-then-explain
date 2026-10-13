@@ -12,7 +12,7 @@
 </div>
 <h1>5. traceroute は、断られた返事で道を知る</h1>
 <p class="lead"><code>traceroute</code> は、ping のように相手に「返事をください」と頼んでいるわけではない。わざと誰も待っていない番号（UDP の 33434 番〜）へ送り、途中のルータの「時間切れです」と、相手の「その番号には誰もいません」という<b>断りの返事（ICMP）</b>を集めて道順を組み立てる。だから、断りを返さない機械は <code>*</code> になる。</p>
-<div class="badges"><span>前提: 第4章を終えている（デフォルトルートが 192.168.10.1）</span><span>所要 14分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="badges"><span>前提: 第4章を終えている（デフォルトルートが 192.168.10.1）</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>traceroute</code> と <code>tracepath</code> の出力から、何番目の機械まで届いたかを読める</li><li>traceroute が TTL と ICMP（Time Exceeded / Port Unreachable）で道順を知る仕組みを説明できる</li><li><code>*</code> や <code>!N</code> が何を意味し、何を意味しないかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>mtr</code> などの別の道具、tracepath が経路の MTU を探す仕組みの細部（表示される <code>pmtu</code> の値が読めれば足りる）、traceroute の送り元のアドレスやポートを指定するオプション。<code>tcpdump</code> はこの章で中身を見るために使うが、出題範囲の外なので使い方は覚えなくてよい。</div></div>
@@ -21,15 +21,15 @@
 <div class="sgoal"><b>この節で分かること</b>: traceroute の出力の各列の意味。</div>
 <pre data-where="練習機の中（student@linuc）"><code>$ traceroute -n 172.16.20.10
 traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
- 1  192.168.10.1  2.023 ms  0.147 ms  0.083 ms
- 2  172.16.20.10  0.374 ms  0.070 ms  0.055 ms</code></pre>
+ 1  192.168.10.1  1.313 ms  0.110 ms  0.055 ms
+ 2  172.16.20.10  0.420 ms  0.071 ms  0.115 ms</code></pre>
 <p>1行が1つの機械（ホップ）で、左から順番・アドレス・3回測った往復時間（ms。あなたの画面では違う）。
 1番目がルータ（192.168.10.1）、2番目がサーバで、ここで終わった。<code>30 hops max</code> は「30 個目まで探す」、<code>60 byte packets</code> は送ったパケットの大きさ。
 <code>-n</code> を外すと、アドレスを名前に引いて表示する。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ traceroute 172.16.20.10
 traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
- 1  _gateway (192.168.10.1)  0.421 ms  0.064 ms  0.049 ms
- 2  172.16.20.10 (172.16.20.10)  0.080 ms  0.062 ms  0.051 ms</code></pre>
+ 1  _gateway (192.168.10.1)  0.616 ms  0.170 ms  0.062 ms
+ 2  172.16.20.10 (172.16.20.10)  0.121 ms  0.081 ms  0.064 ms</code></pre>
 <p><code>_gateway</code> は DNS の名前ではない。この練習機の名前解決の中継役（systemd-resolved）が、いまのデフォルトゲートウェイに付けて答える名前である。
 2番目は名前が引けず、アドレスのまま。名前がどこから来るかは第8章で変わる。</p>
 <p>この道順の1番目にいる router は、練習機の中に作った「別の機械」（名前空間）である。その中に入って、ルータ自身の経路表を見られる。</p>
@@ -50,13 +50,13 @@ $ sudo ip netns exec router ip route
 <p>traceroute は、ping と同じ ICMP の「返事をください（echo request）」を、途中の機械に1台ずつ送って、返事をもらっているのだろう。</p>
 <p>実際に流れたパケットを <code>tcpdump</code> で見る（1つの端末で、裏で tcpdump を動かしてから traceroute を打つ。<code>-q 1</code> は1ホップ1回、<code>-N 1</code> は1つずつ順に送る指定）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo tcpdump -l -n -t -i lab0 -c 4 "udp or icmp" 2&gt;/dev/null &amp; sleep 2; traceroute -n -q 1 -N 1 172.16.20.10; wait
-[1] 3237
+[1] 3520
 traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
- 1  192.168.10.1  1.230 ms
- 2  172.16.20.10  0.191 ms
-IP 192.168.10.2.48439 &gt; 172.16.20.10.33434: UDP, length 32
+ 1  192.168.10.1  1.488 ms
+ 2  172.16.20.10  0.657 ms
+IP 192.168.10.2.53391 &gt; 172.16.20.10.33434: UDP, length 32
 IP 192.168.10.1 &gt; 192.168.10.2: ICMP time exceeded in-transit, length 68
-IP 192.168.10.2.52514 &gt; 172.16.20.10.33435: UDP, length 32
+IP 192.168.10.2.35298 &gt; 172.16.20.10.33435: UDP, length 32
 IP 172.16.20.10 &gt; 192.168.10.2: ICMP 172.16.20.10 udp port 33435 unreachable, length 68
 [1]+  Done                    sudo tcpdump -l -n -t -i lab0 -c 4 "udp or icmp" 2&gt; /dev/null</code></pre>
 <div class="then"><b>だめな理由</b>: 送っているのは ICMP ではなく <b>UDP</b> で、宛先はサーバの 33434 番と 33435 番（誰も待っていない番号）である。
@@ -72,29 +72,45 @@ PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
 From 192.168.10.1 icmp_seq=1 Time to live exceeded
 
 --- 172.16.20.10 ping statistics ---
-1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 2ms
 $ ping -c 1 -t 2 172.16.20.10
 PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
-64 bytes from 172.16.20.10: icmp_seq=1 ttl=63 time=0.448 ms
+64 bytes from 172.16.20.10: icmp_seq=1 ttl=63 time=1.17 ms
 
 --- 172.16.20.10 ping statistics ---
-1 packets transmitted, 1 received, 0% packet loss, time 0ms
-rtt min/avg/max/mdev = 0.448/0.448/0.448/0.000 ms</code></pre>
+1 packets transmitted, 1 received, 0% packet loss, time 1ms
+rtt min/avg/max/mdev = 1.174/1.174/1.174/0.000 ms</code></pre>
 <p>TTL 1 ではルータで尽き、ルータが時間切れを返した。TTL 2 なら届く。返事の <code>ttl=63</code> は、サーバが 64 で出した返事がルータで1減って届いたことを示す。
-ICMP の echo で traceroute をさせることもできる（<code>-I</code>）。ただし ICMP を自分で組み立てて送るには root が要る。</p>
+ICMP の echo で traceroute をさせることもできる（<code>-I</code>）。ただし Ubuntu の既定では、root でないと断られる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ traceroute -I -n 172.16.20.10
 You do not have enough privileges to use this traceroute method.
 socket: Operation not permitted
-$ sudo traceroute -I -n 172.16.20.10
+$ sysctl net.ipv4.ping_group_range
+net.ipv4.ping_group_range = 1	0
+$ getcap /usr/bin/ping
+/usr/bin/ping cap_net_raw=ep</code></pre>
+<p>一般ユーザが ICMP の echo を送れるかは、カーネルの <code>ping_group_range</code>（ICMP を送ってよいグループの番号の範囲）で決まる。
+Ubuntu の既定は「1 から 0」という空の範囲で、誰も入っていない。<code>ping</code> が一般ユーザのまま打てるのは、ファイルに付いた権限（<code>cap_net_raw</code>）で動いているからで、traceroute にはそれが付いていない。
+RHEL 9 などの既定は <code>0 2147483647</code>（全部のグループ）で、そこでは一般ユーザでも <code>-I</code> が通る。同じ値にして確かめ、元に戻す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo sysctl -w net.ipv4.ping_group_range='0 2147483647'
+net.ipv4.ping_group_range = 0 2147483647
+$ traceroute -I -n 172.16.20.10
 traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
- 1  192.168.10.1  7.368 ms  0.326 ms  0.142 ms
- 2  172.16.20.10  0.484 ms * *
+ 1  192.168.10.1  3.658 ms * *
+ 2  * 172.16.20.10  0.473 ms *
+$ sudo sysctl -w net.ipv4.ping_group_range='1 0'
+net.ipv4.ping_group_range = 1 0</code></pre>
+<p>root でないまま通った。以後は Ubuntu の既定に戻したので、<code>sudo</code> を付けて打つ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo traceroute -I -n 172.16.20.10
+traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
+ 1  192.168.10.1  0.718 ms  0.104 ms *
+ 2  172.16.20.10  0.313 ms * *
 $ sudo traceroute -I -n -N 1 172.16.20.10
 traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
- 1  192.168.10.1  0.299 ms  0.228 ms  0.105 ms
- 2  172.16.20.10  0.114 ms  0.106 ms  0.101 ms</code></pre>
-<p><code>-I</code> の2行目に <code>* *</code> が出た。サーバは生きていて、1回目には答えている。
-traceroute は既定で探りを16個まで同時に送る（<code>-N 16</code>）。この取りこぼしはその既定のときに毎回出て、<code>-N 1</code>（1つずつ送る）にすると消えた（著者の環境で3回ずつ試した）。
+ 1  192.168.10.1  0.501 ms  0.320 ms  0.088 ms
+ 2  172.16.20.10  0.091 ms  0.088 ms  0.066 ms</code></pre>
+<p><code>-I</code> の結果に <code>*</code> が混じった。ルータもサーバも生きていて、同じ行のほかの回には答えている（<code>*</code> の位置は打つたびに変わる）。
+traceroute は既定で探りを16個まで同時に送る（<code>-N 16</code>）。この取りこぼしはその既定のときに毎回出て（root でないまま通した上の記録にも出ている）、<code>-N 1</code>（1つずつ送る）にすると消えた（著者の環境で3回ずつ試した）。
 <code>*</code> は「待ち時間のうちに返事を受け取れなかった」というだけで、その機械が止まっている印ではない。次の節でもう一度確かめる。</p>
 <div class="analogy"><b>たとえ</b>: 乗り換え回数の上限が書かれた切符で、行けるところまで行かせる実験に近い。
 上限1回の切符は最初の乗換駅で止められ、駅員が「ここで切れました」と知らせてくる。上限を1ずつ増やして、知らせてきた駅を並べると道順になる。
@@ -105,9 +121,9 @@ traceroute は既定で探りを16個まで同時に送る（<code>-N 16</code>�
 <div class="sgoal"><b>この節で分かること</b>: tracepath の出力の読み方と、traceroute との違い。</div>
 <pre data-where="練習機の中（student@linuc）"><code>$ tracepath -n 172.16.20.10
  1?: [LOCALHOST]                      pmtu 1500
- 1:  192.168.10.1                                          1.852ms
- 1:  192.168.10.1                                          0.116ms
- 2:  172.16.20.10                                          0.495ms reached
+ 1:  192.168.10.1                                          2.493ms
+ 1:  192.168.10.1                                          0.679ms
+ 2:  172.16.20.10                                          1.158ms reached
      Resume: pmtu 1500 hops 2 back 2</code></pre>
 <p>tracepath も UDP と TTL で道順を探す。違いは、経路の途中で通せる最大の大きさ（<b>pmtu</b>、Path MTU）も調べて表示すること。
 ここではどこも 1500 バイトで、2つ目で着いた（<code>reached</code>）。<code>back 2</code> は、返ってきた ICMP の TTL から推定した「帰り道のホップ数」。
@@ -118,7 +134,7 @@ traceroute は道順だけ、tracepath は「この道をどの高さの荷物�
 言い返さない機械があると、pmtu の値は当てにならない。</div>
 <div class="scroll"><table>
 <tr><th></th><th>ping</th><th>traceroute</th><th>tracepath</th></tr>
-<tr><td>送るもの</td><td>ICMP echo</td><td>UDP（33434〜）。<code>-I</code> で ICMP echo（root）</td><td>UDP</td></tr>
+<tr><td>送るもの</td><td>ICMP echo</td><td>UDP（33434〜）。<code>-I</code> で ICMP echo（Ubuntu の既定では root が要る）</td><td>UDP</td></tr>
 <tr><td>分かること</td><td>届くか・往復時間</td><td>途中の機械の並び</td><td>途中の機械の並びと pmtu</td></tr>
 <tr><td>IPv6 では</td><td><code>ping6</code>（または <code>ping</code>）</td><td><code>traceroute6</code>（<code>traceroute -6</code>）</td><td><code>tracepath -6</code>（第6章）</td></tr>
 <tr><td>名前を引かない</td><td><code>-n</code></td><td><code>-n</code></td><td><code>-n</code></td></tr>
@@ -132,27 +148,27 @@ router にそう振る舞わせる。router の中で、時間切れの ICMP を
 $ traceroute -n 172.16.20.10
 traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
  1  * * *
- 2  172.16.20.10  0.297 ms  0.072 ms  0.062 ms
+ 2  172.16.20.10  0.095 ms  0.079 ms  0.058 ms
 $ tracepath -n 172.16.20.10
  1?: [LOCALHOST]                      pmtu 1500
  1:  no reply
- 2:  172.16.20.10                                          0.837ms reached
+ 2:  172.16.20.10                                          0.888ms reached
      Resume: pmtu 1500 hops 2 back 2
 $ ping -c 1 172.16.20.10
 PING 172.16.20.10 (172.16.20.10) 56(84) bytes of data.
-64 bytes from 172.16.20.10: icmp_seq=1 ttl=63 time=0.547 ms
+64 bytes from 172.16.20.10: icmp_seq=1 ttl=63 time=0.834 ms
 
 --- 172.16.20.10 ping statistics ---
 1 packets transmitted, 1 received, 0% packet loss, time 0ms
-rtt min/avg/max/mdev = 0.547/0.547/0.547/0.000 ms</code></pre>
+rtt min/avg/max/mdev = 0.834/0.834/0.834/0.000 ms</code></pre>
 <p>1番目は <code>* * *</code>（tracepath は <code>no reply</code>）になったが、2番目には着いているし、ping も通る。router は普通にパケットを運んでいて、
 <b>時間切れを知らせないだけ</b>である。<code>* * *</code> の行で「ここで止まっている」と判断してはいけない。止まっているかどうかは、その先の行や ping で確かめる。
 元に戻す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo ip netns exec router iptables -D OUTPUT -p icmp --icmp-type time-exceeded -j DROP
 $ traceroute -n 172.16.20.10
 traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
- 1  192.168.10.1  2.023 ms  0.147 ms  0.083 ms
- 2  172.16.20.10  0.374 ms  0.070 ms  0.055 ms</code></pre>
+ 1  192.168.10.1  1.313 ms  0.110 ms  0.055 ms
+ 2  172.16.20.10  0.420 ms  0.071 ms  0.115 ms</code></pre>
 <div class="scroll"><table>
 <tr><th>表示</th><th>意味</th><th>この教材で見た場面</th></tr>
 <tr><td>時間（ms）が3つ</td><td>その機械から時間切れか、着いた印（port unreachable）が返った</td><td>この章のふつうの出力</td></tr>
@@ -169,7 +185,7 @@ traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
 <p>A. ICMP echo request ／ ICMP echo reply　B. UDP（33434 番〜）／ ICMP port unreachable　C. TCP の SYN ／ SYN+ACK　D. UDP（53 番）／ DNS の応答</p>
 <details><summary>答え</summary>
 <p>B。誰も待っていない UDP の番号に送り、相手の「その番号には誰もいない（port unreachable）」で着いたと判断する。
-途中のルータは TTL が尽きたときの time exceeded で分かる。ICMP echo（A）は <code>-I</code> を付けたとき（root が要る）。</p></details></div>
+途中のルータは TTL が尽きたときの time exceeded で分かる。ICMP echo（A）は <code>-I</code> を付けたとき（Ubuntu の既定では root が要る）。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>traceroute の結果が次のようになった。正しい解釈はどれか。</p>
 <pre><code> 1  * * *
@@ -183,8 +199,8 @@ traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
 1行目が <code>192.168.10.254 … !N</code> から <code>192.168.10.1</code> と <code>172.16.20.10</code> の2行に変わるのが見える。診断に使う道具として手に馴染ませておく。</div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>traceroute は UDP（33434 番〜）を TTL 1, 2, 3… で送り、途中の time exceeded と、相手の port unreachable で道順を知る</li><li><code>-I</code> は ICMP echo で調べる（root が要る）。<code>-n</code> は名前を引かない</li><li>tracepath は root なしで使え、道順に加えて経路の MTU（pmtu）を出す</li><li><code>ping -t N</code> で TTL を決めて送れる。返事の <code>ttl=63</code> は、64 から1つのルータで1減ったことを示す</li><li><code>*</code> は返事を受け取れなかっただけ。止まっている印ではない。<code>!N</code> / <code>!H</code> は途中の機械が届かないことを知らせてきた印</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:a313bee9879c93ce7e87f6f58dcbebb2f753fd671235af9355b1607c484e909c / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ traceroute 2.1.5 / iputils 20240117 / iproute2 6.1.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>traceroute は UDP（33434 番〜）を TTL 1, 2, 3… で送り、途中の time exceeded と、相手の port unreachable で道順を知る</li><li><code>-I</code> は ICMP echo で調べる。Ubuntu の既定では root が要る（<code>ping_group_range</code> が空。RHEL 9 などの既定なら一般ユーザでも通る）。<code>-n</code> は名前を引かない</li><li>tracepath は root なしで使え、道順に加えて経路の MTU（pmtu）を出す</li><li><code>ping -t N</code> で TTL を決めて送れる。返事の <code>ttl=63</code> は、64 から1つのルータで1減ったことを示す</li><li><code>*</code> は返事を受け取れなかっただけ。止まっている印ではない。<code>!N</code> / <code>!H</code> は途中の機械が届かないことを知らせてきた印</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ traceroute 2.1.5 / iputils 20240117 / iproute2 6.1.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-network/theory/04-route">← 4. 返事をしたのは、相手ではなかった</a><a href="/linuc-network/theory/06-ipv6">次: 6. IPv6 のアドレスは、頼まなくても付いている →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

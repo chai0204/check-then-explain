@@ -3,8 +3,8 @@
 ########## 0. 環境と一覧 ##########
 
 $ lab env
-テーマ    : lab-linuc-network 1.0.0
-イメージ  : ghcr.io/chai0204/lab-linuc:network-1.0.0
+テーマ    : lab-linuc-network 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:network-1.0.1
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -158,7 +158,7 @@ $ lab check 03
   → この事実から何が欠けているか考えてください。詰まったら lab hint 03
 
 $ sudo nmcli connection add type ethernet ifname enp0s18 con-name lab-dhcp
-Connection 'lab-dhcp' (c6f1881b-2321-4450-9a3d-8075a6c78e5e) successfully added.
+Connection 'lab-dhcp' (506e1791-9668-4600-95c3-a31fedfa8bc8) successfully added.
 
 $ sudo nmcli connection up lab-dhcp
 Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/2)
@@ -255,7 +255,7 @@ $ lab check 06
   判定 : 観測型（判定の中で systemd-resolved を再起動し、そのあと getent で名前を引いた）
   観測 : /etc/resolv.conf          = シンボリックリンク → ../run/systemd/resolve/stub-resolv.conf
          その中の設定              = nameserver 127.0.0.53 search .
-         t14990x3106.check.lab.example = （引けない）
+         t23765x3156.check.lab.example = （引けない）
          ns（短い名前）            = （引けない）
          → lab.example の名前が DNS から引けない
          → 短い名前 ns が ns.lab.example として引けない
@@ -272,7 +272,7 @@ $ lab check 06
   判定 : 観測型（判定の中で systemd-resolved を再起動し、そのあと getent で名前を引いた）
   観測 : /etc/resolv.conf          = シンボリックリンク → ../run/systemd/resolve/stub-resolv.conf
          その中の設定              = nameserver 127.0.0.53 search .
-         t19237x3353.check.lab.example = （引けない）
+         t15515x3415.check.lab.example = （引けない）
          ns（短い名前）            = （引けない）
          → lab.example の名前が DNS から引けない
          → 短い名前 ns が ns.lab.example として引けない
@@ -289,7 +289,7 @@ $ lab check 06
   判定 : 観測型（判定の中で systemd-resolved を再起動し、そのあと getent で名前を引いた）
   観測 : /etc/resolv.conf          = ふつうのファイル
          その中の設定              = nameserver 172.16.20.10 search lab.example
-         t14495x3608.check.lab.example = 172.16.20.10
+         t3662x3662.check.lab.example = 172.16.20.10
          ns（短い名前）            = 172.16.20.10
          systemd-resolved を再起動したあとも、lab.example の名前を 172.16.20.10 の DNS から引けた（短い名前も）
 
@@ -306,7 +306,17 @@ $ lab check 07
          → www.lab.example の Web の応答が返らない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 07
 
+$ getent ahosts www.lab.example
+172.16.20.99    STREAM www.lab.example
+172.16.20.99    DGRAM  
+172.16.20.99    RAW    
+
 $ sudo sed -i '/www.lab.example/d' /etc/hosts
+
+$ getent ahosts www.lab.example
+172.16.20.10    STREAM www.lab.example
+172.16.20.10    DGRAM  
+172.16.20.10    RAW    
 
 $ lab check 07
 ✔ 07 達成
@@ -314,7 +324,7 @@ $ lab check 07
   観測 : getent ahostsv4 www.lab.example = 172.16.20.10
          http://www.lab.example/ の中身  = hello from www.lab.example (172.16.20.10, 80/tcp)
          localhost / 自分のホスト名       = 127.0.0.1 / 127.0.1.1
-         ping も curl も使う名前解決（getent）が、DNS と同じ 172.16.20.10 を返した
+         ping も curl も使う名前解決（getent ahostsv4 で同じ引き方をした）が、DNS と同じ 172.16.20.10 を返した
 
   ════════════════════════════════════════
    確かめて説明する LinuC 主題1.07 — 全7演習クリア
@@ -394,7 +404,7 @@ $ lab check
   判定 : 観測型（判定の中で systemd-resolved を再起動し、そのあと getent で名前を引いた）
   観測 : /etc/resolv.conf          = ふつうのファイル
          その中の設定              = nameserver 172.16.20.10 search lab.example
-         t23764x5074.check.lab.example = 172.16.20.10
+         t15065x5134.check.lab.example = 172.16.20.10
          ns（短い名前）            = 172.16.20.10
          systemd-resolved を再起動したあとも、lab.example の名前を 172.16.20.10 の DNS から引けた（短い名前も）
 ✔ 07 達成
@@ -402,4 +412,4 @@ $ lab check
   観測 : getent ahostsv4 www.lab.example = 172.16.20.10
          http://www.lab.example/ の中身  = hello from www.lab.example (172.16.20.10, 80/tcp)
          localhost / 自分のホスト名       = 127.0.0.1 / 127.0.1.1
-         ping も curl も使う名前解決（getent）が、DNS と同じ 172.16.20.10 を返した
+         ping も curl も使う名前解決（getent ahostsv4 で同じ引き方をした）が、DNS と同じ 172.16.20.10 を返した

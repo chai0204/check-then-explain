@@ -14,6 +14,6 @@ COPY --chown=root:root --chmod=0644 vm/provision.sh /etc/lab-vm/provision.sh
 LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-explain
 LABEL org.opencontainers.image.description="LinuC 主題1.07（ネットワークの基礎）を仮想マシンで確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
-ENV LAB_THEME=linuc-network LAB_VERSION=1.0.0 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:network-1.0.0 LAB_VM_AUTOSTART=1
+ENV LAB_THEME=linuc-network LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:network-1.0.1 LAB_VM_AUTOSTART=1
 USER lab
