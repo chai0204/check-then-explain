@@ -153,6 +153,26 @@ $ pr -3 -t fruits.txt
 $ pr -l 12 fruits.txt | grep -c "Page"
 @@</code></pre>
 <p><code>pr</code> は印刷向けにページを組む。各ページの先頭に、ファイルの<b>更新日時・名前・ページ番号</b>のヘッダを付ける（日時は檻の中の <code>fruits.txt</code> が作られた時刻）。<code>-3</code> は3段組み、<code>-t</code> はヘッダを付けない、<code>-l 12</code> は1ページを12行にする（ヘッダと余白で10行使うので、本文は2行ずつになり4ページになった）。</p>
+<p>試験では、出すページの範囲の書き方も問われる。<code>+開始[:終了]</code>（長い書き方は <code>--pages=開始[:終了]</code>）で、ページは <code>-l</code> で決めた長さで数える。</p>
+<pre><code>@@exam
+$ seq 1 50 > fifty.txt
+$ pr -l 20 fifty.txt | grep -o "Page [0-9]*"
+$ pr -l 20 +1:3 fifty.txt | grep -o "Page [0-9]*"
+$ pr -l 20 --pages=2:3 fifty.txt | grep -o "Page [0-9]*"
+$ pr -l 20 +4 fifty.txt | grep -o "Page [0-9]*"
+@@</code></pre>
+<p>50行を1ページ20行（本文は10行）で組むと5ページになる。<code>+1:3</code> は1〜3ページ、<code>+4</code> は4ページ目から最後まで。区切りは<b>コロン</b>で、カンマやハイフンでは通らない。</p>
+<pre><code>@@exam
+$ pr -l 20 +1,3 fifty.txt | grep -c "Page"; echo "exit=${PIPESTATUS[0]}"
+$ pr -l 20 -p 1:3 fifty.txt
+$ pr -l 20 --pages 1-3 fifty.txt
+@@</code></pre>
+<p><code>+1,3</code> はページの指定と読まれず、そういう名前のファイルとして扱われた（エラーを出したうえで、<code>fifty.txt</code> は5ページ全部を出し、終了コードは 1）。<code>-p</code> というオプションは無く、<code>--pages</code> の範囲にハイフンは使えない。</p>
+<p>ヘッダの日時は、<code>pr</code> を実行した日時ではなく<b>ファイルの更新日時</b>である（<code>ls -l</code> と同じ。標準入力から読んだときだけ、実行した日時になる）。</p>
+<pre><code>@@exam
+$ ls -l --time-style="+%Y-%m-%d %H:%M" fruits.txt
+$ pr fruits.txt | sed -n 3p
+@@</code></pre>
 <pre><code>@@
 $ seq 2500 > big.txt
 $ split big.txt
@@ -192,9 +212,16 @@ D は1文字ずつの置き換え（<code>tr</code> と同じ）で、<code>foo<
 実践編の<a href="/linuc-text/">演習04</a>は、設定ファイルの1つの値だけを <code>sed</code> で書き換え、元を <code>.bak</code> で残す課題である。
 <code>^</code> で行頭を決めないと、変えてはいけない行も変わったと観測される。</div>
 
+<div class="quiz"><b>確認</b>
+<p><code>test.txt</code> を1ページ20行に組み、1ページから3ページまでを表示したい。正しいコマンドはどれか。</p>
+<p>A. <code>pr -l 20 +1,3 test.txt</code>　B. <code>pr -l 20 +1:3 test.txt</code>　C. <code>pr -l 20 -p 1:3 test.txt</code>　D. <code>pr -l 20 --pages 1-3 test.txt</code></p>
+<details><summary>答え</summary>
+<p>B。範囲はコロンで書く（<code>--pages=1:3</code> も同じ）。実測では、A の <code>+1,3</code> はファイル名として扱われ、
+C は <code>invalid option -- 'p'</code>、D は <code>invalid page range ‘1-3’</code> で止まった。</p></details></div>
+
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>sed</code> はファイルを読んで、結果を標準出力に流すだけ。ファイルを変えるのは <code>-i</code></li><li><code>s/A/B/</code> は各行の最初の1か所、<code>g</code> で全部。<code>^</code> で行頭に限る。<code>-n</code> と <code>p</code> で選んだ行だけ出す。<code>d</code> で消す</li><li>行の指定は <code>3</code> <code>2,4</code> <code>$</code> <code>/パターン/</code></li><li><code>-i</code> は新しいファイルに書いて付け替える（i ノード番号が変わる）。<code>-i.bak</code> で元を残す</li><li><code>expand</code> は TAB を空白に、<code>unexpand</code> は行頭の空白を TAB に（<code>-a</code> で全部）。<code>fmt -w</code> は空白の位置で折り返す</li><li><code>pr</code> はヘッダ付きのページを組む。<code>split</code> は既定で1000行ずつ <code>xaa</code> <code>xab</code> …</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:be6456726a12d28311a0d10b518939a3dd43642a49647edc37d12ba374bec63d / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/05-columns">← 5. uniq は隣どうししか比べない</a><a href="/linuc-text/theory/07-redirect">次: 7. リダイレクトは、左から順に配線する →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

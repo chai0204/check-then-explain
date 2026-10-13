@@ -69,6 +69,7 @@ $ grep -l ERROR access.log server.log app.conf
 $ grep -c 8080 access.log server.log app.conf
 $ grep -rl 8080 . | sort
 @@</code></pre>
+<p class="detail">第6章から同じ起動のまま続けて打ってきた場合は、第6章で作った <code>hard.conf</code>・<code>my.conf</code>・<code>my.conf.bak</code> も 8080 を含むので、この一覧が3行増える。本文と同じ画面にしたいときは <code>exit</code> して起動し直す（<code>~/text</code> が元の中身に戻る）。</p>
 <div class="scroll"><table>
 <tr><th>オプション</th><th>意味</th></tr>
 <tr><td><code>-v</code></td><td>当たら<b>ない</b>行を出す</td></tr>
@@ -106,6 +107,14 @@ $ grep "[0-9]\{3\}" server.log | head -3
 <tr><td>まとめる</td><td><code>(A|B)</code></td><td><code>\(A\|B\)</code></td></tr>
 <tr><td><code>.</code> <code>*</code> <code>^</code> <code>$</code> <code>[ ]</code></td><td colspan="2">どちらも同じ意味</td></tr>
 </table></div>
+<p class="detail">試験の例題は「基本正規表現では <code>|</code> は使えない」として作られている。<code>\|</code> <code>\+</code> <code>\?</code> は GNU の拡張で、POSIX の基本正規表現には無いからだ。試験では、基本正規表現では使えないものとして答え、「どちらか」を書くなら <code>grep -E</code> を選ぶ。</p>
+<p>試験の例題の解説には、<code>\d{5}</code> を「拡張正規表現で、ちょうど5桁の数字」と書いているものもある。<code>\d</code>（数字1文字）は Perl の書き方で、<code>grep -E</code> では使えない。この檻の <code>grep</code> では、<code>\d</code> は <code>d</code> という文字として扱われた。</p>
+<pre><code>@@exam
+$ echo "12345 ddddd" | grep -oE "\d{5}"
+$ echo "12345 ddddd" | grep -oP "\d{5}"
+$ echo "12345 ddddd" | grep -oE "[0-9]{5}"
+@@</code></pre>
+<p>数字を表すなら、拡張でも基本でも <code>[0-9]</code>（または <code>[[:digit:]]</code>）と書く。<code>\d</code> が数字になるのは <code>grep -P</code>（Perl 互換）だけである。</p>
 <p><code>egrep</code> は <code>grep -E</code>、<code>fgrep</code> は <code>grep -F</code> と同じものである。中身を見ると、どちらも3行の小さなシェルスクリプトで、仕事をしているのは最後の1行（<code>exec grep -E "$@"</code> / <code>exec grep -F "$@"</code>）だけだった。</p>
 <pre><code>@@
 $ egrep "ERROR|WARN" server.log
@@ -202,7 +211,7 @@ C は先頭に別の文字があり、D は末尾が5桁なので外れる。</p
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>grep</code> のパターンは正規表現。<code>.</code> は任意の1文字で、行のどこかに当たれば出る。文字どおりなら <code>-F</code> か <code>\.</code>、行全体なら <code>-x</code>、単語なら <code>-w</code></li><li><code>^</code> 行頭、<code>$</code> 行末、<code>*</code> 直前の0回以上（だから <code>x*</code> は全行に当たる）、<code>[ ]</code> どれか1文字、<code>[^ ]</code> それ以外の1文字</li><li>基本正規表現（<code>grep</code>）では <code>+ ? { } | ( )</code> に <code>\</code> が要る。拡張（<code>grep -E</code> = <code>egrep</code>）では要らない。<code>grep -F</code> = <code>fgrep</code></li><li><code>-v -i -n -c -l -r -o</code> の意味</li><li>パターンは引用符で囲む。囲まないと <code>*</code> がシェルのワイルドカードとして先に展開される</li><li>規則の一次資料は <code>regex(7)</code>（<code>man 7 regex</code>）。<code>sed</code> も同じ正規表現を使う</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:be6456726a12d28311a0d10b518939a3dd43642a49647edc37d12ba374bec63d / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/08-pipe">← 8. xargs は空白で区切って引数にする</a><a href="/linuc-text/theory/10-vi">次: 10. :w! は、読み取り専用のファイルにも書く →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

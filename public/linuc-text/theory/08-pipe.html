@@ -62,6 +62,37 @@ $ printf "%s\n" apple banana | xargs -I{} echo "果物: {}"
 <p>「まとめて」には上限がある。1回のコマンド行の長さには限りがあり、<code>xargs</code> は超える分を何回かに分けて起動する。30万個の数を渡すと、<code>echo</code> は16回起動して16行を出した。</p>
 <pre><code>$ seq 1 300000 | xargs echo | wc -l
 16</code></pre>
+<p>何を実行したかを見るには <code>-t</code> を付ける。組み立てたコマンド行を<b>標準エラー出力に出してから</b>実行する。試験の例題にならって、<code>/tmp</code> にディレクトリを作って試す。</p>
+<pre><code>$ cd /tmp
+$ mkdir -p dir/d1 dir/d2 dir/d3; touch dir/d1/file1.txt dir/d2/file2.txt dir/d3/file3.txt
+$ find dir -type f | sort | xargs -t rm -f
+rm -f dir/d1/file1.txt dir/d2/file2.txt dir/d3/file3.txt
+$ find dir | sort
+dir
+dir/d1
+dir/d2
+dir/d3
+$ echo a b c | xargs -t -n 1 echo
+echo a
+a
+echo b
+b
+echo c
+c</code></pre>
+<p><code>rm -f dir/d1/file1.txt …</code> の行は <code>-t</code> が出したもので、<code>rm</code> 自身は何も出していない。<code>find dir | sort</code> で、ファイルだけが消えてディレクトリが残ったことが分かる。<code>-p</code> は、1回ずつ確かめてから実行する（<code>y</code> で実行、それ以外で飛ばす）。端末の上で打った記録で見る。</p>
+<pre><code>$ echo a b | xargs -p -n 1 echo
+echo a?...y
+a
+echo b?...n</code></pre>
+<p><code>y</code> と答えた <code>a</code> だけが実行された。ほかの似た名前のオプションも確かめておく。</p>
+<pre><code>$ find dir -type f | xargs -c 'rm -f $0'
+xargs: invalid option -- 'c'
+Try 'xargs --help' for more information.
+$ find dir -type f | xargs -P rm -f
+xargs: invalid number "rm" for -P option
+Try 'xargs --help' for more information.
+$ cd ~/text</code></pre>
+<p><code>-c</code> というオプションは無い。<code>-P</code> は同時に動かすプロセスの数を数で受け取るオプションで、<code>rm</code> を数として読めずに止まった。最後の <code>cd ~/text</code> で、この章の作業場所に戻る。</p>
 
 <h2 id="space">名前の中の空白も、区切りになる</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>xargs</code> が名前を壊す仕組みと、壊さない渡し方。</div>
@@ -195,6 +226,13 @@ wc: 2026.txt: No such file or directory
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-text/">演習06</a>は、名前に空白を含むものも含めて <code>.tmp</code> だけを <code>find</code> と <code>xargs</code> で消す課題である。
 判定は残っているファイルを数えるので、<code>-print0</code> / <code>-0</code> を付け忘れると「空白入りの名前だけが残っている」と観測される。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>dir</code> の下のファイルだけを <code>xargs</code> で消し、実行したコマンドも表示したい。適切なものはどれか。</p>
+<p>A. <code>find dir -type f | xargs rm -f</code>　B. <code>find dir -type f | xargs -c 'rm -f $0'</code>　C. <code>find dir -type f | xargs -t rm -f</code>　D. <code>find dir -type f | xargs -P rm -f</code></p>
+<details><summary>答え</summary>
+<p>C。<code>-t</code> は組み立てたコマンド行を標準エラー出力に出してから実行する。A は消すが表示しない。
+実測では B は <code>invalid option -- 'c'</code>、D は <code>invalid number "rm" for -P option</code> で止まった。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>|</code> は左の1番を右の0番につなぐ。2番は通らない（<code>2&gt;&amp;1 |</code> か <code>|&amp;</code>）。パイプの終了コードは最後のコマンドのもの</li><li><code>xargs</code> は標準入力を区切って引数に並べる。区切りは空白と改行なので、名前の空白でも割れる</li><li>名前を壊さずに渡すには <code>find -print0 | xargs -0</code>（区切りを NUL にする）か <code>find -exec ... {} +</code></li><li><code>-n 数</code> は1回に渡す数、<code>-I{}</code> は1行ずつ差し込み</li><li><code>tee</code> は画面とファイルの両方へ（<code>-a</code> で追記）。<code>$(...)</code> と <code>`...`</code> はコマンド置換で、引用符が無いと空白で区切られる</li></ul></div>

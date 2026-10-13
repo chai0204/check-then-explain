@@ -116,6 +116,7 @@ app.conf:2
 $ grep -rl 8080 . | sort
 ./app.conf
 ./server.log</code></pre>
+<p class="detail">第6章から同じ起動のまま続けて打ってきた場合は、第6章で作った <code>hard.conf</code>・<code>my.conf</code>・<code>my.conf.bak</code> も 8080 を含むので、この一覧が3行増える。本文と同じ画面にしたいときは <code>exit</code> して起動し直す（<code>~/text</code> が元の中身に戻る）。</p>
 <div class="scroll"><table>
 <tr><th>オプション</th><th>意味</th></tr>
 <tr><td><code>-v</code></td><td>当たら<b>ない</b>行を出す</td></tr>
@@ -173,6 +174,15 @@ $ grep "[0-9]\{3\}" server.log | head -3
 <tr><td>まとめる</td><td><code>(A|B)</code></td><td><code>\(A\|B\)</code></td></tr>
 <tr><td><code>.</code> <code>*</code> <code>^</code> <code>$</code> <code>[ ]</code></td><td colspan="2">どちらも同じ意味</td></tr>
 </table></div>
+<p class="detail">試験の例題は「基本正規表現では <code>|</code> は使えない」として作られている。<code>\|</code> <code>\+</code> <code>\?</code> は GNU の拡張で、POSIX の基本正規表現には無いからだ。試験では、基本正規表現では使えないものとして答え、「どちらか」を書くなら <code>grep -E</code> を選ぶ。</p>
+<p>試験の例題の解説には、<code>\d{5}</code> を「拡張正規表現で、ちょうど5桁の数字」と書いているものもある。<code>\d</code>（数字1文字）は Perl の書き方で、<code>grep -E</code> では使えない。この檻の <code>grep</code> では、<code>\d</code> は <code>d</code> という文字として扱われた。</p>
+<pre><code>$ echo "12345 ddddd" | grep -oE "\d{5}"
+ddddd
+$ echo "12345 ddddd" | grep -oP "\d{5}"
+12345
+$ echo "12345 ddddd" | grep -oE "[0-9]{5}"
+12345</code></pre>
+<p>数字を表すなら、拡張でも基本でも <code>[0-9]</code>（または <code>[[:digit:]]</code>）と書く。<code>\d</code> が数字になるのは <code>grep -P</code>（Perl 互換）だけである。</p>
 <p><code>egrep</code> は <code>grep -E</code>、<code>fgrep</code> は <code>grep -F</code> と同じものである。中身を見ると、どちらも3行の小さなシェルスクリプトで、仕事をしているのは最後の1行（<code>exec grep -E "$@"</code> / <code>exec grep -F "$@"</code>）だけだった。</p>
 <pre><code>$ egrep "ERROR|WARN" server.log
 2026-10-13 09:00:05 WARN  disk usage 85%

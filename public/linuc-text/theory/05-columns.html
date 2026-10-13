@@ -169,7 +169,7 @@ $ locale | head -3
 LANG=C.UTF-8
 LANGUAGE=
 LC_CTYPE="C.UTF-8"</code></pre>
-<p class="detail">並び順はロケールで変わる。著者の母艦（glibc）で同じ4文字を並べると、<code>en_US.UTF-8</code> では <code>a A b B</code> と大文字と小文字が交互になり、<code>ja_JP.UTF-8</code> と <code>C.UTF-8</code> では <code>A B a b</code> だった。<code>sort</code> の結果が環境によって違うときは、まず <code>locale</code> を疑う。</p>
+<p class="detail">並び順はロケールで変わる。著者の母艦（glibc）で同じ4文字を並べると、<code>en_US.UTF-8</code> では <code>a A b B</code> と大文字と小文字が交互になり、<code>ja_JP.UTF-8</code> と <code>C.UTF-8</code> では <code>A B a b</code> だった。<code>sort</code> の結果が環境によって違うときは、まず <code>locale</code> を疑う。試験の例題は既定の並びを「文字コード順」と書いているが、それは C ロケール（この檻の <code>C.UTF-8</code> も同じ並び。<code>LC_ALL=C</code> でもそうなる）での話である。選択肢に「文字コード順」とあれば、それが想定された答えと読んでよい。</p>
 <p>次は数を含む表である。見出し行は <code>tail -n +2</code>（2行目から。第4章）で外してから並べる。</p>
 <pre><code>$ tail -n +2 scores.csv | sort -t, -k4
 3,Takahashi,dev,100

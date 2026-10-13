@@ -1,0 +1,212 @@
+
+── lab-linuc-text 1.0.1 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 2. コマンドの在り処と履歴（試験対策の追加） ==========
+
+$ cd ~/text
+
+--- ここから下は、端末（pty）の上で対話シェルを動かし、1行ずつ打鍵した記録 ---
+lab@linuc:~/text$  export PROMPT_COMMAND='PS1="\$ "'
+$ bash
+$ history -c
+$ echo one
+one
+$ echo two
+two
+$ echo three
+three
+$ history
+    1  echo one
+    2  echo two
+    3  echo three
+    4  history
+$ history -d 2
+$ history
+    1  echo one
+    2  echo three
+    3  history
+    4  history -d 2
+    5  history
+$ printf '%s\n' 'echo from-file-1' 'echo from-file-2' > /tmp/hist.txt
+$ history -r /tmp/hist.txt
+$ history 4
+    7  history -r /tmp/hist.txt
+    8  echo from-file-1
+    9  echo from-file-2
+   10  history 4
+$ history -c -w /tmp/hist.txt; wc -l /tmp/hist.txt
+0 /tmp/hist.txt
+$ exit
+exit
+$ exit
+exit
+--- 対話の記録ここまで ---
+
+── lab-linuc-text 1.0.1 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 6. sed と整形（試験対策の追加） ==========
+
+$ cd ~/text
+
+$ seq 1 50 > fifty.txt
+
+$ pr -l 20 fifty.txt | grep -o "Page [0-9]*"
+Page 1
+Page 2
+Page 3
+Page 4
+Page 5
+
+$ pr -l 20 +1:3 fifty.txt | grep -o "Page [0-9]*"
+Page 1
+Page 2
+Page 3
+
+$ pr -l 20 --pages=2:3 fifty.txt | grep -o "Page [0-9]*"
+Page 2
+Page 3
+
+$ pr -l 20 +4 fifty.txt | grep -o "Page [0-9]*"
+Page 4
+Page 5
+
+$ pr -l 20 +1,3 fifty.txt | grep -c "Page"; echo "exit=${PIPESTATUS[0]}"
+pr: +1,3: No such file or directory
+5
+exit=1
+
+$ pr -l 20 -p 1:3 fifty.txt
+pr: invalid option -- 'p'
+Try 'pr --help' for more information.
+
+$ pr -l 20 --pages 1-3 fifty.txt
+pr: invalid page range ‘1-3’
+
+$ ls -l --time-style="+%Y-%m-%d %H:%M" fruits.txt
+-rw-r--r-- 1 lab lab 46 2026-10-13 09:00 fruits.txt
+
+$ pr fruits.txt | sed -n 3p
+2026-10-13 09:00                    fruits.txt                    Page 1
+
+── lab-linuc-text 1.0.1 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 8. パイプと xargs と tee（試験対策の追加） ==========
+
+$ cd /tmp
+
+$ mkdir -p dir/d1 dir/d2 dir/d3; touch dir/d1/file1.txt dir/d2/file2.txt dir/d3/file3.txt
+
+$ find dir -type f | sort | xargs -t rm -f
+rm -f dir/d1/file1.txt dir/d2/file2.txt dir/d3/file3.txt
+
+$ find dir | sort
+dir
+dir/d1
+dir/d2
+dir/d3
+
+$ echo a b c | xargs -t -n 1 echo
+echo a
+a
+echo b
+b
+echo c
+c
+
+$ find dir -type f | xargs -c 'rm -f $0'
+xargs: invalid option -- 'c'
+Try 'xargs --help' for more information.
+
+$ find dir -type f | xargs -P rm -f
+xargs: invalid number "rm" for -P option
+Try 'xargs --help' for more information.
+
+$ cd ~/text
+
+--- ここから下は、端末（pty）の上で対話シェルを動かし、1行ずつ打鍵した記録 ---
+lab@linuc:~/text$  export PROMPT_COMMAND='PS1="\$ "'
+$ echo a b | xargs -p -n 1 echo
+echo a?...y
+a
+echo b?...n
+$ exit
+exit
+--- 対話の記録ここまで ---
+
+── lab-linuc-text 1.0.1 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 9. 正規表現と grep（試験対策の追加） ==========
+
+$ cd ~/text
+
+$ echo "12345 ddddd" | grep -oE "\d{5}"
+ddddd
+
+$ echo "12345 ddddd" | grep -oP "\d{5}"
+12345
+
+$ echo "12345 ddddd" | grep -oE "[0-9]{5}"
+12345
+
+── lab-linuc-text 1.0.1 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 10. vi とエディタの切り替え（試験対策の追加） ==========
+
+$ cd ~/text
+
+$ cp memo.txt e1.txt; cp memo.txt e2.txt
+
+$ vim e1.txt
+（打鍵: dd :e e2.txt⏎ :e! e2.txt⏎ dd :wq⏎）
+E37: No write since last change (add ! to override)
+
+$ cat e1.txt
+apple
+banana
+cherry
+date
+
+$ cat e2.txt
+banana
+cherry
+date

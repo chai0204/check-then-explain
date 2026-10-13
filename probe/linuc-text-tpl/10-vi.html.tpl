@@ -32,9 +32,10 @@ $ cat memo.txt
 <div class="scroll"><table>
 <tr><th>モード</th><th>キーの扱い</th><th>入り方</th><th>抜け方</th></tr>
 <tr><td>ノーマルモード（コマンドモード）</td><td>キーが<b>命令</b>になる（<code>dd</code> で行を消す）</td><td>起動した直後 / <code>ESC</code></td><td><code>i</code> <code>a</code> <code>o</code> などで挿入、<code>:</code> でコマンドライン</td></tr>
-<tr><td>挿入モード</td><td>キーが<b>文字</b>として入る</td><td><code>i</code> <code>a</code> <code>o</code> <code>O</code> <code>c</code> など</td><td><code>ESC</code></td></tr>
+<tr><td>挿入モード（入力モード）</td><td>キーが<b>文字</b>として入る</td><td><code>i</code> <code>a</code> <code>o</code> <code>O</code> <code>c</code> など</td><td><code>ESC</code></td></tr>
 <tr><td>コマンドラインモード</td><td>画面の最下行に命令を打つ（<code>:wq</code>）</td><td><code>:</code>（探すときは <code>/</code> <code>?</code>）</td><td><kbd>Enter</kbd> で実行 / <code>ESC</code> で取り消し</td></tr>
 </table></div>
+<p class="detail">試験の例題は、ノーマルモードを「コマンドモード」、挿入モードを「入力モード」と呼ぶ。名前が違うだけで、同じものである。</p>
 <pre><code>@@
 $ cp memo.txt v5.txt
 $ vim v5.txt
@@ -139,8 +140,18 @@ $ cat v17.txt
 <tr><td><code>:q!</code></td><td>変更を捨てて終わる</td></tr>
 <tr><td><code>:wq</code> / <code>ZZ</code></td><td>保存して終わる（<code>ZZ</code> は変更があるときだけ書く）</td></tr>
 <tr><td><code>:e!</code></td><td>変更を捨て、最後に保存した状態を読み直す</td></tr>
+<tr><td><code>:e ファイル名</code></td><td>別のファイルを開く（保存していない変更があると <code>E37</code> で断られる）</td></tr>
+<tr><td><code>:e! ファイル名</code></td><td>今の変更を捨てて、別のファイルを開く</td></tr>
 <tr><td><code>:w!</code></td><td>読み取り専用でも押し通して保存する（次の節）</td></tr>
 </table></div>
+<p>試験では「保存していない編集をやめて、別のファイルを開く」打ち方も問われる。<code>e1.txt</code> で1行消したまま、<code>e2.txt</code> を開こうとした。</p>
+<pre><code>@@exam
+$ cp memo.txt e1.txt; cp memo.txt e2.txt
+$ vim e1.txt
+$ cat e1.txt
+$ cat e2.txt
+@@</code></pre>
+<p><code>:e e2.txt</code> は <code>E37</code> で断られ、<code>:e! e2.txt</code> は <code>e1.txt</code> の変更を捨てて <code>e2.txt</code> に移った。<code>e1.txt</code> は元のまま、<code>e2.txt</code> には移った先で打った <code>dd</code> が保存されている。<code>:wq! ファイル名</code> は「今の内容をそのファイルに書いて終わる」で、別のファイルを開くものではない。</p>
 
 <h2 id="readonly">読み取り専用のファイルを、:w! で書く</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>!</code> が押し通しているものと、ファイルの権限との関係。</div>
@@ -313,9 +324,16 @@ $ unset EDITOR
 そのかわり、vi を<b>どれにするか</b>は、シェルが起動のときに渡す環境変数でしか伝えられない。第1章の <code>export</code> に戻ってきた。</p>
 </div>
 
+<div class="quiz"><b>確認</b>
+<p>vi で保存していない文書を編集中である。この編集をやめて、新しく <code>/etc/crontab</code> を開くコマンドはどれか。</p>
+<p>A. <code>:e /etc/crontab</code>　B. <code>:wq! /etc/crontab</code>　C. <code>:e! /etc/crontab</code>　D. <code>/e! /etc/crontab</code></p>
+<details><summary>答え</summary>
+<p>C。A は保存していない変更があるので <code>E37</code> で断られる（実測の <code>:e e2.txt</code> と同じ）。
+B は今の内容を <code>/etc/crontab</code> に書いて終わる。D は <code>/</code> なので「<code>e! /etc/crontab</code>」という文字列を探す。</p></details></div>
+
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>vi はモードで同じキーの意味が変わる。<code>i</code> <code>a</code> <code>o</code> <code>O</code> で挿入、<code>ESC</code> でノーマル、<code>:</code> でコマンドライン</li><li><code>h j k l</code> で動く。<code>dd</code> は切り取り、<code>yy</code> は写し、<code>p</code> / <code>P</code> で貼る。<code>c</code> <code>d</code> <code>y</code> は動きのキーと組み合わせる（<code>cw</code> <code>d$</code> <code>yw</code>）</li><li><code>/</code> は下向き、<code>?</code> は上向きに探す。<code>n</code> で次</li><li><code>:q!</code> は捨てて終わる、<code>:e!</code> は読み直す、<code>ZZ</code> は保存して終わる。<code>:w!</code> は持ち主なら読み取り専用のファイルにも書き、権限は 444 のまま（ハードリンクが無ければ新しいファイルとして書くので i ノード番号が変わる）</li><li>nano は <code>^O</code> 保存、<code>^X</code> 終了。標準のエディタは <code>export EDITOR=…</code> で変える（<code>VISUAL</code> を先に見るプログラムもある。sudo を通すなら <code>sudo EDITOR=… コマンド</code>）。Ubuntu の既定は <code>/usr/bin/editor</code>（alternatives）経由で nano</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:be6456726a12d28311a0d10b518939a3dd43642a49647edc37d12ba374bec63d / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/09-regex">← 9. . は何にでも当たる1文字</a><a href="/linuc-text/">次: 実践編（演習8本） →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

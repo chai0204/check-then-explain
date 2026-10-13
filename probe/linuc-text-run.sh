@@ -5,6 +5,7 @@
 #   bash probe/linuc-text-run.sh probe      probe だけ
 #   bash probe/linuc-text-run.sh solve      solve-all だけ
 #   bash probe/linuc-text-run.sh extra      追加の記録（probe/linuc-text-probe-extra.sh。事実確認で直した箇所の裏付け）だけ
+#   bash probe/linuc-text-run.sh exam       試験対策の追加の記録（probe/linuc-text-probe-exam.sh。公式例題の監査で足した箇所）だけ
 #
 # どちらも読者と同じ起動オプション（--hostname linuc と2つのボリューム）で起動したコンテナの中で走らせる。
 # ボリュームは名前を付けず、終わったら docker rm -v で消す（名前付きボリュームを残さないため）。
@@ -43,6 +44,20 @@ run_extra() {
   echo "extra: $(grep -c '^\$ ' "$out") コマンドを記録 → $out"
 }
 
+run_exam() {
+  local out=logs/linuc-text-probe-exam.log ch name
+  : > "$out"
+  for ch in 2 6 8 9 10; do
+    name=linuc-text-exam-$ch
+    docker rm -f -v "$name" >/dev/null 2>&1
+    docker run -d --name "$name" --hostname linuc -v /home/lab/work -v /home/lab/.lab "$IMG" sleep infinity >/dev/null
+    docker cp probe/linuc-text-probe-exam.sh "$name":/tmp/probe-exam.sh
+    docker exec -u lab -w /home/lab "$name" bash -l -i /tmp/probe-exam.sh "$ch" >> "$out" 2>/dev/null
+    docker rm -f -v "$name" >/dev/null
+  done
+  echo "exam: $(grep -c '^\$ ' "$out") 行の \$ を記録 → $out"
+}
+
 run_solve() {
   local out=logs/linuc-text-solve-all.log name=linuc-text-solve
   docker rm -f -v "$name" >/dev/null 2>&1
@@ -57,8 +72,9 @@ case $what in
   probe) run_probe ;;
   solve) run_solve ;;
   extra) run_extra ;;
-  all)   run_probe; run_extra; run_solve ;;
-  *) echo "使い方: bash probe/linuc-text-run.sh [all|probe|extra|solve]"; exit 2 ;;
+  exam)  run_exam ;;
+  all)   run_probe; run_extra; run_exam; run_solve ;;
+  *) echo "使い方: bash probe/linuc-text-run.sh [all|probe|extra|exam|solve]"; exit 2 ;;
 esac
 python3 -I probe/linuc-text-gen.py probe/linuc-text-tpl/*.tpl > /dev/null && echo "章を作り直した"
 node tools/logcheck.mjs linuc-text --strict

@@ -76,7 +76,7 @@ $ sort -f fruits.txt
 $ echo "B a A b" | tr " " "\n" | sort
 $ locale | head -3
 @@</code></pre>
-<p class="detail">並び順はロケールで変わる。著者の母艦（glibc）で同じ4文字を並べると、<code>en_US.UTF-8</code> では <code>a A b B</code> と大文字と小文字が交互になり、<code>ja_JP.UTF-8</code> と <code>C.UTF-8</code> では <code>A B a b</code> だった。<code>sort</code> の結果が環境によって違うときは、まず <code>locale</code> を疑う。</p>
+<p class="detail">並び順はロケールで変わる。著者の母艦（glibc）で同じ4文字を並べると、<code>en_US.UTF-8</code> では <code>a A b B</code> と大文字と小文字が交互になり、<code>ja_JP.UTF-8</code> と <code>C.UTF-8</code> では <code>A B a b</code> だった。<code>sort</code> の結果が環境によって違うときは、まず <code>locale</code> を疑う。試験の例題は既定の並びを「文字コード順」と書いているが、それは C ロケール（この檻の <code>C.UTF-8</code> も同じ並び。<code>LC_ALL=C</code> でもそうなる）での話である。選択肢に「文字コード順」とあれば、それが想定された答えと読んでよい。</p>
 <p>次は数を含む表である。見出し行は <code>tail -n +2</code>（2行目から。第4章）で外してから並べる。</p>
 <pre><code>@@
 $ tail -n +2 scores.csv | sort -t, -k4
@@ -168,7 +168,7 @@ D は先に重複を消してしまうので、全部 1 になる。</p></detail
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>uniq</code> は直前の行とだけ比べる。全体の重複を数えるなら <code>sort | uniq -c | sort -rn</code></li><li><code>cut -d 文字 -f 番号</code>。区切りは1文字ごとなので、空白が続くと空の欄ができる（<code>tr -s</code> でまとめる）。既定の区切りは TAB</li><li><code>sort</code> は既定で文字として比べる。数なら <code>-n</code>、逆順は <code>-r</code>、欄は <code>-t</code> と <code>-k</code></li><li><code>tr</code> は標準入力しか読まない。置換・<code>-d</code> 削除・<code>-s</code> 圧縮</li><li><code>paste</code> は行の位置で並べ、<code>join</code> はキーで突き合わせる。<code>join</code> は両方が並べ替え済みであることが前提</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:be6456726a12d28311a0d10b518939a3dd43642a49647edc37d12ba374bec63d / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/04-lines">← 4. 1行とは、改行で終わっている範囲のこと</a><a href="/linuc-text/theory/06-sed">次: 6. sed は書き換えた結果を見せるだけ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

@@ -150,10 +150,17 @@ $ ls -l ~/.bash_history; echo "exit=$?"
 <tr><td><code>!!</code></td><td>直前のコマンドを再実行</td></tr>
 <tr><td><code>!番号</code></td><td>その番号のコマンドを再実行</td></tr>
 <tr><td><code>!文字列</code></td><td>その文字列で始まる最新のコマンドを再実行</td></tr>
-<tr><td><code>history -c</code></td><td>メモリ上の履歴を消す（ファイルはそのまま）</td></tr>
+<tr><td><code>history -d 番号</code></td><td>その番号の1件だけを消す（「最後の何件」ではない）</td></tr>
+<tr><td><code>history -c</code></td><td>メモリ上の履歴を全部消す（ファイルはそのまま。<code>-w</code> と組むと空の履歴でファイルを上書きする）</td></tr>
+<tr><td><code>history -r ファイル</code></td><td>ファイルの中身を、今の履歴の末尾に読み込む</td></tr>
 <tr><td><code>history -w</code> / <code>history -a</code></td><td>今すぐファイルに書く（全部 / 増えた分だけ）</td></tr>
 <tr><td><kbd>↑</kbd> <kbd>↓</kbd> / <kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>履歴をたどる / 文字列で後ろ向きに検索する</td></tr>
 </table></div>
+<p>試験でよく問われる <code>-d</code> <code>-r</code> <code>-c</code> も、端末の上で打って確かめた（同じように子の bash の中で打っている）。</p>
+<pre><code>{{SESSION@exam 2-21}}</code></pre>
+<p><code>history -d 2</code> は2番の1件（<code>echo two</code>）だけを消し、後ろの番号を詰め直した。消えたのは「最後の2件」ではない。</p>
+<pre><code>{{SESSION@exam 22-30}}</code></pre>
+<p><code>history -r</code> は、ファイルの2行を今の履歴の末尾（8番と9番）に読み込んだ。<code>history -c -w ファイル</code> は、履歴を空にしてから書くので、ファイルも空（0行）になった。「まだ書いていない分を足す」のは <code>-a</code> のほうである。</p>
 <div class="analogy"><b>たとえ</b>: 会議の<b>議事録係</b>に近い。発言はその場でメモされる（<code>history</code> で見える）が、
 清書して共有フォルダ（<code>.bash_history</code>）に置くのは会議が終わってから。
 しかもこの係は「前置きの雑談（空白で始まる行）」と「同じことの繰り返し」をメモしない方針になっている。
@@ -174,9 +181,16 @@ $ ls -l ~/.bash_history; echo "exit=$?"
 実践編の<a href="/linuc-text/">演習02</a>は、自分で用意したコマンドをどこからでも名前だけで動かす課題である。
 判定は <code>/tmp</code> に移ってから探すので、<code>PATH</code> に相対パスを足すと必ず鳴る。</div>
 
+<div class="quiz"><b>確認</b>
+<p><code>history</code> コマンドの説明として正しいものを2つ選べ。</p>
+<p>A. <code>history 10</code> は、最後の10件の履歴を表示する<br>B. <code>history -d 10</code> は、最後の10件の履歴を消す<br>C. <code>history -c -w ~/.bash_history</code> は、まだファイルに書いていない履歴を <code>~/.bash_history</code> に追記する<br>D. <code>history -r ~/.bash_history</code> は、ファイルの中身を今の履歴の末尾に読み込む</p>
+<details><summary>答え</summary>
+<p>A と D。B の <code>-d 10</code> は10番の1件だけを消す（実測の <code>history -d 2</code> は2番だけを消した）。
+C は履歴を空にしてから書くので、ファイルが空になる（実測では 0 行）。追記は <code>history -a</code>。</p></details></div>
+
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>名前だけのコマンドは、シェルが <code>PATH</code> の並びの中だけを前から探す。カレントディレクトリは探さない</li><li><code>/</code> を含む名前は <code>PATH</code> を使わない。だから <code>./hello.sh</code>。127 は見つからない、126 は実行できない</li><li><code>bash file</code> は実行権が要らず子で動く。<code>. file</code>（<code>source</code>）は今のシェルで動くので <code>cd</code> や変数が残る</li><li>絶対パスは <code>/</code> から、相対パスは <code>pwd</code> から数える。<code>.</code> と <code>..</code> は実在する名前</li><li><code>!!</code> <code>!番号</code> <code>!文字列</code> はシェルが展開してから実行する。<code>HISTCONTROL=ignoreboth</code> で空白始まりと連続した重複は残らない</li><li><code>.bash_history</code> に書かれるのはシェルの終了時</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:be6456726a12d28311a0d10b518939a3dd43642a49647edc37d12ba374bec63d / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/01-quote">← 1. 引用符と変数は、コマンドに届く前に片づく</a><a href="/linuc-text/theory/03-man">次: 3. man が説明しているのは、打ったものと別物のことがある →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
