@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. SUID は、実行する人ではなく持ち主で動く — 確かめて説明する LinuC 主題1.10</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="1" data-theme="linuc-security">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-security/theory/">理論編</a> › 第1章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
+</div>
+<h1>1. SUID は、実行する人ではなく持ち主で動く</h1>
+<p class="lead">システムを監査する最初の一歩は、<code>find</code> で特別な権限を持つファイルを洗い出すことである。ところが素朴に <code>find / -perm 4000</code> と打つと、1つも見つからない。SUID ファイルはこの練習機に15個あるのに、である。原因は「ちょうど」と「含む」の違いにある。</p>
+<div class="badges"><span>前提: なし</span><span>前提: 練習機が起動している</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.10.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>find -perm 4000</code> と <code>-perm -4000</code>・<code>-perm /6000</code> の違いを説明できる</li><li>SUID/SGID が「実行する人」ではなく「ファイルの持ち主・グループ」の権限で動くことを言える</li><li><code>s</code> と <code>S</code> の違い、SUID がシェルスクリプトには効かないことを説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: ケーパビリティ（<code>getcap</code>／<code>setcap</code>）による細かい権限分割、AppArmor や SELinux の強制アクセス制御はレベル1の範囲外である。ここでは伝統的な SUID/SGID・スティッキービットの3つだけを扱う。</div></div>
+
+<h2 id="count">「ちょうど 4000」では1つも見つからない</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>-perm</code> の数値が「完全一致」か「ビットを含む」かで結果が変わること。</div>
+<p>SUID ビットは 8 進で <code>4000</code> である。ならばと、その数で探してみる。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>SUID ファイルを全部出したいのだから、<code>-perm 4000</code> と書けばよい。SUID = 4000 なのだから、これで漏れなく出るはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo find / -xdev -perm 4000 -type f 2>/dev/null | wc -l
+@@</code></pre>
+<div class="then"><b>だめな理由</b>: 0 件。1つも出ない。<code>-perm 4000</code> は「モードが<b>ちょうど</b> 4000」という意味で、
+所有者の読み書き実行も、他人の読み実行も、何も立っていないファイルだけが対象になる。
+実在する SUID ファイルは <code>-rwsr-xr-x</code>（8進で 4755）のように他のビットも立っているので、どれも「ちょうど 4000」ではない。
+欲しいのは「4000 の<b>ビットを含む</b>」で、それには先頭に <code>-</code> を付ける。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo find / -xdev -perm -4000 -type f 2>/dev/null
+$ sudo find / -xdev -perm -4000 -type f 2>/dev/null | wc -l
+$ sudo find / -xdev -perm -u+s -type f 2>/dev/null | wc -l
+$ sudo find / -xdev -perm /6000 -type f 2>/dev/null | wc -l
+@@</code></pre>
+<p>15 個出た。<code>-4000</code> は「このビットが立っていれば、他がどうでも一致」という読み方である。記号で <code>-perm -u+s</code> と書いても同じ 15 個になる。SGID（<code>2000</code>）なら <code>-2000</code>、SUID と SGID の<b>どちらか</b>なら <code>/6000</code>（<code>/</code> は「いずれかのビット」）。<code>/6000</code> が 22 個なのは、SUID の15個に SGID だけのファイルが加わるからである（<code>/usr/bin/at</code> は両方立っているので1回だけ数える）。</p>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>意味</th></tr>
+<tr><td><code>-perm 4000</code></td><td>モードが<b>ちょうど</b> 4000（実在しない）</td></tr>
+<tr><td><code>-perm -4000</code> ／ <code>-perm -u+s</code></td><td>4000 のビットを<b>すべて含む</b>（＝ SUID が立っている全部）。記号でも書ける</td></tr>
+<tr><td><code>-perm -2000</code></td><td>SGID が立っている全部</td></tr>
+<tr><td><code>-perm /6000</code></td><td>SUID か SGID の<b>いずれか</b>が立っている</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 「赤い服の人」を探すのに、<code>-perm 4000</code> は「赤い服<b>だけ</b>を着て、ほかに何も身につけていない人」を探している。
+<code>-perm -4000</code> は「赤い服を着ている人（ほかに何を着ていてもよい）」である。
+<br>ただし<b>崩れる点</b>: 服は目で見れば分かるが、モードは複数のビットの重なりなので、人間には「含む」のほうが直感に反する。だから素朴な <code>4000</code> で空振りする。</div>
+
+<h2 id="owner">誰が実行しても、持ち主の権限になる</h2>
+<div class="sgoal"><b>この節で分かること</b>: SUID の <code>s</code> が「実行時に持ち主の権限になる」印であること。</div>
+<p>一覧に見慣れない <code>/usr/local/bin/catfile</code> がいた。これが監査で見つけたいものである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ ls -l /usr/local/bin/catfile
+$ id
+$ /usr/local/bin/catfile /etc/shadow | head -2
+$ ls -l /etc/shadow
+@@</code></pre>
+<p>自分は一般ユーザ <code>student</code>（uid 1000）なのに、一般ユーザには読めないはずの <code>/etc/shadow</code>（この練習機では <code>640</code>・<code>root:shadow</code>）が読めてしまった。<code>catfile</code> は <code>cat</code> の複製で、持ち主が <code>root</code>、そこに <b>SUID</b>（<code>-rws</code> の <code>s</code>）が立っている。<b>SUID が立った実行ファイルは、誰が起動しても「ファイルの持ち主」の権限で動く</b>（実効ユーザ ID が持ち主になる）。だから持ち主が <code>root</code> の <code>catfile</code> は、student が起動しても root としてファイルを読む。</p>
+<p><code>/usr/bin/passwd</code> が SUID なのも同じ理由である。一般ユーザが自分のパスワードを変えるには、一般ユーザには書けない <code>/etc/shadow</code> を更新する必要がある。だから <code>passwd</code> に SUID を付けて、実行の間だけ root の権限を借りる。<b>SUID は「必要な一瞬だけ権限を貸す」仕組み</b>で、だからこそ持ち主が root の SUID が増えていないかを監査する。</p>
+<div class="analogy"><b>たとえ</b>: 合鍵付きの代行サービスに近い。依頼主（student）が誰であっても、代行業者（catfile）は<b>自分が持っている鍵</b>（root の権限）で金庫（/etc/shadow）を開ける。
+<br>ただし<b>崩れる点</b>: 代行業者は依頼内容を選べるが、SUID プログラムは中身のコード次第で何でもしてしまう。<code>cat</code> の複製なら「何でも読める」になる。</div>
+
+<h2 id="script">SUID はシェルスクリプトには効かない</h2>
+<div class="sgoal"><b>この節で分かること</b>: カーネルがスクリプトの SUID を無視すること。</div>
+<p>では、<code>id</code> を実行するだけのシェルスクリプトに SUID を付けたらどうなるか。root 権限で動くなら <code>euid=0</code> が出るはずである（<code>!</code> を含むので<b>シングルクォート</b>で書く。ダブルクォートだと対話シェルの履歴展開で <code>event not found</code> になる）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ printf '#!/bin/bash\nid\n' | sudo tee /usr/local/bin/wrap.sh >/dev/null
+$ sudo chmod 4755 /usr/local/bin/wrap.sh; ls -l /usr/local/bin/wrap.sh
+$ /usr/local/bin/wrap.sh
+@@</code></pre>
+<p><code>s</code> は確かに立っているのに、<code>uid=1000(student)</code> のままで root になっていない。<b>Linux のカーネルは、スクリプト（<code>#!</code> で始まるテキスト）の SUID を無視する</b>。スクリプトは実体がインタプリタ（<code>/bin/bash</code>）で、途中で中身を差し替える余地があり危険だからである。SUID が効くのはコンパイルされた実行ファイルだけだと覚えておく。</p>
+<p>ビットの見え方も押さえる。実行権の有無で <code>s</code> と <code>S</code> が変わる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo chmod 4644 /usr/local/bin/wrap.sh; ls -l /usr/local/bin/wrap.sh
+$ sudo chmod 2755 /usr/local/bin/wrap.sh; ls -l /usr/local/bin/wrap.sh
+$ sudo rm /usr/local/bin/wrap.sh
+@@</code></pre>
+<p>試したスクリプトは消しておく（残すと、この後の <code>-perm -2000</code> の一覧に1行増える）。</p>
+<div class="scroll"><table>
+<tr><th>表示</th><th>意味</th></tr>
+<tr><td><code>-rwsr-xr-x</code></td><td>SUID あり＋所有者に実行権あり（小文字 <code>s</code>）</td></tr>
+<tr><td><code>-rwSr--r--</code></td><td>SUID あり＋所有者に実行権<b>なし</b>（大文字 <code>S</code>。効かない状態）</td></tr>
+<tr><td><code>-rwxr-sr-x</code></td><td>SGID あり＋グループに実行権あり（グループ側の <code>s</code>）</td></tr>
+</table></div>
+<p><b>大文字 <code>S</code> は「ビットは立っているが、実行ビットが無いので宙に浮いている」</b>印である。小文字なら効いている。</p>
+<div class="analogy"><b>たとえ</b>: <code>s</code> と <code>S</code> は、エンジンのかかった車（<code>s</code>）と、鍵は挿さっているがエンジンの切れた車（<code>S</code>）の違いに近い。どちらも鍵（SUID ビット）はあるが、走る（権限が効く）のは実行権のあるほうだけである。
+<br>ただし<b>崩れる点</b>: 車はひと目で動くか分かるが、<code>S</code> は <code>chmod</code> の指定ミスで意図せず生まれることが多く、見落としやすい。</div>
+
+<h2 id="sgid">SGID とスティッキービットも同じ読み方</h2>
+<div class="sgoal"><b>この節で分かること</b>: ディレクトリに付く <code>s</code> と <code>t</code> の意味。</div>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ ls -ld /tmp /var/mail
+$ sudo find / -xdev -perm -2000 -type f 2>/dev/null
+@@</code></pre>
+<p><code>/tmp</code> の末尾の <code>t</code> が<b>スティッキービット</b>。誰でも書けるディレクトリだが、<b>自分が作ったファイルしか消せない</b>ようにする（他人のファイルを消せない）。<code>/var/mail</code> の <code>s</code> は<b>SGID</b>で、ここに作られるファイルのグループが <code>mail</code> に揃う。ファイルに付く SGID は「グループの権限で動く」、ディレクトリに付く SGID は「中のファイルのグループを継承させる」で、意味が変わる。SGID のファイルには <code>chage</code>・<code>unix_chkpwd</code>（グループ <code>shadow</code> で <code>/etc/shadow</code> を読む）や <code>ssh-agent</code> が並ぶ。</p>
+<div class="analogy"><b>たとえ</b>: スティッキービットは、共用の冷蔵庫に「自分のものには名前を書く。他人のものは捨てない」という貼り紙をするのに近い。置くのは自由だが、捨てられるのは自分のぶんだけである。
+<br>ただし<b>崩れる点</b>: 貼り紙は人の良識に頼るが、スティッキービットはカーネルが強制する。root だけは例外で全部消せる。</div>
+
+<h2 id="fix">棚卸しで見つけたら、ビットだけ外す</h2>
+<div class="sgoal"><b>この節で分かること</b>: 不要な SUID の外し方。</div>
+<p>監査で見つけた <code>catfile</code> の SUID を外す。ファイルごと消さず、<b>ビットだけ</b>落とす（<code>u-s</code>）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo chmod u-s /usr/local/bin/catfile; ls -l /usr/local/bin/catfile
+$ /usr/local/bin/catfile /etc/shadow
+@@</code></pre>
+<p><code>s</code> が <code>x</code> に戻り、一般ユーザでは <code>/etc/shadow</code> が読めなくなった。これが監査の目的である。<b>「いま実際にどのファイルが特別な権限を持っているか」を数え、身に覚えのないものを無効化する。</b></p>
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/linuc-security/">演習01</a>が、この棚卸しと無効化をそのまま行う課題である。判定は、練習機の中で <code>catfile</code> の SUID が落ちているかを実際に見る。この章のとおりに打った後なら、演習01 はそのまま達成になる（自力で解きたいなら、この章を打つ前に演習から始める。やり直しは外の端末で <code>vm reset --yes</code>）。</div>
+
+<div class="quiz"><b>確認</b>
+<p>システムの SUID ファイルを<b>漏れなく</b>一覧したい。正しいのはどれか。</p>
+<p>ア <code>find / -perm 4000 -type f</code>　イ <code>find / -perm -4000 -type f</code>　ウ <code>find / -perm 755 -type f</code></p>
+<details><summary>答え</summary>
+<p><b>イ</b>。<code>-perm 4000</code>（ちょうど一致）は他のビットも立った実在の SUID に当たらず 0 件になる。
+「4000 のビットを含む」の <code>-perm -4000</code> を使う。SGID は <code>-perm -2000</code>、どちらかは <code>-perm /6000</code>。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>ls -l</code> で <code>-rwSr--r--</code>（大文字 <code>S</code>）と出た。どういう状態か。</p>
+<details><summary>答え</summary>
+<p>SUID ビットは立っているが、<b>所有者に実行権（x）が無い</b>ので効いていない状態。
+小文字 <code>s</code> なら実行権があり効いている。<code>chmod 4644</code> のように実行権を落とすとこうなる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>id</code> を実行するだけのシェルスクリプトに <code>chmod 4755</code> を付けた。一般ユーザが実行すると <code>euid</code> はどうなるか。</p>
+<details><summary>答え</summary>
+<p>root にならない（<code>uid</code> も実効ユーザも実行者のまま）。カーネルはシェルスクリプトの SUID を無視する。
+効くのはコンパイル済みの実行ファイルだけ。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li><code>find -perm 4000</code> は「ちょうど」なので空振りする。棚卸しは「含む」の <code>-perm -4000</code>（SGID は <code>-2000</code>、いずれかは <code>/6000</code>）</li>
+<li>SUID/SGID は「実行する人」ではなく「ファイルの持ち主・グループ」の権限で動く。だから持ち主 root の SUID は誰が動かしても root になる</li>
+<li><code>s</code> は効いている、<code>S</code> は実行ビットが無く宙に浮いている</li>
+<li>カーネルはシェルスクリプトの SUID を無視する。効くのはコンパイル済みの実行ファイルだけ</li>
+<li>ディレクトリの <code>t</code> はスティッキービット（自分のファイルしか消せない）、ディレクトリの <code>s</code> はグループの継承</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / findutils 4.9.0 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-security/theory/">← 理論編 目次</a><a href="/linuc-security/theory/02-accounts">次: 2. 「ロックした」は「無効化した」ではない →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-security/chapters.js"></script>
+<script src="/linuc-security/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

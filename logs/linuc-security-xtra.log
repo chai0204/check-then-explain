@@ -1,102 +1,13 @@
-========== 補足: who と utmp（tty のないログインは載らない） ==========
+========== 8. 鍵の生成時間（1.0.1・KVM なしの TCG） ==========
 
-$ who
+$ TIMEFORMAT='%R 秒（rsa 4096）'; for i in 1 2 3; do rm -f /tmp/t_rsa /tmp/t_rsa.pub; time ssh-keygen -q -t rsa -b 4096 -N '' -f /tmp/t_rsa; done
+10.672 秒（rsa 4096）
+7.541 秒（rsa 4096）
+4.744 秒（rsa 4096）
 
-$ w -h
-student           10.0.2.2         11:01    4:51   0.00s  0.30s sshd: student [priv]
-========== 補足: ulimit のハードは一方通行 ==========
+$ TIMEFORMAT='%R 秒（ed25519）'; for i in 1 2 3; do rm -f /tmp/t_ed /tmp/t_ed.pub; time ssh-keygen -q -t ed25519 -N '' -f /tmp/t_ed; done
+0.116 秒（ed25519）
+0.111 秒（ed25519）
+0.366 秒（ed25519）
 
-$ bash -c "ulimit -Hn 2048; ulimit -Hn; ulimit -Hn 4096; echo rc=$?"
-2048
-rc=0
-bash: line 1: ulimit: open files: cannot modify limit: Operation not permitted
-
-$ bash -c "ulimit -Sn 256; ulimit -Sn; ulimit -Sn 1024; echo rc=$?"
-256
-rc=0
-========== 補足: アカウント有効期限は shadow の8列目 ==========
-
-$ sudo grep "^olduser" /etc/shadow | cut -d: -f8
-
-
-$ sudo usermod -e 1 olduser; sudo grep "^olduser" /etc/shadow | cut -d: -f8
-1
-
-$ sudo usermod -e "" olduser; echo restored
-restored
-========== 補足: ハードリミットの引き下げは戻せない（同じシェル内） ==========
-
-$ ulimit -Hn 2048; ulimit -Hn; ulimit -Hn 4096
-2048
-bash: line 1: ulimit: open files: cannot modify limit: Operation not permitted
-========== 補足: nologin は自分（vm ssh）も締め出す ==========
-
-$ lab-guest 'echo メンテナンス中（10:40まで） > /etc/nologin'
-
-$ vm ssh echo 入れた
-▶ ssh linuc echo 入れた
-メンテナンス中（10:40まで）
-
-Connection closed by 127.0.0.1 port 2222
-
-$ lab-guest 'rm -f /etc/nologin && echo removed_by_root'
-removed_by_root
-
-$ vm ssh echo 入れた
-▶ ssh linuc echo 入れた
-入れた
-========== 補足2: nologin の一連（本文用・メッセージ統一） ==========
-
-$ echo "メンテナンス中です" | sudo tee /etc/nologin
-メンテナンス中です
-
-$ vm ssh echo hello
-▶ ssh linuc echo hello
-メンテナンス中です
-
-Connection closed by 127.0.0.1 port 2222
-
-$ lab-guest 'rm -f /etc/nologin && echo removed_by_root'
-removed_by_root
-========== 補足: firewalld 稼働中に iptables -L を見る ==========
-
-$ sudo systemctl start firewalld; sleep 2; sudo firewall-cmd --state
-running
-
-$ sudo iptables -L INPUT -n | head -6
-Chain INPUT (policy ACCEPT)
-target     prot opt source               destination         
-
-$ sudo iptables -S | wc -l
-3
-
-$ sudo nft list ruleset 2>/dev/null | wc -l; command -v nft || echo no-nft
-0
-no-nft
-
-$ sudo systemctl stop firewalld; echo stopped
-stopped
-========== 補足: 鍵のサイズと生成時間（RSA と ed25519） ==========
-
-$ rm -f /tmp/k_*; ssh-keygen -q -t rsa -b 4096 -N "" -f /tmp/k_rsa -C demo; ssh-keygen -q -t ecdsa -b 521 -N "" -f /tmp/k_ecdsa -C demo; ssh-keygen -q -t ed25519 -N "" -f /tmp/k_ed -C demo; echo done
-done
-
-$ wc -c /tmp/k_rsa.pub /tmp/k_ecdsa.pub /tmp/k_ed.pub
- 730 /tmp/k_rsa.pub
- 258 /tmp/k_ecdsa.pub
-  86 /tmp/k_ed.pub
-1074 total
-
---- 生成時間（著者計測用・本文には秒数を載せない）---
-real	0m6.236s
-real	0m0.160s
-========== 補足: gpg 暗号化・復号（読者と同じフラグ） ==========
-
-$ echo 社外秘のメモ > ~/secret.txt; gpg --encrypt --recipient deploy@linuc.example ~/secret.txt; ls -l ~/secret.txt.gpg
-gpg: cannot open '/dev/tty': No such device or address
--rw-r--r-- 1 deploy deploy 199 Oct 13 10:59 /home/deploy/secret.txt.gpg
-
-$ gpg --decrypt ~/secret.txt.gpg
-gpg: encrypted with cv25519 key, ID 74AB59485FE29363, created 2026-10-13
-      "Deploy <deploy@linuc.example>"
-社外秘のメモ
+$ rm -f /tmp/t_rsa /tmp/t_rsa.pub /tmp/t_ed /tmp/t_ed.pub

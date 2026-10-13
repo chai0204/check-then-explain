@@ -5,23 +5,20 @@
 $ lab check; echo "exit=$?"
 ✗ 01 未達
   判定 : 観測型（練習機の中で /usr/local/bin/catfile の SUID を見た）
-  観測 : -rwsr-xr-x 1 root root 39384 Oct 13 11:37 /usr/local/bin/catfile
+  観測 : -rwsr-xr-x 1 root root 39384 Oct 13 19:25 /usr/local/bin/catfile
          → まだ SUID が立っている（find -perm -4000 が当たった）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 01
 ✗ 02 未達
   判定 : 観測型（getent shadow olduser の有効期限フィールドを見た）
   観測 : パスワードのロック = いいえ
          アカウント有効期限 = 未設定（never）
-         → 期限切れになっていない。パスワードをロックしても鍵では入れてしまう
-           （本当に止めるには有効期限を切る: usermod -e / chage -E）
+         → アカウントの有効期限が切れていない（鍵を持つ人は、パスワードのロックに関係なく入れる状態）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 02
 ✗ 03 未達
   判定 : 観測型（ss で 2323 の待ち受けと、lab-echo の有効/無効を見た）
-  観測 : 2323 の待ち受け = あり
-         lab-echo: is-active = active / is-enabled = enabled
-         → まだ 2323 で待ち受けている（サービスが動いている）
-         → lab-echo がまだ active
-         → lab-echo が enabled のまま。次の起動でまた上がる（disable が要る）
+  観測 : 2323 の待ち受け = なし
+         lab-echo: is-active = inactive / is-enabled = enabled
+         → lab-echo が enabled のまま（次の起動でまた上がる）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 03
 ✗ 04 未達
   判定 : 観測型（deploy として sudo journalctl と sudo id を実際に打った）
@@ -41,10 +38,9 @@ $ lab check; echo "exit=$?"
 ✗ 06 未達
   判定 : 観測型（authorized_keys の鍵数と、ホーム・.ssh・鍵ファイルの権限を見た）
   観測 : /home/deploy      = 750 deploy
-         /home/deploy/.ssh = ===KEYS===
+         /home/deploy/.ssh = 無い
          authorized_keys   = 無い（公開鍵 0 本）
-         → authorized_keys に鍵が無い
-  /lab/verify/06.sh: line 29: 8#: invalid integer constant (error token is "8#")
+         → authorized_keys に公開鍵が無い
   → この事実から何が欠けているか考えてください。詰まったら lab hint 06
 ✗ 07 未達
   判定 : 観測型（deploy の秘密鍵で暗号文を実際に復号してみた）
@@ -61,18 +57,18 @@ exit=1
 $ lab check 01; echo "exit=$?"
 ✗ 01 未達
   判定 : 観測型（練習機の中で /usr/local/bin/catfile の SUID を見た）
-  観測 : -rwsr-xr-x 1 root root 39384 Oct 13 11:37 /usr/local/bin/catfile
+  観測 : -rwsr-xr-x 1 root root 39384 Oct 13 19:25 /usr/local/bin/catfile
          → まだ SUID が立っている（find -perm -4000 が当たった）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 01
 exit=1
 
 $ ssh linuc sudo\ chmod\ u-s\ /usr/local/bin/catfile\;\ ls\ -l\ /usr/local/bin/catfile
--rwxr-xr-x 1 root root 39384 Oct 13 11:37 /usr/local/bin/catfile
+-rwxr-xr-x 1 root root 39384 Oct 13 19:25 /usr/local/bin/catfile
 
 $ lab check 01; echo "exit=$?"
 ✔ 01 達成
   判定 : 観測型（練習機の中で /usr/local/bin/catfile の SUID を見た）
-  観測 : -rwxr-xr-x 1 root root 39384 Oct 13 11:37 /usr/local/bin/catfile
+  観測 : -rwxr-xr-x 1 root root 39384 Oct 13 19:25 /usr/local/bin/catfile
          SUID ビットは立っていない（find -perm -4000 が当たらなかった）
          → 一般ユーザは catfile 経由で /etc/shadow を読めない
 exit=0
@@ -85,8 +81,7 @@ $ lab check 02; echo "exit=$?"
   判定 : 観測型（getent shadow olduser の有効期限フィールドを見た）
   観測 : パスワードのロック = いいえ
          アカウント有効期限 = 未設定（never）
-         → 期限切れになっていない。パスワードをロックしても鍵では入れてしまう
-           （本当に止めるには有効期限を切る: usermod -e / chage -E）
+         → アカウントの有効期限が切れていない（鍵を持つ人は、パスワードのロックに関係なく入れる状態）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 02
 exit=1
 
@@ -98,8 +93,7 @@ $ lab check 02; echo "exit=$?"
   判定 : 観測型（getent shadow olduser の有効期限フィールドを見た）
   観測 : パスワードのロック = はい（! か *）
          アカウント有効期限 = 未設定（never）
-         → 期限切れになっていない。パスワードをロックしても鍵では入れてしまう
-           （本当に止めるには有効期限を切る: usermod -e / chage -E）
+         → アカウントの有効期限が切れていない（鍵を持つ人は、パスワードのロックに関係なく入れる状態）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 02
 exit=1
 
@@ -111,7 +105,7 @@ $ lab check 02; echo "exit=$?"
   判定 : 観測型（getent shadow olduser の有効期限フィールドを見た）
   観測 : パスワードのロック = はい（! か *）
          アカウント有効期限 = 1970 から 1 日目（今日 = 20739 日目）
-         有効期限が今日以前 → sshd はこのアカウントのログインを拒否する
+         有効期限が今日以前 → 鍵の認証が通っても、PAM のアカウント検査（pam_unix）がログインを拒否する
 exit=0
 
 
@@ -124,7 +118,7 @@ $ lab check 03; echo "exit=$?"
          lab-echo: is-active = active / is-enabled = enabled
          → まだ 2323 で待ち受けている（サービスが動いている）
          → lab-echo がまだ active
-         → lab-echo が enabled のまま。次の起動でまた上がる（disable が要る）
+         → lab-echo が enabled のまま（次の起動でまた上がる）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 03
 exit=1
 
@@ -209,10 +203,9 @@ $ lab check 06; echo "exit=$?"
 ✗ 06 未達
   判定 : 観測型（authorized_keys の鍵数と、ホーム・.ssh・鍵ファイルの権限を見た）
   観測 : /home/deploy      = 750 deploy
-         /home/deploy/.ssh = ===KEYS===
+         /home/deploy/.ssh = 無い
          authorized_keys   = 無い（公開鍵 0 本）
-         → authorized_keys に鍵が無い
-  /lab/verify/06.sh: line 29: 8#: invalid integer constant (error token is "8#")
+         → authorized_keys に公開鍵が無い
   → この事実から何が欠けているか考えてください。詰まったら lab hint 06
 exit=1
 
@@ -229,7 +222,7 @@ $ lab check 06; echo "exit=$?"
   観測 : /home/deploy      = 750 deploy
          /home/deploy/.ssh = 700 deploy
          authorized_keys   = 600 deploy（公開鍵 1 本）
-         鍵が登録され、権限も StrictModes に適合（sshd はこの鍵を使う）
+         鍵が登録され、ホーム・.ssh・鍵の権限が StrictModes の条件を満たす
 exit=0
 
 
@@ -253,7 +246,7 @@ gpg: checking the trustdb
 gpg: marginals needed: 3  completes needed: 1  trust model: pgp
 gpg: depth: 0  valid:   1  signed:   0  trust: 0-, 0q, 0n, 0m, 0f, 1u
 gpg: next trustdb check due at 2029-10-12
--rw-r--r-- 1 deploy deploy 199 Oct 13 11:38 /home/deploy/secret.txt.gpg
+-rw-r--r-- 1 deploy deploy 199 Oct 13 19:26 /home/deploy/secret.txt.gpg
 
 $ lab check 07; echo "exit=$?"
 ✔ 07 達成
@@ -271,7 +264,7 @@ $ lab check 07; echo "exit=$?"
    ✔ 01  find -perm 4000 と -4000 の違い、SUID は「実行する人」ではなく「ファイルの持ち主」で動くこと
    ✔ 02  passwd -l は鍵ログインを止めない。usermod -e / chage -E の期限切れが本当の無効化
    ✔ 03  ポート番号→プロセス→サービスの辿り方。停止と無効化（二度と上がらない）の違い
-   ✔ 04  sudoers.d の権限が緩いと丸ごと無視される。visudo -c で構文を確かめる
+   ✔ 04  other に書ける・root 以外のグループが書ける sudoers は読まれない。visudo -c は構文と権限を確かめる
    ✔ 05  既定 ACCEPT のチェインに DROP を足す。22 を巻き込むと自分が締め出される
    ✔ 06  ~/.ssh と authorized_keys の権限が緩いと sshd は鍵を黙って無視する（StrictModes）
    ✔ 07  公開鍵で暗号化し秘密鍵で復号する。鍵束と設定は ~/.gnupg にある
@@ -292,14 +285,14 @@ exit=0
 $ lab check; echo "exit=$?"
 ✔ 01 達成
   判定 : 観測型（練習機の中で /usr/local/bin/catfile の SUID を見た）
-  観測 : -rwxr-xr-x 1 root root 39384 Oct 13 11:37 /usr/local/bin/catfile
+  観測 : -rwxr-xr-x 1 root root 39384 Oct 13 19:25 /usr/local/bin/catfile
          SUID ビットは立っていない（find -perm -4000 が当たらなかった）
          → 一般ユーザは catfile 経由で /etc/shadow を読めない
 ✔ 02 達成
   判定 : 観測型（getent shadow olduser の有効期限フィールドを見た）
   観測 : パスワードのロック = はい（! か *）
          アカウント有効期限 = 1970 から 1 日目（今日 = 20739 日目）
-         有効期限が今日以前 → sshd はこのアカウントのログインを拒否する
+         有効期限が今日以前 → 鍵の認証が通っても、PAM のアカウント検査（pam_unix）がログインを拒否する
 ✔ 03 達成
   判定 : 観測型（ss で 2323 の待ち受けと、lab-echo の有効/無効を見た）
   観測 : 2323 の待ち受け = なし
@@ -324,7 +317,7 @@ $ lab check; echo "exit=$?"
   観測 : /home/deploy      = 750 deploy
          /home/deploy/.ssh = 700 deploy
          authorized_keys   = 600 deploy（公開鍵 1 本）
-         鍵が登録され、権限も StrictModes に適合（sshd はこの鍵を使う）
+         鍵が登録され、ホーム・.ssh・鍵の権限が StrictModes の条件を満たす
 ✔ 07 達成
   判定 : 観測型（deploy の秘密鍵で暗号文を実際に復号してみた）
   観測 : 秘密鍵の本数 = 1

@@ -14,7 +14,7 @@ ng=0
 [ -n "$listen" ] && { echo "       → まだ 2323 で待ち受けている（サービスが動いている）"; ng=1; }
 [ "$act" = active ] && { echo "       → lab-echo がまだ active"; ng=1; }
 case "$en" in
-  enabled|enabled-runtime|static) echo "       → lab-echo が $en のまま。次の起動でまた上がる（disable が要る）"; ng=1 ;;
+  enabled|enabled-runtime|static) echo "       → lab-echo が $en のまま（次の起動でまた上がる）"; ng=1 ;;
 esac
 [ "$ng" = 0 ] || exit 1
 

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5. sudo は、許したものだけに絞る — 確かめて説明する LinuC 主題1.10</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="5" data-theme="linuc-security">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-security/theory/">理論編</a> › 第5章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
+</div>
+<h1>5. sudo は、許したものだけに絞る</h1>
+<p class="lead"><code>/etc/sudoers.d/</code> にルールを書き、<code>visudo -c</code> も通した。その後でファイルの権限を <code>666</code> にしただけで、「許したはずのコマンドが通らない」状態になる。<code>sudo</code> は、他人が書き換えられる指示書を信用せず、<b>そのファイルを丸ごと読まずに飛ばす</b>からだ。</p>
+<div class="badges"><span>前提: 第4章まで読了</span><span>前提: 練習機が起動している</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.10.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>su</code> と <code>sudo</code> の違い、<code>/etc/sudoers</code> と <code>/etc/sudoers.d/</code> の関係を説明できる</li><li>特定ユーザに特定コマンドだけを許すルールを書ける</li><li><code>sudo</code> がどんな持ち主・権限のファイルを飛ばすか、<code>visudo</code> が何を検査するかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>Cmnd_Alias</code> / <code>Runas_Alias</code> などのエイリアス、<code>Defaults</code> の細かいオプション、LDAP 連携の <code>sudoers</code> はレベル1では深追いしない。ここでは「誰に・何を・パスワードあり/なし」の基本形と、ファイルの置き場所・持ち主と権限・検査だけを扱う。</div></div>
+
+<h2 id="suvs">su は別人になる、sudo は一件だけ代理する</h2>
+<div class="sgoal"><b>この節で分かること</b>: 2つの昇格のしかたの違い。</div>
+<p><code>su</code> は<b>別のユーザに切り替える</b>。<code>su - user</code> はそのユーザのログイン環境ごと（<code>-</code> で <code>PATH</code> やホームも）切り替え、切り替え先の<b>パスワード</b>を聞く。<code>su -</code>（ユーザ省略）で root になる。一方 <code>sudo</code> は<b>1つのコマンドだけ</b>を別ユーザ（既定は root）として実行し、聞くのは<b>自分の</b>パスワードである。誰が何を実行してよいかは <code>/etc/sudoers</code> に書く。</p>
+<p>この練習機の root はパスワード欄が <code>*</code>（第2章で見た）なので、<code>su -</code> で root になることはできない。管理は <code>sudo</code> 経由に一本化されている。クラウドの標準的な構成である。</p>
+<div class="analogy"><b>たとえ</b>: <code>su</code> は制服を着替えて<b>その人になりきる</b>こと、<code>sudo</code> は「この書類1枚だけ代わりにハンコを押してください」と<b>一件だけ代理</b>を頼むことに近い。
+<br>ただし<b>崩れる点</b>: 着替えには相手の鍵（パスワード）が要るが、<code>sudo</code> は自分の身分証（自分のパスワード）だけで、何を代理してよいかは名簿（sudoers）が決める。</div>
+
+<h2 id="read">既定の行を読む: % はグループ、(ALL) は誰としてでも</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>sudoers</code> の1行の読み方。</div>
+<p>まず、この練習機に最初から書かれている行を読む。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo grep -E '^(%|root)' /etc/sudoers
+$ sudo cat /etc/sudoers.d/90-cloud-init-users
+@@</code></pre>
+<p>1行は「<b>誰が　どのホストで＝(誰として:どのグループとして)　何を</b>」の順である。先頭に <code>%</code> が付くと<b>グループ</b>を指す。<code>%sudo ALL=(ALL:ALL) ALL</code> は「グループ <code>sudo</code> の人は、どのホストでも、どのユーザ・どのグループとしてでも、どのコマンドでも（自分のパスワードを入れれば）実行できる」。Ubuntu では <code>sudo</code> グループに入れることが管理者にする標準のやり方である（<code>%admin</code> は古い Ubuntu の管理者グループの名残で、互換のために残っている行）。<code>student ALL=(ALL) NOPASSWD:ALL</code> は、<code>student</code> がパスワードなしで何でもできる行（クラウドの初期設定が書いたもの）。</p>
+<p><code>(ALL)</code> は「root に限らず<b>誰としてでも</b>」実行できるという意味なので、<code>-u</code> で別のユーザとして実行できる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo -u olduser id
+@@</code></pre>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>意味</th></tr>
+<tr><td><code>student ALL=(ALL) ALL</code></td><td>ユーザ <code>student</code> が、誰としてでも、何でも（パスワードあり）</td></tr>
+<tr><td><code>%sudo ALL=(ALL:ALL) ALL</code></td><td>グループ <code>sudo</code> の人が、どのユーザ・どのグループとしてでも、何でも</td></tr>
+<tr><td><code>%lpi ALL=(ALL) NOPASSWD: /sbin/shutdown</code></td><td>グループ <code>lpi</code> の人が、<code>shutdown</code> だけをパスワードなしで</td></tr>
+<tr><td><code>deploy ALL=(root) NOPASSWD: /usr/bin/journalctl</code></td><td><code>deploy</code> が、root としてだけ、<code>journalctl</code> だけをパスワードなしで</td></tr>
+</table></div>
+
+<h2 id="scope">1コマンドだけ許す</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>sudoers</code> ルールの書き方と検査。</div>
+<p><code>deploy</code> は、いまは <code>sudo</code> を一切使えない。ログを読むために <code>journalctl</code> だけを、パスワードなしで許す。本体 <code>/etc/sudoers</code> は直接編集せず、<code>/etc/sudoers.d/</code> にファイルを1つ置く（本体の最後で取り込まれている）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo -l -U deploy ⟪k=1⟫
+$ echo 'deploy ALL=(root) NOPASSWD: /usr/bin/journalctl' | sudo tee /etc/sudoers.d/deploy
+$ sudo ls -l /etc/sudoers.d/deploy
+$ sudo chmod 440 /etc/sudoers.d/deploy
+$ sudo visudo -c
+$ sudo -l -U deploy ⟪k=2⟫
+@@</code></pre>
+<p>ルールの形は <code>deploy ALL=(root) NOPASSWD: /usr/bin/journalctl</code>。左から「誰が」「どのホストで＝(誰として)」「パスワード指定」「どのコマンド（フルパス）」である。<code>tee</code> で作ったファイルは <code>644</code> だったので、推奨の <code>440</code> にそろえてから <code>visudo -c</code> で検査した。<code>deploy</code> になって（<code>sudo -u deploy -i</code>）、実際に打つ。</p>
+<pre data-where="練習機の中（deploy。sudo -u deploy -i の後）"><code>@@
+$ sudo -n journalctl -n 1 --no-pager >/dev/null; echo rc=$? ⟪k=1⟫
+$ sudo -n id; echo rc=$?
+@@</code></pre>
+<p><code>journalctl</code> は通り（<code>rc=0</code>）、<code>id</code> は拒否された（<code>a password is required</code>）。<b>許したものだけが通り、ほかは全部拒否される。</b>これが最小権限である。</p>
+
+<h2 id="perm">持ち主と権限が緩いと、丸ごと読まれない</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>sudo</code> が設定ファイルのどんな持ち主・権限を拒むか。</div>
+<p>このファイルの権限を変えながら、<code>deploy</code> の <code>sudo</code> がどうなるかを順に見る。まず、グループ（<code>root</code>）に書き込みを足す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo chmod 664 /etc/sudoers.d/deploy; sudo ls -l /etc/sudoers.d/deploy
+@@</code></pre>
+<pre data-where="練習機の中（deploy。sudo -u deploy -i の後）"><code>@@
+$ sudo -n journalctl -n 1 --no-pager >/dev/null; echo rc=$? ⟪k=2⟫
+@@</code></pre>
+<p><code>664</code> でも通った（<code>rc=0</code>）。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>グループに書き込みがあっても読まれた。ならば other（誰でも）が書ける <code>666</code> にしても、中身が正しければ効くはずだ。ファイルの権限は中身と関係ない。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo chmod 666 /etc/sudoers.d/deploy; sudo ls -l /etc/sudoers.d/deploy
+@@</code></pre>
+<pre data-where="練習機の中（deploy。sudo -u deploy -i の後）"><code>@@
+$ sudo -n journalctl -n 1 --no-pager >/dev/null; echo rc=$? ⟪k=3⟫
+@@</code></pre>
+<div class="then"><b>だめな理由</b>: <code>666</code>（other も書ける）にした途端、<code>sudo</code> は
+<code>is world writable</code> と警告を出し、そのファイルを<b>読まなかった</b>。結果、さっきまで通っていた
+<code>journalctl</code> まで <code>a password is required</code> で拒否される。<code>sudo</code> はルールに従ってコマンドを root で実行するので、
+<b>他人が書き換えられる設定ファイルを信用しない</b>。中身が正しくても、入れ物が緩ければ飛ばす。</div></div>
+<p>この状態は <code>visudo -c</code> でも見つかる。<code>visudo -c</code> は構文だけでなく<b>持ち主と権限</b>も検査し、<code>rc=1</code> で終わる。ルールを置いた後で誰かが権限を変えても、<code>visudo -c</code> を打ち直せば分かる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo visudo -c; echo rc=$? ⟪k=1⟫
+@@</code></pre>
+<p>グループが <code>root</code> 以外で書き込める場合も飛ばされる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo chmod 660 /etc/sudoers.d/deploy; sudo chgrp deploy /etc/sudoers.d/deploy; sudo ls -l /etc/sudoers.d/deploy
+@@</code></pre>
+<pre data-where="練習機の中（deploy。sudo -u deploy -i の後）"><code>@@
+$ sudo -n journalctl -n 1 --no-pager >/dev/null; echo rc=$? ⟪k=4⟫
+@@</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo visudo -c; echo rc=$? ⟪k=2⟫
+@@</code></pre>
+<p>確かめたら推奨の <code>440</code>・<code>root:root</code> に戻す（戻さないと、この後どの <code>sudo</code> を打っても警告の行が出る）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo chgrp root /etc/sudoers.d/deploy; sudo chmod 440 /etc/sudoers.d/deploy; sudo visudo -c
+@@</code></pre>
+<div class="scroll"><table>
+<tr><th>持ち主・権限</th><th>sudo の扱い</th></tr>
+<tr><td><code>440</code>・<code>root:root</code>（推奨）／<code>644</code>・<code>664</code>・<code>root:root</code></td><td>読まれる（<code>visudo -c</code> は 440 以外を <code>bad permissions</code> と指摘する）</td></tr>
+<tr><td>other が書ける（<code>666</code> など）</td><td><code>is world writable</code> と出して<b>読まない</b></td></tr>
+<tr><td>root 以外のグループが書ける（<code>660</code>・グループ <code>deploy</code> など）</td><td><code>is owned by gid 1002, should be 0</code> と出して<b>読まない</b></td></tr>
+</table></div>
+<p>主題1.09 の logrotate が、group や other に書ける設定ファイルを無視するのと同じ考え方である（<a href="/linuc-services/theory/06-logrotate">主題1.09 の第6章</a>）。境目の細部は違うが、「root として何かを実行する道具は、他人が書き換えられる設定を信用しない」という形は共通している。</p>
+<div class="analogy"><b>たとえ</b>: 現場に出す<b>作業指示書</b>に近い。指示書どおりに重機を動かす（root 権限で実行する）のだから、
+その指示書が<b>部外者でも書き換えられる場所</b>に置いてあったら、現場監督は従わない。
+内容が正しいかより先に「この紙は本物か（書けるのは管理側だけか）」を見る。
+<br>ただし<b>崩れる点</b>: 人間の監督は「たぶん大丈夫」で従うこともあるが、<code>sudo</code> は機械的に判断する。other が書けるか、root 以外のグループが書けるなら、警告を出して例外なく飛ばす。</div>
+
+<h2 id="visudo">壊れた行と、visudo</h2>
+<div class="sgoal"><b>この節で分かること</b>: なぜ <code>visudo</code> を使うのか、壊れた行で何が起きるか。</div>
+<p><code>visudo -c</code> は構文の誤りも行と桁まで示す。<code>NOPASSWD</code> の綴りを <code>NOPASS</code> と間違えたファイルを置いてみる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ echo 'deploy ALL=(root) NOPASS: ALL' | sudo tee /etc/sudoers.d/broken
+$ sudo visudo -c; echo rc=$? ⟪k=3⟫
+$ sudo -n true; echo rc=$?
+@@</code></pre>
+<p><code>visudo -c</code> は <code>1:30: syntax error</code> と場所を指して <code>rc=1</code> を返した。だが <code>sudo</code> そのものは誤りを報告しながら<b>動き続けた</b>（<code>sudo -n true</code> は <code>rc=0</code>）。いまの <code>sudo</code> は、壊れた行の残りを捨てて残りの設定で動く（<code>error_recovery</code>。既定で有効）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ man 5 sudoers | grep -A9 '^ *error_recovery'
+$ sudo rm /etc/sudoers.d/broken
+@@</code></pre>
+<p>壊れたファイルは消しておく（残すと、この後どの <code>sudo</code> を打っても構文の誤りの行が出る。消す <code>sudo rm</code> 自身もまだ報告する）。この練習機の <code>sudo</code> は 1.9.15p5 で、1.9.3 より前は壊れた sudoers で <code>sudo</code> 全体が止まった（<code>error_recovery=false</code> にした場合も同じ）。いまでも、<b>自分を許している行を壊せば、その権限を失う</b>。root がロックされた構成では、自分の <code>sudo</code> を壊すと管理者に戻れなくなる（この練習機なら外から <code>lab-guest</code> で直せる）。だから編集は <code>visudo</code> で行い、保存の前に検査させる。<code>visudo</code> は検査で誤りを見つけると、そのままでは保存させない。</p>
+<div class="analogy"><b>たとえ</b>: <code>visudo</code> は、校正者が通さないと印刷できない<b>輪転機</b>に近い。誤植のある版は刷られない。
+<br>ただし<b>崩れる点</b>: 校正者は内容の良し悪しも見るが、<code>visudo</code> が見るのは文法と持ち主・権限だけである。「全員に全部許す」危険なルールでも、文法が正しければ通してしまう。危険かどうかは人が判断する。</div>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/linuc-security/">演習04</a>は、この <code>deploy</code> に <code>journalctl</code> だけを許す課題である。判定は、<code>deploy</code> として実際に <code>sudo journalctl</code> が通り <code>sudo id</code> が拒否されること、<code>visudo -c</code> が通ることを見る。この章のとおりに打った後なら、演習04 はそのまま達成になる（自力で解きたいなら、この章を打つ前に演習から始める）。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>/etc/sudoers.d/deploy</code> を置いて <code>visudo -c</code> も通った。その後で誰かが権限を <code>666</code> に変えた。<code>deploy</code> の <code>sudo</code> はどうなり、どう見つけられるか。</p>
+<details><summary>答え</summary>
+<p><code>sudo</code> は <code>is world writable</code> と警告してそのファイルを読まないので、許していたコマンドも <code>a password is required</code> で拒否される。
+<code>visudo -c</code> を打ち直せば <code>bad permissions, should be mode 0440</code> と出て見つかる。<code>440</code>・<code>root:root</code> に戻す。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>グループ <code>lpi</code> に属するユーザ全員に、<code>/sbin/shutdown</code> だけをパスワードなしで root として実行させたい。sudoers に書く行はどれか。</p>
+<p>ア <code>lpi ALL=(ALL) NOPASSWD: /sbin/shutdown</code>　イ <code>%lpi ALL=(ALL) NOPASSWD: /sbin/shutdown</code>　ウ <code>@lpi ALL=(ALL) /sbin/shutdown</code></p>
+<details><summary>答え</summary>
+<p><b>イ</b>。グループは先頭に <code>%</code> を付ける（アは <code>lpi</code> という名前のユーザになる）。<code>(ALL)</code> は誰としてでも実行できる指定で、root としての実行も含む。
+パスワードを聞かないのは <code>NOPASSWD:</code>（ウには無いうえ、<code>@</code> はグループの書き方ではない）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/sudoers</code> を直接 <code>vi</code> で編集せず <code>visudo</code> を使うのはなぜか。</p>
+<details><summary>答え</summary>
+<p><code>visudo</code> は保存の前に構文を検査し、誤りがあればそのままでは保存させないから。
+いまの <code>sudo</code>（1.9.3 以降）は壊れた行を捨てて動くが、自分を許す行を壊せばその権限を失い、古い <code>sudo</code> では全体が止まる。
+root がロックされていると戻れなくなるので、壊れた設定を書き込ませない仕組みが要る。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li><code>su</code> は別ユーザに切り替え（相手のパスワード）、<code>sudo</code> は1コマンドを代理実行（自分のパスワード）</li>
+<li>ルールは <code>/etc/sudoers.d/</code> に置く。形は <code>ユーザ ALL=(実行ユーザ) [NOPASSWD:] コマンド</code>（フルパス）。<code>%</code> はグループ、<code>(ALL)</code> は誰としてでも。推奨は <code>440</code>・<code>root:root</code></li>
+<li><code>sudo</code> は、other が書けるファイルと、root 以外のグループが書けるファイルを読まずに飛ばす（<code>root:root</code> の <code>664</code> は読む）</li>
+<li><code>visudo -c</code> は構文と持ち主・権限を検査する。<code>visudo</code> は誤りがあれば保存させない</li>
+<li>いまの <code>sudo</code>（1.9.3 以降）は壊れた行を捨てて動くが、自分を許す行を壊せばその権限を失う</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / sudo 1.9.15p5 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録。deploy の操作は deploy のログインシェルで記録 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-security/theory/04-ports">← 4. 開いているポートは、数えないと見えない</a><a href="/linuc-security/theory/06-services">次: 6. シャドウと、使っていないサービスを止める →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-security/chapters.js"></script>
+<script src="/linuc-security/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

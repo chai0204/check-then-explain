@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. 開いているポートは、数えないと見えない — 確かめて説明する LinuC 主題1.10</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="linuc-security">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-security/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
+</div>
+<h1>4. 開いているポートは、数えないと見えない</h1>
+<p class="lead">開いているポートを <code>nmap</code> で調べると、<code>2323/tcp open 3d-nfsd</code> と出る。だが <code>3d-nfsd</code> というサービスは動いていない。そこで実際に動いているのは <code>ncat</code> である。<code>nmap</code> の「サービス名」は、ポート番号から自分の表を引いた<b>当て推量</b>にすぎない。</p>
+<div class="badges"><span>前提: 第3章まで読了</span><span>前提: 練習機が起動している</span><span>所要 15分</span><span class="impact-c">影響度 C</span><span>出題範囲 1.10.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>ss</code>・<code>netstat</code> で待ち受けポートと、それを出しているプロセスを辿れる</li><li><code>nmap</code> の「SERVICE」列が当て推量であること、既定スキャンの範囲を説明できる</li><li><code>lsof</code>・<code>fuser</code> でポートからプロセスを特定できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>nmap</code> の高度なスキャン（<code>-sS</code> SYN スキャン、OS 判定 <code>-O</code>、NSE スクリプト）はレベル1の範囲外である。ここでは「開いているポートを数え、プロセスまで辿る」ことだけを扱う。</div></div>
+
+<h2 id="list">まず待ち受けを並べる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>ss -ltn</code> の読み方。</div>
+<p><code>ss</code> で TCP の待ち受け（<code>-l</code>）を数字のまま（<code>-n</code>）出す（行の並び順は実行のたびに変わることがある）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ ss -ltn
+@@</code></pre>
+<p><code>22</code>（ssh）と <code>53</code>（名前解決）のほかに、<code>2323</code> が <code>0.0.0.0</code>（全アドレス）で開いている。<code>53</code> が <code>127.0.0.53</code>・<code>127.0.0.54</code> なのは <code>systemd-resolved</code> のスタブで、ローカル専用である。外から届きうるのは <code>0.0.0.0</code>（と <code>[::]</code>）で待つ <code>22</code> と <code>2323</code> だ。<code>2323</code> に心当たりがなければ、これが調査対象になる。</p>
+
+<h2 id="guess">nmap のサービス名は当て推量</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>nmap</code> が何を見て「サービス名」を出しているか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>nmap</code> はポートスキャンの定番だ。SERVICE 列を見れば、そのポートで何が動いているか分かるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ nmap 127.0.0.1 ⟪out=...,4-7⟫
+@@</code></pre>
+<div class="then"><b>だめな理由</b>: <code>2323/tcp</code> が <code>3d-nfsd</code> と出た。だがこの練習機で <code>3d-nfsd</code> は動いていない。
+動いているのは <code>ncat</code> である（次の節で確かめる）。<code>nmap</code> は既定では応答の中身を調べず、
+ポート番号を<b>自前のサービス表 <code>/usr/share/nmap/nmap-services</code></b> で引いて「このポートはよく何に使われるか」を表示しているだけである
+（<code>-sV</code> を付けて初めてバナーを取りに行く）。OS の <code>/etc/services</code> には 2323 は載っていない。
+SERVICE 列は「よくある用途」であって「いま動いているもの」ではない。誰かが 2323 で別のものを動かしていても、ここには正体が出ない。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ grep -w 2323 /etc/services; echo rc=$?
+$ grep -w 2323/tcp /usr/share/nmap/nmap-services
+@@</code></pre>
+<p>もう1つ。<code>Not shown: 998 closed tcp ports</code> とある。<code>nmap</code> の既定は全 65535 ポートではなく、<b>よく使われる約 1000 ポートだけ</b>を見る。そこに入らない番号（たとえば 50000 番台）で待ち受けているものは、既定のスキャンでは<b>見えない</b>。全部見るには <code>nmap -p-</code> が要る。「<code>nmap</code> で何も出なかった＝安全」ではない。</p>
+<div class="analogy"><b>たとえ</b>: <code>nmap</code> のサービス名は、部屋番号から「ここはふつう会議室」と<b>手元の案内図を見て答えている</b>のに近い。実際にその部屋で何が行われているかは、扉を開けて（<code>-sV</code> でバナーを取って）確かめないと分からない。
+<br>ただし<b>崩れる点</b>: 建物の案内図はその建物の持ち主が作るが、<code>nmap-services</code> は世界中の調査から作った「よくある用途」の表で、その部屋の実際の使い方とは無関係である。</div>
+
+<h2 id="trace">ポートからプロセスを辿る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 待ち受けを出している実プロセスの特定。</div>
+<p>正体を知るには、自分のホストの中で「どのプロセスがそのポートを開いているか」を見る。<code>ss -p</code>・<code>netstat -p</code>・<code>lsof</code>・<code>fuser</code> のどれでもよい（他人のプロセスまで見るには root が要る）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo lsof -iTCP:2323 -sTCP:LISTEN -P -n
+$ sudo fuser 2323/tcp
+@@</code></pre>
+<p>どちらも <code>ncat</code> を指した。<code>nmap</code> の言う <code>3d-nfsd</code> ではない。<b>外から当てた名前（nmap）より、自分のホストの中から見たプロセス（ss・lsof・fuser）のほうが正しい。</b></p>
+<p><code>ss -p</code> と <code>netstat -p</code> で全体を見ると、22 番の持ち主の見え方が2つで違う。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo ss -ltnp
+$ sudo netstat -ltnp | grep -E ':22 |:2323 '
+$ systemctl is-active ssh.socket ssh.service
+@@</code></pre>
+<p><code>ss -p</code> は 22 番に <code>sshd</code> と <code>systemd</code>（PID 1）の<b>両方</b>を出す。<code>netstat -p</code> は1つのソケットに1つのプロセスしか出さないので <code>1/init</code>（systemd）だけが見える。これは <code>ssh</code> が<b>ソケット起動</b>になっているためで、<code>systemd</code>（<code>ssh.socket</code>）が 22 番を開いて持ち続け、<b>最初の接続が来たときに <code>sshd</code>（<code>ssh.service</code>）を起動して、同じソケットを渡す</b>。起動した <code>sshd</code> はその後も常駐する（両方 <code>active</code>）。だから一方の道具だけ見て「<code>sshd</code> が待ち受けていない」と判断しない。</p>
+<div class="analogy"><b>たとえ</b>: <code>ss</code>／<code>lsof</code> は、建物の<b>中から</b>「どの部屋の誰が窓を開けているか」を名簿で確かめるのに近い。<code>nmap</code> は<b>外から</b>開いている窓の数を数え、案内図で用途を推測する。
+<br>ただし<b>崩れる点</b>: 外からの観察（nmap）は攻撃者と同じ視点なので価値があるが、正体の特定には中からの名簿（ss・lsof）が要る。両方の視点が要る。</div>
+<div class="analogy"><b>たとえ</b>: ソケット起動の 22 番は、<b>受付の呼び鈴を管理会社が設置し、最初の来客で担当者を呼び出す</b>窓口に近い。担当者（sshd）は一度来たら常駐し、呼び鈴（ソケット）は管理会社（systemd）と担当者が両方握っている。
+<br>ただし<b>崩れる点</b>: 窓口なら誰が握っているか見れば分かるが、<code>netstat -p</code> は1人しか表示しないので、管理会社（PID 1）だけが握っているように見える。</div>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/linuc-security/">演習03</a>は、この <code>2323</code> を出している <code>lab-echo</code> サービスを見つけて止める課題である。判定は、練習機の中で <code>2323</code> が待ち受けていないことを実際に見る。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>nmap</code> で <code>2323/tcp open 3d-nfsd</code> と出た。そのポートで<b>実際に</b>動いているプログラムを特定するには、どれが確実か。</p>
+<p>ア <code>nmap</code> の SERVICE 列をそのまま信じる　イ ホストの中で <code>ss -ltnp</code> / <code>lsof -i</code>　ウ <code>/etc/services</code> を見る</p>
+<details><summary>答え</summary>
+<p><b>イ</b>。<code>nmap</code> の SERVICE 列（ア）は、ポート番号を <code>nmap</code> 自前の <code>nmap-services</code> で引いた当て推量で、実体とは限らない。
+<code>/etc/services</code>（ウ）も番号と名前の対応表にすぎず、いま動いているものは分からない（この練習機では 2323 は載ってすらいない）。
+確実なのは自分のホストの中から <code>ss -p</code>・<code>lsof</code>・<code>fuser</code> でプロセスを見ること。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>netstat -ltnp</code> で 22 番の持ち主が <code>sshd</code> ではなく <code>1/init</code> と出た。<code>sshd</code> は動いていないのか。</p>
+<details><summary>答え</summary>
+<p>動いていないとは限らない。ソケット起動では <code>systemd</code>（PID 1）がソケットを持ち続け、最初の接続で <code>sshd</code> を起こして同じソケットを渡す。
+<code>netstat -p</code> は1つのソケットに1つのプロセスしか出さないので PID 1 だけに見える。<code>ss -ltnp</code> なら <code>sshd</code> と <code>systemd</code> の両方が出る。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li><code>ss -ltn</code> で TCP の待ち受けを数える。<code>0.0.0.0</code>/<code>[::]</code> は外から届きうる、<code>127.0.0.x</code> はローカル専用</li>
+<li><code>nmap</code> の SERVICE 列は、ポート番号を自前の <code>nmap-services</code> で引いた当て推量。実体は <code>-sV</code> かホスト内の <code>ss</code>/<code>lsof</code> で確かめる</li>
+<li><code>nmap</code> の既定はよく使われる約 1000 ポートだけ。全部見るのは <code>nmap -p-</code></li>
+<li>ポートからプロセスは <code>ss -p</code>・<code>netstat -p</code>・<code>lsof -i</code>・<code>fuser</code> で辿る（他人のプロセスには root）</li>
+<li>22 番はソケット起動。<code>ss -p</code> は sshd と systemd の両方、<code>netstat -p</code> は PID 1 だけを出す。sshd は最初の接続で起動し、以後常駐する</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / iproute2（ss）6.1.0 / net-tools（netstat）2.10 / nmap 7.94 / lsof 4.95.0 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-security/theory/03-sessions">← 3. 入っている人と、入れる上限</a><a href="/linuc-security/theory/05-sudo">次: 5. sudo は、許したものだけに絞る →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-security/chapters.js"></script>
+<script src="/linuc-security/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

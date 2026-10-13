@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>8. 鍵は、持ち主で非対称になっている — 確かめて説明する LinuC 主題1.10</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="8" data-theme="linuc-security">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-security/theory/">理論編</a> › 第8章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
+</div>
+<h1>8. 鍵は、持ち主で非対称になっている</h1>
+<p class="lead">公開鍵暗号では、鍵が2つで一対になっていて、役割が<b>非対称</b>だ。公開鍵で暗号化したものは秘密鍵でしか開けず、秘密鍵で署名したものは公開鍵で検証できる。そして鍵の強さは「ビット数の大きさ」だけでは比べられない——256 ビットの <code>ed25519</code> は、4096 ビットの RSA の16分の1の強さではなく、3072 ビットの RSA と同じくらいの強さを持つ。</p>
+<div class="badges"><span>前提: 第7章まで読了</span><span>前提: 練習機が起動している</span><span>所要 22分</span><span class="impact-c">影響度 C</span><span>出題範囲 1.10.3（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>公開鍵暗号の非対称性（暗号化⇔復号、署名⇔検証）と、共通鍵暗号との違いを説明できる</li><li><code>ssh-keygen</code> の3つのアルゴリズム（rsa/ecdsa/ed25519）の違いを言える</li><li><code>ssh-agent</code>・SSH ポート転送・<code>gpg</code> の基本の流れを説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: 楕円曲線の数学、認証局（CA）による SSH 証明書、<code>gpg</code> の信頼の輪（web of trust）の細部はレベル1では深追いしない。ここでは「鍵を作る・使う・片方でしか開けない」という骨格と、SSH の鍵・エージェント・ポート転送・GnuPG の基本操作を扱う。</div></div>
+
+<h2 id="length">ビット数では強さを比べられない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 3つのアルゴリズムの鍵長と強さの関係。</div>
+<p><code>ssh-keygen -t</code> でアルゴリズムを選んで鍵を3種類作り、鍵長（ビット）と公開鍵ファイル（<code>.pub</code>）の大きさを見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ ssh-keygen -q -t rsa -b 4096 -N '' -f /tmp/k_rsa -C demo
+$ ssh-keygen -q -t ecdsa -b 521 -N '' -f /tmp/k_ecdsa -C demo
+$ ssh-keygen -q -t ed25519 -N '' -f /tmp/k_ed -C demo
+@@</code></pre>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>暗号は鍵が長いほど強い。RSA は 4096 ビット、<code>ed25519</code> は 256 ビットなのだから、RSA 4096 のほうが16倍強いはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ for k in rsa ecdsa ed; do ssh-keygen -lf /tmp/k_$k.pub | awk '{print $1, $NF}'; done
+$ wc -c /tmp/k_rsa.pub /tmp/k_ecdsa.pub /tmp/k_ed.pub
+@@</code></pre>
+<div class="then"><b>だめな理由</b>: 鍵長は確かに 4096・521・256 と大きく違い、<code>.pub</code> ファイル（公開鍵を文字で書いたもの）も 730・258・86 バイトと違う。
+だが<b>強さはアルゴリズムと鍵長の組み合わせで決まり、違うアルゴリズムどうしをビット数で比べることはできない</b>。
+強さの目安を「何ビット相当の攻撃の手間か」で揃えると、<code>ed25519</code> は約 128 ビット相当で、<b>RSA 3072 ビットと同じくらい</b>である（米国 NIST の鍵長の指針 SP 800-57 の表、<code>ed25519</code> の仕様 RFC 8032）。
+RSA 4096 はそれより少し強いが、16倍ではない。そして <code>ed25519</code> は鍵が小さく、生成も速い（著者の練習機で3回ずつ測ると、RSA 4096 の生成は 4.7〜10.7 秒、<code>ed25519</code> は 0.1〜0.4 秒だった。RSA は大きな素数を探すので、かかる時間が毎回ばらつく。KVM なしの遅いエミュレーションなので差が目に見える）。</div></div>
+<div class="scroll"><table>
+<tr><th>アルゴリズム</th><th>方式</th><th>鍵長（この記録）</th><th>強さの目安</th><th><code>.pub</code> の大きさ</th></tr>
+<tr><td><code>rsa</code></td><td>素因数分解</td><td>4096 ビット</td><td>128 ビット相当より少し上（3072 で 128 相当）</td><td>730 バイト</td></tr>
+<tr><td><code>ecdsa</code></td><td>楕円曲線（NIST 曲線）</td><td>521 ビット</td><td>約 256 ビット相当（256 ビットの曲線なら 128 相当）</td><td>258 バイト</td></tr>
+<tr><td><code>ed25519</code></td><td>楕円曲線（Edwards 曲線）</td><td>256 ビット</td><td>約 128 ビット相当（RSA 3072 と同程度）</td><td>86 バイト</td></tr>
+</table></div>
+<p>何も指定しないで作ると、いまの既定のアルゴリズムが選ばれる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ ssh-keygen -q -N '' -f /tmp/k_default -C demo
+$ ssh-keygen -lf /tmp/k_default.pub | awk '{print $1, $NF}'
+$ ssh -V
+$ rm /tmp/k_rsa* /tmp/k_ecdsa* /tmp/k_ed* /tmp/k_default*
+@@</code></pre>
+<p>この練習機の OpenSSH 9.6 では既定が <code>ed25519</code> である。既定が <code>ed25519</code> になったのは OpenSSH 9.5（2023年10月）からで、8.0〜9.4 の既定は RSA 3072 ビットだった。古い環境では <code>-t ed25519</code> を明示する。</p>
+<div class="analogy"><b>たとえ</b>: 鍵長と強さは、<b>錠前の種類</b>と<b>ピンの本数</b>の関係に近い。同じ種類の錠前ならピンが多いほど強いが、<b>種類が違えば本数での比較は無意味</b>——ダイヤル錠の桁数とシリンダー錠のピン数を比べても強さは分からない。
+<br>ただし<b>崩れる点</b>: 錠前の強さは破る時間で測れるが、暗号の強さは「いまの計算機で現実的な時間では破れない」という前提の上にあり、将来の計算機（量子計算機など）で前提が変わりうる。</div>
+
+<h2 id="agent">ssh-agent は、鍵を預かって常駐する</h2>
+<div class="sgoal"><b>この節で分かること</b>: パスフレーズを何度も打たずに済ませる仕組みと、その後始末。</div>
+<p>秘密鍵にパスフレーズを付けると安全だが、<code>ssh</code> のたびに打つのは面倒である。そこで、鍵をメモリ上で一度だけ開いて預かる常駐プログラムが ssh-agent である。以後の <code>ssh</code> はエージェントに署名を頼む。鍵を預けるのが <code>ssh-add</code> である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ ssh-add -l ⟪k=1⟫
+$ ssh-agent -s
+$ ssh-add -l ⟪k=2⟫
+@@</code></pre>
+<p><code>ssh-agent -s</code> はエージェントを起動し、その居場所（<code>SSH_AUTH_SOCK</code> など）を<b>シェルの文として出力するだけ</b>である。いまのシェルに取り込まないので、<code>ssh-add</code> はまだ「エージェントに接続できない」と言う。<code>eval $(…)</code> で出力を実行して取り込む。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ eval $(ssh-agent -s) ⟪k=1⟫
+$ ssh-add -l ⟪k=3⟫
+$ ssh-keygen -q -t ed25519 -N '' -f /tmp/ak -C agentdemo
+$ ssh-add /tmp/ak
+$ ssh-add -l | awk '{print $1, $NF}'
+@@</code></pre>
+<p>この後ログアウトして、新しくログインし直してから見る。</p>
+<pre data-where="練習機の中（student@linuc）・ログインし直した後"><code>@@
+$ ps -o pid,ppid,cmd -C ssh-agent
+$ pkill -u student ssh-agent; ps -o pid,ppid,cmd -C ssh-agent
+$ rm /tmp/ak /tmp/ak.pub
+@@</code></pre>
+<p>エージェントは2つとも<b>ログアウトしても動き続けていた</b>（親が PID 1 になっている）。<code>ssh-agent -s</code> は自分を切り離して常駐するので、起動したシェルが終わっても止まらない。止めるのは、そのシェルの中で <code>eval $(ssh-agent -k)</code>（<code>SSH_AGENT_PID</code> のエージェントを止め、変数も消す）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ eval $(ssh-agent -s) ⟪k=2⟫
+$ eval $(ssh-agent -k)
+@@</code></pre>
+<p><code>ssh-agent bash</code> のようにエージェントの子としてシェルを起動する形なら、そのシェルを抜けたときにエージェントも終わる。</p>
+<div class="analogy"><b>たとえ</b>: <code>ssh-agent</code> は、鍵を預かる<b>受付</b>に近い。朝に一度だけ本人確認（パスフレーズ）をすれば、あとは受付が代わりに扉を開ける。
+<br>ただし<b>崩れる点</b>: 人の受付は閉館時間に帰るが、<code>ssh-agent -s</code> で起こした受付は、呼んだ人が帰っても残る。帰る前に <code>ssh-agent -k</code> で帰す必要がある。</div>
+
+<h2 id="strict">鍵を置いても、置き場所が緩いと無視される</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>sshd</code> が鍵の置き場所の権限を見ていること（StrictModes）。</div>
+<p>公開鍵を相手の <code>~/.ssh/authorized_keys</code> に置けば鍵で入れる。だが <code>sshd</code> は、そのファイルやディレクトリが<b>本人以外に書き換えられる状態</b>だと、鍵を使わない。<code>olduser</code> で確かめる（第2章で <code>localhost</code> のホスト鍵を <code>known_hosts</code> に登録済みの前提。この章から始めるなら、最初の <code>ssh</code> に <code>-o StrictHostKeyChecking=accept-new</code> を足す）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ ssh-keygen -q -t ed25519 -N '' -f /tmp/sm_key -C smdemo
+$ sudo install -d -m 700 -o olduser -g olduser /home/olduser/.ssh
+$ sudo install -m 600 -o olduser -g olduser /tmp/sm_key.pub /home/olduser/.ssh/authorized_keys
+$ ssh -i /tmp/sm_key -o BatchMode=yes olduser@localhost id ⟪k=1⟫
+$ sudo chmod 777 /home/olduser/.ssh
+$ ssh -i /tmp/sm_key -o BatchMode=yes olduser@localhost id; echo rc=$?
+$ sudo journalctl --no-pager -n 50 | grep -o 'Authentication refused: .*' | tail -1
+$ sudo chmod 700 /home/olduser/.ssh
+$ ssh -i /tmp/sm_key -o BatchMode=yes olduser@localhost id ⟪k=2⟫
+$ sudo rm -r /home/olduser/.ssh; rm /tmp/sm_key /tmp/sm_key.pub
+@@</code></pre>
+<p><code>.ssh</code> を <code>777</code> にしただけで、同じ鍵が <code>Permission denied (publickey)</code> で弾かれた。手元には理由が出ず、サーバのログにだけ <code>bad ownership or modes</code> と残る。<code>700</code> に戻すとまた入れる（確かめたら、試しに置いた鍵は消しておく）。これが <code>sshd</code> の <b>StrictModes</b>（既定で有効）である。ホーム・<code>.ssh</code>・<code>authorized_keys</code> が group や other に書けると、他人が鍵を差し込めるので信用しない。</p>
+
+<h2 id="forward">ポート転送は、トンネルの出口を手元に作る</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>ssh -L</code> が何を手元に持ってくるか。</div>
+<p>練習機の中では <code>2323</code>（第4章の echo）が動いている。だが<b>外側のホストから直接は触れない</b>（外に転送しているのは <code>22</code> だけ）。試すと接続を拒否される。</p>
+<pre data-where="外（lab@host）"><code>@@
+$ timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/2323 && head -1 <&3'; echo rc=$?
+@@</code></pre>
+<p>ここで <code>ssh -L</code> を使う。<code>-L 19999:127.0.0.1:2323</code> は「<b>手元の 19999 番</b>に来たものを、<code>ssh</code> の暗号トンネルを通して<b>相手（練習機）から見た <code>127.0.0.1:2323</code></b> へ届ける」という意味である。</p>
+<pre data-where="外（lab@host）"><code>@@
+$ ssh -f -N -L 19999:127.0.0.1:2323 linuc; sleep 1; echo tunnel_up
+$ timeout 3 bash -c 'exec 3<>/dev/tcp/127.0.0.1/19999 && head -1 <&3'
+$ pkill -f 19999:127.0.0.1:2323; echo tunnel_down
+@@</code></pre>
+<p>手元の <code>19999</code> に繋ぐと、練習機の中の echo サービスが <code>linuc-echo</code> と返した。<b>外からは見えないサービスに、<code>ssh</code> のトンネル越しに手元から届いた。</b>これが <code>-L</code>（ローカル転送）である。宛先は「<code>ssh</code> の相手から見た」住所なので、相手を中継に使って<b>さらに別のホスト</b>にも届ける。たとえば <code>ssh -L 8080:db.internal:80 relay</code> は、手元の 8080 番を、中継ホスト <code>relay</code> から見た <code>db.internal</code> の 80 番につなぐ（手元から <code>db.internal</code> に直接届かなくてよい）。逆向きに「相手側のポートに来たものを手元側へ届ける」のが <code>-R</code>（リモート転送）、トンネルの中で暗号化されるのは手元と中継の間である。</p>
+<div class="analogy"><b>たとえ</b>: <code>ssh -L</code> は、本社（中継）の内線にしか繋がっていない電話に、<b>自宅（手元）に引いた専用線</b>を通して掛けるのに近い。専用線（ssh のトンネル）の中は暗号化されている。
+<br>ただし<b>崩れる点</b>: 専用線は物理的に1本だが、<code>ssh -L</code> はトンネルの中に何本でも転送を通せる。行き先はあくまで本社（相手側）から見た宛先で、専用線の出口から先（中継から <code>db.internal</code> まで）は暗号化されない。</div>
+
+<h2 id="gpg">GnuPG: 公開鍵で暗号化し、秘密鍵で復号する</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>gpg</code> の鍵束と、公開鍵方式・共通鍵方式の違い。</div>
+<p><code>gpg</code> で鍵を作る。<code>ssh</code> の鍵とは別で、ファイルの暗号化や署名に使う。対話では <code>gpg --gen-key</code>（名前とメールだけ聞き、方式・長さ・期限は既定）か <code>gpg --full-generate-key</code>（方式・鍵長・有効期限も選ぶ）で作るが、ここでは同じ結果を確認なしで作れる <code>--quick-gen-key</code> を使う（<code>deploy</code> になって打つ）。</p>
+<pre data-where="練習機の中（deploy。sudo -u deploy -i の後）"><code>@@
+$ gpg --batch --pinentry-mode loopback --passphrase '' --quick-gen-key 'Deploy <deploy@linuc.example>' ⟪out=1-4,...⟫
+$ gpg -k ⟪out=...,5-7,...,9-10⟫
+$ ls -1 ~/.gnupg
+$ gpgconf --list-dirs agent-socket
+@@</code></pre>
+<p><code>pub</code> が主鍵（<code>[SC]</code> = 署名と鍵の証明）、<code>sub</code> が暗号化用の副鍵（<code>[E]</code>）で、<code>gpg</code> も既定が <code>ed25519</code>（暗号化は <code>cv25519</code>）になっている。<code>~/.gnupg/</code> には公開鍵束 <code>pubring.kbx</code>、秘密鍵 <code>private-keys-v1.d/</code>、信頼のデータベース <code>trustdb.gpg</code>、失効証明書 <code>openpgp-revocs.d/</code> が入る。<code>S.gpg-agent</code> は <b>gpg-agent</b>（秘密鍵とパスフレーズを預かる、<code>ssh-agent</code> の GnuPG 版）の窓口で、<code>/run/user/&lt;UID&gt;</code> があるとき（そのユーザが ssh などでログインしているとき）はそちらに作られる。場所は <code>gpgconf --list-dirs agent-socket</code> で分かる。</p>
+<p>この鍵で、ファイルを<b>自分宛てに</b>暗号化して復号する。</p>
+<pre data-where="練習機の中（deploy。sudo -u deploy -i の後）"><code>@@
+$ echo '社外秘のメモ' > ~/secret.txt
+$ gpg --encrypt --recipient deploy@linuc.example ~/secret.txt
+$ ls -l ~/secret.txt.gpg
+$ gpg --decrypt ~/secret.txt.gpg
+@@</code></pre>
+<p><code>--encrypt --recipient</code>（<code>-e -r</code>）は<b>受け取る人の公開鍵</b>で暗号化する（ここでは自分宛て）。できた <code>.gpg</code> は、対応する<b>秘密鍵</b>を持つ人だけが復号できる。相手に渡すのは公開鍵だけでよい——これが非対称の便利さである。署名（<code>--sign</code> / <code>--clearsign</code>）と検証（<code>--verify</code>）、鍵の書き出し（<code>--export</code>）と取り込み（<code>--import</code>）も同じ鍵束で行う。</p>
+<p>もう1つの方式が <b>共通鍵暗号</b>である。<code>gpg -c</code>（<code>--symmetric</code>）は鍵ペアを使わず、<b>パスフレーズ1つ</b>から作った鍵で暗号化し、復号にも同じパスフレーズを使う。対話で打つと pinentry の画面でパスフレーズを2回聞かれる。ここでは同じ結果を画面なしで作るため、<code>--passphrase</code> で渡している。</p>
+<pre data-where="練習機の中（deploy。sudo -u deploy -i の後）"><code>@@
+$ gpg --batch --pinentry-mode loopback --passphrase kyoutsuu -o ~/secret.sym.gpg -c ~/secret.txt
+$ ls -l ~/secret.txt.gpg ~/secret.sym.gpg
+$ gpg --list-packets ~/secret.txt.gpg 2>/dev/null | grep -o '^:[a-z]* enc packet'
+$ gpg --batch --pinentry-mode loopback --passphrase kyoutsuu --list-packets ~/secret.sym.gpg 2>/dev/null | grep -o '^:[a-z]* enc packet'
+$ gpg --batch --pinentry-mode loopback --passphrase kyoutsuu -d ~/secret.sym.gpg
+@@</code></pre>
+<p>ファイルの先頭の包みが違う。公開鍵方式は <code>pubkey enc packet</code>（受け取る人の公開鍵で包んだ鍵が入っている）、共通鍵方式は <code>symkey enc packet</code>（パスフレーズから作った鍵で包んでいる）。</p>
+<div class="scroll"><table>
+<tr><th></th><th>公開鍵方式（<code>gpg -e -r 相手</code>）</th><th>共通鍵方式（<code>gpg -c</code>）</th></tr>
+<tr><td>暗号化に使うもの</td><td>相手の<b>公開鍵</b></td><td><b>パスフレーズ</b>（共通の秘密）</td></tr>
+<tr><td>復号に使うもの</td><td>相手の<b>秘密鍵</b>（相手しか持たない）</td><td>同じ<b>パスフレーズ</b></td></tr>
+<tr><td>事前に渡すもの</td><td>公開鍵（知られてよい）</td><td>パスフレーズ（安全な経路で渡す必要がある）</td></tr>
+<tr><td>鍵ペア</td><td>要る</td><td>要らない</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 公開鍵は、誰にでも配れる<b>開いた南京錠</b>に近い。相手はそれで箱を閉じる（暗号化）ことはできるが、開ける鍵（秘密鍵）は持ち主だけが持つ。共通鍵暗号は、閉めるのも開けるのも<b>同じ合言葉</b>の箱である。
+<br>ただし<b>崩れる点</b>: 南京錠は閉じると自分でも開けられないが、公開鍵で暗号化したものは<b>自分を受取人に含めれば</b>自分でも開ける（ここで自分宛てに暗号化したように）。鍵の対応が本質で、物理の錠とは違うこともできる。</div>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/linuc-security/">演習06</a>（SSH 鍵の登録と、置き場所の権限）と<a href="/linuc-security/">演習07</a>（<code>gpg</code> で暗号化→復号）が、この章の操作を自分の手で行う課題である。この章の <code>gpg</code> の節を打った後なら、演習07 はそのまま達成になる（演習06 は <code>deploy</code> の鍵なので、この章では先回りしていない）。</div>
+
+<div class="quiz"><b>確認</b>
+<p>いま新しく SSH 鍵を作る。鍵が小さく生成も速く、OpenSSH 9.5 以降の既定にもなっているアルゴリズムはどれか。また、その強さの目安は。</p>
+<p>ア <code>rsa</code>（4096 ビット）　イ <code>ecdsa</code>　ウ <code>ed25519</code></p>
+<details><summary>答え</summary>
+<p><b>ウ</b>。<code>ed25519</code> は鍵長 256 ビット、公開鍵ファイルは 86 バイトと小さく、生成も速い。
+強さは約 128 ビット相当で RSA 3072 ビットと同程度（RSA 4096 のほうが少し上だが、鍵が大きく遅い）。
+違うアルゴリズムどうしはビット数で比べられない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>ホスト A で <code>ssh -L 8080:db:80 relay</code> を実行した。A の 8080 番に繋いだ通信は、どこに届くか。</p>
+<details><summary>答え</summary>
+<p>中継ホスト <code>relay</code> から見た <code>db</code> の 80 番。<code>-L 手元:宛先</code> の宛先は<b>トンネルの出口（ssh の相手側）から見た</b>住所である。
+A と <code>relay</code> の間は ssh で暗号化されるが、<code>relay</code> から <code>db</code> までは通常の通信になる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>パスフレーズだけで暗号化し、同じパスフレーズで復号する（鍵ペアを使わない）<code>gpg</code> のオプションはどれか。</p>
+<p>ア <code>-e</code>　イ <code>-c</code>　ウ <code>-s</code>　エ <code>--export</code></p>
+<details><summary>答え</summary>
+<p><b>イ</b>（<code>--symmetric</code>。共通鍵暗号）。<code>-e</code>（<code>--encrypt</code>）は相手の公開鍵で暗号化する公開鍵方式、<code>-s</code> は署名、<code>--export</code> は公開鍵の書き出し。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>eval $(ssh-agent -s)</code> で起動したエージェントは、ログアウトすると止まるか。</p>
+<details><summary>答え</summary>
+<p>止まらない。<code>ssh-agent</code> は自分を切り離して常駐し（親は PID 1）、ログアウト後も残る。
+止めるのは <code>eval $(ssh-agent -k)</code>。<code>ssh-agent bash</code> の形で起動したなら、その bash を抜けると終わる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>公開鍵暗号は非対称。公開鍵で暗号化→秘密鍵で復号、秘密鍵で署名→公開鍵で検証。共通鍵暗号（<code>gpg -c</code>）は同じパスフレーズで暗号化と復号をする</li>
+<li>強さはアルゴリズムと鍵長で決まり、違うアルゴリズムどうしはビット数で比べられない。<code>ed25519</code> は約 128 ビット相当（RSA 3072 と同程度）で、小さく速く、OpenSSH 9.5 以降の既定</li>
+<li><code>ssh-agent</code> は <code>eval $(ssh-agent -s)</code> で取り込み、<code>ssh-add</code> で鍵を預ける。ログアウトしても残るので <code>eval $(ssh-agent -k)</code> で止める</li>
+<li><code>sshd</code> は、ホーム・<code>.ssh</code>・<code>authorized_keys</code> が本人以外に書けると鍵を使わない（StrictModes）</li>
+<li><code>ssh -L 手元:宛先 相手</code> は、相手から見た宛先を手元のポートに出す（逆向きは <code>-R</code>）</li>
+<li><code>gpg</code> の鍵束・秘密鍵・信頼データベースは <code>~/.gnupg</code>。<code>gpg-agent</code> が秘密鍵とパスフレーズを預かる</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / OpenSSH 9.6p1 / GnuPG 2.4.4 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション。RSA の鍵生成の時間差はこの遅いエミュレーションで顕著）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-security/theory/07-firewall">← 7. ファイアウォールは、自分を締め出せる</a><a href="/linuc-security/theory/09-cloud">次: 9. クラウドでは、守る範囲が分かれている →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-security/chapters.js"></script>
+<script src="/linuc-security/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

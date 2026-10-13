@@ -12,6 +12,8 @@
 <p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
 <p>本文に載せた出力はすべて実機（仮想マシンの練習機）の記録で、演習7本は模範解答どおりに通ること
    （未達のときに判定が鳴ることも）を確認してあります。
+   1.0.1 では事実確認と公式例題の監査で見つかった誤り・誤解を招く記述を直し、記録を全部取り直しました
+   （練習機の中の操作は、読者と同じ対話のログインシェルに続けて打って記録しています）。
    それでも <b>導線の不備</b>は残っている可能性があります。
    先に公開した SQLite 編では、著者が読者として通した段階で
    <b>4回に分けて不備が出ました</b>（説明の順序・リンク切れ・前提の省略・判定の誤り）。
@@ -37,7 +39,8 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <div class="goal">
 <p><b>「止めたつもり」は、たいてい止まっていない。Linux の制限は、正しい対象に・信用できる持ち主の設定で書けたときだけ効く。</b></p>
 <p>パスワードをロックしても鍵では入れる。<code>find -perm 4000</code> では SUID が1つも出ない。
-権限の緩い <code>sudoers</code> は丸ごと無視される。<code>iptables -L</code> が空でも <code>firewalld</code> が守っている。
+other に書ける <code>sudoers</code> は丸ごと読まれない。<code>ulimit -n 512</code> はハードまで下げて戻せなくする。
+<code>firewall-cmd</code> で開けたポートは再読み込みで消える。
 だから監査は、意図ではなく<b>いま実際に効いているもの</b>を数えることから始まります。</p>
 <div class="skip"><b>ここで覚えなくていいこと</b>:
 強制アクセス制御（SELinux・AppArmor）、PAM モジュールの細部、<code>nftables</code> のネイティブ構文、
@@ -51,28 +54,28 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <tr><th>副題</th><th>重要度</th><th>章</th><th>この教材で実際に打つもの</th></tr>
 <tr><td rowspan="5">1.10.1 セキュリティ管理業務の実施</td><td rowspan="5">3</td>
     <td><a href="/linuc-security/theory/01-suid">1</a></td>
-    <td><code>find -perm -4000</code> <code>chmod u-s</code>（SUID/SGID の棚卸し）</td></tr>
+    <td><code>find -perm -4000</code> <code>-perm /6000</code> <code>chmod u-s</code>（SUID/SGID の棚卸し）</td></tr>
 <tr><td><a href="/linuc-security/theory/02-accounts">2</a></td>
-    <td><code>passwd -S/-l</code> <code>usermod -e</code> <code>chage</code> <code>/etc/shadow</code></td></tr>
+    <td><code>passwd -S/-l</code> <code>usermod -e/-s</code> <code>chage -l</code> <code>/etc/shadow</code></td></tr>
 <tr><td><a href="/linuc-security/theory/03-sessions">3</a></td>
-    <td><code>who</code> <code>w</code> <code>last</code> <code>ulimit</code> <code>TMOUT</code> <code>/etc/security/limits.conf</code></td></tr>
+    <td><code>ulimit -S/-H</code> <code>/etc/security/limits.conf</code> <code>TMOUT</code>（<code>readonly</code>）<code>who</code> <code>w</code> <code>last</code> <code>lastb</code></td></tr>
 <tr><td><a href="/linuc-security/theory/04-ports">4</a></td>
     <td><code>ss</code> <code>netstat</code> <code>nmap</code> <code>lsof</code> <code>fuser</code></td></tr>
 <tr><td><a href="/linuc-security/theory/05-sudo">5</a></td>
-    <td><code>su</code> <code>sudo</code> <code>/etc/sudoers</code> <code>/etc/sudoers.d/</code> <code>visudo</code></td></tr>
+    <td><code>sudo -l/-u</code> <code>/etc/sudoers</code> <code>/etc/sudoers.d/</code> <code>visudo -c</code>（<code>su</code> は説明）</td></tr>
 <tr><td rowspan="2">1.10.2 ホストのセキュリティ設定</td><td rowspan="2">3</td>
     <td><a href="/linuc-security/theory/06-services">6</a></td>
-    <td><code>/etc/passwd</code> <code>/etc/shadow</code> <code>/etc/nologin</code> <code>xinetd</code> <code>systemctl</code> <code>service</code> <code>/etc/init.d/</code>（<code>inetd</code> <code>chkconfig</code> は対応表で）</td></tr>
+    <td><code>/etc/passwd</code> <code>/etc/shadow</code> <code>/etc/nologin</code> <code>/etc/xinetd.d/</code>（<code>disable</code>）<code>systemctl</code> <code>service</code> <code>/etc/init.d/</code>（<code>/etc/inetd.conf</code> <code>chkconfig</code> は書式と対応表で）</td></tr>
 <tr><td><a href="/linuc-security/theory/07-firewall">7</a></td>
-    <td><code>iptables</code> <code>firewalld</code> <code>firewall-cmd</code></td></tr>
+    <td><code>iptables</code> <code>firewall-cmd</code>（<code>--add-service</code> <code>--permanent</code> <code>--reload</code>）</td></tr>
 <tr><td>1.10.3 暗号化によるデータの保護</td><td>3</td>
     <td><a href="/linuc-security/theory/08-crypto">8</a></td>
-    <td><code>ssh-keygen</code>（rsa/ecdsa/ed25519）<code>ssh-agent</code> <code>ssh-add</code> <code>ssh -L</code> <code>gpg</code> <code>~/.gnupg/</code></td></tr>
+    <td><code>ssh-keygen</code>（rsa/ecdsa/ed25519）<code>ssh-agent</code> <code>ssh-add</code> <code>ssh -L</code> <code>gpg</code>（<code>-e -r</code> <code>-c</code> <code>-d</code>）<code>~/.gnupg/</code></td></tr>
 <tr><td>1.10.4 クラウドセキュリティの基礎</td><td>3</td>
     <td><a href="/linuc-security/theory/09-cloud">9</a></td>
     <td><b>理論のみ</b>（管理コンソールは檻に入らない。下記）</td></tr>
 </table></div>
-<p class="detail">主題1.10 で、この檻で<b>実際に打てないもの</b>は <code>inetd</code>（<code>openbsd-inetd</code> は <code>xinetd</code> と衝突して同時に入らない。第6章で <code>dpkg</code> と <code>apt-get -s</code> で理由を示しています）、
+<p class="detail">主題1.10 で、この檻で<b>実際に打てないもの</b>は <code>inetd</code>（<code>openbsd-inetd</code> は <code>xinetd</code> と同時に入らない Debian/Ubuntu の取り決め。第6章で <code>dpkg</code> と <code>apt-get -s</code> で示し、<code>inetd.conf</code> の書式は知識として説明）、
 <code>chkconfig</code>（RHEL 系の道具で Ubuntu には無い。<code>update-rc.d</code> で代替）、
 そして <b>1.10.4 クラウドセキュリティ</b>（管理コンソールはアカウント作成と課金が発生するため檻に入りません）です。
 <b>打てない理由も本文に書いてあります。黙って飛ばしてはいません。</b></p>
@@ -82,25 +85,26 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <p>出題範囲に並ぶ語の「一行の意味」と、説明している章です。詰まったらその章へ。</p>
 <div class="scroll"><table>
 <tr><th>語</th><th>一行の意味</th><th>章</th></tr>
-<tr><td><code>find -perm -4000</code></td><td>SUID の棚卸し。<code>4000</code>（ちょうど）ではなく <code>-4000</code>（含む）。SGID は <code>-2000</code></td><td><a href="/linuc-security/theory/01-suid">1</a></td></tr>
+<tr><td><code>find -perm -4000</code></td><td>SUID の棚卸し。<code>4000</code>（ちょうど）ではなく <code>-4000</code>（含む）。<code>-u+s</code> も同じ。SGID は <code>-2000</code>、いずれかは <code>/6000</code></td><td><a href="/linuc-security/theory/01-suid">1</a></td></tr>
 <tr><td><code>passwd -l</code> / <code>usermod -e</code></td><td>ロックはパスワードだけ止める（鍵では入れる）。無効化は有効期限を過去に</td><td><a href="/linuc-security/theory/02-accounts">2</a></td></tr>
-<tr><td><code>chage</code></td><td>パスワードエージングと有効期限（<code>/etc/shadow</code> の3〜8列目）を設定・表示</td><td><a href="/linuc-security/theory/02-accounts">2</a></td></tr>
-<tr><td><code>who</code> / <code>w</code> / <code>last</code></td><td>いまのログイン（utmp）／負荷込み／過去の履歴（wtmp）</td><td><a href="/linuc-security/theory/03-sessions">3</a></td></tr>
-<tr><td><code>ulimit</code></td><td>1ログインの資源上限。ハードは一般ユーザには一方通行</td><td><a href="/linuc-security/theory/03-sessions">3</a></td></tr>
-<tr><td><code>TMOUT</code></td><td>無操作での自動ログアウト秒数（本人が外せる保険）</td><td><a href="/linuc-security/theory/03-sessions">3</a></td></tr>
-<tr><td><code>ss</code> / <code>netstat</code> / <code>lsof</code> / <code>fuser</code></td><td>開いているポートと、それを出すプロセスを辿る</td><td><a href="/linuc-security/theory/04-ports">4</a></td></tr>
-<tr><td><code>nmap</code></td><td>外からポートを数える。SERVICE 列は当て推量、既定は約1000ポート</td><td><a href="/linuc-security/theory/04-ports">4</a></td></tr>
-<tr><td><code>sudo</code> / <code>visudo</code></td><td>1コマンドを代理実行。設定は <code>sudoers.d</code>（<code>440</code>）、検査は <code>visudo -c</code></td><td><a href="/linuc-security/theory/05-sudo">5</a></td></tr>
-<tr><td>シャドウパスワード</td><td><code>/etc/passwd</code> の <code>x</code> が指す <code>/etc/shadow</code>（root だけ読める）</td><td><a href="/linuc-security/theory/06-services">6</a></td></tr>
+<tr><td><code>chage</code></td><td>パスワードエージングと有効期限（<code>/etc/shadow</code> の3〜8列目）。<code>-l</code> で表示、<code>-E</code> でアカウント期限、<code>-I</code> で猶予</td><td><a href="/linuc-security/theory/02-accounts">2</a></td></tr>
+<tr><td><code>ulimit</code></td><td>シェルとその子の資源上限。表示の既定はソフト、設定で <code>-S</code>/<code>-H</code> を省くと両方。ハードは一般ユーザには一方通行</td><td><a href="/linuc-security/theory/03-sessions">3</a></td></tr>
+<tr><td><code>TMOUT</code></td><td>無操作での自動ログアウト秒数。<code>/etc/profile</code> で <code>readonly TMOUT</code> にすれば変更も <code>unset</code> もできない</td><td><a href="/linuc-security/theory/03-sessions">3</a></td></tr>
+<tr><td><code>who</code> / <code>w</code> / <code>last</code></td><td>いまの端末ログイン（utmp）／logind のセッションと実行中のコマンド／過去の履歴（wtmp）。<code>lastb</code> は root</td><td><a href="/linuc-security/theory/03-sessions">3</a></td></tr>
+<tr><td><code>ss</code> / <code>netstat</code> / <code>lsof</code> / <code>fuser</code></td><td>自分のホストの待ち受けと、それを出すプロセスを辿る</td><td><a href="/linuc-security/theory/04-ports">4</a></td></tr>
+<tr><td><code>nmap</code></td><td>ネットワーク越しにポートを調べる（他のホストも）。SERVICE 列は <code>nmap-services</code> の当て推量、既定は約1000ポート</td><td><a href="/linuc-security/theory/04-ports">4</a></td></tr>
+<tr><td><code>sudo</code> / <code>/etc/sudoers</code> / <code>visudo</code></td><td>1コマンドを代理実行。<code>%</code> はグループ、<code>(ALL)</code> は誰としてでも。<code>sudoers.d</code> は 440・root:root、<code>visudo -c</code> で構文と権限を検査</td><td><a href="/linuc-security/theory/05-sudo">5</a></td></tr>
+<tr><td>シャドウパスワード</td><td><code>/etc/passwd</code> の <code>x</code> が指す <code>/etc/shadow</code>（一般ユーザは読めない）</td><td><a href="/linuc-security/theory/06-services">6</a></td></tr>
 <tr><td><code>/etc/nologin</code></td><td>root 以外の全ログインを止める。自分も次から入れない</td><td><a href="/linuc-security/theory/06-services">6</a></td></tr>
-<tr><td><code>xinetd</code> / <code>inetd</code></td><td>スーパーサーバ。同じ役割で衝突し同時に入らない</td><td><a href="/linuc-security/theory/06-services">6</a></td></tr>
+<tr><td><code>xinetd</code> / <code>inetd</code></td><td>スーパーサーバ。<code>/etc/xinetd.d/名前</code> の <code>disable = yes</code>、<code>/etc/inetd.conf</code> は行を <code>#</code> にして <code>HUP</code>。Debian/Ubuntu では同時に入らない</td><td><a href="/linuc-security/theory/06-services">6</a></td></tr>
 <tr><td><code>systemctl</code> / <code>service</code> / <code>chkconfig</code></td><td>サービスの起動・自動起動。<code>chkconfig</code> は RHEL 系（Ubuntu は <code>update-rc.d</code>）</td><td><a href="/linuc-security/theory/06-services">6</a></td></tr>
-<tr><td><code>iptables</code> / <code>firewalld</code></td><td>同じ土台（nftables）の別の前面。混ぜず一方に。22 を巻き込まない</td><td><a href="/linuc-security/theory/07-firewall">7</a></td></tr>
-<tr><td><code>ssh-keygen</code>（rsa/ecdsa/ed25519）</td><td>強さはアルゴリズムで決まる。いまの既定は <code>ed25519</code></td><td><a href="/linuc-security/theory/08-crypto">8</a></td></tr>
-<tr><td><code>ssh-agent</code> / <code>ssh-add</code></td><td>秘密鍵を預かる。<code>eval $(ssh-agent)</code> で取り込む</td><td><a href="/linuc-security/theory/08-crypto">8</a></td></tr>
-<tr><td>SSH ポート転送（<code>-L</code> / <code>-R</code>）</td><td>トンネル越しにサービスを手元／相手側に出す</td><td><a href="/linuc-security/theory/08-crypto">8</a></td></tr>
-<tr><td><code>gpg</code> / <code>~/.gnupg/</code></td><td>公開鍵で暗号化、秘密鍵で復号。鍵束は <code>~/.gnupg</code></td><td><a href="/linuc-security/theory/08-crypto">8</a></td></tr>
-<tr><td>クラウド（責任分担・MFA）</td><td>到達は事業者側のファイアウォールが決める。管理コンソールは MFA で</td><td><a href="/linuc-security/theory/09-cloud">9</a></td></tr>
+<tr><td><code>iptables</code> / <code>firewalld</code></td><td>どちらも netfilter にルールを入れる道具。状態はルールを入れた道具で見る。22 を巻き込まない</td><td><a href="/linuc-security/theory/07-firewall">7</a></td></tr>
+<tr><td><code>firewall-cmd --permanent</code></td><td>付けない変更は再読み込み・再起動で消える。付けた変更は <code>--reload</code> まで反映されない</td><td><a href="/linuc-security/theory/07-firewall">7</a></td></tr>
+<tr><td><code>ssh-keygen</code>（rsa/ecdsa/ed25519）</td><td>強さはアルゴリズムと鍵長で決まる。ed25519 は約128ビット相当（RSA 3072 と同程度）で、OpenSSH 9.5 からの既定</td><td><a href="/linuc-security/theory/08-crypto">8</a></td></tr>
+<tr><td><code>ssh-agent</code> / <code>ssh-add</code></td><td>秘密鍵を預かる。<code>eval $(ssh-agent -s)</code> で取り込み、<code>eval $(ssh-agent -k)</code> で止める（ログアウトでは止まらない）</td><td><a href="/linuc-security/theory/08-crypto">8</a></td></tr>
+<tr><td>SSH ポート転送（<code>-L</code> / <code>-R</code>）</td><td>トンネル越しに、相手から見たサービスを手元に出す（<code>-R</code> は逆向き）</td><td><a href="/linuc-security/theory/08-crypto">8</a></td></tr>
+<tr><td><code>gpg</code> / <code>gpg-agent</code> / <code>~/.gnupg/</code></td><td><code>-e -r</code> は相手の公開鍵で暗号化、<code>-c</code> はパスフレーズの共通鍵暗号。鍵束は <code>~/.gnupg</code></td><td><a href="/linuc-security/theory/08-crypto">8</a></td></tr>
+<tr><td>クラウド（責任共有・多要素認証）</td><td>届くのはセキュリティグループと OS の両方が通すものだけ。設定は利用者。管理コンソールは多要素認証で</td><td><a href="/linuc-security/theory/09-cloud">9</a></td></tr>
 </table></div>
 
 <h2 id="chapters">章</h2>
@@ -109,25 +113,25 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <li><a href="/linuc-security/theory/01-suid">SUID は、実行する人ではなく持ち主で動く</a> —
     <span class="detail"><code>find -perm 4000</code> では0件。SUID はスクリプトには効かない（15分）</span></li>
 <li><a href="/linuc-security/theory/02-accounts">「ロックした」は「無効化した」ではない</a> —
-    <span class="detail"><code>passwd -l</code> の後も鍵で入れる。無効化は <code>usermod -e</code>（14分）</span></li>
+    <span class="detail"><code>passwd -l</code> の後も鍵で入れる。<code>usermod -e</code> で PAM が拒否する（16分）</span></li>
 <li><a href="/linuc-security/theory/03-sessions">入っている人と、入れる上限</a> —
-    <span class="detail">ハードリミットは一方通行。<code>who</code> は端末ログインしか見ない（14分）</span></li>
+    <span class="detail"><code>ulimit -n 512</code> はハードまで下げる。<code>readonly TMOUT</code>。<code>who</code> と <code>w</code> の違い（16分）</span></li>
 <li><a href="/linuc-security/theory/04-ports">開いているポートは、数えないと見えない</a> —
-    <span class="detail"><code>nmap</code> の SERVICE は当て推量（2323 が 3d-nfsd）。22 は <code>1/init</code>（15分）</span></li>
+    <span class="detail"><code>nmap</code> の SERVICE は当て推量（2323 が 3d-nfsd）。22 はソケット起動（15分）</span></li>
 <li><a href="/linuc-security/theory/05-sudo">sudo は、許したものだけに絞る</a> —
-    <span class="detail">権限の緩い <code>sudoers</code> は丸ごと無視。<code>visudo</code> が壊れた設定を止める（14分）</span></li>
+    <span class="detail">other に書ける <code>sudoers</code> は読まれない。<code>visudo -c</code> は権限も見る（16分）</span></li>
 <li><a href="/linuc-security/theory/06-services">シャドウと、使っていないサービスを止める</a> —
-    <span class="detail"><code>/etc/nologin</code> は自分も締め出す。<code>xinetd</code> と <code>inetd</code> は同時に入らない（16分）</span></li>
+    <span class="detail"><code>/etc/nologin</code> は自分も締め出す。<code>xinetd</code> の <code>disable</code>（18分）</span></li>
 <li><a href="/linuc-security/theory/07-firewall">ファイアウォールは、自分を締め出せる</a> —
-    <span class="detail"><code>iptables -L</code> が空でも <code>firewalld</code> が守る。22 を巻き込まない順序（16分）</span></li>
+    <span class="detail"><code>iptables -L</code> が空でも <code>firewalld</code> が守る。<code>--permanent</code> の有無（18分）</span></li>
 <li><a href="/linuc-security/theory/08-crypto">鍵は、持ち主で非対称になっている</a> —
-    <span class="detail">ed25519 は 86 バイトで RSA 4096 と同等以上。トンネルとGPG（18分）</span></li>
+    <span class="detail">ビット数では強さを比べられない。エージェントは残る。共通鍵の <code>gpg -c</code>（22分）</span></li>
 <li><a href="/linuc-security/theory/09-cloud">クラウドでは、守る範囲が分かれている</a> —
-    <span class="detail">到達を決めるのは OS の外。理論のみ（12分）</span></li>
+    <span class="detail">届くのは2つの層が通すものだけ。設定は利用者。理論のみ（14分）</span></li>
 </ol>
 </div>
 <p><a href="/linuc-security/theory/glossary">用語辞書</a> —
-   本文の点線付きの語をクリックすると引けます。20語。</p>
+   本文の点線付きの語をクリックすると引けます。21語。</p>
 
 <h2 id="use">実務のどこで効くか</h2>
 <p>資格の勉強として読んでも、使う場面はこの4つに集まります。</p>
@@ -140,11 +144,11 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
     <td>パスワードを止めただけでは鍵で入れる</td>
     <td>ロック（<code>passwd -l</code>）と無効化（<code>usermod -e</code>）は別物</td><td>2</td></tr>
 <tr><td>権限の棚卸し（誰が何をできるか）</td>
-    <td><code>sudo</code> を1コマンドに絞り、設定ファイルの権限まで見る</td>
-    <td>緩い <code>sudoers</code> は黙って無視される。<code>visudo -c</code> で検査</td><td>5</td></tr>
+    <td><code>sudo</code> を1コマンドに絞り、設定ファイルの持ち主と権限まで見る</td>
+    <td>other に書ける <code>sudoers</code> は読まれない。<code>visudo -c</code> で検査</td><td>5</td></tr>
 <tr><td>公開範囲を絞る（ファイアウォール）</td>
     <td>使わないサービスを止め、要るポートだけ通す</td>
-    <td>管理用 <code>ssh</code> を巻き込むと自分が締め出される。クラウドでは事業者側も見る</td><td>6・7・9</td></tr>
+    <td>管理用 <code>ssh</code> を巻き込むと締め出される。<code>--permanent</code> を忘れると再起動で戻る。クラウドではセキュリティグループも利用者が設定する</td><td>6・7・9</td></tr>
 </table></div>
 
 <h2 id="next">手を動かす</h2>

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. 入っている人と、入れる上限 — 確かめて説明する LinuC 主題1.10</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="linuc-security">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-security/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
+</div>
+<h1>3. 入っている人と、入れる上限</h1>
+<p class="lead">セキュリティ管理には「いま誰が入っているか」を見る道具（<code>who</code>・<code>w</code>・<code>last</code>）と、「どこまで使えるか」「放置したらどうするか」を決める道具（<code>ulimit</code>・<code>TMOUT</code>）がある。後者で油断しやすいのが、<code>ulimit -n 512</code> のように <code>-S</code>/<code>-H</code> を付けずに下げると、<b>ソフトとハードの両方が下がり、同じシェルではもう上げられない</b>ことだ。</p>
+<div class="badges"><span>前提: 第2章まで読了</span><span>前提: 練習機が起動している</span><span>所要 16分</span><span class="impact-c">影響度 C</span><span>出題範囲 1.10.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>ulimit</code> のソフトとハードの違い、<code>-S</code>/<code>-H</code> を省いたときの動きを説明できる</li><li><code>/etc/security/limits.conf</code> と <code>TMOUT</code>（<code>readonly</code> を含む）がいつ・どう効くかを言える</li><li><code>who</code>・<code>w</code>・<code>last</code> が何を見ているかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: cgroup による資源制限（<code>systemd</code> の <code>MemoryMax=</code> など）はレベル1の範囲外である。ここではシェルの <code>ulimit</code> と、ログイン時に適用される <code>/etc/security/limits.conf</code> だけを扱う。</div></div>
+
+<h2 id="ulimit">-S/-H を省くと、両方が下がる</h2>
+<div class="sgoal"><b>この節で分かること</b>: ソフトリミットとハードリミットの違いと、省略時の動き。</div>
+<p><code>ulimit</code> の上限は、<b>そのシェルと、そこから起動したプロセス</b>にかかる。<code>-n</code> が開けるファイル数、<code>-u</code> がプロセス数（こちらはユーザ全体で数える）である。それぞれにソフト（<code>-S</code>）とハード（<code>-H</code>）がある。いまの値を見て、ソフトだけを上げ下げしてみる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ ulimit -Sn; ulimit -Hn ⟪k=1⟫
+$ ulimit -Sn 512; ulimit -Sn
+$ ulimit -Sn 4096; echo rc=$?
+@@</code></pre>
+<p>ソフトは 512 に下げ、また 4096 に戻せた（<code>rc=0</code>）。ソフトは<b>ハード（天井）の範囲内で</b>上げ下げ自由である。では、<code>-S</code> も <code>-H</code> も付けずに下げるとどうなるか。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>ulimit -n</code> で表示されるのはソフトリミットだ。だから <code>ulimit -n 512</code> と打っても下がるのはソフトだけで、あとで <code>ulimit -n 4096</code> と打てば戻せるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ ulimit -n 512
+$ ulimit -Sn; ulimit -Hn ⟪k=2⟫
+$ ulimit -n 4096
+$ echo rc=$?
+@@</code></pre>
+<div class="then"><b>だめな理由</b>: ソフトもハードも 512 になり、4096 に戻そうとすると
+<code>Operation not permitted</code> で拒否された（<code>rc=1</code>）。表示の既定はソフトだが、<b>設定で <code>-S</code>/<code>-H</code> を省くと両方が変わる</b>（<code>man bash</code> の <code>ulimit</code> の項）。
+そしてハードを上げられるのは root だけなので、一般ユーザにとってハードの引き下げは一方通行である。
+同じシェルでは戻せず、新しくログインし直すまでこのままになる。</div></div>
+<div class="scroll"><table>
+<tr><th>指定</th><th>表示（値を書かない）</th><th>設定（値を書く）</th></tr>
+<tr><td><code>-S</code></td><td>ソフトを表示</td><td>ソフトだけ変える（ハードの範囲内なら上げ下げ自由）</td></tr>
+<tr><td><code>-H</code></td><td>ハードを表示</td><td>ハードだけ変える（下げるのは誰でも、上げるのは root だけ）</td></tr>
+<tr><td>省略</td><td>ソフトを表示（表示の既定）</td><td><b>ソフトとハードの両方</b>を変える</td></tr>
+</table></div>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ ulimit -u
+@@</code></pre>
+<p>ハードを 512 に下げたこのシェルは、もう戻せない。続きは <code>exit</code> して入り直してから打つ（外の端末で <code>vm ssh</code>）。</p>
+<p>恒久的に効かせるには、ログインのたびに PAM（<code>pam_limits</code>）が読む <code>/etc/security/limits.conf</code> に書く。書いた直後のいまのシェルには効かず、<b>次のログインから</b>効く。</p>
+<pre data-where="練習機の中（student@linuc）・ログインし直した後"><code>@@
+$ ulimit -Hn ⟪k=1⟫
+$ echo 'student hard nofile 2000' | sudo tee -a /etc/security/limits.conf
+$ ulimit -Hn ⟪k=2⟫
+@@</code></pre>
+<p>書いた後も、いまのシェルのハードは 1048576 のまま。外の端末から新しくログインして見ると 2000 になっている。</p>
+<pre data-where="外（lab@host）"><code>@@
+$ ssh linuc 'ulimit -Hn'
+@@</code></pre>
+<p>確かめたら、足した行を消して元に戻す（残すと、この後のログインのハードがずっと 2000 になる）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ sudo sed -i '/^student hard nofile 2000$/d' /etc/security/limits.conf; grep -c 'nofile 2000' /etc/security/limits.conf
+@@</code></pre>
+<div class="analogy"><b>たとえ</b>: ハードリミットは、ダムの<b>最高水位</b>に近い。日々の水位（ソフト）はその下で自由に動かせるが、最高水位そのものを下げたら、権限のない現場では二度と上げ直せない。
+<br>ただし<b>崩れる点</b>: ダムは1つだが、上限はシェルごとにかかる。別のシェル（新しいログイン）は、<code>limits.conf</code> から決まる別の水位で始まる。</div>
+
+<h2 id="tmout">TMOUT は、放置したシェルを閉じる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 自動ログアウトの仕組みと、利用者に外させない方法。</div>
+<p><code>TMOUT</code> は bash の<b>シェル変数</b>（<code>export</code> すれば環境変数にもなる）で、対話シェルが入力を待ったまま、その秒数が過ぎると<b>自動でログアウト</b>する。いまは設定されていない。3 秒にして待ってみる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ echo "TMOUT=[$TMOUT]" ⟪k=1⟫
+$ TMOUT=3 ⟪pre=（3 秒なにも打たずに待つ）⟫
+@@</code></pre>
+<p>シェルが閉じた（ログアウトした）。席を離れた端末が乗っ取られるのを防ぐ仕組みである。入り直して続ける。ただの変数なので、そのままでは本人が <code>unset TMOUT</code> で外せる。外させないには <b><code>readonly</code></b> にする。</p>
+<pre data-where="練習機の中（student@linuc）・ログインし直した後"><code>@@
+$ TMOUT=600; readonly TMOUT; export TMOUT
+$ unset TMOUT ⟪k=1⟫
+$ TMOUT=0
+$ echo "TMOUT=[$TMOUT]" ⟪k=2⟫
+@@</code></pre>
+<p><code>readonly</code> にした変数は、変更も <code>unset</code> もできない（このシェルは 600 秒放置すると閉じる）。全員に効かせるには、ログイン時に読まれる <code>/etc/profile</code>（や <code>/etc/profile.d/</code>）に書く。新しくログインすると、最初から外せない状態になっている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ printf 'TMOUT=600\nreadonly TMOUT\nexport TMOUT\n' | sudo tee /etc/profile.d/tmout.sh
+@@</code></pre>
+<pre data-where="練習機の中（student@linuc）・新しくログインし直した後"><code>@@
+$ echo "TMOUT=[$TMOUT]" ⟪k=3⟫
+$ unset TMOUT ⟪k=2⟫
+$ sudo rm /etc/profile.d/tmout.sh
+@@</code></pre>
+<p>確かめたら <code>/etc/profile.d/tmout.sh</code> は消しておく（残すと、この後のログインがすべて 600 秒で閉じる）。消しても、このシェルの <code>TMOUT</code> は <code>readonly</code> のままなので、抜けて入り直す。</p>
+<div class="analogy"><b>たとえ</b>: <code>TMOUT</code> は、一定時間で自動的にロックがかかる<b>画面のロック</b>に近い。<code>readonly</code> を付けると、利用者が設定画面でロックを切れなくなる。
+<br>ただし<b>崩れる点</b>: 画面ロックは OS が強制するが、<code>TMOUT</code> は bash の変数である。別のシェル（<code>sh</code> など）を起動すれば効かない。強制の範囲は bash の対話シェルに限られる。</div>
+
+<h2 id="who">who・w・last が見ているもの</h2>
+<div class="sgoal"><b>この節で分かること</b>: ログイン状況と履歴がどこに記録されているか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ who
+$ last -a | head -5
+@@</code></pre>
+<p><code>who</code> は<b>いま</b>のログインを <code>/var/run/utmp</code> から読む。<code>pts/0</code> は疑似端末（SSH の対話ログイン）、<code>(10.0.2.2)</code> は接続元である。<code>last</code> は<b>過去</b>の記録を <code>/var/log/wtmp</code> から読み、ログインだけでなく <code>reboot</code>（起動）も並ぶ。失敗したログインは <code>lastb</code>（<code>/var/log/btmp</code>）にある。</p>
+<p><code>who</code> に載るのは<b>端末を伴うログイン</b>だけである。外の端末から、端末を付けずにコマンドだけ実行してみると、<code>who</code> には何も出ない。だが <code>w</code> は出す。</p>
+<pre data-where="外（lab@host）"><code>@@
+$ ssh linuc who
+$ ssh linuc w -h
+@@</code></pre>
+<p>この練習機の <code>w</code> は、<code>utmp</code> ではなく systemd のログイン管理（logind）のセッション一覧を元に表示するので、端末の無いセッションも出る（<code>TTY</code> の欄が空になる）。対話でログインしたときの <code>w</code> も同じ形になる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ w
+@@</code></pre>
+<p><code>w</code> の右端の <code>WHAT</code> は、そのセッションでいま動いているコマンドである（ここでは <code>sshd</code> のセッション処理が出ている）。誰が何をしているかの手がかりになる。</p>
+<p>履歴を読む権限も違う。<code>wtmp</code> は誰でも読めるので <code>last</code> は一般ユーザでも打てるが、ログインに失敗した記録の <code>btmp</code> は root とグループ <code>utmp</code> しか読めないので、<code>lastb</code> には root が要る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@
+$ ls -l /var/log/wtmp /var/log/btmp
+$ last -a | head -3
+$ lastb
+$ sudo lastb | head -3
+@@</code></pre>
+<p>だから「<code>who</code> が空だから誰もいない」とは限らない。端末なしの <code>ssh</code> や <code>cron</code> の処理は <code>who</code> に出ないので、<code>w</code> やプロセス（<code>ps</code>・第4章の <code>ss</code>）と併せて見る。</p>
+<div class="analogy"><b>たとえ</b>: <code>utmp</code> は、建物の<b>入館ゲートの在館リスト</b>に近い。ゲートを通った人（端末ログイン）は載るが、窓口で用件だけ済ませた人（端末なしのコマンド実行）は載らない。
+<br>ただし<b>崩れる点</b>: 建物ならどちらも受付の記録に残るが、Linux では見る道具ごとに記録の出どころが違う（<code>who</code> は utmp、<code>w</code> は logind）。道具を1つだけ見て判断しない。</div>
+
+<div class="note try"><b>手を動かす</b>: この章には専用の演習はない。練習機に入って（外の端末で <code>vm ssh</code>）、<code>ulimit -n 512</code> の後で <code>ulimit -n 4096</code> が通らないこと、<code>readonly TMOUT</code> が <code>unset</code> できないことを自分で確かめられる（戻すには <code>exit</code> してログインし直す）。</div>
+
+<div class="quiz"><b>確認</b>
+<p>一般ユーザが <code>ulimit -n 512</code>（<code>-S</code>/<code>-H</code> なし）を実行した。同じシェルで <code>ulimit -n 4096</code> は成功するか。</p>
+<details><summary>答え</summary>
+<p>成功しない（<code>Operation not permitted</code>）。<code>-S</code>/<code>-H</code> を省いて設定するとソフトとハードの両方が 512 になり、
+ハードを上げられるのは root だけだから。ソフトだけを変えたいなら <code>ulimit -Sn 512</code> とする。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>全ユーザの対話シェルを 600 秒の無操作で自動ログアウトさせ、利用者が変更も解除もできないようにしたい。<code>/etc/profile</code> に何を書くか。</p>
+<details><summary>答え</summary>
+<p><code>TMOUT=600</code>、<code>readonly TMOUT</code>、<code>export TMOUT</code>。<code>readonly</code> が無いと、利用者は <code>unset TMOUT</code> や <code>TMOUT=0</code> で外せる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>who</code> と <code>last</code> は、それぞれどのファイルを読むか。</p>
+<details><summary>答え</summary>
+<p><code>who</code> は<b>いま</b>のログインを <code>utmp</code>（<code>/var/run/utmp</code>）から、
+<code>last</code> は<b>過去</b>のログインと再起動を <code>wtmp</code>（<code>/var/log/wtmp</code>）から読む。失敗は <code>btmp</code>（<code>lastb</code>）。
+<code>who</code> には端末を伴うログインしか載らない。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li><code>ulimit</code> はシェルとその子プロセスにかかる（<code>-u</code> はユーザ全体のプロセス数）。表示の既定はソフト、設定で <code>-S</code>/<code>-H</code> を省くと両方が変わる</li>
+<li>ハードを上げられるのは root だけ。一般ユーザの引き下げは一方通行</li>
+<li><code>/etc/security/limits.conf</code> は PAM がログイン時に読む。いま開いているシェルには効かない</li>
+<li><code>TMOUT</code> は無操作での自動ログアウト。<code>/etc/profile</code> に <code>readonly TMOUT</code> と書けば利用者は変更も <code>unset</code> もできない</li>
+<li><code>who</code> は utmp（端末ログインだけ）、<code>last</code> は wtmp（一般ユーザも打てる）、<code>lastb</code> は btmp（root が要る）。この練習機の <code>w</code> は logind から端末なしのセッションも出し、<code>WHAT</code> に実行中のコマンドを出す</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / bash 5.2.21 / procps（w）4.0.4 / util-linux（last）2.39.3 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で、1つのシェルに続けて打って記録 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-security/theory/02-accounts">← 2. 「ロックした」は「無効化した」ではない</a><a href="/linuc-security/theory/04-ports">次: 4. 開いているポートは、数えないと見えない →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-security/chapters.js"></script>
+<script src="/linuc-security/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -11,11 +11,11 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
 </div>
 <h1>7. ファイアウォールは、自分を締め出せる</h1>
-<p class="lead"><code>iptables -L</code> が空だから無防備だ——とは限らない。<code>firewalld</code> が動いていると、<code>iptables -L</code> は空っぽに見えるのに、通信は別の仕組み（nftables）で選り分けられている。見る道具を間違えると、守られているのに無防備に見え、その逆も起きる。そして管理用の <code>ssh</code> を巻き込むと、自分が締め出される。</p>
-<div class="badges"><span>前提: 第6章まで読了</span><span>前提: 練習機が起動している</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.10.2（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<p class="lead"><code>iptables -L</code> が空だから無防備だ——とは限らない。この練習機で <code>firewalld</code> を動かすと、<code>iptables -L</code> は空っぽに見えるのに、通信は <code>firewalld</code> のルールで選り分けられている。見る道具を間違えると、守られているのに無防備に見える。そして管理用の <code>ssh</code> を巻き込むと、自分が締め出される。</p>
+<div class="badges"><span>前提: 第6章まで読了</span><span>前提: 練習機が起動している</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.10.2（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>iptables</code> と <code>firewalld</code> が別の前面であること、状態をどこで見るかを説明できる</li><li><code>iptables</code> でポートを落とし、管理用の <code>ssh</code> を巻き込まない順序を踏める</li><li><code>firewalld</code> の既定（ゾーンと許可サービス）を読める</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: <code>nftables</code> のネイティブ構文、<code>iptables</code> の <code>NAT</code>/<code>mangle</code> テーブル、<code>firewalld</code> のリッチルールや direct interface はレベル1では深追いしない。ここでは「落とす／通す」の基本と、2つの前面の関係だけを扱う。</div></div>
+<ul><li><code>iptables</code> と <code>firewalld</code> の関係と、状態をどこで見るかを説明できる</li><li><code>iptables</code> でポートを落とし、管理用の <code>ssh</code> を巻き込まない書き方ができる</li><li><code>firewall-cmd</code> の実行時の設定と <code>--permanent</code> の違いを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>nftables</code> のネイティブ構文、<code>iptables</code> の <code>nat</code>/<code>mangle</code> テーブル、<code>firewalld</code> のリッチルールや direct interface はレベル1では深追いしない。ここでは「落とす／通す」の基本と、2つの道具の関係だけを扱う。</div></div>
 
 <h2 id="frontends">iptables -L が空でも、守られていることがある</h2>
 <div class="sgoal"><b>この節で分かること</b>: 状態を見る道具を間違えると誤読すること。</div>
@@ -24,89 +24,133 @@
 <p>Linux のファイアウォールといえば <code>iptables</code> だ。<code>iptables -L</code> を見て、ルールが空なら何も守っていない（素通し）ということだ。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo systemctl start firewalld; sleep 2; sudo firewall-cmd --state
 running
-$ sudo iptables -L INPUT -n | head -6
+$ sudo iptables -L INPUT -n
 Chain INPUT (policy ACCEPT)
-target     prot opt source               destination
-$ sudo iptables -S | wc -l
-3</code></pre>
+target     prot opt source               destination         
+$ sudo iptables -S
+-P INPUT ACCEPT
+-P FORWARD ACCEPT
+-P OUTPUT ACCEPT</code></pre>
 <div class="then"><b>だめな理由</b>: <code>firewalld</code> は <code>running</code>（動いている）のに、<code>iptables -L INPUT</code> は
-<code>policy ACCEPT</code> でルールが1つも無く、<code>iptables -S</code> も3行（3つのチェインの既定方針だけ）しかない。
-<b><code>iptables</code> と <code>firewalld</code> は別の「前面」で、同じ土台（カーネルの netfilter / nftables）を別のやり方で操作する。</b>
-<code>firewalld</code> が入れたルールは nftables 側にあり、<code>iptables -L</code> の古い見方には映らない。
-だから「<code>iptables -L</code> が空＝無防備」は誤り。<code>firewalld</code> の状態は <code>firewall-cmd</code> で見る。
-見る道具と、設定する道具を揃えないと、守られているのに無防備に見える。</div></div>
-<p>実際、この練習機の <code>iptables</code> はもう <code>nftables</code> が土台である。バージョンにそう書いてある。</p>
-<pre data-where="練習機の中（student@linuc）"><code>$ sudo iptables --version
+<code>policy ACCEPT</code> でルールが1つも無く、<code>iptables -S</code> も3つのチェインの既定方針だけである。
+<code>iptables</code> と <code>firewalld</code> は、どちらもカーネルのパケット選別の仕組み（<b>netfilter</b>）にルールを入れる道具で、
+この練習機では <code>iptables</code> が nftables 版（<code>iptables-nft</code>）、<code>firewalld</code> も nftables を使う設定になっている。
+<code>firewalld</code> は自分専用の表にルールを入れるので、<code>iptables -L</code> の見方には映らない。
+だから「<code>iptables -L</code> が空＝無防備」は誤り。<code>firewalld</code> の状態は <code>firewall-cmd</code> で見る。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo grep '^FirewallBackend' /etc/firewalld/firewalld.conf
+FirewallBackend=nftables
+$ sudo iptables --version
 iptables v1.8.10 (nf_tables)</code></pre>
-<p><code>(nf_tables)</code> は「<code>iptables</code> という<b>コマンド</b>だが、裏で動かしているのは <code>nftables</code>」という意味である。<code>iptables</code> で直接足したルールは <code>iptables -L</code> に映るが、<code>firewalld</code> が足したルールは映らない。2つを混ぜると状態が読めなくなるので、<b>どちらか一方に統一する</b>のが原則である。</p>
-<div class="analogy"><b>たとえ</b>: <code>iptables</code> と <code>firewalld</code> は、同じ<b>配電盤</b>（netfilter）を操作する2つの<b>操作卓</b>に近い。<code>firewalld</code> の卓で入れた設定は、<code>iptables</code> の卓の表示灯には出ない。
-<br>ただし<b>崩れる点</b>: 配電盤は1つなので、両方の卓から同時にいじると、どちらの設定が生きているか分からなくなる。だから運用では操作卓を1つに決める。</div>
+<p><code>FirewallBackend=nftables</code> と <code>iptables v1.8.10 (nf_tables)</code> がその組み合わせを示している。<code>iptables-legacy</code> を使う環境や、<code>firewalld</code> を <code>iptables</code> バックエンドで動かす環境では、<code>firewalld</code> のルールが <code>iptables -L</code> にも出る。<b>どの道具が、どの表にルールを入れたか</b>で見え方が変わるので、運用では道具を1つに決め、その道具で状態を見る。</p>
+<div class="analogy"><b>たとえ</b>: <code>iptables</code> と <code>firewalld</code> は、同じ<b>配電盤</b>（netfilter）につながる2つの<b>操作卓</b>に近い。<code>firewalld</code> の卓で入れた設定は、<code>iptables</code> の卓の表示灯には出ない（この練習機の組み合わせでは）。
+<br>ただし<b>崩れる点</b>: 配電盤は1つなので、両方の卓から同時にいじると、パケットは両方の設定を通ることになり、どちらで落ちたか分からなくなる。だから運用では操作卓を1つに決める。</div>
+
+<h2 id="firewalld">firewalld は、再読み込みで実行時の設定が消える</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>firewall-cmd</code> の実行時の設定と恒久的な設定。</div>
+<p><code>firewalld</code> は「ゾーン」ごとに通すサービス／ポートを持つ。既定ゾーンと、その中身を見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo firewall-cmd --get-default-zone
+public
+$ sudo firewall-cmd --list-all
+public (default, active)
+  target: default
+  ingress-priority: 0
+  egress-priority: 0
+  icmp-block-inversion: no
+  interfaces: 
+  sources: 
+  services: dhcpv6-client ssh
+  ports: 
+  protocols: 
+  forward: yes
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: 
+  rich rules: </code></pre>
+<p>既定ゾーン <code>public</code> の <code>services</code> に <code>ssh</code> が<b>最初から入っている</b>。だから <code>firewalld</code> を起動しても管理用の <code>ssh</code> は通る（さきほど <code>iptables -L</code> が空でも <code>ssh</code> で入れていたのはこのため）。<code>http</code> を足してみる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo firewall-cmd --add-service=http
+success
+$ sudo firewall-cmd --list-services
+dhcpv6-client http ssh
+$ sudo firewall-cmd --reload
+success
+$ sudo firewall-cmd --list-services
+dhcpv6-client ssh</code></pre>
+<p><code>--add-service</code> だけで足した <code>http</code> は、<code>--reload</code>（設定ファイルからの読み直し）で<b>消えた</b>。<code>--permanent</code> を付けない変更は<b>実行時の設定</b>だけに入り、再読み込みや再起動で失われる。恒久的にするには <code>--permanent</code> を付ける。ただし <code>--permanent</code> は設定ファイルにだけ書くので、<b>いまの動作には読み直すまで反映されない</b>。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo firewall-cmd --permanent --add-service=http
+success
+$ sudo firewall-cmd --list-services
+dhcpv6-client ssh
+$ sudo firewall-cmd --reload
+success
+$ sudo firewall-cmd --list-services
+dhcpv6-client http ssh</code></pre>
+<p>外すのは <code>--remove-service</code> で、これも <code>--permanent</code> の有無で同じ違いがある。元に戻して止めておく。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo firewall-cmd --permanent --remove-service=http
+success
+$ sudo firewall-cmd --reload
+success
+$ sudo firewall-cmd --list-services
+dhcpv6-client ssh
+$ sudo systemctl stop firewalld</code></pre>
+<div class="analogy"><b>たとえ</b>: <code>firewall-cmd</code> の実行時の設定は<b>ホワイトボードの貼り紙</b>、<code>--permanent</code> は<b>規則集の改訂</b>に近い。貼り紙はすぐ効くが、規則集から貼り直す（<code>--reload</code>）と剥がされる。規則集を直しても、貼り直すまで現場は変わらない。
+<br>ただし<b>崩れる点</b>: 現場なら両方を同時に直せばよいと気づきやすいが、<code>firewall-cmd</code> はどちらに書いたかを表示しない。<code>--list-services</code> と <code>--permanent --list-services</code> を見比べないと分からない。</div>
 
 <h2 id="drop">iptables で落とし、22 は残す</h2>
-<div class="sgoal"><b>この節で分かること</b>: ルールの足し方と、管理 <code>ssh</code> を守る順序。</div>
-<p><code>firewalld</code> を止め、<code>iptables</code> で直接 <code>2323</code> への接続を落とす。既定の方針（<code>policy ACCEPT</code>）はそのままに、<code>DROP</code> ルールを1本足す。<b>22 には絶対に触れない。</b></p>
+<div class="sgoal"><b>この節で分かること</b>: ルールの足し方と、管理 <code>ssh</code> を守る書き方。</div>
+<p><code>iptables</code> で直接 <code>2323</code> への接続を落とす。<code>INPUT</code> の既定方針（<code>policy ACCEPT</code>）はそのままに、<code>DROP</code> ルールを1本足す。<b>22 には触れない。</b></p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo iptables -L INPUT -n
 Chain INPUT (policy ACCEPT)
-target     prot opt source               destination
+target     prot opt source               destination         
 $ sudo iptables -A INPUT -p tcp --dport 2323 -j DROP
 $ sudo iptables -L INPUT -n --line-numbers
 Chain INPUT (policy ACCEPT)
-num  target     prot opt source               destination
+num  target     prot opt source               destination         
 1    DROP       6    --  0.0.0.0/0            0.0.0.0/0            tcp dpt:2323</code></pre>
-<p><code>-A INPUT</code>（末尾に追加）で、<code>tcp</code> の宛先ポート <code>2323</code> を <code>DROP</code>（黙って捨てる）にした。効いているか確かめる。接続は応答なしでタイムアウトする（<code>rc=124</code>）。</p>
-<pre data-where="練習機の中（student@linuc）"><code>$ timeout 3 bash -c "&lt;/dev/tcp/127.0.0.1/2323"; echo rc=$?
+<p><code>-A INPUT</code>（末尾に追加）で、<code>tcp</code> の宛先ポート <code>2323</code> を <code>DROP</code>（応答せずに捨てる）にした。効いているか確かめる。接続は応答なしでタイムアウトする（<code>rc=124</code>）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ timeout 3 bash -c '&lt;/dev/tcp/127.0.0.1/2323'; echo rc=$?
 rc=124</code></pre>
 <p>そして最も大事な確認——<b>管理用の <code>ssh</code>（22）がまだ生きているか</b>を、外の端末から見る。</p>
 <pre data-where="外（lab@host）"><code>$ vm ssh echo ssh_is_alive
 ▶ ssh linuc echo ssh_is_alive
 ssh_is_alive</code></pre>
 <p>通った。<code>2323</code> だけを落とし、<code>22</code> は残せている。もし <code>INPUT</code> の方針を <code>DROP</code> にしたり、<code>22</code> を巻き込むルールを書くと、<b>その瞬間に自分の <code>ssh</code> が切れて締め出される</b>（第6章の戻し方——<code>vm console</code> / <code>lab-guest</code> / <code>vm reset</code>——がここでも効く）。足したルールは消しておく。</p>
-<pre data-where="練習機の中（student@linuc）"><code>$ sudo iptables -D INPUT -p tcp --dport 2323 -j DROP; sudo iptables -L INPUT -n
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo iptables -D INPUT -p tcp --dport 2323 -j DROP
+$ sudo iptables -L INPUT -n
 Chain INPUT (policy ACCEPT)
 target     prot opt source               destination         </code></pre>
-<p><b>この <code>iptables</code> のルールは再起動で消える。</b>この練習機は保存の仕組み（<code>iptables-save</code> と起動時の復元、<code>netfilter-persistent</code> など）を入れていないので、恒久化には別の手当てが要る。「設定した＝次回も効く」ではない。</p>
+<p>初期状態の違いも押さえる。この練習機の <code>iptables</code> は「既定は通し、落とすものを足す」状態から始まり、<code>firewalld</code> のゾーンは「許可したサービスだけ通す」状態から始まる。だが <code>iptables</code> も、先に <code>22</code> と確立済みの接続を通すルールを入れてから <code>-P INPUT DROP</code> にすれば、許可したものだけを通す形にできる（順番を逆にすると、その瞬間に締め出される）。<b>この <code>iptables</code> のルールは再起動で消える。</b>この練習機は保存と復元の仕組み（<code>iptables-save</code> と <code>netfilter-persistent</code> など）を入れていないので、恒久化には別の手当てが要る。</p>
 <div class="analogy"><b>たとえ</b>: <code>iptables</code> のルールは、ホワイトボードに書いた<b>その場の申し送り</b>に近い。いまは効くが、停電（再起動）で消える。残したいなら台帳（<code>iptables-save</code> の出力）に書き写し、始業時に貼り直す仕掛けが要る。
 <br>ただし<b>崩れる点</b>: 申し送りは消えても業務は続くが、ファイアウォールが消えると穴が開く。消えることを知らないと、再起動後に無防備になる。</div>
-
-<h2 id="firewalld">firewalld は、ゾーンで許すものを決める</h2>
-<div class="sgoal"><b>この節で分かること</b>: <code>firewalld</code> の既定が何を通すか。</div>
-<p><code>firewalld</code> は「ゾーン」ごとに通すサービス／ポートを<b>許可リスト</b>で持つ（既定は許可した以外を通さない）。既定ゾーンと、その中身を見る。</p>
-<pre data-where="練習機の中（student@linuc）"><code>$ sudo firewall-cmd --get-default-zone
-public
-$ sudo firewall-cmd --list-all
-public (default, active)
-  target: default
-  services: dhcpv6-client ssh
-  ports: </code></pre>
-<p>既定ゾーン <code>public</code> の <code>services</code> に <code>ssh</code> が<b>最初から入っている</b>。だから <code>firewalld</code> を起動しても管理用の <code>ssh</code> は通る（さきほど <code>iptables -L</code> が空に見えても <code>ssh</code> で入れていたのはこのため）。ポートを足すなら <code>firewall-cmd --add-port=2323/tcp</code>、恒久化は <code>--permanent</code> を付けて <code>--reload</code> する。<b><code>iptables</code> が「既定は通す→落とすものを足す」なのに対し、<code>firewalld</code> は「既定は落とす→通すものを足す」</b>という逆の発想である。</p>
-<pre data-where="練習機の中（student@linuc）"><code>$ sudo systemctl stop firewalld; echo stopped
-stopped</code></pre>
-<div class="analogy"><b>たとえ</b>: <code>iptables</code> の既定 <code>ACCEPT</code> は「<b>基本は通す。危ない人だけ名簿（DROP）で止める</b>」入口、<code>firewalld</code> は「<b>基本は断る。招待客（許可サービス）だけ通す</b>」入口に近い。
-<br>ただし<b>崩れる点</b>: どちらも同じ扉（netfilter）を守るが、名簿の向き（遮断リストか許可リストか）が逆なので、片方の感覚でもう片方を設定すると穴が開く。</div>
 
 <div class="note try"><b>手を動かす</b>: 実践編の<a href="/linuc-security/">演習05</a>は、<code>iptables</code> で <code>2323</code> を落としつつ <code>22</code> を残す課題である。判定は、<code>2323</code> を落とすルールがあること、<code>22</code> を落とすルールが無いこと、そして<b>外側から <code>ssh linuc</code> が実際に通ること</b>（自分を締め出していないこと）を確かめる。</div>
 
 <div class="quiz"><b>確認</b>
-<p><code>firewalld</code> が <code>running</code> なのに <code>iptables -L INPUT</code> は <code>policy ACCEPT</code> でルールが空だった。このホストは無防備か。</p>
+<p>この練習機で <code>firewalld</code> が <code>running</code> なのに、<code>iptables -L INPUT</code> は <code>policy ACCEPT</code> でルールが空だった。このホストは無防備か。</p>
 <details><summary>答え</summary>
-<p>無防備とは限らない。<code>iptables</code> と <code>firewalld</code> は同じ土台（nftables）の別の前面で、
-<code>firewalld</code> が入れたルールは <code>iptables -L</code> には映らない。状態は <code>firewall-cmd --list-all</code> などで見る。
-見る道具を前面に合わせる。</p></details></div>
+<p>無防備とは限らない。<code>firewalld</code>（nftables バックエンド）は自分専用の表にルールを入れるので、<code>iptables-nft</code> の <code>iptables -L</code> には映らない。
+状態は <code>firewall-cmd --list-all</code> などで見る。どの道具がルールを入れたかに合わせて、見る道具を選ぶ。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>firewall-cmd --add-service=http</code> を実行したら Web が見えるようになった。翌日サーバを再起動したら見えなくなった。なぜか。どうすればよかったか。</p>
+<details><summary>答え</summary>
+<p><code>--permanent</code> を付けない変更は実行時の設定だけで、再読み込み（<code>--reload</code>）や再起動で消えるから。
+<code>firewall-cmd --permanent --add-service=http</code> で恒久化し、<code>firewall-cmd --reload</code> でいまの動作にも反映する（または両方の形で1回ずつ打つ）。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>iptables</code> で <code>2323</code> を落としたい。自分はいま <code>ssh</code>（22）で入っている。やってはいけないのはどれか。</p>
-<p>ア <code>iptables -A INPUT -p tcp --dport 2323 -j DROP</code>　イ <code>iptables -P INPUT DROP</code>（方針を DROP に）　ウ 22 への ACCEPT を先に入れてから作業</p>
+<p>ア <code>iptables -A INPUT -p tcp --dport 2323 -j DROP</code>　イ 22 を通すルールより先に <code>iptables -P INPUT DROP</code>（方針を DROP に）　ウ 22 と確立済みの接続を通すルールを入れてから方針を DROP に</p>
 <details><summary>答え</summary>
-<p><b>イ</b>。確立済み接続や 22 を通す手当てをせずに <code>INPUT</code> の方針を <code>DROP</code> にすると、その瞬間に自分の <code>ssh</code> が切れて締め出される。
-<code>2323</code> だけを落とすア、22 を先に通すウは安全。締め出しても <code>vm console</code> / <code>lab-guest</code> で戻せる。</p></details></div>
+<p><b>イ</b>。22 や確立済みの接続を通す手当てより先に方針を <code>DROP</code> にすると、その瞬間に自分の <code>ssh</code> が切れて締め出される。
+<code>2323</code> だけを落とすア、順番を守るウは安全。締め出しても <code>vm console</code> / <code>lab-guest</code> で戻せる。</p></details></div>
+
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
-<li><code>iptables</code> と <code>firewalld</code> は同じ土台（nftables）を操作する別の前面。混ぜず一方に統一する</li>
-<li><code>iptables -L</code> は自分が <code>iptables</code> で足したルールしか映さない。<code>firewalld</code> の状態は <code>firewall-cmd</code> で見る</li>
-<li><code>iptables -A INPUT ... -j DROP</code> で落とす。管理用の <code>22</code> は巻き込まない（<code>policy DROP</code> や 22 の遮断は自分を締め出す）</li>
+<li><code>iptables</code> と <code>firewalld</code> はどちらもカーネルの netfilter にルールを入れる道具。この練習機（iptables-nft と nftables バックエンド）では <code>firewalld</code> のルールは <code>iptables -L</code> に映らない</li>
+<li>状態は、ルールを入れた道具で見る（<code>firewalld</code> なら <code>firewall-cmd</code>）。道具は1つに決める</li>
+<li><code>firewall-cmd --add-service</code>／<code>--remove-service</code> は実行時だけ。<code>--permanent</code> は設定ファイルだけで、<code>--reload</code> まで反映されない</li>
+<li><code>iptables -A INPUT ... -j DROP</code> で落とす。管理用の 22 を巻き込まない（通すルールより先に方針を DROP にしない）</li>
 <li><code>iptables</code> のルールは再起動で消える。恒久化には保存と復元の仕掛けが要る</li>
-<li><code>firewalld</code> は許可リスト方式。既定ゾーン <code>public</code> は <code>ssh</code> を最初から通す</li>
 </ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.0@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / iptables 1.8.10 (nf_tables) / firewalld 2.1.1 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / iptables 1.8.10 (nf_tables) / firewalld 2.1.1（FirewallBackend=nftables）/ apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-security/theory/06-services">← 6. シャドウと、使っていないサービスを止める</a><a href="/linuc-security/theory/08-crypto">次: 8. 鍵は、持ち主で非対称になっている →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

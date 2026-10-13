@@ -4,7 +4,7 @@
 #   この主題は「練習機を壊して自分を締め出す」操作（/etc/nologin・ファイアウォール）を扱う。
 #   壊しても、判定は qemu-guest-agent 経由の lab-guest で動き、vm reset --yes で工場出荷時に戻せる。
 #
-#   build: docker build -t lab-linuc-security:1.0.0 containers/linuc-security
+#   build: docker build -t lab-linuc-security:1.0.1 containers/linuc-security
 FROM lab-linuc-machine:1.0.0
 USER root
 
@@ -20,6 +20,6 @@ COPY --chown=root:root --chmod=0644 vm/provision.sh /etc/lab-vm/provision.sh
 LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-explain
 LABEL org.opencontainers.image.description="LinuC 主題1.10（セキュリティ）を仮想マシンで確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
-ENV LAB_THEME=linuc-security LAB_VERSION=1.0.0 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:security-1.0.0 LAB_VM_AUTOSTART=1
+ENV LAB_THEME=linuc-security LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:security-1.0.1 LAB_VM_AUTOSTART=1
 USER lab
