@@ -5,7 +5,7 @@
 # 記録の取り方（読者と同じ --hostname とボリューム2つで起動する。ボリューム名は linuc-shell- で始める）:
 #   docker run -d --name linuc-shell-probe --hostname linuc \
 #     -v linuc-shell-probe-work:/home/lab/work -v linuc-shell-probe-state:/home/lab/.lab \
-#     lab-linuc-shell:1.0.0 sleep infinity
+#     lab-linuc-shell:1.0.2 sleep infinity
 #   docker cp probe/linuc-shell-probe.sh linuc-shell-probe:/tmp/run.sh
 #   docker exec -u lab -w /home/lab linuc-shell-probe bash /tmp/run.sh > logs/linuc-shell-probe.log 2>&1
 #   docker rm -f linuc-shell-probe

@@ -1,0 +1,135 @@
+
+
+========== 第5章: 配列の要素は ${a[1]}（添字は 0 から）/ 引用符なしの $@ ==========
+$ mkdir -p ~/try && cd ~/try
+$ a=(x y z)
+$ echo ${a[1]}
+y
+$ echo $a[1]
+x[1]
+$ echo $a
+x
+$ echo ${a[@]}; echo ${#a[@]}
+x y z
+3
+$ set -- "my file.txt" b; for a in $@; do echo "[$a]"; done
+[my]
+[file.txt]
+[b]
+$ sh -c 'a=(x y z)'
+sh: 1: Syntax error: "(" unexpected
+$ exit
+logout
+
+
+========== 第2章: alias を一度だけ避ける・unalias・= の前後の空白 ==========
+$ cd ~/try
+$ alias ls='ls -l'
+$ ls -d /etc
+drwxr-xr-x 1 root root 4096 Oct 13 19:18 /etc
+$ \ls -d /etc
+/etc
+$ command ls -d /etc
+/etc
+$ /usr/bin/ls -d /etc
+/etc
+$ unalias ls
+$ alias ls
+bash: alias: ls: not found
+$ alias ll = 'ls -l'; echo "終了ステータス $?"
+alias ll='ls -alF'
+bash: alias: =: not found
+bash: alias: ls -l: not found
+終了ステータス 1
+$ x = 1
+bash: x: command not found
+$ x=no; [ "$x"="yes" ] && echo "空白が無いと、いつも真"
+空白が無いと、いつも真
+$ [ "$x" = "yes" ] || echo "空白があれば、正しく偽"
+空白があれば、正しく偽
+$ exit
+logout
+
+
+========== 第2章: /etc/profile にも alias は書ける（ログインシェルで定義される） ==========
+$ cd ~/try
+$ echo "alias zz='echo /etc/profile で定義した alias'" | sudo tee -a /etc/profile
+alias zz='echo /etc/profile で定義した alias'
+$ bash -l -c 'alias zz'
+alias zz='echo /etc/profile で定義した alias'
+$ bash -c 'alias zz'
+bash: line 1: alias: zz: not found
+$ sudo sed -i '/^alias zz=/d' /etc/profile; tail -1 /etc/profile
+fi
+$ exit
+logout
+
+
+========== 第2章: ~/.bashrc の HISTSIZE=0（履歴を覚えない・ファイルにも書かない） ==========
+$ cd ~/try
+$ grep -n -E '^ *(PS1|HISTSIZE)=' ~/.bashrc
+19:HISTSIZE=1000
+60:    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+62:    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
+69:    PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
+$ echo 'HISTSIZE=0' >> ~/.bashrc
+$ HISTFILE=/tmp/hist-demo bash
+lab@linuc:~/try$ echo 履歴に残すか
+履歴に残すか
+lab@linuc:~/try$ history
+lab@linuc:~/try$ exit
+exit
+$ ls -l /tmp/hist-demo
+ls: cannot access '/tmp/hist-demo': No such file or directory
+$ sed -i '/^HISTSIZE=0$/d' ~/.bashrc
+$ HISTFILE=/tmp/hist-demo2 bash
+lab@linuc:~/try$ echo 履歴に残すか
+履歴に残すか
+lab@linuc:~/try$ exit
+exit
+$ cat /tmp/hist-demo2
+echo 履歴に残すか
+exit
+$ exit
+logout
+
+
+========== 第6章: expr は計算結果が 0 のとき終了ステータス 1 を返す ==========
+$ cd ~/try
+$ expr 2 + 3; echo "終了ステータス $?"
+5
+終了ステータス 0
+$ expr 2 - 2; echo "終了ステータス $?"
+0
+終了ステータス 1
+$ expr 3 \* 4
+12
+$ i=0; i=$(expr $i + 1); echo $i
+1
+$ expr --help | grep -A1 'Exit status'
+Exit status is 0 if EXPRESSION is neither null nor 0, 1 if EXPRESSION is null
+or 0, 2 if EXPRESSION is syntactically invalid, and 3 if an error occurred.
+$ exit
+logout
+
+
+========== 第8章: function 名前() { } とも書ける（bash だけ） ==========
+$ cd ~/try
+$ function hi2() { echo "function と () を両方付けても書ける"; }
+$ hi2
+function と () を両方付けても書ける
+$ sh -c 'function f() { echo x; }; f'
+sh: 1: Syntax error: "(" unexpected
+$ exit
+logout
+
+
+========== 第4章: 先頭行が無いスクリプトは、起動した側のシェルが読む ==========
+$ cd ~/try
+$ printf 'echo "BASH_VERSION=[$BASH_VERSION]"\n' > noshebang.sh; chmod +x noshebang.sh
+$ ./noshebang.sh
+BASH_VERSION=[5.2.21(1)-release]
+$ sh -c ./noshebang.sh
+BASH_VERSION=[]
+$ exit
+logout

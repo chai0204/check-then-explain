@@ -25,6 +25,7 @@ PAIRS=(
   "linuc-files     lab-linuc-files:1.0.1         $REPO:files-1.0.1"
   "linuc-text      lab-linuc-text:1.0.1          $REPO:text-1.0.1"
   "linuc-shell     lab-linuc-shell:1.0.1         $REPO:shell-1.0.1"
+  "linuc-shell     lab-linuc-shell:1.0.2         $REPO:shell-1.0.2"
   "linuc-files     lab-linuc-files:1.0.0         $REPO:files-1.0.0"
   "linuc-text      lab-linuc-text:1.0.0          $REPO:text-1.0.0"
   "linuc-shell     lab-linuc-shell:1.0.0         $REPO:shell-1.0.0"

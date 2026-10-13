@@ -30,7 +30,7 @@ $ cat &gt; hello.sh &lt;&lt;'END'
 &gt; echo "\$0 は $0"
 &gt; END
 $ ls -l hello.sh
--rw-r--r-- 1 lab lab 93 Oct 13 11:44 hello.sh
+-rw-r--r-- 1 lab lab 93 Oct 13 19:20 hello.sh
 $ ./hello.sh; echo "終了ステータス $?"
 bash: ./hello.sh: Permission denied
 終了ステータス 126
@@ -43,7 +43,7 @@ $0 は hello.sh
 <div class="naive"><h4>ふつうこう考える</h4>
 <p><code>bash hello.sh</code> で正しく動くことは確かめた。足りなかったのは実行権だけなのだから、<code>chmod +x</code> すれば <code>./hello.sh</code> でも同じように動くはずだ。</p>
 <pre><code>$ chmod +x hello.sh; ls -l hello.sh
--rwxr-xr-x 1 lab lab 93 Oct 13 11:44 hello.sh
+-rwxr-xr-x 1 lab lab 93 Oct 13 19:20 hello.sh
 $ ./hello.sh; echo "終了ステータス $?"
 ./hello.sh: 2: function: not found
 こんにちは、
@@ -97,7 +97,10 @@ say ()
 $ ./noshebang.sh
 BASH_VERSION=[5.2.21(1)-release]
 $ sh noshebang.sh
+BASH_VERSION=[]
+$ sh -c ./noshebang.sh
 BASH_VERSION=[]</code></pre>
+<p>bash から直接実行すると bash が読み（<code>BASH_VERSION</code> がある）、dash から直接実行させると dash が読んだ（空）。先頭行が無いスクリプトを読むのは、ログインシェルではなく<b>そのスクリプトを起動したシェル</b>である。試験の例題の解説には「ログインシェル（bash）で実行される」と書かれていることがあるが、それは起動した側もログインシェルも bash である、ふつうの場面の言い方と読めばよい。</p>
 <div class="scroll"><table>
 <tr><th>書き方</th><th>読むプログラム</th><th>先頭行</th><th>要る権限</th><th><code>$0</code></th><th>どこで動くか</th></tr>
 <tr><td><code>./hello.sh</code></td><td><code>#!</code> の行のプログラム（無ければ起動した側のシェル）</td><td>使われる</td><td>r と x</td><td><code>./hello.sh</code></td><td>子のプロセス</td></tr>
@@ -112,11 +115,11 @@ BASH_VERSION=[]</code></pre>
 <h2 id="perm">chmod: スクリプトには r と x の両方が要る</h2>
 <div class="sgoal"><b>この節で分かること</b>: 権限の書き方と、スクリプトと実行ファイルの違い。</div>
 <pre><code>$ chmod 700 hello.sh; ls -l hello.sh
--rwx------ 1 lab lab 95 Oct 13 11:44 hello.sh
+-rwx------ 1 lab lab 95 Oct 13 19:20 hello.sh
 $ chmod u=rwx,go=rx hello.sh; ls -l hello.sh
--rwxr-xr-x 1 lab lab 95 Oct 13 11:44 hello.sh
+-rwxr-xr-x 1 lab lab 95 Oct 13 19:20 hello.sh
 $ chmod go-x hello.sh; ls -l hello.sh
--rwxr--r-- 1 lab lab 95 Oct 13 11:44 hello.sh
+-rwxr--r-- 1 lab lab 95 Oct 13 19:20 hello.sh
 $ chmod 755 hello.sh</code></pre>
 <p><code>chmod</code> は数字でも記号でも書ける。数字は r=4・w=2・x=1 の足し算を、所有者・グループ・その他の順に3桁並べたものである。</p>
 <div class="scroll"><table>
@@ -128,15 +131,15 @@ $ chmod 755 hello.sh</code></pre>
 </table></div>
 <p>umask を 077 にした中で試すと、違いが見える。</p>
 <pre><code>$ (umask 077; chmod 644 hello.sh; chmod +x hello.sh; ls -l hello.sh)
--rwxr--r-- 1 lab lab 95 Oct 13 11:43 hello.sh
+-rwxr--r-- 1 lab lab 95 Oct 13 19:19 hello.sh
 $ (umask 077; chmod 644 hello.sh; chmod a+x hello.sh; ls -l hello.sh)
--rwxr-xr-x 1 lab lab 95 Oct 13 11:43 hello.sh</code></pre>
+-rwxr-xr-x 1 lab lab 95 Oct 13 19:19 hello.sh</code></pre>
 <p>次に、全員が使える場所へ置く。カレントディレクトリは PATH に入っていないので、名前だけでは動かない（第2章）。<code>/usr/local/bin</code> は管理者が自分でコマンドを置くための場所で、全員の PATH に最初から入っている。</p>
 <pre><code>$ hello.sh
 bash: hello.sh: command not found
 $ sudo cp hello.sh /usr/local/bin/hello
 $ ls -l /usr/local/bin/hello
--rwxr-xr-x 1 root root 95 Oct 13 11:45 /usr/local/bin/hello
+-rwxr-xr-x 1 root root 95 Oct 13 19:21 /usr/local/bin/hello
 $ hello
 こんにちは、lab
 $0 は /usr/local/bin/hello
@@ -145,12 +148,12 @@ $ sudo -u alice hello
 $0 は /usr/local/bin/hello</code></pre>
 <p>alice も名前だけで使えた。ここで、その他（alice）から r を外して x だけにしてみる。比べるために、機械語の実行ファイル（<code>id</code> のコピー）も同じ 711 にする。</p>
 <pre><code>$ sudo chmod 711 /usr/local/bin/hello; ls -l /usr/local/bin/hello
--rwx--x--x 1 root root 95 Oct 13 11:45 /usr/local/bin/hello
+-rwx--x--x 1 root root 95 Oct 13 19:21 /usr/local/bin/hello
 $ sudo -u alice hello; echo "終了ステータス $?"
 /bin/bash: /usr/local/bin/hello: Permission denied
 終了ステータス 126
 $ sudo cp /usr/bin/id /usr/local/bin/myid; sudo chmod 711 /usr/local/bin/myid; ls -l /usr/local/bin/myid
--rwx--x--x 1 root root 39432 Oct 13 11:45 /usr/local/bin/myid
+-rwx--x--x 1 root root 39432 Oct 13 19:21 /usr/local/bin/myid
 $ sudo -u alice myid -un
 alice</code></pre>
 <p>機械語の <code>myid</code> は x だけで動き、スクリプトの <code>hello</code> は <code>/bin/bash: … Permission denied</code> になった。エラーを出したのが <code>/bin/bash</code> であることに注目する。カーネルは x を見て <code>/bin/bash</code> を起動するところまではやった。そこから先、<b>alice の権限で動く bash が、スクリプトを読めなかった</b>。スクリプトは読まれてはじめて動くので、使う人に r が要る。</p>
@@ -163,9 +166,9 @@ alice</code></pre>
 $ chown lab /usr/local/bin/hello
 chown: changing ownership of '/usr/local/bin/hello': Operation not permitted
 $ sudo chown alice:alice /usr/local/bin/hello; ls -l /usr/local/bin/hello
--rwxr-xr-x 1 alice alice 95 Oct 13 11:45 /usr/local/bin/hello
+-rwxr-xr-x 1 alice alice 95 Oct 13 19:21 /usr/local/bin/hello
 $ sudo chown root:root /usr/local/bin/hello; ls -l /usr/local/bin/hello
--rwxr-xr-x 1 root root 95 Oct 13 11:45 /usr/local/bin/hello</code></pre>
+-rwxr-xr-x 1 root root 95 Oct 13 19:21 /usr/local/bin/hello</code></pre>
 <p>所有者を変えられるのは root だけで、lab が自分に変えようとすると <code>Operation not permitted</code> になった。<code>chown 所有者:グループ ファイル</code> の形で、両方を一度に変えられる。</p>
 <p>グループだけなら事情が違う。ファイルの所有者は、<b>自分が属しているグループへなら</b> root でなくても変えられる（<code>chgrp グループ ファイル</code> か <code>chown :グループ ファイル</code>）。alice を <code>staff</code> グループに入れて試す。</p>
 <pre><code>$ sudo usermod -aG staff alice; id alice
@@ -173,9 +176,9 @@ uid=1001(alice) gid=1001(alice) groups=1001(alice),50(staff)
 $ sudo -u alice bash -c umask
 0002
 $ sudo -u alice bash -c 'cd /tmp &amp;&amp; touch g.txt &amp;&amp; chgrp staff g.txt &amp;&amp; ls -l g.txt'
--rw-rw-r-- 1 alice staff 0 Oct 13 11:43 g.txt
+-rw-rw-r-- 1 alice staff 0 Oct 13 19:19 g.txt
 $ sudo -u alice bash -c 'cd /tmp &amp;&amp; chown :alice g.txt &amp;&amp; ls -l g.txt'
--rw-rw-r-- 1 alice alice 0 Oct 13 11:43 g.txt
+-rw-rw-r-- 1 alice alice 0 Oct 13 19:19 g.txt
 $ sudo -u alice bash -c 'cd /tmp &amp;&amp; chgrp lab g.txt'
 chgrp: changing group of 'g.txt': Operation not permitted
 $ sudo -u alice bash -c 'cd /tmp &amp;&amp; chown lab g.txt'
@@ -256,7 +259,7 @@ $ sudo -iu alice report
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>./x.sh</code> はカーネルが <code>#!</code> の行のプログラムを起動する。<code>bash x.sh</code>・<code>sh x.sh</code> は読むプログラムを自分で決めるので、先頭行はただのコメント</li><li>Ubuntu の <code>/bin/sh</code> は dash。<code>function</code> などの bash の書き方は <code>#!/bin/sh</code> では動かない</li><li><code>./x.sh</code> には r と x、<code>bash x.sh</code> と <code>. x.sh</code> には r だけが要る。他人に使わせるスクリプトには、その人に r と x の両方が要る</li><li>全員用のスクリプトは <code>/usr/local/bin</code> に置き、<code>chown root:root</code>・<code>chmod 755</code>。所有者を変えるのは root だけ。グループは、所有者が自分の属するグループへなら <code>chgrp</code> や <code>chown :グループ</code> で変えられる</li><li>スクリプトは実行した人の PATH のコピーで動く。先頭で <code>PATH=/usr/bin:/bin</code> と決めると、使う人に左右されない</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.1@sha256:a628e4d188c1cf80ccb2c636f74f85187038fd641c0c7eb7e110d7b327f3830e / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.2@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-shell/theory/03-lists">← 3. &amp;&amp; と || は、直前の数だけを見ている</a><a href="/linuc-shell/theory/05-args">次: 5. 引数は、渡す側のシェルが切ってから渡す →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

@@ -155,12 +155,79 @@ alias が展開された
 $ bash --posix a.sh
 alias が展開された</code></pre>
 <p>どの場合も、スクリプトの外（あなたの <code>~/.bashrc</code> やプロンプト）で定義した alias はスクリプトに届かない。<b>届かないこと</b>（子に渡らない）と<b>置き換えないこと</b>（<code>expand_aliases</code>）は、別々の理由である。</p>
+<p>alias を消さずに、<b>そのときだけ</b>元のコマンドを使うには、名前の前に <code>\</code> を付ける。前に <code>command</code> を付けても、フルパスで書いても alias は使われない。<code>unalias</code> は定義そのものを消す。</p>
+<pre><code>$ alias ls='ls -l'
+$ ls -d /etc
+drwxr-xr-x 1 root root 4096 Oct 13 19:18 /etc
+$ \ls -d /etc
+/etc
+$ command ls -d /etc
+/etc
+$ /usr/bin/ls -d /etc
+/etc
+$ unalias ls
+$ alias ls
+bash: alias: ls: not found</code></pre>
+<p><code>alias ls='ls -l'</code> は、Ubuntu の <code>~/.bashrc</code> が作っていた <code>ls --color=auto</code> の定義を上書きし、<code>unalias ls</code> はその定義を消した。どちらも新しく開いた対話シェルでは <code>~/.bashrc</code> から元に戻る。</p>
+<p>alias も変数の代入も、<code>=</code> の前後に<b>空白を入れない</b>。反対に <code>[ ]</code> の中で比べる <code>=</code> には空白が要る（第6章）。</p>
+<pre><code>$ alias ll = 'ls -l'; echo "終了ステータス $?"
+alias ll='ls -alF'
+bash: alias: =: not found
+bash: alias: ls -l: not found
+終了ステータス 1
+$ x = 1
+bash: x: command not found
+$ x=no; [ "$x"="yes" ] &amp;&amp; echo "空白が無いと、いつも真"
+空白が無いと、いつも真
+$ [ "$x" = "yes" ] || echo "空白があれば、正しく偽"
+空白があれば、正しく偽</code></pre>
+<div class="scroll"><table>
+<tr><th>書き方</th><th><code>=</code> の前後</th><th>逆にすると</th></tr>
+<tr><td><code>alias ll='ls -l'</code></td><td>空白を入れない</td><td><code>alias ll = 'ls -l'</code> は <code>ll</code>・<code>=</code>・<code>ls -l</code> の3つを別々に調べ、<code>=</code> と <code>ls -l</code> は <code>not found</code>（終了ステータス 1）</td></tr>
+<tr><td><code>x=1</code>（代入）</td><td>空白を入れない</td><td><code>x = 1</code> は <code>x</code> という名前のコマンドを探して <code>command not found</code></td></tr>
+<tr><td><code>[ "$x" = "yes" ]</code>（比べる）</td><td>空白を入れる</td><td><code>[ "$x"="yes" ]</code> は1つの長い文字列になり、空でないので<b>いつも真</b></td></tr>
+</table></div>
 <p>ここで第1章の2つのファイルの役割がつながる。</p>
 <div class="scroll"><table>
 <tr><th>書くもの</th><th>子に渡るか</th><th>書く場所</th><th>理由</th></tr>
 <tr><td>環境変数（<code>PATH</code>・<code>EDITOR</code> など）</td><td>コピーが渡る</td><td><code>~/.profile</code>（ログイン時に1回）</td><td>1回作れば、以後のすべての子に渡る</td></tr>
 <tr><td>alias・シェル変数・シェルの設定</td><td>渡らない</td><td><code>~/.bashrc</code>（対話シェルごと）</td><td>渡らないので、対話シェルが起動するたびに作り直す</td></tr>
 </table></div>
+<p>alias は <code>~/.bashrc</code> 以外にも書ける。<code>/etc/profile</code> に書けば、ログインシェルで定義される。ただしログインしない子のシェルには渡らないので、全員の対話シェルで使わせたいなら、どの対話シェルも読む <code>/etc/bash.bashrc</code>（Debian 系）に書くのがふつうである。</p>
+<pre><code>$ echo "alias zz='echo /etc/profile で定義した alias'" | sudo tee -a /etc/profile
+alias zz='echo /etc/profile で定義した alias'
+$ bash -l -c 'alias zz'
+alias zz='echo /etc/profile で定義した alias'
+$ bash -c 'alias zz'
+bash: line 1: alias: zz: not found
+$ sudo sed -i '/^alias zz=/d' /etc/profile; tail -1 /etc/profile
+fi</code></pre>
+<p>試験の例題の解説に「<code>/etc/profile</code> には alias を書けない」とあることがあるが、記録のとおり書ける。問われているのは「どのシェルで定義されるか」で、ログインシェルなら定義され、ログインしないシェルでは定義されない。</p>
+<p><code>~/.bashrc</code> に書くものは alias だけではない。プロンプトの形を決める <code>PS1</code> や、覚えておく履歴の件数を決める <code>HISTSIZE</code> のようなシェル変数も、Ubuntu ではここで決めている（履歴の仕組みそのものは<a href="/linuc-text/theory/02-path#history">主題1.03 の第2章</a>で扱う）。試験に出るのは <code>HISTSIZE=0</code> と書いたときで、履歴を1件も覚えず、終わるときに履歴ファイルにも何も書かない。</p>
+<pre><code>$ grep -n -E '^ *(PS1|HISTSIZE)=' ~/.bashrc
+19:HISTSIZE=1000
+60:    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+62:    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
+69:    PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
+$ echo 'HISTSIZE=0' &gt;&gt; ~/.bashrc
+$ HISTFILE=/tmp/hist-demo bash
+lab@linuc:~/try$ echo 履歴に残すか
+履歴に残すか
+lab@linuc:~/try$ history
+lab@linuc:~/try$ exit
+exit
+$ ls -l /tmp/hist-demo
+ls: cannot access '/tmp/hist-demo': No such file or directory
+$ sed -i '/^HISTSIZE=0$/d' ~/.bashrc
+$ HISTFILE=/tmp/hist-demo2 bash
+lab@linuc:~/try$ echo 履歴に残すか
+履歴に残すか
+lab@linuc:~/try$ exit
+exit
+$ cat /tmp/hist-demo2
+echo 履歴に残すか
+exit</code></pre>
+<p><code>HISTSIZE=0</code> の子のシェルでは <code>history</code> が何も出さず、抜けた後も履歴ファイルが作られていない。その行を消してから開いた子のシェルでは、打った2行がファイルに残った。<code>HISTFILE=…</code> は、この実験のために履歴ファイルの置き場所だけを変える指定である。</p>
 <div class="analogy"><b>たとえ</b>: alias は自分の<b>手帳に書いた略語表</b>に近い。「ll と書いたら ls -alF のこと」と自分だけが知っている。
 同じ部屋の別の人（子のシェル）は、同じ手帳を自分で持ってこない限り読めない。
 <br>ただし<b>崩れる点</b>: 人なら略語を見て意味を推測できるが、bash は手帳に無い略語を一切推測しない。<code>command not found</code> で止まる。</div>
@@ -235,6 +302,15 @@ $ here
 <p><code>source ~/.bashrc</code> と <code>. ~/.bashrc</code>。
 <code>bash ~/.bashrc</code> は子のプロセスが読んで終わるだけで、いまのシェルには何も残らない（記録では8行目の <code>return</code> でエラーにもなった）。</p></details></div>
 <div class="quiz"><b>確認</b>
+<p><code>alias ls='ls -l'</code> が設定されている。alias を消さずに、このときだけ元の <code>ls</code> を実行する書き方を挙げよ。</p>
+<details><summary>答え</summary>
+<p><code>\ls</code>・<code>command ls</code>・<code>/usr/bin/ls</code>（フルパス）。どれも記録では長い形式にならなかった。<code>unalias ls</code> も元に戻るが、こちらは定義そのものを消す（次に使うにはもう一度 <code>alias</code> で定義し直す）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>~/.bashrc</code> の末尾に <code>HISTSIZE=0</code> と書いた。この後に開いた対話シェルについて正しいものはどれか。<br>
+(A) <code>history</code> は打ったコマンドを表示する　(B) <code>history</code> は何も表示せず、終わったあと履歴ファイルにも書かれない　(C) <code>history</code> は何も表示しないが、履歴ファイルには書かれる</p>
+<details><summary>答え</summary>
+<p>(B)。<code>HISTSIZE</code> は覚えておく件数で、0 なら1件も覚えない。覚えていないものは、終わるときにファイルへ書く分も無い（記録では履歴ファイルが作られなかった）。</p></details></div>
+<div class="quiz"><b>確認</b>
 <p><code>set.sh</code> の中身は <code>export GREETING=hello</code> の1行だけである。<code>bash set.sh</code> を実行した直後に、元のシェルで <code>echo "[$GREETING]"</code> と打つと何が出るか。</p>
 <details><summary>答え</summary>
 <p><code>[]</code>（空）。<code>export</code> は子のシェルの中で起き、子が終わると消えた。<code>export</code> は「自分の子へコピーを渡す」印であって、親へ送り返す手段ではない。
@@ -259,8 +335,8 @@ bash: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin=/usr/local/sb
 (C) は子のプロセスが読むだけなので、変数は呼んだ側に残らない。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>bash ファイル</code> は子のプロセスに読ませる。<code>source ファイル</code>・<code>. ファイル</code> はいまのシェルに読ませる。設定の読み直しは後者</li><li>子に渡るのは <code>export</code> した環境変数の<b>コピー</b>だけ。子が変えても親は変わらない</li><li><code>declare -p 名前</code> の <code>-x</code> が環境変数の印。<code>env</code> は環境変数だけを出す</li><li>alias は子に渡らない。bash のスクリプトでは既定で展開されない（<code>shopt -s expand_aliases</code> で有効になる。sh（dash）は展開する）。だから対話シェルごとに読まれる <code>~/.bashrc</code> に書く</li><li>PATH は <code>:</code> 区切りで左から探す。先頭に足すと優先、末尾に足すと後回し。手で足した PATH は次のログインで消える</li><li><code>source</code> は bash の別名。sh（dash）で使えるのは <code>.</code> だけ</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.1@sha256:a628e4d188c1cf80ccb2c636f74f85187038fd641c0c7eb7e110d7b327f3830e / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>bash ファイル</code> は子のプロセスに読ませる。<code>source ファイル</code>・<code>. ファイル</code> はいまのシェルに読ませる。設定の読み直しは後者</li><li>子に渡るのは <code>export</code> した環境変数の<b>コピー</b>だけ。子が変えても親は変わらない</li><li><code>declare -p 名前</code> の <code>-x</code> が環境変数の印。<code>env</code> は環境変数だけを出す</li><li>alias は子に渡らない。bash のスクリプトでは既定で展開されない（<code>shopt -s expand_aliases</code> で有効になる。sh（dash）は展開する）。だから対話シェルごとに読まれる <code>~/.bashrc</code> に書く</li><li>alias をそのときだけ避けるのは <code>\ls</code>・<code>command ls</code>・フルパス。<code>unalias</code> は定義ごと消す。<code>alias ll='ls -l'</code> も <code>x=1</code> も <code>=</code> の前後に空白を入れない</li><li><code>~/.bashrc</code> の <code>HISTSIZE=0</code> は、履歴を覚えずファイルにも書かない。プロンプトは <code>PS1</code></li><li>PATH は <code>:</code> 区切りで左から探す。先頭に足すと優先、末尾に足すと後回し。手で足した PATH は次のログインで消える</li><li><code>source</code> は bash の別名。sh（dash）で使えるのは <code>.</code> だけ</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.2@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-shell/theory/01-startup">← 1. 読まれる起動ファイルは、シェルの生まれ方で決まる</a><a href="/linuc-shell/theory/03-lists">次: 3. &amp;&amp; と || は、直前の数だけを見ている →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

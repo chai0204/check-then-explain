@@ -3,8 +3,8 @@
 ========== 0. 環境 ==========
 
 $ lab env
-テーマ    : lab-linuc-shell 1.0.1
-イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.1
+テーマ    : lab-linuc-shell 1.0.2
+イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.2
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -17,7 +17,7 @@ umask     : 0022
 
 $ （docker run で入ったときの画面。/bin/bash -l が起動して、案内を出す）
 
-── lab-linuc-shell 1.0.1 ────────────────────────────────────────
+── lab-linuc-shell 1.0.2 ────────────────────────────────────────
 lab-linuc-shell  進捗 0/8
   次 → 01 「ログインしたときだけ挨拶を出す」 (目安 10分 / 影響度 B)
   lab start 01 で課題を開く
@@ -38,7 +38,7 @@ $ echo $-
 himBHs
 $ bash -l
 
-── lab-linuc-shell 1.0.1 ────────────────────────────────────────
+── lab-linuc-shell 1.0.2 ────────────────────────────────────────
 lab-linuc-shell  進捗 0/8
   次 → 01 「ログインしたときだけ挨拶を出す」 (目安 10分 / 影響度 B)
   lab start 01 で課題を開く
@@ -228,7 +228,7 @@ lab-base  進捗 0/8
 [~/.profile]
 [~/.bashrc]
 alice@linuc:~$ ll -d ~
-drwxr-x--- 1 alice alice 4096 Oct 13 11:42 /home/alice/
+drwxr-x--- 1 alice alice 4096 Oct 13 19:18 /home/alice/
 alice@linuc:~$ printf 'echo "[~/.bash_profile]"\nPATH="$HOME/bin:$PATH"\n' > ~/.bash_profile
 alice@linuc:~$ cat ~/.bash_profile
 echo "[~/.bash_profile]"
@@ -290,7 +290,7 @@ lab-base  進捗 0/8
 [~/.profile]
 [~/.bashrc]
 alice@linuc:~$ ll -d ~
-drwxr-x--- 1 alice alice 4096 Oct 13 11:43 /home/alice/
+drwxr-x--- 1 alice alice 4096 Oct 13 19:19 /home/alice/
 alice@linuc:~$ exit
 logout
 [~/.bash_logout]
@@ -474,7 +474,7 @@ $ cat > hello.sh <<'END'
 > echo "\$0 は $0"
 > END
 $ ls -l hello.sh
--rw-r--r-- 1 lab lab 93 Oct 13 11:44 hello.sh
+-rw-r--r-- 1 lab lab 93 Oct 13 19:20 hello.sh
 $ ./hello.sh; echo "終了ステータス $?"
 bash: ./hello.sh: Permission denied
 終了ステータス 126
@@ -483,7 +483,7 @@ $ bash hello.sh; echo "終了ステータス $?"
 $0 は hello.sh
 終了ステータス 0
 $ chmod +x hello.sh; ls -l hello.sh
--rwxr-xr-x 1 lab lab 93 Oct 13 11:44 hello.sh
+-rwxr-xr-x 1 lab lab 93 Oct 13 19:20 hello.sh
 $ ./hello.sh; echo "終了ステータス $?"
 ./hello.sh: 2: function: not found
 こんにちは、
@@ -522,17 +522,17 @@ BASH_VERSION=[5.2.21(1)-release]
 $ sh noshebang.sh
 BASH_VERSION=[]
 $ chmod 700 hello.sh; ls -l hello.sh
--rwx------ 1 lab lab 95 Oct 13 11:44 hello.sh
+-rwx------ 1 lab lab 95 Oct 13 19:20 hello.sh
 $ chmod u=rwx,go=rx hello.sh; ls -l hello.sh
--rwxr-xr-x 1 lab lab 95 Oct 13 11:44 hello.sh
+-rwxr-xr-x 1 lab lab 95 Oct 13 19:20 hello.sh
 $ chmod go-x hello.sh; ls -l hello.sh
--rwxr--r-- 1 lab lab 95 Oct 13 11:44 hello.sh
+-rwxr--r-- 1 lab lab 95 Oct 13 19:20 hello.sh
 $ chmod 755 hello.sh
 $ hello.sh
 bash: hello.sh: command not found
 $ sudo cp hello.sh /usr/local/bin/hello
 $ ls -l /usr/local/bin/hello
--rwxr-xr-x 1 root root 95 Oct 13 11:45 /usr/local/bin/hello
+-rwxr-xr-x 1 root root 95 Oct 13 19:21 /usr/local/bin/hello
 $ hello
 こんにちは、lab
 $0 は /usr/local/bin/hello
@@ -540,21 +540,21 @@ $ sudo -u alice hello
 こんにちは、alice
 $0 は /usr/local/bin/hello
 $ sudo chmod 711 /usr/local/bin/hello; ls -l /usr/local/bin/hello
--rwx--x--x 1 root root 95 Oct 13 11:45 /usr/local/bin/hello
+-rwx--x--x 1 root root 95 Oct 13 19:21 /usr/local/bin/hello
 $ sudo -u alice hello; echo "終了ステータス $?"
 /bin/bash: /usr/local/bin/hello: Permission denied
 終了ステータス 126
 $ sudo cp /usr/bin/id /usr/local/bin/myid; sudo chmod 711 /usr/local/bin/myid; ls -l /usr/local/bin/myid
--rwx--x--x 1 root root 39432 Oct 13 11:45 /usr/local/bin/myid
+-rwx--x--x 1 root root 39432 Oct 13 19:21 /usr/local/bin/myid
 $ sudo -u alice myid -un
 alice
 $ sudo chmod 755 /usr/local/bin/hello
 $ chown lab /usr/local/bin/hello
 chown: changing ownership of '/usr/local/bin/hello': Operation not permitted
 $ sudo chown alice:alice /usr/local/bin/hello; ls -l /usr/local/bin/hello
--rwxr-xr-x 1 alice alice 95 Oct 13 11:45 /usr/local/bin/hello
+-rwxr-xr-x 1 alice alice 95 Oct 13 19:21 /usr/local/bin/hello
 $ sudo chown root:root /usr/local/bin/hello; ls -l /usr/local/bin/hello
--rwxr-xr-x 1 root root 95 Oct 13 11:45 /usr/local/bin/hello
+-rwxr-xr-x 1 root root 95 Oct 13 19:21 /usr/local/bin/hello
 $ cat > report.sh <<'END'
 > #!/bin/bash
 > echo "作成日: $(date +%F)"
@@ -660,7 +660,7 @@ $ sed -i 's/\$\*/"$@"/' cpall.sh; cat cpall.sh
 #!/bin/bash
 cp "$@" /tmp/
 $ bash cpall.sh "my file.txt"; ls -l "/tmp/my file.txt"
--rw-r--r-- 1 lab lab 0 Oct 13 11:45 '/tmp/my file.txt'
+-rw-r--r-- 1 lab lab 0 Oct 13 19:21 '/tmp/my file.txt'
 $ cat > ten.sh <<'END'
 > #!/bin/bash
 > echo "\$# = $#"
@@ -1042,8 +1042,8 @@ logout
 ========== 9. 最終環境 ==========
 
 $ lab env
-テーマ    : lab-linuc-shell 1.0.1
-イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.1
+テーマ    : lab-linuc-shell 1.0.2
+イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.2
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6

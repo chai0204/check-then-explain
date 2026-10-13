@@ -42,7 +42,7 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 ほとんどがこの事実への対処として存在しています。だから<b>「いまどのシェルの中で動いているか」を見分けられれば、語を丸暗記しなくても答えが組み立てられます</b>。
 例外は関数だけで、関数は子ではない（第8章）。</p>
 <div class="skip"><b>ここで覚えなくていいこと</b>:
-zsh・csh などほかのシェル、<code>getopts</code>、配列、<code>[[ ]]</code> の詳しい文法、<code>trap</code> とシグナル、<code>set -e</code>、
+zsh・csh などほかのシェル、<code>getopts</code>、配列の操作（要素の取り出し方だけは第5章で扱う）、<code>[[ ]]</code> の詳しい文法、<code>trap</code> とシグナル、<code>set -e</code>、
 プロセス置換、<code>select</code> 文。どれもレベル1の詳細欄に無く、この8章には出てこないか、名前だけです。</div>
 </div>
 
@@ -55,20 +55,20 @@ zsh・csh などほかのシェル、<code>getopts</code>、配列、<code>[[ ]]
     <td><a href="/linuc-shell/theory/01-startup">1</a></td>
     <td><code>/etc/profile</code> <code>/etc/bash.bashrc</code> <code>~/.bash_profile</code> <code>~/.bash_login</code> <code>~/.profile</code> <code>~/.bashrc</code> <code>~/.bash_logout</code>（印を仕込んで <code>sudo -i</code>・<code>su -</code>・<code>su</code>・<code>bash</code> で起動）</td></tr>
 <tr><td><a href="/linuc-shell/theory/02-source">2</a></td>
-    <td><code>source</code> <code>.</code> <code>export</code> <code>declare -p</code> <code>env</code> <code>alias</code> <code>unalias</code> <code>type</code> <code>PATH</code></td></tr>
+    <td><code>source</code> <code>.</code> <code>export</code> <code>declare -p</code> <code>env</code> <code>alias</code> <code>unalias</code> <code>\ls</code> <code>type</code> <code>PATH</code> <code>PS1</code> <code>HISTSIZE</code></td></tr>
 <tr><td><a href="/linuc-shell/theory/03-lists">3</a></td>
     <td>リスト（<code>;</code> <code>&amp;&amp;</code> <code>||</code>）・コマンド置換（<code>$( )</code> <code>` `</code>）・<code>( )</code> と <code>{ }</code></td></tr>
 <tr><td rowspan="5">1.06.2 シェルスクリプト</td><td rowspan="5">6</td>
     <td><a href="/linuc-shell/theory/04-script">4</a></td>
     <td><code>#!</code> <code>chmod</code> <code>chown</code> <code>./x.sh</code>・<code>bash x.sh</code>・<code>sh x.sh</code>・<code>. x.sh</code> <code>/usr/local/bin</code> スクリプトの中の <code>PATH</code></td></tr>
 <tr><td><a href="/linuc-shell/theory/05-args">5</a></td>
-    <td><code>$0</code> <code>$1</code>〜<code>$n</code>・<code>${10}</code> <code>$#</code> <code>$@</code> <code>$*</code> <code>shift</code> <code>set --</code></td></tr>
+    <td><code>$0</code> <code>$1</code>〜<code>$n</code>・<code>${10}</code> <code>$#</code> <code>$@</code> <code>$*</code> <code>shift</code> <code>set --</code> 配列の <code>${a[1]}</code></td></tr>
 <tr><td><a href="/linuc-shell/theory/06-status">6</a></td>
-    <td><code>$?</code> <code>exit</code> <code>test</code> <code>[ ]</code> <code>if</code>・<code>elif</code>・<code>else</code></td></tr>
+    <td><code>$?</code> <code>exit</code> <code>expr</code> <code>test</code> <code>[ ]</code> <code>if</code>・<code>elif</code>・<code>else</code></td></tr>
 <tr><td><a href="/linuc-shell/theory/07-loops">7</a></td>
     <td><code>for</code> <code>while</code> <code>until</code> <code>seq</code> <code>read</code> <code>case</code> <code>break</code> <code>continue</code></td></tr>
 <tr><td><a href="/linuc-shell/theory/08-function">8</a></td>
-    <td><code>function</code> <code>local</code> <code>return</code> <code>bash -x</code> <code>bash -v</code> <code>set -x</code></td></tr>
+    <td><code>function</code>（<code>function 名前() { }</code> の形も） <code>local</code> <code>return</code> <code>bash -x</code> <code>bash -v</code> <code>set -x</code></td></tr>
 </table></div>
 <p class="detail">この檻で<b>実際に打てないもの</b>は、ssh によるログイン（sshd を入れていない。ログインシェルになる点は <code>su -</code> と同じ）、
 GUI の端末アプリが開くシェル、cron から起動されたスクリプトの PATH（主題1.08.2）、Red Hat 系の <code>/etc/bashrc</code> です。
@@ -113,6 +113,18 @@ GUI の端末アプリが開くシェル、cron から起動されたスクリ�
 <tr><td><code>bash -v</code></td><td>読み込んだ行をそのまま表示しながら実行する</td><td><a href="/linuc-shell/theory/08-function#debug">8</a></td></tr>
 <tr><td><code>bash -x</code></td><td>展開した後の形に <code>+</code> を付けて表示しながら実行する</td><td><a href="/linuc-shell/theory/08-function#debug">8</a></td></tr>
 </table></div>
+
+<p>LinuC の公式例題には、上の語のほかに次の形も出ている。どれも本文で記録を取ってある。</p>
+<div class="scroll"><table>
+<tr><th>形</th><th>一行で</th><th>章</th></tr>
+<tr><td><code>${a[1]}</code></td><td>配列の要素。添字は 0 から。<code>$a[1]</code> は先頭の要素の後ろに文字 <code>[1]</code> が付くだけ</td><td><a href="/linuc-shell/theory/05-args#ten">5</a></td></tr>
+<tr><td><code>\ls</code>・<code>command ls</code></td><td>alias を消さずに、そのときだけ避ける。<code>unalias</code> は定義ごと消す</td><td><a href="/linuc-shell/theory/02-source#alias">2</a></td></tr>
+<tr><td><code>alias ll='ls -l'</code></td><td><code>=</code> の前後に空白を入れない（<code>[ ]</code> の中の <code>=</code> は空白が要る）</td><td><a href="/linuc-shell/theory/02-source#alias">2</a></td></tr>
+<tr><td><code>HISTSIZE=0</code></td><td><code>~/.bashrc</code> に書くと、履歴を覚えずファイルにも書かない。プロンプトは <code>PS1</code></td><td><a href="/linuc-shell/theory/02-source#alias">2</a></td></tr>
+<tr><td><code>expr</code></td><td>計算結果を出す。結果が 0 なら終了ステータスは 1</td><td><a href="/linuc-shell/theory/06-status#status">6</a></td></tr>
+<tr><td><code>function 名前() { }</code></td><td>bash では <code>function</code> と <code>()</code> を両方付けても書ける（dash では文法エラー）</td><td><a href="/linuc-shell/theory/08-function#same">8</a></td></tr>
+</table></div>
+<p class="detail">例題の解説が本文と違う言い方をしているところが3つある。先頭行（<code>#!</code>）が無いスクリプトは「ログインシェルで実行される」のではなく起動した側のシェルが読む（<a href="/linuc-shell/theory/04-script#three">第4章</a>）。「<code>$@</code> は引数ごとに <code>""</code> で囲まれる」のは <code>"$@"</code> と書いたときだけ（<a href="/linuc-shell/theory/05-args#params">第5章</a>）。<code>/etc/profile</code> にも alias は書ける（<a href="/linuc-shell/theory/02-source#alias">第2章</a>）。どれも記録で確かめてある。</p>
 
 <h2 id="chapters">章</h2>
 <div class="toc">

@@ -1,10 +1,10 @@
 #!/bin/bash
 # LinuC 主題1.06 の訂正の裏付け（2026-10-13、事実確認で見つかった誤り3件・誤解を招く6件のうち、端末で示せるもの）。
-# イメージは push 済みの lab-linuc-shell:1.0.0（sha256:377dbd9c…）のまま。作り直さずに、同じイメージで取る。
+# 最初は push 済みの 1.0.0（sha256:377dbd9c…）で取った。演習のヒントの誤りを直した 1.0.1、seed を 0755 にした 1.0.2 で、ほかの記録と一緒に取り直した。
 # 記録の取り方（読者と同じ --hostname とボリューム2つで起動する。ボリューム名は linuc-shell- で始める）:
 #   docker run -d --name linuc-shell-extra6 --hostname linuc \
 #     -v linuc-shell-extra6-work:/home/lab/work -v linuc-shell-extra6-state:/home/lab/.lab \
-#     lab-linuc-shell:1.0.0 sleep infinity
+#     lab-linuc-shell:1.0.2 sleep infinity
 #   docker cp probe/linuc-shell-extra6.sh linuc-shell-extra6:/tmp/run.sh
 #   docker exec -u lab -w /home/lab linuc-shell-extra6 bash /tmp/run.sh > logs/linuc-shell-extra6.log 2>&1
 #   docker rm -f linuc-shell-extra6

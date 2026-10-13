@@ -2,9 +2,11 @@
 # LinuC 主題1.06（シェルおよびスクリプト）用の檻。
 # 読者 lab のほかに alice と bob を置く。どの起動ファイルがいつ読まれるかを、
 # 自分以外のユーザで実測するため（自分の ~/.bashrc を壊すと、その端末ごと使えなくなる）。
-#   build: docker build -t lab-linuc-shell:1.0.1 containers/linuc-shell
+#   build: docker build -t lab-linuc-shell:1.0.2 containers/linuc-shell
 #   1.0.1（2026-10-13）: 演習のヒントと模範解答の誤り（~/.bashrc を読むシェル・コマンドを探す順・
 #   dash の function の読み方ほか）を直した。lab/ の層だけが 1.0.0 と違う（useradd の層はキャッシュで同一）。
+#   1.0.2（2026-10-13）: 配布ファイル（seed）を 0755 にする層を足した。lab reset の後に演習のスクリプトを
+#   直して保存できなかった不具合の修正。それより下の層は 1.0.1 とキャッシュで同一。
 FROM lab-linuc-base:1.0.0
 USER root
 
@@ -32,13 +34,19 @@ RUN useradd -m -s /bin/bash alice \
 
 # ---- 2) 教材資産。root 所有・読み取りのみ ----------------------------------
 COPY --chown=root:root --chmod=0555 lab/ /lab/
+#   配布ファイル（seed）だけは 0755 にする。root 所有なので、読者が元を書き換えられないのは同じ。
+#   0555 のままだと、lab reset が cp -r で写した ~/work/NN のファイルと下のディレクトリが読み取り専用になる
+#   （lab start は写した後に chmod u+w するが、lab reset はしない）。1.0.1 で実測: lab reset 06 の後の
+#   menu.sh が -r-xr-xr-x になり、追記が Permission denied。~/work/07/logs も dr-xr-xr-x（2026-10-13）。
+#   主題1.03（linuc-text）と同じ直し方。
+COPY --chown=root:root --chmod=0755 lab/seed/ /lab/seed/
 
 LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-explain
 LABEL org.opencontainers.image.description="LinuC 主題1.06（シェルおよびスクリプト）を手で確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
 
-ENV LAB_THEME=linuc-shell LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:shell-1.0.1
+ENV LAB_THEME=linuc-shell LAB_VERSION=1.0.2 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:shell-1.0.2
 USER lab
 WORKDIR /home/lab
 # ログインシェルで起動する。入口の案内（/etc/profile.d/99-lab.sh）が出るのはこのため。

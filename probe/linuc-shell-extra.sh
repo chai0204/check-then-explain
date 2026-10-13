@@ -3,7 +3,7 @@
 # 記録の取り方（読者と同じ --hostname とボリューム2つで起動する。ボリューム名は linuc-shell- で始める）:
 #   docker run -d --name linuc-shell-extra --hostname linuc \
 #     -v linuc-shell-extra-work:/home/lab/work -v linuc-shell-extra-state:/home/lab/.lab \
-#     lab-linuc-shell:1.0.0 sleep infinity
+#     lab-linuc-shell:1.0.2 sleep infinity
 #   docker cp probe/linuc-shell-extra.sh linuc-shell-extra:/tmp/run.sh
 #   docker exec -u lab -w /home/lab linuc-shell-extra bash /tmp/run.sh > logs/linuc-shell-extra.log 2>&1
 #   docker rm -f linuc-shell-extra

@@ -5,7 +5,7 @@
 # 記録の取り方（読者と同じ --hostname とボリューム2つで起動する。ボリューム名は linuc-shell- で始める）:
 #   docker run -d --name linuc-shell-solve --hostname linuc \
 #     -v linuc-shell-solve-work:/home/lab/work -v linuc-shell-solve-state:/home/lab/.lab \
-#     lab-linuc-shell:1.0.0 sleep infinity
+#     lab-linuc-shell:1.0.2 sleep infinity
 #   docker cp probe/linuc-shell-solve-all.sh linuc-shell-solve:/tmp/run.sh
 #   docker exec -u lab -w /home/lab linuc-shell-solve bash /tmp/run.sh > logs/linuc-shell-solve-all.log 2>&1
 #   docker rm -f linuc-shell-solve
@@ -204,6 +204,16 @@ R 'cd ~'
 H "J. 全問通した状態で lab check（完走メッセージが出るはず）"
 R 'lab check; echo "exit=$?"'
 R 'lab ls'
+
+H "L. lab reset の後も、配布ファイルを直して保存できる（1.0.2 で直した。1.0.1 では読み取り専用になった）"
+R 'lab reset 06'
+R 'ls -ld ~/work/06; ls -l ~/work/06'
+R "echo '# x' >> ~/work/06/menu.sh; echo \"追記の終了ステータス \$?\"; tail -1 ~/work/06/menu.sh"
+R 'lab reset 07'
+R 'ls -ld ~/work/07 ~/work/07/logs; ls -l ~/work/07/count.sh'
+R 'echo "--- 写しの元（/lab/seed）は root のもので、読者は書き換えられない ---"'
+R 'ls -ld /lab/seed/06 /lab/seed/06/menu.sh'
+R "echo '# x' >> /lab/seed/06/menu.sh; echo \"追記の終了ステータス \$?\""
 
 H "K. 最終環境"
 R 'lab env'

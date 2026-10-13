@@ -36,7 +36,12 @@ $ bye bob
 $ bash -c 'wave alice'; echo "終了ステータス $?"
 bash: line 1: wave: command not found
 終了ステータス 127</code></pre>
-<p>書き方は2つある。<code>名前() { …; }</code> は sh の規格にある書き方で、dash でも動く。<code>function 名前 { …; }</code> は bash の書き方で、第4章のとおり dash では動かない。<code>type</code> は、その名前が関数であることと中身を見せた。</p>
+<p>書き方は主に2つある。<code>名前() { …; }</code> は sh の規格にある書き方で、dash でも動く。<code>function 名前 { …; }</code> は bash の書き方で、第4章のとおり dash では動かない。2つを合わせた <code>function 名前() { …; }</code> も bash では書ける（試験の例題にはこの形も出る）。dash では、これも文法エラーになる。<code>type</code> は、その名前が関数であることと中身を見せた。</p>
+<pre><code>$ function hi2() { echo "function と () を両方付けても書ける"; }
+$ hi2
+function と () を両方付けても書ける
+$ sh -c 'function f() { echo x; }; f'
+sh: 1: Syntax error: "(" unexpected</code></pre>
 <p>関数は子のシェルに渡らない。<code>bash -c</code> で起動した子からは <code>wave</code> が見えず、127（見つからない）になった。第2章の alias と同じで、関数は環境変数ではないからである。</p>
 <p>名前だけで打ったコマンドは、alias の次に<b>関数</b>が調べられ、組み込みコマンドと PATH はその後になる（第2章のサーチパスの順）。だから既存のコマンドと同じ名前の関数を作ると、そちらが先に動く。</p>
 <pre><code>$ date() { echo "関数の date が先に動いた"; }
@@ -232,14 +237,14 @@ $ bash number.sh alice bob carol
 <code>-n</code> と <code>-e</code> はこの章では扱っていない。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>#!/bin/sh</code> で始まるスクリプトで関数を定義したい。Ubuntu で動く書き方はどちらか。<br>
-(A) <code>function backup { …; }</code>　(B) <code>backup() { …; }</code></p>
+(A) <code>function backup { …; }</code>　(B) <code>backup() { …; }</code>　(C) <code>function backup() { …; }</code></p>
 <details><summary>答え</summary>
-<p>(B)。<code>/bin/sh</code> は dash で、<code>function</code> キーワードを知らない（第4章の記録: <code>function: not found</code> のあと文法エラー）。
-bash で動かすなら（先頭行が <code>#!/bin/bash</code>）どちらでもよい。</p></details></div>
+<p>(B)。<code>/bin/sh</code> は dash で、<code>function</code> キーワードを知らない（第4章の記録: <code>function: not found</code> のあと文法エラー。(C) の形も記録では <code>Syntax error</code>）。
+bash で動かすなら（先頭行が <code>#!/bin/bash</code>）どれでもよい。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>関数は <code>名前() { …; }</code> か <code>function 名前 { …; }</code>（bash のみ）。子のシェルには渡らない</li><li>関数は呼んだシェルの中で動く。<code>local</code> を付けない変数は共有され、<code>exit</code> はスクリプト全体を終わらせる。関数だけ終えるのは <code>return</code></li><li><code>bash -x</code> は展開後の形に <code>+</code> を付けて、<code>bash -v</code> は読んだままを出す。一部だけなら <code>set -x</code> … <code>set +x</code></li><li>子は親の環境変数のコピーを受け取り、返せるのは 0〜255 の終了ステータス1つだけ。主題1.06 の語はほとんどがこの言い換え</li><li>動かないときは「どのシェルか → 何を受け取ったか → 何を返したか → どこで変わったか」の順に確かめる</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.1@sha256:a628e4d188c1cf80ccb2c636f74f85187038fd641c0c7eb7e110d7b327f3830e / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>関数は <code>名前() { …; }</code> か <code>function 名前 { …; }</code>（bash のみ）。<code>function 名前() { …; }</code> も bash では書ける。子のシェルには渡らない</li><li>関数は呼んだシェルの中で動く。<code>local</code> を付けない変数は共有され、<code>exit</code> はスクリプト全体を終わらせる。関数だけ終えるのは <code>return</code></li><li><code>bash -x</code> は展開後の形に <code>+</code> を付けて、<code>bash -v</code> は読んだままを出す。一部だけなら <code>set -x</code> … <code>set +x</code></li><li>子は親の環境変数のコピーを受け取り、返せるのは 0〜255 の終了ステータス1つだけ。主題1.06 の語はほとんどがこの言い換え</li><li>動かないときは「どのシェルか → 何を受け取ったか → 何を返したか → どこで変わったか」の順に確かめる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.2@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-shell/theory/07-loops">← 7. パイプの先で数えた数は、持ち帰れない</a><a href="/linuc-shell/">実践編（演習8本）→</a></nav>
 <section id="comments">
 <h2>コメント</h2>

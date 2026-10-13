@@ -14,8 +14,8 @@
 <p class="lead">スクリプトが受け取る引数は、あなたが打った1行の文字列ではない。呼んだ側のシェルが空白で切り、引用符を外したあとの「語の並び」である。スクリプトの中でそれを <code>"$@"</code> と書けば区切りが保たれ、<code>$*</code> と書くともう一度切り直される。<code>"my file.txt"</code> が <code>my</code> と <code>file.txt</code> に割れるのは、この切り直しのときである。</p>
 <div class="badges"><span>前提: 第4章まで読了</span><span>所要 15分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.06.2（重要度6）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>$0</code>・<code>$1</code>〜<code>$n</code>・<code>$#</code>・<code>$@</code>・<code>$*</code> が何を表すかを、実際の出力で説明できる</li><li><code>"$@"</code>・<code>"$*"</code>・<code>$*</code> の違いを言い、受け取った引数を別のコマンドへ渡すときに <code>"$@"</code> を使う理由を言える</li><li><code>shift</code> と <code>$#</code> で引数を1つずつ処理でき、10個目以降の書き方（<code>${10}</code>）を知っている</li><li>引数の数を確かめて、使い方を標準エラーに出して終われる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: <code>getopts</code> によるオプションの解析、<code>$$</code>・<code>$!</code>・<code>$-</code> など他の特殊パラメータ（<code>$-</code> は第1章で使った）、<code>IFS</code> の細かい規則、配列。</div></div>
+<ul><li><code>$0</code>・<code>$1</code>〜<code>$n</code>・<code>$#</code>・<code>$@</code>・<code>$*</code> が何を表すかを、実際の出力で説明できる</li><li><code>"$@"</code>・<code>"$*"</code>・<code>$*</code> の違いを言い、受け取った引数を別のコマンドへ渡すときに <code>"$@"</code> を使う理由を言える</li><li><code>shift</code> と <code>$#</code> で引数を1つずつ処理でき、10個目以降の書き方（<code>${10}</code>）と、配列の要素の書き方（<code>${a[1]}</code>）を知っている</li><li>引数の数を確かめて、使い方を標準エラーに出して終われる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>getopts</code> によるオプションの解析、<code>$$</code>・<code>$!</code>・<code>$-</code> など他の特殊パラメータ（<code>$-</code> は第1章で使った）、<code>IFS</code> の細かい規則、配列の操作（足す・消す・切り出す）。配列は、要素の取り出し方だけを第3節で扱う。</div></div>
 
 <h2 id="split">my file.txt が、2つに割れる</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>$*</code> で引数を渡すと何が起きるか。</div>
@@ -40,7 +40,7 @@ cp: cannot stat 'file.txt': No such file or directory
 #!/bin/bash
 cp "$@" /tmp/
 $ bash cpall.sh "my file.txt"; ls -l "/tmp/my file.txt"
--rw-r--r-- 1 lab lab 0 Oct 13 11:45 '/tmp/my file.txt'</code></pre>
+-rw-r--r-- 1 lab lab 0 Oct 13 19:21 '/tmp/my file.txt'</code></pre>
 <div class="analogy"><b>たとえ</b>: 引数は、呼ぶ側が<b>箱詰めして渡した荷物</b>に近い。<code>"$@"</code> は箱のまま次へ回す。<code>$*</code> は箱を全部開けて中身を床に並べ、空白のところで改めて箱に詰め直す。<code>"$*"</code> は全部を1つの大箱にまとめる。
 <br>ただし<b>崩れる点</b>: 荷物なら詰め直しても中身は変わらないが、引数は詰め直すと区切りの位置が変わる。<code>my file.txt</code> は2つの別の名前になり、どちらも存在しないファイルを指す。</div>
 
@@ -102,11 +102,17 @@ $2 = file.txt
 <tr><td><code>$*</code>・<code>$@</code>（引用符なし）</td><td>全部を並べてから、空白でもう一度切り直す</td><td><code>[my]</code> <code>[file.txt]</code> <code>[b]</code></td></tr>
 </table></div>
 <p><code>$#</code>・<code>$@</code>・<code>$*</code>・<code>$0</code>・<code>$?</code> のように、記号1文字の名前を持つものは<b>特殊パラメータ</b>と呼ばれる。<code>$0</code> は呼ばれ方で変わる（第4章の記録では <code>./hello.sh</code>・<code>hello.sh</code>・<code>/usr/local/bin/hello</code> だった）。</p>
+<p>表の最後の行のとおり、引用符で囲まない <code>$@</code> は <code>$*</code> と同じく切り直される。</p>
+<pre><code>$ set -- "my file.txt" b; for a in $@; do echo "[$a]"; done
+[my]
+[file.txt]
+[b]</code></pre>
+<p>試験の解説には「<code>$@</code> は引数を1つずつ <code>""</code> で囲んだものになる」と書かれていることがある。これは <code>"$@"</code> と<b>引用符で囲んで書いたとき</b>の話で、囲まなければ上のとおり割れる。</p>
 <div class="analogy"><b>たとえ</b>: <code>$0</code> は<b>呼び出しのときに呼ばれた名前</b>、<code>$1</code> 以降は<b>受付の番号札</b>に近い。同じ人でも「おーい」と呼ばれるか、フルネームで呼ばれるかで <code>$0</code> は変わる。
 <br>ただし<b>崩れる点</b>: 番号札は配った後で数字が変わらないが、位置パラメータは <code>shift</code> で全員の番号が1つずつ繰り上がる（次の節）。</div>
 
-<h2 id="ten">10個目は ${10}</h2>
-<div class="sgoal"><b>この節で分かること</b>: 2桁の位置パラメータの書き方。</div>
+<h2 id="ten">10個目は ${10}、配列の要素も ${a[1]}</h2>
+<div class="sgoal"><b>この節で分かること</b>: 2桁の位置パラメータと、配列の要素の書き方。どちらも波かっこが要る理由。</div>
 <pre><code>$ cat &gt; ten.sh &lt;&lt;'END'
 &gt; #!/bin/bash
 &gt; echo "\$# = $#"
@@ -118,6 +124,20 @@ $# = 10
 $10 = a0
 ${10} = j</code></pre>
 <p><code>$10</code> は「<code>$1</code> の後ろに文字 <code>0</code>」と読まれ、<code>a0</code> になった。10個目以降は <code>${10}</code> のように波かっこで囲む。</p>
+<p>bash の<b>配列</b>も、同じ理由で波かっこが要る。<code>a=(x y z)</code> は3つの要素を持つ配列を作り、添字は <b>0 から</b>数える。</p>
+<pre><code>$ a=(x y z)
+$ echo ${a[1]}
+y
+$ echo $a[1]
+x[1]
+$ echo $a
+x
+$ echo ${a[@]}; echo ${#a[@]}
+x y z
+3
+$ sh -c 'a=(x y z)'
+sh: 1: Syntax error: "(" unexpected</code></pre>
+<p><code>${a[1]}</code> は2つ目の <code>y</code> である。<code>$a[1]</code> は「<code>$a</code>（添字を書かない配列は先頭の要素 <code>x</code>）の後ろに文字 <code>[1]</code>」と読まれて <code>x[1]</code> になった。全部の要素は <code>${a[@]}</code>、要素の数は <code>${#a[@]}</code> である。配列は bash の機能で、sh（dash）に書くと文法エラーになる。</p>
 
 <h2 id="shift">shift で、引数を前に詰める</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>shift</code> の働きと、それを使った引数の処理のしかた。</div>
@@ -200,10 +220,14 @@ $ bash need.sh alice bob 2&gt; /dev/null; echo "終了ステータス $?"
 <p>スクリプトの中で <code>echo $10</code> と書いたら、10個目の引数ではなく別の文字が出た。何が出たのか、正しくはどう書くか。</p>
 <details><summary>答え</summary>
 <p><code>$1</code> の値の後ろに <code>0</code> を付けたもの（記録では <code>a0</code>）。正しくは <code>${10}</code>。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>a=(x y z)</code> のあと、<code>echo ${a[1]}</code> と <code>echo $a[1]</code> はそれぞれ何を出すか。</p>
+<details><summary>答え</summary>
+<p><code>y</code> と <code>x[1]</code>。添字は 0 から数えるので <code>${a[1]}</code> は2つ目。波かっこが無いと <code>$a</code>（先頭の要素 <code>x</code>）の後ろに文字 <code>[1]</code> が付くだけになる。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>引数を空白で切り、引用符を外すのは<b>呼んだ側</b>のシェル。スクリプトは切られた後の語の並びを受け取る</li><li><code>$0</code> は呼ばれた名前、<code>$1</code>〜<code>$9</code> と <code>${10}</code> 以降が位置パラメータ、<code>$#</code> が数</li><li><code>"$@"</code> は受け取った区切りのまま、<code>"$*"</code> は1つにまとめ、引用符なしの <code>$*</code>・<code>$@</code> は切り直す。渡すなら <code>"$@"</code></li><li><code>shift</code> は先頭を捨てて詰め、<code>$#</code> を減らす。詰めすぎると、bash では何もせず 1 を返して続き、sh（dash）ではエラーでスクリプトが終わる</li><li>引数の数は <code>[ $# -ne 1 ]</code> などで確かめ、使い方は <code>&gt;&amp;2</code>、終了は <code>exit 1</code></li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.1@sha256:a628e4d188c1cf80ccb2c636f74f85187038fd641c0c7eb7e110d7b327f3830e / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>引数を空白で切り、引用符を外すのは<b>呼んだ側</b>のシェル。スクリプトは切られた後の語の並びを受け取る</li><li><code>$0</code> は呼ばれた名前、<code>$1</code>〜<code>$9</code> と <code>${10}</code> 以降が位置パラメータ、<code>$#</code> が数</li><li>配列の要素は <code>${a[1]}</code>（添字は 0 から）。<code>$a[1]</code> は先頭の要素に文字 <code>[1]</code> が付くだけ。全部は <code>${a[@]}</code>、数は <code>${#a[@]}</code></li><li><code>"$@"</code> は受け取った区切りのまま、<code>"$*"</code> は1つにまとめ、引用符なしの <code>$*</code>・<code>$@</code> は切り直す。渡すなら <code>"$@"</code></li><li><code>shift</code> は先頭を捨てて詰め、<code>$#</code> を減らす。詰めすぎると、bash では何もせず 1 を返して続き、sh（dash）ではエラーでスクリプトが終わる</li><li>引数の数は <code>[ $# -ne 1 ]</code> などで確かめ、使い方は <code>&gt;&amp;2</code>、終了は <code>exit 1</code></li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.2@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-shell/theory/04-script">← 4. 先頭行を読むのはカーネルで、bash ではない</a><a href="/linuc-shell/theory/06-status">次: 6. スクリプトが返せるのは、0〜255 の数1つ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
