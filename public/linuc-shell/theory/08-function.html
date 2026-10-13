@@ -38,6 +38,20 @@ bash: line 1: wave: command not found
 終了ステータス 127</code></pre>
 <p>書き方は2つある。<code>名前() { …; }</code> は sh の規格にある書き方で、dash でも動く。<code>function 名前 { …; }</code> は bash の書き方で、第4章のとおり dash では動かない。<code>type</code> は、その名前が関数であることと中身を見せた。</p>
 <p>関数は子のシェルに渡らない。<code>bash -c</code> で起動した子からは <code>wave</code> が見えず、127（見つからない）になった。第2章の alias と同じで、関数は環境変数ではないからである。</p>
+<p>名前だけで打ったコマンドは、alias の次に<b>関数</b>が調べられ、組み込みコマンドと PATH はその後になる（第2章のサーチパスの順）。だから既存のコマンドと同じ名前の関数を作ると、そちらが先に動く。</p>
+<pre><code>$ date() { echo "関数の date が先に動いた"; }
+$ date
+関数の date が先に動いた
+$ type date
+date is a function
+date () 
+{ 
+    echo "関数の date が先に動いた"
+}
+$ unset -f date
+$ type date
+date is /usr/bin/date</code></pre>
+<p><code>unset -f</code> で関数を消すと、PATH の <code>/usr/bin/date</code> に戻った。</p>
 <div class="analogy"><b>たとえ</b>: 関数は、自分の手帳に書いた<b>「いつもの手順」の名前</b>に近い。「朝の点検」と書けば、自分がその場で手順を順にこなす。誰かに頼む（子のプロセスを起動する）わけではない。
 <br>ただし<b>崩れる点</b>: 手帳の手順は他人に見せれば使ってもらえるが、関数は子のシェルには見えない。使わせたいなら、子の側で定義し直すか、スクリプトにして置く（第4章）。</div>
 

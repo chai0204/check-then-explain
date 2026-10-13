@@ -14,7 +14,7 @@
 <p class="lead"><code>~/.bashrc</code> に alias を1行足し、<code>bash ~/.bashrc</code> で読み直そうとした。エラーが出て、alias も増えない。<code>bash ファイル</code> は「新しい bash を起動してファイルを読ませ、終わらせる」コマンドだからである。新しい bash は親の環境変数の<b>コピー</b>を受け取って始まり、終わるときに何も書き戻さない。いまのシェル自身に読ませるのが <code>source</code>（<code>.</code>）である。</p>
 <div class="badges"><span>前提: 第1章まで読了</span><span>所要 18分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.06.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>source ファイル</code>・<code>. ファイル</code>・<code>bash ファイル</code> の違いを、どのシェルが読むかで説明できる</li><li>シェル変数と環境変数を <code>export</code> で作り分け、どちらが子に渡るかを言える</li><li>PATH の足し方と、足した PATH が効く範囲を言える</li><li>alias が子のシェルにもスクリプトにも効かない理由と、だから <code>~/.bashrc</code> に書くことを説明できる</li></ul>
+<ul><li><code>source ファイル</code>・<code>. ファイル</code>・<code>bash ファイル</code> の違いを、どのシェルが読むかで説明できる</li><li>シェル変数と環境変数を <code>export</code> で作り分け、どちらが子に渡るかを言える</li><li>PATH の足し方と、足した PATH が効く範囲を言える</li><li>alias が子のシェルに渡らず、bash のスクリプトでは既定で展開されない理由と、だから <code>~/.bashrc</code> に書くことを説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>declare</code> の全オプション、<code>set</code> と <code>env</code> が出す一覧の中身、<code>hash</code>（コマンドの在りかの記憶）、<code>readonly</code>、<code>export -f</code>（関数を子に渡す bash 独自の機能）。覚えるのは <code>source</code>・<code>.</code>・<code>export</code>・<code>alias</code>・<code>unalias</code>・<code>PATH</code> の6つでよい。</div></div>
 
 <h2 id="reload">~/.bashrc を直しても、いまのシェルは変わらない</h2>
@@ -34,9 +34,19 @@ $ bash ~/.bashrc
 $ hi
 bash: hi: command not found</code></pre>
 <div class="then"><b>だめな理由</b>: <code>bash ~/.bashrc</code> は「新しい bash（子のプロセス）を起動し、そのファイルを読ませる」コマンドである。
-いまのシェルは何も読んでいない。読んだのは子で、子は読み終わるとすぐ終わる。仮に alias が定義されたとしても、それは子の中だけの話で、子と一緒に消える。
-しかもこの子は対話シェルではないので、<code>~/.bashrc</code> の8行目（第1章で見た「対話でなければ戻る」の <code>return</code>）で止まり、
-関数の外での <code>return</code> だとエラーを出した。<b>読み直しは、いまのシェル自身にさせる必要がある</b>。</div></div>
+いまのシェルは何も読んでいない。読んだのは子で、子は読み終わるとすぐ終わる。
+この子は対話シェルではないので、<code>~/.bashrc</code> の8行目（第1章で見た「対話でなければ戻る」の <code>return</code>）を実行する。
+関数の外の <code>return</code> なのでエラーを出すが、bash はそこで止まらずに<b>最後まで読む</b>。末尾の <code>alias hi</code> も子の中では定義されたが、子が終わると一緒に消えた。
+<b>読み直しは、いまのシェル自身にさせる必要がある</b>。</div></div>
+<p>子が最後まで読んだことは、<code>~/.bashrc</code> の写しの末尾に <code>alias hi</code>（定義を表示するコマンド）を足して読ませると確かめられる。</p>
+<pre><code>$ cp ~/.bashrc /tmp/bashrc.copy; echo 'alias hi' &gt;&gt; /tmp/bashrc.copy
+$ bash /tmp/bashrc.copy; echo "終了ステータス $?"
+/tmp/bashrc.copy: line 8: return: can only `return' from a function or sourced script
+alias hi='echo やあ'
+終了ステータス 0
+$ hi
+bash: hi: command not found</code></pre>
+<p>エラーの行の後に <code>hi</code> の定義が表示された。子は8行目を越えて末尾まで読み、alias を定義していた。それでも、子が終わった後のあなたのシェルに <code>hi</code> は無い。</p>
 <p>いまのシェルに読ませるのが <code>source</code> である。</p>
 <pre><code>$ source ~/.bashrc
 $ hi
@@ -127,11 +137,24 @@ $ unalias yo
 $ yo
 bash: yo: command not found</code></pre>
 <p>プロンプトで定義した <code>yo</code> は、<code>bash -ic</code>（対話シェルとして子を起動する）からは見えない。<b>エイリアスは環境変数ではないので、子にコピーされない</b>。一方 <code>hi</code> は見えている。子が自分で <code>~/.bashrc</code> を読み直して、自分で定義したからである。</p>
-<p>スクリプトの中では、<code>~/.bashrc</code> に書いた <code>hi</code> すら使えない。スクリプトを読む bash は対話シェルではないので <code>~/.bashrc</code> を読まず、そもそも alias の置き換えをしない。終了ステータス 127 は「コマンドが見つからない」である（第6章）。置き換えをするかどうかは <code>shopt</code> の <code>expand_aliases</code> が決めていて、対話シェルのときだけ <code>on</code> になっている。</p>
+<p>スクリプトの中では、<code>~/.bashrc</code> に書いた <code>hi</code> すら使えない。スクリプトを読む bash は対話シェルではないので <code>~/.bashrc</code> を読まず、しかも<b>既定では</b> alias の置き換えをしない。終了ステータス 127 は「コマンドが見つからない」である（第6章）。置き換えをするかどうかは <code>shopt</code> の <code>expand_aliases</code> が決めていて、bash では対話シェルのときだけ <code>on</code> になっている。</p>
 <pre><code>$ bash -c 'shopt expand_aliases'
 expand_aliases 	off
 $ bash -ic 'shopt expand_aliases'
 expand_aliases 	on</code></pre>
+<p>「既定では」と書いたのは、変えられるからである。スクリプトの中で定義した alias を、bash は既定どおり置き換えないが、先に <code>shopt -s expand_aliases</code> と書けば置き換える。<code>sh</code>（dash）や <code>bash --posix</code> は、非対話でも置き換える。</p>
+<pre><code>$ printf 'alias hi3="echo alias が展開された"\nhi3\n' &gt; a.sh
+$ bash a.sh; echo "終了ステータス $?"
+a.sh: line 2: hi3: command not found
+終了ステータス 127
+$ printf 'shopt -s expand_aliases\nalias hi3="echo alias が展開された"\nhi3\n' &gt; a2.sh
+$ bash a2.sh
+alias が展開された
+$ sh a.sh
+alias が展開された
+$ bash --posix a.sh
+alias が展開された</code></pre>
+<p>どの場合も、スクリプトの外（あなたの <code>~/.bashrc</code> やプロンプト）で定義した alias はスクリプトに届かない。<b>届かないこと</b>（子に渡らない）と<b>置き換えないこと</b>（<code>expand_aliases</code>）は、別々の理由である。</p>
 <p>ここで第1章の2つのファイルの役割がつながる。</p>
 <div class="scroll"><table>
 <tr><th>書くもの</th><th>子に渡るか</th><th>書く場所</th><th>理由</th></tr>
@@ -149,7 +172,23 @@ expand_aliases 	on</code></pre>
 $ type ls cd
 ls is aliased to `ls --color=auto'
 cd is a shell builtin</code></pre>
-<p>名前だけで打ったコマンドは、まず alias と組み込みコマンドが調べられ、どちらでもなければ <code>PATH</code> に <code>:</code> 区切りで並んだディレクトリを<b>左から順に</b>探す。これがコマンドサーチパスで、最初に見つかったものが実行される。<code>type</code> を使うと、どれに当たったかが分かる（<code>ls</code> は Ubuntu の <code>~/.bashrc</code> が作った alias だった）。</p>
+<p>名前だけで打ったコマンドは、まず alias が置き換えられ、次に関数（第8章）、組み込みコマンドの順に調べられる。どれでもなければ <code>PATH</code> に <code>:</code> 区切りで並んだディレクトリを<b>左から順に</b>探す。これがコマンドサーチパスで、最初に見つかったものが実行される。<code>type</code> を使うと、どれに当たったかが分かる（<code>ls</code> は Ubuntu の <code>~/.bashrc</code> が作った alias だった）。関数 → 組み込み → PATH の順は、man にこう書いてある（alias はそれより前に置き換えられる）。</p>
+<pre><code>$ MANWIDTH=80 man bash | grep -A10 'If the command name contains no slashes'
+       If the command name contains no slashes, the shell attempts  to  locate
+       it.   If  there  exists a shell function by that name, that function is
+       invoked as described above in FUNCTIONS.  If the name does not match  a
+       function,  the shell searches for it in the list of shell builtins.  If
+       a match is found, that builtin is invoked.
+
+       If the name is neither a shell function nor a builtin, and contains  no
+       slashes,  bash  searches  each element of the PATH for a directory con‐
+       taining an executable file by that name.  Bash uses a hash table to re‐
+（略）</code></pre>
+<p><code>type -a</code> は、当たる候補を探す順に全部出す。<code>echo</code> は組み込みが先なので、<code>/usr/bin/echo</code> は使われない。</p>
+<pre><code>$ type -a echo
+echo is a shell builtin
+echo is /usr/bin/echo
+echo is /bin/echo</code></pre>
 <p>カレントディレクトリは PATH に入っていない。</p>
 <pre><code>$ cat &gt; here.sh &lt;&lt;'END'
 &gt; #!/bin/bash
@@ -220,7 +259,7 @@ bash: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin=/usr/local/sb
 (C) は子のプロセスが読むだけなので、変数は呼んだ側に残らない。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>bash ファイル</code> は子のプロセスに読ませる。<code>source ファイル</code>・<code>. ファイル</code> はいまのシェルに読ませる。設定の読み直しは後者</li><li>子に渡るのは <code>export</code> した環境変数の<b>コピー</b>だけ。子が変えても親は変わらない</li><li><code>declare -p 名前</code> の <code>-x</code> が環境変数の印。<code>env</code> は環境変数だけを出す</li><li>alias は子に渡らず、スクリプトの中では使えない。だから対話シェルごとに読まれる <code>~/.bashrc</code> に書く</li><li>PATH は <code>:</code> 区切りで左から探す。先頭に足すと優先、末尾に足すと後回し。手で足した PATH は次のログインで消える</li><li><code>source</code> は bash の別名。sh（dash）で使えるのは <code>.</code> だけ</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>bash ファイル</code> は子のプロセスに読ませる。<code>source ファイル</code>・<code>. ファイル</code> はいまのシェルに読ませる。設定の読み直しは後者</li><li>子に渡るのは <code>export</code> した環境変数の<b>コピー</b>だけ。子が変えても親は変わらない</li><li><code>declare -p 名前</code> の <code>-x</code> が環境変数の印。<code>env</code> は環境変数だけを出す</li><li>alias は子に渡らない。bash のスクリプトでは既定で展開されない（<code>shopt -s expand_aliases</code> で有効になる。sh（dash）は展開する）。だから対話シェルごとに読まれる <code>~/.bashrc</code> に書く</li><li>PATH は <code>:</code> 区切りで左から探す。先頭に足すと優先、末尾に足すと後回し。手で足した PATH は次のログインで消える</li><li><code>source</code> は bash の別名。sh（dash）で使えるのは <code>.</code> だけ</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.0@sha256:377dbd9c61203aabe633343f1265668f3a719aa60e12d7e8a019368c7d8460b5 / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-shell/theory/01-startup">← 1. 読まれる起動ファイルは、シェルの生まれ方で決まる</a><a href="/linuc-shell/theory/03-lists">次: 3. &amp;&amp; と || は、直前の数だけを見ている →</a></nav>
 <section id="comments">

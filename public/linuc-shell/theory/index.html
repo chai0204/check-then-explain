@@ -90,12 +90,12 @@ GUI の端末アプリが開くシェル、cron から起動されたスクリ�
 <tr><td><code>.</code> / <code>source</code></td><td>ファイルを子を作らずに、いまのシェルで読む。sh（dash）で使えるのは <code>.</code> だけ</td><td><a href="/linuc-shell/theory/02-source#reload">2</a></td></tr>
 <tr><td><code>;</code> <code>&amp;&amp;</code> <code>||</code>（リスト）</td><td>常に・成功（0）なら・失敗なら次へ。見るのは直前の終了ステータスだけ</td><td><a href="/linuc-shell/theory/03-lists#lists">3</a></td></tr>
 <tr><td>コマンド置換</td><td><code>$(コマンド)</code>・<code>`コマンド`</code> を出力に置き換える。中はサブシェル</td><td><a href="/linuc-shell/theory/03-lists#subst">3</a></td></tr>
-<tr><td><code>alias</code></td><td>コマンドの別名。子に渡らず、スクリプトでは使えない</td><td><a href="/linuc-shell/theory/02-source#alias">2</a></td></tr>
-<tr><td><code>PATH</code></td><td>コマンドを探すディレクトリの並び。<code>:</code> 区切りで左から探す</td><td><a href="/linuc-shell/theory/02-source#path">2</a></td></tr>
+<tr><td><code>alias</code></td><td>コマンドの別名。子に渡らない。bash のスクリプトでは既定で展開されない（<code>shopt -s expand_aliases</code> で有効になる）</td><td><a href="/linuc-shell/theory/02-source#alias">2</a></td></tr>
+<tr><td><code>PATH</code></td><td>コマンドを探すディレクトリの並び。<code>:</code> 区切りで左から探す（alias・関数・組み込みのどれでもなかったとき）</td><td><a href="/linuc-shell/theory/02-source#path">2</a></td></tr>
 <tr><td colspan="3"><b>1.06.2 シェルスクリプト（重要度6）</b></td></tr>
 <tr><td><code>function</code></td><td>関数を作る bash の書き方（sh では <code>名前() { }</code>）。関数は子ではない</td><td><a href="/linuc-shell/theory/08-function#same">8</a></td></tr>
 <tr><td><code>#!</code></td><td>直接実行したとき、カーネルがこの行のプログラムに読ませる。<code>bash x.sh</code> では無視される</td><td><a href="/linuc-shell/theory/04-script#three">4</a></td></tr>
-<tr><td><code>chown</code></td><td>所有者・グループを変える（root だけ）。全員用は <code>root:root</code></td><td><a href="/linuc-shell/theory/04-script#owner">4</a></td></tr>
+<tr><td><code>chown</code></td><td>所有者を変えるのは root だけ。グループは、所有者が自分の属するグループへなら変えられる（<code>chown :グループ</code>・<code>chgrp</code>）。全員用は <code>root:root</code></td><td><a href="/linuc-shell/theory/04-script#owner">4</a></td></tr>
 <tr><td><code>chmod</code></td><td>権限を変える。全員用のスクリプトは 755。スクリプトには r と x が要る</td><td><a href="/linuc-shell/theory/04-script#perm">4</a></td></tr>
 <tr><td><code>for</code></td><td>並べたものを1つずつ。並びは直接・ワイルドカード・<code>$(seq …)</code></td><td><a href="/linuc-shell/theory/07-loops#for">7</a></td></tr>
 <tr><td><code>while</code></td><td>条件のコマンドが 0 の間。<code>while read … done &lt; ファイル</code></td><td><a href="/linuc-shell/theory/07-loops#while">7</a></td></tr>
@@ -143,8 +143,8 @@ GUI の端末アプリが開くシェル、cron から起動されたスクリ�
 <div class="scroll"><table>
 <tr><th>場面</th><th>ここで効く理由</th><th>見落としやすい点</th><th>関連する章</th></tr>
 <tr><td>新しいサーバで自分の環境を整える</td>
-    <td>PATH は <code>~/.profile</code>、alias は <code>~/.bashrc</code> と書き分ければ、どの入り方でも同じ環境になる</td>
-    <td><code>~/.bash_profile</code> を新しく作ると <code>~/.profile</code> が読まれなくなる</td><td>1・2</td></tr>
+    <td>PATH は <code>~/.profile</code>、alias は <code>~/.bashrc</code> と書き分ければ、ログインして使う限り（端末・ssh・<code>su -</code>・<code>sudo -i</code>）同じ環境になる</td>
+    <td><code>~/.bash_profile</code> を新しく作ると <code>~/.profile</code> が読まれなくなる。<code>su</code>（<code>-</code> なし）や <code>sudo -u</code> では <code>~/.profile</code> は読まれない</td><td>1・2</td></tr>
 <tr><td>スクリプトを他の人や cron に使わせる</td>
     <td>実行するのは別の人・別の環境なので、PATH も権限も自分の端末と違う</td>
     <td>先頭行・r と x・所有者・PATH の4つを揃える。<code>sudo -i</code> と <code>su -</code> でも PATH が違う</td><td>4</td></tr>

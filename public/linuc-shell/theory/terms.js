@@ -21,7 +21,7 @@ window.TERM_GROUPS = [
 
     { t:"対話シェル", alt:["インタラクティブシェル","対話型シェル"], id:"interactive-shell",
       hint:"人がプロンプトにコマンドを打ち込んでいるシェル。$- に i が入る",
-      body:"プロンプトを出し、人が打ったコマンドを1行ずつ実行するシェル。<code>$-</code> に <code>i</code> が含まれる。ログインしない対話シェル（端末で <code>bash</code> と打ったもの）は <code>/etc/bash.bashrc</code> と <code>~/.bashrc</code> を読む。スクリプトを実行している bash や <code>bash -c</code> は非対話で、<code>~/.bashrc</code> を読まず、alias も置き換えない。<b>たとえ</b>: 窓口で<b>客と話しながら</b>処理する係。書類の束（スクリプト）を黙って処理する係とは、手元に置く道具が違う。<b>崩れる点</b>: 人なら同じ係が両方こなせるが、bash は起動したときに対話か非対話かが決まり、途中で変わらない。",
+      body:"プロンプトを出し、人が打ったコマンドを1行ずつ実行するシェル。<code>$-</code> に <code>i</code> が含まれる。ログインしない対話シェル（端末で <code>bash</code> と打ったもの）は <code>/etc/bash.bashrc</code> と <code>~/.bashrc</code> を読む。スクリプトを実行している bash や <code>bash -c</code> は非対話で、<code>~/.bashrc</code> を読まず、既定では alias も置き換えない。<b>たとえ</b>: 窓口で<b>客と話しながら</b>処理する係。書類の束（スクリプト）を黙って処理する係とは、手元に置く道具が違う。<b>崩れる点</b>: 人なら同じ係が両方こなせるが、bash は起動したときに対話か非対話かが決まり、途中で変わらない。",
       misread:"ログインシェルと同じものだと思われがちだが、別の性質である。ログインかつ非対話（sudo -iu alice コマンド）も、非ログインかつ対話（bash と打ったもの）もある。", ch:1 },
 
     { t:"起動ファイル", alt:["初期化ファイル"], id:"startup-file",
@@ -53,17 +53,17 @@ window.TERM_GROUPS = [
 
     { t:"エイリアス", alt:["alias"], id:"alias",
       hint:"コマンドに付ける短い別名。対話シェルでだけ置き換えられる",
-      body:"<code>alias ll='ls -alF'</code> のように、打った名前を別のコマンド列に置き換える定義。<code>alias</code> で一覧、<code>unalias</code> で取り消し、<code>type 名前</code> で確かめる。環境変数ではないので子のシェルには渡らず、非対話シェル（スクリプト）では置き換えそのものが行われない（<code>expand_aliases</code> が <code>off</code>）。だから対話シェルごとに読まれる <code>~/.bashrc</code> に書く。<b>たとえ</b>: 自分の<b>手帳の略語表</b>。<b>崩れる点</b>: 人は略語を推測できるが、bash は手帳に無い略語を一切推測せず <code>command not found</code> で止まる。",
-      misread:"~/.bashrc に書いた alias はスクリプトの中でも使えると思われがちだが、スクリプトでは使えない（終了ステータス 127）。", ch:2 },
+      body:"<code>alias ll='ls -alF'</code> のように、打った名前を別のコマンド列に置き換える定義。<code>alias</code> で一覧、<code>unalias</code> で取り消し、<code>type 名前</code> で確かめる。環境変数ではないので子のシェルには渡らない。bash の非対話シェル（スクリプト）は既定で置き換えをしない（<code>expand_aliases</code> が <code>off</code>。スクリプトの中で <code>shopt -s expand_aliases</code> と書けば置き換える。sh（dash）は既定で置き換える）。だから対話シェルごとに読まれる <code>~/.bashrc</code> に書く。<b>たとえ</b>: 自分の<b>手帳の略語表</b>。<b>崩れる点</b>: 人は略語を推測できるが、bash は手帳に無い略語を一切推測せず <code>command not found</code> で止まる。",
+      misread:"~/.bashrc に書いた alias はスクリプトの中でも使えると思われがちだが、スクリプトは ~/.bashrc を読まないうえ、bash は既定でスクリプトの中の alias を置き換えない（終了ステータス 127）。", ch:2 },
 
     { t:"組み込みコマンド", alt:["ビルトイン","builtin"], id:"builtin",
       hint:"bash 自身が持っている命令。cd・source・. ・export・[ など",
-      body:"別のプログラムを起動せず、bash 自身が実行する命令。<code>cd</code>・<code>source</code>・<code>.</code>・<code>export</code>・<code>alias</code>・<code>read</code>・<code>test</code>・<code>[</code> など。<code>type 名前</code> で <code>is a shell builtin</code> と出る。いまのシェルの状態（カレントディレクトリや変数）を変える命令は、子のプロセスではできないので組み込みになっている。<b>たとえ</b>: 外注せずに<b>社内でやる仕事</b>。<b>崩れる点</b>: <code>[</code> と <code>test</code> は組み込みでもあり、<code>/usr/bin/[</code> という外の実行ファイルとしても在る。同じ名前が2つあるときは組み込みが先に使われる。",
+      body:"別のプログラムを起動せず、bash 自身が実行する命令。<code>cd</code>・<code>source</code>・<code>.</code>・<code>export</code>・<code>alias</code>・<code>read</code>・<code>test</code>・<code>[</code> など。<code>type 名前</code> で <code>is a shell builtin</code> と出る。いまのシェルの状態（カレントディレクトリや変数）を変える命令は、子のプロセスではできないので組み込みになっている。<b>たとえ</b>: 外注せずに<b>社内でやる仕事</b>。<b>崩れる点</b>: <code>[</code> と <code>test</code> は組み込みでもあり、<code>/usr/bin/[</code> という外の実行ファイルとしても在る。同じ名前が2つあるときは組み込みが先に使われる（同じ名前の関数があれば、関数がさらに先）。",
       misread:"cd も /usr/bin のどこかにあるプログラムだと思われがちだが、別プロセスが cd しても親の場所は変わらないので、cd は組み込みでしかありえない。", ch:2 },
 
     { t:"コマンドサーチパス", alt:["サーチパス"], id:"search-path",
       hint:"名前だけで打ったコマンドを探すディレクトリの並び。PATH 変数",
-      body:"名前だけで打ったコマンドを探しに行くディレクトリの並びで、環境変数 <code>PATH</code> に <code>:</code> 区切りで書く。左から順に探し、最初に見つかったものを実行する。カレントディレクトリは入っていないので、そこにあるスクリプトは <code>./x.sh</code> と書く。先頭に足せば優先、末尾に足せば後回しになる。<b>たとえ</b>: 倉庫の<b>棚を見て回る順番</b>。<b>崩れる点</b>: 人は新しい棚が増えれば気づくが、シェルは PATH を書き換えてもらうまで新しいディレクトリを見に行かない（<code>~/bin</code> を作った後の <code>source ~/.profile</code>）。",
+      body:"名前だけで打ったコマンドが alias・関数・組み込みコマンドのどれでもなかったときに、探しに行くディレクトリの並び。環境変数 <code>PATH</code> に <code>:</code> 区切りで書く。左から順に探し、最初に見つかったものを実行する。カレントディレクトリは入っていないので、そこにあるスクリプトは <code>./x.sh</code> と書く。先頭に足せば優先、末尾に足せば後回しになる。<b>たとえ</b>: 倉庫の<b>棚を見て回る順番</b>。<b>崩れる点</b>: 人は新しい棚が増えれば気づくが、シェルは PATH を書き換えてもらうまで新しいディレクトリを見に行かない（<code>~/bin</code> を作った後の <code>source ~/.profile</code>）。",
       misread:"PATH を変えれば次のログインでも効くと思われがちだが、コマンドで変えた PATH はそのシェルと子だけに効き、ログインし直すと消える。", ch:2 },
   ]},
 

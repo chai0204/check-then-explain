@@ -1,0 +1,137 @@
+
+
+========== 第2章: bash ~/.bashrc は8行目で止まらず最後まで読む（子の中では alias が定義される） ==========
+$ mkdir -p ~/try && cd ~/try
+$ echo "alias hi='echo やあ'" >> ~/.bashrc
+$ cp ~/.bashrc /tmp/bashrc.copy; echo 'alias hi' >> /tmp/bashrc.copy
+$ bash /tmp/bashrc.copy; echo "終了ステータス $?"
+/tmp/bashrc.copy: line 8: return: can only `return' from a function or sourced script
+alias hi='echo やあ'
+終了ステータス 0
+$ hi
+bash: hi: command not found
+$ exit
+logout
+
+
+========== 第2章: スクリプトの中の alias（bash の既定・expand_aliases・dash） ==========
+$ cd ~/try
+$ printf 'alias hi3="echo alias が展開された"\nhi3\n' > a.sh
+$ bash a.sh; echo "終了ステータス $?"
+a.sh: line 2: hi3: command not found
+終了ステータス 127
+$ printf 'shopt -s expand_aliases\nalias hi3="echo alias が展開された"\nhi3\n' > a2.sh
+$ bash a2.sh
+alias が展開された
+$ sh a.sh
+alias が展開された
+$ bash --posix a.sh
+alias が展開された
+$ exit
+logout
+
+
+========== 第2章・第8章: 名前だけで打ったコマンドを探す順番（関数 → 組み込み → PATH） ==========
+$ cd ~/try
+$ MANWIDTH=80 man bash | grep -A10 'If the command name contains no slashes'
+       If the command name contains no slashes, the shell attempts  to  locate
+       it.   If  there  exists a shell function by that name, that function is
+       invoked as described above in FUNCTIONS.  If the name does not match  a
+       function,  the shell searches for it in the list of shell builtins.  If
+       a match is found, that builtin is invoked.
+
+       If the name is neither a shell function nor a builtin, and contains  no
+       slashes,  bash  searches  each element of the PATH for a directory con‐
+       taining an executable file by that name.  Bash uses a hash table to re‐
+       member the full pathnames of executable files  (see  hash  under  SHELL
+       BUILTIN  COMMANDS  below).  A full search of the directories in PATH is
+$ type -a echo
+echo is a shell builtin
+echo is /usr/bin/echo
+echo is /bin/echo
+$ date() { echo "関数の date が先に動いた"; }
+$ date
+関数の date が先に動いた
+$ type date
+date is a function
+date () 
+{ 
+    echo "関数の date が先に動いた"
+}
+$ unset -f date
+$ type date
+date is /usr/bin/date
+$ exit
+logout
+
+
+========== 第4章: dash は function say { を1つのコマンドとして読む（say と { は引数） ==========
+$ cd ~/try
+$ cat > hello.sh <<'END'
+> #!/bin/sh
+> function say {
+>     echo "こんにちは、$1"
+> }
+> say "$(id -un)"
+> echo "\$0 は $0"
+> END
+$ mkdir -p fbin
+$ printf '#!/bin/sh\necho "function が受け取った引数: $# 個: $*"\n' > fbin/function; chmod +x fbin/function
+$ PATH="$HOME/try/fbin:$PATH" sh hello.sh
+function が受け取った引数: 2 個: say {
+こんにちは、
+hello.sh: 4: Syntax error: "}" unexpected
+$ exit
+logout
+
+
+========== 第4章: chmod +x は umask で隠されたビットには付けない / グループは所有者が変えられる ==========
+$ cd ~/try
+$ sed -i '1s|.*|#!/bin/bash|' hello.sh; head -1 hello.sh
+#!/bin/bash
+$ (umask 077; chmod 644 hello.sh; chmod +x hello.sh; ls -l hello.sh)
+-rwxr--r-- 1 lab lab 95 Oct 13 11:14 hello.sh
+$ (umask 077; chmod 644 hello.sh; chmod a+x hello.sh; ls -l hello.sh)
+-rwxr-xr-x 1 lab lab 95 Oct 13 11:14 hello.sh
+$ sudo usermod -aG staff alice; id alice
+uid=1001(alice) gid=1001(alice) groups=1001(alice),50(staff)
+$ sudo -u alice bash -c umask
+0002
+$ sudo -u alice bash -c 'cd /tmp && touch g.txt && chgrp staff g.txt && ls -l g.txt'
+-rw-rw-r-- 1 alice staff 0 Oct 13 11:14 g.txt
+$ sudo -u alice bash -c 'cd /tmp && chown :alice g.txt && ls -l g.txt'
+-rw-rw-r-- 1 alice alice 0 Oct 13 11:14 g.txt
+$ sudo -u alice bash -c 'cd /tmp && chgrp lab g.txt'
+chgrp: changing group of 'g.txt': Operation not permitted
+$ sudo -u alice bash -c 'cd /tmp && chown lab g.txt'
+chown: changing ownership of 'g.txt': Operation not permitted
+$ exit
+logout
+
+
+========== 第5章: 詰めすぎた shift は、bash では 1 を返して続き、dash ではスクリプトが終わる ==========
+$ cd ~/try
+$ cat > sh.sh <<'END'
+> #!/bin/bash
+> echo "はじめ:     \$# = $#  \$1 = $1  \$@ = $@"
+> shift
+> echo "shift 後:   \$# = $#  \$1 = $1  \$@ = $@"
+> shift 2
+> echo "shift 2 後: \$# = $#  \$1 = $1"
+> shift 5
+> echo "shift 5 の終了ステータス = $?  \$# = $#"
+> END
+$ bash sh.sh a b c d; echo "終了ステータス $?"
+はじめ:     $# = 4  $1 = a  $@ = a b c d
+shift 後:   $# = 3  $1 = b  $@ = b c d
+shift 2 後: $# = 1  $1 = d
+shift 5 の終了ステータス = 1  $# = 1
+終了ステータス 0
+$ sh sh.sh a b c d; echo "終了ステータス $?"
+はじめ:     $# = 4  $1 = a  $@ = a b c d
+shift 後:   $# = 3  $1 = b  $@ = b c d
+shift 2 後: $# = 1  $1 = d
+sh.sh: 7: shift: can't shift that many
+終了ステータス 2
+$ exit
+logout

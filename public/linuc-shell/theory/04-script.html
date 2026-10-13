@@ -51,7 +51,7 @@ $ ./hello.sh; echo "終了ステータス $?"
 終了ステータス 2</code></pre>
 <div class="then"><b>だめな理由</b>: 直接実行すると、カーネルはファイルの先頭2文字が <code>#!</code>（<b>シバン</b>、shebang とも呼ぶ）かを見て、その行に書かれたプログラム（ここでは <code>/bin/sh</code>）を起動し、ファイルを読ませる。
 Ubuntu の <code>/bin/sh</code> は bash ではなく <b>dash</b> である。dash は <code>function</code> というキーワードを知らない。
-<code>function</code> をコマンド名だと思って探し（<code>function: not found</code>）、次の <code>{ … }</code> をただのまとまりとして<b>その場で実行</b>し（だから引数の無い「こんにちは、」が出た）、最後に残った <code>}</code> で文法エラーになった。
+<code>function say {</code> の1行を1つのコマンドとして読み、<code>function</code> をコマンド名だと思って探し（<code>function: not found</code>。<code>say</code> と <code>{</code> はその引数になった）、次の行の <code>echo</code> を単独のコマンドとして<b>その場で実行</b>し（だから引数の無い「こんにちは、」が出た）、対になる <code>{</code> の無い <code>}</code> で文法エラーになった。
 <code>bash hello.sh</code> のときは、先頭行は <code>#</code> で始まるただのコメントとして読み飛ばされていた。<b>先頭行を読むのは bash ではなく、直接実行されたときのカーネル</b>である。</div></div>
 <pre><code>$ head -1 hello.sh; ls -l /bin/sh
 #!/bin/sh
@@ -61,7 +61,15 @@ hello.sh: 2: function: not found
 こんにちは、
 hello.sh: 4: Syntax error: "}" unexpected
 終了ステータス 2</code></pre>
-<p><code>sh hello.sh</code> も同じ結果になる。こちらは「dash に読ませる」なので、先頭行はやはりコメントである。先頭行を bash に直す。</p>
+<p><code>sh hello.sh</code> も同じ結果になる。こちらは「dash に読ませる」なので、先頭行はやはりコメントである。</p>
+<p>dash が <code>function</code> に何を渡したかは、<code>function</code> という名前のコマンドを仮に作って PATH の先頭に置くと見える。</p>
+<pre><code>$ mkdir -p fbin
+$ printf '#!/bin/sh\necho "function が受け取った引数: $# 個: $*"\n' &gt; fbin/function; chmod +x fbin/function
+$ PATH="$HOME/try/fbin:$PATH" sh hello.sh
+function が受け取った引数: 2 個: say {
+こんにちは、
+hello.sh: 4: Syntax error: "}" unexpected</code></pre>
+<p>受け取った引数は <code>say</code> と <code>{</code> の2つだった。<code>{</code> は「まとまりの始まり」としてではなく、ただの文字として渡されている。だから最後の <code>}</code> には対になる相手がいない。先頭行を bash に直す。</p>
 <pre><code>$ sed -i '1s|.*|#!/bin/bash|' hello.sh; head -1 hello.sh
 #!/bin/bash
 $ ./hello.sh
@@ -116,8 +124,13 @@ $ chmod 755 hello.sh</code></pre>
 <tr><td><code>chmod 755</code> / <code>chmod u=rwx,go=rx</code></td><td><code>rwxr-xr-x</code></td><td>所有者は全部、他の人は読んで実行できる（全員が使うスクリプトの形）</td></tr>
 <tr><td><code>chmod 700</code></td><td><code>rwx------</code></td><td>所有者だけ</td></tr>
 <tr><td><code>chmod 644</code></td><td><code>rw-r--r--</code></td><td>実行権なし（作ったばかりのファイルの形）</td></tr>
-<tr><td><code>chmod +x</code> / <code>chmod go-x</code></td><td>—</td><td>今の権限に足す・から引く。<code>+x</code> は全員に x を足す</td></tr>
+<tr><td><code>chmod +x</code> / <code>chmod go-x</code></td><td>—</td><td>今の権限に足す・から引く。<code>+x</code> のように誰に（<code>u</code>・<code>g</code>・<code>o</code>・<code>a</code>）を省くと、umask が隠しているビットには付けない（umask が 022 なら全員に付く）。必ず全員に付けるなら <code>a+x</code></td></tr>
 </table></div>
+<p>umask を 077 にした中で試すと、違いが見える。</p>
+<pre><code>$ (umask 077; chmod 644 hello.sh; chmod +x hello.sh; ls -l hello.sh)
+-rwxr--r-- 1 lab lab 95 Oct 13 11:14 hello.sh
+$ (umask 077; chmod 644 hello.sh; chmod a+x hello.sh; ls -l hello.sh)
+-rwxr-xr-x 1 lab lab 95 Oct 13 11:14 hello.sh</code></pre>
 <p>次に、全員が使える場所へ置く。カレントディレクトリは PATH に入っていないので、名前だけでは動かない（第2章）。<code>/usr/local/bin</code> は管理者が自分でコマンドを置くための場所で、全員の PATH に最初から入っている。</p>
 <pre><code>$ hello.sh
 bash: hello.sh: command not found
@@ -154,6 +167,20 @@ $ sudo chown alice:alice /usr/local/bin/hello; ls -l /usr/local/bin/hello
 $ sudo chown root:root /usr/local/bin/hello; ls -l /usr/local/bin/hello
 -rwxr-xr-x 1 root root 95 Oct 13 10:45 /usr/local/bin/hello</code></pre>
 <p>所有者を変えられるのは root だけで、lab が自分に変えようとすると <code>Operation not permitted</code> になった。<code>chown 所有者:グループ ファイル</code> の形で、両方を一度に変えられる。</p>
+<p>グループだけなら事情が違う。ファイルの所有者は、<b>自分が属しているグループへなら</b> root でなくても変えられる（<code>chgrp グループ ファイル</code> か <code>chown :グループ ファイル</code>）。alice を <code>staff</code> グループに入れて試す。</p>
+<pre><code>$ sudo usermod -aG staff alice; id alice
+uid=1001(alice) gid=1001(alice) groups=1001(alice),50(staff)
+$ sudo -u alice bash -c umask
+0002
+$ sudo -u alice bash -c 'cd /tmp &amp;&amp; touch g.txt &amp;&amp; chgrp staff g.txt &amp;&amp; ls -l g.txt'
+-rw-rw-r-- 1 alice staff 0 Oct 13 11:14 g.txt
+$ sudo -u alice bash -c 'cd /tmp &amp;&amp; chown :alice g.txt &amp;&amp; ls -l g.txt'
+-rw-rw-r-- 1 alice alice 0 Oct 13 11:14 g.txt
+$ sudo -u alice bash -c 'cd /tmp &amp;&amp; chgrp lab g.txt'
+chgrp: changing group of 'g.txt': Operation not permitted
+$ sudo -u alice bash -c 'cd /tmp &amp;&amp; chown lab g.txt'
+chown: changing ownership of 'g.txt': Operation not permitted</code></pre>
+<p>alice が属している <code>staff</code> と <code>alice</code> へは変えられ、属していない <code>lab</code> へは変えられなかった。所有者を <code>lab</code> にすることもできない。ファイルが <code>-rw-rw-r--</code> なのは、<code>sudo -u alice</code> で動いたシェルの umask が <code>0002</code> だったからで、ここではグループの列だけを見ればよい。</p>
 <p>全員が使うスクリプトの<b>所有者</b>を root にするのは、書き換えられる人を減らすためである。alice の持ち物のままだと、alice はいつでも中身を書き換えられ、次に lab が <code>hello</code> と打ったときには alice が書いたものが <b>lab の権限で</b>動く。<code>rwxr-xr-x root root</code> なら、書き換えられるのは root だけになる。</p>
 
 <h2 id="path">使う人の PATH に、左右されない</h2>
@@ -218,7 +245,7 @@ $ sudo -iu alice report
 <div class="quiz"><b>確認</b>
 <p>全員が使うスクリプトを <code>/usr/local/bin/tool</code> に置いた。所有者を root、グループを root にし、所有者だけが書き換えられ、全員が実行できる状態にするコマンドを2つ書け。</p>
 <details><summary>答え</summary>
-<p><code>chown root:root /usr/local/bin/tool</code> と <code>chmod 755 /usr/local/bin/tool</code>（どちらも root で実行する。一般ユーザの <code>chown</code> は <code>Operation not permitted</code>）。
+<p><code>chown root:root /usr/local/bin/tool</code> と <code>chmod 755 /usr/local/bin/tool</code>（どちらも root で実行する。一般ユーザが所有者を変えようとすると <code>Operation not permitted</code> になる。グループだけなら、所有者が自分の属するグループへ変えられる）。
 <code>chmod 711</code> にするとスクリプトは他のユーザから読めなくなり、<code>Permission denied</code> で動かない。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>スクリプトの2行目に <code>PATH=/usr/bin:/bin</code> と書く理由を説明せよ。</p>
@@ -228,7 +255,7 @@ $ sudo -iu alice report
 代入はスクリプトの中だけで効き、実行した人の PATH は変わらない。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>./x.sh</code> はカーネルが <code>#!</code> の行のプログラムを起動する。<code>bash x.sh</code>・<code>sh x.sh</code> は読むプログラムを自分で決めるので、先頭行はただのコメント</li><li>Ubuntu の <code>/bin/sh</code> は dash。<code>function</code> などの bash の書き方は <code>#!/bin/sh</code> では動かない</li><li><code>./x.sh</code> には r と x、<code>bash x.sh</code> と <code>. x.sh</code> には r だけが要る。他人に使わせるスクリプトには、その人に r と x の両方が要る</li><li>全員用のスクリプトは <code>/usr/local/bin</code> に置き、<code>chown root:root</code>・<code>chmod 755</code></li><li>スクリプトは実行した人の PATH のコピーで動く。先頭で <code>PATH=/usr/bin:/bin</code> と決めると、使う人に左右されない</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>./x.sh</code> はカーネルが <code>#!</code> の行のプログラムを起動する。<code>bash x.sh</code>・<code>sh x.sh</code> は読むプログラムを自分で決めるので、先頭行はただのコメント</li><li>Ubuntu の <code>/bin/sh</code> は dash。<code>function</code> などの bash の書き方は <code>#!/bin/sh</code> では動かない</li><li><code>./x.sh</code> には r と x、<code>bash x.sh</code> と <code>. x.sh</code> には r だけが要る。他人に使わせるスクリプトには、その人に r と x の両方が要る</li><li>全員用のスクリプトは <code>/usr/local/bin</code> に置き、<code>chown root:root</code>・<code>chmod 755</code>。所有者を変えるのは root だけ。グループは、所有者が自分の属するグループへなら <code>chgrp</code> や <code>chown :グループ</code> で変えられる</li><li>スクリプトは実行した人の PATH のコピーで動く。先頭で <code>PATH=/usr/bin:/bin</code> と決めると、使う人に左右されない</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.0@sha256:377dbd9c61203aabe633343f1265668f3a719aa60e12d7e8a019368c7d8460b5 / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-shell/theory/03-lists">← 3. &amp;&amp; と || は、直前の数だけを見ている</a><a href="/linuc-shell/theory/05-args">次: 5. 引数は、渡す側のシェルが切ってから渡す →</a></nav>
 <section id="comments">
