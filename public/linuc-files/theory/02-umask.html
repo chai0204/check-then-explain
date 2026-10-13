@@ -210,7 +210,7 @@ umask はプロセスごとの値で、ログインし直したシェルは起�
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>chmod</code> の数値は r=4・w=2・x=1 の足し算を3桁並べたもの。記号は <code>u g o a</code> × <code>+ - =</code> × <code>r w x</code></li><li>新しいファイルは 666、ディレクトリは 777 から、umask に立っているビットを落として作られる</li><li>引き算ではない。<code>umask 033</code> のファイルは 633 ではなく 644（実測）</li><li><code>umask</code> で値を、<code>umask -S</code> で残る権限を記号で見る</li><li>数値の <code>chmod</code> は umask を見ない。「誰に」を省いた記号指定（<code>chmod +w</code>・<code>chmod -w</code>）だけは、umask に立っているビットに触らない</li><li>umask はプロセスの値で、子に受け継がれる。毎回効かせるなら <code>~/.bashrc</code>・<code>~/.profile</code>・<code>/etc/profile</code>（PAM なら <code>/etc/login.defs</code> の <code>UMASK</code>）</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:6b256ca7b7f40bb879761737a315e018979ae26ab8b0ef71dcaaf0d77031fa69 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-files/theory/01-permissions">← 1. 名前と中身は、別の場所にある</a><a href="/linuc-files/theory/03-special-bits">次: 3. 特殊なビットは「誰として動くか」と「誰が消せるか」を変える →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

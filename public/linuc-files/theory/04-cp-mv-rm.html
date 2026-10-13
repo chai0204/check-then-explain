@@ -257,7 +257,7 @@ a. <code>rmdir old</code>　b. <code>rm old</code>　c. <code>rm -r old</code>�
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>cp</code> は新しいファイルを作る。時刻は写した時刻、権限は umask を落としたもの、所有者は写した人になる</li><li><code>-p</code> で時刻と権限を写す。<code>-a</code> はそれに加えて再帰し、リンクをリンクのまま写す。所有者まで写せるのは root だけ</li><li><code>mv</code> は同じファイルシステムなら名前を書き換えるだけ（inode 番号も時刻も変わらない）。別のファイルシステムへは写して消す</li><li>ディレクトリは <code>mkdir -p</code> でまとめて作り、<code>rmdir</code>（空だけ）か <code>rm -r</code> で消す。<code>cp -r</code> の行き先が既にあると、その中へ写す</li><li><code>touch</code> はアクセス時刻と更新時刻の両方を書き換える（<code>-a</code> / <code>-m</code> で片方だけ）。<code>file</code> は拡張子ではなく中身で種類を判定する</li><li>ワイルドカード（<code>*</code> <code>?</code> <code>[...]</code>）を広げるのはシェル。<code>*</code> は隠しファイルに一致せず、一致しないとパターンがそのまま渡る</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / bash 5.2.21 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:6b256ca7b7f40bb879761737a315e018979ae26ab8b0ef71dcaaf0d77031fa69 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / bash 5.2.21 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-files/theory/03-special-bits">← 3. 特殊なビットは「誰として動くか」と「誰が消せるか」を変える</a><a href="/linuc-files/theory/05-find">次: 5. find は名前をたどり、中身の属性で選ぶ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
