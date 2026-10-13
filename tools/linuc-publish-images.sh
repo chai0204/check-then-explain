@@ -13,6 +13,8 @@
 # 置き換えるのは public/<slug>/ と、章のひな形 probe/<slug>-tpl/（あれば）の中の「<公開名>@sha256:__DIGEST__」だけ。
 # ひな形も置き換えるのは、記録から章を作り直したときにダイジェストが __DIGEST__ に戻らないようにするため。
 # ダイジェストは push の出力からではなく、レジストリに問い合わせて確かめる（push 後に実物を見る）。
+# 最後に tools/ghcr-anon-check.mjs で、読者と同じ条件（ログインなし）で取れるかを確かめる。
+# 新しいパッケージは非公開で作られるので、オーナーが公開に切り替えるまではそこで止まる（2026-10-14 追加）。
 set -euo pipefail
 cd "$(dirname "$0")/.."
 DRY=0; [ "${1:-}" = "--dry-run" ] && { DRY=1; shift; }
@@ -69,5 +71,10 @@ for line in "${PAIRS[@]}"; do
   grep -rl "$ref@sha256:__DIGEST__" "${dirs[@]}" | xargs -r sed -i "s#$ref@sha256:__DIGEST__#$ref@$dg#g"
   echo "✔ $ref@$dg（$n ファイルを置き換え）"
 done
-left=$(grep -rl '__DIGEST__' public | wc -l)
+# 全部置き換え済みだと grep は 1 を返す。pipefail で黙って止まらないようにする
+left=$( (grep -rl '__DIGEST__' public || true) | wc -l)
 echo "残りの __DIGEST__: $left ファイル"
+if [ "$DRY" = 0 ]; then
+  have=(); for s in "$@"; do if [ -d "public/$s" ]; then have+=("$s"); fi; done
+  if [ $# -eq 0 ] || [ ${#have[@]} -gt 0 ]; then node tools/ghcr-anon-check.mjs "${have[@]}"; fi
+fi
