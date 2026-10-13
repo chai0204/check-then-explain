@@ -1,0 +1,138 @@
+# KVM の記事の演習5本を、両方向で確かめる台本（未達・前提不足 → 模範解答 → 達成）。
+#   python3 -I probe/kvm-seq.py --steps probe/kvm-solve-steps.txt --out logs/kvm-solve-all.log --prefix kvm-solve \
+#     --sess-args "priv=--privileged" --sess-args "capadd=--device /dev/kvm --group-add <GID> --cap-add SYS_PTRACE" \
+#     --sess-args "root=--device /dev/kvm --user 0"
+# @nodev は --device なしで起動した檻（KVM が要る演習が前提不足 exit 2 になる経路）。@main は読者の檻。
+# @priv・@capadd・@root は、特権を渡しすぎた檻（演習02 の判定が CapBnd・CapEff で鳴ることの確かめ）。
+# 0660 の /dev/kvm で演習02 が未達 → 達成になる記録と、入れ子を許していない KVM・KVM の無いカーネルの記録は
+# logs/kvm-ubuntu.log（lab の仮想マシンの Ubuntu 24.04 で取った）。
+
+== --device なしで起動した檻: KVM が要る演習は前提不足（exit 2） ==
+@nodev
+$ lab check 02
+$ lab check 03
+$ lab check 04
+# 「KVM が駄目なら TCG」の頼み方（第3章の確認・理論編の目次の「実務」）。-accel kvm:tcg という書き方は無い
+$ qemu-linuc -accel kvm:tcg
+$ qemu-linuc -machine accel=kvm:tcg
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm -accel tcg
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+$ qemu-linuc stop
+$ exit
+
+== 演習01 ==
+@main
+$ lab check 01
+$ qemu-linuc -accel tcg
+$ ssh linuc
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization):'
+$ grep -o -w -E 'vmx|svm|hypervisor' /proc/cpuinfo | sort | uniq -c
+$ ls -l /dev/kvm
+$ exit
+$ lab check 01
+
+== 演習02（この檻は --device /dev/kvm --group-add <GID> で起動してある） ==
+@main
+$ ls -l /dev/kvm
+$ id
+$ grep -E '^(Groups|CapEff|CapBnd)' /proc/self/status
+$ lab check 02
+
+== 演習02 を、特権を渡しすぎた檻で（判定は CapBnd と CapEff で鳴る） ==
+# --privileged で起動した檻。lab は root ではないので CapEff は 0 のまま、CapBnd（持てる特権の上限）が増える
+@priv
+$ grep -E '^(Groups|CapEff|CapBnd)' /proc/self/status
+$ lab check 02
+$ exit
+# --device /dev/kvm --group-add <GID> に --cap-add SYS_PTRACE を足した檻
+@capadd
+$ grep -E '^(Groups|CapEff|CapBnd)' /proc/self/status
+$ lab check 02
+$ exit
+# --device /dev/kvm --user 0（root）で起動した檻
+@root
+$ grep -E '^(Groups|CapEff|CapBnd)' /proc/self/status
+$ lab check 02
+$ exit
+
+== 演習03 ==
+@main
+$ lab check 03
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+$ ssh linuc systemd-detect-virt
+$ ssh linuc
+$ journalctl --no-pager -o cat -g 'Detected virtualization|Startup finished in .*kernel'
+$ exit
+$ lab check 03
+# 解答03 の【-enable-kvm】: 古い書き方 -machine accel=kvm でも、QEMU は同じように /dev/kvm を開く
+$ qemu-linuc stop
+$ qemu-linuc -machine accel=kvm
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+$ lab check 03
+# 名前を消して（kvm=off）KVM で起動すると、練習機は qemu と名乗る。判定は QEMU のファイルで KVM と決める（第5章。-snapshot で記録は残さない）
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm -cpu host,kvm=off -snapshot
+$ ssh linuc systemd-detect-virt
+$ lab check 03
+# 「KVM が駄目なら TCG」（-machine accel=kvm:tcg・-accel kvm -accel tcg）は、/dev/kvm を開ける檻では KVM を使う（第3章の表）
+$ qemu-linuc stop
+$ qemu-linuc -machine accel=kvm:tcg
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm -accel tcg
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+
+== 演習04 ==
+@main
+$ lab check 04
+# 名前だけをあなたの PC の CPU に付け替えた型（-cpu qemu64,model-id=…）は、型番（family・model・stepping）で見分ける
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm -cpu "qemu64,model-id=$(lscpu | sed -n 's/^Model name: *//p')"
+$ lab check 04
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm -cpu host
+$ ssh linuc
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+$ ls -l /dev/kvm
+$ exit
+$ lab check 04
+
+== 演習05 ==
+@main
+$ lab check 05
+$ qemu-linuc stop
+$ qemu-linuc -accel tcg -cpu qemu64,-svm
+$ ssh linuc
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization):'
+$ ls -l /dev/kvm
+$ exit
+$ lab check 05
+# 解答05 の【もともと印を持たない型では、消したことにならない】: TCG の Intel の型（Nehalem）は初めから印が無い
+$ qemu-linuc stop
+$ qemu-linuc -accel tcg -cpu Nehalem
+$ lab check 05
+# EPYC も TCG では svm を名乗るが、判定が見分けられるのは qemu64 と max の名乗りだけ
+$ qemu-linuc stop
+$ qemu-linuc -accel tcg -cpu EPYC,-svm
+$ lab check 05
+# モデル名だけを qemu64 と同じにした別の型（Opteron_G1）は、型番で見分ける
+$ qemu-linuc stop
+$ qemu-linuc -accel tcg -cpu "Opteron_G1,model-id=QEMU Virtual CPU version 2.5+"
+$ lab check 05
+# TCG の max（もともと svm を名乗る QEMU の型）から消せば合格
+$ qemu-linuc stop
+$ qemu-linuc -accel tcg -cpu max,-svm
+$ lab check 05
+# KVM で -cpu を付けずに起動しても（既定の型は Intel の PC の KVM では初めから印が無い）、印を消したことにはしない
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm
+$ lab check 05
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm -cpu host,-vmx
+$ lab check 05
+$ qemu-linuc stop
+$ lab ls

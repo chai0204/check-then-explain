@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5. 中から見える CPU は、アクセラレータで変わる — 確かめて説明する KVM</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="5" data-theme="kvm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <a href="/kvm/theory/">理論編</a> › 第5章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/">詳しく</a></p>
+</div>
+<h1>5. 中から見える CPU は、アクセラレータで変わる</h1>
+<p class="lead">TCG の練習機は AMD の CPU を名乗った（第1章）。同じ CPU の型（既定の <code>qemu64</code>）のまま KVM で起動すると、練習機は <code>GenuineIntel</code> を名乗り、<code>svm</code> は消え、
+<code>Hypervisor vendor: KVM</code> が出る。<code>-cpu host</code> にすれば、あなたの PC の CPU の名前と印をそのまま名乗り、練習機の中にも <code>/dev/kvm</code> ができる（入れ子の仮想化）。
+練習機から見える CPU は、QEMU の型と、命令を実行しているもの（QEMU のソフトか、本物の CPU か）の両方で決まる。
+「どのハイパーバイザーか」の名前も QEMU が書いていて、消すこともできる。</p>
+<div class="badges"><span>前提: 第4章まで読了（練習機が KVM で動いている）</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>同じ CPU の型でも、TCG と KVM で練習機の CPU の名乗り（メーカー・印）が変わることを、出力で示せる</li>
+<li>練習機の中から、どのハイパーバイザーの上にいるかを尋ねる方法を3つ言え（<code>systemd-detect-virt</code>・<code>lscpu</code> の <code>Hypervisor vendor</code>・CPUID の名前）、その答えが QEMU の書いた名乗りで、消せることを示せる</li>
+<li><code>-cpu host</code> と、印を消す書き方（<code>-cpu host,-vmx</code>）で、入れ子の仮想化の入口を出し入れできる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: CPUID の他の番号の中身、kvm-clock などの準仮想化の仕組みの中身、CPU の型の一覧（<code>Skylake-Client</code> など）の各項目、
+入れ子の仮想化の速さと、その中で動く仮想マシンの作り方。</div></div>
+
+<h2 id="vendor">同じ型でも、KVM では Intel を名乗る</h2>
+<div class="sgoal"><b>この節で分かること</b>: アクセラレータを変えると、練習機の中の何が変わるか。</div>
+<p>第4章の最後で、練習機は <code>-accel kvm</code>（CPU の型は指定していないので既定の <code>qemu64</code>）で動いている。中に入る。</p>
+<pre data-where="外（lab@host）"><code>$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:37:30 2026 from 10.0.2.2   ← 日時はあなたが入った時刻になる</code></pre>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>練習機の CPU は、QEMU の <code>-cpu</code> の型で決まる。型は第1章と同じ <code>qemu64</code> のままなのだから、TCG でも KVM でも、中から見える CPU は同じはずだ。
+違うのは速さだけで、AMD の CPU を名乗り、AMD-V（<code>svm</code>）を持つと答えるだろう。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+Vendor ID:                               GenuineIntel   ← 第1章（TCG）では AuthenticAMD
+Model name:                              QEMU Virtual CPU version 2.5+
+Hypervisor vendor:                       KVM   ← TCG では、この行が無かった
+
+$ grep -o -w -E 'vmx|svm|hypervisor' /proc/cpuinfo | sort | uniq -c
+      2 hypervisor   ← svm が消え、仮想マシンの印だけが残った
+
+$ sudo dmesg | grep -E 'Hypervisor detected|paravirtualized|kvm_amd|kvm_intel'
+[    0.000000] Hypervisor detected: KVM   ← TCG では、この行が無かった
+[    0.006780] Booting paravirtualized kernel on KVM   ← TCG では on bare hardware</code></pre>
+<div class="then"><b>だめな理由</b>: 型は同じでも、練習機は Intel の CPU を名乗り、<code>svm</code> は消えていた。
+KVM でも、練習機が CPUID を実行すると本物の CPU はいったん KVM に戻り、KVM が QEMU の用意した答えの表から答える（だから型の名前は QEMU のまま）。
+ただし KVM では練習機の命令を本物の CPU が実行するので、表に載せられるのは<b>本物の CPU と KVM が持っている機能だけ</b>である。
+Intel の CPU に AMD-V は無いので <code>svm</code> は外された（第3章の警告）。メーカーの名前は、QEMU が KVM のときは既定で本物の CPU のもの（<code>GenuineIntel</code>）に置き換える（<code>-cpu qemu64,vendor=…</code> で変えることはできる）。
+型の名前（<code>QEMU Virtual CPU version 2.5+</code>）だけが同じで、中身は「命令を誰が実行しているか」で変わった。
+AMD の PC で同じことをすると、メーカーは <code>AuthenticAMD</code> のままで、<code>svm</code> も（<code>kvm_amd</code> の <code>nested</code> が 1 なら）残る。<b>KVM の練習機の中の画面は、読む人の PC で変わる</b>。</div></div>
+<p><code>hypervisor</code> は、CPU が「自分は仮想マシンの CPU だ」と知らせる印で、TCG のときにもあった（第1章）。では、どのハイパーバイザーか。第1章と同じ場所の CPUID を読む。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo modprobe cpuid
+
+$ sudo od -A n -c -j $((0x40000000)) -N 16 /dev/cpu/0/cpuid
+ 001  \0  \0   @   K   V   M   K   V   M   K   V   M  \0  \0  \0   ← 第1章（TCG）では TCGTCGTCGTCG</code></pre>
+<p>CPU の答えの同じ場所に、今度は <code>KVMKVMKVM</code> と書いてある。書いたのは KVM ではなく QEMU で、KVM で動かすときの答えの表を作るときに、既定でこの名前を入れる（TCG の <code>TCGTCGTCGTCG</code> も QEMU が書いていた）。
+Linux のカーネルはこの名前を知っているので、起動のときに <code>Hypervisor detected: KVM</code> と記録し、
+KVM と協力して動く仕組み（時計の読み方など。<b>準仮想化</b>）を使った。それが <code>Booting paravirtualized kernel on KVM</code> の行である。
+TCG の <code>TCGTCGTCGTCG</code> はカーネルも <code>lscpu</code> も知らない名前なので、TCG の練習機は、仮想マシンだとは分かっている（<code>hypervisor</code> の印がある）のに準仮想化を使わず、実機と同じやり方で起動し（<code>on bare hardware</code>）、<code>Hypervisor vendor</code> の行も出なかった。
+<code>systemd-detect-virt</code> は TCG の名前も知っているので、第3章で <code>qemu</code> と答えた。</p>
+<div class="scroll"><table>
+<tr><th>練習機の中で見たもの</th><th>TCG（第1章・第3章）</th><th>KVM（この章。既定の型）</th></tr>
+<tr><td>メーカー（<code>lscpu</code> の <code>Vendor ID</code>）</td><td><code>AuthenticAMD</code></td><td><code>GenuineIntel</code>（本物の CPU のメーカー）</td></tr>
+<tr><td>仮想化支援の印</td><td><code>svm</code></td><td>無い（<code>svm</code> は外された）</td></tr>
+<tr><td><code>hypervisor</code> の印</td><td>ある</td><td>ある</td></tr>
+<tr><td>CPUID の 0x40000000 の名前</td><td><code>TCGTCGTCGTCG</code></td><td><code>KVMKVMKVM</code></td></tr>
+<tr><td><code>lscpu</code> の <code>Hypervisor vendor</code></td><td>出ない（名前を知らない）</td><td><code>KVM</code></td></tr>
+<tr><td>カーネルの記録（<code>dmesg</code>）</td><td><code>on bare hardware</code></td><td><code>Hypervisor detected: KVM</code>・<code>on KVM</code></td></tr>
+<tr><td><code>systemd-detect-virt</code></td><td><code>qemu</code></td><td><code>kvm</code></td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: CPU の型（<code>qemu64</code>）は、<b>舞台の配役表</b>に近い。役名は同じでも、TCG では代役（QEMU）が演じ、KVM では本人（本物の CPU）が演じる。
+本人が演じれば、特技（使える機能）は本人ができるものに限られ、名乗る声（メーカー）も本人のものにそろえるのが QEMU の決まりである。
+<br>ただし<b>崩れる点</b>: 舞台では代役も本人も役名どおりに振る舞おうとするが、KVM の本人は、自分に無い特技（<code>svm</code>）を演じることがそもそもできない。役を寄せるのではなく、役のほうが削られる。</div>
+<div class="analogy"><b>たとえ</b>: CPUID の 0x40000000 番は、<b>建物の管理人室の表札</b>に近い。住人（練習機の OS）が見に行くと、管理会社の名前（<code>KVMKVMKVM</code>）が書いてある。
+知っている会社なら、その会社のやり方（準仮想化）に合わせて暮らす。
+<br>ただし<b>崩れる点</b>: 表札は誰でも読める字で書かれているが、住人が「知っている会社」かどうかは住人の側の知識で決まる。同じ <code>TCGTCGTCGTCG</code> を、カーネルは知らず、<code>systemd-detect-virt</code> は知っていた。
+それに、この表札を掛けているのは管理会社（KVM）ではなく、建物を建てた側（QEMU）である（この章の最後の節）。</div>
+
+<h2 id="host">-cpu host は、あなたの PC の CPU をそのまま見せる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>-cpu host</code> が練習機に見せるものと、入れ子の仮想化の条件。</div>
+<p>練習機から出て、QEMU が用意している CPU の型を見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ exit
+logout
+Connection to 127.0.0.1 closed.</code></pre>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -cpu help | grep -E '^ *x86 (qemu64|max|host) '
+x86 qemu64                (alias configured by machine type)   ← 何も指定しないときの型
+x86 host                  processor with all supported host features   ← 本物の CPU の機能を、KVM が渡せる分だけ全部
+x86 max                   Enables all features supported by the accelerator in the current host   ← その方式で使える機能を全部（TCG では QEMU が真似できる分）
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel kvm -cpu host
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+...
+    -accel kvm -cpu host   ← svm の警告は出ない
+練習機が起動し終わりました（QEMU を起動してから 6.6 秒。カーネルの最初の表示は 4.2 秒の時点）
+ssh linuc で入れます</code></pre>
+<pre data-where="外（lab@host）"><code>$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:37:31 2026 from 10.0.2.2</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+Vendor ID:                               GenuineIntel
+Model name:                              Intel(R) Core(TM) Ultra 9 285H   ← あなたの PC の CPU の名前
+Virtualization:                          VT-x   ← vmx が練習機にも渡った
+Hypervisor vendor:                       KVM
+
+$ ls -l /dev/kvm
+crw-rw---- 1 root kvm 10, 232 Oct 14 03:37 /dev/kvm   ← 練習機の中にも KVM の入口がある
+
+$ lsmod | grep kvm
+kvm_intel             487424  0   ← 練習機のカーネルが Intel 用の KVM を読み込んだ
+kvm                  1404928  1 kvm_intel
+irqbypass              12288  1 kvm
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.</code></pre>
+<p class="detail">この出力は<b>あなたの PC の CPU で変わる</b>。AMD の PC なら <code>AuthenticAMD</code>・<code>AMD-V</code>・<code>kvm_amd</code> になる。</p>
+<p><code>-cpu host</code> では、練習機は本物の CPU の名前を名乗り、仮想化支援機能 VT-x（<code>vmx</code>）まで持っていると答えた。練習機のカーネルはそれを見て <code>kvm_intel</code> を読み込み、
+練習機の中にも <code>/dev/kvm</code> ができた。練習機の中で、さらに仮想マシンを KVM で動かせる状態である。これを<b>入れ子の仮想化</b>（nested virtualization）という。</p>
+<p>練習機に <code>vmx</code> を渡すかどうかは、あなたの PC の KVM の設定で決まっている。外（この檻はあなたの PC のカーネルを見ている）で見る。</p>
+<pre data-where="外（lab@host）"><code>$ cat /sys/module/kvm_intel/parameters/nested
+Y   ← 入れ子の仮想化を許している</code></pre>
+<p class="detail">AMD の PC ではファイルが <code>/sys/module/kvm_amd/parameters/nested</code> になり、許していれば <code>1</code> と出る。</p>
+<p><code>N</code>（AMD は <code>0</code>）なら、KVM は <code>vmx</code> を練習機に渡さず、<code>-cpu host</code> でも練習機の中に <code>/dev/kvm</code> はできない。
+クラウドの仮想マシンや、仮想マシンの中の Linux で「この中で KVM が使えない」ときは、外側の KVM（やハイパーバイザー）がこの印を渡していないことを、まず疑う。</p>
+<div class="analogy"><b>たとえ</b>: 入れ子の仮想化は、<b>貸し会議室の中に、さらに貸し会議室を作る</b>ことに近い。建物のオーナー（あなたの PC の KVM）が又貸しを許していれば（<code>nested=Y</code>）、借り手（練習機）も自分で部屋を貸せる。
+<br>ただし<b>崩れる点</b>: 又貸しの許可は書類で確かめられるが、練習機には「許されているか」を尋ねる窓口が無い。練習機は CPU の答えに <code>vmx</code> があるかだけを見て、あれば KVM を用意する。</div>
+
+<h2 id="hide">印を消すと、入れ子の入口も消える</h2>
+<div class="sgoal"><b>この節で分かること</b>: CPU の型から機能を1つ消す書き方と、その効き目。</div>
+<p><code>-cpu</code> の値には、型の名前の後ろに「<code>+機能</code>」「<code>-機能</code>」を並べて、機能を1つずつ足したり消したりできる。<code>vmx</code> だけを消して起動する。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel kvm -cpu host,-vmx
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+...
+    -accel kvm -cpu host,-vmx   ← 本物の CPU から vmx だけを消す
+練習機が起動し終わりました（QEMU を起動してから 7.1 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ ssh linuc "grep -o -w -E 'vmx|svm' /proc/cpuinfo | sort | uniq -c; ls -l /dev/kvm"
+ls: cannot access '/dev/kvm': No such file or directory   ← 印が無いので、練習機のカーネルは KVM を用意しなかった</code></pre>
+<p><code>grep</code> は何も出さず（<code>vmx</code> も <code>svm</code> も無い）、練習機の中に <code>/dev/kvm</code> は無い。CPU の名前は本物のまま、仮想化支援の印だけが消えた。
+第1章で見たとおり、練習機のカーネルは CPU の答え（CPUID）を見て KVM を用意するかどうかを決めるので、印を消せば入れ子の仮想化はできなくなる。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/kvm/practice/">演習04</a>で <code>-cpu host</code> の練習機を起動し、中の CPU があなたの PC の CPU と同じ名前になることを確かめる（KVM が要る）。
+<a href="/kvm/practice/">演習05</a>は、印を消して練習機の中の <code>/dev/kvm</code> を無くす課題で、TCG（<code>-cpu qemu64,-svm</code>）でも KVM でもできる。</div>
+
+<h2 id="name">名前を消しても、KVM は KVM</h2>
+<div class="sgoal"><b>この節で分かること</b>: 練習機の中から見える「どのハイパーバイザーか」の名前が、何の証拠になり、何の証拠にならないか。</div>
+<p>この章の最初で、練習機の CPUID の 0x40000000 番には <code>KVMKVMKVM</code> と書いてあった。KVM で動かすときも、CPU の答えの表を作るのは QEMU で（KVM はその表から答える）、名前も QEMU が表に入れている。
+<code>-cpu</code> の値には、機能の印のほかに、こうした QEMU の決まりごとも書ける。<code>kvm=off</code> は「KVM の名前を書かない」という指定である。
+<code>-snapshot</code> は、この起動で練習機のディスクに書いたものを、QEMU が終わるときに捨てる指定で、この起動を練習機の起動の記録に残さないために付ける（理由はこの節の最後）。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel kvm -cpu host,kvm=off -snapshot
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+...
+    -accel kvm -cpu host,kvm=off -snapshot   ← 名前を書かない・この起動をディスクに残さない
+練習機が起動し終わりました（QEMU を起動してから 6.7 秒。カーネルの最初の表示は 4.0 秒の時点）
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+/dev/kvm
+anon_inode:kvm-vm   ← KVM で動いている
+anon_inode:kvm-vcpu:0
+anon_inode:kvm-vcpu-stats:0
+anon_inode:kvm-vcpu:1
+anon_inode:kvm-vcpu-stats:1</code></pre>
+<pre data-where="外（lab@host）"><code>$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:37:42 2026 from 10.0.2.2   ← 日時はあなたが入った時刻になる</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo modprobe cpuid
+
+$ sudo od -A n -c -j $((0x40000000)) -N 16 /dev/cpu/0/cpuid
+  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0   ← 名前が無い（KVMKVMKVM も TCGTCGTCGTCG も無い）
+
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+Vendor ID:                               GenuineIntel
+Model name:                              Intel(R) Core(TM) Ultra 9 285H
+Virtualization:                          VT-x   ← Hypervisor vendor の行が出ない
+
+$ sudo dmesg | grep -E 'Hypervisor detected|paravirtualized'
+[    0.007200] Booting paravirtualized kernel on bare hardware   ← 準仮想化を使わず、実機と同じやり方で起動した
+
+$ systemd-detect-virt
+qemu   ← kvm ではない
+
+$ cat /sys/class/dmi/id/sys_vendor
+QEMU   ← ファームウェアが書いた機種の情報
+
+$ journalctl -b --no-pager -o cat -g 'Detected virtualization'
+Detected virtualization qemu.   ← この起動を、練習機は qemu の上と記録した
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.</code></pre>
+<p class="detail">この出力の <code>Model name</code> などは<b>あなたの PC の CPU で変わる</b>。<code>od</code> の行も変わることがある。名前を書かないと 0x40000000 番の答えが無くなり、
+Intel を名乗る練習機には、KVM は Intel の CPU と同じく「いちばん大きい基本の番号」の答えを返す。著者の PC ではその答えが 0 なので <code>\0</code> が並んだが、
+基本の番号が 0xD までの古い Intel の CPU では、0 でない字が並ぶ（著者の PC で、<code>-cpu host,kvm=off,level=13</code> として確かめた）。どちらでも <code>KVMKVMKVM</code> は無い。</p>
+<p>QEMU のプロセスは KVM の仮想マシン（<code>anon_inode:kvm-vm</code>）を持っていて、練習機は KVM で動いている。それなのに練習機の中では、CPUID の 0x40000000 番に名前が無く、<code>lscpu</code> に <code>Hypervisor vendor</code> の行が出ず、
+カーネルは準仮想化を使わずに実機と同じやり方で起動した（<code>on bare hardware</code>）。<code>systemd-detect-virt</code> は <code>kvm</code> ではなく <code>qemu</code> と答えた。
+CPUID に名前が無いので、ファームウェアが書いた機種の情報（<code>/sys/class/dmi/id/sys_vendor</code> の <code>QEMU</code>）から答えたのである。</p>
+<p><b>練習機の中から見える名前は、QEMU の名乗りで、KVM を使っているかどうかの証拠ではない</b>。確かめるなら、外で QEMU のプロセスが開いているファイルを見る（第3章）。
+<code>-snapshot</code> を付けたのは、最後に見た <code>journalctl</code> の行のためである。練習機の systemd は、起動するたびに何の上で起動したと思ったかを記録に残し、演習03 はその記録（練習機の名乗り）で起動を分けて、時間を並べる。
+この起動は KVM なのに <code>qemu</code> と記録されたので、ディスクに残すと、演習03 が TCG の起動として並べる時間に、この KVM の起動が混ざる。<code>-snapshot</code> なので、QEMU が終わればこの記録も消える。</p>
+<div class="analogy"><b>たとえ</b>: <code>kvm=off</code> は、<b>管理人室の表札を外す</b>ことに近い。管理会社（KVM）は変わらず建物を管理しているが、住人（練習機の OS）は表札を見ても会社が分からないので、その会社のやり方（準仮想化）を使わずに暮らす。
+<br>ただし<b>崩れる点</b>: 表札を外しても、建物の登記（ファームウェアの機種の情報）には建てた会社の名前（QEMU）が残っていて、そちらを見る住人（<code>systemd-detect-virt</code>）は、仮想マシンの中だとは気づく。それでも、管理しているのが KVM かどうかは、建物の中からは分からない。</div>
+
+<div class="quiz"><b>確認</b>
+<p>仮想マシンの中で <code>lscpu</code> を打つと <code>Hypervisor vendor: KVM</code> と出た。また、<code>sudo dmesg</code> に <code>Booting paravirtualized kernel on KVM</code> があった。この2つから何が言えるか。</p>
+<details><summary>答え</summary>
+<p>CPU の答え（CPUID の 0x40000000 番）に KVM の名前（<code>KVMKVMKVM</code>）が書かれていて、カーネルがそれを知っている名前として受け取り、KVM と協力する仕組み（準仮想化）で起動した、ということ。
+ただし名前は QEMU が CPUID に書いた名乗りなので、命令を本物の CPU が実行していることまでは、この2つだけでは言えない。反対に、<code>kvm=off</code> で名前を消せば、KVM で動いていてもこの2つは出ない（この章の最後の節）。
+確かめるなら、外から QEMU のプロセスの <code>/proc/PID/fd</code> を見る（第3章）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>Intel の PC で、同じ練習機を TCG と KVM（どちらも <code>-cpu</code> を指定しない）で起動し、中で <code>lscpu</code> の <code>Vendor ID</code> を見た。それぞれ何が出るか。理由も述べよ。</p>
+<details><summary>答え</summary>
+<p>TCG は <code>AuthenticAMD</code>、KVM は <code>GenuineIntel</code>。TCG では CPU の答えを QEMU が作るので、既定の型の答え（AMD）がそのまま出る。
+KVM では、QEMU が既定でメーカーの名前を本物の CPU（Intel）のものに置き換える（型の名前は QEMU のまま）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>KVM の上の仮想マシンの中で、さらに KVM を使いたい。外の PC の <code>/sys/module/kvm_intel/parameters/nested</code> は <code>Y</code> だった。QEMU にどう頼めばよいか。反対に、使わせたくないときは。</p>
+<details><summary>答え</summary>
+<p><code>-accel kvm -cpu host</code> で起動すれば、<code>vmx</code> が仮想マシンに渡り、中のカーネルが <code>kvm_intel</code> を読み込んで <code>/dev/kvm</code> を作る。
+使わせたくなければ <code>-cpu host,-vmx</code> のように印を消す（外の <code>nested</code> を <code>N</code> にしても渡らなくなる）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>KVM では練習機の命令を本物の CPU が実行するので、同じ型でも、本物が持たない機能は消える。メーカーの名前も、QEMU の既定で本物のものになる</li>
+<li>CPUID の 0x40000000 番の名前（<code>KVMKVMKVM</code>・<code>TCGTCGTCGTCG</code>）は、どちらも QEMU が書いている。<code>lscpu</code>・<code>dmesg</code>・<code>systemd-detect-virt</code> はそれを読む</li>
+<li><code>-cpu …,kvm=off</code> で名前を消すと、KVM で動いていても中からは名乗らない（<code>systemd-detect-virt</code> は <code>qemu</code>）。KVM かどうかの決め手は、外の <code>/proc/PID/fd</code></li>
+<li><code>-cpu host</code> は本物の CPU の名前と印をそのまま見せる。<code>vmx</code> / <code>svm</code> が渡ると練習機の中にも <code>/dev/kvm</code> ができる（入れ子の仮想化。外の <code>nested</code> が許しているとき）</li>
+<li><code>-cpu 型,-機能</code> で印を消せる。印が無ければ、中のカーネルは KVM を用意しない</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:kvm-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・OVMF 2024.02 / 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4）/ apt snapshot 20260929T000000Z / ホストは Linux 7.2.6・Intel Core Ultra 9 285H（kvm_intel の nested は Y）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/kvm/theory/04-speed">← 4. 速くなるのは、CPU が命令を実行する部分だけ</a><a href="/kvm/theory/06-site">次: 6. このサイトの練習機が KVM を使わない理由 →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/kvm/">KVM</a> · <a href="/kvm/theory/">理論編 目次</a> · <a href="/kvm/practice/">実践編</a> · <a href="/kvm/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/kvm/chapters.js"></script>
+<script src="/kvm/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

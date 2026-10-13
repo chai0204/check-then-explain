@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>実践編 — 確かめて説明する KVM</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="kvm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <strong>実践編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文の出力はすべて実機の記録で、演習5本は模範解答どおりに通ること・未達のときと KVM が使えないときに判定が鳴ることを
+   両方確認してあります。それでも<b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、読者として通した段階で4回に分けて不備が出ました。
+   詰まったら <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   ページ下のコメントへ。それが直す順番になります。</p>
+</div>
+
+<h1>確かめて説明する KVM — 実践編</h1>
+<p class="lead">コンテナの中で、Ubuntu 24.04 の練習機（仮想マシン）を <code>qemu-system-x86_64</code> で直接起動し、
+<strong>同じ練習機を TCG（完全エミュレーション）と KVM で起動して比べます</strong>。KVM を使うには、あなたの PC の <code>/dev/kvm</code> を檻に渡します。
+渡せない PC でも、<code>--device</code> なしで檻は起動し、TCG の演習はできます（Linux の PC で確かめました。macOS・Windows の Docker Desktop では試していません）。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+<p class="detail">この記事は<b>あなたの PC の CPU と KVM</b>を見るので、CPU の名前・<code>/dev/kvm</code> の権限・時間などは本文と違って正常です。そういう行には本文に注記があります。</p>
+
+<div class="notfor">
+<h4>この教材が向かない人</h4>
+<ul>
+<li>いま動かしたいだけの人 → 公式ドキュメントのほうが速い</li>
+<li>答えだけ欲しい人 → AI に聞いたほうが速く、あなたの語彙に合う</li>
+</ul>
+<p>向く人: 実践編の <code>docker run</code> は打てる。練習機も動く。
+でも「KVM を使うとは何をすることか」「なぜこのサイトの練習機は遅いのか」を人に説明できない人。</p>
+</div>
+
+<h2 id="cage">この教材の檻</h2>
+<div class="cages"><div class="scroll"><table>
+<tr><th>檻</th><th>準備</th><th>ここで触れる</th><th>ここでは触れない（逃がす先）</th></tr>
+<tr><td>コンテナの中で QEMU の練習機を1台、直接起動する</td><td>3分</td>
+    <td><code>/proc/cpuinfo</code>・<code>/dev/kvm</code>・<code>--device</code> と <code>--group-add</code>・<code>-accel tcg</code> / <code>kvm</code>・<code>-cpu host</code>・<code>/proc/PID/fd</code>・<code>systemd-analyze</code>・<code>nested</code></td>
+    <td>QEMU の装置・ディスク・ファームウェア → <a href="/qemu/theory/">QEMU の記事</a>、AMD の PC・ファームウェアの設定 → 理論編（<a href="/kvm/theory/#cage">理由</a>）</td></tr>
+</table></div></div>
+<p>端末には2つの場所があります。プロンプトで、いまどちらにいるかが分かります。</p>
+<pre><code>あなたの PC（ホスト OS。/dev/kvm がある）
+└─ コンテナ          lab@host       … 外。qemu-linuc・ssh・lab check を打つ場所
+   └─ 練習機（QEMU）  student@linuc  … 仮想マシン。Ubuntu 24.04 が自分のカーネルで動く</code></pre>
+<p>影響度 <b>B</b>（変更は練習機とコンテナの中だけ。あなたの PC の設定もファイルも書き換えません）。
+<code>/dev/kvm</code> を渡しても、あなたの PC の KVM の設定（<code>nested</code> など）は読むだけで、変えません。</p>
+
+<h2 id="start">はじめる</h2>
+<p><b>あなたの PC が Linux で、<code>/dev/kvm</code> がある場合</b>（<code>ls -l /dev/kvm</code> で確かめる）。</p>
+<pre><code>docker run --rm -it --name lab-kvm --hostname host \
+  --device /dev/kvm --group-add "$(stat -c %g /dev/kvm)" \
+  -v lab-kvm-vm:/home/lab/vm -v lab-kvm-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab:kvm-1.0.0@sha256:__DIGEST__</code></pre>
+<p><b><code>/dev/kvm</code> が無い場合</b>（入れ子の仮想化が無効な仮想マシンの中など）は、<code>--device</code> と <code>--group-add</code> の行を外します。
+TCG の演習（01・05）と、理論編の TCG の章はそのままできます。KVM が要る演習は <code>lab check</code> が「前提不足」と理由を出します。
+macOS・Windows の Docker Desktop では、著者は試していません（<code>/dev/kvm</code> が渡せるかも、檻が起動するかも未確認です。この檻のイメージは amd64 用だけです）。</p>
+<pre><code>docker run --rm -it --name lab-kvm --hostname host \
+  -v lab-kvm-vm:/home/lab/vm -v lab-kvm-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab:kvm-1.0.0@sha256:__DIGEST__</code></pre>
+<div class="scroll"><table>
+<tr><th>書いてあるもの</th><th>なぜ書くか</th></tr>
+<tr><td><code>--rm -it</code></td><td>端末をつないで起動し、抜けたらコンテナを消す。あなたの PC に残骸を残さない</td></tr>
+<tr><td><code>--hostname host</code></td><td>外のプロンプトを <code>lab@host</code> にする（練習機は <code>student@linuc</code>）。本文と同じ表示にするため</td></tr>
+<tr><td><code>--device /dev/kvm</code></td><td>あなたの PC の <code>/dev/kvm</code> を檻に置き、その番号（10, 232）を開くことをコンテナに許す（第2章）</td></tr>
+<tr><td><code>--group-add "$(stat -c %g /dev/kvm)"</code></td><td><code>/dev/kvm</code> の持ち主のグループの番号を、檻の lab に足す。<code>/dev/kvm</code> が 0660 の PC ではこれが無いと開けない（第2章）</td></tr>
+<tr><td><code>-v lab-kvm-vm:…</code></td><td>練習機のディスク（土台との差分）の置き場。起動し直しても練習機の中は続きから</td></tr>
+<tr><td><code>-v lab-kvm-state:…</code></td><td>演習の進捗の置き場。<b>これを省くと次回起動時に進捗が消えます</b></td></tr>
+<tr><td><code>@sha256:…</code></td><td>イメージを1つに固定する。これがあるので「本文と同じ文字が出る」を約束できる</td></tr>
+</table></div>
+<div class="note warn"><b>podman で起動する場合</b>: <code>docker</code> を <code>podman</code> に置き換えても檻は起動します。ただし rootless の podman では、
+<code>--group-add</code> の番号は<b>檻の中の番号</b>として扱われ、あなたの PC の kvm グループにはなりません（檻の中の <code>/dev/kvm</code> は <code>nobody nogroup</code> と表示されます）。
+<code>/dev/kvm</code> が 0660 の PC（Ubuntu 24.04・podman 4.9.3）では、この起動コマンドのままでは <code>Permission denied</code> で開けませんでした。
+あなたが kvm グループに入ったうえで <code>--group-add keep-groups</code> を使うと開けました（podman の OCI ランタイムが crun のときだけ効きます。<code>--runtime runc</code> では効きませんでした）。
+0666 の PC（著者の PC・podman 5.8.6・crun）では、どちらでも開けました。演習の判定（<code>lab check</code>）を podman で通しては試していません。</div>
+<p><code>--privileged</code> も <code>--cap-add</code> も要りません。<code>--device</code> と <code>--group-add</code> で増えるのは、デバイスのファイル1つと補助グループ1つで、
+特権は増えません（持てる特権の上限 <code>CapBnd</code> が docker の既定のままです）。第2章と演習02で、実際に測って確かめます。</p>
+
+<p>入ると、現在地が出ます。著者の PC（<code>--device</code> と <code>--group-add</code> を付けて起動）では、こう出ました。</p>
+<pre><code>groups: cannot find name for group ID 302
+練習機 linuc: 止まっている / /dev/kvm: あり（この檻の lab が読み書きできる）
+  qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
+
+
+── lab-kvm 1.0.0 ────────────────────────────────────────
+lab-kvm  進捗 0/5
+  次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-kvm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────</code></pre>
+<ul>
+<li>1行目の <code>groups: cannot find name for group ID 302</code> は害がありません。302 はあなたの PC の <code>/dev/kvm</code> のグループの番号で、檻の中にはその番号の名前が無い、という知らせです（番号は PC で違う。第2章）。
+<code>--group-add</code> を付けなかったときは出ません。</li>
+<li>2行目は、練習機が動いているか（動いていれば TCG か KVM か）と、この檻の lab が <code>/dev/kvm</code> を開けるかです。
+<code>/dev/kvm: なし</code> なら <code>--device</code> なしで起動しています。<code>あり（開けない: Permission denied）</code> なら <code>--group-add</code> が要ります。</li>
+</ul>
+
+<h2 id="qemu">練習機の動かし方</h2>
+<p>練習機は <code>qemu-linuc</code> で起動します。後ろに書いたものがそのまま QEMU のオプションになり、実際に打ったコマンド行を ▶ で表示します。
+固定の部分（メモリ・CPU の数・UEFI・ディスク・NIC）は、このサイトの他の練習機と同じです。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>何をするか</th></tr>
+<tr><td><code>qemu-linuc -accel tcg</code></td><td>TCG で起動し、練習機が起動し終わるまで待つ（著者の PC で 30 秒前後）</td></tr>
+<tr><td><code>qemu-linuc -accel kvm</code></td><td>KVM で起動する（同じく 7 秒前後。<code>/dev/kvm</code> が要る）</td></tr>
+<tr><td><code>qemu-linuc -accel kvm -cpu host</code></td><td>練習機にあなたの PC の CPU をそのまま見せて起動する</td></tr>
+<tr><td><code>ssh linuc</code> / <code>exit</code></td><td>練習機に入る / 外に戻る</td></tr>
+<tr><td><code>qemu-linuc stop</code></td><td>練習機の中で <code>poweroff</code> を頼み、止まるまで待つ。<b>檻を抜ける前に打ってください</b></td></tr>
+<tr><td><code>qemu-linuc status</code></td><td>動いているか・どのアクセラレータか・<code>/dev/kvm</code> を開けるか</td></tr>
+<tr><td><code>qemu-linuc reset --yes</code></td><td>練習機のディスクを最初の状態に戻す（中の変更と起動の記録はすべて消える）</td></tr>
+</table></div>
+<p>練習機を止めずに檻を <code>exit</code> すると、練習機は電源を抜かれたのと同じになります（次の起動でディスクの回復が走ることがあります）。</p>
+
+<h2 id="ex">演習</h2>
+<p>5本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません（QEMU のプロセスが開いているファイルと、練習機の中の OS の答えを見ます）。
+詰まったら <code>lab hint NN</code> を何度でも。使い切ったら <code>lab solve NN</code> で模範解答に必ず届きます
+（見ても構いません。進捗には「solve を見た」として残ります）。</p>
+<div class="scroll"><table>
+<tr><th>No</th><th>やること</th><th>KVM</th><th>章</th><th>目安</th></tr>
+<tr><td>01</td><td>練習機を TCG で起動し、中から見える CPU を確かめる</td><td>不要</td><td><a href="/kvm/theory/01-cpu">1</a></td><td>10分</td></tr>
+<tr><td>02</td><td>この檻の lab が <code>/dev/kvm</code> を開けるようにする</td><td>要る</td><td><a href="/kvm/theory/02-dev-kvm">2</a></td><td>10分</td></tr>
+<tr><td>03</td><td>同じ練習機を KVM で起動し直し、起動の速さを比べる</td><td>要る</td><td><a href="/kvm/theory/03-accel">3</a>・<a href="/kvm/theory/04-speed">4</a></td><td>12分</td></tr>
+<tr><td>04</td><td>練習機に、あなたの PC の CPU をそのまま見せる</td><td>要る</td><td><a href="/kvm/theory/05-guest">5</a></td><td>10分</td></tr>
+<tr><td>05</td><td>練習機の CPU から、仮想化支援の印を消す</td><td>不要</td><td><a href="/kvm/theory/05-guest">5</a></td><td>12分</td></tr>
+</table></div>
+<p>課題は <code>lab start NN</code> で開きます。<code>lab</code> は「元に戻すには起動し直してください」と出しますが、この檻では起動し直しても練習機のディスクは戻りません（ボリュームに残ります）。
+練習機を最初の状態に戻すのは <code>qemu-linuc stop</code> の後の <code>qemu-linuc reset --yes</code> です（演習03 が見る起動の記録も消えます）。</p>
+<p>判定は外の端末でも、練習機の中でも <code>lab check NN</code> で打てます。演習03・04 を <code>/dev/kvm</code> の無い（開けない）檻で打つと、
+<code>⚠ この環境では判定できません</code> と、理由（<code>/dev/kvm</code> が無い・開けない）が出ます。読者の失敗ではありません。
+演習02 は <code>/dev/kvm</code> を用意すること自体が課題なので、KVM のある PC では <code>✗ 未達</code> になり、docker が動いているカーネルに KVM が無いときだけ <code>⚠</code> になります。
+演習05 は、KVM（<code>-cpu host</code>）で確かめようとして、あなたの PC の KVM が入れ子の仮想化を許していない（<code>nested</code> が <code>N</code> / <code>0</code>）ときも <code>⚠</code> になります（TCG でやってください）。</p>
+<p>先に読む場合は <a href="/kvm/theory/">理論編（6章）</a>へ。章と演習は対応しているので、どちらから始めても構いません。</p>
+
+<h2 id="report">本文と違う出力が出たら</h2>
+<p>教材のバグとして直します。次の4つを貼ってください。</p>
+<ol>
+<li>打ったコマンド（外か、練習機の中か）</li>
+<li>本文に書いてある出力</li>
+<li>あなたの画面に出た出力</li>
+<li><code>lab env</code> の全文（外で打つ）</li>
+</ol>
+<pre data-where="外（lab@host）"><code>$ lab env
+テーマ    : lab-kvm 1.0.0
+イメージ  : ghcr.io/chai0204/lab:kvm-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+CPU       : Intel(R) Core(TM) Ultra 9 285H（仮想化支援の印: vmx）
+KVM       : カーネルのモジュール kvm_intel kvm
+練習機    : 止まっている
+/dev/kvm  : あり（この檻の lab が読み書きできる）
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb</code></pre>
+<p><a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。
+<code>カーネル</code>・<code>CPU</code>・<code>KVM</code>・<code>/dev/kvm</code> の行は、あなたの PC のものなので本文と違って正常です。違いを切り分けるのに使います。
+<code>CapBnd</code> が <code>00000000a80425fb</code> より多いなら <code>--privileged</code> や <code>--cap-add</code> を、<code>CapEff</code> が 0 でないなら <code>--user 0</code> などで root として起動しています
+（lab のまま <code>--privileged</code> で起動しても、<code>CapEff</code> は 0 のままです）。</p>
+
+<h2 id="end">終わったら</h2>
+<pre><code>qemu-linuc stop                                  # 檻の中で。練習機を正常に止める
+exit                                             # 檻を抜ける（--rm なのでコンテナは消える）
+docker volume rm lab-kvm-vm lab-kvm-state        # あなたの PC で。練習機のディスクと進捗も消す場合だけ</code></pre>
+<p>イメージは <code>docker rmi</code> で消せます。あなたの PC には何も残りません（名前付きボリューム以外のファイルを作っていないため）。
+続きをやる日は、同じ <code>docker run</code> をもう一度打てば、練習機のディスクも進捗もそのまま残っています。</p>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:kvm-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0・OVMF 2024.02 / 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4）/ apt snapshot 20260929T000000Z / ホストは Linux 7.2.6・Intel Core Ultra 9 285H（/dev/kvm は crw-rw-rw- root:302）/ docker 29.8.0・amd64 で検証。0660 の場合は Ubuntu 24.04.5 LTS・docker.io 29.1.3 で検証 / 検証日 2026-10-14</div>
+
+<!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
+<nav class="pager"><a href="/kvm/theory/">← 理論編</a><a href="/">記事の一覧へ →</a></nav>
+<!-- /catalog:pager -->
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/kvm/">KVM</a> · <a href="/kvm/theory/">理論編 目次</a> · <a href="/kvm/practice/">実践編</a> · <a href="/kvm/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

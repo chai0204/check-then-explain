@@ -1,0 +1,72 @@
+# 台本 probe/kvm-extra-steps.txtを、読者と同じ起動（docker run --rm -it --hostname host、名前の無いボリューム2つ、PID 1 は tini、
+# その子の bash -l、umask 022、TERM=xterm）の1つのシェルに、最初から順に打った記録（章の間で exit しない）。
+# 端末 80 桁 × 24 行。作り方: python3 -I probe/kvm-seq.py（イメージ lab-kvm:1.0.0）
+
+# KVM の記事: 本文の注記の出どころ（著者の確かめ）。本文の端末ブロックには載せていない記録。
+
+#   python3 -I probe/kvm-seq.py --steps probe/kvm-extra-steps.txt --out logs/kvm-extra.log --prefix kvm-extra
+
+# 檻は読者と同じ起動（--device /dev/kvm --group-add <GID>）。
+
+
+========== 第5章の注記: kvm=off の練習機に、基本の番号の最大が 0xD の CPU（古い Intel の CPU と同じ）を名乗らせる ==========
+
+# level=13 で、CPUID の基本の番号の最大を 0xD にする。名前（0x40000000 番）を尋ねると、0xD 番の答えが返る
+
+# --- main: 起動（--rm -it --name kvm-extra-main --hostname host --device /dev/kvm --group-add 302 -v /home/lab/vm -v /home/lab/.lab lab-kvm:1.0.0）して入ったときの表示 ---
+groups: cannot find name for group ID 302
+練習機 linuc: 止まっている / /dev/kvm: あり（この檻の lab が読み書きできる）
+  qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
+
+
+── lab-kvm 1.0.0 ────────────────────────────────────────
+lab-kvm  進捗 0/5
+  次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-kvm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+# --- ここまで ---
+
+$ qemu-linuc -accel kvm -cpu host,kvm=off,level=13 -snapshot
+▶ qemu-img create -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 /home/lab/vm/linuc.qcow2 20G
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm -cpu host,kvm=off,level=13 -snapshot
+練習機が起動し終わりました（QEMU を起動してから 6.9 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+
+$ sudo modprobe cpuid
+
+$ sudo od -A n -c -j $((0x40000000)) -N 16 /dev/cpu/0/cpuid
+  \a 002  \0  \0 210  \n  \0  \0 210  \n  \0  \0  \0  \0  \0  \0
+
+$ sudo od -A n -t x4 -j $((0x40000000)) -N 16 /dev/cpu/0/cpuid
+ 00000207 00000a88 00000a88 00000000
+
+$ sudo od -A n -t x4 -j 13 -N 16 /dev/cpu/0/cpuid
+ 00000207 00000a88 00000a88 00000000
+
+$ sudo od -A n -t x4 -j 0 -N 16 /dev/cpu/0/cpuid
+ 0000000d 756e6547 6c65746e 49656e69
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）

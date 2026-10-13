@@ -1,0 +1,100 @@
+# KVM の記事: rootless の podman で /dev/kvm を渡した記録。作り方: probe/kvm-podman.sh（イメージ lab-kvm:1.0.0。docker の檻と同じもの）
+# 著者の PC（NixOS・podman 5.8.6）と、lab の仮想マシンの Ubuntu 24.04（podman 4.9.3。apt で crun を入れ、runc も入っている）で取った。
+
+========== podman（rootless）5.8.6・NixOS 26.05 (Yarara)・/dev/kvm crw-rw-rw- root:kvm ==========
+
+$ ls -l /dev/kvm
+crw-rw-rw- 1 root kvm 10, 232 Oct 14 03:26 /dev/kvm
+
+$ id -nG | grep -o -w kvm
+kvm
+
+$ podman info --format '{{.Host.OCIRuntime.Name}}'
+crun
+
+$ podman run --rm --device /dev/kvm --group-add "$(stat -c %g /dev/kvm)" --entrypoint bash docker.io/library/lab-kvm:1.0.0 -c 'id; ls -l /dev/kvm; grep -E "^(Groups|CapEff|CapBnd)" /proc/self/status; ( exec 3<>/dev/kvm ) && echo "/dev/kvm を読み書きで開けた"'
+uid=1000(lab) gid=1000(lab) groups=1000(lab),302
+crw-rw-rw- 1 nobody nogroup 10, 232 Oct 14 03:26 /dev/kvm
+Groups:	302 1000 
+CapEff:	0000000000000000
+CapBnd:	00000000800405fb
+/dev/kvm を読み書きで開けた
+
+$ podman run --rm --device /dev/kvm --group-add keep-groups --entrypoint bash docker.io/library/lab-kvm:1.0.0 -c 'id; ls -l /dev/kvm; grep -E "^(Groups|CapEff|CapBnd)" /proc/self/status; ( exec 3<>/dev/kvm ) && echo "/dev/kvm を読み書きで開けた"'
+uid=1000(lab) gid=1000(lab) groups=1000(lab),65534(nogroup),0(root),65534(nogroup)
+crw-rw-rw- 1 nobody nogroup 10, 232 Oct 14 03:26 /dev/kvm
+Groups:	65534 65534 65534 65534 65534 65534 65534 65534 65534 65534 65534 65534 65534 0 65534 65534 65534 65534 
+CapEff:	0000000000000000
+CapBnd:	00000000800405fb
+/dev/kvm を読み書きで開けた
+
+========== podman（rootless）4.9.3・Ubuntu 24.04.5 LTS・/dev/kvm crw-rw---- root:kvm ==========
+
+$ ls -l /dev/kvm
+crw-rw---- 1 root kvm 10, 232 Oct 13 18:26 /dev/kvm
+
+$ id -nG | grep -o -w kvm
+
+$ podman info --format '{{.Host.OCIRuntime.Name}}'
+crun
+
+$ podman run --rm --device /dev/kvm --group-add "$(stat -c %g /dev/kvm)" --entrypoint bash docker.io/library/lab-kvm:1.0.0 -c 'id; ls -l /dev/kvm; grep -E "^(Groups|CapEff|CapBnd)" /proc/self/status; ( exec 3<>/dev/kvm ) && echo "/dev/kvm を読み書きで開けた"'
+uid=1000(lab) gid=1000(lab) groups=1000(lab),993
+crw-rw---- 1 nobody nogroup 10, 232 Oct 14 03:26 /dev/kvm
+Groups:	993 1000 
+CapEff:	0000000000000000
+CapBnd:	00000000800405fb
+bash: line 1: /dev/kvm: Permission denied
+
+$ podman run --rm --device /dev/kvm --group-add keep-groups --entrypoint bash docker.io/library/lab-kvm:1.0.0 -c 'id; ls -l /dev/kvm; grep -E "^(Groups|CapEff|CapBnd)" /proc/self/status; ( exec 3<>/dev/kvm ) && echo "/dev/kvm を読み書きで開けた"'
+uid=1000(lab) gid=1000(lab) groups=1000(lab),65534(nogroup),0(root)
+crw-rw---- 1 nobody nogroup 10, 232 Oct 14 03:26 /dev/kvm
+Groups:	65534 0 
+CapEff:	0000000000000000
+CapBnd:	00000000800405fb
+bash: line 1: /dev/kvm: Permission denied
+
+$ podman run --rm --runtime runc --device /dev/kvm --group-add keep-groups --entrypoint bash docker.io/library/lab-kvm:1.0.0 -c 'id; ls -l /dev/kvm; grep -E "^(Groups|CapEff|CapBnd)" /proc/self/status; ( exec 3<>/dev/kvm ) && echo "/dev/kvm を読み書きで開けた"'
+uid=1000(lab) gid=1000(lab) groups=1000(lab)
+crw-rw---- 1 nobody nogroup 10, 232 Oct 14 03:26 /dev/kvm
+Groups:	1000 
+CapEff:	0000000000000000
+CapBnd:	00000000800405fb
+bash: line 1: /dev/kvm: Permission denied
+
+# ここで Ubuntu 24.04 の利用者 student を kvm グループに入れた（sudo usermod -aG kvm student）。入り直して同じスクリプトをもう一度走らせた
+
+========== podman（rootless）4.9.3・Ubuntu 24.04.5 LTS・/dev/kvm crw-rw---- root:kvm ==========
+
+$ ls -l /dev/kvm
+crw-rw---- 1 root kvm 10, 232 Oct 13 18:28 /dev/kvm
+
+$ id -nG | grep -o -w kvm
+kvm
+
+$ podman info --format '{{.Host.OCIRuntime.Name}}'
+crun
+
+$ podman run --rm --device /dev/kvm --group-add "$(stat -c %g /dev/kvm)" --entrypoint bash docker.io/library/lab-kvm:1.0.0 -c 'id; ls -l /dev/kvm; grep -E "^(Groups|CapEff|CapBnd)" /proc/self/status; ( exec 3<>/dev/kvm ) && echo "/dev/kvm を読み書きで開けた"'
+uid=1000(lab) gid=1000(lab) groups=1000(lab),993
+crw-rw---- 1 nobody nogroup 10, 232 Oct 14 03:28 /dev/kvm
+Groups:	993 1000 
+CapEff:	0000000000000000
+CapBnd:	00000000800405fb
+bash: line 1: /dev/kvm: Permission denied
+
+$ podman run --rm --device /dev/kvm --group-add keep-groups --entrypoint bash docker.io/library/lab-kvm:1.0.0 -c 'id; ls -l /dev/kvm; grep -E "^(Groups|CapEff|CapBnd)" /proc/self/status; ( exec 3<>/dev/kvm ) && echo "/dev/kvm を読み書きで開けた"'
+uid=1000(lab) gid=1000(lab) groups=1000(lab),65534(nogroup),0(root)
+crw-rw---- 1 nobody nogroup 10, 232 Oct 14 03:28 /dev/kvm
+Groups:	65534 65534 0 
+CapEff:	0000000000000000
+CapBnd:	00000000800405fb
+/dev/kvm を読み書きで開けた
+
+$ podman run --rm --runtime runc --device /dev/kvm --group-add keep-groups --entrypoint bash docker.io/library/lab-kvm:1.0.0 -c 'id; ls -l /dev/kvm; grep -E "^(Groups|CapEff|CapBnd)" /proc/self/status; ( exec 3<>/dev/kvm ) && echo "/dev/kvm を読み書きで開けた"'
+uid=1000(lab) gid=1000(lab) groups=1000(lab)
+crw-rw---- 1 nobody nogroup 10, 232 Oct 14 03:28 /dev/kvm
+Groups:	1000 
+CapEff:	0000000000000000
+CapBnd:	00000000800405fb
+bash: line 1: /dev/kvm: Permission denied

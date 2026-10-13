@@ -1,0 +1,56 @@
+# Ubuntu 24.04 の PC（/dev/kvm が crw-rw---- root:kvm、kvm の GID は 993）で、本文の起動コマンドを打った台本。
+# 著者の PC は /dev/kvm が 0666 で、--group-add が無くても開けてしまう。0660 の PC での違いを記録するため、
+# lab の仮想マシン（Ubuntu 24.04 の cloud image・入れ子の KVM・apt の docker.io 29.1.3）の中で取る:
+#   python3 -I kvm-seq.py --steps kvm-ubuntu-steps.txt --out kvm-ubuntu.log \
+#     --main-args "--device /dev/kvm --group-add 993" --nodev-args "--device /dev/kvm"
+# @pc はその PC のシェル、@nodev は --device /dev/kvm だけで起動した檻、@main は --group-add も付けた檻、
+# @bare は何も付けずに起動した檻。後半では、著者の PC では変えられないもの（あなたの PC のカーネルの設定）を、
+# この仮想マシンの中で変えて記録する: 入れ子の仮想化を許さない KVM（nested=0）と、KVM の無いカーネル（部品を外す）。
+
+== Ubuntu 24.04 の PC（コンテナの外） ==
+@pc
+$ ls -l /dev/kvm
+$ stat -c %g /dev/kvm
+$ id
+
+== --device /dev/kvm だけで起動した檻 ==
+@nodev
+$ ls -l /dev/kvm
+$ id
+$ qemu-linuc -accel kvm
+$ lab check 02
+$ exit
+
+== --device /dev/kvm --group-add 993 で起動した檻 ==
+@main
+$ ls -l /dev/kvm
+$ id
+$ qemu-linuc -accel kvm
+$ lab check 02
+$ qemu-linuc stop
+
+== 入れ子の仮想化を許していない KVM（kvm_intel を nested=0 で読み込み直した） ==
+@pc
+$ sudo modprobe -r kvm_intel
+$ sudo modprobe kvm_intel nested=0
+$ cat /sys/module/kvm_intel/parameters/nested
+@main
+$ qemu-linuc -accel kvm -cpu host
+$ ssh linuc "grep -o -w -E 'vmx|svm' /proc/cpuinfo | sort | uniq -c; ls -l /dev/kvm"
+$ lab check 05
+$ qemu-linuc stop
+$ exit
+
+== docker が動いているカーネルに KVM が無い（kvm の部品を外した） ==
+@pc
+$ sudo modprobe -r kvm_intel kvm
+$ ls -l /dev/kvm
+$ docker run --rm --device /dev/kvm lab-kvm:1.0.0 true
+@bare
+$ ls -l /dev/kvm
+$ lab check 02
+$ lab check 03
+$ exit
+@pc
+$ sudo modprobe kvm_intel
+$ ls -l /dev/kvm

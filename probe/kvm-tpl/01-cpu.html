@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. 仮想化支援機能は、CPU の自己申告 — 確かめて説明する KVM</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="1" data-theme="kvm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <a href="/kvm/theory/">理論編</a> › 第1章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/">詳しく</a></p>
+</div>
+<h1>1. 仮想化支援機能は、CPU の自己申告</h1>
+<p class="lead">あなたの PC の CPU には、仮想マシンを速く動かすための仕組み（Intel は VT-x、AMD は AMD-V）があり、<code>/proc/cpuinfo</code> に <code>vmx</code> か <code>svm</code> という印で出る。
+QEMU がソフトだけで作った CPU（TCG）で練習機を起動し、中で同じものを見ると、Intel の PC の上で AMD の CPU を名乗り、<code>svm</code> まで出す。
+練習機のカーネルはそれを信じて、KVM まで用意した。CPU の印は、CPU が「持っている」と答えた内容でしかない
+（TCG の QEMU は、その AMD-V もソフトで真似していて、練習機の中の KVM で仮想マシンまで動いた）。</p>
+<div class="badges"><span>前提: 檻が起動している（<a href="/kvm/practice/">実践編</a>）</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>lscpu</code> と <code>/proc/cpuinfo</code> で、CPU が仮想化支援機能（VT-x / AMD-V）を名乗っているかを確かめられる</li>
+<li>練習機（TCG）の CPU が何を名乗っているかを出力で示し、それを答えているのが QEMU だと説明できる</li>
+<li>「CPU が印を出している」と「KVM が使える」が別のことだと言える</li>
+<li>TCG の練習機の中の KVM で、小さな仮想マシンが動くことを示せる（QEMU が AMD-V もソフトで真似している）</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: CPUID 命令の細かい仕様（何番の問い合わせのどのビットか）、VT-x と AMD-V の命令の違い（VMLAUNCH・VMRUN など）、
+<code>/proc/cpuinfo</code> の <code>vmx flags</code> の各項目の意味、ファームウェア（BIOS / UEFI）の設定画面で仮想化支援を有効にする手順。</div></div>
+
+<h2 id="host">あなたの PC の CPU は、仮想化支援を名乗っている</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>vmx</code> と <code>svm</code> が何の印で、どこに出るか。</div>
+<p>檻に入ったら、外（<code>lab@host</code>）で CPU を見る。</p>
+<pre data-where="外（lab@host）"><code><!--log probe 1:1-2 note="Vendor ID::CPU のメーカー;Virtualization::仮想化支援機能の名前"--></code></pre>
+<p class="detail">この2つの出力は、<b>あなたの画面では本文と違って正常</b>である。あなたの PC の CPU が出る（AMD の PC なら <code>AuthenticAMD</code>・<code>AMD-V</code>・<code>svm</code>）。
+この檻はコンテナなので、<code>/proc/cpuinfo</code> を作っているのはあなたの PC のカーネルで、見えるのはあなたの PC の CPU そのものである（<a href="/linuc-boot/theory/03-container">LinuC 1.01 の第3章</a>）。</p>
+<p>CPU は、仮想マシンの中の OS（<b>ゲスト</b>）の命令を、そのまま自分で実行できる仕組みを持っている。
+ゲストが「ハードウェアを直接触る」ような命令を実行しようとした瞬間にだけ止まり、仮想マシンを動かしている側（ハイパーバイザー）に処理を戻す。
+これが<b>仮想化支援機能</b>で、Intel のものを VT-x、AMD のものを AMD-V と呼ぶ。Linux は、CPU がこれを持っていると答えたとき、<code>/proc/cpuinfo</code> の <code>flags</code> の行に
+Intel なら <code>vmx</code>、AMD なら <code>svm</code> を並べる。<code>lscpu</code> の <code>Virtualization</code> の行は、それを名前で言い直したものである。</p>
+<div class="analogy"><b>たとえ</b>: 仮想化支援機能は、<b>大きな工場に「来客用の作業場」が作り付けてある</b>ことに近い。来客（ゲスト）は自分の道具で自由に作業できるが、
+危ない機械（ハードウェア）に手を伸ばした瞬間にブザーが鳴り、工場の係（ハイパーバイザー）が代わりに操作する。作業場が無ければ、係が来客の作業を1つずつ真似して代わりにやるしかない。
+<br>ただし<b>崩れる点</b>: 来客は自分が作業場にいると分かっているが、ゲストの OS は、ハイパーバイザーが知らせない限り、自分の命令が作業場の中で実行されていることを知らない（知らせ方は第5章）。ブザーが鳴っても、ゲストからは何も起きなかったように見える。</div>
+
+<h2 id="guest">練習機の CPU は、AMD を名乗る</h2>
+<div class="sgoal"><b>この節で分かること</b>: QEMU がソフトで作った CPU（TCG）が、何を名乗るか。</div>
+<p>練習機（Ubuntu 24.04 の仮想マシン）を起動する。<code>qemu-linuc</code> は、練習機を <code>qemu-system-x86_64</code> で直接起動する、この檻の短縮のコマンドである。
+後ろに書いたものはそのまま QEMU のオプションになり、実際に打ったコマンド行を ▶ で表示して、練習機が起動し終わるまで待つ。<code>-accel tcg</code> は、QEMU に「練習機の命令を翻訳して実行する方式（TCG）で動け」と頼むオプションである。</p>
+<pre data-where="外（lab@host）"><code><!--log probe 1:3 note="▶ qemu-img create::最初の1回だけ。練習機のディスク（土台との差分）を作る;    -accel tcg::あなたが足したオプション"--></code></pre>
+<p class="detail">秒数は、あなたの PC の速さで変わる。▶ の固定の部分（メモリ・CPU の数・UEFI のファームウェア・ディスク・NIC・シリアル）が何をしているかは、<a href="/qemu/theory/">QEMU の記事</a>で1つずつ扱う。
+この記事で変えるのは、最後の行（<code>-accel</code> と <code>-cpu</code>）だけである。</p>
+<p>起動し終わったら、練習機に入って、外と同じコマンドを打つ。</p>
+<pre data-where="外（lab@host）"><code><!--log probe 1:4--></code></pre>
+<p class="detail">案内の最後の行にある <code>vm console</code> は、libvirt に登録した練習機（第6章の <code>vm start</code> で起動するもの）のシリアルにつなぐコマンドである。
+<code>qemu-linuc</code> で起動した練習機は libvirt に登録されておらず、シリアルはファイル（<code>~/vm/serial.log</code>）に書き出しているので、<code>vm console</code> ではつながらない。この記事では練習機の NIC を止めないので、使わない。</p>
+<pre data-where="練習機の中（student@linuc）"><code><!--log probe 1:5-6 note="Vendor ID::Intel の PC の上で、AMD を名乗る;Model name::QEMU が作った CPU の名前;hypervisor::「自分は仮想マシンだ」という印（第5章）;svm::AMD-V の印。CPU 2個に1つずつ"--></code></pre>
+<p>あなたの PC の CPU が Intel でも AMD でも、練習機は同じ答えを返す（ここは全員が本文と同じ画面になる）。
+メーカーは <code>AuthenticAMD</code>、名前は <code>QEMU Virtual CPU version 2.5+</code>。そして、仮想化支援機能 AMD-V を持っていると名乗る（練習機の CPU は2個なので、印も2つずつ出る）。<code>Hypervisor vendor</code> の行は出なかった（第5章で、KVM のときと比べる）。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>vmx</code> や <code>svm</code> は、CPU の回路に作り付けられた機能の印だ。QEMU がソフトで作った CPU には回路が無いのだから、
+この印は形だけで、練習機の中に KVM（仮想化支援機能を使って仮想マシンを動かす Linux の仕組み）が用意されることは無いはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code><!--log probe 1:7-9 note="crw-rw----::練習機の中にも KVM の入口がある;kvm_amd ::AMD の仮想化支援機能を使う KVM の部品;Nested Virtualization enabled::設定（nested）の報告。この中で作る仮想マシンにも AMD-V を見せる"--></code></pre>
+<div class="then"><b>だめな理由</b>: 練習機のカーネルは <code>kvm_amd</code> を読み込み、<code>/dev/kvm</code>（KVM の入口。第2章）まで作っていた。
+OS が CPU の正体を知る主な方法は、<b>CPUID という命令で CPU に尋ねること</b>である（ほかに、MSR という CPU の設定を読むこともある）。答えに AMD-V があれば、カーネルは <code>svm</code> を並べ、<code>kvm_amd</code> を読み込む。
+TCG の練習機では、その問いに答えているのは QEMU である。QEMU が何も指定されないときに作る CPU（<code>qemu64</code> という型）は「AMD の CPU で、AMD-V を持っている」と答える。
+<code>kvm_amd</code> が読み込まれるときに確かめるのも、この答え（AMD の CPU か、<code>svm</code> の印があるか）で、AMD-V を動かしてみるわけではない。
+AMD-V を実際に使い始めるのは、仮想マシンを作るときである（練習機のカーネル 6.8 の場合。Linux 6.12 からは、既定で読み込んだときに使い始める。<code>kvm</code> の設定 <code>enable_virt_at_load</code> の既定が <code>Y</code>）。
+だから <code>kvm_amd</code> は、AMD-V を試さないまま初期化を終え、<code>/dev/kvm</code> を作った。
+（<code>Nested Virtualization enabled</code> は判断の結果ではなく、<code>kvm_amd</code> の設定 <code>nested</code> が有効だという報告で、この中で作る仮想マシンにも AMD-V を見せる、という意味である。）
+<b>CPU の印は、回路の有無ではなく、CPU（ここでは QEMU）が「持っている」と答えた内容</b>だった。
+ただし、この印は形だけでもない。TCG の QEMU は AMD-V の仕組みもソフトで真似していて、この練習機の KVM で、さらに仮想マシンを動かすこともできる（次の節で確かめる）。
+（<code>Booting paravirtualized kernel on bare hardware</code> の行は第5章で読む。）</div></div>
+<p>CPU の答えは、練習機の中から直接読める。<code>cpuid</code> というカーネルの部品を読み込むと、<code>/dev/cpu/0/cpuid</code> というファイルから、CPUID の答えを番号ごとに読み出せる。
+読む場所（<code>-j</code> で飛ばすバイト数）が CPUID の問いの番号で、<code>0x40000000</code> は「あなたはどのハイパーバイザーか」を尋ねる番号である。</p>
+<pre data-where="練習機の中（student@linuc）"><code><!--log probe 1:10-11 note="T   C   G::QEMU の TCG が、CPU の答えに自分の名前を書いている"--></code></pre>
+<p>最初の4バイトの後ろに、<code>TCGTCGTCGTCG</code> と並んでいる。CPU の答えを書いているのが QEMU の TCG だということを、答えそのものが名乗っている。
+同じものを KVM の練習機で読むと何が出るかは、第5章で見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code><!--log probe 1:12--></code></pre>
+<p><code>exit</code> で練習機から出て、外に戻った。</p>
+<div class="analogy"><b>たとえ</b>: CPUID は、OS が CPU に渡す<b>問診票</b>に近い。「メーカーは」「何ができるか」の欄に CPU が自分で書き込み、OS はそれを読んで、どの部品（ドライバ）を使うか決める。
+TCG では、問診票を書いているのは CPU ではなく、CPU の代わりをしている QEMU である。
+<br>ただし<b>崩れる点</b>: 病院は問診票の後に検査をして確かめるが、仮想マシンの中の OS は、答えを外から確かめる方法を持たない。MSR を読んでも、答えるのはやはりハイパーバイザーである。</div>
+<div class="scroll"><table>
+<tr><th>見たもの</th><th>外（あなたの PC の CPU。著者の場合）</th><th>練習機の中（TCG・既定の CPU）</th></tr>
+<tr><td>メーカー（<code>Vendor ID</code>）</td><td><code>GenuineIntel</code></td><td><code>AuthenticAMD</code></td></tr>
+<tr><td>名前（<code>Model name</code>）</td><td><code>Intel(R) Core(TM) Ultra 9 285H</code></td><td><code>QEMU Virtual CPU version 2.5+</code></td></tr>
+<tr><td>仮想化支援の印</td><td><code>vmx</code>（VT-x）</td><td><code>svm</code>（AMD-V）</td></tr>
+<tr><td>答えているのは</td><td>本物の CPU</td><td>QEMU（ソフト）</td></tr>
+</table></div>
+
+<h2 id="nested">その AMD-V で、練習機の中の KVM も動く</h2>
+<div class="sgoal"><b>この節で分かること</b>: QEMU が名乗った AMD-V を、練習機の中の KVM が本当に使えるか。</div>
+<p>練習機の中の KVM で、仮想マシンを1つ動かしてみる。この檻には、そのための小さなプログラム <code>tiny-vm.py</code> を置いてある。
+練習機の <code>/dev/kvm</code> に仮想マシンを作り、命令を6つ（2+2 を計算して、答えの文字を装置に書き、止まる）だけ実行させる。
+仮想マシンを作る前と後には、CPU の AMD-V のスイッチ（EFER という CPU の設定の SVME）も読む。中身は次のとおり（読み飛ばしてよい。KVM に頼むこと（ioctl）が順に並んでいる）。</p>
+<details><summary>tiny-vm.py の中身</summary>
+<pre data-where="外（lab@host）"><code><!--log probe 1:13--></code></pre>
+</details>
+<p><code>ssh linuc sudo python3 -</code> は、練習機の中の root で Python を動かし、プログラムを標準入力（<code>&lt;</code> で渡した、この檻のファイル）から読ませる、という意味である。</p>
+<pre data-where="外（lab@host）"><code><!--log probe 1:14 note="EFER.SVME）: 0::読み込んだだけの kvm_amd は、スイッチを入れていない;KVM_CREATE_VM::練習機の KVM に、仮想マシンを作った;EFER.SVME）: 1::仮想マシンを作ると、スイッチが入った;b'4'::2+2 の答えを、装置に書いた;KVM_EXIT_HLT::hlt で止まった"--></code></pre>
+<p>仮想マシンを作る前、AMD-V のスイッチは 0 だった。<code>kvm_amd</code> は、読み込まれたときに AMD-V を試していない（前の節）。仮想マシンを作ると 1 になり、
+仮想マシンは 2+2 を計算して、文字 <code>4</code> を装置（番号 0x3f8）に書き、<code>hlt</code> で止まった。KVM は、装置に触れたときと止まったときに仮想マシンを止めて、プログラムに知らせている。</p>
+<p>この仮想マシンの命令を実行したのも、本物の CPU ではない。QEMU の TCG が、AMD-V の仕組み（仮想マシンに入る命令や、装置に触れたら止まる仕組み）までソフトで真似して、ひとまとまりずつ翻訳して実行した。
+だから TCG の練習機の <code>svm</code> は、名乗りだけでなく、中身も QEMU が持っている。それでも <code>kvm_amd</code> が印を信じたのは、中身を確かめたからではない。</p>
+<div class="analogy"><b>たとえ</b>: TCG の練習機の中の KVM は、<b>朗読劇の中の劇中劇</b>に近い。TCG の QEMU は、役者の台詞を1つずつ読み上げる朗読者である（第3章）。
+劇の中でさらに小さな劇（仮想マシン）が始まっても、その台詞も朗読者が読み上げ、「劇中劇が始まる」「ここで止まる」という合図（AMD-V の仕組み）まで朗読者が演じる。
+<br>ただし<b>崩れる点</b>: 朗読劇の観客は朗読者が読んでいると知っているが、練習機の中の KVM は、頼んだ AMD-V を本物の CPU が受け持っているのか、朗読者が真似しているのかを知らないし、知らなくても動く。</div>
+<p>練習機を止める。<code>qemu-linuc stop</code> は、ssh で練習機に <code>sudo poweroff</code> を頼み、QEMU のプロセスが終わるまで待つ。</p>
+<pre data-where="外（lab@host）"><code><!--log probe 1:15--></code></pre>
+
+<h2 id="meaning">印があることと、使えることは別</h2>
+<div class="sgoal"><b>この節で分かること</b>: 印が「ある」ときと「無い」ときに、それぞれ何が言えるか。</div>
+<p>印は CPU の申告なので、<b>印が無ければ、その OS からは仮想化支援機能を使えない</b>（カーネルは KVM の部品を読み込まない）。
+ただし、印が無い理由は CPU が持っていないとは限らない。ファームウェア（BIOS / UEFI）の設定で仮想化支援機能が切られていると、Intel の CPU では Linux 5.6 以降、AMD の CPU では Linux 6.7 以降は、印を並べない（このときカーネルは、CPUID ではなく MSR を読んで、切られていることを知る）。
+仮想マシンの中では、外のハイパーバイザーが印を見せていないこともある（第5章で、自分で消して確かめる）。</p>
+<p>反対に、<b>印があっても、KVM が使えるとは限らない</b>。印は「CPU がそう答えた」というだけで、使うにはさらに、カーネルに KVM の部品があり、その入口のファイルを開けることが要る。
+この檻の外（あなたの PC）は <code>vmx</code> を出していたが、この檻の中で KVM が使えるかどうかは、檻をどう起動したかで決まる。第2章で、その条件を1つずつ確かめる。</p>
+<div class="analogy"><b>たとえ</b>: 印は、運転免許証の<b>「中型」の欄に丸がある</b>ことに近い。丸が無ければ中型には乗れない。丸があっても、目の前の車の鍵を持っていなければ乗れない。
+<br>ただし<b>崩れる点</b>: 免許証は発行元が試験で確かめた記録だが、CPU の印は CPU（または CPU の代わりをしている QEMU）の自己申告で、誰も確かめていない。
+練習機の <code>svm</code> は、本人ではなく代理人（QEMU）が書いた丸で、この代理人は実際に中型も運転できた（前の節）。それでも、丸が正しいかどうかを、カーネルは確かめずに信じている。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/kvm/practice/">演習01</a>で、練習機を TCG で起動して、中から見える CPU を確かめる（KVM が使えない PC でもできる）。
+<a href="/kvm/practice/">演習05</a>では反対に、練習機の CPU から仮想化支援の印を消して、練習機の中の <code>/dev/kvm</code> が消えることを確かめる。</div>
+
+<div class="quiz"><b>確認</b>
+<p>ある Linux の計算機で <code>grep -m1 -o -w -E 'vmx|svm' /proc/cpuinfo</code> を打つと <code>svm</code> と出た。この出力から言えることはどれか。</p>
+<p>A. この計算機は AMD の CPU を積んだ実機である<br>B. この計算機の OS から見ると、CPU は AMD-V を持っていると答えている<br>C. この計算機では KVM が使える<br>D. この計算機は仮想マシンではない</p>
+<details><summary>答え</summary>
+<p>B。印は CPU（仮想マシンなら、CPU の代わりをしているハイパーバイザー）が CPUID で答えた内容である。
+TCG の練習機は Intel の PC の上で <code>svm</code> を出したので、A も D も言えない。C は、カーネルの部品と <code>/dev/kvm</code> を開けるかどうか（第2章）を見ないと分からない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>練習機（TCG）の中で <code>lsmod | grep kvm</code> に <code>kvm_amd</code> が出たのはなぜか。「誰が、何と答えたから」の形で説明せよ。</p>
+<details><summary>答え</summary>
+<p>QEMU が、CPUID の問いに「AMD の CPU で、AMD-V を持っている」と答えたから。練習機のカーネルはその答えを見て、AMD 用の KVM の部品 <code>kvm_amd</code> を読み込み、<code>/dev/kvm</code> を作った。
+読み込みのときに AMD-V を試してはいないし、練習機のカーネルからは、その答えを外から確かめる方法も無い（その AMD-V は、QEMU がソフトで真似していて、実際に使えた）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>VT-x を持っているはずの Intel の CPU の PC で、<code>grep -c vmx /proc/cpuinfo</code> が 0 を返した。まず何を疑うか。</p>
+<details><summary>答え</summary>
+<p>ファームウェア（BIOS / UEFI）の設定で仮想化支援機能が切られていること。Intel の CPU では、Linux 5.6 以降は切られていると <code>vmx</code> を並べない（AMD の CPU の <code>svm</code> も、Linux 6.7 以降は同じ）。
+その PC 自体が仮想マシンなら、外のハイパーバイザーが印を見せていないこともある（第5章）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>仮想化支援機能は、ゲストの命令を CPU に直接実行させ、危ない命令のときだけハイパーバイザーに戻す仕組み。Intel は VT-x（印は <code>vmx</code>）、AMD は AMD-V（<code>svm</code>）</li>
+<li><code>lscpu</code> の <code>Virtualization</code> と <code>/proc/cpuinfo</code> の <code>flags</code> で見る。コンテナの中ではあなたの PC の CPU が見える</li>
+<li>OS は CPU の正体を主に CPUID の答えで知る。TCG の練習機では QEMU が答え、Intel の PC の上で <code>AuthenticAMD</code> と <code>svm</code> を名乗る</li>
+<li>練習機のカーネルはその答えを信じて <code>kvm_amd</code> を読み込み、<code>/dev/kvm</code> を作った（読み込みのときに AMD-V は試していない）。印は申告で、使えるかどうかは別に決まる（第2章）</li>
+<li>TCG の QEMU は AMD-V の仕組みもソフトで真似しているので、練習機の中の KVM で仮想マシンも動いた。命令を実行したのは、ここでも QEMU のソフトである</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:kvm-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・OVMF 2024.02 / 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4）/ apt snapshot 20260929T000000Z / ホストは Linux 7.2.6・Intel Core Ultra 9 285H（/dev/kvm は crw-rw-rw- root:302）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/kvm/theory/">← 理論編 目次</a><a href="/kvm/theory/02-dev-kvm">次: 2. KVM の入口は /dev/kvm ひとつ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/kvm/">KVM</a> · <a href="/kvm/theory/">理論編 目次</a> · <a href="/kvm/practice/">実践編</a> · <a href="/kvm/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/kvm/chapters.js"></script>
+<script src="/kvm/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

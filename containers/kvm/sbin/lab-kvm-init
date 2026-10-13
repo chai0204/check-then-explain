@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# KVM の記事の檻の入口（tini の子）。読者のシェル（既定は bash -l）になる前に2つだけ用意する。
+#   1. 前のコンテナの QEMU の PID の記録（~/vm/qemu.pid）を消す。--rm で消えたコンテナの QEMU はもういない。
+#      残しておくと、同じ番号の別のプロセス（下の socat など）を「動いている練習機」と取り違えうる。
+#   2. 練習機の中の lab（10.0.2.2:7777）を外の lab へ中継する socat を立てる。QEMU の slirp が、
+#      練習機から見た 10.0.2.2 を、このコンテナの 127.0.0.1 へ届ける（仮想マシン型の檻の lab-vm-init と同じ）。
+mkdir -p "$HOME/vm" "$HOME/.lab" "$HOME/work" 2>/dev/null
+rm -f "$HOME/vm/qemu.pid"
+setsid socat TCP-LISTEN:7777,bind=127.0.0.1,fork,reuseaddr EXEC:/usr/local/libexec/lab-remote \
+  </dev/null >/dev/null 2>&1 &
+exec "$@"

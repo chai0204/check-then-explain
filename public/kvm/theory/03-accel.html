@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. QEMU は、頼まれたときだけ KVM を使う — 確かめて説明する KVM</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="kvm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <a href="/kvm/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/">詳しく</a></p>
+</div>
+<h1>3. QEMU は、頼まれたときだけ KVM を使う</h1>
+<p class="lead"><code>/dev/kvm</code> を開ける檻で、何も付けずに QEMU を起動すると、練習機は TCG で動く（起動し終わるまで 30 秒）。
+QEMU が <code>/dev/kvm</code> を開くのは、<code>-accel kvm</code>（古い書き方は <code>-enable-kvm</code>）と頼まれたときだけである。
+そのとき QEMU のプロセスは、カーネルの中に作ってもらった仮想マシンと仮想の CPU を、ファイルとして持っている。</p>
+<div class="badges"><span>前提: 第2章まで読了（この檻で /dev/kvm を開ける）</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>QEMU の既定のアクセラレータが TCG であることを、<code>/dev/kvm</code> を開ける檻で示せる</li>
+<li><code>-accel kvm</code>・<code>-enable-kvm</code> で起動した QEMU が、<code>/dev/kvm</code> と <code>kvm-vm</code>・<code>kvm-vcpu</code> を開いていることを <code>/proc</code> で示せる</li>
+<li>既定の CPU で出る <code>svm</code> の警告と、<code>-cpu host</code> が KVM のときだけ使える理由を説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: KVM に頼むときの命令（ioctl）の名前と引数、QEMU の他のアクセラレータ（macOS の HVF・Windows の WHPX・Xen）、
+libvirt が組み立てるコマンド行（第6章と <a href="/qemu/theory/07-libvirt">QEMU の記事の第7章</a>）、TCG が命令を翻訳する仕組みの中身（<a href="/qemu/theory/04-tcg">QEMU の記事の第4章</a>）。</div></div>
+
+<h2 id="default">何も言わなければ、TCG</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/dev/kvm</code> があることと、QEMU が KVM を使うことの関係。</div>
+<p>この檻では、lab が <code>/dev/kvm</code> を読み書きで開ける（第2章）。QEMU が KVM を使えるものはそろっている。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>KVM が使えるなら、QEMU は使う。わざわざ遅い方式を選ぶ理由は無いので、<code>/dev/kvm</code> を開ける檻で起動すれば、何も指定しなくても KVM で速く動くはずだ。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-linuc
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid   ← オプションは何も足していない
+練習機が起動し終わりました（QEMU を起動してから 29.5 秒。カーネルの最初の表示は 6.3 秒の時点）   ← 第1章の TCG（-accel tcg）と同じくらい
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+
+$ ssh linuc systemd-detect-virt
+qemu   ← 練習機は、自分が QEMU の TCG の上にいると答えた</code></pre>
+<div class="then"><b>だめな理由</b>: 速くならなかった。QEMU のプロセスが開いているファイルに、KVM のものが1つも無い（<code>grep</code> が何も出さない）。練習機自身も <code>qemu</code>（TCG）と答えた。
+この檻の <code>qemu-system-x86_64</code> は、<b>アクセラレータを指定されなければ TCG を使う</b>。<code>/dev/kvm</code> があっても、それを開くかどうかは QEMU に渡すオプションで決まり、
+TCG で動けるかぎり、QEMU が自分で KVM に乗り換えることはしない（名前が kvm で終わる作りの QEMU、たとえば <code>qemu-kvm</code> は、反対に KVM を先に試す）。</div></div>
+<p><code>readlink /proc/<i>PID</i>/fd/*</code> は、プロセスが開いているファイル（ファイル記述子）がそれぞれ何を指しているかを出す。<code>$(pgrep qemu)</code> は QEMU のプロセスの番号に置き換わる。
+この QEMU に組み込まれているアクセラレータは、QEMU 自身に尋ねられる（組み込まれていても、<code>/dev/kvm</code> を開けなければ <code>kvm</code> は使えない。<code>--device</code> なしの檻でも同じ2行が出る）。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-system-x86_64 -accel help
+Accelerators supported in QEMU binary:
+tcg
+kvm
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（4.7 秒）</code></pre>
+<div class="analogy"><b>たとえ</b>: アクセラレータの指定は、<b>タクシーに「高速道路を使って」と言う</b>ことに近い。高速道路（KVM）がすぐそこにあっても、言わなければ下の道（TCG）を走る。
+<br>ただし<b>崩れる点</b>: 運転手は気を利かせて高速道路を勧めてくることがあるが、QEMU は何も勧めない。黙って下の道を走り、着くのが遅くても理由を言わない。</div>
+
+<h2 id="fd">KVM の仮想マシンは、カーネルの中にある</h2>
+<div class="sgoal"><b>この節で分かること</b>: KVM で動くとき、QEMU とカーネルがそれぞれ何を持っているか。</div>
+<p>同じ練習機を、<code>-accel kvm</code> を付けて起動し直す。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-linuc -accel kvm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+...
+    -accel kvm
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]   ← 既定の CPU が名乗る svm を、本物の CPU が持っていない
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 6.7 秒。カーネルの最初の表示は 4.2 秒の時点）   ← 何も付けなかった TCG よりずっと短い
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+/dev/kvm   ← 入口
+anon_inode:kvm-vm   ← カーネルの中の仮想マシン
+anon_inode:kvm-vcpu:0   ← 仮想の CPU（0番）
+anon_inode:kvm-vcpu-stats:0
+anon_inode:kvm-vcpu:1
+anon_inode:kvm-vcpu-stats:1
+
+$ ssh linuc systemd-detect-virt
+kvm   ← 練習機は、KVM の上にいると答えた</code></pre>
+<p class="detail">秒数はあなたの PC で変わる。<code>kvm-vcpu-stats</code> の行は、仮想の CPU ごとの統計を読むためのもので、Linux 5.14 より古いカーネルの PC では出ない。
+AMD の PC では、<code>kvm_amd</code> の <code>nested</code> が 1（既定）なら <code>svm</code> の警告は出ない（0 なら Intel と同じ警告が出る。理由は第5章）。</p>
+<p>QEMU は <code>/dev/kvm</code> を開いて、カーネルに「仮想マシンを1つ作って」と頼んだ。カーネルは KVM の中に仮想マシンを作り、それを<b>ファイル記述子</b>として QEMU に返す。
+それが <code>anon_inode:kvm-vm</code> である（<code>anon_inode</code> は、ディスクの上に名前を持たないファイルという意味）。続けて「仮想の CPU を作って」と2回頼み、<code>kvm-vcpu:0</code> と <code>kvm-vcpu:1</code> を受け取った。
+QEMU の中では、仮想の CPU ごとのスレッドが、自分の <code>kvm-vcpu</code> に「実行して」と頼み続ける。すると本物の CPU が、仮想化支援機能を使って練習機の命令を<b>そのまま</b>実行する。
+練習機が装置に読み書きしようとしたときなど、本物の CPU だけでは済まない場面になると、CPU は KVM に戻り、KVM は必要なら QEMU に「この装置の処理をして」と渡す。
+ディスクやネットワークの装置は、KVM で動くときも QEMU がソフトで真似している（割り込みの装置など一部は、KVM がカーネルの中で受け持つ）。</p>
+<div class="analogy"><b>たとえ</b>: KVM で動く QEMU は、<b>劇場の舞台監督</b>に近い。役者（練習機の命令）は舞台（本物の CPU）で自分で演じ、監督は袖で待っていて、小道具（装置）が要る場面になると呼ばれて手渡す。
+TCG の QEMU は、役者の台詞を1つずつ自分で読み上げる朗読者である。
+<br>ただし<b>崩れる点</b>: 舞台監督は劇場を持っていないが、KVM で動く QEMU は劇場（カーネルの中の仮想マシン）を<b>ファイルとして手に持っている</b>。QEMU のプロセスが終われば、ファイルが閉じられ、劇場ごと消える。</div>
+<p><code>svm</code> の警告は、第1章の答えの続きである。何も指定しないときの CPU（<code>qemu64</code>）は AMD-V（<code>svm</code>）を持つと名乗る型だった。
+TCG なら QEMU がソフトで真似できたが、KVM では練習機の命令を本物の CPU が実行するので、<b>本物の CPU が持っていない機能は練習機に渡せない</b>。
+Intel の CPU に <code>svm</code> は無いので、QEMU は「その印は付けられない」と警告し、印を外して起動した（仮想の CPU が2個なので2行出る）。中から見て何が変わったかは、第5章で見る。</p>
+
+<h2 id="spell">-enable-kvm は、同じ頼み方の古い書き方</h2>
+<div class="sgoal"><b>この節で分かること</b>: KVM を頼む書き方の違いと、KVM が無いと使えないオプション。</div>
+<pre data-where="外（lab@host）"><code>$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -enable-kvm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+...
+    -enable-kvm   ← -accel kvm の古い書き方
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 6.8 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+/dev/kvm
+anon_inode:kvm-vm   ← -accel kvm のときと同じものを開いている
+anon_inode:kvm-vcpu:0
+anon_inode:kvm-vcpu-stats:0
+anon_inode:kvm-vcpu:1
+anon_inode:kvm-vcpu-stats:1
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）</code></pre>
+<p><code>-enable-kvm</code> でも、QEMU は同じように <code>/dev/kvm</code> を開き、仮想マシンと仮想の CPU を受け取った。古い資料や設定には、<code>-enable-kvm</code> や <code>-machine accel=kvm</code> と書かれていることがある。
+意味は <code>-accel kvm</code> と同じで、いまの QEMU の書き方は <code>-accel</code> である。</p>
+<p>反対に、KVM でなければ使えないオプションがある。<code>-cpu host</code> は「この PC の本物の CPU を、そのまま練習機に見せる」という指定で、TCG では断られる。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-linuc -accel tcg -cpu host
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+...
+    -accel tcg -cpu host
+qemu-system-x86_64: CPU model 'host' requires KVM or HVF   ← 本物の CPU をそのまま見せられるのは、本物の CPU に実行させる方式だけ</code></pre>
+<p>TCG では、練習機の命令を実行しているのは QEMU のソフトで、そもそも「そのまま見せる」本物の CPU がいない。<code>HVF</code> は macOS の、KVM と同じ役目の仕組みである。
+<code>-cpu host</code> で練習機の中がどう見えるかは、第5章で確かめる。</p>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>意味</th><th>QEMU が開くもの</th></tr>
+<tr><td>（何も書かない）</td><td>TCG（この QEMU の場合）</td><td>KVM のものは何も開かない</td></tr>
+<tr><td><code>-accel tcg</code></td><td>TCG（命令を翻訳して実行）</td><td>同上</td></tr>
+<tr><td><code>-accel kvm</code></td><td>KVM（本物の CPU に直接実行させる）</td><td><code>/dev/kvm</code>・<code>kvm-vm</code>・<code>kvm-vcpu:N</code></td></tr>
+<tr><td><code>-enable-kvm</code> / <code>-machine accel=kvm</code></td><td><code>-accel kvm</code> の古い書き方</td><td>同上</td></tr>
+<tr><td><code>-machine accel=kvm:tcg</code> / <code>-accel kvm -accel tcg</code></td><td>KVM を試し、<code>/dev/kvm</code> を開けなければ TCG（起動のときに <code>falling back to tcg</code> と警告する）</td><td>開ければ KVM のときと同じ。開けなければ何も開かない</td></tr>
+</table></div>
+<p class="detail">最後の行は、本文の記録ではなく、演習の判定を確かめたときの記録で確かめた（<code>/dev/kvm</code> を開ける檻では KVM を使い、<code>--device</code> なしの檻では警告を出して TCG で起動した）。
+<code>-accel kvm:tcg</code> とは書けない（<code>invalid accelerator kvm:tcg</code> で起動しない）。</p>
+<div class="analogy"><b>たとえ</b>: <code>-cpu host</code> は、<b>本人の身分証をそのまま見せる</b>ことに近い。KVM なら練習機の命令は本人（本物の CPU）が実行しているので、本人の身分証を出せる。
+TCG で頼むのは、代読している朗読者に「作者本人の身分証を出して」と言うようなもので、持っていない。
+<br>ただし<b>崩れる点</b>: 身分証は本人がそのまま出すものだが、<code>-cpu host</code> でも KVM は本物の CPU の機能のうち、自分が練習機に渡せるものだけを見せる。まったくの素通しではない（第5章で、自分で印を消すこともする）。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/kvm/practice/">演習03</a>で、同じ練習機を KVM で起動し直す。判定は、QEMU のプロセスが <code>anon_inode:kvm-vm</code> を開いているかを見る（練習機の答えも表示するが、名乗りは消せるので合否には使わない。第5章）。
+何も付けずに起動しても合格しない。</div>
+
+<div class="quiz"><b>確認</b>
+<p>同僚が「<code>/dev/kvm</code> はあるのに、QEMU の仮想マシンが遅い」と言っている。QEMU のプロセスの番号は 4242 だった。KVM を使っているかどうかを、どう確かめるか。</p>
+<details><summary>答え</summary>
+<p><code>readlink /proc/4242/fd/* | grep kvm</code> で、<code>anon_inode:kvm-vm</code> があるかを見る。無ければ TCG で動いている。
+理由は、アクセラレータを指定していない、TCG をはっきり指定している（<code>-accel tcg</code>。libvirt なら <code>&lt;domain type='qemu'&gt;</code>。第6章）、
+「KVM が駄目なら TCG」と頼んでいて（<code>-machine accel=kvm:tcg</code> や <code>-accel kvm -accel tcg</code>）、<code>/dev/kvm</code> を開けずに TCG に切り替わった（起動のときに <code>falling back to tcg</code> と出る）、のどれかである。
+仮想マシンの中の <code>systemd-detect-virt</code> の答えは、決め手にならない。もとになる名前は QEMU が CPUID に書く名乗りで、KVM で動いていても消せる（第5章）。外の <code>/proc/PID/fd</code> を見る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>Intel の CPU の PC で、<code>-accel kvm</code> を付けて QEMU を起動すると <code>warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]</code> が出た。何が起きているか。</p>
+<details><summary>答え</summary>
+<p>CPU の型を指定していないので、QEMU は既定の型（<code>qemu64</code>）を使い、それは AMD-V（<code>svm</code>）を持つと名乗る。KVM では本物の CPU が持っていない機能は練習機に渡せないので、
+QEMU が <code>svm</code> を外して起動した、という知らせである。起動は続く。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>qemu-system-x86_64 -accel tcg -cpu host …</code> が <code>CPU model 'host' requires KVM or HVF</code> で起動しなかった。なぜ TCG では <code>host</code> を使えないのか。</p>
+<details><summary>答え</summary>
+<p><code>host</code> は「練習機の命令を実行している本物の CPU を、そのまま見せる」型で、TCG では命令を実行しているのが QEMU のソフトだから、見せる本物の CPU がいない。
+KVM（Linux）や HVF（macOS）のように本物の CPU に直接実行させる方式でだけ使える。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>この檻の <code>qemu-system-x86_64</code> は、アクセラレータを指定されなければ TCG で動く。<code>/dev/kvm</code> があっても、自分では使わない</li>
+<li><code>-accel kvm</code>（古い書き方は <code>-enable-kvm</code>・<code>-machine accel=kvm</code>）で、QEMU は <code>/dev/kvm</code> を開く</li>
+<li>KVM で動く QEMU は、カーネルの中の仮想マシン（<code>kvm-vm</code>）と仮想の CPU（<code>kvm-vcpu:N</code>）をファイルとして持っている。<code>/proc/PID/fd</code> で見える</li>
+<li>KVM では本物の CPU が命令を実行するので、本物が持たない機能は渡せない（<code>svm</code> の警告）。<code>-cpu host</code> は KVM のときだけ使える</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:kvm-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・OVMF 2024.02 / 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4）/ apt snapshot 20260929T000000Z / ホストは Linux 7.2.6・Intel Core Ultra 9 285H（/dev/kvm は crw-rw-rw- root:302）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/kvm/theory/02-dev-kvm">← 2. KVM の入口は /dev/kvm ひとつ</a><a href="/kvm/theory/04-speed">次: 4. 速くなるのは、CPU が命令を実行する部分だけ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/kvm/">KVM</a> · <a href="/kvm/theory/">理論編 目次</a> · <a href="/kvm/practice/">実践編</a> · <a href="/kvm/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/kvm/chapters.js"></script>
+<script src="/kvm/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

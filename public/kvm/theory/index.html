@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理論編 — 確かめて説明する KVM</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="kvm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <strong>理論編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文に載せた出力はすべて実機の記録で、本文のコマンドを第1章から同じシェルで通しに打ち直して、本文と同じ画面になることを機械で突き合わせてあります。
+   演習5本は、模範解答どおりに通ることと、未達のとき・KVM が使えないときに判定が鳴ることを確認してあります。
+   それでも <b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、著者が読者として通した段階で
+   <b>4回に分けて不備が出ました</b>（説明の順序・リンク切れ・前提の省略・判定の誤り）。
+   同じ種類のものが残っていると考えてください。</p>
+<p>詰まったところ・本文と違う出力が出たところは、
+   <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   各ページ下のコメントに書いてください。それが直す順番になります。</p>
+</div>
+
+<h1>理論編 — KVM</h1>
+<p class="lead">このサイトの実践編は、読者に docker で「檻」を起動させ、その中で QEMU の練習機（Ubuntu 24.04 の仮想マシン）を動かしている。
+その練習機は、KVM を使わない完全エミュレーション（TCG）で動く。この記事では、同じ練習機を TCG と KVM の両方で起動して、
+KVM が何で、どこにあり、何を速くし、何を変えるのかを、あなたの PC の上で確かめる。全6章・約2時間。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+<p class="detail">ただし、この記事は<b>あなたの PC の CPU と KVM そのもの</b>を見るので、CPU の名前・<code>/dev/kvm</code> の権限・時間など、PC ごとに違って当然の行がある。そういう行には、ブロックの直後に注記を置いた。</p>
+
+<h2 id="spine">この6章を貫いている1つの事実</h2>
+<div class="goal">
+<p><b>KVM の正体は、CPU の仮想化支援機能を使って仮想マシンを動かすカーネルの部品で、使う側には <code>/dev/kvm</code> というファイル1つで配られている。QEMU はそれを開いたときだけ速くなり、練習機の中から見える CPU も変わる。
+開けるかどうかは、CPU の印・カーネル・ファイルの権限・コンテナの許可の4つで決まる。</b></p>
+<p>「KVM を使う」という言い方は、何か大きな仕組みを有効にするように聞こえる。実際に起きているのは、QEMU が <code>/dev/kvm</code> を開き、
+カーネルに仮想マシンと仮想の CPU を作ってもらって、それをファイルとして持つことだけである。
+だから、使えるかどうかは「そのファイルを開けるか」で決まり（第1・2章）、使うかどうかは QEMU に頼むかで決まり（第3章）、
+使ったときに変わるのは、本物の CPU が命令を実行する部分の速さと、練習機から見える CPU の姿である（第4・5章）。
+このサイトの練習機は、全員が開けるわけではないことと、開くと画面が変わることを理由に、開かないことを選んでいる（第6章）。</p>
+<div class="skip"><b>ここで覚えなくていいこと</b>:
+KVM に頼むときの命令（ioctl）の一覧、VT-x と AMD-V の命令の違い、メモリのアドレスの変換を CPU に任せる仕組み（EPT・NPT）の細部、
+入れ子の仮想化の速さ、QEMU の装置・ディスク・ファームウェアの選び方（<a href="/qemu/theory/">QEMU の記事</a>）、libvirt の定義の書き方。</div>
+</div>
+
+<h2 id="scope">この記事で扱うこと・扱わないこと</h2>
+<div class="scroll"><table>
+<tr><th>扱うこと</th><th>どこで</th></tr>
+<tr><td>CPU の仮想化支援機能（VT-x / AMD-V）と、<code>/proc/cpuinfo</code> の <code>vmx</code> / <code>svm</code>。印が CPUID の答え（自己申告）であること</td><td><a href="/kvm/theory/01-cpu">1</a></td></tr>
+<tr><td>KVM はカーネルのモジュール（<code>kvm</code> と <code>kvm_intel</code> / <code>kvm_amd</code>）で、<code>/dev/kvm</code>（10, 232）を出す</td><td><a href="/kvm/theory/02-dev-kvm">2</a></td></tr>
+<tr><td>コンテナに <code>/dev/kvm</code> を渡すとは何を渡すことか（device cgroup・ファイルの権限・<code>--group-add</code>・特権は増えない）。0666 と 0660 の両方の PC</td><td><a href="/kvm/theory/02-dev-kvm">2</a></td></tr>
+<tr><td>QEMU は KVM をアクセラレータとして使う（<code>-accel kvm</code>・<code>-enable-kvm</code>・<code>-cpu host</code>）。既定は TCG</td><td><a href="/kvm/theory/03-accel">3</a></td></tr>
+<tr><td>同じ練習機を TCG と KVM で起動して、段階ごとの時間と CPU の時間を測って比べる</td><td><a href="/kvm/theory/04-speed">4</a></td></tr>
+<tr><td>練習機の中から見た違い（<code>systemd-detect-virt</code>・<code>hypervisor</code> の印・CPUID の名前・<code>dmesg</code>）と、入れ子の仮想化（<code>nested</code>）。中から見える名前は QEMU が書いた名乗りで、消せる（<code>kvm=off</code>）</td><td><a href="/kvm/theory/05-guest">5</a></td></tr>
+<tr><td>このサイトの仮想マシン型の檻が KVM を使わない理由（定義が <code>type='qemu'</code>・全員に同じ画面・権限ゼロ）と、その代償</td><td><a href="/kvm/theory/06-site">6</a></td></tr>
+</table></div>
+<div class="scroll"><table>
+<tr><th>扱わないこと</th><th>どこで扱うか・なぜ扱わないか</th></tr>
+<tr><td>QEMU そのもの（マシンの型・装置・ディスクイメージ・ファームウェア・シリアル・モニタ・ネットワーク）</td><td><a href="/qemu/theory/">QEMU の記事</a>。この記事では、練習機を起動するコマンド行の最後の行（<code>-accel</code> と <code>-cpu</code>）だけを変える</td></tr>
+<tr><td>libvirt と <code>virsh</code> の使い方</td><td><a href="/linuc-boot/theory/01-virsh">LinuC 1.01 の第1章</a>。この記事では、定義の <code>type</code> だけを見る</td></tr>
+<tr><td>コンテナの仕組み（名前空間・cgroup の全体・イメージ）</td><td><a href="/docker/theory/">Docker の記事</a>。この記事では、デバイスを渡す部分（device cgroup）だけを見る</td></tr>
+<tr><td>Xen・VMware・Hyper-V などの他のハイパーバイザー、macOS の HVF の使い方</td><td>この記事の檻では動かせない。名前が出るだけ</td></tr>
+<tr><td>KVM の性能の調整（CPU の固定・大きなページ・vhost）</td><td>速さは第4章の起動の時間だけを測る。調整は読者の PC で結果が大きく変わり、同じ画面を約束できない</td></tr>
+</table></div>
+
+<h2 id="cages">このサイトの他の記事の檻は、これをどう使っているか</h2>
+<p>この記事を読みに来た理由は、たぶん実践編の <code>docker run</code> にある。このサイトの檻は、KVM との関係で3種類に分かれる。</p>
+<div class="scroll"><table>
+<tr><th>檻の種類</th><th>どの記事</th><th>KVM との関係</th></tr>
+<tr><td>コンテナ型（コンテナの中で直接打つ）</td><td>LinuC 1.02・1.03・1.04・1.06・1.09、SQLite など</td><td>仮想マシンを動かさないので、KVM は関係ない。カーネルはあなたの PC のもの（<a href="/linuc-boot/theory/03-container">LinuC 1.01 の第3章</a>）</td></tr>
+<tr><td>仮想マシン型（コンテナの中で libvirt が QEMU の練習機を動かす）</td><td>LinuC 1.01・1.05・1.07・1.08・1.10 など</td><td>練習機の定義が <code>type='qemu'</code> なので TCG で動く。<code>--device /dev/kvm</code> を渡しても KVM は使わない（第6章で確かめた）</td></tr>
+<tr><td>この記事の檻（コンテナの中で QEMU を直接打つ）</td><td>この記事</td><td><code>--device /dev/kvm</code> と <code>--group-add</code> を渡したときだけ、<code>-accel kvm</code> で KVM を使える</td></tr>
+</table></div>
+<p>仮想マシン型の檻の起動コマンドに <code>--privileged</code> も <code>--cap-add</code> も <code>--device</code> も無いのは、TCG がホストの特権も装置も1つも借りないからである。
+練習機の中の <code>lscpu</code> が全員に同じ <code>QEMU TCG CPU version 2.5+</code> を出すのも、TCG だからである（定義が <code>cpu mode='maximum'</code>、つまり <code>-cpu max</code> なのでこの名前になる。この記事の練習機は既定の <code>qemu64</code> なので <code>QEMU Virtual CPU version 2.5+</code>。<code>max</code> は KVM では読む人の CPU の名前になる。第5章）。
+この記事の檻だけが、比べるために <code>/dev/kvm</code> を受け取る。それでも渡すのはファイル1つとグループ1つで、特権は増えない（持てる特権の上限 <code>CapBnd</code> が docker の既定のまま。第2章）。</p>
+
+<h2 id="vary">読む人の PC で変わるもの</h2>
+<div class="scroll"><table>
+<tr><th>出るもの</th><th>著者の PC</th><th>あなたの PC で</th></tr>
+<tr><td>CPU のメーカー・名前・印（外）</td><td><code>GenuineIntel</code>・<code>Intel(R) Core(TM) Ultra 9 285H</code>・<code>vmx</code></td><td>AMD なら <code>AuthenticAMD</code>・<code>svm</code>・<code>kvm_amd</code></td></tr>
+<tr><td><code>/dev/kvm</code> の権限とグループ</td><td><code>crw-rw-rw-</code>・302</td><td>Ubuntu などでは <code>crw-rw----</code>・別の番号（記録した Ubuntu 24.04 では 993）</td></tr>
+<tr><td>起動の時間・CPU の時間</td><td>TCG 30.5 秒・KVM 6.6 秒</td><td>CPU の速さとほかの負荷で変わる</td></tr>
+<tr><td>KVM の練習機の中の CPU</td><td><code>GenuineIntel</code>（<code>-cpu host</code> では Core Ultra 9 285H）</td><td>あなたの PC の CPU のメーカー・名前</td></tr>
+<tr><td>入れ子の仮想化（<code>nested</code>）</td><td><code>Y</code></td><td><code>N</code> のこともある（AMD は <code>1</code> / <code>0</code>）</td></tr>
+</table></div>
+<p>TCG の練習機の中は、どの PC でも同じ画面になる（第1章の <code>AuthenticAMD</code>・<code>svm</code> など）。</p>
+
+<h2 id="chapters">章</h2>
+<div class="toc">
+<ol>
+<li><a href="/kvm/theory/01-cpu">仮想化支援機能は、CPU の自己申告</a> —
+    <span class="detail">Intel の PC の上の TCG の練習機が、AMD の CPU と AMD-V を名乗り、KVM まで用意した。その KVM で仮想マシンも動く（25分）</span></li>
+<li><a href="/kvm/theory/02-dev-kvm">KVM の入口は /dev/kvm ひとつ</a> —
+    <span class="detail">同じ番号のファイルを root で作っても開けない。関門は3つで、エラーの文言で見分けられる（25分）</span></li>
+<li><a href="/kvm/theory/03-accel">QEMU は、頼まれたときだけ KVM を使う</a> —
+    <span class="detail"><code>/dev/kvm</code> を開ける檻でも、何も付けなければ TCG。KVM の仮想マシンはファイルとして見える（20分）</span></li>
+<li><a href="/kvm/theory/04-speed">速くなるのは、CPU が命令を実行する部分だけ</a> —
+    <span class="detail">全体は 4.6 倍、ユーザ空間は 13.0 倍、GRUB の待ちは縮まない（20分）</span></li>
+<li><a href="/kvm/theory/05-guest">中から見える CPU は、アクセラレータで変わる</a> —
+    <span class="detail">同じ型でも KVM では Intel を名乗る。<code>-cpu host</code> で入れ子の仮想化の入口が開く。中から見える名前は QEMU が書いていて、消せる（25分）</span></li>
+<li><a href="/kvm/theory/06-site">このサイトの練習機が KVM を使わない理由</a> —
+    <span class="detail"><code>/dev/kvm</code> を渡しても <code>-accel tcg</code>。ここで6章が1本になる（15分）</span></li>
+</ol>
+</div>
+<p><a href="/kvm/theory/glossary">用語辞書</a> —
+   本文の点線付きの語をクリックすると引けます。</p>
+
+<h2 id="cage">檻で再現できないもの</h2>
+<div class="scroll"><table>
+<tr><th>こと</th><th>なぜ再現できないか</th><th>代わりにしたこと</th></tr>
+<tr><td><code>/dev/kvm</code> が 0660 の PC</td><td>著者の PC は 0666 で、<code>--group-add</code> が無くても開けてしまう</td><td>第2章で、Ubuntu 24.04（検証用の仮想マシン。入れ子の KVM・docker.io 29.1.3）で同じ檻を起動した記録を載せた</td></tr>
+<tr><td>AMD の CPU の PC</td><td>著者の PC は Intel だけ</td><td>出力が変わる行に注記を置いた（<code>AuthenticAMD</code>・<code>svm</code>・<code>kvm_amd</code>・<code>nested</code> が <code>1</code>）。記録は無い</td></tr>
+<tr><td>ファームウェアで仮想化支援を切った PC、<code>nested</code> が <code>N</code> の PC</td><td>あなたの PC のファームウェアやカーネルの設定を変えることになり、檻の外に影響する</td><td>第1・5章で、何が起きるかを説明した。印が無い CPU は、第5章で <code>-cpu host,-vmx</code> を使って練習機の中に作って確かめた。
+    <code>nested</code> が <code>N</code> の KVM は、検証用の仮想マシン（Ubuntu 24.04）で <code>kvm_intel</code> を <code>nested=0</code> で読み込み直し、演習05 の判定が「前提不足」になることを記録した</td></tr>
+<tr><td>rootless の podman で起動した檻</td><td>本文の記録は docker で取った。rootless の podman では <code>--group-add</code> の番号が檻の中の番号になり、0660 の <code>/dev/kvm</code> は開けなかった</td>
+    <td>Ubuntu 24.04 の podman 4.9.3 と、著者の PC の podman 5.8.6 で試した結果と、代わりの書き方（<code>--group-add keep-groups</code>・crun）を実践編に書いた</td></tr>
+<tr><td>macOS・Windows の Docker Desktop</td><td>著者は試していない。<code>/dev/kvm</code> が渡せるかも、檻が起動するかも確かめていない（この檻のイメージは amd64 用だけ）</td><td>docker が動くカーネルに KVM が無いときを、検証用の仮想マシン（Ubuntu 24.04）で KVM の部品を外して記録した（第2章）。<code>--device /dev/kvm</code> は docker の時点で失敗し、<code>--device</code> なしの檻では KVM が要る演習を <code>lab check</code> が「前提不足」と理由を出して終える</td></tr>
+</table></div>
+
+<h2 id="use">実務のどこで効くか</h2>
+<div class="scroll"><table>
+<tr><th>場面</th><th>ここで効く理由</th><th>見落としやすい点</th><th>関連する章</th></tr>
+<tr><td>仮想マシンが遅い</td><td>QEMU のプロセスが <code>anon_inode:kvm-vm</code> を持っているかで、KVM を使っているかが分かる</td><td><code>/dev/kvm</code> があっても、<code>qemu-system-x86_64</code> はアクセラレータを指定しなければ TCG。TCG をはっきり指定している（<code>-accel tcg</code>・libvirt の <code>type='qemu'</code>）ことも、
+    「KVM が駄目なら TCG」（<code>-machine accel=kvm:tcg</code>・<code>-accel kvm -accel tcg</code>）で KVM を開けずに TCG に切り替わっている（起動のときに <code>falling back to tcg</code> と出る）こともある。仮想マシンの中の <code>systemd-detect-virt</code> は決め手にならない</td><td>3・5・6</td></tr>
+<tr><td>コンテナや CI で KVM を使いたい</td><td>渡すのは <code>--device /dev/kvm</code> と、0660 ならグループ。特権は要らない</td><td><code>--privileged</code> で済ませると、要らない特権を全部渡すことになる</td><td>2</td></tr>
+<tr><td>仮想マシンの中で仮想マシンを動かしたい</td><td>外の <code>nested</code> と、中に見せる CPU の型（<code>vmx</code> / <code>svm</code>）で決まる</td><td>中の OS の設定をいくら見ても、外が印を渡していなければ使えない</td><td>5</td></tr>
+<tr><td>仮想マシンの中の画面や挙動を、人や環境の間でそろえたい</td><td>KVM では CPU のメーカーや機能が外の PC に引きずられる。型を決めても、メーカーの名前と、外の CPU が持たない機能は引きずられる。完全にそろえるなら TCG</td><td>速さの違いだけでなく、<code>/proc/cpuinfo</code> などの画面も変わる</td><td>5・6</td></tr>
+</table></div>
+
+<h2 id="next">手を動かす</h2>
+<p>読んだあと、同じ操作を自分でやる演習が5本あります。判定は<b>観測できる結果だけ</b>で行い、
+コマンドの打ち方は見ません。KVM が使えない PC でも、演習01 と演習05 はできます。</p>
+<p><a href="/kvm/practice/">実践編（檻の入り方と演習5本）→</a></p>
+
+<!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
+<nav class="pager"><a href="/kvm/">← KVM（記事のホーム）</a><a href="/kvm/theory/01-cpu">第1章から読む →</a></nav>
+<!-- /catalog:pager -->
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/kvm/">KVM</a> · <a href="/kvm/theory/">理論編 目次</a> · <a href="/kvm/practice/">実践編</a> · <a href="/kvm/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. KVM の入口は /dev/kvm ひとつ — 確かめて説明する KVM</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="2" data-theme="kvm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <a href="/kvm/theory/">理論編</a> › 第2章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/">詳しく</a></p>
+</div>
+<h1>2. KVM の入口は /dev/kvm ひとつ</h1>
+<p class="lead">KVM は Linux のカーネルの部品（<code>kvm</code> と <code>kvm_intel</code> / <code>kvm_amd</code> のモジュール）で、使う側に見えるのは <code>/dev/kvm</code> というファイル1つだけである。
+コンテナに KVM を渡すとは、このファイルを置き、開くことを許すことだ。同じ番号のファイルを自分で作っても、root でも開けない。
+開けるかどうかは、ファイルがあるか・ファイルの権限・コンテナの許可（device cgroup）の3つの関門で決まり、どこで止まったかはエラーの文言で分かる。</p>
+<div class="badges"><span>前提: 第1章まで読了</span><span>前提: 端末をもう1つ開ける</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>KVM がカーネルのモジュールで、<code>/dev/kvm</code>（文字デバイス 10, 232）を出していることを示せる</li>
+<li>コンテナの中で <code>/dev/kvm</code> を開くまでの3つの関門を、それぞれのエラー（No such file or directory・Operation not permitted・Permission denied）で示せる</li>
+<li><code>--device /dev/kvm</code> と <code>--group-add</code> が何を渡し、何を渡さないか（持てる特権の上限 <code>CapBnd</code> は docker の既定のまま）を測って言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: KVM に何を頼むかの細かい種類（ioctl の名前）、cgroup v1 と v2 の違いや、デバイスの許可が中でどう実装されているか（BPF）、
+<code>/dev/kvm</code> の権限を決めている udev の規則の書き方、podman の rootless で渡すときの細部。</div></div>
+
+<h2 id="module">KVM は、あなたの PC のカーネルの中にある</h2>
+<div class="sgoal"><b>この節で分かること</b>: KVM がどこにあり、使う側から何が見えるか。</div>
+<p>外（<code>lab@host</code>）で、カーネルが読み込んでいる部品（モジュール）の一覧から、名前が <code>kvm</code> で始まるものを探す。</p>
+<pre data-where="外（lab@host）"><code><!--log probe 2:1-2 note="kvm_intel::Intel の VT-x を使う部分;10, 232::文字デバイス。番号は 10, 232"--></code></pre>
+<p class="detail">この2つは<b>あなたの PC で変わる</b>。AMD の PC なら <code>kvm_amd</code>。<code>/dev/kvm</code> の権限とグループは、著者の PC は <code>crw-rw-rw-</code> と 302 だが、
+Ubuntu などでは <code>crw-rw----</code> と別の番号になる（この章の最後で、その場合を記録で見る）。日時は檻を起動した時刻になる。</p>
+<p><code>/proc/modules</code> はカーネルが自分で書いている一覧で、コンテナの中から見えるのは<b>あなたの PC のカーネル</b>の部品である。
+KVM の本体は <code>kvm</code>、CPU のメーカーごとの部分が <code>kvm_intel</code>（VT-x）と <code>kvm_amd</code>（AMD-V）に分かれている。</p>
+<p>KVM を使う側に見えるのは、<code>/dev/kvm</code> という<b>デバイスファイル</b>1つだけである。行の頭の <code>c</code> は文字デバイス、<code>10, 232</code> はカーネルの中の窓口を指す番号（10 は小さな装置をまとめる misc、232 が KVM）。
+ファイルの名前に意味は無く、カーネルはこの番号で、開いた人の頼みを KVM へ回す。QEMU はこのファイルを開いて「仮想マシンを作って」「この CPU を動かして」と頼む（第3章）。</p>
+<div class="analogy"><b>たとえ</b>: <code>/dev/kvm</code> は、役所の建物の中にある<b>窓口の番号札</b>（10 番の 232）に近い。仕事をしているのは奥の部署（カーネルの KVM）で、札は「どこに頼めばよいか」を示すだけである。
+<br>ただし<b>崩れる点</b>: 役所の窓口は札が無くても見つけられるが、プログラムは <code>/dev/kvm</code> というファイルが無いと、KVM に頼む方法を持たない。札を外されたら、部署があっても頼めない。</div>
+
+<h2 id="group">名前の無いグループ 302</h2>
+<div class="sgoal"><b>この節で分かること</b>: 起動のときに渡した <code>--group-add</code> が、この檻の中で何になっているか。</div>
+<p>実践編の起動コマンドには <code>--device /dev/kvm</code> と <code>--group-add "$(stat -c %g /dev/kvm)"</code> がある。檻に入ったとき、最初の行にこう出ていた。</p>
+<pre><code>groups: cannot find name for group ID 302</code></pre>
+<p class="detail">302 は著者の PC の番号で、あなたの PC では別の番号のことがある。<code>--group-add</code> を付けずに起動したときは、この行は出ない。</p>
+<p>自分が何者かを見る。</p>
+<pre data-where="外（lab@host）"><code><!--log probe 2:3-6 note="groups=1000(lab),302::302 には名前が無い;^2::kvm という名前も 302 という番号も、この檻の /etc/group に無い;CapEff::いま効いている特権は無い（lab は root ではない）;CapBnd::持てる特権の上限。docker の既定のまま"--></code></pre>
+<p><code>--group-add</code> は、コンテナの中のプロセスに<b>補助グループを番号で</b>足す。<code>$(stat -c %g /dev/kvm)</code> は docker を打つ前にあなたの PC のシェルが展開し、
+<code>/dev/kvm</code> の持ち主のグループの番号（著者の PC では 302）になる。カーネルが覚えているのは番号だけで、番号に名前を付けているのは各ファイルシステムの <code>/etc/group</code> である。
+この檻の <code>/etc/group</code> には、kvm という名前のグループも 302 という番号も無い（<code>getent</code> は何も出さず、終了コード 2 は「見つからない」）。だから <code>id</code> は番号だけを出し、ログインのときに <code>groups</code> コマンド（Ubuntu の <code>/etc/bash.bashrc</code> が打っている）が「名前が見つからない」と言った。害は無い。</p>
+<p><code>CapEff</code> は、いま効いている特権（ケーパビリティ）の一覧で、全部 0 である。この lab のまま、第3章で QEMU は KVM の仮想マシンを作る。
+<b>KVM を使うのに特権は要らない</b>。<code>/dev/kvm</code> を開けさえすれば、誰でもカーネルに仮想マシンを作ってもらえる。</p>
+<p>ただし <code>CapEff</code> が 0 なのは、lab が root ではないからである。起動のときに特権を渡しすぎていないかは、<code>CapEff</code> では分からない（<code>--privileged</code> で起動しても、lab の <code>CapEff</code> は 0 のままだった）。
+渡した特権が出るのは <code>CapBnd</code>（このコンテナのプロセスが持てる特権の上限）で、<code>00000000a80425fb</code> は docker の既定のままである。<code>--privileged</code> で起動すると <code>000001ffffffffff</code> になった（どちらも、演習02 の判定を確かめたときの記録）。</p>
+<div class="analogy"><b>たとえ</b>: <code>--group-add 302</code> は、<b>番号だけが書かれた会員証</b>を渡すことに近い。受付（カーネル）は番号で照らし合わせるので、名前が無くても通れる。
+<br>ただし<b>崩れる点</b>: 会員証の名前は本人が見て安心するためのものだが、ここで名前を引いているのは檻の中の <code>/etc/group</code> で、あなたの PC の <code>/etc/group</code>（302 は kvm）とは別のファイルである。同じ番号に、場所ごとに別の名前が付きうる。</div>
+
+<h2 id="cgroup">ファイルを作っても、開けない</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>--device</code> が、ファイルを置くこと以外に何を渡しているか。</div>
+<p>比べるために、<code>--device</code> を付けない檻をもう1つ起動する。<b>あなたの PC で、端末をもう1つ開いて</b>打つ（ボリュームは付けない。<code>--rm</code> なので抜けると消える）。</p>
+<pre><code>docker run --rm -it --name lab-kvm-nodev --hostname host \
+  ghcr.io/chai0204/lab:kvm-1.0.0@sha256:__DIGEST__</code></pre>
+<p>入ると、最初の行は <code>練習機 linuc: 止まっている / /dev/kvm: なし（この檻は --device /dev/kvm なしで起動した）</code> になり、<code>groups:</code> の行は出ない。この2つ目の檻で打つ。</p>
+<pre data-where="2つ目の檻（--device なし。lab@host）"><code><!--log probe 2:7-11 fold note="No such file or directory::1つ目の関門: ファイルが無い;2 <domain::libvirt も、KVM（kvm）を使える候補に入れない"--></code></pre>
+<p><code>/dev/kvm</code> は無いが、CPU は <code>vmx</code> を名乗り、カーネルには <code>kvm_intel</code> がある。KVM はすぐそこにあって、入口のファイルだけが無い。
+（<code>virsh capabilities</code> は、このサイトの仮想マシン型の檻が使っている libvirt に「どんな仮想マシンを作れるか」を尋ねるコマンドで、第6章でもう一度使う。）</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>/dev/kvm</code> は番号 10, 232 のデバイスファイルにすぎない。番号さえ合えば中身は同じなのだから、無いなら作ればよい。
+この檻の lab は <code>sudo</code> で root になれるので、自分で作って、誰でも読み書きできる権限にすれば使えるはずだ。</p>
+<pre data-where="2つ目の檻（--device なし。lab@host）"><code><!--log probe 2:12-15 fold note="crw-rw-rw-::同じ番号・誰でも読み書きできる権限;Operation not permitted::lab でも開けない;sh: 1: cannot create::root（sudo）でも開けない（dash は読み書きで開くときもこう出す）"--></code></pre>
+<div class="then"><b>だめな理由</b>: ファイルは作れた（<code>mknod</code>）が、lab でも root でも開けなかった。エラーは「権限が無い（Permission denied）」ではなく「その操作は許されていない（Operation not permitted）」である。
+コンテナは cgroup という仕組みで、<b>どの番号のデバイスを開いてよいかの一覧</b>を持たされている（<b>device cgroup</b>）。docker の既定では、端末や <code>/dev/null</code> などの決まった番号だけが入っていて、10, 232 は入っていない。
+カーネルはファイルを開くとき、ファイルの権限に加えてこの一覧も確かめるので、権限を誰でも読み書きできるようにしても、root でも開けない。
+<b><code>--device /dev/kvm</code> は、ファイルを置くと同時に、この一覧に 10, 232 を足している</b>。ファイルだけ真似しても、許しは付いてこない。</div></div>
+<p>では、ファイルの権限も足りないときはどうなるか。作った <code>/dev/kvm</code> を、root だけが読み書きできる権限（600）にして、lab のまま開かせる。</p>
+<pre data-where="2つ目の檻（--device なし。lab@host）"><code><!--log probe 2:16-17 fold note="Permission denied::device cgroup の許しも無いままなのに、権限のエラーが出た"--></code></pre>
+<p>今度は <code>Permission denied</code> になった。device cgroup の許しが無いのは前と同じなのに、出たのはファイルの権限のエラーである。
+カーネルはファイルを開くとき、<b>まずファイルの権限を確かめ、次に device cgroup を確かめる</b>。両方とも駄目なら、先に確かめた権限のほうで断られる。
+<code>Permission denied</code> を直しても（グループを足しても）、次に <code>Operation not permitted</code> が出ることがある、ということでもある。</p>
+<pre data-where="2つ目の檻（--device なし。lab@host）"><code><!--log probe 2:18-19--></code></pre>
+<p>2つ目の檻を <code>exit</code> で抜けると、<code>--rm</code> なのでコンテナごと消え、作った <code>/dev/kvm</code> も残らない。ここからは、元の端末（1つ目の檻）に戻る。</p>
+<div class="analogy"><b>たとえ</b>: device cgroup は、ビルの<b>入館証に書かれた「入ってよい部屋の番号」</b>に近い。部屋のドアの合鍵（デバイスファイル）を自分で作っても、入館証に番号が無ければ警備（カーネル）に止められる。
+<br>ただし<b>崩れる点</b>: ビルの警備は人を見て止めるが、device cgroup は「どのグループ（cgroup）のプロセスか」で止める。同じ人（root）でも、所属するグループが違えば止められる。</div>
+
+<h2 id="perm">0660 の PC では、グループが要る</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>--group-add</code> が要る PC と、要らない PC の違い。</div>
+<p>著者の PC の <code>/dev/kvm</code> は <code>crw-rw-rw-</code>（0666）で、誰でも読み書きできる。だからこの PC では、<code>--group-add</code> を付けなくても開ける。
+Ubuntu 24.04 などでは <code>crw-rw----</code>（0660）で、持ち主のグループ（kvm）に入っていないと開けない。その場合を、Ubuntu 24.04 の PC で同じ檻を起動して記録した
+（著者の PC の上の、検証用の仮想マシン。入れ子の仮想化で KVM が使える。docker は Ubuntu の docker.io 29.1.3）。</p>
+<pre data-where="Ubuntu 24.04 の PC（コンテナの外）"><code><!--log ubuntu 0:1-3 note="crw-rw----::0660。kvm グループの人だけが読み書きできる;993::この PC の kvm グループの番号;groups=1000(student),112(docker)::この人は kvm グループに入っていない"--></code></pre>
+<p>この PC で、<code>--device /dev/kvm</code> だけを付けて檻を起動した（<code>docker run --rm -it --hostname host --device /dev/kvm …</code>）。</p>
+<pre data-where="Ubuntu 24.04 の PC・--device だけで起動した檻（lab@host）"><code><!--log ubuntu 1:1-3 fold note="crw-rw----::権限もグループの番号も、PC のまま持ち込まれる;Permission denied::3つ目の関門: ファイルの権限"--></code></pre>
+<p>今度のエラーは <code>Permission denied</code> である。<code>--device</code> を付けたので、device cgroup の許しはある。止めたのはファイルの権限で、0660 の <code>/dev/kvm</code> を、993 のグループに入っていない lab（UID 1000）は開けない。
+実践編の起動コマンドと同じく <code>--group-add 993</code> も付けて起動し直すと、ログインのときに <code>groups: cannot find name for group ID 993</code> と出て、開ける。</p>
+<pre data-where="Ubuntu 24.04 の PC・--group-add も付けた檻（lab@host）"><code><!--log ubuntu 2:1-3 fold note="groups=1000(lab),993::番号で足された補助グループ;起動し終わりました::開けた。練習機が KVM で起動した"--></code></pre>
+<p class="detail">秒数は、その PC（ここでは仮想マシンの中の入れ子の KVM）の速さである。</p>
+<p class="detail">デスクトップの PC では、画面の前でログインしている人に、ファイルの権限とは別に ACL で <code>/dev/kvm</code> の読み書きが許されていることがある（<code>ls -l</code> の権限の後ろに <code>+</code> が付く）。
+docker の <code>--device</code> は ACL を持ち込まないので、檻の中では <code>--group-add</code> が要ることに変わりはない。</p>
+<p>この PC の student は kvm グループに入っていなかったが、檻の中では KVM が使えた。docker の本体（デーモン）は root で動いていて、デバイスを渡すかどうかは docker が決めるからである。
+<b>docker を使える人は、kvm グループに入っていなくても KVM を使える</b>。</p>
+<div class="scroll"><table>
+<tr><th>エラー（QEMU が出す）</th><th>どの関門で止まったか</th><th>渡すもの</th></tr>
+<tr><td><code>No such file or directory</code></td><td>入口のファイルが無い</td><td><code>--device /dev/kvm</code>（ファイルを置く）</td></tr>
+<tr><td><code>Permission denied</code></td><td>ファイルの権限（0660 など）で、持ち主のグループに入っていない</td><td><code>--group-add "$(stat -c %g /dev/kvm)"</code></td></tr>
+<tr><td><code>Operation not permitted</code></td><td>ファイルの権限は通ったが、コンテナの device cgroup が 10, 232 を許していない</td><td><code>--device /dev/kvm</code>（許しも足す）</td></tr>
+</table></div>
+<p>2つ以上の関門で止まるときは、先に確かめられるほうのエラーが出る。ファイルが無ければ <code>No such file</code>、あれば次にファイルの権限（<code>Permission denied</code>）、最後に device cgroup（<code>Operation not permitted</code>）。</p>
+<p>この3つより手前に、第1章の関門がある。CPU が仮想化支援を名乗り（<code>vmx</code> / <code>svm</code>）、カーネルに <code>kvm</code> の部品があること。
+ここで言うカーネルは、docker が動いているカーネルである。Docker Desktop（macOS・Windows）は、docker を自分の中の Linux の仮想マシンで動かす作りなので、そのカーネルになる（著者は Docker Desktop を試していない）。
+docker が動いているカーネルに KVM が無いときを、さきほどの Ubuntu 24.04 の PC で KVM の部品を外して記録した。</p>
+<pre data-where="Ubuntu 24.04 の PC（コンテナの外）"><code><!--log ubuntu 4:1-3 note="No such file or directory::KVM の部品を外したので、入口のファイルも無い;error gathering device information::渡すファイルが無いので、docker の時点で失敗する"--></code></pre>
+<p class="detail">ここだけイメージの名前が <code>lab-kvm:1.0.0</code> なのは、検証用の仮想マシンに読み込んだときの名前だからである。中身は実践編のイメージと同じ。</p>
+<p>この檻は <code>--device</code> なしなら起動する。その檻で、KVM が要る演習の判定を打った。</p>
+<pre data-where="Ubuntu 24.04 の PC・何も付けずに起動した檻（lab@host）"><code><!--log ubuntu 4:4-5 note="No such file or directory::この檻にも入口のファイルは無い;前提不足::判定できない理由を出して終わる（読者の失敗ではない）"--></code></pre>
+<div class="analogy"><b>たとえ</b>: 3つの関門は、<b>建物の入口（ファイル）・部屋の鍵（ファイルの権限）・入館証（device cgroup）</b>に近い。どれか1つでも欠ければ、部屋には入れない。
+<br>ただし<b>崩れる点</b>: 建物なら入口・フロア・部屋の順に止められ、止められた場所も目で見えるが、カーネルは部屋の鍵を先に確かめ、入館証を後で確かめる。
+両方欠けていれば鍵のほうで断られ、どこで止まったかは QEMU が出すエラーの文言（No such file・denied・not permitted）でしか分からない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/kvm/practice/">演習02</a>は、この檻の lab が <code>/dev/kvm</code> を開けるように起動し直す課題である。判定は実際に <code>/dev/kvm</code> を読み書きで開き、特権が増えていないこと（<code>CapBnd</code> が docker の既定のままで、<code>CapEff</code> も 0）も確かめる。
+<code>--device</code> なしの檻で <code>lab check 02</code> を打つと、未達の理由として「この檻の /dev に kvm が無い」が出る。</div>
+
+<div class="quiz"><b>確認</b>
+<p>コンテナの中で QEMU を <code>-accel kvm</code> で起動すると、次のように出た。何が足りないか。</p>
+<pre><code>Could not access KVM kernel module: Permission denied</code></pre>
+<details><summary>答え</summary>
+<p>ファイルの権限で断られている。<code>/dev/kvm</code> はコンテナの中にあるが（無ければ No such file）、0660 などで、コンテナの中のプロセスがその持ち主のグループに入っていない。
+<code>--group-add "$(stat -c %g /dev/kvm)"</code> を付けて起動し直す。ただし、権限は device cgroup より先に確かめられるので、この文言からは device cgroup が許しているかまでは分からない。
+<code>--device</code> で渡したファイルなら許されている（自分で <code>mknod</code> したファイルなら、権限を直しても次は Operation not permitted になる）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>2つ目の檻で、root になって <code>mknod</code> で作った <code>/dev/kvm</code>（<code>crw-rw-rw-</code>）は、lab からも root（<code>sudo</code>）からも開けなかった。root でも開けない理由を、「誰が・何を見て」止めたのかで説明せよ。</p>
+<details><summary>答え</summary>
+<p>カーネルが、そのプロセスの属するコンテナの device cgroup（開いてよいデバイスの番号の一覧）を見て止めた。一覧に 10, 232 が無いので、ファイルの権限や root かどうかに関係なく、開くことが許されない（Operation not permitted）。
+<code>--device /dev/kvm</code> は、ファイルを置くと同時にこの一覧へ 10, 232 を足す。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>この檻の <code>CapEff</code> は <code>0000000000000000</code> だった。それでも QEMU が KVM で仮想マシンを作れたのはなぜか。</p>
+<details><summary>答え</summary>
+<p>KVM を使うのに特権（ケーパビリティ）は要らず、<code>/dev/kvm</code> を読み書きで開けることだけが条件だから。誰が KVM を使えるかは、ファイルの置き場（<code>--device</code>）と権限（グループ）で決まっている。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>KVM はカーネルの部品（<code>kvm</code> と <code>kvm_intel</code> / <code>kvm_amd</code>）で、使う側に見えるのは <code>/dev/kvm</code>（文字デバイス 10, 232）1つだけ</li>
+<li>コンテナで開くまでの関門は3つで、確かめられる順に: ファイルがあるか（No such file）、ファイルの権限（Permission denied）、device cgroup が許すか（Operation not permitted）</li>
+<li><code>--device /dev/kvm</code> はファイルと許しを、<code>--group-add</code> はグループの番号を渡す。名前は檻の <code>/etc/group</code> に無いことがある</li>
+<li>特権は1つも増えない（持てる特権の上限 <code>CapBnd</code> は docker の既定のまま。<code>CapEff</code> が 0 なのは lab が root でないからで、渡しすぎていない証拠にはならない）。KVM を使えるかどうかは、<code>/dev/kvm</code> を開けるかどうかだけで決まる</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:kvm-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・OVMF 2024.02 / 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4）/ apt snapshot 20260929T000000Z / ホストは Linux 7.2.6・Intel Core Ultra 9 285H（/dev/kvm は crw-rw-rw- root:302）/ docker 29.8.0・amd64 で検証。0660 の記録と KVM の部品を外した記録は Ubuntu 24.04.5 LTS（検証用の仮想マシン。カーネル 6.8.0-142-generic・docker.io 29.1.3・/dev/kvm は crw-rw---- root:kvm、GID 993）/ 検証日 2026-10-14</div>
+<nav class="pager"><a href="/kvm/theory/01-cpu">← 1. 仮想化支援機能は、CPU の自己申告</a><a href="/kvm/theory/03-accel">次: 3. QEMU は、頼まれたときだけ KVM を使う →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/kvm/">KVM</a> · <a href="/kvm/theory/">理論編 目次</a> · <a href="/kvm/practice/">実践編</a> · <a href="/kvm/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/kvm/chapters.js"></script>
+<script src="/kvm/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

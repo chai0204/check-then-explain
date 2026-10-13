@@ -1,0 +1,8 @@
+#!/bin/bash
+# lab env の追加行。この檻の画面は「/dev/kvm を開けるか」と「練習機をどのアクセラレータで動かしているか」で変わる。
+cpu=$(sed -n 's/^model name[[:space:]]*: //p' /proc/cpuinfo | head -1)
+flag=$(grep -o -w -m1 -E 'vmx|svm' /proc/cpuinfo | head -1)
+mods=$(grep -o -E '^kvm[a-z_]*' /proc/modules 2>/dev/null | tr '\n' ' ')
+printf 'CPU       : %s（仮想化支援の印: %s）\n' "${cpu:-不明}" "${flag:-なし}"
+printf 'KVM       : カーネルのモジュール %s\n' "${mods:-なし}"
+printf '%s\n' "$(/usr/local/bin/qemu-linuc status --short | sed 's/^練習機 linuc: /練習機    : /; s| / /dev/kvm: |\n/dev/kvm  : |')"

@@ -1,0 +1,124 @@
+# KVM の記事（public/kvm/theory/）の端末表示の出どころ。本文と同じ順に、同じ打ち方で打つ台本。
+#   python3 -I probe/kvm-seq.py --steps probe/kvm-steps.txt --out logs/kvm-probe.log
+# @main は読者の檻（--device /dev/kvm --group-add <GID>、ボリューム2つ）、@nodev は --device なしの2つ目の檻。
+# 1つの檻の中では、最初から最後まで同じシェルのまま打つ（章の間で exit しない）。
+
+== 0. 入ったとき（実践編の検証環境ブロック） ==
+@main
+$ lab env
+
+== 第1章 仮想化支援機能は、CPU の自己申告 ==
+@main
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+$ grep -m1 -o -w -E 'vmx|svm' /proc/cpuinfo
+$ qemu-linuc -accel tcg
+$ ssh linuc
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+$ grep -o -w -E 'vmx|svm|hypervisor' /proc/cpuinfo | sort | uniq -c
+$ ls -l /dev/kvm
+$ lsmod | grep kvm
+$ sudo dmesg | grep -E 'Hypervisor detected|paravirtualized|kvm_amd|kvm_intel'
+$ sudo modprobe cpuid
+$ sudo od -A n -c -j $((0x40000000)) -N 16 /dev/cpu/0/cpuid
+$ exit
+$ cat /usr/local/share/lab-kvm/tiny-vm.py
+$ ssh linuc sudo python3 - < /usr/local/share/lab-kvm/tiny-vm.py
+$ qemu-linuc stop
+
+== 第2章 KVM の入口は /dev/kvm ひとつ ==
+@main
+$ grep -o -E '^kvm[a-z_]*' /proc/modules
+$ ls -l /dev/kvm
+$ id
+$ getent group kvm 302
+$ echo $?
+$ grep -E '^(Groups|CapEff|CapBnd)' /proc/self/status
+@nodev
+$ ls -l /dev/kvm
+$ grep -m1 -o -w -E 'vmx|svm' /proc/cpuinfo
+$ grep -o -E '^kvm[a-z_]*' /proc/modules
+$ virsh capabilities | grep -o "<domain type='[a-z]*'" | sort | uniq -c
+$ qemu-linuc -accel kvm
+$ sudo mknod -m 666 /dev/kvm c 10 232
+$ ls -l /dev/kvm
+$ qemu-linuc -accel kvm
+$ sudo sh -c 'exec 3<>/dev/kvm'
+$ sudo chmod 600 /dev/kvm
+$ qemu-linuc -accel kvm
+$ grep -E '^(Groups|CapEff|CapBnd)' /proc/self/status
+$ exit
+
+== 第3章 QEMU は、頼まれたときだけ KVM を使う ==
+@main
+$ qemu-linuc
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+$ ssh linuc systemd-detect-virt
+$ qemu-system-x86_64 -accel help
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+$ ssh linuc systemd-detect-virt
+$ qemu-linuc stop
+$ qemu-linuc -enable-kvm
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+$ qemu-linuc stop
+$ qemu-linuc -accel tcg -cpu host
+
+== 第4章 速くなるのは、CPU が命令を実行する部分だけ ==
+@main
+$ qemu-linuc -accel tcg
+$ ssh linuc systemd-analyze
+$ ps -o pid,etimes,times,comm -p $(pgrep qemu)
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm
+$ ssh linuc systemd-analyze
+$ ps -o pid,etimes,times,comm -p $(pgrep qemu)
+$ ssh linuc
+$ grep -H '^GRUB_TIMEOUT=' /etc/default/grub.d/*.cfg
+$ journalctl --no-pager -o cat -g 'Detected virtualization|Startup finished in .*kernel'
+$ exit
+
+== 第5章 中から見える CPU は、アクセラレータで変わる ==
+@main
+$ ssh linuc
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+$ grep -o -w -E 'vmx|svm|hypervisor' /proc/cpuinfo | sort | uniq -c
+$ sudo dmesg | grep -E 'Hypervisor detected|paravirtualized|kvm_amd|kvm_intel'
+$ sudo modprobe cpuid
+$ sudo od -A n -c -j $((0x40000000)) -N 16 /dev/cpu/0/cpuid
+$ exit
+$ qemu-system-x86_64 -cpu help | grep -E '^ *x86 (qemu64|max|host) '
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm -cpu host
+$ ssh linuc
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+$ ls -l /dev/kvm
+$ lsmod | grep kvm
+$ exit
+$ cat /sys/module/kvm_intel/parameters/nested
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm -cpu host,-vmx
+$ ssh linuc "grep -o -w -E 'vmx|svm' /proc/cpuinfo | sort | uniq -c; ls -l /dev/kvm"
+$ qemu-linuc stop
+$ qemu-linuc -accel kvm -cpu host,kvm=off -snapshot
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+$ ssh linuc
+$ sudo modprobe cpuid
+$ sudo od -A n -c -j $((0x40000000)) -N 16 /dev/cpu/0/cpuid
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+$ sudo dmesg | grep -E 'Hypervisor detected|paravirtualized'
+$ systemd-detect-virt
+$ cat /sys/class/dmi/id/sys_vendor
+$ journalctl -b --no-pager -o cat -g 'Detected virtualization'
+$ exit
+
+== 第6章 このサイトの練習機が KVM を使わない理由 ==
+@main
+$ qemu-linuc stop
+$ grep -E '<domain|<cpu' /etc/lab-vm/domain.xml.in
+$ virsh capabilities | grep -o "<domain type='[a-z]*'" | sort | uniq -c
+$ vm start
+$ ps -o args= -p $(pgrep qemu) | grep -o -E -- '-(accel|cpu) [a-z]+'
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+$ ssh linuc systemd-detect-virt
+$ vm stop

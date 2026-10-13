@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6. このサイトの練習機が KVM を使わない理由 — 確かめて説明する KVM</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="6" data-theme="kvm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <a href="/kvm/theory/">理論編</a> › 第6章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/">詳しく</a></p>
+</div>
+<h1>6. このサイトの練習機が KVM を使わない理由</h1>
+<p class="lead">このサイトの仮想マシン型の檻（LinuC の記事の練習機）は、libvirt の定義に <code>type='qemu'</code> と書いてあり、<code>/dev/kvm</code> を渡しても TCG で動く。
+KVM を使えば起動は数倍速いが、練習機の中の画面が読む人の PC で変わり、<code>/dev/kvm</code> を渡せない人は練習機を動かせず、渡せる人にも起動のオプションを増やすことになる。
+この檻は、全員に同じ画面を出し、何の権限も求めないために、速さを払っている。</p>
+<div class="badges"><span>前提: 第5章まで読了</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>このサイトの仮想マシン型の檻が TCG で動くことを、定義（XML）と、動いている QEMU の両方で示せる</li>
+<li>KVM にすると練習機の中の何が読む人ごとに変わるかを、この記事の記録から挙げられる</li>
+<li>TCG を選んだ代わりに払っているもの（時間と CPU）を、数字で言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: libvirt の定義（XML）の他の項目、<code>virsh</code> の使い方（<a href="/linuc-boot/theory/01-virsh">LinuC 1.01 の第1章</a>）、
+定義を <code>type='kvm'</code> に書き換える手順、クラウドの仮想マシンで入れ子の仮想化を有効にする設定。</div></div>
+
+<h2 id="define">定義には type='qemu' と書いてある</h2>
+<div class="sgoal"><b>この節で分かること</b>: このサイトの仮想マシン型の檻が、何で練習機を動かしているか。</div>
+<p>この記事の檻は、LinuC の仮想マシン型の檻と同じ土台（<code>lab-linuc-machine</code>）の上にあり、その檻が使う libvirt と練習機の定義も入っている。
+LinuC の記事では、読者は <code>vm start</code> や <code>virsh start</code> で練習機を起動していた。<code>vm</code> は、中で <code>virsh</code> を打つ短縮のコマンドである。
+<code>qemu-linuc</code> の練習機を止めてから、定義を見る。</p>
+<pre data-where="外（lab@host）"><code><!--log probe 6:1-3 note="domain type='qemu'::TCG で動かす、という指定;cpu mode='maximum'::QEMU が真似できる機能を全部見せる;2 <domain type='kvm'::この檻なら、libvirt は KVM の仮想マシンも作れる"--></code></pre>
+<p><code>&lt;domain type='qemu'&gt;</code> は libvirt に「QEMU の TCG で動かす」と言っている。KVM で動かすなら <code>type='kvm'</code> と書く。
+<code>virsh capabilities</code> は、libvirt が作れる仮想マシンの種類を数えたもので、この檻（<code>/dev/kvm</code> を開ける）では <code>kvm</code> と <code>qemu</code> の両方がある
+（第2章の、<code>--device</code> なしの2つ目の檻では <code>qemu</code> だけだった。数の 2 は、libvirt が作れる練習機の種類の数で、64 ビットの x86_64 と 32 ビットの i686 の分）。</p>
+<div class="analogy"><b>たとえ</b>: <code>virsh capabilities</code> と定義の <code>type</code> の関係は、<b>レストランのメニューと注文票</b>に近い。メニューに「特急（<code>kvm</code>）」が載っていても、
+注文票に「普通（<code>qemu</code>）」と書けば、普通のものが出てくる。
+<br>ただし<b>崩れる点</b>: レストランのメニューは店が決めて毎日同じだが、<code>capabilities</code> は檻の起動のしかた（<code>/dev/kvm</code> を渡したか）で変わる。
+同じ注文票でも、メニューに特急が無い檻では、<code>type='kvm'</code> と書いた練習機はそもそも起動できない。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>LinuC の記事の仮想マシン型の檻も、起動のときに <code>--device /dev/kvm</code>（と <code>--group-add</code>）を足せば、libvirt は KVM が使えることに気づいて、練習機は数秒で起動するはずだ。
+この檻は <code>/dev/kvm</code> を開けるので、その檻と同じ <code>vm start</code> で確かめられる。</p>
+<pre data-where="外（lab@host）"><code><!--log probe 6:4-7 note="練習機が起動しました::KVM（第3・4章）よりずっと長い;-accel tcg::libvirt が QEMU に渡したのは TCG;^qemu::練習機も TCG の上にいると答えた"--></code></pre>
+<div class="then"><b>だめな理由</b>: TCG で起動していた。libvirt が組み立てた QEMU のコマンド行（組み立て方は <a href="/qemu/theory/07-libvirt">QEMU の記事の第7章</a>）は <code>-accel tcg -cpu max</code> で、QEMU は <code>/dev/kvm</code> を開いていない。
+libvirt は、<code>/dev/kvm</code> が使えるかどうかではなく、<b>定義に書かれた <code>type</code> のとおりに</b> QEMU を起動する。定義が <code>type='qemu'</code> である限り、
+<code>/dev/kvm</code> を渡しても TCG のままで、速くはならない。速くするには定義そのものを <code>type='kvm'</code> に書き換える必要があり、このサイトの檻はわざとそうしていない。
+（「起動中…」の行の数は、待った時間で変わる。）</div></div>
+<pre data-where="外（lab@host）"><code><!--log probe 6:8--></code></pre>
+<div class="analogy"><b>たとえ</b>: libvirt の定義は、<b>工事の発注書</b>に近い。発注書に「手作業で」（<code>type='qemu'</code>）と書いてあれば、現場に重機（<code>/dev/kvm</code>）が置いてあっても、業者は手作業で進める。
+<br>ただし<b>崩れる点</b>: 現場の業者は重機があれば「使いましょうか」と言うかもしれないが、libvirt は言わない。重機が置いてあることを知っていても（<code>virsh capabilities</code>）、発注書を勝手に書き換えない。</div>
+
+<h2 id="why">全員に同じ画面を出すために</h2>
+<div class="sgoal"><b>この節で分かること</b>: KVM にすると何が読む人ごとに変わり、TCG で何を払っているか。</div>
+<p>このシリーズの約束は「本文のコマンドは、読者の画面に本文と同じ文字を出す」ことである。この記事で見てきたとおり、KVM にすると練習機の中の画面が読む人の PC で変わる。</p>
+<div class="scroll"><table>
+<tr><th>練習機の中で見るもの</th><th>TCG（どの PC でも同じ）</th><th>KVM（読む人の PC で変わる）</th><th>章</th></tr>
+<tr><td>CPU のメーカー・印（既定の型）</td><td><code>AuthenticAMD</code>・<code>svm</code></td><td>あなたの PC の CPU のメーカー。Intel なら <code>svm</code> は消える</td><td><a href="/kvm/theory/05-guest">5</a></td></tr>
+<tr><td>CPU の名前（<code>-cpu host</code>・libvirt の <code>maximum</code>）</td><td>QEMU が作った名前</td><td>あなたの PC の CPU の名前</td><td><a href="/kvm/theory/05-guest">5</a></td></tr>
+<tr><td><code>systemd-detect-virt</code>・<code>lscpu</code> の <code>Hypervisor vendor</code></td><td><code>qemu</code>・出ない</td><td><code>kvm</code>・<code>KVM</code></td><td><a href="/kvm/theory/05-guest">5</a></td></tr>
+<tr><td>練習機の中の <code>/dev/kvm</code>（入れ子）</td><td>既定の型ではある（<code>kvm_amd</code>）</td><td>あなたの PC の KVM の <code>nested</code> と CPU の型で変わる</td><td><a href="/kvm/theory/01-cpu">1</a>・<a href="/kvm/theory/05-guest">5</a></td></tr>
+<tr><td>起動にかかる時間</td><td>遅い（著者の PC で <!--num probe 4:1 total--> 秒）</td><td>速い（同じく <!--num probe 4:5 total--> 秒）</td><td><a href="/kvm/theory/04-speed">4</a></td></tr>
+</table></div>
+<p>LinuC の記事には、CPU の名前（<code>lscpu</code>）や <code>systemd-detect-virt</code> の答えを本文に載せている章がある（<a href="/linuc-boot/theory/03-container">LinuC 1.01 の第3章</a>）。
+KVM の読者と TCG の読者でそこが違えば、約束が守れない。さらに、KVM を使うには <code>/dev/kvm</code> を開ける檻が要る（第2章）。docker が動くカーネルに KVM が無い読者は使えず、
+使える読者にも <code>--device</code> と <code>--group-add</code> を足してもらうことになる。TCG なら、起動のオプションに権限を1つも足さずに、全員が同じ練習機を動かせる。</p>
+<p>払っているものは、第4章で測った。</p>
+<div class="scroll"><table>
+<tr><th>同じ練習機の起動（著者の PC）</th><th>TCG</th><th>KVM</th></tr>
+<tr><td>QEMU を起動してから、起動し終わるまで</td><td><!--num probe 4:1 total--> 秒</td><td><!--num probe 4:5 total--> 秒</td></tr>
+<tr><td>起動し終わった直後までに QEMU が使った CPU の時間</td><td><!--num probe 4:3 times--> 秒</td><td><!--num probe 4:7 times--> 秒</td></tr>
+<tr><td>練習機の OS が数えたユーザ空間の時間</td><td><!--num probe 4:2 sauser--> 秒</td><td><!--num probe 4:6 sauser--> 秒</td></tr>
+</table></div>
+<p>練習機の中で重い処理をしない LinuC の演習では、待つのは主に起動と停止の数十秒である。このサイトは、その時間を払って、画面と権限を全員にそろえた。</p>
+<div class="analogy"><b>たとえ</b>: このサイトの練習機は、<b>全員に同じ教習車</b>を用意する教習所に近い。自分の車（KVM）で来れば速く着くが、車種によってハンドルの位置やメーターの見え方が違い、教本の写真と合わなくなる。
+同じ教習車なら遅くても、全員が教本と同じ景色を見られる。
+<br>ただし<b>崩れる点</b>: 教習車は教習所が持ち、乗るのに免許の種類を確かめるが、この練習機は読む人の PC の上で動き、乗るのに何の許可も要らない。そろえているのは車ではなく、車の動かし方（TCG）である。</div>
+
+<h2 id="spine">この6章を貫いている1つの事実</h2>
+<div class="sgoal"><b>この節で分かること</b>: 6つの章が、1つの事実から出てくること。</div>
+<p><b>KVM の正体は、CPU の仮想化支援機能を使って仮想マシンを動かすカーネルの部品で、使う側には <code>/dev/kvm</code> というファイル1つで配られている。QEMU はそれを開いたときだけ速くなり、練習機の中から見える CPU も変わる。
+開けるかどうかは、CPU の印・カーネル・ファイルの権限・コンテナの許可の4つで決まる。</b></p>
+<div class="scroll"><table>
+<tr><th>章</th><th>この事実の、どの部分か</th></tr>
+<tr><td><a href="/kvm/theory/01-cpu">1</a></td><td>最初の関門の CPU の印は、CPU（TCG では QEMU）の自己申告。練習機のカーネルは、その答えを見て KVM を用意した</td></tr>
+<tr><td><a href="/kvm/theory/02-dev-kvm">2</a></td><td>KVM の入口はファイル1つ。コンテナの許可（device cgroup）とファイルの権限で、開けるかが決まる。特権は要らない</td></tr>
+<tr><td><a href="/kvm/theory/03-accel">3</a></td><td>QEMU は頼まれたときだけ開く。開いた QEMU は、カーネルの中の仮想マシンと仮想の CPU をファイルとして持つ</td></tr>
+<tr><td><a href="/kvm/theory/04-speed">4</a></td><td>開いて速くなるのは、本物の CPU が命令を実行する部分だけ。待ち時間と装置は速くならない</td></tr>
+<tr><td><a href="/kvm/theory/05-guest">5</a></td><td>開くと、練習機の CPU は本物の CPU を名乗る。印を渡せば、練習機の中にも <code>/dev/kvm</code> ができる</td></tr>
+<tr><td>6</td><td>このサイトの練習機は、開かないことを選んだ。全員が開けるわけではなく、開くと画面が変わるから</td></tr>
+</table></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/kvm/practice/">演習02</a>を、<code>--group-add</code> を外して起動し直した檻でもう一度 <code>lab check 02</code> してみてほしい。あなたの PC の <code>/dev/kvm</code> が 0660 なら未達になり、0666 なら合格のままになる。
+どちらになるかで、あなたの PC の <code>/dev/kvm</code> の権限の数字（誰でもか、グループだけか）が分かる。</div>
+
+<div class="quiz"><b>確認</b>
+<p>LinuC の記事の仮想マシン型の檻を、<code>--device /dev/kvm --group-add "$(stat -c %g /dev/kvm)"</code> を足して起動した。練習機の起動は速くなるか。理由も述べよ。</p>
+<details><summary>答え</summary>
+<p>速くならない。練習機の定義が <code>type='qemu'</code> なので、libvirt は QEMU に <code>-accel tcg</code> を渡し、<code>/dev/kvm</code> を開かせない。
+この檻で <code>vm start</code> した練習機は、<code>/dev/kvm</code> を開ける檻でも TCG で起動し、<code>systemd-detect-virt</code> は <code>qemu</code> と答えた。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>このサイトの練習機を KVM で動かすと、読者によって本文と違う画面になりうる。どんなコマンドの出力が変わるか、2つ挙げよ。</p>
+<details><summary>答え</summary>
+<p>例: <code>lscpu</code> の <code>Vendor ID</code>・<code>Model name</code>（読者の PC の CPU になる）、<code>systemd-detect-virt</code>（<code>qemu</code> が <code>kvm</code> になる）、
+<code>/proc/cpuinfo</code> の仮想化支援の印、<code>sudo dmesg</code> の <code>Hypervisor detected</code> の行、起動にかかる時間。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>このサイトの仮想マシン型の檻は、libvirt の定義が <code>type='qemu'</code>。<code>/dev/kvm</code> を渡しても <code>-accel tcg</code> で動く</li>
+<li>libvirt は、使えるかどうか（<code>virsh capabilities</code>）ではなく、定義の <code>type</code> のとおりに動かす</li>
+<li>KVM にすると、練習機の中の CPU・<code>systemd-detect-virt</code>・起動の時間が読む人の PC で変わり、<code>/dev/kvm</code> を渡せない人は使えない</li>
+<li>TCG を選んで、全員に同じ画面と、権限ゼロの起動を約束した。代わりに、起動の時間（著者の PC で <!--num probe 4:1 total--> 秒と <!--num probe 4:5 total--> 秒）と CPU を払っている</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:kvm-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0・OVMF 2024.02 / 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4）/ apt snapshot 20260929T000000Z / ホストは Linux 7.2.6・Intel Core Ultra 9 285H（/dev/kvm は crw-rw-rw- root:302）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/kvm/theory/05-guest">← 5. 中から見える CPU は、アクセラレータで変わる</a><a href="/kvm/practice/">実践編へ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/kvm/">KVM</a> · <a href="/kvm/theory/">理論編 目次</a> · <a href="/kvm/practice/">実践編</a> · <a href="/kvm/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/kvm/chapters.js"></script>
+<script src="/kvm/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

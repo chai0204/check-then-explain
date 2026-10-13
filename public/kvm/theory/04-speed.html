@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. 速くなるのは、CPU が命令を実行する部分だけ — 確かめて説明する KVM</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="kvm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <a href="/kvm/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/">詳しく</a></p>
+</div>
+<h1>4. 速くなるのは、CPU が命令を実行する部分だけ</h1>
+<p class="lead">同じ練習機（同じディスク）を TCG と KVM で起動すると、起動し終わるまで 30.5 秒と 6.6 秒だった。ところが段階ごとに分けると、
+OS が起動していく部分（ユーザ空間）は 13.0 倍速いのに、カーネルの最初の表示まで（おおむねファームウェアと GRUB）は 1.5 倍にしかならない。
+GRUB がメニューを出して待つ 3 秒は、何で動かしても 3 秒である。KVM が速くするのは、CPU が命令を実行している時間だけだ。</p>
+<div class="badges"><span>前提: 第3章まで読了</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>外（<code>qemu-linuc</code> の時間・<code>ps</code>）と中（<code>systemd-analyze</code>・journal）の両方で、起動の時間を段階に分けて測れる</li>
+<li>段階ごとに速くなる割合が違うことを、自分の測った数字で示せる</li>
+<li>KVM が速くするもの（CPU が命令を実行する時間）と、速くしないもの（待ち時間・QEMU が真似している装置）を言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: ベンチマークの取り方（何回測って平均するか、ばらつきの扱い）、仮想マシンが KVM に戻る回数や理由の数え方（<code>perf kvm stat</code> など）、
+メモリのアドレスの変換を CPU に任せる仕組み（Intel の EPT・AMD の NPT）の細部、ディスクやネットワークの速さの比べ方。</div></div>
+
+<h2 id="measure">同じディスクを、2通りで起動して測る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 起動の時間を、外と中からどう区切って測るか。</div>
+<p>第3章の終わりで練習機は止まっている。まず TCG で起動し、起動し終わったところで、中から OS の記録を、外から QEMU のプロセスを見る。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-linuc -accel tcg
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+...
+    -accel tcg
+練習機が起動し終わりました（QEMU を起動してから 30.5 秒。カーネルの最初の表示は 6.0 秒の時点）   ← QEMU を起動してから、練習機のカーネルが最初の行を出すまで
+ssh linuc で入れます
+
+$ ssh linuc systemd-analyze
+Startup finished in 2.161s (kernel) + 22.258s (userspace) = 24.420s   ← カーネルの時間と、ユーザ空間の時間
+graphical.target reached after 21.300s in userspace.
+
+$ ps -o pid,etimes,times,comm -p $(pgrep qemu)
+    PID ELAPSED     TIME COMMAND
+   1408      31       52 qemu-system-x86   ← 経過時間（秒）と、そのあいだに使った CPU の時間（秒）</code></pre>
+<p><code>qemu-linuc</code> は2つの時間を出す。練習機が起動し終わるまで（練習機の systemd が「起動し終わった」と答えるまで）と、練習機のシリアルの画面にカーネルの最初の行（<code>Linux version …</code>）が出るまでである。
+最初の行より前は、おおむねファームウェア（UEFI）と GRUB の時間である（最初の行は、カーネルが動き出してシリアルの画面を使えるようになってから出るので、動き出した瞬間より少し後になる）。
+<code>systemd-analyze</code> は練習機の OS 自身の記録で、カーネルが動き出してから systemd に渡すまで（<code>kernel</code>。initramfs の仕事も入る）と、systemd が起動し終わるまで（<code>userspace</code>）に分けて出す。
+<code>ps</code> の <code>ELAPSED</code> はプロセスが起動してからの秒数、<code>TIME</code> はそのあいだに使った CPU の時間（秒）で、起動し終わった直後に測っている。</p>
+<p>止めて、同じディスクを KVM で起動し、同じものを見る。</p>
+<pre data-where="外（lab@host）"><code>$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（4.5 秒）
+
+$ qemu-linuc -accel kvm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+...
+    -accel kvm
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 6.6 秒。カーネルの最初の表示は 4.0 秒の時点）   ← TCG のときと比べる
+ssh linuc で入れます
+
+$ ssh linuc systemd-analyze
+Startup finished in 728ms (kernel) + 1.713s (userspace) = 2.442s   ← TCG のときと比べる
+graphical.target reached after 1.700s in userspace.
+
+$ ps -o pid,etimes,times,comm -p $(pgrep qemu)
+    PID ELAPSED     TIME COMMAND
+   1825       6        8 qemu-system-x86   ← 経過時間（秒）と、そのあいだに使った CPU の時間（秒）</code></pre>
+<p class="detail">ここの時間は、<b>どれもあなたの PC で変わる</b>（CPU の速さ、ほかに動いているもの）。比べるのは、同じ PC の TCG と KVM の間だけにしてほしい。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>起動し終わるまでが 30.5 秒から 6.6 秒になった。KVM で約 4.6 倍速くなったということで、練習機の中のどの部分も、だいたい同じ割合で速くなっているはずだ。</p>
+<div class="scroll"><table>
+<tr><th>測ったもの（著者の PC）</th><th>TCG</th><th>KVM</th><th>KVM で</th></tr>
+<tr><td>QEMU を起動してから、カーネルの最初の表示まで（おおむねファームウェアと GRUB）</td><td>6.0 秒</td><td>4.0 秒</td><td>1.5 倍</td></tr>
+<tr><td>カーネル（<code>systemd-analyze</code> の <code>kernel</code>。initramfs も入る）</td><td>2.161 秒</td><td>0.728 秒</td><td>3.0 倍</td></tr>
+<tr><td>ユーザ空間（<code>systemd-analyze</code> の <code>userspace</code>）</td><td>22.258 秒</td><td>1.713 秒</td><td>13.0 倍</td></tr>
+<tr><td>QEMU を起動してから、起動し終わるまで（<code>qemu-linuc</code>）</td><td>30.5 秒</td><td>6.6 秒</td><td>4.6 倍</td></tr>
+<tr><td>起動し終わった直後までに QEMU が使った CPU の時間（<code>ps</code> の <code>TIME</code>）</td><td>52 秒</td><td>8 秒</td><td>6.5 倍</td></tr>
+</table></div>
+<div class="then"><b>だめな理由</b>: 段階によって、1.5 倍から 13.0 倍までばらばらだった。ユーザ空間（たくさんのプログラムが起動していく部分）は CPU が命令を実行し続ける時間なので、
+本物の CPU に直接実行させる KVM でいちばん速くなる。カーネルの最初の表示までには、<b>待っている時間</b>が入っている（GRUB の待ちの 3 秒。KVM では 4.0 秒のうちの 3 秒、TCG でも 6.0 秒のうちの 3 秒）。
+GRUB はメニューを出して、決まった秒数だけキーが押されるのを待つ。待ち時間は、命令をどれだけ速く実行しても縮まない。
+全体の 4.6 倍は、よく縮む部分と縮まない部分を足したもので、<b>どの部分の速さも表していない</b>。</div></div>
+<p>表の上の3行を足すと、ほぼ4行目になる（ずれは、カーネルの最初の行が少し遅れて出ることと、起動し終わったかを確かめる時間の分）。</p>
+<p>GRUB が何秒待つかは、練習機の中の設定にある。</p>
+<pre data-where="外（lab@host）"><code>$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:35:40 2026 from 10.0.2.2</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ grep -H '^GRUB_TIMEOUT=' /etc/default/grub.d/*.cfg
+/etc/default/grub.d/50-cloudimg-settings.cfg:GRUB_TIMEOUT=0
+/etc/default/grub.d/99-lab.cfg:GRUB_TIMEOUT=3   ← 後から読まれるほうが勝つ。メニューで 3 秒待つ</code></pre>
+<p>Ubuntu のクラウドイメージは待たない設定（<code>0</code>）だが、このサイトの練習機は GRUB のメニューを見せるために 3 秒にしてある（LinuC 1.01 の記事で、メニューからカーネルに引数を渡す練習をするため）。
+KVM の 4.0 秒のうち 3 秒はこの待ち時間で、残りの約 1.0 秒がファームウェアと GRUB の仕事（とカーネルの最初の一歩）である。TCG では、その仕事に約 3.0 秒かかっていた（6.0 秒のうちの 3 秒が待ち時間）。</p>
+<div class="analogy"><b>たとえ</b>: 起動は、<b>引っ越しの一日</b>に近い。荷物を運ぶ（命令を実行する）作業は、人手を増やせば（KVM）何倍も速くなる。
+でも、鍵の受け渡しの約束の時刻（GRUB の待ち時間）は、人手を増やしても早まらない。一日の長さが何倍縮んだかは、作業と待ちの割合で決まる。
+<br>ただし<b>崩れる点</b>: 引っ越しの人手は増やした分だけ費用がかかるが、KVM は費用が増えるどころか、使う CPU の時間がかえって減る（52 秒から 8 秒）。TCG は命令を翻訳する手間に CPU を使っていた。</div>
+
+<h2 id="cpu">TCG は、翻訳に CPU を使う</h2>
+<div class="sgoal"><b>この節で分かること</b>: 速さの差が、CPU の使い方の差でもあること。</div>
+<p>TCG の QEMU は、経過 31 秒のあいだに CPU を 52 秒使った。経過時間より長いのは、CPU を2個（<code>-smp 2</code>）持つ練習機の命令を、QEMU が2本のスレッドで同時に翻訳して実行しているからである。
+練習機のカーネルが「仕事が無い」と CPU を休ませる命令（HLT）を出している間は、QEMU のスレッドも休む。だから TCG の 52 秒は、<b>練習機の命令を翻訳して実行するために使った時間</b>である（装置を真似する QEMU の仕事も入っている）。</p>
+<p>KVM の QEMU は経過 6 秒・CPU 8 秒だった。本物の CPU が練習機の命令をそのまま実行した時間も、QEMU のスレッドの CPU の時間として数えられるので、0 にはならない（CPU が2個あるので、経過時間より長くもなりうる）。
+それでも、命令を翻訳する手間が無いぶん、同じ起動に使った CPU の時間は TCG のほうが 6.5 倍多かった（どちらも起動し終わった直後に測った。測るまでの数秒の待ちも入るので、倍率はおおよそである）。</p>
+<div class="analogy"><b>たとえ</b>: TCG は、外国語の本を<b>声に出して訳しながら</b>読むことに近い。読むのにも訳すのにも頭を使い、2冊を2人で同時に訳せば、その分の手間がかかる。
+KVM は、その言葉が分かる人が<b>そのまま黙読</b>する。
+<br>ただし<b>崩れる点</b>: 黙読は本の中身によらず速いが、KVM でも練習機が装置に触る場面（ディスクを読む、ネットワークに送る）は、本物の CPU から KVM と QEMU に戻って、QEMU がソフトで装置を真似する。
+そこは黙読にならず、TCG のときと同じ QEMU の仕事が残る。</div>
+
+<h2 id="history">同じディスクに、すべての起動の記録が残っている</h2>
+<div class="sgoal"><b>この節で分かること</b>: 練習機の OS 自身が、どの起動をどのアクセラレータで迎えたかを記録していること。</div>
+<p>練習機の中のログ（journal）には、起動のたびに systemd が書いた2行が残っている。どの仮想化の上で起動したか（<code>Detected virtualization</code>）と、起動にかかった時間（<code>Startup finished</code>）である。
+第1章から、同じディスクを何度も起動してきた。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ journalctl --no-pager -o cat -g 'Detected virtualization|Startup finished in .*kernel'
+Detected virtualization qemu.   ← 第1章（-accel tcg）
+Startup finished in 2.005s (kernel) + 22.938s (userspace) = 24.943s.
+Detected virtualization qemu.   ← 第3章（何も付けない＝TCG）
+Startup finished in 1.959s (kernel) + 21.283s (userspace) = 23.242s.
+Detected virtualization kvm.   ← 第3章（-accel kvm）
+Startup finished in 676ms (kernel) + 1.831s (userspace) = 2.507s.
+Detected virtualization kvm.   ← 第3章（-enable-kvm）
+Startup finished in 754ms (kernel) + 1.920s (userspace) = 2.674s.
+Detected virtualization qemu.   ← この章（-accel tcg）
+Startup finished in 2.161s (kernel) + 22.258s (userspace) = 24.420s.
+Detected virtualization kvm.   ← この章（-accel kvm）
+Startup finished in 728ms (kernel) + 1.713s (userspace) = 2.442s.
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.</code></pre>
+<p>同じディスク・同じ OS で、起動にかかった時間が TCG の3回はどれも 20 秒台、KVM の3回はどれも数秒だった。同じ方式どうしのばらつき（ほかに動いているものの影響）より、アクセラレータの違いのほうがずっと大きい。
+練習機の中の OS は、自分が何の上で起動したかを毎回自分で調べて書いている（どう調べているかは第5章）。</p>
+<div class="analogy"><b>たとえ</b>: この journal は、同じ車の<b>運転日誌</b>に近い。日によって道（TCG か KVM か）が違い、日誌には「今日はどの道を通ったか」と「何分かかったか」が並んでいる。
+<br>ただし<b>崩れる点</b>: 運転日誌は運転手が書くが、この記録は車自身（練習機の systemd）が、道を自分で調べて書いている。運転手（あなた）が何を頼んだかは、日誌には書かれない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/kvm/practice/">演習03</a>の判定は、この journal から、いまの起動と、それより前に練習機が <code>qemu</code> と記録した最後の起動を探し、2つの <code>Startup finished</code> を並べて出す（いま KVM で動いているかは、QEMU のプロセスのファイルで決める）。
+あなたの PC での倍率は、それを見て計算できる。</div>
+
+<div class="quiz"><b>確認</b>
+<p>ある人が「KVM にしたら仮想マシンの起動が 3 倍速くなった。だから CPU を使う処理も 3 倍速くなる」と言った。この推論のどこがおかしいか。</p>
+<details><summary>答え</summary>
+<p>起動の時間には、CPU が命令を実行する時間と、待ち時間（GRUB のメニュー、ネットワークの応答など）が混ざっている。待ち時間は KVM でも縮まないので、全体の倍率は
+命令を実行する部分の倍率より小さく出る。著者の PC では、全体が 4.6 倍でも、CPU が働き続けるユーザ空間は 13.0 倍だった。CPU を使う処理の倍率は、起動の時間からは言えない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>TCG の QEMU で、<code>ps -o etimes,times</code> が <code>31</code> と <code>52</code> を出した。経過時間より CPU の時間が長いのはなぜか。</p>
+<details><summary>答え</summary>
+<p>練習機に CPU が2個あり、QEMU が2本のスレッドで同時に命令を翻訳・実行していたから。CPU の時間は、使ったスレッドの分を足し合わせて数える。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>KVM の練習機で、カーネルの最初の表示までにかかった 4.0 秒のうち、3 秒はどの設定から来ているか。それを 0 にすると、TCG と KVM のどちらの起動がより大きな割合で縮むか。</p>
+<details><summary>答え</summary>
+<p><code>/etc/default/grub.d/99-lab.cfg</code> の <code>GRUB_TIMEOUT=3</code>（GRUB のメニューで待つ秒数）。0 にすると、どちらも同じ 3 秒だけ縮むが、全体が短い KVM のほうが割合では大きく縮む（6.6 秒 → 約 3.6 秒と、30.5 秒 → 約 27.5 秒）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>起動の時間は、外（起動し終わるまで・カーネルの最初の表示まで・<code>ps</code>）と中（<code>systemd-analyze</code>）で段階に分けて測れる</li>
+<li>KVM で縮むのは CPU が命令を実行する時間。ユーザ空間は 13.0 倍、カーネルの最初の表示までは 1.5 倍（GRUB の 3 秒の待ちは縮まない）</li>
+<li>TCG は命令の翻訳に CPU を使う。同じ起動で、QEMU が使った CPU の時間は 52 秒と 8 秒</li>
+<li>装置（ディスク・ネットワーク）は KVM でも QEMU がソフトで真似している。全体の倍率は、どの部分の速さも表さない</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:kvm-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・OVMF 2024.02 / 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4）/ apt snapshot 20260929T000000Z / ホストは Linux 7.2.6・Intel Core Ultra 9 285H（16 スレッド。ほかの仮想マシンも動いている状態で測った）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/kvm/theory/03-accel">← 3. QEMU は、頼まれたときだけ KVM を使う</a><a href="/kvm/theory/05-guest">次: 5. 中から見える CPU は、アクセラレータで変わる →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/kvm/">KVM</a> · <a href="/kvm/theory/">理論編 目次</a> · <a href="/kvm/practice/">実践編</a> · <a href="/kvm/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/kvm/chapters.js"></script>
+<script src="/kvm/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,620 @@
+# 本文の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run --rm -it --hostname host、名前の無いボリューム2つ、PID 1 は tini、
+# その子の bash -l、umask 022、TERM=xterm）の1つのシェルに、最初から順に打った記録（章の間で exit しない）。
+# 端末 80 桁 × 24 行。作り方: python3 -I probe/kvm-seq.py（イメージ lab-kvm:1.0.0）
+
+
+========== 1. 01-cpu.html ==========
+
+# --- main: 起動（--rm -it --name kvm-rep-main --hostname host --device /dev/kvm --group-add 302 -v /home/lab/vm -v /home/lab/.lab lab-kvm:1.0.0）して入ったときの表示 ---
+groups: cannot find name for group ID 302
+練習機 linuc: 止まっている / /dev/kvm: あり（この檻の lab が読み書きできる）
+  qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
+
+
+── lab-kvm 1.0.0 ────────────────────────────────────────
+lab-kvm  進捗 0/5
+  次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-kvm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+# --- ここまで ---
+
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+Vendor ID:                               GenuineIntel
+Model name:                              Intel(R) Core(TM) Ultra 9 285H
+Virtualization:                          VT-x
+
+$ grep -m1 -o -w -E 'vmx|svm' /proc/cpuinfo
+vmx
+
+$ qemu-linuc -accel tcg
+▶ qemu-img create -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 /home/lab/vm/linuc.qcow2 20G
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel tcg
+練習機が起動し終わりました（QEMU を起動してから 39.6 秒。カーネルの最初の表示は 6.5 秒の時点）
+ssh linuc で入れます
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+Vendor ID:                               AuthenticAMD
+Model name:                              QEMU Virtual CPU version 2.5+
+Virtualization:                          AMD-V
+
+$ grep -o -w -E 'vmx|svm|hypervisor' /proc/cpuinfo | sort | uniq -c
+      2 hypervisor
+      2 svm
+
+$ ls -l /dev/kvm
+crw-rw---- 1 root kvm 10, 232 Oct 14 03:26 /dev/kvm
+
+$ lsmod | grep kvm
+kvm_amd               212992  0
+ccp                   147456  1 kvm_amd
+kvm                  1404928  1 kvm_amd
+irqbypass              12288  1 kvm
+
+$ sudo dmesg | grep -E 'Hypervisor detected|paravirtualized|kvm_amd|kvm_intel'
+[    0.069406] Booting paravirtualized kernel on bare hardware
+[   18.292107] kvm_amd: Nested Virtualization enabled
+[   18.292428] kvm_amd: Nested Paging disabled
+[   18.292745] kvm_amd: PMU virtualization is disabled
+
+$ sudo modprobe cpuid
+
+$ sudo od -A n -c -j $((0x40000000)) -N 16 /dev/cpu/0/cpuid
+ 001  \0  \0   @   T   C   G   T   C   G   T   C   G   T   C   G
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ cat /usr/local/share/lab-kvm/tiny-vm.py
+"""練習機の中の KVM（入れ子の仮想化）に、小さな仮想マシンを1つ作って動かす（練習機の中の root で動かす）。
+  檻（lab@host）から: ssh linuc sudo python3 - < /usr/local/share/lab-kvm/tiny-vm.py
+仮想マシンのメモリに置く命令は6つだけ（実モード）:
+  mov al,2 / add al,2 / add al,'0' / mov dx,0x3f8 / out dx,al / hlt
+  2+2 を計算して、文字 '4' を装置の番号 0x3f8（シリアル）に書き、hlt で止まる。
+  装置への書き込みと hlt では、KVM が仮想マシンを止めて、このプログラムに知らせる（KVM_EXIT_IO・KVM_EXIT_HLT）。
+仮想マシンを作る前と後に、CPU 0 の AMD-V のスイッチ（EFER という設定の SVME。MSR 0xC0000080 の bit 12）も読む。
+"""
+import ctypes, fcntl, mmap, os, struct, subprocess
+
+
+def svme():
+    f = os.open("/dev/cpu/0/msr", os.O_RDONLY)
+    v = int.from_bytes(os.pread(f, 8, 0xC0000080), "little")
+    os.close(f)
+    return (v >> 12) & 1
+
+
+subprocess.run(["modprobe", "msr"], check=True)
+print("AMD-V のスイッチ（EFER.SVME）:", svme())
+kvm = os.open("/dev/kvm", os.O_RDWR)
+vm = fcntl.ioctl(kvm, 0xAE01, 0)                                   # KVM_CREATE_VM
+print("KVM_CREATE_VM → 仮想マシンを作った")
+print("AMD-V のスイッチ（EFER.SVME）:", svme())
+mem = mmap.mmap(-1, 0x10000)                                       # 仮想マシンのメモリ（64KiB）
+code = bytes([0xB0, 0x02, 0x04, 0x02, 0x04, 0x30, 0xBA, 0xF8, 0x03, 0xEE, 0xF4])
+mem[0x1000:0x1000 + len(code)] = code
+addr = ctypes.addressof(ctypes.c_char.from_buffer(mem))
+fcntl.ioctl(vm, 0x4020AE46, struct.pack("<IIQQQ", 0, 0, 0, 0x10000, addr))   # KVM_SET_USER_MEMORY_REGION
+cpu = fcntl.ioctl(vm, 0xAE41, 0)                                   # KVM_CREATE_VCPU
+run = mmap.mmap(cpu, fcntl.ioctl(kvm, 0xAE04, 0))                  # KVM_GET_VCPU_MMAP_SIZE
+sregs = bytearray(312)
+fcntl.ioctl(cpu, 0x8138AE83, sregs)                                # KVM_GET_SREGS
+struct.pack_into("<Q", sregs, 0, 0)                                # cs の base を 0
+struct.pack_into("<H", sregs, 12, 0)                               # cs の selector を 0
+fcntl.ioctl(cpu, 0x4138AE84, bytes(sregs))                         # KVM_SET_SREGS
+regs = bytearray(144)
+struct.pack_into("<QQ", regs, 128, 0x1000, 0x2)                    # rip = 0x1000、rflags = 2
+fcntl.ioctl(cpu, 0x4090AE82, bytes(regs))                          # KVM_SET_REGS
+while True:
+    fcntl.ioctl(cpu, 0xAE80, 0)                                    # KVM_RUN
+    reason = struct.unpack_from("<I", run, 8)[0]
+    if reason == 2:                                                # KVM_EXIT_IO
+        size, port, off = run[33], struct.unpack_from("<H", run, 34)[0], struct.unpack_from("<Q", run, 40)[0]
+        print(f"KVM_RUN → KVM_EXIT_IO（装置 {port:#x} に {run[off:off + size]!r} を書いた）")
+    elif reason == 5:                                              # KVM_EXIT_HLT
+        print("KVM_RUN → KVM_EXIT_HLT（hlt で止まった）")
+        break
+    else:
+        print("KVM_RUN → 止まった理由", reason)
+        break
+
+$ ssh linuc sudo python3 - < /usr/local/share/lab-kvm/tiny-vm.py
+AMD-V のスイッチ（EFER.SVME）: 0
+KVM_CREATE_VM → 仮想マシンを作った
+AMD-V のスイッチ（EFER.SVME）: 1
+KVM_RUN → KVM_EXIT_IO（装置 0x3f8 に b'4' を書いた）
+KVM_RUN → KVM_EXIT_HLT（hlt で止まった）
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（4.0 秒）
+
+
+========== 2. 02-dev-kvm.html ==========
+
+$ grep -o -E '^kvm[a-z_]*' /proc/modules
+kvm_intel
+kvm
+
+$ ls -l /dev/kvm
+crw-rw-rw- 1 root 302 10, 232 Oct 14 03:26 /dev/kvm
+
+$ id
+uid=1000(lab) gid=1000(lab) groups=1000(lab),302
+
+$ getent group kvm 302
+
+$ echo $?
+2
+
+$ grep -E '^(Groups|CapEff|CapBnd)' /proc/self/status
+Groups:	302 1000
+CapEff:	0000000000000000
+CapBnd:	00000000a80425fb
+
+# --- nodev: 起動（--rm -it --name kvm-rep-nodev --hostname host lab-kvm:1.0.0）して入ったときの表示 ---
+練習機 linuc: 止まっている / /dev/kvm: なし（この檻は --device /dev/kvm なしで起動した）
+  qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
+
+
+── lab-kvm 1.0.0 ────────────────────────────────────────
+lab-kvm  進捗 0/5
+  次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-kvm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+# --- ここまで ---
+
+$ ls -l /dev/kvm
+ls: cannot access '/dev/kvm': No such file or directory
+
+$ grep -m1 -o -w -E 'vmx|svm' /proc/cpuinfo
+vmx
+
+$ grep -o -E '^kvm[a-z_]*' /proc/modules
+kvm_intel
+kvm
+
+$ virsh capabilities | grep -o "<domain type='[a-z]*'" | sort | uniq -c
+      2 <domain type='qemu'
+
+$ qemu-linuc -accel kvm
+▶ qemu-img create -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 /home/lab/vm/linuc.qcow2 20G
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm
+Could not access KVM kernel module: No such file or directory
+qemu-system-x86_64: -accel kvm: failed to initialize kvm: No such file or directory
+
+$ sudo mknod -m 666 /dev/kvm c 10 232
+
+$ ls -l /dev/kvm
+crw-rw-rw- 1 root root 10, 232 Oct 14 03:27 /dev/kvm
+
+$ qemu-linuc -accel kvm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm
+Could not access KVM kernel module: Operation not permitted
+qemu-system-x86_64: -accel kvm: failed to initialize kvm: Operation not permitted
+
+$ sudo sh -c 'exec 3<>/dev/kvm'
+sh: 1: cannot create /dev/kvm: Operation not permitted
+
+$ sudo chmod 600 /dev/kvm
+
+$ qemu-linuc -accel kvm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm
+Could not access KVM kernel module: Permission denied
+qemu-system-x86_64: -accel kvm: failed to initialize kvm: Permission denied
+
+$ grep -E '^(Groups|CapEff|CapBnd)' /proc/self/status
+Groups:	1000
+CapEff:	0000000000000000
+CapBnd:	00000000a80425fb
+
+$ exit
+logout
+
+
+========== 3. 03-accel.html ==========
+
+$ qemu-linuc
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid
+練習機が起動し終わりました（QEMU を起動してから 36.1 秒。カーネルの最初の表示は 6.1 秒の時点）
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+
+$ ssh linuc systemd-detect-virt
+qemu
+
+$ qemu-system-x86_64 -accel help
+Accelerators supported in QEMU binary:
+tcg
+kvm
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（5.0 秒）
+
+$ qemu-linuc -accel kvm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 7.2 秒。カーネルの最初の表示は 4.2 秒の時点）
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+/dev/kvm
+anon_inode:kvm-vm
+anon_inode:kvm-vcpu:0
+anon_inode:kvm-vcpu-stats:0
+anon_inode:kvm-vcpu:1
+anon_inode:kvm-vcpu-stats:1
+
+$ ssh linuc systemd-detect-virt
+kvm
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -enable-kvm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -enable-kvm
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 6.7 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+/dev/kvm
+anon_inode:kvm-vm
+anon_inode:kvm-vcpu:0
+anon_inode:kvm-vcpu-stats:0
+anon_inode:kvm-vcpu:1
+anon_inode:kvm-vcpu-stats:1
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel tcg -cpu host
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel tcg -cpu host
+qemu-system-x86_64: CPU model 'host' requires KVM or HVF
+
+
+========== 4. 04-speed.html ==========
+
+$ qemu-linuc -accel tcg
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel tcg
+練習機が起動し終わりました（QEMU を起動してから 33.7 秒。カーネルの最初の表示は 6.1 秒の時点）
+ssh linuc で入れます
+
+$ ssh linuc systemd-analyze
+Startup finished in 2.133s (kernel) + 25.432s (userspace) = 27.566s
+graphical.target reached after 24.625s in userspace.
+
+$ ps -o pid,etimes,times,comm -p $(pgrep qemu)
+    PID ELAPSED     TIME COMMAND
+   1513      34       59 qemu-system-x86
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（5.0 秒）
+
+$ qemu-linuc -accel kvm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 6.8 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ ssh linuc systemd-analyze
+Startup finished in 761ms (kernel) + 1.951s (userspace) = 2.712s
+graphical.target reached after 1.876s in userspace.
+
+$ ps -o pid,etimes,times,comm -p $(pgrep qemu)
+    PID ELAPSED     TIME COMMAND
+   1968       7        9 qemu-system-x86
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:27:02 2026 from 10.0.2.2
+
+$ grep -H '^GRUB_TIMEOUT=' /etc/default/grub.d/*.cfg
+/etc/default/grub.d/50-cloudimg-settings.cfg:GRUB_TIMEOUT=0
+/etc/default/grub.d/99-lab.cfg:GRUB_TIMEOUT=3
+
+$ journalctl --no-pager -o cat -g 'Detected virtualization|Startup finished in .*kernel'
+Detected virtualization qemu.
+Startup finished in 2.389s (kernel) + 30.669s (userspace) = 33.058s.
+Detected virtualization qemu.
+Startup finished in 2.181s (kernel) + 27.845s (userspace) = 30.026s.
+Detected virtualization kvm.
+Startup finished in 829ms (kernel) + 2.146s (userspace) = 2.976s.
+Detected virtualization kvm.
+Startup finished in 794ms (kernel) + 1.849s (userspace) = 2.643s.
+Detected virtualization qemu.
+Startup finished in 2.133s (kernel) + 25.432s (userspace) = 27.566s.
+Detected virtualization kvm.
+Startup finished in 761ms (kernel) + 1.951s (userspace) = 2.712s.
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+
+========== 5. 05-guest.html ==========
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:29:05 2026 from 10.0.2.2
+
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+Vendor ID:                               GenuineIntel
+Model name:                              QEMU Virtual CPU version 2.5+
+Hypervisor vendor:                       KVM
+
+$ grep -o -w -E 'vmx|svm|hypervisor' /proc/cpuinfo | sort | uniq -c
+      2 hypervisor
+
+$ sudo dmesg | grep -E 'Hypervisor detected|paravirtualized|kvm_amd|kvm_intel'
+[    0.000000] Hypervisor detected: KVM
+[    0.007317] Booting paravirtualized kernel on KVM
+
+$ sudo modprobe cpuid
+
+$ sudo od -A n -c -j $((0x40000000)) -N 16 /dev/cpu/0/cpuid
+ 001  \0  \0   @   K   V   M   K   V   M   K   V   M  \0  \0  \0
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ qemu-system-x86_64 -cpu help | grep -E '^ *x86 (qemu64|max|host) '
+x86 qemu64                (alias configured by machine type)
+x86 host                  processor with all supported host features
+x86 max                   Enables all features supported by the accelerator in the current host
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel kvm -cpu host
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm -cpu host
+練習機が起動し終わりました（QEMU を起動してから 6.7 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:29:05 2026 from 10.0.2.2
+
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+Vendor ID:                               GenuineIntel
+Model name:                              Intel(R) Core(TM) Ultra 9 285H
+Virtualization:                          VT-x
+Hypervisor vendor:                       KVM
+
+$ ls -l /dev/kvm
+crw-rw---- 1 root kvm 10, 232 Oct 14 03:29 /dev/kvm
+
+$ lsmod | grep kvm
+kvm_intel             487424  0
+kvm                  1404928  1 kvm_intel
+irqbypass              12288  1 kvm
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ cat /sys/module/kvm_intel/parameters/nested
+Y
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel kvm -cpu host,-vmx
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm -cpu host,-vmx
+練習機が起動し終わりました（QEMU を起動してから 6.7 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ ssh linuc "grep -o -w -E 'vmx|svm' /proc/cpuinfo | sort | uniq -c; ls -l /dev/kvm"
+ls: cannot access '/dev/kvm': No such file or directory
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel kvm -cpu host,kvm=off -snapshot
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm -cpu host,kvm=off -snapshot
+練習機が起動し終わりました（QEMU を起動してから 6.8 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+/dev/kvm
+anon_inode:kvm-vm
+anon_inode:kvm-vcpu:0
+anon_inode:kvm-vcpu-stats:0
+anon_inode:kvm-vcpu:1
+anon_inode:kvm-vcpu-stats:1
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:29:16 2026 from 10.0.2.2
+
+$ sudo modprobe cpuid
+
+$ sudo od -A n -c -j $((0x40000000)) -N 16 /dev/cpu/0/cpuid
+  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0
+
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+Vendor ID:                               GenuineIntel
+Model name:                              Intel(R) Core(TM) Ultra 9 285H
+Virtualization:                          VT-x
+
+$ sudo dmesg | grep -E 'Hypervisor detected|paravirtualized'
+[    0.007442] Booting paravirtualized kernel on bare hardware
+
+$ systemd-detect-virt
+qemu
+
+$ cat /sys/class/dmi/id/sys_vendor
+QEMU
+
+$ journalctl -b --no-pager -o cat -g 'Detected virtualization'
+Detected virtualization qemu.
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+
+========== 6. 06-site.html ==========
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ grep -E '<domain|<cpu' /etc/lab-vm/domain.xml.in
+<domain type='qemu' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
+  <cpu mode='maximum'/>
+
+$ virsh capabilities | grep -o "<domain type='[a-z]*'" | sort | uniq -c
+      2 <domain type='kvm'
+      2 <domain type='qemu'
+
+$ vm start
+▶ virsh start linuc
+  起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+  起動中… 20秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+練習機が起動しました（32秒）
+  入るには:  ssh linuc   （抜けるときは exit）
+
+$ ps -o args= -p $(pgrep qemu) | grep -o -E -- '-(accel|cpu) [a-z]+'
+-accel tcg
+-cpu max
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+
+$ ssh linuc systemd-detect-virt
+qemu
+
+$ vm stop
+▶ virsh shutdown linuc
+止まりました（6秒）

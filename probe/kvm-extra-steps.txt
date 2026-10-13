@@ -1,0 +1,16 @@
+# KVM の記事: 本文の注記の出どころ（著者の確かめ）。本文の端末ブロックには載せていない記録。
+#   python3 -I probe/kvm-seq.py --steps probe/kvm-extra-steps.txt --out logs/kvm-extra.log --prefix kvm-extra
+# 檻は読者と同じ起動（--device /dev/kvm --group-add <GID>）。
+
+== 第5章の注記: kvm=off の練習機に、基本の番号の最大が 0xD の CPU（古い Intel の CPU と同じ）を名乗らせる ==
+@main
+# level=13 で、CPUID の基本の番号の最大を 0xD にする。名前（0x40000000 番）を尋ねると、0xD 番の答えが返る
+$ qemu-linuc -accel kvm -cpu host,kvm=off,level=13 -snapshot
+$ ssh linuc
+$ sudo modprobe cpuid
+$ sudo od -A n -c -j $((0x40000000)) -N 16 /dev/cpu/0/cpuid
+$ sudo od -A n -t x4 -j $((0x40000000)) -N 16 /dev/cpu/0/cpuid
+$ sudo od -A n -t x4 -j 13 -N 16 /dev/cpu/0/cpuid
+$ sudo od -A n -t x4 -j 0 -N 16 /dev/cpu/0/cpuid
+$ exit
+$ qemu-linuc stop

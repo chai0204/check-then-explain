@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# qemu-linuc — 練習機（linuc）を、libvirt を通さずに qemu-system-x86_64 で直接起動する（KVM の記事の檻）。
+#
+#   qemu-linuc [QEMU のオプション…]   起動して、練習機が起動し終わるまで待つ   例: qemu-linuc -accel kvm -cpu host
+#   qemu-linuc stop                   練習機の中で poweroff を頼み、QEMU が終わるまで待つ
+#   qemu-linuc status [--short]       動いているか・どのアクセラレータか・/dev/kvm を開けるか
+#   qemu-linuc reset --yes            練習機のディスクを最初の状態に戻す（中の変更はすべて消える）
+#
+# 起動のたびに、実際に打つ qemu-system-x86_64 のコマンド行を ▶ で表示する。
+# 最後の行が、あなたが足したオプション（-accel や -cpu）。それより上は毎回同じ固定の部分で、
+# メモリ・CPU の数・ファームウェア（UEFI）・ディスク・NIC を、このサイトの他の練習機と同じにしてある。
+# このスクリプトを通さずに、▶ の行をそのまま打っても同じ練習機が起動する。
+set -uo pipefail
+VM=$HOME/vm
+DISK=$VM/linuc.qcow2
+BASE=/var/lib/lab-vm/linuc-guest.qcow2
+PIDF=$VM/qemu.pid
+SERIAL=$VM/serial.log
+
+show() { printf '▶ %s\n' "$*"; }
+sec() { printf '%d.%d' $(($1 / 1000)) $((($1 % 1000) / 100)); }   # ミリ秒 → 「12.3」
+qpid() {   # 動いている QEMU の PID（無ければ失敗）
+  local p; p=$(cat "$PIDF" 2>/dev/null) || return 1
+  [ "$(cat "/proc/$p/comm" 2>/dev/null)" = qemu-system-x86 ] && echo "$p"
+}
+accel() {  # KVM を使っている QEMU は、カーネルの中の仮想マシン（anon_inode:kvm-vm）をファイルとして持っている
+  readlink "/proc/$1/fd/"* 2>/dev/null | grep -qx 'anon_inode:kvm-vm' && echo KVM || echo TCG
+}
+# ssh の待ち受けは「SSH のバナーが返るか」で見る。QEMU のポート転送（slirp）は、練習機の sshd が
+# まだいなくても 127.0.0.1:2222 の接続を受け付けてから切るので、つながるかどうかでは分からない。
+# 練習機の NIC が上がる前に確かめると、応答が無いまま待たされる。待つのは 1 秒まで（4 秒にしていたときは、
+# KVM の起動が毎回 8.5 秒前後にそろってしまい、時間を測る道具として粗すぎた。実測 2026-10-14）。
+ssh_up() { timeout 1 bash -c 'exec 3<>/dev/tcp/127.0.0.1/2222 && head -c 4 <&3' 2>/dev/null | grep -q '^SSH-'; }
+kvm_dev() {  # この檻の /dev/kvm の様子を1行で
+  if [ ! -e /dev/kvm ]; then echo "なし（この檻は --device /dev/kvm なしで起動した）"; return; fi
+  local e; e=$( { exec 3<>/dev/kvm; } 2>&1 ) && { echo "あり（この檻の lab が読み書きできる）"; return; }
+  echo "あり（開けない: ${e##*: }）"
+}
+
+cmd_start() {
+  local p
+  if p=$(qpid); then echo "練習機はもう動いています（PID $p）。止めるには: qemu-linuc stop"; exit 1; fi
+  if ssh_up; then echo "127.0.0.1:2222 を別の練習機が使っています（vm で起動したもの・手で起動した QEMU など）"; exit 1; fi
+  mkdir -p "$VM"
+  if [ ! -f "$DISK" ]; then
+    show "qemu-img create -f qcow2 -b $BASE -F qcow2 $DISK 20G"
+    qemu-img create -q -f qcow2 -b "$BASE" -F qcow2 "$DISK" 20G || exit 1
+  fi
+  local fixed=(-machine q35 -m 1536 -smp 2
+               -bios /usr/share/ovmf/OVMF.fd
+               -drive "file=$DISK,if=virtio"
+               -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22
+               -device virtio-net-pci,netdev=n0,addr=0x10
+               -display none -serial "file:$SERIAL"
+               -daemonize -pidfile "$PIDF")
+  # 表示は読みやすさのために折り返す（\ は行の続き。打つときもこのままでよい）
+  local tail=" \\"; [ $# -eq 0 ] && tail=""
+  printf '▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \\\n'
+  printf '    -bios /usr/share/ovmf/OVMF.fd \\\n'
+  printf '    -drive file=%s,if=virtio \\\n' "$DISK"
+  printf '    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \\\n'
+  printf '    -device virtio-net-pci,netdev=n0,addr=0x10 \\\n'
+  printf '    -display none -serial file:%s \\\n' "$SERIAL"
+  printf '    -daemonize -pidfile %s%s\n' "$PIDF" "$tail"
+  [ $# -gt 0 ] && printf '    %s\n' "$*"
+  # 時間は2つ測る: 練習機が起動し終わるまでと、練習機のカーネルがシリアルに最初の行（「Linux version …」）を
+  # 出すまで。それより前はおおむねファームウェアと GRUB の時間（最初の行は、カーネルが動き出して、シリアルの画面を
+  # 使えるようになってから出るので、カーネルが動き出した瞬間より少し後になる）。
+  # カーネルの行は別の見張りが 0.1 秒ごとに探す。ssh の確かめは、練習機の NIC が上がる前だと
+  # 応答が無いまま待たされることがあり、同じ流れで探すとカーネルの時刻が遅れて見えた（実測）。
+  local t0 tk="" i w
+  rm -f "$VM/.kernel-start"
+  t0=$(date +%s%3N)
+  qemu-system-x86_64 "${fixed[@]}" "$@" || exit $?
+  ( for ((j = 0; j < 3000; j++)); do
+      grep -qa 'Linux version' "$SERIAL" 2>/dev/null && { date +%s%3N > "$VM/.kernel-start"; exit 0; }
+      sleep 0.1
+    done ) &
+  w=$!
+  for ((i = 0; i < 1200; i++)); do
+    ssh_up && break
+    qpid >/dev/null || { kill "$w" 2>/dev/null; echo "QEMU が終わりました（練習機は起動しませんでした）"; exit 1; }
+    sleep 0.25
+  done
+  ssh_up || { kill "$w" 2>/dev/null; echo "5 分待っても練習機の ssh が応答しません"; exit 1; }
+  # ssh が応答しても、練習機の systemd はまだ起動の途中のことがある（TCG では特に。systemd-analyze が
+  # 「Bootup is not yet finished」と断る）。練習機自身に、起動し終わるまで待ってもらう
+  timeout 300 ssh -o BatchMode=yes -o ConnectTimeout=5 linuc systemctl is-system-running --wait >/dev/null 2>&1
+  local t1; t1=$(date +%s%3N)
+  kill "$w" 2>/dev/null; wait "$w" 2>/dev/null
+  tk=$(cat "$VM/.kernel-start" 2>/dev/null)
+  if [ -n "$tk" ]; then
+    echo "練習機が起動し終わりました（QEMU を起動してから $(sec $((t1 - t0))) 秒。カーネルの最初の表示は $(sec $((tk - t0))) 秒の時点）"
+  else
+    echo "練習機が起動し終わりました（QEMU を起動してから $(sec $((t1 - t0))) 秒）"
+  fi
+  echo "ssh linuc で入れます"
+}
+
+cmd_stop() {
+  local p
+  p=$(qpid) || { echo "練習機は止まっています"; return 0; }
+  show "ssh linuc sudo poweroff"
+  ssh -o BatchMode=yes -o ConnectTimeout=5 linuc sudo poweroff >/dev/null 2>&1
+  local t0 i
+  t0=$(date +%s%3N)
+  for ((i = 0; i < 240; i++)); do
+    kill -0 "$p" 2>/dev/null || { rm -f "$PIDF"; echo "止まりました（$(sec $(($(date +%s%3N) - t0))) 秒）"; return 0; }
+    sleep 0.25
+  done
+  show "kill $p"
+  kill "$p" 2>/dev/null
+  for ((i = 0; i < 20; i++)); do kill -0 "$p" 2>/dev/null || break; sleep 0.5; done
+  rm -f "$PIDF"
+  echo "60 秒待っても止まらないので、QEMU を終わらせました（電源を抜いたのと同じ）"
+}
+
+cmd_status() {
+  local p st
+  if p=$(qpid); then st="動いている（$(accel "$p")）"; else st="止まっている"; fi
+  if [ "${1:-}" = "--short" ]; then
+    printf '練習機 linuc: %s / /dev/kvm: %s\n' "$st" "$(kvm_dev)"
+    return 0
+  fi
+  printf '練習機   : %s\n' "$st"
+  [ -n "${p:-}" ] && printf 'QEMU     : PID %s\n' "$p"
+  printf '/dev/kvm : %s\n' "$(kvm_dev)"
+  printf 'ディスク : %s（土台 %s）\n' "$DISK" "$BASE"
+}
+
+cmd_reset() {
+  if [ "${1:-}" != "--yes" ]; then
+    echo "練習機のディスクを最初の状態に戻します（中の変更はすべて消えます）。よければ: qemu-linuc reset --yes"
+    return 1
+  fi
+  if qpid >/dev/null; then echo "先に止めてください: qemu-linuc stop"; return 1; fi
+  rm -f "$DISK"
+  echo "戻しました。次の qemu-linuc で、最初の状態の練習機が起動します"
+}
+
+case "${1:-}" in
+  stop)   cmd_stop ;;
+  status) shift; cmd_status "$@" ;;
+  reset)  shift; cmd_reset "$@" ;;
+  -h|--help|help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *)      cmd_start "$@" ;;
+esac

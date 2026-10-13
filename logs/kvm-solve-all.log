@@ -1,0 +1,865 @@
+# 台本 probe/kvm-solve-steps.txtを、読者と同じ起動（docker run --rm -it --hostname host、名前の無いボリューム2つ、PID 1 は tini、
+# その子の bash -l、umask 022、TERM=xterm）の1つのシェルに、最初から順に打った記録（章の間で exit しない）。
+# 端末 80 桁 × 24 行。作り方: python3 -I probe/kvm-seq.py（イメージ lab-kvm:1.0.0）
+
+# KVM の記事の演習5本を、両方向で確かめる台本（未達・前提不足 → 模範解答 → 達成）。
+
+#   python3 -I probe/kvm-seq.py --steps probe/kvm-solve-steps.txt --out logs/kvm-solve-all.log --prefix kvm-solve \
+
+#     --sess-args "priv=--privileged" --sess-args "capadd=--device /dev/kvm --group-add <GID> --cap-add SYS_PTRACE" \
+
+#     --sess-args "root=--device /dev/kvm --user 0"
+
+# @nodev は --device なしで起動した檻（KVM が要る演習が前提不足 exit 2 になる経路）。@main は読者の檻。
+
+# @priv・@capadd・@root は、特権を渡しすぎた檻（演習02 の判定が CapBnd・CapEff で鳴ることの確かめ）。
+
+# 0660 の /dev/kvm で演習02 が未達 → 達成になる記録と、入れ子を許していない KVM・KVM の無いカーネルの記録は
+
+# logs/kvm-ubuntu.log（lab の仮想マシンの Ubuntu 24.04 で取った）。
+
+
+========== --device なしで起動した檻: KVM が要る演習は前提不足（exit 2） ==========
+
+# --- nodev: 起動（--rm -it --name kvm-solve-nodev --hostname host lab-kvm:1.0.0）して入ったときの表示 ---
+練習機 linuc: 止まっている / /dev/kvm: なし（この檻は --device /dev/kvm なしで起動した）
+  qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
+
+
+── lab-kvm 1.0.0 ────────────────────────────────────────
+lab-kvm  進捗 0/5
+  次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-kvm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+# --- ここまで ---
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（この檻の lab として /dev/kvm を読み書きで開き、自分の権限を /proc/self/status で見た）
+  観測 : この檻の /dev に kvm が無い
+         docker が動いているカーネルには KVM がある（/sys/module/kvm）・CPU は vmx を名乗っている
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ lab check 03
+⚠ 03 この環境では判定できません
+  前提不足: この檻には /dev/kvm がありません（--device /dev/kvm を付けずに起動しています。演習02）
+
+$ lab check 04
+⚠ 04 この環境では判定できません
+  前提不足: この檻には /dev/kvm がありません（--device /dev/kvm を付けずに起動しています。演習02）
+
+# 「KVM が駄目なら TCG」の頼み方（第3章の確認・理論編の目次の「実務」）。-accel kvm:tcg という書き方は無い
+
+$ qemu-linuc -accel kvm:tcg
+▶ qemu-img create -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 /home/lab/vm/linuc.qcow2 20G
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm:tcg
+qemu-system-x86_64: -accel kvm:tcg: invalid accelerator kvm:tcg
+
+$ qemu-linuc -machine accel=kvm:tcg
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -machine accel=kvm:tcg
+Could not access KVM kernel module: No such file or directory
+qemu-system-x86_64: failed to initialize kvm: No such file or directory
+qemu-system-x86_64: falling back to tcg
+練習機が起動し終わりました（QEMU を起動してから 39.5 秒。カーネルの最初の表示は 6.5 秒の時点）
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（5.0 秒）
+
+$ qemu-linuc -accel kvm -accel tcg
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm -accel tcg
+Could not access KVM kernel module: No such file or directory
+qemu-system-x86_64: -accel kvm: failed to initialize kvm: No such file or directory
+qemu-system-x86_64: falling back to tcg
+練習機が起動し終わりました（QEMU を起動してから 34.8 秒。カーネルの最初の表示は 6.1 秒の時点）
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（5.0 秒）
+
+$ exit
+logout
+
+
+========== 演習01 ==========
+
+# --- main: 起動（--rm -it --name kvm-solve-main --hostname host --device /dev/kvm --group-add 302 -v /home/lab/vm -v /home/lab/.lab lab-kvm:1.0.0）して入ったときの表示 ---
+groups: cannot find name for group ID 302
+練習機 linuc: 止まっている / /dev/kvm: あり（この檻の lab が読み書きできる）
+  qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
+
+
+── lab-kvm 1.0.0 ────────────────────────────────────────
+lab-kvm  進捗 0/5
+  次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-kvm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+# --- ここまで ---
+
+$ lab check 01
+✗ 01 未達
+  判定 : 観測型（QEMU のプロセスが開いているファイルと、練習機の中の OS の答えを見た）
+  観測 : 練習機（QEMU のプロセス）が動いていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+
+$ qemu-linuc -accel tcg
+▶ qemu-img create -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 /home/lab/vm/linuc.qcow2 20G
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel tcg
+練習機が起動し終わりました（QEMU を起動してから 31.8 秒。カーネルの最初の表示は 6.5 秒の時点）
+ssh linuc で入れます
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization):'
+Vendor ID:                               AuthenticAMD
+Model name:                              QEMU Virtual CPU version 2.5+
+Virtualization:                          AMD-V
+
+$ grep -o -w -E 'vmx|svm|hypervisor' /proc/cpuinfo | sort | uniq -c
+      2 hypervisor
+      2 svm
+
+$ ls -l /dev/kvm
+crw-rw---- 1 root kvm 10, 232 Oct 14 03:28 /dev/kvm
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ lab check 01
+✔ 01 達成
+  判定 : 観測型（QEMU のプロセスが開いているファイルと、練習機の中の OS の答えを見た）
+  観測 : QEMU（PID 82）は /dev/kvm も anon_inode:kvm-vm も持っていない → 命令を翻訳して動いている（TCG）
+         練習機の中の OS が ssh に応答した（systemd-detect-virt → qemu）
+         練習機の中の CPU: AuthenticAMD / QEMU Virtual CPU version 2.5+ / 仮想化支援の印 svm
+         練習機の中の /dev/kvm: ある（kvm_amd）
+         → あなたの PC の CPU とは別の、QEMU がソフトで作った CPU が、自分の名前と印を名乗っている
+
+
+========== 演習02（この檻は --device /dev/kvm --group-add <GID> で起動してある） ==========
+
+$ ls -l /dev/kvm
+crw-rw-rw- 1 root 302 10, 232 Oct 14 03:27 /dev/kvm
+
+$ id
+uid=1000(lab) gid=1000(lab) groups=1000(lab),302
+
+$ grep -E '^(Groups|CapEff|CapBnd)' /proc/self/status
+Groups:	302 1000
+CapEff:	0000000000000000
+CapBnd:	00000000a80425fb
+
+$ lab check 02
+✔ 02 達成
+  判定 : 観測型（この檻の lab として /dev/kvm を読み書きで開き、自分の権限を /proc/self/status で見た）
+  観測 : /dev/kvm → crw-rw-rw- root:302（番号 10, 232）
+         lab のグループ（Groups）→ 302 1000
+         lab が /dev/kvm を読み書きで開けた
+         CapBnd=00000000a80425fb（docker の既定のまま）・CapEff=0000000000000000 → 特権は増えていない
+         → 渡したのはデバイスのファイル1つと、それを開けるグループだけ
+
+
+========== 演習02 を、特権を渡しすぎた檻で（判定は CapBnd と CapEff で鳴る） ==========
+
+# --privileged で起動した檻。lab は root ではないので CapEff は 0 のまま、CapBnd（持てる特権の上限）が増える
+
+# --- priv: 起動（--rm -it --name kvm-solve-priv --hostname host --privileged lab-kvm:1.0.0）して入ったときの表示 ---
+練習機 linuc: 止まっている / /dev/kvm: あり（この檻の lab が読み書きできる）
+  qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
+
+
+── lab-kvm 1.0.0 ────────────────────────────────────────
+lab-kvm  進捗 0/5
+  次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-kvm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+# --- ここまで ---
+
+$ grep -E '^(Groups|CapEff|CapBnd)' /proc/self/status
+Groups:	1000
+CapEff:	0000000000000000
+CapBnd:	000001ffffffffff
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（この檻の lab として /dev/kvm を読み書きで開き、自分の権限を /proc/self/status で見た）
+  観測 : /dev/kvm → crw-rw-rw- root:302（番号 10, 232）
+         lab のグループ（Groups）→ 1000
+         lab が /dev/kvm を読み書きで開けた
+         CapBnd=000001ffffffffff → docker の既定（00000000a80425fb）より多くの特権を持てる（--privileged・--cap-add など）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ exit
+logout
+
+# --device /dev/kvm --group-add <GID> に --cap-add SYS_PTRACE を足した檻
+
+# --- capadd: 起動（--rm -it --name kvm-solve-capadd --hostname host --device /dev/kvm --group-add 302 --cap-add SYS_PTRACE lab-kvm:1.0.0）して入ったときの表示 ---
+groups: cannot find name for group ID 302
+練習機 linuc: 止まっている / /dev/kvm: あり（この檻の lab が読み書きできる）
+  qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
+
+
+── lab-kvm 1.0.0 ────────────────────────────────────────
+lab-kvm  進捗 0/5
+  次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-kvm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+# --- ここまで ---
+
+$ grep -E '^(Groups|CapEff|CapBnd)' /proc/self/status
+Groups:	302 1000
+CapEff:	0000000000000000
+CapBnd:	00000000a80c25fb
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（この檻の lab として /dev/kvm を読み書きで開き、自分の権限を /proc/self/status で見た）
+  観測 : /dev/kvm → crw-rw-rw- root:302（番号 10, 232）
+         lab のグループ（Groups）→ 302 1000
+         lab が /dev/kvm を読み書きで開けた
+         CapBnd=00000000a80c25fb → docker の既定（00000000a80425fb）より多くの特権を持てる（--privileged・--cap-add など）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ exit
+logout
+
+# --device /dev/kvm --user 0（root）で起動した檻
+
+# --- root: 起動（--rm -it --name kvm-solve-root --hostname host --device /dev/kvm --user 0 lab-kvm:1.0.0）して入ったときの表示 ---
+練習機 linuc: 止まっている / /dev/kvm: あり（この檻の lab が読み書きできる）
+  qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
+
+
+── lab-kvm 1.0.0 ────────────────────────────────────────
+lab-kvm  進捗 0/5
+  次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /root/.lab/progress.json（消すには docker volume rm lab-kvm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+# --- ここまで ---
+
+$ grep -E '^(Groups|CapEff|CapBnd)' /proc/self/status
+Groups:	0
+CapEff:	00000000a80425fb
+CapBnd:	00000000a80425fb
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（この檻の root として /dev/kvm を読み書きで開き、自分の権限を /proc/self/status で見た）
+  観測 : /dev/kvm → crw-rw-rw- root:302（番号 10, 232）
+         root のグループ（Groups）→ 0
+         root が /dev/kvm を読み書きで開けた
+         CapEff=00000000a80425fb → 特権が効いている。lab ではなく root として動いている（--user 0 など）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ exit
+logout
+
+
+========== 演習03 ==========
+
+$ lab check 03
+✗ 03 未達
+  判定 : 観測型（QEMU のプロセスが開いているファイルと、練習機の中の起動の記録を見た）
+  観測 : QEMU（PID 82）は anon_inode:kvm-vm を持っていない → 命令を翻訳して動いている（TCG）
+         練習機の中の systemd-detect-virt → qemu（練習機の名乗り。合否には使わない）
+         このディスクの起動の記録（練習機の名乗り）: qemu 1 回・kvm 0 回（いちばん新しい1回が、いまの起動）
+         いまの起動（練習機の名乗りは qemu）: Startup finished in 2.227s (kernel) + 23.109s (userspace) = 25.336s.
+         → いまより前に、このディスクを TCG で起動した記録が無い（練習機が qemu と記録した起動が無い。比べる相手がいない）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（5.2 秒）
+
+$ qemu-linuc -accel kvm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 7.1 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+/dev/kvm
+anon_inode:kvm-vm
+anon_inode:kvm-vcpu:0
+anon_inode:kvm-vcpu-stats:0
+anon_inode:kvm-vcpu:1
+anon_inode:kvm-vcpu-stats:1
+
+$ ssh linuc systemd-detect-virt
+kvm
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:28:21 2026 from 10.0.2.2
+
+$ journalctl --no-pager -o cat -g 'Detected virtualization|Startup finished in .*kernel'
+Detected virtualization qemu.
+Startup finished in 2.227s (kernel) + 23.109s (userspace) = 25.336s.
+Detected virtualization kvm.
+Startup finished in 756ms (kernel) + 2.198s (userspace) = 2.954s.
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ lab check 03
+✔ 03 達成
+  判定 : 観測型（QEMU のプロセスが開いているファイルと、練習機の中の起動の記録を見た）
+  観測 : QEMU（PID 662）は anon_inode:kvm-vm を持っている → KVM で動いている
+         練習機の中の systemd-detect-virt → kvm（練習機の名乗り。合否には使わない）
+         このディスクの起動の記録（練習機の名乗り）: qemu 1 回・kvm 1 回（いちばん新しい1回が、いまの起動）
+         いまの起動（練習機の名乗りは kvm）: Startup finished in 756ms (kernel) + 2.198s (userspace) = 2.954s.
+         それより前に qemu と記録した起動（最後に起動し終わったもの）: Startup finished in 2.227s (kernel) + 23.109s (userspace) = 25.336s.
+         → 同じ練習機（同じディスク）を、いまは KVM で動かしている（起動の時間は、上の2行で比べる）
+
+# 解答03 の【-enable-kvm】: 古い書き方 -machine accel=kvm でも、QEMU は同じように /dev/kvm を開く
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -machine accel=kvm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -machine accel=kvm
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 6.9 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+/dev/kvm
+anon_inode:kvm-vm
+anon_inode:kvm-vcpu:0
+anon_inode:kvm-vcpu-stats:0
+anon_inode:kvm-vcpu:1
+anon_inode:kvm-vcpu-stats:1
+
+$ lab check 03
+✔ 03 達成
+  判定 : 観測型（QEMU のプロセスが開いているファイルと、練習機の中の起動の記録を見た）
+  観測 : QEMU（PID 924）は anon_inode:kvm-vm を持っている → KVM で動いている
+         練習機の中の systemd-detect-virt → kvm（練習機の名乗り。合否には使わない）
+         このディスクの起動の記録（練習機の名乗り）: qemu 1 回・kvm 2 回（いちばん新しい1回が、いまの起動）
+         いまの起動（練習機の名乗りは kvm）: Startup finished in 790ms (kernel) + 1.984s (userspace) = 2.775s.
+         それより前に qemu と記録した起動（最後に起動し終わったもの）: Startup finished in 2.227s (kernel) + 23.109s (userspace) = 25.336s.
+         → 同じ練習機（同じディスク）を、いまは KVM で動かしている（起動の時間は、上の2行で比べる）
+
+# 名前を消して（kvm=off）KVM で起動すると、練習機は qemu と名乗る。判定は QEMU のファイルで KVM と決める（第5章。-snapshot で記録は残さない）
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel kvm -cpu host,kvm=off -snapshot
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm -cpu host,kvm=off -snapshot
+練習機が起動し終わりました（QEMU を起動してから 6.7 秒。カーネルの最初の表示は 4.0 秒の時点）
+ssh linuc で入れます
+
+$ ssh linuc systemd-detect-virt
+qemu
+
+$ lab check 03
+✔ 03 達成
+  判定 : 観測型（QEMU のプロセスが開いているファイルと、練習機の中の起動の記録を見た）
+  観測 : QEMU（PID 1198）は anon_inode:kvm-vm を持っている → KVM で動いている
+         練習機の中の systemd-detect-virt → qemu（練習機の名乗り。合否には使わない）
+         このディスクの起動の記録（練習機の名乗り）: qemu 2 回・kvm 2 回（いちばん新しい1回が、いまの起動）
+         いまの起動（練習機の名乗りは qemu）: Startup finished in 549ms (kernel) + 1.632s (userspace) = 2.181s.
+         それより前に qemu と記録した起動（最後に起動し終わったもの）: Startup finished in 2.227s (kernel) + 23.109s (userspace) = 25.336s.
+         → 同じ練習機（同じディスク）を、いまは KVM で動かしている（起動の時間は、上の2行で比べる）
+
+# 「KVM が駄目なら TCG」（-machine accel=kvm:tcg・-accel kvm -accel tcg）は、/dev/kvm を開ける檻では KVM を使う（第3章の表）
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -machine accel=kvm:tcg
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -machine accel=kvm:tcg
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 7.0 秒。カーネルの最初の表示は 4.3 秒の時点）
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+/dev/kvm
+anon_inode:kvm-vm
+anon_inode:kvm-vcpu:0
+anon_inode:kvm-vcpu-stats:0
+anon_inode:kvm-vcpu:1
+anon_inode:kvm-vcpu-stats:1
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel kvm -accel tcg
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm -accel tcg
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 7.2 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ readlink /proc/$(pgrep qemu)/fd/* | grep kvm
+/dev/kvm
+anon_inode:kvm-vm
+anon_inode:kvm-vcpu:0
+anon_inode:kvm-vcpu-stats:0
+anon_inode:kvm-vcpu:1
+anon_inode:kvm-vcpu-stats:1
+
+
+========== 演習04 ==========
+
+$ lab check 04
+✗ 04 未達
+  判定 : 観測型（練習機の中の CPU の名乗りを、あなたの PC の CPU と比べた）
+  観測 : QEMU（PID 1671）は KVM で動いている
+         あなたの PC の CPU : GenuineIntel / Intel(R) Core(TM) Ultra 9 285H（family 6・model 197・stepping 2）
+         練習機の中の CPU   : GenuineIntel / QEMU Virtual CPU version 2.5+（family 15・model 107・stepping 1）
+         → 名乗りが違う
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+
+# 名前だけをあなたの PC の CPU に付け替えた型（-cpu qemu64,model-id=…）は、型番（family・model・stepping）で見分ける
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel kvm -cpu "qemu64,model-id=$(lscpu | sed -n 's/^Model name: *//p')"
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm -cpu qemu64,model-id=Intel(R) Core(TM) Ultra 9 285H
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 7.0 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ lab check 04
+✗ 04 未達
+  判定 : 観測型（練習機の中の CPU の名乗りを、あなたの PC の CPU と比べた）
+  観測 : QEMU（PID 1938）は KVM で動いている
+         あなたの PC の CPU : GenuineIntel / Intel(R) Core(TM) Ultra 9 285H（family 6・model 197・stepping 2）
+         練習機の中の CPU   : GenuineIntel / Intel(R) Core(TM) Ultra 9 285H（family 15・model 107・stepping 1）
+         → モデル名は同じだが、メーカーか型番（family・model・stepping）が違う（名前だけを付け替えた別の型）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel kvm -cpu host
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm -cpu host
+練習機が起動し終わりました（QEMU を起動してから 7.7 秒。カーネルの最初の表示は 4.4 秒の時点）
+ssh linuc で入れます
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:28:46 2026 from 10.0.2.2
+
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization|Hypervisor vendor):'
+Vendor ID:                               GenuineIntel
+Model name:                              Intel(R) Core(TM) Ultra 9 285H
+Virtualization:                          VT-x
+Hypervisor vendor:                       KVM
+
+$ ls -l /dev/kvm
+crw-rw---- 1 root kvm 10, 232 Oct 14 03:29 /dev/kvm
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ lab check 04
+✔ 04 達成
+  判定 : 観測型（練習機の中の CPU の名乗りを、あなたの PC の CPU と比べた）
+  観測 : QEMU（PID 2182）は KVM で動いている
+         あなたの PC の CPU : GenuineIntel / Intel(R) Core(TM) Ultra 9 285H（family 6・model 197・stepping 2）
+         練習機の中の CPU   : GenuineIntel / Intel(R) Core(TM) Ultra 9 285H（family 6・model 197・stepping 2）
+         練習機の中の仮想化支援の印: vmx / 練習機の中の /dev/kvm: ある（kvm_intel）
+         → 練習機は、あなたの PC の CPU をそのまま名乗っている（中から見える画面が、読む人の PC で変わる）
+
+
+========== 演習05 ==========
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（練習機の中の CPU の名乗り・印と /dev/kvm を、練習機の中で見た）
+  観測 : QEMU（PID 2182）は KVM で動いている
+         練習機の中の CPU: GenuineIntel / Intel(R) Core(TM) Ultra 9 285H（family 6・model 197・stepping 2）
+         練習機の中の /proc/cpuinfo の vmx・svm → 4 vmx
+         練習機の中の /dev/kvm → ある（kvm_intel）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel tcg -cpu qemu64,-svm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel tcg -cpu qemu64,-svm
+練習機が起動し終わりました（QEMU を起動してから 32.8 秒。カーネルの最初の表示は 6.1 秒の時点）
+ssh linuc で入れます
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:29:53 2026 from 10.0.2.2
+
+$ lscpu | grep -E '^(Vendor ID|Model name|Virtualization):'
+Vendor ID:                               AuthenticAMD
+Model name:                              QEMU Virtual CPU version 2.5+
+
+$ ls -l /dev/kvm
+ls: cannot access '/dev/kvm': No such file or directory
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ lab check 05
+✔ 05 達成
+  判定 : 観測型（練習機の中の CPU の名乗り・印と /dev/kvm を、練習機の中で見た）
+  観測 : QEMU（PID 2497）は TCG で動いている
+         練習機の中の CPU: AuthenticAMD / QEMU Virtual CPU version 2.5+（family 15・model 107・stepping 1）
+         練習機の中の /proc/cpuinfo の vmx・svm → 無い
+         練習機の中の /dev/kvm → 無い
+         練習機の CPU は qemu64 か max の名乗りのまま（どちらも TCG では svm を名乗る型）、仮想化支援の印だけが無い
+         → CPU が仮想化支援を名乗らないので、練習機のカーネルは KVM を用意しなかった（入れ子の仮想化はできない）
+
+  ════════════════════════════════════════
+   確かめて説明する KVM — 全5演習クリア
+  ════════════════════════════════════════
+
+  所要 2分（最初の達成から最後の達成まで）
+
+  自分の手で確かめたこと
+
+   ✔ 01  TCG の練習機の CPU は QEMU が作ったもので、AMD の CPU と仮想化支援（svm）を名乗ること
+   ✔ 02  --device が /dev/kvm のファイルと開く許可を、--group-add がそれを開けるグループを渡し、特権は増えないこと
+   ✔ 03  -accel kvm を付けたときだけ QEMU は /dev/kvm を開き、カーネルの中の仮想マシンで命令を実行すること
+   ✔ 04  -cpu host は KVM のときだけ使え、練習機にあなたの PC の CPU の名前と印をそのまま見せること
+   ✔ 05  -cpu の後ろに -vmx・-svm を付けると印が消え、練習機の中の KVM（入れ子の仮想化）も消えること
+
+  この5つは全部、1つの事実から出ていました。
+
+      KVM の正体は、CPU の仮想化支援機能を使って仮想マシンを動かすカーネルの部品で、使う側には /dev/kvm というファイル1つで配られている。
+      QEMU はそれを開いたときだけ速くなり、練習機の中から見える CPU も変わる。
+      開けるかどうかは、CPU の印・カーネル・ファイルの権限・コンテナの許可の4つで決まる。
+
+  理論編の最終章に、それぞれがどう繋がるかを書いてあります → /kvm/theory/06-site
+
+# 解答05 の【もともと印を持たない型では、消したことにならない】: TCG の Intel の型（Nehalem）は初めから印が無い
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel tcg -cpu Nehalem
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel tcg -cpu Nehalem
+練習機が起動し終わりました（QEMU を起動してから 37.5 秒。カーネルの最初の表示は 5.7 秒の時点）
+ssh linuc で入れます
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（練習機の中の CPU の名乗り・印と /dev/kvm を、練習機の中で見た）
+  観測 : QEMU（PID 3015）は TCG で動いている
+         練習機の中の CPU: GenuineIntel / Intel Core i7 9xx (Nehalem Class Core i7)（family 6・model 26・stepping 3）
+         練習機の中の /proc/cpuinfo の vmx・svm → 無い
+         練習機の中の /dev/kvm → 無い
+         TCG のこの判定が見分けられるのは、qemu64 と max（どちらも TCG では svm を名乗る QEMU の型）の名乗りだけ
+         → 練習機の CPU はそのどちらの名乗りでもなく、印を消した結果かどうかが、この観測からは分からない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+# EPYC も TCG では svm を名乗るが、判定が見分けられるのは qemu64 と max の名乗りだけ
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（4.7 秒）
+
+$ qemu-linuc -accel tcg -cpu EPYC,-svm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel tcg -cpu EPYC,-svm
+qemu-system-x86_64: warning: TCG doesn't support requested feature: CPUID.80000001H:EDX.fxsr-opt [bit 25]
+qemu-system-x86_64: warning: TCG doesn't support requested feature: CPUID.80000001H:ECX.misalignsse [bit 7]
+qemu-system-x86_64: warning: TCG doesn't support requested feature: CPUID.80000001H:ECX.osvw [bit 9]
+qemu-system-x86_64: warning: TCG doesn't support requested feature: CPUID.80000001H:ECX.topoext [bit 22]
+qemu-system-x86_64: warning: TCG doesn't support requested feature: CPUID.0DH:EAX.xsavec [bit 1]
+qemu-system-x86_64: warning: TCG doesn't support requested feature: CPUID.80000001H:EDX.fxsr-opt [bit 25]
+qemu-system-x86_64: warning: TCG doesn't support requested feature: CPUID.80000001H:ECX.misalignsse [bit 7]
+qemu-system-x86_64: warning: TCG doesn't support requested feature: CPUID.80000001H:ECX.osvw [bit 9]
+qemu-system-x86_64: warning: TCG doesn't support requested feature: CPUID.80000001H:ECX.topoext [bit 22]
+qemu-system-x86_64: warning: TCG doesn't support requested feature: CPUID.0DH:EAX.xsavec [bit 1]
+練習機が起動し終わりました（QEMU を起動してから 32.0 秒。カーネルの最初の表示は 5.6 秒の時点）
+ssh linuc で入れます
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（練習機の中の CPU の名乗り・印と /dev/kvm を、練習機の中で見た）
+  観測 : QEMU（PID 3480）は TCG で動いている
+         練習機の中の CPU: AuthenticAMD / AMD EPYC Processor（family 23・model 1・stepping 2）
+         練習機の中の /proc/cpuinfo の vmx・svm → 無い
+         練習機の中の /dev/kvm → 無い
+         TCG のこの判定が見分けられるのは、qemu64 と max（どちらも TCG では svm を名乗る QEMU の型）の名乗りだけ
+         → 練習機の CPU はそのどちらの名乗りでもなく、印を消した結果かどうかが、この観測からは分からない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+# モデル名だけを qemu64 と同じにした別の型（Opteron_G1）は、型番で見分ける
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel tcg -cpu "Opteron_G1,model-id=QEMU Virtual CPU version 2.5+"
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel tcg -cpu Opteron_G1,model-id=QEMU Virtual CPU version 2.5+
+練習機が起動し終わりました（QEMU を起動してから 28.7 秒。カーネルの最初の表示は 6.0 秒の時点）
+ssh linuc で入れます
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（練習機の中の CPU の名乗り・印と /dev/kvm を、練習機の中で見た）
+  観測 : QEMU（PID 3926）は TCG で動いている
+         練習機の中の CPU: AuthenticAMD / QEMU Virtual CPU version 2.5+（family 15・model 6・stepping 1）
+         練習機の中の /proc/cpuinfo の vmx・svm → 無い
+         練習機の中の /dev/kvm → 無い
+         TCG のこの判定が見分けられるのは、qemu64 と max（どちらも TCG では svm を名乗る QEMU の型）の名乗りだけ
+         → 練習機の CPU はそのどちらの名乗りでもなく、印を消した結果かどうかが、この観測からは分からない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+# TCG の max（もともと svm を名乗る QEMU の型）から消せば合格
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.7 秒）
+
+$ qemu-linuc -accel tcg -cpu max,-svm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel tcg -cpu max,-svm
+練習機が起動し終わりました（QEMU を起動してから 31.6 秒。カーネルの最初の表示は 5.6 秒の時点）
+ssh linuc で入れます
+
+$ lab check 05
+✔ 05 達成
+  判定 : 観測型（練習機の中の CPU の名乗り・印と /dev/kvm を、練習機の中で見た）
+  観測 : QEMU（PID 4412）は TCG で動いている
+         練習機の中の CPU: AuthenticAMD / QEMU TCG CPU version 2.5+（family 6・model 6・stepping 3）
+         練習機の中の /proc/cpuinfo の vmx・svm → 無い
+         練習機の中の /dev/kvm → 無い
+         練習機の CPU は qemu64 か max の名乗りのまま（どちらも TCG では svm を名乗る型）、仮想化支援の印だけが無い
+         → CPU が仮想化支援を名乗らないので、練習機のカーネルは KVM を用意しなかった（入れ子の仮想化はできない）
+
+# KVM で -cpu を付けずに起動しても（既定の型は Intel の PC の KVM では初めから印が無い）、印を消したことにはしない
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.7 秒）
+
+$ qemu-linuc -accel kvm
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 6.8 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（練習機の中の CPU の名乗り・印と /dev/kvm を、練習機の中で見た）
+  観測 : QEMU（PID 4870）は KVM で動いている
+         練習機の中の CPU: GenuineIntel / QEMU Virtual CPU version 2.5+（family 15・model 107・stepping 1）
+         練習機の中の /proc/cpuinfo の vmx・svm → 無い
+         練習機の中の /dev/kvm → 無い
+         あなたの PC の CPU は「GenuineIntel / Intel(R) Core(TM) Ultra 9 285H（family 6・model 197・stepping 2）」。練習機の CPU はそれと違う型で、もともと印を持たない型でも印は出ない
+         → 印を消した結果かどうかが、この観測からは分からない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ qemu-linuc -accel kvm -cpu host,-vmx
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm -cpu host,-vmx
+練習機が起動し終わりました（QEMU を起動してから 6.7 秒。カーネルの最初の表示は 4.1 秒の時点）
+ssh linuc で入れます
+
+$ lab check 05
+✔ 05 達成
+  判定 : 観測型（練習機の中の CPU の名乗り・印と /dev/kvm を、練習機の中で見た）
+  観測 : QEMU（PID 5116）は KVM で動いている
+         練習機の中の CPU: GenuineIntel / Intel(R) Core(TM) Ultra 9 285H（family 6・model 197・stepping 2）
+         練習機の中の /proc/cpuinfo の vmx・svm → 無い
+         練習機の中の /dev/kvm → 無い
+         練習機はあなたの PC の CPU を名乗っているのに、仮想化支援の印だけが無い
+         → CPU が仮想化支援を名乗らないので、練習機のカーネルは KVM を用意しなかった（入れ子の仮想化はできない）
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ lab ls
+演習一覧
+  ✔ 01  練習機を TCG で起動し、中から見える CPU を確かめる 10分 / 影響度 B
+  ✔ 02  この檻の lab が /dev/kvm を開けるようにする 10分 / 影響度 B
+  ✔ 03  同じ練習機を KVM で起動し直し、起動の速さを比べる 12分 / 影響度 B
+  ✔ 04  練習機に、あなたの PC の CPU をそのまま見せる 10分 / 影響度 B
+  ✔ 05  練習機の CPU から、仮想化支援の印を消す 12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手

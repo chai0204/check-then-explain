@@ -1,0 +1,224 @@
+# 台本 probe/kvm-ubuntu-steps.txtを、読者と同じ起動（docker run --rm -it --hostname host、名前の無いボリューム2つ、PID 1 は tini、
+# その子の bash -l、umask 022、TERM=xterm）の1つのシェルに、最初から順に打った記録（章の間で exit しない）。
+# 端末 80 桁 × 24 行。作り方: python3 -I probe/kvm-seq.py（イメージ lab-kvm:1.0.0）
+
+# Ubuntu 24.04 の PC（/dev/kvm が crw-rw---- root:kvm、kvm の GID は 993）で、本文の起動コマンドを打った台本。
+
+# 著者の PC は /dev/kvm が 0666 で、--group-add が無くても開けてしまう。0660 の PC での違いを記録するため、
+
+# lab の仮想マシン（Ubuntu 24.04 の cloud image・入れ子の KVM・apt の docker.io 29.1.3）の中で取る:
+
+#   python3 -I kvm-seq.py --steps kvm-ubuntu-steps.txt --out kvm-ubuntu.log \
+
+#     --main-args "--device /dev/kvm --group-add 993" --nodev-args "--device /dev/kvm"
+
+# @pc はその PC のシェル、@nodev は --device /dev/kvm だけで起動した檻、@main は --group-add も付けた檻、
+
+# @bare は何も付けずに起動した檻。後半では、著者の PC では変えられないもの（あなたの PC のカーネルの設定）を、
+
+# この仮想マシンの中で変えて記録する: 入れ子の仮想化を許さない KVM（nested=0）と、KVM の無いカーネル（部品を外す）。
+
+
+========== Ubuntu 24.04 の PC（コンテナの外） ==========
+
+$ ls -l /dev/kvm
+crw-rw---- 1 root kvm 10, 232 Oct 13 18:26 /dev/kvm
+
+$ stat -c %g /dev/kvm
+993
+
+$ id
+uid=1000(student) gid=1000(student) groups=1000(student),112(docker)
+
+
+========== --device /dev/kvm だけで起動した檻 ==========
+
+# --- nodev: 起動（--rm -it --name kvm-seq-nodev --hostname host --device /dev/kvm lab-kvm:1.0.0）して入ったときの表示 ---
+練習機 linuc: 止まっている / /dev/kvm: あり（開けない: Permission denied）
+  qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
+
+
+── lab-kvm 1.0.0 ────────────────────────────────────────
+lab-kvm  進捗 0/5
+  次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-kvm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+# --- ここまで ---
+
+$ ls -l /dev/kvm
+crw-rw---- 1 root 993 10, 232 Oct 14 03:28 /dev/kvm
+
+$ id
+uid=1000(lab) gid=1000(lab) groups=1000(lab)
+
+$ qemu-linuc -accel kvm
+▶ qemu-img create -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 /home/lab/vm/linuc.qcow2 20G
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm
+Could not access KVM kernel module: Permission denied
+qemu-system-x86_64: -accel kvm: failed to initialize kvm: Permission denied
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（この檻の lab として /dev/kvm を読み書きで開き、自分の権限を /proc/self/status で見た）
+  観測 : /dev/kvm → crw-rw---- root:993（番号 10, 232）
+         lab のグループ（Groups）→ 1000
+         lab が /dev/kvm を読み書きで開こうとした → Permission denied
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ exit
+logout
+
+
+========== --device /dev/kvm --group-add 993 で起動した檻 ==========
+
+# --- main: 起動（--rm -it --name kvm-seq-main --hostname host --device /dev/kvm --group-add 993 -v /home/lab/vm -v /home/lab/.lab lab-kvm:1.0.0）して入ったときの表示 ---
+groups: cannot find name for group ID 993
+練習機 linuc: 止まっている / /dev/kvm: あり（この檻の lab が読み書きできる）
+  qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
+
+
+── lab-kvm 1.0.0 ────────────────────────────────────────
+lab-kvm  進捗 0/5
+  次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-kvm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+# --- ここまで ---
+
+$ ls -l /dev/kvm
+crw-rw---- 1 root 993 10, 232 Oct 14 03:28 /dev/kvm
+
+$ id
+uid=1000(lab) gid=1000(lab) groups=1000(lab),993
+
+$ qemu-linuc -accel kvm
+▶ qemu-img create -f qcow2 -b /var/lib/lab-vm/linuc-guest.qcow2 -F qcow2 /home/lab/vm/linuc.qcow2 20G
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+qemu-system-x86_64: warning: host doesn't support requested feature: CPUID.80000001H:ECX.svm [bit 2]
+練習機が起動し終わりました（QEMU を起動してから 10.2 秒。カーネルの最初の表示は 4.9 秒の時点）
+ssh linuc で入れます
+
+$ lab check 02
+✔ 02 達成
+  判定 : 観測型（この檻の lab として /dev/kvm を読み書きで開き、自分の権限を /proc/self/status で見た）
+  観測 : /dev/kvm → crw-rw---- root:993（番号 10, 232）
+         lab のグループ（Groups）→ 993 1000
+         lab が /dev/kvm を読み書きで開けた
+         CapBnd=00000000a80425fb（docker の既定のまま）・CapEff=0000000000000000 → 特権は増えていない
+         → 渡したのはデバイスのファイル1つと、それを開けるグループだけ
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.7 秒）
+
+
+========== 入れ子の仮想化を許していない KVM（kvm_intel を nested=0 で読み込み直した） ==========
+
+$ sudo modprobe -r kvm_intel
+
+$ sudo modprobe kvm_intel nested=0
+
+$ cat /sys/module/kvm_intel/parameters/nested
+N
+
+$ qemu-linuc -accel kvm -cpu host
+▶ qemu-system-x86_64 -machine q35 -m 1536 -smp 2 \
+    -bios /usr/share/ovmf/OVMF.fd \
+    -drive file=/home/lab/vm/linuc.qcow2,if=virtio \
+    -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -device virtio-net-pci,netdev=n0,addr=0x10 \
+    -display none -serial file:/home/lab/vm/serial.log \
+    -daemonize -pidfile /home/lab/vm/qemu.pid \
+    -accel kvm -cpu host
+練習機が起動し終わりました（QEMU を起動してから 9.7 秒。カーネルの最初の表示は 4.6 秒の時点）
+ssh linuc で入れます
+
+$ ssh linuc "grep -o -w -E 'vmx|svm' /proc/cpuinfo | sort | uniq -c; ls -l /dev/kvm"
+ls: cannot access '/dev/kvm': No such file or directory
+
+$ lab check 05
+⚠ 05 この環境では判定できません
+  判定 : 観測型（練習機の中の CPU の名乗り・印と /dev/kvm を、練習機の中で見た）
+  観測 : QEMU（PID 335）は KVM で動いている
+         練習機の中の CPU: GenuineIntel / Intel(R) Core(TM) Ultra 9 285H（family 6・model 197・stepping 2）
+         練習機の中の /proc/cpuinfo の vmx・svm → 無い
+         練習機の中の /dev/kvm → 無い
+  前提不足: あなたの PC の KVM は入れ子の仮想化を許していません（nested → N）。-cpu host にも初めから印が無いので、
+            消したかどうかをこの観測では確かめられません。TCG でやってください（qemu-linuc -accel tcg -cpu qemu64,-svm）
+
+$ qemu-linuc stop
+▶ ssh linuc sudo poweroff
+止まりました（3.5 秒）
+
+$ exit
+logout
+
+
+========== docker が動いているカーネルに KVM が無い（kvm の部品を外した） ==========
+
+$ sudo modprobe -r kvm_intel kvm
+
+$ ls -l /dev/kvm
+ls: cannot access '/dev/kvm': No such file or directory
+
+$ docker run --rm --device /dev/kvm lab-kvm:1.0.0 true
+docker: Error response from daemon: error gathering device information while adding custom device "/dev/kvm": no such file or directory
+
+Run 'docker run --help' for more information
+
+# --- bare: 起動（--rm -it --name kvm-seq-bare --hostname host lab-kvm:1.0.0）して入ったときの表示 ---
+練習機 linuc: 止まっている / /dev/kvm: なし（この檻は --device /dev/kvm なしで起動した）
+  qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
+
+
+── lab-kvm 1.0.0 ────────────────────────────────────────
+lab-kvm  進捗 0/5
+  次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-kvm-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+# --- ここまで ---
+
+$ ls -l /dev/kvm
+ls: cannot access '/dev/kvm': No such file or directory
+
+$ lab check 02
+⚠ 02 この環境では判定できません
+  判定 : 観測型（この檻の lab として /dev/kvm を読み書きで開き、自分の権限を /proc/self/status で見た）
+  前提不足: docker が動いているカーネルに KVM が見当たりません（/sys/module/kvm が無いか、CPU が vmx・svm を名乗っていない）。
+            この演習は、本文の記録で読んでください
+
+$ lab check 03
+⚠ 03 この環境では判定できません
+  前提不足: docker が動いているカーネルに KVM が見当たりません（/sys/module/kvm が無いか、CPU が vmx・svm を名乗っていない）。
+            この演習は、本文の記録で読んでください
+
+$ exit
+logout
+
+$ sudo modprobe kvm_intel
+
+$ ls -l /dev/kvm
+crw-rw---- 1 root kvm 10, 232 Oct 13 18:28 /dev/kvm
