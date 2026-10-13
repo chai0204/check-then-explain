@@ -90,17 +90,17 @@ $ cd ~/try
 $ sed -i '1s|.*|#!/bin/bash|' hello.sh; head -1 hello.sh
 #!/bin/bash
 $ (umask 077; chmod 644 hello.sh; chmod +x hello.sh; ls -l hello.sh)
--rwxr--r-- 1 lab lab 95 Oct 13 11:14 hello.sh
+-rwxr--r-- 1 lab lab 95 Oct 13 11:43 hello.sh
 $ (umask 077; chmod 644 hello.sh; chmod a+x hello.sh; ls -l hello.sh)
--rwxr-xr-x 1 lab lab 95 Oct 13 11:14 hello.sh
+-rwxr-xr-x 1 lab lab 95 Oct 13 11:43 hello.sh
 $ sudo usermod -aG staff alice; id alice
 uid=1001(alice) gid=1001(alice) groups=1001(alice),50(staff)
 $ sudo -u alice bash -c umask
 0002
 $ sudo -u alice bash -c 'cd /tmp && touch g.txt && chgrp staff g.txt && ls -l g.txt'
--rw-rw-r-- 1 alice staff 0 Oct 13 11:14 g.txt
+-rw-rw-r-- 1 alice staff 0 Oct 13 11:43 g.txt
 $ sudo -u alice bash -c 'cd /tmp && chown :alice g.txt && ls -l g.txt'
--rw-rw-r-- 1 alice alice 0 Oct 13 11:14 g.txt
+-rw-rw-r-- 1 alice alice 0 Oct 13 11:43 g.txt
 $ sudo -u alice bash -c 'cd /tmp && chgrp lab g.txt'
 chgrp: changing group of 'g.txt': Operation not permitted
 $ sudo -u alice bash -c 'cd /tmp && chown lab g.txt'

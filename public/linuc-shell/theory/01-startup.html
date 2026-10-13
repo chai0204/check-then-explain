@@ -244,7 +244,7 @@ $ sudo grep -n -B1 -A3 'not running interactively' /home/alice/.bashrc
 [~/.profile]
 [~/.bashrc]
 alice@linuc:~$ ll -d ~
-drwxr-x--- 1 alice alice 4096 Oct 13 10:43 /home/alice/
+drwxr-x--- 1 alice alice 4096 Oct 13 11:42 /home/alice/
 alice@linuc:~$ printf 'echo "[~/.bash_profile]"\nPATH="$HOME/bin:$PATH"\n' &gt; ~/.bash_profile
 alice@linuc:~$ cat ~/.bash_profile
 echo "[~/.bash_profile]"
@@ -297,7 +297,7 @@ $ sudo -iu alice
 [~/.profile]
 [~/.bashrc]
 alice@linuc:~$ ll -d ~
-drwxr-x--- 1 alice alice 4096 Oct 13 10:44 /home/alice/
+drwxr-x--- 1 alice alice 4096 Oct 13 11:43 /home/alice/
 alice@linuc:~$ exit
 logout
 [~/.bash_logout]</code></pre>
@@ -359,7 +359,7 @@ $ head -1 /etc/profile
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>ログインシェルかどうかは <code>shopt login_shell</code>、対話シェルかどうかは <code>$-</code> の <code>i</code> で分かる。終わるときの表示も <code>logout</code> と <code>exit</code> で違う</li><li>ログインシェルが読むのは <code>/etc/profile</code> と、<code>~/.bash_profile</code> → <code>~/.bash_login</code> → <code>~/.profile</code> のうち最初に見つかった1つ。終わるときに <code>~/.bash_logout</code></li><li>ログインしない対話シェルが読むのは <code>/etc/bash.bashrc</code> と <code>~/.bashrc</code></li><li>ログインシェルで <code>~/.bashrc</code> が読まれるのは、Ubuntu の <code>~/.profile</code> が読み込んでいるから。<code>~/.bash_profile</code> を作るとこの連鎖が切れる</li><li><code>su -</code> と <code>sudo -i</code> はログインシェル、<code>-</code> の無い <code>su</code> はログインしない対話シェル</li><li>ログインシェルそのものは <code>/etc/passwd</code> の最後の欄が決める。Ubuntu の <code>useradd</code> の既定は <code>/bin/sh</code></li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.0@sha256:377dbd9c61203aabe633343f1265668f3a719aa60e12d7e8a019368c7d8460b5 / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-shell/theory/">← 理論編 目次</a><a href="/linuc-shell/theory/02-source">次: 2. 子のシェルは、親を書き換えられない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

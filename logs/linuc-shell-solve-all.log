@@ -3,8 +3,8 @@
 ########## 0. 環境 ##########
 
 $ lab env
-テーマ    : lab-linuc-shell 1.0.0
-イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.0
+テーマ    : lab-linuc-shell 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.1
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -104,15 +104,15 @@ $ lab start 01
 
 $ sudo ls -la /home/bob
 total 40
-drwxr-x--- 1 bob  bob  4096 Oct 13 10:43 .
+drwxr-x--- 1 bob  bob  4096 Oct 13 11:42 .
 drwxr-xr-x 1 root root 4096 Oct 13 10:01 ..
--rw------- 1 bob  bob    40 Oct 13 10:43 .bash_history
+-rw------- 1 bob  bob    40 Oct 13 11:42 .bash_history
 -rw-r--r-- 1 bob  bob   220 Mar 31  2024 .bash_logout
 -rw-r--r-- 1 bob  bob    68 Oct 13 10:01 .bash_profile
 -rw-r--r-- 1 bob  bob  3771 Mar 31  2024 .bashrc
-drwxrwxr-x 2 bob  bob  4096 Oct 13 10:43 .lab
+drwxrwxr-x 2 bob  bob  4096 Oct 13 11:42 .lab
 -rw-r--r-- 1 bob  bob   807 Mar 31  2024 .profile
-drwxrwxr-x 2 bob  bob  4096 Oct 13 10:43 work
+drwxrwxr-x 2 bob  bob  4096 Oct 13 11:42 work
 
 $ sudo cat /home/bob/.bash_profile
 # ~/.bash_profile — 前任者が置いた設定
@@ -285,7 +285,7 @@ $ lab check 02; echo "exit=$?"
 exit=1
 
 $ mkdir -p ~/bin; cp ~/work/02/today ~/bin/; ls -l ~/bin/today
--rwxr-xr-x 1 lab lab 97 Oct 13 10:43 /home/lab/bin/today
+-rwxr-xr-x 1 lab lab 97 Oct 13 11:43 /home/lab/bin/today
 
 $ today; echo "exit=$?"
 /tmp/run.sh: line 16: today: command not found
@@ -388,7 +388,7 @@ $ lab start 03
 
 $ cd ~/work/03; ls -l
 total 4
--rwxr-xr-x 1 lab lab 227 Oct 13 10:43 greet
+-rwxr-xr-x 1 lab lab 227 Oct 13 11:43 greet
 
 $ cat greet
 #!/bin/sh
@@ -435,7 +435,7 @@ $ ./greet
 こんにちは、lab さん。今日は 10月13日 です
 
 $ sudo cp greet /usr/local/bin/greet; sudo chown lab /usr/local/bin/greet; ls -l /usr/local/bin/greet
--rwxr-xr-x 1 lab root 229 Oct 13 10:43 /usr/local/bin/greet
+-rwxr-xr-x 1 lab root 229 Oct 13 11:43 /usr/local/bin/greet
 
 $ sudo -iu alice greet
 こんにちは、alice さん。今日は 10月13日 です
@@ -455,14 +455,14 @@ $ echo "--- 所有者と権限を直す。711 だと alice は読めない ---"
 --- 所有者と権限を直す。711 だと alice は読めない ---
 
 $ sudo chown root:root /usr/local/bin/greet; sudo chmod 711 /usr/local/bin/greet; ls -l /usr/local/bin/greet
--rwx--x--x 1 root root 229 Oct 13 10:43 /usr/local/bin/greet
+-rwx--x--x 1 root root 229 Oct 13 11:43 /usr/local/bin/greet
 
 $ sudo -u alice greet; echo "exit=$?"
 /bin/bash: /usr/local/bin/greet: Permission denied
 exit=126
 
 $ sudo chmod 755 /usr/local/bin/greet; ls -l /usr/local/bin/greet
--rwxr-xr-x 1 root root 229 Oct 13 10:43 /usr/local/bin/greet
+-rwxr-xr-x 1 root root 229 Oct 13 11:43 /usr/local/bin/greet
 
 $ sudo -iu alice greet
 こんにちは、alice さん。今日は 10月13日 です
@@ -494,7 +494,7 @@ PATH=/usr/bin:/bin
 # 実行した人に挨拶する。全員が greet と打つだけで使えるようにしたい。
 
 $ sudo cp greet /usr/local/bin/greet; sudo chown root:root /usr/local/bin/greet; sudo chmod 755 /usr/local/bin/greet; ls -l /usr/local/bin/greet
--rwxr-xr-x 1 root root 248 Oct 13 10:43 /usr/local/bin/greet
+-rwxr-xr-x 1 root root 248 Oct 13 11:43 /usr/local/bin/greet
 
 $ sudo -u alice env PATH=/tmp/fake:/usr/local/bin:/usr/bin:/bin greet
 こんにちは、alice さん。今日は 10月13日 です
@@ -560,9 +560,9 @@ $ lab start 04
 
 $ cd ~/work/04; ls -l
 total 12
--rwxr-xr-x 1 lab lab  27 Oct 13 10:43 memo.txt
--rwxr-xr-x 1 lab lab 325 Oct 13 10:43 mkbak.sh
--rwxr-xr-x 1 lab lab  40 Oct 13 10:43 my notes.txt
+-rwxr-xr-x 1 lab lab  27 Oct 13 11:43 memo.txt
+-rwxr-xr-x 1 lab lab 325 Oct 13 11:43 mkbak.sh
+-rwxr-xr-x 1 lab lab  40 Oct 13 11:43 my notes.txt
 
 $ lab check 04; echo "exit=$?"
 ✗ 04 未達
@@ -1298,8 +1298,8 @@ $ lab ls
 ########## K. 最終環境 ##########
 
 $ lab env
-テーマ    : lab-linuc-shell 1.0.0
-イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.0
+テーマ    : lab-linuc-shell 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.1
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
