@@ -205,7 +205,7 @@ iputils が tracepath6 をやめて <code>tracepath -6</code> に一本化した
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>NIC を上げるとリンクローカル（fe80::/10）が必ず付く。ルータ広告があれば SLAAC でもう1つ（ここでは ULA の fd00:10::/64）が付く</li><li>EUI-64 は MAC の真ん中に ff:fe を挟み、先頭の 7 ビット目を反転して後半 64 ビットを作る</li><li>リンクローカル宛てには <code>%NIC名</code> が要る。付けないと別の NIC から出て Address unreachable になる</li><li>IPv6 にブロードキャストは無い。全員宛ては ff02::1（マルチキャスト）、ARP の代わりは NDP</li><li><code>ping6</code> / <code>traceroute6</code> / <code>tracepath -6</code>。Ubuntu 24.04 には <code>tracepath6</code> が無い</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / iputils 20240117 / traceroute 2.1.5 / ifupdown 0.8.41 / dnsmasq-base 2.91（ルータ広告）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.0@sha256:a313bee9879c93ce7e87f6f58dcbebb2f753fd671235af9355b1607c484e909c / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ iproute2 6.1.0 / iputils 20240117 / traceroute 2.1.5 / ifupdown 0.8.41 / dnsmasq-base 2.91（ルータ広告）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-network/theory/05-trace">← 5. traceroute は、断られた返事で道を知る</a><a href="/linuc-network/theory/07-ports">次: 7. LISTEN していても、外からは入れない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
