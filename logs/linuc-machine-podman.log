@@ -1,0 +1,27 @@
+# 仮想マシン型の檻（土台 lab-linuc-machine:1.0.0）を podman 5.8.6 rootless（lab ユーザ）で起動した記録。2026-10-13
+# 試験に使った檻: lab-linuc-admin:1.0.0（docker save | ssh lab podman load で送った）
+# 起動: podman run -d --name podman-vm-test --hostname host --stop-timeout 30 -v /home/lab/vm -v /home/lab/.lab <image>
+
+Loaded image: docker.io/library/lab-linuc-admin:1.0.0
+$ bash podman-vm-inner.sh
+podman version 5.8.6
+ssh まで: 32 秒
+練習機 linuc: running（エージェント 応答あり / ssh 待ち受け中）
+qemu:///session
+ Id   Name    State
+-----------------------
+ 1    linuc   running
+
+linuc
+6.8.0-142-generic
+running
+root
+lab-guest rc=0
+演習一覧
+  · 01  ユーザを1人、使える状態で作る  12分 / 影響度 B
+  · 02  今の所属を残したまま、グループを1つ足す 10分 / 影響度 B
+CapEff:	0000000000000000
+CapBnd:	00000000800405fb
+0022
+podman stop: 4 秒 / 終了コード 0
+== 片付け済み
