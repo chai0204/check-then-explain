@@ -1,0 +1,67 @@
+# docker の CLI が podman の受け口に頼むときの版の番号を、受け口の記録で確かめた記録。作り方: bash probe/podman-api.sh。2026-10-14
+# 檻: lab-podman:1.0.0（sha256:3f74d5a000e1df114762a2e06176fbc2afcaedfda3416168cf6a207a560f414a）。練習機の中で student として打つ
+
+$ systemctl --user start podman.socket
+
+$ DOCKER_HOST=unix:///run/user/1000/podman/podman.sock docker version --format 'client {{.Client.APIVersion}} / server {{.Server.APIVersion}}'
+client 1.52 / server 1.41
+終了コード 0
+--- 受け口に届いた要求（podman.service の記録）
+"HEAD /_ping HTTP/1.1" 200
+"HEAD /_ping HTTP/1.1" 200
+"GET /v1.52/version HTTP/1.1" 200
+
+$ DOCKER_HOST=unix:///run/user/1000/podman/podman.sock docker ps --format "{{.Names}}"
+終了コード 0
+--- 受け口に届いた要求（podman.service の記録）
+"HEAD /_ping HTTP/1.1" 200
+"HEAD /_ping HTTP/1.1" 200
+"GET /v1.52/containers/json HTTP/1.1" 200
+
+$ DOCKER_HOST=unix:///run/user/1000/podman/podman.sock docker run --rm alpine:3.24.2 true
+終了コード 0
+--- 受け口に届いた要求（podman.service の記録）
+"HEAD /_ping HTTP/1.1" 200
+"HEAD /_ping HTTP/1.1" 200
+"HEAD /_ping HTTP/1.1" 200
+"POST /v1.52/containers/create HTTP/1.1" 201
+"HEAD /_ping HTTP/1.1" 200
+"HEAD /_ping HTTP/1.1" 200
+"HEAD /_ping HTTP/1.1" 200
+"POST /v1.52/containers/<ID>/start HTTP/1.1" 204
+"POST /v1.52/containers/<ID>/attach?stderr=1&stdout=1&stream=1 HTTP/1.1" 200
+"POST /v1.52/containers/<ID>/wait?condition=removed HTTP/1.1" 200
+
+$ DOCKER_HOST=unix:///run/user/1000/podman/podman.sock docker images --format "{{.Repository}}:{{.Tag}}"
+alpine:3.24.2
+busybox:1.38.0
+終了コード 0
+--- 受け口に届いた要求（podman.service の記録）
+"HEAD /_ping HTTP/1.1" 200
+"HEAD /_ping HTTP/1.1" 200
+"GET /v1.52/images/json HTTP/1.1" 200
+
+$ DOCKER_HOST=unix:///run/user/1000/podman/podman.sock docker images
+API version 1.41 is not supported by this client: the minimum supported API version is 1.44
+終了コード 1
+--- 受け口に届いた要求（podman.service の記録）
+"HEAD /_ping HTTP/1.1" 200
+"HEAD /_ping HTTP/1.1" 200
+
+$ DOCKER_HOST=unix:///run/user/1000/podman/podman.sock DOCKER_API_VERSION=1.41 docker images --format "{{.Repository}}:{{.Tag}}"
+alpine:3.24.2
+busybox:1.38.0
+終了コード 0
+--- 受け口に届いた要求（podman.service の記録）
+"HEAD /_ping HTTP/1.1" 200
+"GET /v1.41/images/json HTTP/1.1" 200
+
+$ DOCKER_HOST=unix:///run/user/1000/podman/podman.sock docker image inspect --platform linux/amd64 alpine:3.24.2 --format "{{.Id}}"
+
+API version 1.41 is not supported by this client: the minimum supported API version is 1.44
+終了コード 1
+--- 受け口に届いた要求（podman.service の記録）
+"HEAD /_ping HTTP/1.1" 200
+"HEAD /_ping HTTP/1.1" 200
+
+$ systemctl --user stop podman.socket podman.service

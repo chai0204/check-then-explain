@@ -28,7 +28,7 @@
 <p>コンテナはイメージから作った。だからコンテナの中で <code>/etc/motd</code> を消せば、元のイメージからも消える。
 同じイメージから次に起動するコンテナにも、もう <code>/etc/motd</code> は無いはずだ。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ docker run -d --name w1 alpine:3.24.2 sleep 1000
-6534eaca511d5a5218d35ae6f675b292a816d23ea4fa18c26ce9a31eeae9a5b1
+73e6fc00af4bb0b5d84fe0b533c63b272053d3b78f1e50322c4cf4d40a699a85
 $ docker exec w1 rm /etc/motd
 $ docker exec w1 sh -c 'echo hello &gt; /root/note.txt'
 $ docker diff w1 | sort -k2
@@ -69,16 +69,16 @@ $ low=$(sudo findmnt -N $pid -n -o OPTIONS / | tr ',' '\n' | sed -n 's/^lowerdir
 $ sudo ls -lR $up
 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/fs:
 total 8
-drwxr-xr-x 2 root root 4096 Oct 14 03:43 etc
-drwx------ 2 root root 4096 Oct 14 03:43 root
+drwxr-xr-x 2 root root 4096 Oct 14 05:11 etc
+drwx------ 2 root root 4096 Oct 14 05:11 root
 
 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/fs/etc:
 total 0
-c--------- 2 root root 0, 0 Oct 14 03:43 motd
+c--------- 2 root root 0, 0 Oct 14 05:11 motd
 
 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/fs/root:
 total 4
--rw-r--r-- 1 root root 6 Oct 14 03:43 note.txt
+-rw-r--r-- 1 root root 6 Oct 14 05:11 note.txt
 $ sudo ls -l $low/etc/motd
 -rw-r--r-- 1 root root 284 Mar 25  2026 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs/etc/motd</code></pre>
 <p>上の層には、<code>/root/note.txt</code>（足したファイル）があり、<code>/etc/motd</code> は<b>種類が <code>c</code>（文字デバイス）で番号が 0, 0 の特別なファイル</b>になっていた。
@@ -131,7 +131,7 @@ repositories
 world
 $ docker run --rm -v "$HOME/apkdir":/etc/apk alpine:3.24.2 ls /etc/apk
 $ ls -ld ~/apkdir
-drwxr-xr-x 2 root root 4096 Oct 14 03:43 /home/student/apkdir
+drwxr-xr-x 2 root root 4096 Oct 14 05:11 /home/student/apkdir
 $ docker run --rm --mount type=bind,source="$HOME/nodir",target=/etc/apk alpine:3.24.2 ls /etc/apk
 docker: Error response from daemon: invalid mount config for type "bind": bind source path does not exist: /home/student/nodir
 
@@ -147,7 +147,7 @@ alpine の <code>/tmp</code>（中身は空で、誰でも書ける <code>drwxrw
 <pre data-where="練習機の中（student@linuc）"><code>$ docker run --rm -v tmpvol:/tmp alpine:3.24.2 ls -ld /tmp
 drwxrwxrwt    2 root     root          4096 Sep 17 17:32 /tmp
 $ docker run --rm -v "$HOME/tmpdir":/tmp alpine:3.24.2 ls -ld /tmp
-drwxr-xr-x    2 root     root          4096 Oct 13 18:44 /tmp</code></pre>
+drwxr-xr-x    2 root     root          4096 Oct 13 20:11 /tmp</code></pre>
 <p>名前付きボリュームの <code>/tmp</code> は、中身が空でもイメージと同じ <code>drwxrwxrwt</code> になった。バインドマウントの <code>~/tmpdir</code> は、docker が作ったときの <code>drwxr-xr-x</code> の root の持ち物のままで、イメージの権限は写らない。</p>
 <p>写すかどうかは、コンテナを作るときにボリュームが空かどうかだけで決まる。新しいかどうか、何回目かは見ない。<code>apkvol</code> を空にしてから、もう一度使う。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo find /var/lib/docker/volumes/apkvol/_data -mindepth 1 -delete

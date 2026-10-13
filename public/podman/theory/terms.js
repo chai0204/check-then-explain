@@ -74,7 +74,7 @@ window.TERM_GROUPS = [
   { g: "pod と systemd", terms: [
     { t:"infra", alt:["infra コンテナ","pause"], id:"infra",
       hint:"pod の名前空間を持ち続け、pod の網の寿命の区切りになる、何もしないコンテナ",
-      body:"pod を作ると podman が最初に作るコンテナで、中身は何もしないで眠り続けるだけのプログラム（localhost/podman-pause のイメージ。catatonit から作る）。pod の uts・ipc の名前空間を持ち続け、アプリのコンテナはそこに相乗りする。pod の網（rootless では <code>/run/user/1000/netns/</code> の下のファイルで固定する）も infra が動いている間は保たれ、infra を止めると podman が片付ける。アプリが入れ替わっても、infra が動いていればアドレスと公開は変わらない。<b>たとえ</b>: シェアハウスの<b>大家</b>。何もしないで住み続け、住所を保つ。<b>崩れる点</b>: 大家は住人の面倒を見ることもあるが、infra は本当に何もしない。住人が落ちても起こしたりしない（それは <code>--restart</code> や systemd の仕事）。",
+      body:"pod を作ると podman が最初に作るコンテナで、中身は何もしないで眠り続けるだけのプログラム（localhost/podman-pause のイメージ。catatonit から作る）。pod の uts・ipc の名前空間を持ち続け、アプリのコンテナはそこに相乗りする。pod の網（rootless では <code>/run/user/1000/netns/</code> の下のファイルで固定する）も infra が動いている間は保たれ、infra を止めると podman が外とのつなぎ（tap0・公開・網のファイル）を片付ける（名前空間は、入っているアプリがいる間は残り、lo だけになる）。アプリが入れ替わっても、infra が動いていればアドレスと公開は変わらない。<b>たとえ</b>: シェアハウスの<b>大家</b>。何もしないで住み続け、住所を保つ。<b>崩れる点</b>: 大家は住人の面倒を見ることもあるが、infra は本当に何もしない。住人が落ちても起こしたりしない（それは <code>--restart</code> や systemd の仕事）。",
       misread:"pod の管理をしているプロセスだと思われがちだが、名前空間を持っているだけで、何も管理していない。", ch:5 },
 
     { t:"linger", alt:["enable-linger"], id:"linger",
@@ -95,7 +95,7 @@ window.TERM_GROUPS = [
 
     { t:"docker 互換の API", id:"compat-api",
       hint:"podman が docker の API の形で頼みを受け付ける受け口（podman.socket）",
-      body:"podman は <code>podman system service</code>（student の systemd の <code>podman.socket</code>）で、docker の API と同じ形の受け口を開ける。<code>DOCKER_HOST</code> をそのソケットに向ければ、docker の CLI が podman にコンテナを作らせる。podman 4.9 は docker の API の 1.41 版として振る舞う。docker の CLI 29 は 1.44 版より古いサーバとの版合わせを断る決まりを持っていて、たいていのコマンドは断りを無視して動くが、既定の <code>docker images</code> の表示は断られる（<code>DOCKER_API_VERSION=1.41</code> か <code>--format</code> で出る）。<b>たとえ</b>: <b>通訳つきの窓口</b>。<b>崩れる点</b>: 窓口の通訳の世代を聞いて、客（CLI）のほうが「古い通訳は相手にしない」と決めていることがある。断るのは窓口ではなく客の側。",
+      body:"podman は <code>podman system service</code>（student の systemd の <code>podman.socket</code>）で、docker の API と同じ形の受け口を開ける。<code>DOCKER_HOST</code> をそのソケットに向ければ、docker の CLI が podman にコンテナを作らせる。podman 4.9 は docker の API の 1.41 版として振る舞う。docker の CLI 29 は 1.44 版より古いサーバとの版合わせを断る決まりを持っていて、たいていのコマンドは断りを無視して CLI 自身の版（1.52）の番号のまま頼み、podman はそれを咎めずに答えるので動くが、既定の <code>docker images</code> の表示などは断られる（<code>DOCKER_API_VERSION=1.41</code> か <code>--format</code> で出る）。<b>たとえ</b>: <b>通訳つきの窓口</b>。<b>崩れる点</b>: 窓口の通訳の世代を聞いて、客（CLI）のほうが「古い通訳は相手にしない」と決めていることがある。断るのは窓口ではなく客の側。",
       misread:"podman が dockerd を中に持っていると思われがちだが、docker の API の形を真似ているだけで、相手の版をどう扱うかはクライアントの側の決まりでも変わる。", ch:7 },
   ]},
 ];

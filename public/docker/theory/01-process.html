@@ -30,7 +30,7 @@ containerd の内部（スナップショッタやプラグインの構成）、
 <p>コンテナは小さな仮想マシンだ。<code>docker run alpine</code> は Alpine Linux を起動する。
 だから中では Alpine のカーネルが動き、最初に init（PID 1）が起動して、その上で頼んだコマンドが動いているはずだ。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ docker run -d --name c1 alpine:3.24.2 sleep 1000
-3e689908b618f54bb8ed5c71bc14e1548ca6e1006b747ff138a35b5ab4f2dcfc
+981267bab3a9c262d93876775c313b695912e8eef8bb99f472684d49e5f43c91
 $ docker exec c1 ps
 PID   USER     TIME  COMMAND
     1 root      0:00 sleep 1000
@@ -58,17 +58,17 @@ PRETTY_NAME="Ubuntu 24.04.5 LTS"</code></pre>
 <h2 id="ps">外から見ると、ただのプロセス</h2>
 <div class="sgoal"><b>この節で分かること</b>: 同じプロセスが、中と外で別の番号を持っていること。</div>
 <pre data-where="練習機の中（student@linuc）"><code>$ docker ps
-CONTAINER ID   IMAGE           COMMAND        CREATED          STATUS         PORTS     NAMES
-3e689908b618   alpine:3.24.2   "sleep 1000"   10 seconds ago   Up 9 seconds             c1
+CONTAINER ID   IMAGE           COMMAND        CREATED          STATUS          PORTS     NAMES
+981267bab3a9   alpine:3.24.2   "sleep 1000"   12 seconds ago   Up 10 seconds             c1
 $ pid=$(docker inspect -f '{{.State.Pid}}' c1)
 $ echo $pid
-1018
+1002
 $ ps -o pid,ppid,user,cmd -p $pid
     PID    PPID USER     CMD
-   1018     995 root     sleep 1000</code></pre>
+   1002     978 root     sleep 1000</code></pre>
 <p><code>docker inspect -f</code> は、コンテナの情報から1つの項目だけを取り出す（<code>{{.State.Pid}}</code> は「練習機から見た PID」）。
 その番号で練習機の <code>ps</code> を引くと、<code>sleep 1000</code> が root のプロセスとして1行で出た。
-コンテナの中では PID 1、練習機からは PID 1018。<b>同じ1つのプロセスに、番号が2つ付いている</b>。
+コンテナの中では PID 1、練習機からは PID 1002。<b>同じ1つのプロセスに、番号が2つ付いている</b>。
 番号の付け方を分けているのが、次の名前空間である（あなたの画面の PID は本文と違ってよい。以下では変数 <code>$pid</code> で指す）。</p>
 
 <h2 id="ns">見え方の区切り — 名前空間</h2>
@@ -88,7 +88,7 @@ mnt:[4026532354]
 net:[4026532359]
 user:[4026531837]
 $ docker exec c1 hostname
-3e689908b618
+981267bab3a9
 $ hostname
 linuc</code></pre>
 <p>pid・uts・mnt・net の4つは番号が違う。<b>番号が違えば、別の名前空間にいる</b>。ところが最後の <code>user</code> だけは同じ番号だった。</p>
@@ -106,9 +106,9 @@ linuc</code></pre>
 <h2 id="cgroup">使える量の区切り — cgroup</h2>
 <div class="sgoal"><b>この節で分かること</b>: cgroup がプロセスをどこにまとめ、どこで量を絞っているか。</div>
 <pre data-where="練習機の中（student@linuc）"><code>$ cat /proc/$pid/cgroup
-0::/system.slice/docker-3e689908b618f54bb8ed5c71bc14e1548ca6e1006b747ff138a35b5ab4f2dcfc.scope
+0::/system.slice/docker-981267bab3a9c262d93876775c313b695912e8eef8bb99f472684d49e5f43c91.scope
 $ docker run -d --name c2 --memory 64m alpine:3.24.2 sleep 1000
-652e855e31ed2f91752c5be03ff52ad9d48a751b320d9a2e7fa1f0835c95625b
+3bdec56de34b37bcf83d3d232df2d187edfb69b0055e853f01db8c7494afb5cd
 $ docker exec c2 cat /sys/fs/cgroup/memory.max
 67108864
 $ systemctl show --property=MemoryMax docker-$(docker inspect -f '{{.Id}}' c2).scope
@@ -130,7 +130,7 @@ CPU の上限なら止めずに遅くするだけで、量の種類ごとに超�
 <div class="sgoal"><b>この節で分かること</b>: <code>docker run</code> を打ってからプロセスができるまでに、誰が何をしているか。</div>
 <p><code>docker</code> コマンド（CLI）は、自分ではコンテナを作らない。ソケットを通して、root で動いている <b>dockerd</b>（docker のデーモン）に頼む。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls -l /run/docker.sock
-srw-rw---- 1 root docker 0 Oct 14 03:39 /run/docker.sock
+srw-rw---- 1 root docker 0 Oct 14 05:07 /run/docker.sock
 $ id
 uid=1000(student) gid=1000(student) groups=1000(student),4(adm),27(sudo),108(docker)
 $ docker version --format 'client {{.Client.Version}} / server {{.Server.Version}}'
@@ -140,12 +140,12 @@ client 29.1.3 / server 29.1.3</code></pre>
 <p>頼まれた dockerd も、自分ではプロセスを作らない。練習機の中で、関係するプロセスを並べる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ps -o pid,ppid,user,comm -C dockerd,containerd,containerd-shim,sleep
     PID    PPID USER     COMMAND
-    556       1 root     containerd
-    710       1 root     dockerd
-    995       1 root     containerd-shim
-   1018     995 root     sleep
-   1197       1 root     containerd-shim
-   1221    1197 root     sleep
+    540       1 root     containerd
+    689       1 root     dockerd
+    978       1 root     containerd-shim
+   1002     978 root     sleep
+   1181       1 root     containerd-shim
+   1206    1181 root     sleep
 $ runc --version
 runc version 1.3.4-0ubuntu1~24.04.1
 spec: 1.2.1
@@ -155,8 +155,8 @@ $ ps -C runc
     PID TTY          TIME CMD
 $ sudo runc --root /run/docker/runtime-runc/moby state $(docker inspect -f '{{.Id}}' c1) | jq '{id, pid, status}'
 {
-  "id": "3e689908b618f54bb8ed5c71bc14e1548ca6e1006b747ff138a35b5ab4f2dcfc",
-  "pid": 1018,
+  "id": "981267bab3a9c262d93876775c313b695912e8eef8bb99f472684d49e5f43c91",
+  "pid": 1002,
   "status": "running"
 }</code></pre>
 <p>並び方を読むと、役割が分かる。</p>

@@ -17,10 +17,12 @@ run=$(lab-guest 'podman run --rm busybox:1.38.0 echo ok' 2>&1 | tail -1)
 echo "観測 : root の置き場所の busybox:1.38.0 の ID = ${id:0:12} / DIGEST = ${dg:7:12}…"
 echo "       root の podman で起動 → $run"
 [ "${id:0:12}" = aaef90e06523 ] || { echo "       student の busybox:1.38.0（aaef90e06523）と中身が違う"; exit 1; }
-if [ "$dg" = sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e ]; then
-  echo "       DIGEST がレジストリの値（fd7dc98638c8…）のまま。レジストリ（のミラー）から取ってきたもので、student の置き場所から運んだものではない"
-  exit 1
-fi
+case "$dg" in
+  sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e|sha256:f97baa533a26513c453a362be331a43eb60214302f449c16571b23cea141dce4)
+    echo "       DIGEST がレジストリの値（${dg:7:12}…）のまま。レジストリ（のミラー）から取ってきたもので、student の置き場所から運んだものではない"
+    echo "       （同じ ID のイメージが root の置き場所に先にあると、運んでも名前が足されるだけで DIGEST は変わらない。sudo podman rmi -f で消してから運び直す）"
+    exit 1 ;;
+esac
 [ "$run" = ok ] || exit 1
 echo "       → student と同じ中身（ID が同じ）を運び（DIGEST は読み込んだ側で作り直されている）、root で起動できた"
 exit 0

@@ -1,0 +1,58 @@
+# AppArmor が有効な docker で、--cap-add SYS_ADMIN の効き方を確かめた記録。作り方: bash probe/docker-apparmor.sh。2026-10-14
+# 檻: lab-docker:1.0.0（sha256:77f2d9852e4004e892bb5fbfe774101eaed135f78aa4fa784d71d2af47e4c2ab）。練習機の中の docker で確かめる
+
+========== 1. SYS_ADMIN を足しても、docker-default が mount を断る ==========
+
+$ docker info --format "{{.SecurityOptions}}"
+[name=apparmor name=seccomp,profile=builtin name=cgroupns]
+
+$ docker run --rm --cap-add SYS_ADMIN alpine:3.24.2 sh -c 'grep CapEff /proc/self/status; cat /proc/self/attr/current; mount -o remount,rw /sys/fs/cgroup 2>&1; grep " /sys/fs/cgroup " /proc/self/mounts'
+CapEff:	00000000a82425fb
+docker-default (enforce)
+mount: mounting cgroup on /sys/fs/cgroup failed: Permission denied
+cgroup /sys/fs/cgroup cgroup2 ro,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot 0 0
+
+$ docker run --rm --cap-add SYS_ADMIN --security-opt apparmor=unconfined alpine:3.24.2 sh -c 'cat /proc/self/attr/current; mount -o remount,rw /sys/fs/cgroup 2>&1 && echo remounted; grep " /sys/fs/cgroup " /proc/self/mounts'
+unconfined
+remounted
+cgroup /sys/fs/cgroup cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot 0 0
+
+========== 2. LinuC 1.09 の檻を、その実践編の起動コマンドのまま起動する ==========
+
+（ホストの docker から練習機の docker へ送る: docker save ghcr.io/chai0204/lab-linuc-services:1.0.2 | ssh linuc docker load）
+Loaded image: ghcr.io/chai0204/lab-linuc-services:1.0.2
+
+$ docker run -d -t --name lab-linuc --hostname linuc --cap-add SYS_ADMIN -v lab-linuc-services-state:/root/.lab ghcr.io/chai0204/lab-linuc-services:1.0.2
+a0fbfb499db1b1f1f7a68c899d6b5357c12e73085aab93c1f7bf2a0c87a087a2
+
+$ sleep 20
+
+$ docker ps -a --format "{{.Names}}: {{.Status}}"
+lab-linuc: Exited (3) 21 seconds ago
+
+$ docker logs lab-linuc 2>&1 | tail -8
+  理由 : docker は cgroup を ro でマウントする。戻すには CAP_SYS_ADMIN が要る
+
+  docker の場合 : 起動コマンドに --cap-add SYS_ADMIN があるか確認してください
+  podman の場合 : --systemd=always を付けてください
+
+  この教材の入口に、動作確認済みの起動コマンドをそのまま置いてあります。
+    https://check-then-explain.junxiaosong508-de2.workers.dev/linuc-services/
+
+
+$ docker inspect -f '終了コード {{.State.ExitCode}} / AppArmor の規則 {{.AppArmorProfile}}' lab-linuc
+終了コード 3 / AppArmor の規則 docker-default
+
+$ docker rm -f lab-linuc; docker volume rm lab-linuc-services-state
+lab-linuc
+lab-linuc-services-state
+
+========== 3. AppArmor の無い docker（著者の PC。NixOS の docker）では ==========
+
+$ docker info --format '{{.ServerVersion}} {{.SecurityOptions}}'
+29.8.0 [name=seccomp,profile=builtin name=cgroupns]
+
+$ docker run --rm --cap-add SYS_ADMIN ubuntu:24.04 sh -c 'grep CapEff /proc/self/status; mount -o remount,rw /sys/fs/cgroup 2>&1 && echo remounted; grep " /sys/fs/cgroup " /proc/self/mounts'
+CapEff:	00000000a82425fb
+remounted
+cgroup /sys/fs/cgroup cgroup2 rw,nosuid,nodev,noexec,relatime 0 0

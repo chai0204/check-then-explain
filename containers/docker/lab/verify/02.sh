@@ -15,8 +15,9 @@ if [ $rc -ne 0 ]; then
 fi
 read -r running init sig <<<"$st"
 [ "$running" = true ] || { echo "観測 : ex02 は動いていない（判定は、動いている ex02 を止めて止まり方を見る）"; exit 1; }
-case "${sig:-}" in
-  ""|SIGTERM|TERM|15) ;;
+s=${sig^^}; s=${s#SIG}
+case "$s" in
+  ""|TERM|15) ;;
   *) echo "観測 : docker stop が最初に送る合図が TERM ではない（--stop-signal / STOPSIGNAL が $sig）"
      echo "       この演習は、TERM で終わるようにすること"
      exit 1 ;;

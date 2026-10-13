@@ -84,8 +84,10 @@ TERM では止まらず、10秒待った docker が KILL で止めたのであ�
 tini は子が終わったら後始末（終わったプロセスの回収）もする。</p>
 <p>このサイトの仮想マシン型の檻は、<code>--init</code> の代わりにイメージ自身が <code>tini</code> を PID 1 に置き（イメージの ENTRYPOINT。<a href="/linuc-boot/theory/03-container">LinuC 1.01 の第3章</a>の <code>ps -p 1</code>）、
 起動コマンドに <code>--stop-timeout 30</code> を付けている。<code>docker stop</code> の TERM を tini が子の起動スクリプト（<code>lab-vm-init</code>）に中継し、
-起動スクリプトは TERM を受け取ると練習機を正常に止めてから終わる。ただ、その正常停止に十数秒かかるので、既定の10秒では KILL に間に合わない。
-だから入口の <code>docker run</code> には <code>--stop-timeout 30</code> が付いている。</p>
+起動スクリプトは TERM を受け取ると練習機を正常に止めてから終わる。正常停止にかかる時間は、練習機の中で何が動いているかで変わる。
+著者の記録（<code>logs/docker-stop.log</code>）では、練習機の中で何も動いていなければ 4.4 秒だったが、TERM を受け取らない PID 1 のコンテナ（この章の <code>sleep</code> のようなもの）を3つ残していると、
+練習機の中の docker がそれぞれ10秒待ってから KILL するので 16.0 秒かかった（起動し直すと、3つとも <code>Exited (137)</code> だった）。
+既定の10秒では間に合わないことがあるので、入口の <code>docker run</code> には <code>--stop-timeout 30</code> が付いている（起動スクリプトは、25秒待っても練習機が止まらなければ電源を切る）。</p>
 <div class="analogy"><b>たとえ</b>: <code>--stop-timeout</code> は閉店時刻の<b>「閉店まで○分」の放送</b>の長さを変えるだけで、<code>--init</code> は<b>入口に受付係を置く</b>ことに近い。
 放送を長くしても、聞く気の無い客はやはり最後に追い出される。受付係がいれば、閉店の知らせを一人ひとりに伝えてくれる。
 <br>ただし<b>崩れる点</b>: 受付係（docker-init）が伝えても、客（子のプロセス）が TERM の受け取りを無視するように作られていれば、やはり出ていかない。

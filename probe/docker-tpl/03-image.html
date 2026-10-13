@@ -72,7 +72,7 @@ ID で指せば、手元の名前の無いイメージがそのまま動いた�
 入り口の <code>index.json</code> から、ダイジェストを1つずつたどる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>@@ jq . index.json
 @@ jq -r '.manifests[] | [.digest[7:19], .platform.os + "/" + .platform.architecture + (.platform.variant // "")] | @tsv' blobs/sha256/294b*  ## head=10
-@@ docker image inspect alpine:3.24.2 --format '{{.Os}}/{{.Architecture}}'</code></pre>
+@@ docker image inspect alpine:3.24.2 --format '{{.Os}}/{{.Architecture}}{{with .Variant}}/{{.}}{{end}}'</code></pre>
 <p><code>index.json</code> は、ダイジェスト <code>294b683c…</code> のファイルを指していた。そのファイル（<b>イメージの目録</b>、image index）は、
 CPU の種類ごとの設計図の一覧で、<code>linux/amd64</code> のものは <code>d56c381f961d…</code> である（<code>unknown/unknown</code> の行は、各設計図に付いた来歴の記録）。
 練習機は x86_64 なので、docker は amd64 の分だけを取ってきてある（<code>docker image inspect</code> の答えも <code>linux/amd64</code>）。<code>docker images</code> が出していた ID <code>294b683cb724</code> は、この目録のダイジェストだった。
@@ -114,7 +114,7 @@ docker もレジストリから取るたびに同じ計算をしている。設�
 <div class="quiz"><b>確認</b>
 <p>同じ <code>alpine:3.24.2</code> を起動したのに、Aさんと Bさんで動きが違った。中身が同じかどうかを、どのコマンドの何で確かめればよいか。</p>
 <details><summary>答え</summary>
-<p><code>docker images --digests</code> の DIGEST と、CPU の種類（<code>docker image inspect alpine:3.24.2 --format '{{.Os}}/{{.Architecture}}'</code>）を比べる。
+<p><code>docker images --digests</code> の DIGEST と、CPU の種類（<code>docker image inspect alpine:3.24.2 --format '{{.Os}}/{{.Architecture}}{{with .Variant}}/{{.}}{{end}}'</code>。arm の v6 と v7 のような版の違いは <code>.Variant</code> に出る）を比べる。
 目録のダイジェストと CPU の種類が両方同じなら中身は同じで、違いは起動のしかた（環境・ボリューム・オプション）にある。
 ID（<code>.Id</code>）は、docker の版とイメージの置き場所の設定で、目録のダイジェストだったり設定の指紋だったりするので、PC の間で比べる値には使わない。
 ダイジェストが違えば、名前が別の中身に付いている。それ以降は <code>alpine:3.24.2@sha256:…</code> のように<b>ダイジェストまで書いて</b>起動すれば、中身が1つに決まる。</p></details></div>

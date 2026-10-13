@@ -39,13 +39,13 @@ $ lab check 01
   → この事実から何が欠けているか考えてください。詰まったら lab hint 01
 
 $ docker run -d --name ex01 --memory 64m alpine:3.24.2 sleep 3600
-449062cc2ba74e8e00e07e34cfee2da34b4dc5cdd980630a7fe079bc94bd051d
+9491bdec79a3146f784e85b11a60b42e9a3dfd67eebf45d6de9e9c482932e6a3
 
 $ lab check 01
 ✗ 01 未達
   判定 : 観測型（練習機の docker に ex01 の状態を尋ね、cgroup のファイルを読んだ）
   観測 : ex01（イメージ alpine:3.24.2・コマンド sleep）が動いているか: true
-         /sys/fs/cgroup/system.slice/docker-449062cc2ba7….scope/memory.max = 67108864
+         /sys/fs/cgroup/system.slice/docker-9491bdec79a3….scope/memory.max = 67108864
          上限は 100663296（96 × 1024 × 1024）ではない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 01
 
@@ -53,7 +53,7 @@ $ docker rm -f ex01
 ex01
 
 $ docker run -d --name ex01 --memory 96m busybox:1.38.0 sleep 3600
-0963524af774a8751abc8dd76bd9b275d985e9ea6972669cff5450098a87899d
+40eebac81f9fcde18c10526dfeba4a819f1642395d06ad07d556d87fdb3cd55c
 
 $ lab check 01
 ✗ 01 未達
@@ -66,7 +66,7 @@ $ docker rm -f ex01
 ex01
 
 $ docker run -d --name ex01 --memory 96m alpine:3.24.2 sleep 3600
-05587e47e76676eb2c2e4b8a8dc15db5d375340e196501c65eb7f19593b929ef
+033788ebda74c3ca2785612ac0f61e517cb26310b6e8051744c1cf4ed96923d1
 
 $ cat /sys/fs/cgroup/system.slice/docker-$(docker inspect -f '{{.Id}}' ex01).scope/memory.max
 100663296
@@ -75,7 +75,20 @@ $ lab check 01
 ✔ 01 達成
   判定 : 観測型（練習機の docker に ex01 の状態を尋ね、cgroup のファイルを読んだ）
   観測 : ex01（イメージ alpine:3.24.2・コマンド sleep）が動いているか: true
-         /sys/fs/cgroup/system.slice/docker-05587e47e766….scope/memory.max = 100663296
+         /sys/fs/cgroup/system.slice/docker-033788ebda74….scope/memory.max = 100663296
+         → ex01 のかごに 96MiB の上限が書かれている
+
+$ docker rm -f ex01
+ex01
+
+$ docker run -d --name ex01 --memory 96m alpine:3.24.2 /bin/sleep 3600
+4d520e029d9978baf9da9a3f88976c45d617afbcbb472c32f89388f13811f20d
+
+$ lab check 01
+✔ 01 達成
+  判定 : 観測型（練習機の docker に ex01 の状態を尋ね、cgroup のファイルを読んだ）
+  観測 : ex01（イメージ alpine:3.24.2・コマンド /bin/sleep）が動いているか: true
+         /sys/fs/cgroup/system.slice/docker-4d520e029d99….scope/memory.max = 100663296
          → ex01 のかごに 96MiB の上限が書かれている
 
 
@@ -88,12 +101,12 @@ $ lab check 02
   → この事実から何が欠けているか考えてください。詰まったら lab hint 02
 
 $ docker run -d --name ex02 alpine:3.24.2 sleep 3600
-b22d1ac18d6b2836a72a7ff0801ece149a5f17fef2b1a97f74e4f814244c7de6
+443f60e09ac5165f2a1aff13372444b77886f20bd32c6b52c4618c50deb70119
 
 $ lab check 02
 ✗ 02 未達
   判定 : 観測型（ex02 に docker stop を打ち、かかった時間と終了コードを見た。見た後は docker start で起動し直した）
-  観測 : docker stop ex02 に 11.8 秒、終了コード 137（--init なし）
+  観測 : docker stop ex02 に 11.4 秒、終了コード 137（--init なし）
          137 = 128 + 9。TERM は届かず、待ち時間の後に KILL で止められた
   → この事実から何が欠けているか考えてください。詰まったら lab hint 02
 
@@ -101,7 +114,7 @@ $ docker rm -f ex02
 ex02
 
 $ docker run -d --name ex02 --init --stop-signal HUP alpine:3.24.2 sleep 3600
-704a3152ca8a2ea81b9035eccfc8bc92aef4959d806933d0755c0dbc3720812b
+952d5dee9803575d6b7c6456e369feb96da6725cd999f20c80d50f82be566f2f
 
 $ lab check 02
 ✗ 02 未達
@@ -114,7 +127,7 @@ $ docker rm -f ex02
 ex02
 
 $ docker run -d --name ex02 --init alpine:3.24.2 sleep 3600
-1f01acdc27abd66a39156700f95c95f24e18cc84a33c2adbf51fbc75f52de651
+67ed67275046570ead383bfb3131bd293a1a9ed15da4156adaf4cefa0c9fa89a
 
 $ docker exec ex02 ps
 PID   USER     TIME  COMMAND
@@ -125,12 +138,25 @@ PID   USER     TIME  COMMAND
 $ lab check 02
 ✔ 02 達成
   判定 : 観測型（ex02 に docker stop を打ち、かかった時間と終了コードを見た。見た後は docker start で起動し直した）
-  観測 : docker stop ex02 に 1.9 秒、終了コード 143（--init あり）
+  観測 : docker stop ex02 に 1.4 秒、終了コード 143（--init あり）
          143 = 128 + 15。TERM で終わったという報告（--init の docker-init は、子が TERM で終わったことをこの値で報告する）
          （判定の後、docker start ex02 で起動し直しました）
 
 $ docker ps --format '{{.Names}}: {{.Status}}' --filter name=ex02
-ex02: Up 2 seconds
+ex02: Up 1 second
+
+$ docker rm -f ex02
+ex02
+
+$ docker run -d --name ex02 --init --stop-signal sigterm alpine:3.24.2 sleep 3600
+062b7c2823af33fb68909b1106e7bee6c84cb110dfcb464b84c1217b15c43c52
+
+$ lab check 02
+✔ 02 達成
+  判定 : 観測型（ex02 に docker stop を打ち、かかった時間と終了コードを見た。見た後は docker start で起動し直した）
+  観測 : docker stop ex02 に 1.2 秒、終了コード 143（--init あり）
+         143 = 128 + 15。TERM で終わったという報告（--init の docker-init は、子が TERM で終わったことをこの値で報告する）
+         （判定の後、docker start ex02 で起動し直しました）
 
 
 ========== 演習 03 付け替えられた名前を、中身に戻す ==========
@@ -167,7 +193,7 @@ $ lab check 04
   → この事実から何が欠けているか考えてください。詰まったら lab hint 04
 
 $ docker run -d --name ex04-writer -v ex04-data:/data alpine:3.24.2 sh -c "echo \"keep me\" > /data/memo.txt; sleep 3600"
-0f8ade6fccc3c9c8f5c4e8df3a7fd3ac1312c0400273b71bcc55345e94429825
+f390ce8fa656a4826b048620a22819608498400823c6a1077554b030d2ed2e59
 
 $ lab check 04
 ✗ 04 未達
@@ -200,7 +226,7 @@ $ lab check 05
   → この事実から何が欠けているか考えてください。詰まったら lab hint 05
 
 $ docker run -d --name ex05 -p 8080:80 busybox:1.38.0 sh -c 'mkdir -p /www && echo "hello from ex05" > /www/index.html && exec httpd -f -p 80 -h /www'
-9ac1cff57672ae05104f9831c1fc4bf711233c6fe3676baae51a75b154459f00
+636185add2767a8dbf29b6ef92846db0454f57a71f464d4c373ed6e725f99d97
 
 $ lab check 05
 ✗ 05 未達
@@ -214,7 +240,7 @@ $ docker rm -f ex05
 ex05
 
 $ docker run -d --name ex05 -p 10.0.2.15:8080:80 busybox:1.38.0 sh -c 'mkdir -p /www && echo "hello from ex05" > /www/index.html && exec httpd -f -p 80 -h /www'
-f3e0a949bba2a1c67602639959d3c60af116d4a78bd2eafbe7e96e9db1b68949
+cb2147c0ef9b1680e46445236874838f0c61a433975e0b7c10468d50e3af5853
 
 $ docker port ex05
 80/tcp -> 10.0.2.15:8080
@@ -239,7 +265,7 @@ $ lab check 06
   → この事実から何が欠けているか考えてください。詰まったら lab hint 06
 
 $ mkdir -p ~/ex06 && cd ~/ex06 && echo 'echo "hello, $(cat /opt/ready.txt)"' > greet.sh && printf '%s\n' 'FROM alpine:3.24.2' 'COPY greet.sh /opt/greet.sh' 'RUN sleep 8 && echo "ready" > /opt/ready.txt' 'CMD ["sh", "/opt/greet.sh"]' > Dockerfile && docker build -q -t ex06:1 . && docker run --rm ex06:1
-sha256:83fb13c802c6401f8ead112469e95fe7925acf582caba7563297a780bdb7e891
+sha256:f9b9accccaf570213fada642bcf08955150bb2aca5a4e4ecd21281d835b73029
 hello, ready
 
 $ lab check 06
@@ -251,7 +277,7 @@ $ lab check 06
   → この事実から何が欠けているか考えてください。詰まったら lab hint 06
 
 $ cd ~/ex06 && printf '%s\n' 'FROM alpine:3.24.2' 'RUN mkdir -p /opt' 'COPY greet.sh /opt/greet.sh' 'RUN sleep 8 && echo "ready" > /opt/ready.txt' 'CMD ["sh", "/opt/greet.sh"]' > Dockerfile && docker build -q -t ex06:1 . && docker run --rm ex06:1
-sha256:c6ca3ad8af00b3da4c4b8066331015607d4af956c241911d33c89aa5f0bc9078
+sha256:e5ab951161ec1b6e7d2e2838d288020fcfba701acf3b94886602ab4839e491fb
 hello, ready
 
 $ lab check 06
@@ -267,7 +293,7 @@ FROM alpine:3.24.2
 RUN sleep 8 && echo "ready" > /opt/ready.txt
 COPY greet.sh /opt/greet.sh
 CMD ["sh", "/opt/greet.sh"]
-sha256:a23b5b6550d8533634bd82a8306880fc54db27f8ad2b0e9c8aa2ebdc204f7328
+sha256:614e24aa0c4840799dc2692a4eadfef590fed550a7ad8a35a30d9fe4728034a8
 hello, ready
 
 $ lab check 06
@@ -288,12 +314,12 @@ $ lab check 07
   → この事実から何が欠けているか考えてください。詰まったら lab hint 07
 
 $ docker run -d --name ex07 --privileged alpine:3.24.2 sleep 3600
-b8f46acc753bc4c19170c62d743c223c2a291139792ffcb39b515f6a54d89eca
+6944ef7feaff23a3502b0a5a822dd0121ed8ef63635e49a367ba630874c6b2b4
 
 $ lab check 07
 ✗ 07 未達
   判定 : 観測型（ex07 に渡した特権の一覧を尋ね、ex07 の中で仮想の NIC を作って消した）
-  観測 : ex07 動いている=true / --privileged=true / 足したケーパビリティ=null
+  観測 : ex07 動いている=true / --privileged=true / 足したケーパビリティ=null / 網=bridge / 制限の解除=["label=disable"]
          --privileged で起動している（全部を渡している）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 07
 
@@ -301,12 +327,12 @@ $ docker rm -f ex07
 ex07
 
 $ docker run -d --name ex07 --cap-add ALL alpine:3.24.2 sleep 3600
-1547cf30afe8c2dcc962dac9ce204443894857f8e4d52b1cef1468bccd717a7c
+0240b51655d9f464b4ecf130c4ae197e999118857d29e71a086463ee8dd395ed
 
 $ lab check 07
 ✗ 07 未達
   判定 : 観測型（ex07 に渡した特権の一覧を尋ね、ex07 の中で仮想の NIC を作って消した）
-  観測 : ex07 動いている=true / --privileged=false / 足したケーパビリティ=["ALL"]
+  観測 : ex07 動いている=true / --privileged=false / 足したケーパビリティ=["ALL"] / 網=bridge / 制限の解除=null
          ex07 の PID 1 の CapEff=000001ffffffffff / 中で ip link add … type dummy → ok
          ALL は1つではなく全部のケーパビリティを足す（CapEff が全部の 000001ffffffffff になる）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 07
@@ -314,8 +340,34 @@ $ lab check 07
 $ docker rm -f ex07
 ex07
 
+$ docker run -d --name ex07 --network host --cap-add NET_ADMIN alpine:3.24.2 sleep 3600
+c3aa77fdc3320a8b00b50695b71ed6ccd4360df2e6c4e383d4289f78dd623cba
+
+$ lab check 07
+✗ 07 未達
+  判定 : 観測型（ex07 に渡した特権の一覧を尋ね、ex07 の中で仮想の NIC を作って消した）
+  観測 : ex07 動いている=true / --privileged=false / 足したケーパビリティ=["CAP_NET_ADMIN"] / 網=host / 制限の解除=null
+         --network host で、練習機の網をそのまま使っている（作った NIC は練習機の網に入る）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+
+$ docker rm -f ex07
+ex07
+
+$ docker run -d --name ex07 --cap-add NET_ADMIN --security-opt seccomp=unconfined --security-opt apparmor=unconfined alpine:3.24.2 sleep 3600
+a0249f33d8dc9ef94173350991dda9c722119fd81353585db5e7f6dae42f12f7
+
+$ lab check 07
+✗ 07 未達
+  判定 : 観測型（ex07 に渡した特権の一覧を尋ね、ex07 の中で仮想の NIC を作って消した）
+  観測 : ex07 動いている=true / --privileged=false / 足したケーパビリティ=["CAP_NET_ADMIN"] / 網=bridge / 制限の解除=["seccomp=unconfined","apparmor=unconfined"]
+         --security-opt で seccomp・AppArmor などの制限を外している（--privileged が外すものの一部）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+
+$ docker rm -f ex07
+ex07
+
 $ docker run -d --name ex07 --cap-add NET_ADMIN alpine:3.24.2 sleep 3600
-2b70256b23891131cec5217a43df23238174cdd300a3cb7b5d84cab8be50e414
+136ea52e2411e09ec65f024647e469a40e6adb4cea477ab89656e30fe7416727
 
 $ docker exec ex07 grep CapEff /proc/self/status
 CapEff:	00000000a80435fb
@@ -323,7 +375,7 @@ CapEff:	00000000a80435fb
 $ lab check 07
 ✔ 07 達成
   判定 : 観測型（ex07 に渡した特権の一覧を尋ね、ex07 の中で仮想の NIC を作って消した）
-  観測 : ex07 動いている=true / --privileged=false / 足したケーパビリティ=["CAP_NET_ADMIN"]
+  観測 : ex07 動いている=true / --privileged=false / 足したケーパビリティ=["CAP_NET_ADMIN"] / 網=bridge / 制限の解除=null
          ex07 の PID 1 の CapEff=00000000a80435fb / 中で ip link add … type dummy → ok
          → ケーパビリティを1つだけ足して、ネットワークの設定が通った
 
@@ -331,7 +383,7 @@ $ lab check 07
    確かめて説明する Docker — 全7演習クリア
   ════════════════════════════════════════
 
-  所要 5分（最初の達成から最後の達成まで）
+  所要 4分（最初の達成から最後の達成まで）
 
   自分の手で確かめたこと
 
@@ -351,6 +403,22 @@ $ lab check 07
 
   理論編の最終章に、それぞれがどう繋がるかを書いてあります → /docker/theory/07-privileges
 
+
+$ docker rm -f ex07
+ex07
+
+$ docker run -d --name ex07 --cap-drop ALL --cap-add NET_ADMIN alpine:3.24.2 sleep 3600
+043758fef7cf924b96873fd926edec64201c1f0285f1ac0405d2ac9ff32de5b1
+
+$ docker exec ex07 grep CapEff /proc/self/status
+CapEff:	0000000000001000
+
+$ lab check 07
+✔ 07 達成
+  判定 : 観測型（ex07 に渡した特権の一覧を尋ね、ex07 の中で仮想の NIC を作って消した）
+  観測 : ex07 動いている=true / --privileged=false / 足したケーパビリティ=["CAP_NET_ADMIN"] / 網=bridge / 制限の解除=null
+         ex07 の PID 1 の CapEff=0000000000001000 / 中で ip link add … type dummy → ok
+         → ケーパビリティを1つだけ足して、ネットワークの設定が通った
 
 
 ========== 全問の後 ==========

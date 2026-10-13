@@ -21,6 +21,8 @@ echo "       8080 番で待ち受けているプロセス: ${who:-（無い）}�
 echo "       student の podman の ex04: ${owner:-（無い）}"
 [ "$body" = "hello from ex04" ] || exit 1
 [ -n "$owner" ] || exit 1
+case "$owner" in *"8080->80"*) ;; *) echo "       ex04 に、練習機の 8080 番からコンテナの 80 番への公開（-p）が無い"; exit 1 ;; esac
 [ "$wuser" = student ] || { echo "       待ち受けているのが student のプロセスではない（rootless ではない）"; exit 1; }
+case "$who" in rootlessport|pasta|pasta.*|slirp4netns) ;; *) echo "       待ち受けているのが公開の中継のプロセス（rootlessport・pasta）ではない"; exit 1 ;; esac
 echo "       → rootless のまま、student の $who が 8080 番で受けてコンテナに届けた"
 exit 0

@@ -1,6 +1,6 @@
 # この檻（lab-podman:1.0.0）を、rootless の podman（lab ユーザ）で、読者と同じオプション（名前付きボリューム）で起動した記録。2026-10-14
 # 作り方: bash probe/podman-rootless.sh（イメージは docker save | ssh lab podman load で送った）
-# イメージ lab-podman:1.0.0 の ID: sha256:239b92f471f4a240d8c9dc975546d9ca312e8e06a13be37dbd15790cd9ce5af0
+# イメージ lab-podman:1.0.0 の ID: sha256:3f74d5a000e1df114762a2e06176fbc2afcaedfda3416168cf6a207a560f414a
 
 Loaded image: docker.io/library/lab-podman:1.0.0
 
@@ -8,7 +8,7 @@ $ podman version --format '{{.Client.Version}}'
 5.8.6
 
 $ podman run -d --name podman-rootless --hostname host --stop-timeout 30 -v podman-rootless-vm:/home/lab/vm -v podman-rootless-state:/home/lab/.lab docker.io/library/lab-podman:1.0.0
-起動から ssh まで: 36 秒
+起動から ssh まで: 35 秒
 
 $ podman exec podman-rootless lab env
 テーマ    : lab-podman 1.0.0
@@ -24,8 +24,8 @@ apt 固定  : 20260929T000000Z
 特権      : CapEff=0000000000000000 CapBnd=00000000800405fb
 
 $ podman exec podman-rootless ls -ld /home/lab/vm /home/lab/.lab
-drwxr-xr-x 2 lab lab 4096 Oct 14 03:09 /home/lab/.lab
-drwxr-xr-x 3 lab lab 4096 Oct 14 03:09 /home/lab/vm
+drwxr-xr-x 2 lab lab 4096 Oct 14 05:11 /home/lab/.lab
+drwxr-xr-x 3 lab lab 4096 Oct 14 05:11 /home/lab/vm
 
 $ podman exec podman-rootless sh -c umask
 0022

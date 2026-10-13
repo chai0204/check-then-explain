@@ -40,9 +40,9 @@ $ time docker build --progress=plain -t app:1 .
 #6 DONE 0.2s
 ...
 #7 [3/3] RUN sleep 10 &amp;&amp; echo "dependencies installed" &gt; /app/deps.txt
-#7 DONE 11.6s
+#7 DONE 12.0s
 ...
-real	0m18.832s
+real	0m19.855s
 ...
 $ docker run --rm app:1
 app v1</code></pre>
@@ -57,7 +57,7 @@ app v1</code></pre>
 #7 [3/3] RUN sleep 10 &amp;&amp; echo "dependencies installed" &gt; /app/deps.txt
 #7 CACHED
 ...
-real	0m3.692s
+real	0m3.647s
 ...</code></pre>
 <p>今度は <code>COPY</code> も <code>RUN</code> も <code>CACHED</code> で、すぐに終わった。材料が前回と同じなので、前回できた層をそのまま使ったのである。</p>
 <div class="analogy"><b>たとえ</b>: ビルドのキャッシュは、<b>料理の作り置き</b>に近い。同じレシピの同じ手順を、同じ下ごしらえの上でもう一度やるなら、冷蔵庫の作り置きを出せば済む。
@@ -76,9 +76,9 @@ $ time docker build --progress=plain -t app:2 .
 #6 DONE 0.2s
 ...
 #7 [3/3] RUN sleep 10 &amp;&amp; echo "dependencies installed" &gt; /app/deps.txt
-#7 DONE 11.6s
+#7 DONE 11.5s
 ...
-real	0m15.827s
+real	0m15.941s
 ...</code></pre>
 <div class="then"><b>だめな理由</b>: <code>COPY</code> だけでなく <code>RUN</code> も作り直され、また10秒あまりかかった。
 <b>ある段のキャッシュの材料には、その段の命令と、それより前の段が作った層の中身が入る</b>。<code>COPY</code> の層が変われば、その上で実行する <code>RUN</code> は
@@ -99,12 +99,12 @@ real	0m15.827s
 $ time docker build --progress=plain -t app:3 .
 ...
 #6 [2/3] RUN mkdir /app &amp;&amp; sleep 10 &amp;&amp; echo "dependencies installed" &gt; /app/deps.txt
-#6 DONE 11.5s
+#6 DONE 11.4s
 ...
 #7 [3/3] COPY app.sh /app/app.sh
 #7 DONE 0.3s
 ...
-real	0m16.080s
+real	0m16.087s
 ...
 $ echo 'echo "app v3"' &gt; app.sh
 $ time docker build --progress=plain -t app:4 .
@@ -115,7 +115,7 @@ $ time docker build --progress=plain -t app:4 .
 #7 [3/3] COPY app.sh /app/app.sh
 #7 DONE 0.2s
 ...
-real	0m3.958s
+real	0m3.867s
 ...
 $ docker run --rm app:4
 app v3</code></pre>
@@ -125,9 +125,9 @@ app v3</code></pre>
 <p>出来上がったイメージの層は、<code>docker history</code> で上（新しい段）から順に見られる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ docker history app:4
 IMAGE          CREATED          CREATED BY                                      SIZE      COMMENT
-c6435a09ce04   6 seconds ago    CMD ["sh" "/app/app.sh"]                        0B        buildkit.dockerfile.v0
+8749a7775a90   6 seconds ago    CMD ["sh" "/app/app.sh"]                        0B        buildkit.dockerfile.v0
 &lt;missing&gt;      6 seconds ago    COPY app.sh /app/app.sh # buildkit              12.3kB    buildkit.dockerfile.v0
-&lt;missing&gt;      12 seconds ago   RUN /bin/sh -c mkdir /app &amp;&amp; sleep 10 &amp;&amp; ech…   12.3kB    buildkit.dockerfile.v0
+&lt;missing&gt;      11 seconds ago   RUN /bin/sh -c mkdir /app &amp;&amp; sleep 10 &amp;&amp; ech…   12.3kB    buildkit.dockerfile.v0
 &lt;missing&gt;      3 weeks ago      CMD ["/bin/sh"]                                 0B        buildkit.dockerfile.v0
 &lt;missing&gt;      3 weeks ago      ADD alpine-minirootfs-3.24.2-x86_64.tar.gz /…   9.08MB    buildkit.dockerfile.v0</code></pre>
 <p>上の3行が Dockerfile の <code>CMD</code>・<code>COPY</code>・<code>RUN</code> で、その下の2行は FROM で土台にした Alpine のイメージが作られたときの記録である。

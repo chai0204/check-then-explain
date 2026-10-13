@@ -30,10 +30,10 @@
 $ podman run --rm -v "$HOME/share":/share alpine:3.24.2 sh -c 'id -u; touch /share/by-root; ls -ln /share'
 0
 total 0
--rw-r--r--    1 0        0                0 Oct 13 18:12 by-root
+-rw-r--r--    1 0        0                0 Oct 13 20:08 by-root
 $ ls -ln ~/share
 total 0
--rw-r--r-- 1 1000 1000 0 Oct 14 03:12 by-root</code></pre>
+-rw-r--r-- 1 1000 1000 0 Oct 14 05:08 by-root</code></pre>
 <div class="then"><b>だめな理由</b>: コンテナの中では持ち主が <code>0</code>（root）に見えるファイルが、練習機の上では <code>1000</code>（student）の持ち物だった。
 <b>rootless のコンテナの中の UID 0 は、練習機の上では student（UID 1000）である</b>。同じファイルを、中と外で別の番号で見ている。
 docker（ユーザ名前空間を区切らない）では、中の root は練習機の root そのものだった。</div></div>
@@ -73,22 +73,22 @@ $ grep student /etc/subuid /etc/subgid
 <pre data-where="練習機の中（student@linuc）"><code>$ podman run --rm --user 1000:1000 -v "$HOME/share":/share alpine:3.24.2 touch /share/by-1000
 touch: /share/by-1000: Permission denied
 $ podman run --rm -v "$HOME/share":/share alpine:3.24.2 ls -lnd /share
-drwxrwxr-x    2 0        0             4096 Oct 13 18:12 /share</code></pre>
+drwxrwxr-x    2 0        0             4096 Oct 13 20:08 /share</code></pre>
 <p>中の UID 1000 は書けなかった。<code>~/share</code> は外では student（1000）の持ち物だが、中から見ると UID 0 の持ち物で、中の 1000（外の 100999）には書く権限が無い。
 コンテナの中で root 以外のユーザとして動くアプリ（多くのサーバがそうする）に、外のディレクトリを渡すときによく起きる。</p>
 <p>直すには、ディレクトリの持ち主を「中の 1000」にする。外の番号（100999）に <code>chown</code> するのは、student には許されていない。podman unshare の中なら、student は root なので、中の番号で <code>chown</code> できる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ podman unshare chown 1000:1000 ~/share
 $ ls -lnd ~/share
-drwxrwxr-x 2 100999 100999 4096 Oct 14 03:12 /home/student/share
+drwxrwxr-x 2 100999 100999 4096 Oct 14 05:08 /home/student/share
 $ podman run --rm --user 1000:1000 -v "$HOME/share":/share alpine:3.24.2 touch /share/by-1000
 $ ls -ln ~/share
 total 0
--rw-r--r-- 1 100999 100999 0 Oct 14 03:12 by-1000
--rw-r--r-- 1   1000   1000 0 Oct 14 03:12 by-root
+-rw-r--r-- 1 100999 100999 0 Oct 14 05:08 by-1000
+-rw-r--r-- 1   1000   1000 0 Oct 14 05:08 by-root
 $ podman unshare ls -ln ~/share
 total 0
--rw-r--r-- 1 1000 1000 0 Oct 14 03:12 by-1000
--rw-r--r-- 1    0    0 0 Oct 14 03:12 by-root</code></pre>
+-rw-r--r-- 1 1000 1000 0 Oct 14 05:08 by-1000
+-rw-r--r-- 1    0    0 0 Oct 14 05:08 by-root</code></pre>
 <p>外から見ると <code>~/share</code> の持ち主は <code>100999</code> になり、中の UID 1000 が書けるようになった。<code>podman unshare ls</code> で中から見ると、同じものが 0 と 1000 に見える。
 <b>同じファイルを、外と中で別の番号で見ている</b>のが rootless の仕組みである。</p>
 <p>片付けるとき、ここで1つ詰まる。</p>

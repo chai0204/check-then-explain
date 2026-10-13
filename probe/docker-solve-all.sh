@@ -47,6 +47,10 @@ G 'docker run -d --name ex01 --memory 96m alpine:3.24.2 sleep 3600'
 G "cat /sys/fs/cgroup/system.slice/docker-\$(docker inspect -f '{{.Id}}' ex01).scope/memory.max"
 H 'lab check 01'
 
+G 'docker rm -f ex01'
+G 'docker run -d --name ex01 --memory 96m alpine:3.24.2 /bin/sleep 3600'
+H 'lab check 01'
+
 S "演習 02 docker stop が TERM で終わるコンテナを動かす"
 H 'lab check 02'
 G 'docker run -d --name ex02 alpine:3.24.2 sleep 3600'
@@ -59,6 +63,9 @@ G 'docker run -d --name ex02 --init alpine:3.24.2 sleep 3600'
 G 'docker exec ex02 ps'
 H 'lab check 02'
 G "docker ps --format '{{.Names}}: {{.Status}}' --filter name=ex02"
+G 'docker rm -f ex02'
+G 'docker run -d --name ex02 --init --stop-signal sigterm alpine:3.24.2 sleep 3600'
+H 'lab check 02'
 
 S "演習 03 付け替えられた名前を、中身に戻す"
 G 'docker tag busybox:1.38.0 ex03:base'
@@ -102,7 +109,17 @@ G 'docker rm -f ex07'
 G 'docker run -d --name ex07 --cap-add ALL alpine:3.24.2 sleep 3600'
 H 'lab check 07'
 G 'docker rm -f ex07'
+G 'docker run -d --name ex07 --network host --cap-add NET_ADMIN alpine:3.24.2 sleep 3600'
+H 'lab check 07'
+G 'docker rm -f ex07'
+G 'docker run -d --name ex07 --cap-add NET_ADMIN --security-opt seccomp=unconfined --security-opt apparmor=unconfined alpine:3.24.2 sleep 3600'
+H 'lab check 07'
+G 'docker rm -f ex07'
 G 'docker run -d --name ex07 --cap-add NET_ADMIN alpine:3.24.2 sleep 3600'
+G 'docker exec ex07 grep CapEff /proc/self/status'
+H 'lab check 07'
+G 'docker rm -f ex07'
+G 'docker run -d --name ex07 --cap-drop ALL --cap-add NET_ADMIN alpine:3.24.2 sleep 3600'
 G 'docker exec ex07 grep CapEff /proc/self/status'
 H 'lab check 07'
 

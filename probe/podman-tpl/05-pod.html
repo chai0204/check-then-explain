@@ -31,7 +31,7 @@
 <p>空の pod を作っただけで、コンテナが1つ（<code>…-infra</code>）できている。中身は <code>localhost/podman-pause</code> という、この練習機で今作られたばかりのイメージである
 （podman は、何もしないで眠り続けるだけの小さなプログラム catatonit から、最初の pod のときに作る。だから CREATED が新しい）。</p>
 <div class="analogy"><b>たとえ</b>: infra のコンテナは、<b>会議室の予約だけを持ち続ける人</b>に近い。会議の出席者（アプリのコンテナ）が入れ替わっても、予約（網とホスト名の名前空間）が切れないので、同じ部屋（同じアドレス・同じ公開）をずっと使える。
-<br>ただし<b>崩れる点</b>: 予約者は会議に出なくても予約は残るが、infra のコンテナは実際に動いているプロセス（pause）で、これを止めると予約ごと（pod の網ごと）消える。</div>
+<br>ただし<b>崩れる点</b>: 予約者は会議に出なくても予約は残るが、infra のコンテナは実際に動いているプロセス（pause）で、これを止めると、部屋の外線と受付（外とのつなぎと公開）が外される。部屋そのもの（名前空間）は、中に人（アプリ）がいる間は残り、内線（127.0.0.1）だけが使える。</div>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>pod は、関係するコンテナをまとめて起動・停止するための名前の束だ。コンテナ同士は、普段と同じくそれぞれ別のネットワークにいるので、相手に届くにはアドレスか名前を調べて指定する必要があるはずだ。</p>
 <pre data-where="練習機の中（student@linuc）"><code>@@ podman run -d --pod pod1 --name pod1-web busybox:1.38.0 httpd -f -h /etc
@@ -64,13 +64,17 @@
 pod の網も infra が動いている間は保たれる（rootless の podman は、網の名前空間を <code>/run/user/1000/netns/</code> の下のファイルで固定している）。
 だから、起動し直したアプリは同じアドレス・同じ公開のまま戻れる。逆に、infra を止めると何が起きるかを確かめる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>@@ ls /run/user/1000/netns/ | wc -l
+@@ readlink /proc/$a/ns/net
 @@ podman stop $(podman pod inspect --format '{{.InfraContainerID}}' pod1)
 @@ podman ps -a --pod --format '{{.Names}}  {{.Status}}'
 @@ curl -s -m 5 http://127.0.0.1:8081/hostname; echo "exit=$?"
-@@ ls /run/user/1000/netns/ | wc -l</code></pre>
+@@ ls /run/user/1000/netns/ | wc -l
+@@ readlink /proc/$a/ns/net
+@@ podman exec pod1-web ip -o -4 addr</code></pre>
 <p>infra を止めると、アプリの <code>pod1-web</code> は <code>Up</code> のままなのに、pod に付けた公開（8081 番）には届かなくなった（<code>curl</code> の終了コード 7 は「つながらなかった」）。
-網を固定していたファイルも 1 個から 0 個になった。podman は infra が止まると、pod の網を片付ける（公開を受けていたプロセスも止める）。
-<b>pod の網と公開の寿命は、infra のコンテナの寿命に結び付いている</b>。</p>
+網を固定していたファイルも 1 個から 0 個になり、<code>pod1-web</code> の中の網には <code>lo</code>（127.0.0.1）だけが残った（10.0.2.100 の <code>tap0</code> が消えた）。
+ただし <code>pod1-web</code> の網の名前空間の番号は、止める前と同じだった。podman が片付けたのは<b>外とのつなぎ</b>（<code>tap0</code> を持つ slirp4netns・公開を受けていた rootlessport・網を固定していたファイル）で、
+名前空間そのものは、入っているアプリがいる間は残る。<b>pod の外とのつなぎと公開の寿命は、infra のコンテナの寿命に結び付いている</b>。</p>
 <div class="analogy"><b>たとえ</b>: pod は<b>シェアハウス</b>に近い。住人（コンテナ）は自分の部屋（mnt・pid）を持つが、玄関と住所と電話（net・uts）は1つを分け合う。
 大家（infra）は何もしないで住み続け、住人が入れ替わっても住所が変わらないようにしている。
 <br>ただし<b>崩れる点</b>: シェアハウスの住人は互いの声が聞こえるが、pod のコンテナは既定では互いのプロセスが見えない（pid は別）。
@@ -91,14 +95,14 @@ pod の網も infra が動いている間は保たれる（rootless の podman �
 <div class="quiz"><b>確認</b>
 <p>pod を作っただけなのに、<code>podman ps -a</code> にコンテナが1つ増え、<code>podman images</code> に <code>localhost/podman-pause</code> が増えた。何のためか。</p>
 <details><summary>答え</summary>
-<p>pod の名前空間を持ち続け、pod の網と公開の寿命の区切りになる infra のコンテナと、その中身（何もしないで眠るだけのプログラム）である。
-アプリのコンテナが入れ替わっても、infra が動いている限り pod の網と公開は消えない（infra を止めると、podman が網を片付ける）。</p></details></div>
+<p>pod の名前空間を持ち続け、pod の外とのつなぎと公開の寿命の区切りになる infra のコンテナと、その中身（何もしないで眠るだけのプログラム）である。
+アプリのコンテナが入れ替わっても、infra が動いている限り pod の網と公開は消えない（infra を止めると、podman が外とのつなぎと公開を片付ける）。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
 <li>pod のコンテナは net と uts（podman の既定では ipc も）の名前空間を分け合う。127.0.0.1 で互いに届き、ホスト名は pod の名前になる</li>
 <li>mnt と pid は別なので、別のイメージから作ったコンテナを1つの pod に入れられる</li>
-<li>pod の名前空間と網を保つのは infra のコンテナ（podman-pause のイメージ）。infra を止めると、アプリが動いていても pod の網と公開は片付けられる。ポートの公開は pod に付ける</li>
+<li>pod の名前空間と網を保つのは infra のコンテナ（podman-pause のイメージ）。infra を止めると、アプリが動いていても外とのつなぎ（<code>tap0</code>）と公開は片付けられ、名前空間には <code>lo</code> だけが残る。ポートの公開は pod に付ける</li>
 </ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:podman-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・podman 4.9.3・catatonit 0.1.7）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
 <nav class="pager"><a href="/podman/theory/04-network">← 4. rootless のネットワークは、カーネルの外で中継される</a><a href="/podman/theory/06-systemd">次: 6. ログアウトしても動かし続けるのは、systemd の仕事 →</a></nav>

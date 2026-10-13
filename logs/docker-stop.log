@@ -1,0 +1,43 @@
+# 檻 lab-docker:1.0.0 の docker stop にかかる時間（--stop-timeout 30）。作り方: bash probe/docker-stop.sh。2026-10-14
+# イメージの ID: sha256:77f2d9852e4004e892bb5fbfe774101eaed135f78aa4fa784d71d2af47e4c2ab
+
+========== 1. 練習機の中で何も動いていないとき ==========
+
+$ docker ps -a --format "{{.Names}}: {{.Status}}"
+
+$ docker stop docker-stop
+docker-stop
+かかった時間: 4.4 秒 / 檻の終了コード 0
+
+========== 2. TERM を受け取らない PID 1 のコンテナを3つ残したとき（演習の解答の形） ==========
+
+$ docker run -d --name ex01 --memory 96m alpine:3.24.2 sleep 3600
+64f1c86d45b24e02f2a419f70f86530a4b863ffb368477f09c7fb098e70b4e8c
+
+$ docker run -d --name ex05 -p 10.0.2.15:8080:80 busybox:1.38.0 sh -c 'mkdir -p /www && echo "hello from ex05" > /www/index.html && exec httpd -f -p 80 -h /www'
+0e1931220edaf237b6c0c78bd3340b7244e0dcd4f91c44e5bdc87b30c0b6d990
+
+$ docker run -d --name ex07 --cap-add NET_ADMIN alpine:3.24.2 sleep 3600
+cff09d750e3928e0278cbefce5488f441b0e9607cd6678f1a4aed9d80af860f1
+
+$ docker ps --format "{{.Names}}: {{.Status}}"
+ex07: Up 1 second
+ex05: Up 5 seconds
+ex01: Up 8 seconds
+
+$ docker stop docker-stop
+docker-stop
+かかった時間: 16.0 秒 / 檻の終了コード 0
+
+========== 3. 起動し直した後、練習機の中のコンテナはどう止められていたか ==========
+
+$ docker ps -a --format "{{.Names}}: {{.Status}}"
+ex07: Exited (137) 48 seconds ago
+ex05: Exited (137) 48 seconds ago
+ex01: Exited (137) 48 seconds ago
+
+$ sudo journalctl -b -1 -n 4 --no-pager -o cat
+Shutting down.
+Syncing filesystems and block devices.
+Sending SIGTERM to remaining processes...
+Journal stopped

@@ -1,0 +1,43 @@
+# 檻 lab-podman:1.0.0 の docker stop にかかる時間（--stop-timeout 30）。作り方: bash probe/docker-stop.sh。2026-10-14
+# イメージの ID: sha256:3f74d5a000e1df114762a2e06176fbc2afcaedfda3416168cf6a207a560f414a
+
+========== 1. 練習機の中で何も動いていないとき ==========
+
+$ podman ps -a --format "{{.Names}}: {{.Status}}"
+
+$ docker stop podman-stop
+podman-stop
+かかった時間: 5.1 秒 / 檻の終了コード 0
+
+========== 2. TERM を受け取らない PID 1 のコンテナを3つ残したとき（演習の解答の形） ==========
+
+$ podman run -d --name ex01 alpine:3.24.2 sleep 3600
+4165a955b15caebe3363f907eb9fa14ed5684710455dc8054e3740f786881fc9
+
+$ podman run -d --name ex04 -p 127.0.0.1:8080:80 busybox:1.38.0 sh -c 'mkdir -p /www && echo "hello from ex04" > /www/index.html && exec httpd -f -p 80 -h /www'
+bdc681e8869f7b73a8b9cdc54e6d950b73e597cc25ecfc209e35193d105f4b3e
+
+$ podman run -d --name ex07 alpine:3.24.2 sleep 3600
+10eddb66aa2e6fc8e026bf0cde9c1e42d3d290482fcbccb03c8c7469471e0a06
+
+$ podman ps --format "{{.Names}}: {{.Status}}"
+ex01: Up 5 seconds
+ex04: Up 3 seconds
+ex07: Up 1 second
+
+$ docker stop podman-stop
+podman-stop
+かかった時間: 8.3 秒 / 檻の終了コード 0
+
+========== 3. 起動し直した後、練習機の中のコンテナはどう止められていたか ==========
+
+$ podman ps -a --format "{{.Names}}: {{.Status}}"
+ex01: Created
+ex04: Created
+ex07: Created
+
+$ sudo journalctl -b -1 -n 4 --no-pager -o cat
+Syncing filesystems and block devices.
+Sending SIGTERM to remaining processes...
+Received SIGTERM from PID 1 (systemd-shutdow).
+Journal stopped

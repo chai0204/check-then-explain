@@ -14,26 +14,26 @@ $ docker ps
 Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
 
 $ podman run -d --name p1 alpine:3.24.2 sleep 1000
-e9849bbb0ee8c795b0ae6846ac67aa79206e65db6f6ee7b07116ddccbd62e148
+2fad8d6064c841b26204316206c890fc2bd08694dabf60ec248d8976228b0648
 
 $ podman ps
 CONTAINER ID  IMAGE                            COMMAND     CREATED        STATUS        PORTS       NAMES
-e9849bbb0ee8  docker.io/library/alpine:3.24.2  sleep 1000  4 seconds ago  Up 3 seconds              p1
+2fad8d6064c8  docker.io/library/alpine:3.24.2  sleep 1000  3 seconds ago  Up 3 seconds              p1
 
 $ ps -o pid,ppid,user,comm -C podman,conmon,sleep,catatonit,dockerd
     PID    PPID USER     COMMAND
-    804       1 student  catatonit
-    823       1 student  conmon
-    825     823 student  sleep
+    798       1 student  catatonit
+    816       1 student  conmon
+    818     816 student  sleep
 
 $ ps -o args= -C conmon | tr ' ' '\n' | grep -A1 -E '^-(c|r|b|n|l)$|^--exit-command$'
 -c
-e9849bbb0ee8c795b0ae6846ac67aa79206e65db6f6ee7b07116ddccbd62e148
+2fad8d6064c841b26204316206c890fc2bd08694dabf60ec248d8976228b0648
 --
 -r
 /usr/bin/crun
 -b
-/home/student/.local/share/containers/storage/overlay-containers/e9849bbb0ee8c795b0ae6846ac67aa79206e65db6f6ee7b07116ddccbd62e148/userdata
+/home/student/.local/share/containers/storage/overlay-containers/2fad8d6064c841b26204316206c890fc2bd08694dabf60ec248d8976228b0648/userdata
 --
 -n
 p1
@@ -53,10 +53,10 @@ defaultNetworkBackend  overlay             overlay-layers
 libpod                 overlay-containers  storage.lock
 
 $ ls -l ~/.local/share/containers/storage/db.sql
--rw-r--r-- 1 student student 122880 Oct 14 03:21 /home/student/.local/share/containers/storage/db.sql
+-rw-r--r-- 1 student student 122880 Oct 14 05:15 /home/student/.local/share/containers/storage/db.sql
 
 $ cat /proc/$(podman inspect -f '{{.State.Pid}}' p1)/cgroup
-0::/user.slice/user-1000.slice/user@1000.service/user.slice/libpod-e9849bbb0ee8c795b0ae6846ac67aa79206e65db6f6ee7b07116ddccbd62e148.scope/container
+0::/user.slice/user-1000.slice/user@1000.service/user.slice/libpod-2fad8d6064c841b26204316206c890fc2bd08694dabf60ec248d8976228b0648.scope/container
 
 $ podman rm -f -t 0 p1
 p1
@@ -72,11 +72,11 @@ $ mkdir ~/share
 $ podman run --rm -v "$HOME/share":/share alpine:3.24.2 sh -c 'id -u; touch /share/by-root; ls -ln /share'
 0
 total 0
--rw-r--r--    1 0        0                0 Oct 13 18:22 by-root
+-rw-r--r--    1 0        0                0 Oct 13 20:16 by-root
 
 $ ls -ln ~/share
 total 0
--rw-r--r-- 1 1000 1000 0 Oct 14 03:22 by-root
+-rw-r--r-- 1 1000 1000 0 Oct 14 05:16 by-root
 
 $ cat /proc/self/uid_map
          0          0 4294967295
@@ -97,24 +97,24 @@ $ podman run --rm --user 1000:1000 -v "$HOME/share":/share alpine:3.24.2 touch /
 touch: /share/by-1000: Permission denied
 
 $ podman run --rm -v "$HOME/share":/share alpine:3.24.2 ls -lnd /share
-drwxrwxr-x    2 0        0             4096 Oct 13 18:22 /share
+drwxrwxr-x    2 0        0             4096 Oct 13 20:16 /share
 
 $ podman unshare chown 1000:1000 ~/share
 
 $ ls -lnd ~/share
-drwxrwxr-x 2 100999 100999 4096 Oct 14 03:22 /home/student/share
+drwxrwxr-x 2 100999 100999 4096 Oct 14 05:16 /home/student/share
 
 $ podman run --rm --user 1000:1000 -v "$HOME/share":/share alpine:3.24.2 touch /share/by-1000
 
 $ ls -ln ~/share
 total 0
--rw-r--r-- 1 100999 100999 0 Oct 14 03:22 by-1000
--rw-r--r-- 1   1000   1000 0 Oct 14 03:22 by-root
+-rw-r--r-- 1 100999 100999 0 Oct 14 05:16 by-1000
+-rw-r--r-- 1   1000   1000 0 Oct 14 05:16 by-root
 
 $ podman unshare ls -ln ~/share
 total 0
--rw-r--r-- 1 1000 1000 0 Oct 14 03:22 by-1000
--rw-r--r-- 1    0    0 0 Oct 14 03:22 by-root
+-rw-r--r-- 1 1000 1000 0 Oct 14 05:16 by-1000
+-rw-r--r-- 1    0    0 0 Oct 14 05:16 by-root
 
 $ rm -rf ~/share
 rm: cannot remove '/home/student/share/by-root': Permission denied
@@ -183,21 +183,21 @@ $ podman rm web
 web
 
 $ podman run -d --name web -p 127.0.0.1:8080:80 busybox:1.38.0 httpd -f -h /etc
-dba79eb6314e4cc8c933ec115f9feac69e3f95725a45cedfda5372ca2d75f950
+09f398e14d22ab214d8b65d5c806e394e3b6d067c099f1df831866ede24ff9e0
 
 $ curl -s http://127.0.0.1:8080/hostname
-dba79eb6314e
+09f398e14d22
 
 $ ps -o pid,ppid,user,comm -C rootlessport,exe,slirp4netns,conmon,httpd
     PID    PPID USER     COMMAND
-   1287       1 student  slirp4netns
-   1289       1 student  rootlessport
-   1294    1289 student  exe
-   1303       1 student  conmon
-   1305    1303 student  httpd
+   1280       1 student  slirp4netns
+   1282       1 student  rootlessport
+   1287    1282 student  exe
+   1296       1 student  conmon
+   1298    1296 student  httpd
 
 $ ss -ltnp | grep 8080
-LISTEN 0      4096       127.0.0.1:8080      0.0.0.0:*    users:(("rootlessport",pid=1289,fd=5))
+LISTEN 0      4096       127.0.0.1:8080      0.0.0.0:*    users:(("rootlessport",pid=1282,fd=11))
 
 $ sudo iptables -t nat -S | grep -c 8080
 0
@@ -241,19 +241,19 @@ web
 ========== 5. 05-pod.html ==========
 
 $ podman pod create --name pod1 -p 127.0.0.1:8081:80
-8ef4f2c8a7142b0f6428e068538c35432cad9133aa0e27e135defd632d4aaecb
+9bdb91685606c47e036398ca74ba11713a4ac43497f43684e4f33c746f621650
 
 $ podman ps -a --pod --format '{{.Names}}  {{.Image}}  {{.PodName}}'
-8ef4f2c8a714-infra  localhost/podman-pause:4.9.3-0  pod1
+9bdb91685606-infra  localhost/podman-pause:4.9.3-0  pod1
 
 $ podman images
 REPOSITORY                 TAG         IMAGE ID      CREATED        SIZE
-localhost/podman-pause     4.9.3-0     944ccfdda183  3 seconds ago  835 kB
+localhost/podman-pause     4.9.3-0     c5ee8ac7f42b  3 seconds ago  835 kB
 docker.io/library/alpine   3.24.2      320994c3b997  3 weeks ago    8.72 MB
 docker.io/library/busybox  1.38.0      aaef90e06523  5 months ago   4.69 MB
 
 $ podman run -d --pod pod1 --name pod1-web busybox:1.38.0 httpd -f -h /etc
-c5ad753fd6bdfb3d783edde0a636748d0cce32466f1d558f758e0436a02348b1
+04fd1f3457d6329f82290f8566646404d1d05b9e04b6733a8ea175869967c28b
 
 $ podman run --rm --pod pod1 alpine:3.24.2 wget -qO- http://127.0.0.1/hostname
 pod1
@@ -266,30 +266,33 @@ $ a=$(podman inspect --format '{{.State.Pid}}' pod1-web)
 $ b=$(podman inspect --format '{{.State.Pid}}' $(podman pod inspect --format '{{.InfraContainerID}}' pod1))
 
 $ readlink /proc/$a/ns/net /proc/$a/ns/uts /proc/$a/ns/ipc /proc/$a/ns/pid /proc/$a/ns/mnt
-net:[4026532353]
+net:[4026532351]
 uts:[4026532413]
 ipc:[4026532414]
 pid:[4026532418]
 mnt:[4026532417]
 
 $ readlink /proc/$b/ns/net /proc/$b/ns/uts /proc/$b/ns/ipc /proc/$b/ns/pid /proc/$b/ns/mnt
-net:[4026532353]
+net:[4026532351]
 uts:[4026532413]
 ipc:[4026532414]
 pid:[4026532415]
 mnt:[4026532411]
 
 $ podman inspect --format '{{.HostConfig.NetworkMode}}' pod1-web
-container:fa43f0ac192ae8809731c8eb598c2fd958dba6b1853a7e9cd439604f2f1d788e
+container:6018b5d65074f1265756efab60f82c23cc76b8298df4b782ea1d82e012edcffb
 
 $ ls /run/user/1000/netns/ | wc -l
 1
 
+$ readlink /proc/$a/ns/net
+net:[4026532351]
+
 $ podman stop $(podman pod inspect --format '{{.InfraContainerID}}' pod1)
-fa43f0ac192ae8809731c8eb598c2fd958dba6b1853a7e9cd439604f2f1d788e
+6018b5d65074f1265756efab60f82c23cc76b8298df4b782ea1d82e012edcffb
 
 $ podman ps -a --pod --format '{{.Names}}  {{.Status}}'
-8ef4f2c8a714-infra  Exited (0) 1 second ago
+9bdb91685606-infra  Exited (0) 1 second ago
 pod1-web  Up 14 seconds
 
 $ curl -s -m 5 http://127.0.0.1:8081/hostname; echo "exit=$?"
@@ -298,8 +301,14 @@ exit=7
 $ ls /run/user/1000/netns/ | wc -l
 0
 
+$ readlink /proc/$a/ns/net
+net:[4026532351]
+
+$ podman exec pod1-web ip -o -4 addr
+1: lo    inet 127.0.0.1/8 scope host lo\       valid_lft forever preferred_lft forever
+
 $ podman pod rm -f -t 0 pod1
-8ef4f2c8a7142b0f6428e068538c35432cad9133aa0e27e135defd632d4aaecb
+9bdb91685606c47e036398ca74ba11713a4ac43497f43684e4f33c746f621650
 
 $ podman ps -a
 CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
@@ -311,10 +320,10 @@ $ loginctl show-user student -p Linger
 Linger=no
 
 $ podman run -d --name p6 alpine:3.24.2 sleep 3600
-c44ff9a831e454e3b8873d44b21fa6a56c1468459168fef9c44c40c997e19c15
+ff39552656814297d69d9179380ba4e10d4436cdac37ef49665127d4be39122e
 
 $ podman ps --format '{{.Names}}: {{.Status}}'
-p6: Up 2 seconds
+p6: Up 3 seconds
 
 $ exit
 logout
@@ -328,7 +337,7 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Wed Oct 14 03:21:34 2026 from 10.0.2.2
+Last login: Wed Oct 14 05:15:41 2026 from 10.0.2.2
 
 $ podman ps -a --format '{{.Names}}: {{.Status}}'
 p6: Created
@@ -342,7 +351,7 @@ $ loginctl show-user student -p Linger
 Linger=yes
 
 $ podman run -d --name p6 alpine:3.24.2 sleep 3600
-b912a9be9d0e7cf71e8ad221359eed9e561a68775461e7ad99536c220dcc28b9
+b7578e14232086f81e9ba134ef32ddd10c35eb3c5ca82b5cb53bc56920376fb7
 
 $ exit
 logout
@@ -356,7 +365,7 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Wed Oct 14 03:24:00 2026 from 10.0.2.2
+Last login: Wed Oct 14 05:17:58 2026 from 10.0.2.2
 
 $ podman ps -a --format '{{.Names}}: {{.Status}}'
 p6: Up 21 seconds
@@ -365,7 +374,7 @@ $ podman rm -f -t 0 p6
 p6
 
 $ podman run -d --name rs --restart=on-failure:2 alpine:3.24.2 sh -c 'exit 3'
-5182d64e5307131936895e4947a94e598fbdd31b50e4bc0378adf2e150d746eb
+8978c59c6ef7109b258c90b214e6ebf0f7372de3072aae6948d1dd78e313218c
 
 $ sleep 15
 
@@ -406,7 +415,7 @@ $ systemctl --user is-active web.service
 active
 
 $ curl -s http://127.0.0.1:8082/hostname
-59914b88ab73
+71adcd54b9a9
 
 $ podman ps --format '{{.Names}}  {{.Ports}}'
 systemd-web  127.0.0.1:8082->80/tcp
@@ -421,7 +430,7 @@ NRestarts=1
 ActiveState=active
 
 $ curl -s http://127.0.0.1:8082/hostname
-9672488e2ad0
+9c99abefc89e
 
 $ systemctl --user stop web.service
 
@@ -463,7 +472,7 @@ $ podman run --rm --user 1000:1000 --cap-add NET_RAW alpine:3.24.2 sh -c 'ping -
 ping-ok
 
 $ podman run -d --name p7 alpine:3.24.2 sleep 1000
-ffe5984358a1646f9d48314418505911af40d95e35760ec701852b91b5cd42ba
+23faab6d23d57d93bc48ea6900dd107abe8eb1b3819a57a2d2c6cc4207989df8
 
 $ podman exec p7 sh -c 'umask; echo "TERM=$TERM"'
 0022
@@ -476,23 +485,33 @@ $ grep Umask /proc/$(pgrep -x conmon)/status
 Umask:	0022
 
 $ podman exec -d p7 sleep 2000
-e732df1efc99e37ae0c364543c66f3f59934dad94e08272d6a71a38df0dd9904
+f511ff673aa8f2749632dfe4262c9882e442c0861a85d86e5d138a9ea04e3999
 
 $ ps -o pid,ppid,comm -C sleep,conmon
     PID    PPID COMMAND
-   2315       1 conmon
-   2318    2315 sleep
-   2353       1 conmon
-   2356    2353 sleep
+   2333       1 conmon
+   2335    2333 sleep
+   2371       1 conmon
+   2374    2371 sleep
 
 $ podman run -d --name p7u --umask 0077 alpine:3.24.2 sleep 1000
-4d101f88e6a87349aea2bceef86087af900711e75d04a68f0e0dbca80f0310ae
+67fa2531cb865b2a73c4cae98fb58886db1488409581af908764a7768167b7b4
 
 $ podman exec p7u sh -c umask
 0077
 
-$ grep Umask /proc/$(podman inspect -f '{{.State.ConmonPid}}' p7u)/status
-Umask:	0022
+$ podman exec -d p7u sleep 3000
+2c5fa8f87b7ee2512fccce36b1f3554333a04a7e3d1e83d8a40da0b2cbe8779a
+
+$ s=$(pgrep -x -f 'sleep 3000'); p=$(ps -o ppid= -p $s | tr -d ' ')
+
+$ grep Umask /proc/$s/status /proc/$p/status
+/proc/2428/status:Umask:	0077
+/proc/2425/status:Umask:	0022
+
+$ ps -o pid,comm -p $p
+    PID COMMAND
+   2425 conmon
 
 $ podman inspect p7 p7u --format '{{.Name}} {{.Config.Umask}}'
 p7 0022
@@ -505,9 +524,9 @@ $ time podman stop p7
 WARN[0010] StopSignal SIGTERM failed to stop container p7 in 10 seconds, resorting to SIGKILL
 p7
 
-real	0m11.672s
-user	0m1.048s
-sys	0m1.276s
+real	0m11.017s
+user	0m0.712s
+sys	0m0.848s
 
 $ podman rm p7
 p7
@@ -515,7 +534,7 @@ p7
 $ systemctl --user start podman.socket
 
 $ ls -l /run/user/1000/podman/podman.sock
-srw-rw---- 1 student student 0 Oct 14 03:26 /run/user/1000/podman/podman.sock
+srw-rw---- 1 student student 0 Oct 14 05:20 /run/user/1000/podman/podman.sock
 
 $ export DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
 
@@ -541,7 +560,7 @@ docker.io/library/alpine:3.24.2
 docker.io/library/busybox:1.38.0
                                 aaef90e06523       4.69MB             0B
 localhost/podman-pause:4.9.3-0
-                                944ccfdda183        835kB             0B
+                                c5ee8ac7f42b        835kB             0B
 
 $ unset DOCKER_HOST
 

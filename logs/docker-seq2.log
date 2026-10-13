@@ -7,7 +7,7 @@
 ========== 1. 01-process.html ==========
 
 $ docker run -d --name c1 alpine:3.24.2 sleep 1000
-505ffa04a27d4001a26c019bade3ed2ba3708175903974bc093004af4088c7d4
+accda2cf9e753fbd2ed951ec2ef2738c01330fb55601be7d1daad6f693798c35
 
 $ docker exec c1 ps
 PID   USER     TIME  COMMAND
@@ -28,16 +28,16 @@ PRETTY_NAME="Ubuntu 24.04.5 LTS"
 
 $ docker ps
 CONTAINER ID   IMAGE           COMMAND        CREATED          STATUS         PORTS     NAMES
-505ffa04a27d   alpine:3.24.2   "sleep 1000"   10 seconds ago   Up 9 seconds             c1
+accda2cf9e75   alpine:3.24.2   "sleep 1000"   10 seconds ago   Up 9 seconds             c1
 
 $ pid=$(docker inspect -f '{{.State.Pid}}' c1)
 
 $ echo $pid
-1004
+1002
 
 $ ps -o pid,ppid,user,cmd -p $pid
     PID    PPID USER     CMD
-   1004     977 root     sleep 1000
+   1002     977 root     sleep 1000
 
 $ readlink /proc/$$/ns/pid /proc/$$/ns/uts /proc/$$/ns/mnt /proc/$$/ns/net /proc/$$/ns/user
 pid:[4026531836]
@@ -54,16 +54,16 @@ net:[4026532359]
 user:[4026531837]
 
 $ docker exec c1 hostname
-505ffa04a27d
+accda2cf9e75
 
 $ hostname
 linuc
 
 $ cat /proc/$pid/cgroup
-0::/system.slice/docker-505ffa04a27d4001a26c019bade3ed2ba3708175903974bc093004af4088c7d4.scope
+0::/system.slice/docker-accda2cf9e753fbd2ed951ec2ef2738c01330fb55601be7d1daad6f693798c35.scope
 
 $ docker run -d --name c2 --memory 64m alpine:3.24.2 sleep 1000
-9bd092bfc79862da8efa22c6b496d3b50575f029db05da8bfc1f85287a5fa6d1
+51cdc337064a48291216d6e4e0df0815005f37ec75e3d6ed7debaa369dbde500
 
 $ docker exec c2 cat /sys/fs/cgroup/memory.max
 67108864
@@ -75,7 +75,7 @@ $ cat /sys/fs/cgroup/system.slice/docker-$(docker inspect -f '{{.Id}}' c2).scope
 67108864
 
 $ ls -l /run/docker.sock
-srw-rw---- 1 root docker 0 Oct 14 03:47 /run/docker.sock
+srw-rw---- 1 root docker 0 Oct 14 05:15 /run/docker.sock
 
 $ id
 uid=1000(student) gid=1000(student) groups=1000(student),4(adm),27(sudo),108(docker)
@@ -85,12 +85,12 @@ client 29.1.3 / server 29.1.3
 
 $ ps -o pid,ppid,user,comm -C dockerd,containerd,containerd-shim,sleep
     PID    PPID USER     COMMAND
-    559       1 root     containerd
-    691       1 root     dockerd
+    549       1 root     containerd
+    694       1 root     dockerd
     977       1 root     containerd-shim
-   1004     977 root     sleep
-   1181       1 root     containerd-shim
-   1205    1181 root     sleep
+   1002     977 root     sleep
+   1177       1 root     containerd-shim
+   1201    1177 root     sleep
 
 $ runc --version
 runc version 1.3.4-0ubuntu1~24.04.1
@@ -103,8 +103,8 @@ $ ps -C runc
 
 $ sudo runc --root /run/docker/runtime-runc/moby state $(docker inspect -f '{{.Id}}' c1) | jq '{id, pid, status}'
 {
-  "id": "505ffa04a27d4001a26c019bade3ed2ba3708175903974bc093004af4088c7d4",
-  "pid": 1004,
+  "id": "accda2cf9e753fbd2ed951ec2ef2738c01330fb55601be7d1daad6f693798c35",
+  "pid": 1002,
   "status": "running"
 }
 
@@ -122,14 +122,14 @@ $ sh -c 'sleep 1000 & sleep 1; kill $!; wait $!; echo "exit=$?"' 2>/dev/null
 exit=143
 
 $ docker run -d --name c3 alpine:3.24.2 sleep 1000
-ea36edc13822714a1f2d580d7b8355740b0a169093d93a05cca41ddfbebe96c6
+42762f090b8ddf6a6021f3ea2619611c021b6304bf5b8f5ff7b38cd6aa10f994
 
 $ time docker stop c3
 c3
 
-real	0m11.168s
-user	0m0.307s
-sys	0m0.074s
+real	0m11.172s
+user	0m0.319s
+sys	0m0.099s
 
 $ docker ps -a --format '{{.Names}}: {{.Status}}'
 c3: Exited (137) 1 second ago
@@ -156,23 +156,23 @@ $ docker rm c3
 c3
 
 $ docker run -d --name c4 --stop-timeout 3 alpine:3.24.2 sleep 1000
-5defe6133ac7b151218a26095d4754171480b78254fcd7c326904410401c933e
+45e75783ef78e81c1bd84bb77536722822bdc763dd71ed15368e14e2bda1ab65
 
 $ time docker stop c4
 c4
 
-real	0m4.164s
-user	0m0.310s
-sys	0m0.084s
+real	0m4.177s
+user	0m0.322s
+sys	0m0.095s
 
 $ docker run -d --name c5 --init alpine:3.24.2 sleep 1000
-8147aee402b28c7f79c7505b5e23993dd21f74c8dd8333509d1ad6796ca0fdc7
+191acadd12dbdeed44a3dbdd4b96e70585e40937bb2cc06588b70e8c3c8c5083
 
 $ docker exec c5 ps
 PID   USER     TIME  COMMAND
     1 root      0:00 /sbin/docker-init -- sleep 1000
-    7 root      0:00 sleep 1000
-    8 root      0:00 ps
+    6 root      0:00 sleep 1000
+    7 root      0:00 ps
 
 $ docker exec c5 grep SigCgt /proc/1/status
 SigCgt:	0000000000000000
@@ -180,9 +180,9 @@ SigCgt:	0000000000000000
 $ time docker stop c5
 c5
 
-real	0m1.032s
-user	0m0.290s
-sys	0m0.074s
+real	0m1.052s
+user	0m0.338s
+sys	0m0.103s
 
 $ docker ps -a --format '{{.Names}}: {{.Status}}'
 c5: Exited (143) 1 second ago
@@ -193,7 +193,7 @@ c4
 c5
 
 $ docker run -d --name c6 alpine:3.24.2 sleep 1000
-8e4bcaa1202a1b0fb065789056a723f5bfb7a52fd87c0e5e457fa62c9a426078
+d044464d50c27ccadfe6147ad734df1cc81b05bdf5767f406a8355a30d3bc304
 
 $ docker exec c6 sh -c 'echo "TERM=$TERM"; umask; tty'
 TERM=
@@ -219,16 +219,16 @@ $ docker exec -d c6 sleep 2000
 
 $ ps -o pid,ppid,user,cmd -C sleep
     PID    PPID USER     CMD
-   2046    2024 root     sleep 1000
-   2253    2024 root     sleep 2000
+   2044    2021 root     sleep 1000
+   2253    2021 root     sleep 2000
 
 $ ps -o pid,ppid,comm -C containerd-shim
     PID    PPID COMMAND
-   2024       1 containerd-shim
+   2021       1 containerd-shim
 
 $ grep Umask /proc/$(pgrep -x containerd)/status /proc/$(pgrep -x containerd-shim)/status
-/proc/559/status:Umask:	0022
-/proc/2024/status:Umask:	0022
+/proc/549/status:Umask:	0022
+/proc/2021/status:Umask:	0022
 
 $ sudo mkdir -p /etc/systemd/system/containerd.service.d
 
@@ -244,7 +244,7 @@ $ docker ps --format '{{.Names}}: {{.Status}}'
 c6: Up 22 seconds
 
 $ docker run -d --name c7 alpine:3.24.2 sleep 1000
-cdc0acab8c3b8a02ca4c5438955b693b6cd3720d7f22463767efbf378cbb6eb7
+fdd98792b675e04be0b2eac0fcdbd61b6b557e2a7bf158f6722a3ddc18d3fe5f
 
 $ docker exec c7 sh -c umask
 0077
@@ -369,7 +369,7 @@ ec6f2ae075c1	unknown/unknown
 ce2789264b55	linux/s390x
 d72add410491	unknown/unknown
 
-$ docker image inspect alpine:3.24.2 --format '{{.Os}}/{{.Architecture}}'
+$ docker image inspect alpine:3.24.2 --format '{{.Os}}/{{.Architecture}}{{with .Variant}}/{{.}}{{end}}'
 linux/amd64
 
 $ jq . blobs/sha256/d56c*
@@ -436,7 +436,7 @@ $ rm -rf ~/img
 ========== 4. 04-storage.html ==========
 
 $ docker run -d --name w1 alpine:3.24.2 sleep 1000
-38d5b0deb3f2aa879bd176a897fb132fffc506c72ebfd460d6a7dc96bb261793
+55b1c3c2f404818872517ff2f5a97b83522bf411542b62943633350623ceb878
 
 $ docker exec w1 rm /etc/motd
 
@@ -476,16 +476,16 @@ $ low=$(sudo findmnt -N $pid -n -o OPTIONS / | tr ',' '\n' | sed -n 's/^lowerdir
 $ sudo ls -lR $up
 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/fs:
 total 8
-drwxr-xr-x 2 root root 4096 Oct 14 03:50 etc
-drwx------ 2 root root 4096 Oct 14 03:50 root
+drwxr-xr-x 2 root root 4096 Oct 14 05:18 etc
+drwx------ 2 root root 4096 Oct 14 05:18 root
 
 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/fs/etc:
 total 0
-c--------- 2 root root 0, 0 Oct 14 03:50 motd
+c--------- 2 root root 0, 0 Oct 14 05:18 motd
 
 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/fs/root:
 total 4
--rw-r--r-- 1 root root 6 Oct 14 03:50 note.txt
+-rw-r--r-- 1 root root 6 Oct 14 05:18 note.txt
 
 $ sudo ls -l $low/etc/motd
 -rw-r--r-- 1 root root 284 Mar 25  2026 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs/etc/motd
@@ -527,7 +527,7 @@ world
 $ docker run --rm -v "$HOME/apkdir":/etc/apk alpine:3.24.2 ls /etc/apk
 
 $ ls -ld ~/apkdir
-drwxr-xr-x 2 root root 4096 Oct 14 03:51 /home/student/apkdir
+drwxr-xr-x 2 root root 4096 Oct 14 05:19 /home/student/apkdir
 
 $ docker run --rm --mount type=bind,source="$HOME/nodir",target=/etc/apk alpine:3.24.2 ls /etc/apk
 docker: Error response from daemon: invalid mount config for type "bind": bind source path does not exist: /home/student/nodir
@@ -538,7 +538,7 @@ $ docker run --rm -v tmpvol:/tmp alpine:3.24.2 ls -ld /tmp
 drwxrwxrwt    2 root     root          4096 Sep 17 17:32 /tmp
 
 $ docker run --rm -v "$HOME/tmpdir":/tmp alpine:3.24.2 ls -ld /tmp
-drwxr-xr-x    2 root     root          4096 Oct 13 18:51 /tmp
+drwxr-xr-x    2 root     root          4096 Oct 13 20:19 /tmp
 
 $ sudo find /var/lib/docker/volumes/apkvol/_data -mindepth 1 -delete
 
@@ -563,16 +563,16 @@ $ sudo rmdir ~/apkdir ~/tmpdir
 ========== 5. 05-ports.html ==========
 
 $ docker run -d --name web -p 10.0.2.15:8080:80 busybox:1.38.0 httpd -f -h /etc
-cc3512a30aaaa591e042aa2f7b15eca2e23b0adfe7d7218a77d138bbd51ecc93
+244705fcdad211be6f208f27323046ea47d3d8bbc1cd9621d3e7b2f23707c219
 
 $ docker ps --format '{{.Names}}  {{.Ports}}'
 web  10.0.2.15:8080->80/tcp
 
 $ curl -s http://10.0.2.15:8080/hostname
-cc3512a30aaa
+244705fcdad2
 
 $ sudo ss -ltnp | grep 8080
-LISTEN 0      4096       10.0.2.15:8080       0.0.0.0:*    users:(("docker-proxy",pid=4436,fd=7))
+LISTEN 0      4096       10.0.2.15:8080       0.0.0.0:*    users:(("docker-proxy",pid=4442,fd=7))
 
 $ sudo iptables -I INPUT -p tcp --dport 8080 -j DROP
 
@@ -586,7 +586,7 @@ logout
 Connection to 127.0.0.1 closed.
 
 $ curl -s http://127.0.0.1:8080/hostname
-cc3512a30aaa
+244705fcdad2
 
 $ ssh linuc
 
@@ -594,10 +594,10 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Wed Oct 14 03:47:56 2026 from 10.0.2.2
+Last login: Wed Oct 14 05:15:51 2026 from 10.0.2.2
 
 $ sudo iptables -L INPUT -n -v --line-numbers | head -3
-Chain INPUT (policy ACCEPT 265 packets, 18935 bytes)
+Chain INPUT (policy ACCEPT 279 packets, 19747 bytes)
 num   pkts bytes target     prot opt in     out     source               destination
 1        0     0 DROP       6    --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:8080
 
@@ -618,20 +618,20 @@ $ docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' w
 
 $ docker exec web ip addr show eth0
 2: eth0@if50: <BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN> mtu 1500 qdisc noqueue
-    link/ether b6:e7:d9:05:65:7a brd ff:ff:ff:ff:ff:ff
+    link/ether 16:31:4b:8a:96:dd brd ff:ff:ff:ff:ff:ff
     inet 172.17.0.2/16 brd 172.17.255.255 scope global eth0
        valid_lft forever preferred_lft forever
 
 $ ip -br addr show docker0
-docker0          UP             172.17.0.1/16 fe80::9ca8:87ff:feca:6f0c/64
+docker0          UP             172.17.0.1/16 fe80::b80e:c5ff:fe78:9999/64
 
 $ ip -br link show master docker0
-veth7d95448@if2  UP             8e:91:be:5f:bd:d2 <BROADCAST,MULTICAST,UP,LOWER_UP>
+vethb5b672a@if2  UP             8a:35:1b:f6:37:7b <BROADCAST,MULTICAST,UP,LOWER_UP>
 
 $ sudo iptables -D INPUT -p tcp --dport 8080 -j DROP
 
 $ docker run --rm alpine:3.24.2 wget -qO- -T 3 http://10.0.2.15:8080/hostname
-cc3512a30aaa
+244705fcdad2
 
 $ docker rm -f web
 web
@@ -664,48 +664,47 @@ $ time docker build --progress=plain -t app:1 .
 #2 DONE 0.2s
 
 #3 [internal] load .dockerignore
-#3 transferring context:
 #3 transferring context: 2B 0.0s done
-#3 DONE 0.2s
+#3 DONE 0.1s
 
 #4 [internal] load build context
 #4 DONE 0.0s
 
 #5 [1/3] FROM docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 #5 resolve docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
-#5 resolve docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 0.3s done
+#5 resolve docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 0.2s done
 #5 DONE 0.3s
-
-#5 [1/3] FROM docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
-#5 DONE 0.5s
 
 #4 [internal] load build context
 #4 transferring context: 47B 0.0s done
 #4 DONE 0.2s
 
+#5 [1/3] FROM docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+#5 DONE 0.4s
+
 #6 [2/3] COPY app.sh /app/app.sh
 #6 DONE 0.2s
 
 #7 [3/3] RUN sleep 10 && echo "dependencies installed" > /app/deps.txt
-#7 DONE 11.8s
+#7 DONE 12.0s
 
 #8 exporting to image
 #8 exporting layers
-#8 exporting layers 0.9s done
-#8 exporting manifest sha256:866c8dfc89ff6bd09cbc41d94b5e8c8141dbf4c0812881b64c0d499dbb951639 0.1s done
-#8 exporting config sha256:642eb4c845f1a98f52c48d42569a25741073186f1db719861207a8f52ce923e0 0.1s done
-#8 exporting attestation manifest sha256:d18dacdf9709b720efc0b9ab17f53a7831c8eaa25b54ae520f4fe602ba53c65f
-#8 exporting attestation manifest sha256:d18dacdf9709b720efc0b9ab17f53a7831c8eaa25b54ae520f4fe602ba53c65f 0.2s done
-#8 exporting manifest list sha256:18f773b1737e1977be4e487852df2153564e477c8b91033dcad3b3e19d67dad2
-#8 exporting manifest list sha256:18f773b1737e1977be4e487852df2153564e477c8b91033dcad3b3e19d67dad2 0.1s done
+#8 exporting layers 0.8s done
+#8 exporting manifest sha256:f5612d0de7d6aee73be3a429b6c192cd3165c285b960eb7349776fc6400f3081 0.1s done
+#8 exporting config sha256:95c982e6dde7d2cbb447aa55fa49c9e09d742cacd5a325fdf92b1b596a714154 0.1s done
+#8 exporting attestation manifest sha256:c7219acf4dae01c7e6326d1051b5f4642fba62b9d320273ac78bc532846a3ef8
+#8 exporting attestation manifest sha256:c7219acf4dae01c7e6326d1051b5f4642fba62b9d320273ac78bc532846a3ef8 0.2s done
+#8 exporting manifest list sha256:565ed372a3ef35263fab40943cc077da362f017ad8a4e063b8a8ec65e5d22f7e 0.1s done
+#8 naming to docker.io/library/app:1
 #8 naming to docker.io/library/app:1 0.0s done
 #8 unpacking to docker.io/library/app:1
-#8 unpacking to docker.io/library/app:1 0.3s done
-#8 DONE 2.0s
+#8 unpacking to docker.io/library/app:1 0.2s done
+#8 DONE 1.8s
 
-real	0m20.075s
-user	0m2.035s
-sys	0m1.165s
+real	0m19.335s
+user	0m1.740s
+sys	0m0.844s
 
 $ docker run --rm app:1
 app v1
@@ -718,11 +717,11 @@ $ time docker build --progress=plain -t app:1 .
 #1 DONE 0.1s
 
 #2 [internal] load metadata for docker.io/library/alpine:3.24.2
-#2 DONE 0.2s
+#2 DONE 0.1s
 
 #3 [internal] load .dockerignore
-#3 transferring context: 2B 0.0s done
-#3 DONE 0.1s
+#3 transferring context: 2B done
+#3 DONE 0.0s
 
 #4 [internal] load build context
 #4 DONE 0.0s
@@ -744,18 +743,20 @@ $ time docker build --progress=plain -t app:1 .
 
 #8 exporting to image
 #8 exporting layers 0.0s done
-#8 exporting manifest sha256:866c8dfc89ff6bd09cbc41d94b5e8c8141dbf4c0812881b64c0d499dbb951639 0.0s done
-#8 exporting config sha256:642eb4c845f1a98f52c48d42569a25741073186f1db719861207a8f52ce923e0 0.0s done
-#8 exporting attestation manifest sha256:75066ee9dc7f8ab987006a9ede44a9686959a9f4ccadf0aa0bf91f502ebf3ba7
-#8 exporting attestation manifest sha256:75066ee9dc7f8ab987006a9ede44a9686959a9f4ccadf0aa0bf91f502ebf3ba7 0.2s done
-#8 exporting manifest list sha256:bdfecead96ab7a75561f3d21d2da73efa6f68cb75424388cfe01d5f00d04658e 0.1s done
+#8 exporting manifest sha256:f5612d0de7d6aee73be3a429b6c192cd3165c285b960eb7349776fc6400f3081 0.0s done
+#8 exporting config sha256:95c982e6dde7d2cbb447aa55fa49c9e09d742cacd5a325fdf92b1b596a714154 0.0s done
+#8 exporting attestation manifest sha256:1e9666ad6a51a313514cdcc7c0a5c8a82f427120e8e6657f86669366c77286bf
+#8 exporting attestation manifest sha256:1e9666ad6a51a313514cdcc7c0a5c8a82f427120e8e6657f86669366c77286bf 0.2s done
+#8 exporting manifest list sha256:d86d83d344a72683c26b9c98fc49a73417824732a1e0ea50b5accc0fd2ea17ad
+#8 exporting manifest list sha256:d86d83d344a72683c26b9c98fc49a73417824732a1e0ea50b5accc0fd2ea17ad 0.1s done
+#8 naming to docker.io/library/app:1
 #8 naming to docker.io/library/app:1 0.0s done
 #8 unpacking to docker.io/library/app:1 0.1s done
-#8 DONE 0.7s
+#8 DONE 0.6s
 
-real	0m3.792s
-user	0m0.868s
-sys	0m0.526s
+real	0m3.754s
+user	0m1.188s
+sys	0m0.475s
 
 $ echo 'echo "app v2"' > app.sh
 
@@ -782,7 +783,7 @@ $ time docker build --progress=plain -t app:2 .
 #5 DONE 0.2s
 
 #4 [internal] load build context
-#4 transferring context: 47B 0.0s done
+#4 transferring context: 47B 0.1s done
 #4 DONE 0.1s
 
 #5 [1/3] FROM docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
@@ -796,22 +797,20 @@ $ time docker build --progress=plain -t app:2 .
 
 #8 exporting to image
 #8 exporting layers
-#8 exporting layers 0.9s done
-#8 exporting manifest sha256:fda98971eac340199d393584503d3dadc35d9eaf422d88bf736a93f535850615 0.1s done
-#8 exporting config sha256:dd9680f53dd85f22d505768e4ca7f5047de9715f06efaad9f28ed5fffd0ee12e 0.1s done
-#8 exporting attestation manifest sha256:0edc3bc7b2cd97df3dbfa5ac11eb4d01265b945bb0eb6f7a441dfa204574ff04
-#8 exporting attestation manifest sha256:0edc3bc7b2cd97df3dbfa5ac11eb4d01265b945bb0eb6f7a441dfa204574ff04 0.2s done
-#8 exporting manifest list sha256:56dfb41ff264dc945c5c4da024fe6245eb0a1ec4468321cff74e0ba8806f0468
-#8 exporting manifest list sha256:56dfb41ff264dc945c5c4da024fe6245eb0a1ec4468321cff74e0ba8806f0468 0.1s done
-#8 naming to docker.io/library/app:2
+#8 exporting layers 0.7s done
+#8 exporting manifest sha256:0406aafe0a1b7a61f3568cac270cd81c2a5e4c146971e49e13c37ac4eff48cf1 0.1s done
+#8 exporting config sha256:def31215184fc4e4ea62f028b22ff9f26c99b785611df0d27ee6a07864582964 0.1s done
+#8 exporting attestation manifest sha256:10ddeb608aae32b2b31105cb3e58c66b785d00b8f58a6b70695aade93d95b3d9
+#8 exporting attestation manifest sha256:10ddeb608aae32b2b31105cb3e58c66b785d00b8f58a6b70695aade93d95b3d9 0.2s done
+#8 exporting manifest list sha256:87a2335bddad4b672c91c3a0b210b6138633676a656c22bd394b441076b80850 0.1s done
 #8 naming to docker.io/library/app:2 0.0s done
 #8 unpacking to docker.io/library/app:2
-#8 unpacking to docker.io/library/app:2 0.3s done
-#8 DONE 2.0s
+#8 unpacking to docker.io/library/app:2 0.2s done
+#8 DONE 1.6s
 
-real	0m16.593s
-user	0m0.984s
-sys	0m0.594s
+real	0m16.007s
+user	0m1.068s
+sys	0m0.585s
 
 $ cat > Dockerfile <<'EOF'
 > FROM alpine:3.24.2
@@ -832,42 +831,39 @@ $ time docker build --progress=plain -t app:3 .
 
 #3 [internal] load .dockerignore
 #3 transferring context: 2B 0.0s done
-#3 DONE 0.1s
+#3 DONE 0.0s
 
 #4 [internal] load build context
-#4 transferring context: 27B 0.0s done
+#4 transferring context: 27B done
 #4 DONE 0.1s
 
 #5 [1/3] FROM docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
-#5 resolve docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
-#5 resolve docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 0.3s done
+#5 resolve docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 0.2s done
 #5 CACHED
 
 #6 [2/3] RUN mkdir /app && sleep 10 && echo "dependencies installed" > /app/deps.txt
-#6 DONE 11.5s
+#6 DONE 11.4s
 
 #7 [3/3] COPY app.sh /app/app.sh
-#7 DONE 0.4s
+#7 DONE 0.3s
 
 #8 exporting to image
 #8 exporting layers
-#8 exporting layers 0.8s done
-#8 exporting manifest sha256:98db9353865455369e6fbe25c51577c7b1f46d6209258bcfbef379b8d014b880 0.1s done
-#8 exporting config sha256:b413e268f5201c932350a4b953a452db50856fd878073dca3d3eeb851bab1bd6
-#8 exporting config sha256:b413e268f5201c932350a4b953a452db50856fd878073dca3d3eeb851bab1bd6 0.1s done
-#8 exporting attestation manifest sha256:aec1cce1b6f6e18f2bb9036dd3dc828a705cce3ad9c5fadf7d2dffe0ec2bd4a5
-#8 exporting attestation manifest sha256:aec1cce1b6f6e18f2bb9036dd3dc828a705cce3ad9c5fadf7d2dffe0ec2bd4a5 0.3s done
-#8 exporting manifest list sha256:8e7c0c9ca04ba180a3017f82616ce629784e74cfdd0eb1d366da1dbd696e01d5
-#8 exporting manifest list sha256:8e7c0c9ca04ba180a3017f82616ce629784e74cfdd0eb1d366da1dbd696e01d5 0.1s done
-#8 naming to docker.io/library/app:3
+#8 exporting layers 0.7s done
+#8 exporting manifest sha256:ddb8f7b3cdd52ec1e053778bd2a5d92ac870b89c96585b2817b1f4a44ab43411 0.1s done
+#8 exporting config sha256:15a7d69815eac04c479d8c0ade10589f4e152ed30e26d443403ba4a96c4ee37b 0.1s done
+#8 exporting attestation manifest sha256:b5903894e445e0128537ec6f61fe1c6f58404ba68ef0f55ba6c22bad96bd30d5
+#8 exporting attestation manifest sha256:b5903894e445e0128537ec6f61fe1c6f58404ba68ef0f55ba6c22bad96bd30d5 0.1s done
+#8 exporting manifest list sha256:ed3743a27bffeb3c651fd55db8796e329bfb8804e8df702a945e84fe8bf30508
+#8 exporting manifest list sha256:ed3743a27bffeb3c651fd55db8796e329bfb8804e8df702a945e84fe8bf30508 0.1s done
 #8 naming to docker.io/library/app:3 0.0s done
 #8 unpacking to docker.io/library/app:3
-#8 unpacking to docker.io/library/app:3 0.3s done
-#8 DONE 2.0s
+#8 unpacking to docker.io/library/app:3 0.2s done
+#8 DONE 1.6s
 
-real	0m17.192s
-user	0m0.970s
-sys	0m0.533s
+real	0m16.017s
+user	0m0.893s
+sys	0m0.532s
 
 $ echo 'echo "app v3"' > app.sh
 
@@ -876,13 +872,13 @@ $ time docker build --progress=plain -t app:4 .
 
 #1 [internal] load build definition from Dockerfile
 #1 transferring dockerfile: 184B 0.0s done
-#1 DONE 0.1s
+#1 DONE 0.0s
 
 #2 [internal] load metadata for docker.io/library/alpine:3.24.2
-#2 DONE 0.2s
+#2 DONE 0.1s
 
 #3 [internal] load .dockerignore
-#3 transferring context: 2B 0.0s done
+#3 transferring context: 2B done
 #3 DONE 0.0s
 
 #4 [internal] load build context
@@ -890,42 +886,41 @@ $ time docker build --progress=plain -t app:4 .
 #4 DONE 0.1s
 
 #5 [1/3] FROM docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
-#5 resolve docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
-#5 resolve docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 0.3s done
-#5 DONE 0.3s
+#5 resolve docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 0.2s done
+#5 DONE 0.2s
 
 #6 [2/3] RUN mkdir /app && sleep 10 && echo "dependencies installed" > /app/deps.txt
 #6 CACHED
 
 #7 [3/3] COPY app.sh /app/app.sh
-#7 DONE 0.3s
+#7 DONE 0.1s
 
 #8 exporting to image
 #8 exporting layers
-#8 exporting layers 0.5s done
-#8 exporting manifest sha256:06a5886befacb968943baf89967fd2e430cbaa8a495a3e110d551f24169dccea 0.1s done
-#8 exporting config sha256:e4e46320f4dcd8916099ff0dc2ba688ce1ad7b07257d5527fc573523a692a765 0.1s done
-#8 exporting attestation manifest sha256:422586768d46e344d0dadd8ee1db749e5f6a8a972e78cf0d276ba3917631df50
-#8 exporting attestation manifest sha256:422586768d46e344d0dadd8ee1db749e5f6a8a972e78cf0d276ba3917631df50 0.2s done
-#8 exporting manifest list sha256:5573d859ae8e45a58ff3a1dfd7636edeaefdd9ae1de95415694954a9cd8052de 0.1s done
-#8 naming to docker.io/library/app:4
+#8 exporting layers 0.4s done
+#8 exporting manifest sha256:9988ffc240b2bb4056af5703480f6eb34148bb3cdb170234dfc3e9070e302c6a 0.1s done
+#8 exporting config sha256:658a5ce91a992989856f1f41bc56ea5f2045aea76abee1dcfb83aa5fb813553d 0.1s done
+#8 exporting attestation manifest sha256:392b526320ffdac0a23022dae1afda9191fb387961ec838bbd33123301b567f6
+#8 exporting attestation manifest sha256:392b526320ffdac0a23022dae1afda9191fb387961ec838bbd33123301b567f6 0.2s done
+#8 exporting manifest list sha256:5acb6b61dfdf67b6f201a2603314c7a58144b7a975419b46c06a3a28fea47236
+#8 exporting manifest list sha256:5acb6b61dfdf67b6f201a2603314c7a58144b7a975419b46c06a3a28fea47236 0.1s done
 #8 naming to docker.io/library/app:4 0.0s done
 #8 unpacking to docker.io/library/app:4
-#8 unpacking to docker.io/library/app:4 0.2s done
-#8 DONE 1.6s
+#8 unpacking to docker.io/library/app:4 0.1s done
+#8 DONE 1.2s
 
-real	0m4.543s
-user	0m0.867s
-sys	0m0.479s
+real	0m3.795s
+user	0m0.879s
+sys	0m0.475s
 
 $ docker run --rm app:4
 app v3
 
 $ docker history app:4
 IMAGE          CREATED          CREATED BY                                      SIZE      COMMENT
-5573d859ae8e   6 seconds ago    CMD ["sh" "/app/app.sh"]                        0B        buildkit.dockerfile.v0
+5acb6b61dfdf   6 seconds ago    CMD ["sh" "/app/app.sh"]                        0B        buildkit.dockerfile.v0
 <missing>      6 seconds ago    COPY app.sh /app/app.sh # buildkit              12.3kB    buildkit.dockerfile.v0
-<missing>      13 seconds ago   RUN /bin/sh -c mkdir /app && sleep 10 && ech…   12.3kB    buildkit.dockerfile.v0
+<missing>      11 seconds ago   RUN /bin/sh -c mkdir /app && sleep 10 && ech…   12.3kB    buildkit.dockerfile.v0
 <missing>      3 weeks ago      CMD ["/bin/sh"]                                 0B        buildkit.dockerfile.v0
 <missing>      3 weeks ago      ADD alpine-minirootfs-3.24.2-x86_64.tar.gz /…   9.08MB    buildkit.dockerfile.v0
 
@@ -935,13 +930,13 @@ $ rm -r ~/app
 
 $ docker rmi app:1 app:2 app:3 app:4
 Untagged: app:1
-Deleted: sha256:bdfecead96ab7a75561f3d21d2da73efa6f68cb75424388cfe01d5f00d04658e
+Deleted: sha256:d86d83d344a72683c26b9c98fc49a73417824732a1e0ea50b5accc0fd2ea17ad
 Untagged: app:2
-Deleted: sha256:56dfb41ff264dc945c5c4da024fe6245eb0a1ec4468321cff74e0ba8806f0468
+Deleted: sha256:87a2335bddad4b672c91c3a0b210b6138633676a656c22bd394b441076b80850
 Untagged: app:3
-Deleted: sha256:8e7c0c9ca04ba180a3017f82616ce629784e74cfdd0eb1d366da1dbd696e01d5
+Deleted: sha256:ed3743a27bffeb3c651fd55db8796e329bfb8804e8df702a945e84fe8bf30508
 Untagged: app:4
-Deleted: sha256:5573d859ae8e45a58ff3a1dfd7636edeaefdd9ae1de95415694954a9cd8052de
+Deleted: sha256:5acb6b61dfdf67b6f201a2603314c7a58144b7a975419b46c06a3a28fea47236
 
 
 ========== 7. 07-privileges.html ==========
@@ -953,7 +948,7 @@ uid=0(root) gid=0(root) groups=0(root),0(root),1(bin),2(daemon),3(sys),4(adm),6(
 
 $ ls -ln ~/share
 total 0
--rw-r--r-- 1 0 0 0 Oct 14 03:53 made-by-container
+-rw-r--r-- 1 0 0 0 Oct 14 05:21 made-by-container
 
 $ grep CapEff /proc/self/status
 CapEff:	0000000000000000
@@ -973,7 +968,7 @@ ip: RTNETLINK answers: Operation not permitted
 $ docker run --rm --cap-add NET_ADMIN alpine:3.24.2 sh -c 'grep CapEff /proc/self/status; ip link add lab0 type dummy; ip link show lab0'
 CapEff:	00000000a80435fb
 3: lab0: <BROADCAST,NOARP> mtu 1500 qdisc noop state DOWN qlen 1000
-    link/ether be:f3:33:87:47:08 brd ff:ff:ff:ff:ff:ff
+    link/ether fe:58:83:7a:37:f5 brd ff:ff:ff:ff:ff:ff
 
 $ capsh --decode=00000000a80435fb
 0x00000000a80435fb=cap_chown,cap_dac_override,cap_fowner,cap_fsetid,cap_kill,cap_setgid,cap_setuid,cap_setpcap,cap_net_bind_service,cap_net_admin,cap_net_raw,cap_sys_chroot,cap_mknod,cap_audit_write,cap_setfcap
@@ -996,10 +991,10 @@ urandom
 zero
 
 $ ls -l /dev/kvm
-crw-rw---- 1 root kvm 10, 232 Oct 14 03:47 /dev/kvm
+crw-rw---- 1 root kvm 10, 232 Oct 14 05:15 /dev/kvm
 
 $ docker run --rm --device /dev/kvm alpine:3.24.2 sh -c 'ls -l /dev/kvm; grep CapEff /proc/self/status'
-crw-rw----    1 root     994        10, 232 Oct 13 18:54 /dev/kvm
+crw-rw----    1 root     994        10, 232 Oct 13 20:21 /dev/kvm
 CapEff:	00000000a80425fb
 
 $ docker run --rm --device /dev/kvm --user 1000:1000 alpine:3.24.2 sh -c 'id; head -c0 /dev/kvm 2>&1 && echo opened'
@@ -1024,6 +1019,11 @@ CapEff:	000001ffffffffff
 Seccomp:	0
 unconfined
 191
+
+$ docker run --rm --cap-add SYS_ADMIN alpine:3.24.2 sh -c 'grep CapEff /proc/self/status; mount -o remount,rw /sys/fs/cgroup 2>&1; grep " /sys/fs/cgroup " /proc/self/mounts'
+CapEff:	00000000a82425fb
+mount: mounting cgroup on /sys/fs/cgroup failed: Permission denied
+cgroup /sys/fs/cgroup cgroup2 ro,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot 0 0
 
 $ docker run --rm --user 1000:1000 alpine:3.24.2 sh -c 'id; grep CapEff /proc/self/status'
 uid=1000 gid=1000 groups=1000

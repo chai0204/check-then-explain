@@ -69,7 +69,7 @@ docker exec -it lab-podman bash -l</code></pre>
 
 podman exec -it lab-podman bash -l</code></pre>
 <ul>
-<li><code>--stop-timeout 30</code> は特権ではなく、止めるときに待つ秒数です。練習機を正常に止めるのに KVM なしで十数秒かかり、既定の10秒では電源を抜くのと同じ止まり方になります。</li>
+<li><code>--stop-timeout 30</code> は特権ではなく、止めるときに待つ秒数です。練習機を正常に止めるのにかかる時間は、練習機の中で動いているもの次第です（著者の記録 <code>logs/podman-stop.log</code> では、何も動いていなければ 5.1 秒、student のコンテナを3つ残していると 8.3 秒）。既定の10秒を超えると電源を抜くのと同じ止まり方になるので、30秒にしています。</li>
 <li><code>--privileged</code> も <code>--cap-add</code> も要りません。</li>
 <li>rootless の podman で起動した場合、あなたがログアウトすると、この檻も止まることがあります（<a href="/podman/theory/06-systemd">第6章</a>で、その理由を練習機の中で確かめます）。</li>
 </ul>

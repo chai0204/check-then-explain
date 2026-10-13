@@ -41,9 +41,9 @@ docker では、待ち受けるのも宛先を書き換えるのも root の doc
 <pre data-where="練習機の中（student@linuc）"><code>$ podman rm web
 web
 $ podman run -d --name web -p 127.0.0.1:8080:80 busybox:1.38.0 httpd -f -h /etc
-57b6ebe16be4dc555ef2029cb80fcf204fc5760c02c6817ae85b7bdfdc45bd8a
+cb9a05fb9f151a095328a52fa917eca60a8df1c94a4b6d4a60d339796e360bff
 $ curl -s http://127.0.0.1:8080/hostname
-57b6ebe16be4</code></pre>
+cb9a05fb9f15</code></pre>
 
 <div class="analogy"><b>たとえ</b>: 1024 番未満のポートは、<b>建物の正面玄関の受付席</b>に近い。一般の入居者（一般ユーザ）は座れず、管理会社の人（特権を持つプロセス）だけが座れる。rootless の podman で受付に座るのは、入居者の代理人（rootlessport）なので、正面玄関には座れない。
 <br>ただし<b>崩れる点</b>: 本物の建物の決まりは変えにくいが、この線は練習機の設定 <code>net.ipv4.ip_unprivileged_port_start</code> の1つの値で、root なら引き直せる。ただし引き直すと、すべての入居者が座れるようになる。</div>
@@ -52,13 +52,13 @@ $ curl -s http://127.0.0.1:8080/hostname
 <div class="sgoal"><b>この節で分かること</b>: rootless のポートの公開とコンテナの外への通信を、どのプロセスが受け持っているか。</div>
 <pre data-where="練習機の中（student@linuc）"><code>$ ps -o pid,ppid,user,comm -C rootlessport,exe,slirp4netns,conmon,httpd
     PID    PPID USER     COMMAND
-   1286       1 student  slirp4netns
-   1289       1 student  rootlessport
-   1294    1289 student  exe
-   1302       1 student  conmon
-   1304    1302 student  httpd
+   1295       1 student  slirp4netns
+   1297       1 student  rootlessport
+   1303    1297 student  exe
+   1311       1 student  conmon
+   1313    1311 student  httpd
 $ ss -ltnp | grep 8080
-LISTEN 0      4096       127.0.0.1:8080      0.0.0.0:*    users:(("rootlessport",pid=1289,fd=5))
+LISTEN 0      4096       127.0.0.1:8080      0.0.0.0:*    users:(("rootlessport",pid=1297,fd=10))
 $ sudo iptables -t nat -S | grep -c 8080
 0</code></pre>
 <p>練習機の 127.0.0.1:8080 で待ち受けているのは、student の <b>rootlessport</b> だった（<code>pid=</code> と <code>fd=</code> の番号は起動のたびに変わるので、あなたの画面では本文と違う）。iptables の nat 表には 8080 の規則が1つも無い（数えると 0）。

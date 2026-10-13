@@ -33,7 +33,7 @@ $ docker run --rm -v "$HOME/share":/share alpine:3.24.2 sh -c 'id; touch /share/
 uid=0(root) gid=0(root) groups=0(root),0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel),11(floppy),20(dialout),26(tape),27(video)
 $ ls -ln ~/share
 total 0
--rw-r--r-- 1 0 0 0 Oct 14 03:46 made-by-container</code></pre>
+-rw-r--r-- 1 0 0 0 Oct 14 05:13 made-by-container</code></pre>
 <div class="then"><b>だめな理由</b>: コンテナの中の root が作ったファイルは、練習機の上でも持ち主が <code>0</code>（root）だった。
 第1章で見たとおり、docker は既定でユーザの名前空間を区切らないので、<b>中の UID 0 は練習機の UID 0 そのもの</b>である。
 コンテナの中の root ができることを絞っているのは「別人にすること」ではなく、次の節のケーパビリティと、seccomp・AppArmor という別の仕組みである。</div></div>
@@ -64,7 +64,7 @@ ip: RTNETLINK answers: Operation not permitted
 $ docker run --rm --cap-add NET_ADMIN alpine:3.24.2 sh -c 'grep CapEff /proc/self/status; ip link add lab0 type dummy; ip link show lab0'
 CapEff:	00000000a80435fb
 3: lab0: &lt;BROADCAST,NOARP&gt; mtu 1500 qdisc noop state DOWN qlen 1000
-    link/ether 66:3e:68:7e:ca:be brd ff:ff:ff:ff:ff:ff
+    link/ether 92:c5:60:d2:cf:81 brd ff:ff:ff:ff:ff:ff
 $ capsh --decode=00000000a80435fb
 0x00000000a80435fb=cap_chown,cap_dac_override,cap_fowner,cap_fsetid,cap_kill,cap_setgid,cap_setuid,cap_setpcap,cap_net_bind_service,cap_net_admin,cap_net_raw,cap_sys_chroot,cap_mknod,cap_audit_write,cap_setfcap</code></pre>
 <p>既定では、仮想の NIC を足す操作が <code>Operation not permitted</code> で断られた。<code>--cap-add NET_ADMIN</code> を付けると <code>CapEff</code> のビットが1つ増え
@@ -96,9 +96,9 @@ tty
 urandom
 zero
 $ ls -l /dev/kvm
-crw-rw---- 1 root kvm 10, 232 Oct 14 03:39 /dev/kvm
+crw-rw---- 1 root kvm 10, 232 Oct 14 05:07 /dev/kvm
 $ docker run --rm --device /dev/kvm alpine:3.24.2 sh -c 'ls -l /dev/kvm; grep CapEff /proc/self/status'
-crw-rw----    1 root     994        10, 232 Oct 13 18:46 /dev/kvm
+crw-rw----    1 root     994        10, 232 Oct 13 20:14 /dev/kvm
 CapEff:	00000000a80425fb
 $ docker run --rm --device /dev/kvm --user 1000:1000 alpine:3.24.2 sh -c 'id; head -c0 /dev/kvm 2&gt;&amp;1 &amp;&amp; echo opened'
 uid=1000 gid=1000 groups=1000
@@ -138,6 +138,15 @@ AppArmor の規則 <code>docker-default</code> が強制（<code>enforce</code>�
 <p>docker の文書によれば、<code>--privileged</code> を付けたコンテナは、ケーパビリティが全部になり、既定の seccomp の一覧と AppArmor の規則が外れ、ホスト（ここでは練習機）の装置を全部使えるようになる
 （ほかに <code>/sys</code> と cgroup のマウントが書き込み可になる）。つまり上の4項目が、<b>既定のコンテナの値から、練習機の root の値へほぼ丸ごと変わる</b>。
 名前空間で見え方は分かれていても、練習機の root とほぼ同じ力を渡すオプションで、何を渡したかを1つずつ数えられない。</p>
+<p>ケーパビリティと AppArmor は別々に効く。マウントなどを許す <code>CAP_SYS_ADMIN</code> を足しても、AppArmor の規則が断る操作は通らない。
+docker が読むだけでマウントする <code>/sys/fs/cgroup</code> を、書けるように付け直してみる（<code>2&gt;&amp;1</code> は、エラーの行を同じ出力の流れに入れて、表示の順を保つため）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ docker run --rm --cap-add SYS_ADMIN alpine:3.24.2 sh -c 'grep CapEff /proc/self/status; mount -o remount,rw /sys/fs/cgroup 2&gt;&amp;1; grep " /sys/fs/cgroup " /proc/self/mounts'
+CapEff:	00000000a82425fb
+mount: mounting cgroup on /sys/fs/cgroup failed: Permission denied
+cgroup /sys/fs/cgroup cgroup2 ro,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot 0 0</code></pre>
+<p><code>CapEff</code> には <code>CAP_SYS_ADMIN</code> のビットが足された（<code>a82425fb</code>）のに、付け直しは <code>Permission denied</code> で断られ、<code>/sys/fs/cgroup</code> は <code>ro</code>（読むだけ）のままだった。
+断ったのは、この練習機の docker が当てる AppArmor の規則 <code>docker-default</code> で、この規則はマウントを許さない。<b>ケーパビリティを足しても、AppArmor の判定は変わらない</b>。
+AppArmor の無い docker（著者の PC の NixOS の docker）では、同じ付け直しが通った（著者の記録 <code>logs/docker-apparmor.log</code>）。同じオプションでも、PC の側の仕組みで結果が変わる。</p>
 <p>逆の向きに、渡すものを減らすオプションもある。<code>--user</code> は、コンテナの最初のプロセスを root 以外で起動する。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ docker run --rm --user 1000:1000 alpine:3.24.2 sh -c 'id; grep CapEff /proc/self/status'
 uid=1000 gid=1000 groups=1000
@@ -174,10 +183,12 @@ docker run -d --name lab-… --hostname host --stop-timeout 30 \
 檻の中の root（いれば）は docker の既定の14個のケーパビリティしか持たず、読者の PC のファイルは1つも見えない。
 コンテナの中で docker を動かしたり（dockerd は <code>--privileged</code> を要る）、ブートやディスクを触ったりしたい記事が仮想マシン型を選んでいるのは、
 仮想マシンなら、中の root が何をしても読者の PC の特権を1つも借りずに済むからである。</p>
-<p>ただし、このサイトには例外が2つある。どちらも、渡すものを1つずつ書き、何が増えるかをそのページで測って見せている。</p>
+<p>ただし、このサイトには例外が2つある。どちらも、渡すものを起動コマンドに1つずつ書いている。</p>
 <div class="scroll"><table>
 <tr><th>実践編</th><th>足すもの</th><th>何のためか</th></tr>
-<tr><td><a href="/linuc-services/practice/">LinuC 1.09（時刻・ログ・メール）</a></td><td><code>--cap-add SYS_ADMIN</code>（<code>CapEff</code> が <code>a80425fb</code> から <code>a82425fb</code> へ、1ビット）</td><td>檻の中で systemd を PID 1 として動かすため（docker が読むだけでマウントする <code>/sys/fs/cgroup</code> を、書けるようにする）</td></tr>
+<tr><td><a href="/linuc-services/practice/">LinuC 1.09（時刻・ログ・メール）</a></td><td><code>--cap-add SYS_ADMIN</code>（<code>CapEff</code> が <code>a80425fb</code> から <code>a82425fb</code> へ、1ビット）</td><td>檻の中で systemd を PID 1 として動かすため（docker が読むだけでマウントする <code>/sys/fs/cgroup</code> を、書けるようにする）。
+AppArmor の無い PC では、この1ビットで足りる。AppArmor が有効な PC（Ubuntu・Debian の docker など）では、上の節のとおり <code>docker-default</code> がマウントを断るので、これだけでは檻が起動しない（この練習機の docker で、1.09 の檻をその起動コマンドのまま起動すると <code>Exited (3)</code> だった。著者の記録 <code>logs/docker-apparmor.log</code>）。
+1.09 の実践編に、AppArmor が有効な PC での起動のしかたを書いてある</td></tr>
 <tr><td><a href="/kvm/practice/">KVM</a></td><td><code>--device /dev/kvm</code> と <code>--group-add</code>（この章の <code>--device</code> の節と同じ形）</td><td>読者の PC の KVM を、檻の中の QEMU に使わせるため</td></tr>
 </table></div>
 <p>この章で作ったディレクトリを片付ける（中のファイルは root の持ち物なので <code>sudo</code> が要る）。</p>

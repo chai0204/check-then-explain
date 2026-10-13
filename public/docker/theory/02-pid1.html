@@ -32,13 +32,13 @@ tini の作りの細部、systemd のドロップインの書式の全項目、D
 <pre data-where="練習機の中（student@linuc）"><code>$ sh -c 'sleep 1000 &amp; sleep 1; kill $!; wait $!; echo "exit=$?"' 2&gt;/dev/null
 exit=143
 $ docker run -d --name c3 alpine:3.24.2 sleep 1000
-23d5371198a8a00bf4841c3ea1f755253bb47ce4b4c2df78856b6d0598db8338
+8c122fc4d822f9573ce693fca3b448220f48f43a2deb8841fb5278114c437135
 $ time docker stop c3
 c3
 
-real	0m11.186s
-user	0m0.307s
-sys	0m0.084s
+real	0m11.442s
+user	0m0.409s
+sys	0m0.220s
 $ docker ps -a --format '{{.Names}}: {{.Status}}'
 c3: Exited (137) 1 second ago</code></pre>
 <div class="then"><b>だめな理由</b>: <code>docker stop</code> は10秒あまりかかり、コンテナの終了コードは <code>137</code>（128 + 9。9 は KILL の番号）だった。
@@ -61,7 +61,7 @@ $ grep SigCgt /proc/$pid/status
 SigCgt:	0000000000000000
 $ sudo kill -KILL $pid
 $ docker ps -a --format '{{.Names}}: {{.Status}}'
-c3: Exited (137) Less than a second ago</code></pre>
+c3: Exited (137) 1 second ago</code></pre>
 <p>練習機の root が送った TERM でも、コンテナは <code>Up</code> のままだった。<code>SigCgt</code>（自分で受け取ると登録した合図の一覧）は全部 0 で、
 この <code>sleep</code> は TERM の受け取り方を何も決めていない。普通のプロセスなら、決めていない合図は「既定の動作」（TERM なら終了）になる。
 ところが<b>名前空間の PID 1 には既定の動作が働かない</b>。PID 1 が不意に死ぬと名前空間の全プロセスが道連れになるので、カーネルが守っている（Linux の pid_namespaces の決まり）。
@@ -78,15 +78,15 @@ c3: Exited (137) Less than a second ago</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ docker rm c3
 c3
 $ docker run -d --name c4 --stop-timeout 3 alpine:3.24.2 sleep 1000
-55342bc80a7e716a12a9f871f95602549097a8f744cb8fef3123944f616c4fc9
+817f6515c1bff1636c8334cc8257b605927e42e2009023ba7dd5886ac714a25d
 $ time docker stop c4
 c4
 
-real	0m4.375s
-user	0m0.359s
-sys	0m0.138s
+real	0m4.426s
+user	0m0.337s
+sys	0m0.121s
 $ docker run -d --name c5 --init alpine:3.24.2 sleep 1000
-e11b7729c99fad76b32a1891eed4fc91c18c373f3595ab916ff46fa87b9ffcb5
+327abd82b04df10b199faa5ea8e347cbb070e7fe27152b5b63b3eeded3a4a1bd
 $ docker exec c5 ps
 PID   USER     TIME  COMMAND
     1 root      0:00 /sbin/docker-init -- sleep 1000
@@ -97,9 +97,9 @@ SigCgt:	0000000000000000
 $ time docker stop c5
 c5
 
-real	0m1.079s
-user	0m0.322s
-sys	0m0.098s
+real	0m1.120s
+user	0m0.315s
+sys	0m0.095s
 $ docker ps -a --format '{{.Names}}: {{.Status}}'
 c5: Exited (143) 1 second ago
 c4: Exited (137) 10 seconds ago
@@ -118,8 +118,10 @@ c5</code></pre>
 tini は子が終わったら後始末（終わったプロセスの回収）もする。</p>
 <p>このサイトの仮想マシン型の檻は、<code>--init</code> の代わりにイメージ自身が <code>tini</code> を PID 1 に置き（イメージの ENTRYPOINT。<a href="/linuc-boot/theory/03-container">LinuC 1.01 の第3章</a>の <code>ps -p 1</code>）、
 起動コマンドに <code>--stop-timeout 30</code> を付けている。<code>docker stop</code> の TERM を tini が子の起動スクリプト（<code>lab-vm-init</code>）に中継し、
-起動スクリプトは TERM を受け取ると練習機を正常に止めてから終わる。ただ、その正常停止に十数秒かかるので、既定の10秒では KILL に間に合わない。
-だから入口の <code>docker run</code> には <code>--stop-timeout 30</code> が付いている。</p>
+起動スクリプトは TERM を受け取ると練習機を正常に止めてから終わる。正常停止にかかる時間は、練習機の中で何が動いているかで変わる。
+著者の記録（<code>logs/docker-stop.log</code>）では、練習機の中で何も動いていなければ 4.4 秒だったが、TERM を受け取らない PID 1 のコンテナ（この章の <code>sleep</code> のようなもの）を3つ残していると、
+練習機の中の docker がそれぞれ10秒待ってから KILL するので 16.0 秒かかった（起動し直すと、3つとも <code>Exited (137)</code> だった）。
+既定の10秒では間に合わないことがあるので、入口の <code>docker run</code> には <code>--stop-timeout 30</code> が付いている（起動スクリプトは、25秒待っても練習機が止まらなければ電源を切る）。</p>
 <div class="analogy"><b>たとえ</b>: <code>--stop-timeout</code> は閉店時刻の<b>「閉店まで○分」の放送</b>の長さを変えるだけで、<code>--init</code> は<b>入口に受付係を置く</b>ことに近い。
 放送を長くしても、聞く気の無い客はやはり最後に追い出される。受付係がいれば、閉店の知らせを一人ひとりに伝えてくれる。
 <br>ただし<b>崩れる点</b>: 受付係（docker-init）が伝えても、客（子のプロセス）が TERM の受け取りを無視するように作られていれば、やはり出ていかない。
@@ -129,7 +131,7 @@ tini は子が終わったら後始末（終わったプロセスの回収）も
 <div class="sgoal"><b>この節で分かること</b>: <code>docker exec</code> と <code>docker run -it</code> で、端末の種類（TERM）と umask が違って見える理由。</div>
 <p>コンテナにもう1つプロセスを足すのが <code>docker exec</code> である。同じ問い（TERM・umask・端末があるか）を、入り方を変えて投げる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ docker run -d --name c6 alpine:3.24.2 sleep 1000
-ca55da7f9e40af205f79920060f196d90f1335722f81bc6dd91c9bea1884899f
+7a0a9055f907cb7e51f5a2d8b8b6a883184153fd301af8c2bf523373084601f0
 $ docker exec c6 sh -c 'echo "TERM=$TERM"; umask; tty'
 TERM=
 0022
@@ -153,14 +155,14 @@ TERM=xterm
 <pre data-where="練習機の中（student@linuc）"><code>$ docker exec -d c6 sleep 2000
 $ ps -o pid,ppid,user,cmd -C sleep
     PID    PPID USER     CMD
-   2067    2043 root     sleep 1000
-   2275    2043 root     sleep 2000
+   2047    2022 root     sleep 1000
+   2251    2022 root     sleep 2000
 $ ps -o pid,ppid,comm -C containerd-shim
     PID    PPID COMMAND
-   2043       1 containerd-shim
+   2022       1 containerd-shim
 $ grep Umask /proc/$(pgrep -x containerd)/status /proc/$(pgrep -x containerd-shim)/status
-/proc/556/status:Umask:	0022
-/proc/2043/status:Umask:	0022</code></pre>
+/proc/540/status:Umask:	0022
+/proc/2022/status:Umask:	0022</code></pre>
 <p>後から足した <code>sleep 2000</code> の親は、PID 1 の <code>sleep 1000</code> ではなく、<b>shim</b> だった（2つの PPID が同じ）。
 shim の umask は、shim を起動した containerd と同じ <code>0022</code> である。<b><code>docker exec</code> のプロセスは shim の子で、umask を shim から受け継ぐ</b>のではないか。
 containerd の umask を変えて確かめる。containerd は systemd のサービスなので、systemd の設定の追加分（ドロップイン）で <code>UMask=</code> を足し、containerd を再起動する。</p>
@@ -172,9 +174,9 @@ $ sudo systemctl daemon-reload
 $ sudo systemctl restart containerd</code></pre>
 <p>containerd を再起動しても、<code>c6</code> は動いたままか。そのうえで、新しいコンテナ <code>c7</code> を起動し、3通りの umask を比べる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ docker ps --format '{{.Names}}: {{.Status}}'
-c6: Up 22 seconds
+c6: Up 23 seconds
 $ docker run -d --name c7 alpine:3.24.2 sleep 1000
-65d6e3607b11b62d3944c863902cd6bb7790c099700b43f7e28300b6fe52d3b6
+862a02847dcb07af30accf40dea8bdac6a6526e184479ea62127332fbc5e26e6
 $ docker exec c7 sh -c umask
 0077
 $ docker exec c6 sh -c umask

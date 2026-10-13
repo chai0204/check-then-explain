@@ -27,11 +27,11 @@
 <p>BusyBox の小さな web サーバ（<code>httpd</code>）を、コンテナの 80 番（httpd の既定）で動かす。<code>-f</code> は「裏に回らず、前で動き続ける」（PID 1 が終わるとコンテナが終わるため）、<code>-h /etc</code> は「<code>/etc</code> の中のファイルを配る」という意味で、
 <code>/hostname</code> を頼むとコンテナのホスト名が返ってくる。公開する先は、練習機の外向きの NIC（enp0s16）のアドレス <code>10.0.2.15</code> の 8080 番にする。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ docker run -d --name web -p 10.0.2.15:8080:80 busybox:1.38.0 httpd -f -h /etc
-72e05bfb2cb5270dfb367c2972215689195a83968c16975e786a57dffc55f870
+d56024e052565462154e52dab6928028daba9b9905b07efd5ed4aa8c1d101846
 $ docker ps --format '{{.Names}}  {{.Ports}}'
 web  10.0.2.15:8080-&gt;80/tcp
 $ curl -s http://10.0.2.15:8080/hostname
-72e05bfb2cb5
+d56024e05256
 $ sudo ss -ltnp | grep 8080
 LISTEN 0      4096       10.0.2.15:8080       0.0.0.0:*    users:(("docker-proxy",pid=4431,fd=7))</code></pre>
 <p>練習機の 8080 番で、<code>docker-proxy</code> というプロセスが待ち受けている。これだけ見ると、docker が 8080 番で受けて中へ中継しているように見える。</p>
@@ -52,7 +52,7 @@ $ exit
 logout
 Connection to 127.0.0.1 closed.</code></pre>
 <pre data-where="外（lab@host）"><code>$ curl -s http://127.0.0.1:8080/hostname
-72e05bfb2cb5
+d56024e05256
 $ ssh linuc
 ...</code></pre>
 <div class="then"><b>だめな理由</b>: 8080 番あてを捨てる規則を入れたのに、外からの <code>curl</code> にはコンテナのホスト名が返ってきた。
@@ -65,7 +65,7 @@ DNAT は、到着した客の行き先を「この国」から「乗り継ぎの
 <br>ただし<b>崩れる点</b>: 空港の乗り継ぎ客は自分が乗り継ぐと知っているが、パケットは行き先を書き換えられたことを知らない。送った側から見れば、ずっと 10.0.2.15:8080 と話している。</div>
 <p>練習機に戻ったので、パケットの数を数える。<code>-v</code> を付けると、規則ごとに当てはまったパケットの数（pkts）が出る。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo iptables -L INPUT -n -v --line-numbers | head -3
-Chain INPUT (policy ACCEPT 286 packets, 20135 bytes)
+Chain INPUT (policy ACCEPT 280 packets, 19859 bytes)
 num   pkts bytes target     prot opt in     out     source               destination
 1        0     0 DROP       6    --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:8080
 $ sudo iptables -t nat -L DOCKER -n -v
@@ -96,13 +96,13 @@ $ docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' w
 172.17.0.2
 $ docker exec web ip addr show eth0
 2: eth0@if50: &lt;BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN&gt; mtu 1500 qdisc noqueue
-    link/ether 02:1c:0a:ee:a0:f4 brd ff:ff:ff:ff:ff:ff
+    link/ether e6:d2:f3:6e:55:91 brd ff:ff:ff:ff:ff:ff
     inet 172.17.0.2/16 brd 172.17.255.255 scope global eth0
        valid_lft forever preferred_lft forever
 $ ip -br addr show docker0
-docker0          UP             172.17.0.1/16 fe80::448f:b0ff:fef5:de78/64
+docker0          UP             172.17.0.1/16 fe80::ec99:1bff:fee2:320d/64
 $ ip -br link show master docker0
-vethf0275de@if2  UP             a6:b7:a7:7b:b0:af &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;</code></pre>
+veth3fd5169@if2  UP             d2:e7:d5:5a:c1:43 &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;</code></pre>
 <p class="detail">MAC アドレス（<code>link/ether</code> の後ろ）・<code>veth…</code> の名前・<code>fe80::</code> で始まる IPv6 のアドレスは、起動のたびに乱数から作られるので、あなたの画面では本文と違う。172.17.0.x のアドレスは同じになる。</p>
 <p>古い記事でよく見る <code>{{.NetworkSettings.IPAddress}}</code> は、この docker（29.1.3）では項目が無いと言われて失敗した。アドレスはネットワークごとに持つ形（<code>.NetworkSettings.Networks</code> の下）に移っていて、<code>range</code> で回すと 172.17.0.2 が出た。</p>
 <p>コンテナの中の <code>eth0</code>（172.17.0.2）と、練習機の <code>veth…</code> は、<b>veth</b>（仮想の LAN ケーブルの両端）の組である。
@@ -123,7 +123,7 @@ vethf0275de@if2  UP             a6:b7:a7:7b:b0:af &lt;BROADCAST,MULTICAST,UP,LOW
 <p>入れた規則を消し、さっき届かなかったコンテナからの接続をもう一度試してから、コンテナを片付ける。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo iptables -D INPUT -p tcp --dport 8080 -j DROP
 $ docker run --rm alpine:3.24.2 wget -qO- -T 3 http://10.0.2.15:8080/hostname
-72e05bfb2cb5
+d56024e05256
 $ docker rm -f web
 web</code></pre>
 <p>DROP の規則を消すと、コンテナからの接続も届いた（返ってきたのは <code>web</code> のホスト名）。</p>

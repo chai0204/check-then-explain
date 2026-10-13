@@ -38,15 +38,15 @@ Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docke
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>podman も docker と同じだ。<code>podman run -d</code> は裏で動いているデーモンに頼んでいて、コンテナはそのデーモンの子として動いているはずだ。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ podman run -d --name p1 alpine:3.24.2 sleep 1000
-87e3117e45a3d8f9e2738e6cbd9203375db7e1b7344fccd5bb9fc3c09201ef11
+a510a9df6f2e1b9cb15dadefa5d976f4c53bf3c98af638d9d842c4e7f9e0d898
 $ podman ps
 CONTAINER ID  IMAGE                            COMMAND     CREATED        STATUS        PORTS       NAMES
-87e3117e45a3  docker.io/library/alpine:3.24.2  sleep 1000  3 seconds ago  Up 3 seconds              p1
+a510a9df6f2e  docker.io/library/alpine:3.24.2  sleep 1000  3 seconds ago  Up 3 seconds              p1
 $ ps -o pid,ppid,user,comm -C podman,conmon,sleep,catatonit,dockerd
     PID    PPID USER     COMMAND
-    794       1 student  catatonit
-    814       1 student  conmon
-    816     814 student  sleep</code></pre>
+    809       1 student  catatonit
+    828       1 student  conmon
+    830     828 student  sleep</code></pre>
 <div class="then"><b>だめな理由</b>: コンテナは動いているのに、<code>podman</code> という名前のプロセスはどこにもいない。dockerd もいない。
 <code>sleep 1000</code> の親は <b><code>conmon</code></b> で、conmon の親は PID 1（練習機の systemd）である（シェルから起動したとき。第6章の quadlet で起動すると、conmon の親は student の systemd になる）。
 <b><code>podman run -d</code> はコンテナを作り、見張り役の conmon を残して、自分は終わった</b>。頼む相手のデーモンは最初からいない。
@@ -59,12 +59,12 @@ $ ps -o pid,ppid,user,comm -C podman,conmon,sleep,catatonit,dockerd
 <div class="sgoal"><b>この節で分かること</b>: conmon の役目と、コンテナを作った OCI ランタイム。</div>
 <pre data-where="練習機の中（student@linuc）"><code>$ ps -o args= -C conmon | tr ' ' '\n' | grep -A1 -E '^-(c|r|b|n|l)$|^--exit-command$'
 -c
-87e3117e45a3d8f9e2738e6cbd9203375db7e1b7344fccd5bb9fc3c09201ef11
+a510a9df6f2e1b9cb15dadefa5d976f4c53bf3c98af638d9d842c4e7f9e0d898
 --
 -r
 /usr/bin/crun
 -b
-/home/student/.local/share/containers/storage/overlay-containers/87e3117e45a3d8f9e2738e6cbd9203375db7e1b7344fccd5bb9fc3c09201ef11/userdata
+/home/student/.local/share/containers/storage/overlay-containers/a510a9df6f2e1b9cb15dadefa5d976f4c53bf3c98af638d9d842c4e7f9e0d898/userdata
 --
 -n
 p1
@@ -98,9 +98,9 @@ db.sql                 networks            overlay-images  userns.lock
 defaultNetworkBackend  overlay             overlay-layers
 libpod                 overlay-containers  storage.lock
 $ ls -l ~/.local/share/containers/storage/db.sql
--rw-r--r-- 1 student student 122880 Oct 14 03:12 /home/student/.local/share/containers/storage/db.sql
+-rw-r--r-- 1 student student 122880 Oct 14 05:07 /home/student/.local/share/containers/storage/db.sql
 $ cat /proc/$(podman inspect -f '{{.State.Pid}}' p1)/cgroup
-0::/user.slice/user-1000.slice/user@1000.service/user.slice/libpod-87e3117e45a3d8f9e2738e6cbd9203375db7e1b7344fccd5bb9fc3c09201ef11.scope/container</code></pre>
+0::/user.slice/user-1000.slice/user@1000.service/user.slice/libpod-a510a9df6f2e1b9cb15dadefa5d976f4c53bf3c98af638d9d842c4e7f9e0d898.scope/container</code></pre>
 <p><code>podman ps</code> は、student のホームの下の記録（<code>db.sql</code> という SQLite のデータベースと、<code>/run/user/1000/</code> の下の実行時の記録）を、毎回自分で読んでいる。
 コンテナのプロセスは、練習機の <code>system.slice</code>（root のサービスの置き場所）ではなく、
 <b>student の systemd</b>（<code>user@1000.service</code>）の下のかごに入っている。student のログインに結びついたこの systemd が、第6章の主役になる。</p>

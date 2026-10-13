@@ -95,6 +95,12 @@ AppArmor の規則 <code>docker-default</code> が強制（<code>enforce</code>�
 <p>docker の文書によれば、<code>--privileged</code> を付けたコンテナは、ケーパビリティが全部になり、既定の seccomp の一覧と AppArmor の規則が外れ、ホスト（ここでは練習機）の装置を全部使えるようになる
 （ほかに <code>/sys</code> と cgroup のマウントが書き込み可になる）。つまり上の4項目が、<b>既定のコンテナの値から、練習機の root の値へほぼ丸ごと変わる</b>。
 名前空間で見え方は分かれていても、練習機の root とほぼ同じ力を渡すオプションで、何を渡したかを1つずつ数えられない。</p>
+<p>ケーパビリティと AppArmor は別々に効く。マウントなどを許す <code>CAP_SYS_ADMIN</code> を足しても、AppArmor の規則が断る操作は通らない。
+docker が読むだけでマウントする <code>/sys/fs/cgroup</code> を、書けるように付け直してみる（<code>2&gt;&amp;1</code> は、エラーの行を同じ出力の流れに入れて、表示の順を保つため）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker run --rm --cap-add SYS_ADMIN alpine:3.24.2 sh -c 'grep CapEff /proc/self/status; mount -o remount,rw /sys/fs/cgroup 2&gt;&amp;1; grep " /sys/fs/cgroup " /proc/self/mounts'</code></pre>
+<p><code>CapEff</code> には <code>CAP_SYS_ADMIN</code> のビットが足された（<code>a82425fb</code>）のに、付け直しは <code>Permission denied</code> で断られ、<code>/sys/fs/cgroup</code> は <code>ro</code>（読むだけ）のままだった。
+断ったのは、この練習機の docker が当てる AppArmor の規則 <code>docker-default</code> で、この規則はマウントを許さない。<b>ケーパビリティを足しても、AppArmor の判定は変わらない</b>。
+AppArmor の無い docker（著者の PC の NixOS の docker）では、同じ付け直しが通った（著者の記録 <code>logs/docker-apparmor.log</code>）。同じオプションでも、PC の側の仕組みで結果が変わる。</p>
 <p>逆の向きに、渡すものを減らすオプションもある。<code>--user</code> は、コンテナの最初のプロセスを root 以外で起動する。</p>
 <pre data-where="練習機の中（student@linuc）"><code>@@ docker run --rm --user 1000:1000 alpine:3.24.2 sh -c 'id; grep CapEff /proc/self/status'
 @@ docker run --rm --user 1000:1000 alpine:3.24.2 sh -c 'cat /proc/sys/net/ipv4/ping_group_range; ping -c1 -q 127.0.0.1 &gt;/dev/null &amp;&amp; echo ping-ok'</code></pre>
@@ -127,10 +133,12 @@ docker run -d --name lab-… --hostname host --stop-timeout 30 \
 檻の中の root（いれば）は docker の既定の14個のケーパビリティしか持たず、読者の PC のファイルは1つも見えない。
 コンテナの中で docker を動かしたり（dockerd は <code>--privileged</code> を要る）、ブートやディスクを触ったりしたい記事が仮想マシン型を選んでいるのは、
 仮想マシンなら、中の root が何をしても読者の PC の特権を1つも借りずに済むからである。</p>
-<p>ただし、このサイトには例外が2つある。どちらも、渡すものを1つずつ書き、何が増えるかをそのページで測って見せている。</p>
+<p>ただし、このサイトには例外が2つある。どちらも、渡すものを起動コマンドに1つずつ書いている。</p>
 <div class="scroll"><table>
 <tr><th>実践編</th><th>足すもの</th><th>何のためか</th></tr>
-<tr><td><a href="/linuc-services/practice/">LinuC 1.09（時刻・ログ・メール）</a></td><td><code>--cap-add SYS_ADMIN</code>（<code>CapEff</code> が <code>a80425fb</code> から <code>a82425fb</code> へ、1ビット）</td><td>檻の中で systemd を PID 1 として動かすため（docker が読むだけでマウントする <code>/sys/fs/cgroup</code> を、書けるようにする）</td></tr>
+<tr><td><a href="/linuc-services/practice/">LinuC 1.09（時刻・ログ・メール）</a></td><td><code>--cap-add SYS_ADMIN</code>（<code>CapEff</code> が <code>a80425fb</code> から <code>a82425fb</code> へ、1ビット）</td><td>檻の中で systemd を PID 1 として動かすため（docker が読むだけでマウントする <code>/sys/fs/cgroup</code> を、書けるようにする）。
+AppArmor の無い PC では、この1ビットで足りる。AppArmor が有効な PC（Ubuntu・Debian の docker など）では、上の節のとおり <code>docker-default</code> がマウントを断るので、これだけでは檻が起動しない（この練習機の docker で、1.09 の檻をその起動コマンドのまま起動すると <code>Exited (3)</code> だった。著者の記録 <code>logs/docker-apparmor.log</code>）。
+1.09 の実践編に、AppArmor が有効な PC での起動のしかたを書いてある</td></tr>
 <tr><td><a href="/kvm/practice/">KVM</a></td><td><code>--device /dev/kvm</code> と <code>--group-add</code>（この章の <code>--device</code> の節と同じ形）</td><td>読者の PC の KVM を、檻の中の QEMU に使わせるため</td></tr>
 </table></div>
 <p>この章で作ったディレクトリを片付ける（中のファイルは root の持ち物なので <code>sudo</code> が要る）。</p>

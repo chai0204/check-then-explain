@@ -30,9 +30,9 @@
 <pre data-where="練習機の中（student@linuc）"><code>$ loginctl show-user student -p Linger
 Linger=no</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ podman run -d --name p6 alpine:3.24.2 sleep 3600
-ba62326e75af4df877c5372c4ce6e66c8e0e033d63e32f10fb71fd1c6c8d2338
+7546e1110be427255b3815098a98c200c16385ef684a1afc6a8a379bf08be833
 $ podman ps --format '{{.Names}}: {{.Status}}'
-p6: Up 3 seconds
+p6: Up 2 seconds
 $ exit
 logout
 Connection to 127.0.0.1 closed.</code></pre>
@@ -57,7 +57,7 @@ p6</code></pre>
 $ loginctl show-user student -p Linger
 Linger=yes</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ podman run -d --name p6 alpine:3.24.2 sleep 3600
-68e90a933430147a42a35536df4531652ad696f5ef829021b584b158ea5a0e0c
+c7d7c1e0086e28a56c3a842222f7e819ac4a19dfc479b7c89c4bdfc6529b4548
 $ exit
 logout
 Connection to 127.0.0.1 closed.</code></pre>
@@ -79,7 +79,7 @@ p6</code></pre>
 <p>linger だけでは、練習機を起動し直したときにコンテナを起動する人がいない。podman にはデーモンがいないので、機械の起動のときに立ち上がって「動いていたコンテナ」を起動し直す係もいない。
 落ちたときの起動し直しなら、podman にも docker と同じ <code>--restart</code> がある。終了コードが 0 以外なら2回まで起動し直す（<code>on-failure:2</code>）コンテナで確かめる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ podman run -d --name rs --restart=on-failure:2 alpine:3.24.2 sh -c 'exit 3'
-96750c08bf4292026fbb3740f8a1eee14d45f3677b485fd862d58568a90a52dd
+38751accf4f8b1f313fbb627b90bb361991f9fcef3fb00c44afb951914abfab0
 $ sleep 15
 $ podman inspect rs --format '{{.RestartCount}} {{.State.Status}} {{.State.ExitCode}}'
 2 exited 3
@@ -118,7 +118,7 @@ web.service</code></pre>
 $ systemctl --user is-active web.service
 active
 $ curl -s http://127.0.0.1:8082/hostname
-9967b3b5471c
+11e37cbc51fe
 $ podman ps --format '{{.Names}}  {{.Ports}}'
 systemd-web  127.0.0.1:8082-&gt;80/tcp</code></pre>
 <p>コンテナの名前は <code>systemd-web</code> だった。落ちたらどうなるかを、外から KILL を送って確かめる（<code>podman kill</code> の既定は KILL）。</p>
@@ -129,7 +129,7 @@ $ systemctl --user show -p NRestarts -p ActiveState web.service
 NRestarts=1
 ActiveState=active
 $ curl -s http://127.0.0.1:8082/hostname
-d18d70c50fac</code></pre>
+1574995ee40c</code></pre>
 <p>systemd は止まったことに気づき（コンテナの終わりを conmon から知らされる）、<code>Restart=always</code> に従って起動し直した（<code>NRestarts=1</code>）。
 返ってきたホスト名が前と違うのは、起動し直したのが<b>新しいコンテナ</b>だからである（<code>podman run --rm --replace</code> で作り直している）。</p>
 <div class="analogy"><b>たとえ</b>: quadlet は、<b>手書きの作業メモを、事務所の正式な業務手順書に清書してくれる係</b>に近い。メモ（<code>.container</code>）には「何を動かすか」だけを書けば、
