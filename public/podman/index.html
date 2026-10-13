@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Podman — 確かめて説明する</title>
+<meta name="description" content="このサイトの檻を docker の代わりに動かせる podman が、docker とどこまで同じでどこから違うのかを、練習機（仮想マシン）の中の本物の podman（rootless）で確かめる7章。デーモンのいない作り、コンテナの中の root が外では本人になるユーザ名前空間、ユーザの systemd に任せる動かし方を、プロセスと UID の番号で見る。podman は打った人の権限のまま、打った人の置き場所に、打った人の systemd の下でコンテナを作る。">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="podman">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <strong>Podman</strong></nav>
+<div class="draftbar compact"><p><b>ドラフト</b>: この記事は<b>著者が読者として通していません</b>。本文の出力はすべて実機の記録で、演習は模範解答で通ること・未達のときに判定が鳴ることを確かめてあります。それでも導線の不備は残っている可能性があります。詰まったら各ページ下のコメントか <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> へ。</p></div>
+<h1>Podman</h1>
+<div class="badges"><span>中級</span><span>演習あり（仮想マシン）</span><span>約3時間47分</span><span>状態: ドラフト</span></div>
+<p class="lead">このサイトの檻を docker の代わりに動かせる podman が、docker とどこまで同じでどこから違うのかを、練習機（仮想マシン）の中の本物の podman（rootless）で確かめる7章。デーモンのいない作り、コンテナの中の root が外では本人になるユーザ名前空間、ユーザの systemd に任せる動かし方を、プロセスと UID の番号で見る。podman は打った人の権限のまま、打った人の置き場所に、打った人の systemd の下でコンテナを作る。</p>
+
+<div class="card"><h3>想定読者</h3><p>docker の代わりに podman を打てるが、rootless だと何が違うのか、なぜログアウトでコンテナが止まるのかを人に説明できない人。端末でコマンドを打てて、docker か podman でコンテナを動かせることが前提（Docker の記事を先に読むと比べやすい）。</p></div>
+
+<h2 id="outcomes">得られるもの</h2>
+<ul>
+<li>podman にデーモンがいないことを、conmon とプロセスの親子で示せる</li>
+<li>rootless のコンテナの中の UID が外で何番になるかを、UID の対応表から計算できる</li>
+<li>rootless のコンテナがログアウトで止まる理由を説明し、linger と quadlet で動かし続けられる</li>
+<li>docker と podman で、既定の特権・ping の許し方・exec の umask の決まり方・印のファイルがどう違うかを示せる</li>
+</ul>
+
+<h2 id="start">進め方</h2>
+<div class="toc">
+  <a href="/podman/theory/"><b>理論編</b><span>全7章・約2時間32分。1章ごとに「実際に打つと何が出るか」を先に置いてある。</span></a>
+  <a href="/podman/practice/"><b>実践編</b><span>演習7本・約1時間15分。docker か podman で、練習機（仮想マシン）入りの檻を1つ起動する。イメージ約2GB・起動から ssh まで約30秒。KVM も特権も要らない。</span></a>
+</div>
+<p class="detail">完了推定時間（約3時間47分）は、各章の所要時間と演習の目安の合計です。</p>
+
+<h2 id="chapters">章</h2>
+<ol class="chlist">
+<li><a href="/podman/theory/01-daemonless">podman には、頼む相手のデーモンがいない</a></li>
+<li><a href="/podman/theory/02-userns">コンテナの中の root は、外では student</a></li>
+<li><a href="/podman/theory/03-storage">イメージの置き場所は、ユーザごとに別</a></li>
+<li><a href="/podman/theory/04-network">rootless のネットワークは、カーネルの外で中継される</a></li>
+<li><a href="/podman/theory/05-pod">pod は、ネットワークを分け合うコンテナの組</a></li>
+<li><a href="/podman/theory/06-systemd">ログアウトしても動かし続けるのは、systemd の仕事</a></li>
+<li><a href="/podman/theory/07-compat">同じコマンドで、違う仕組み</a></li>
+</ol>
+
+
+
+<h2 id="related">関連記事</h2>
+<ul>
+<li><a href="/docker/">Docker</a></li>
+<li><a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a>（LinuC レベル1 101 主題1.01）</li>
+</ul>
+
+<p class="detail">公開 2026-10-14 ／ 最終更新 2026-10-14 ／ 関連領域: サーバー・セキュリティ・仮想化</p>
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/podman/">Podman</a> · <a href="/podman/theory/">理論編 目次</a> · <a href="/podman/practice/">実践編</a> · <a href="/podman/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

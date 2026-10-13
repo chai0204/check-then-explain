@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QEMU — 確かめて説明する</title>
+<meta name="description" content="このサイトの仮想マシン型の檻の中で動いている QEMU を、libvirt を通さずに qemu-system-x86_64 と qemu-img で直接打って確かめる7章。何も渡さずに組み上がる PC、端末を壊すシリアル、書いたところだけを持つディスク、命令を翻訳する CPU、プロセスの中のネットワーク、差し替えられるファームウェアを順に見て、最後に libvirt が組み立てたコマンド行を読む。仮想マシンは QEMU という1つのプロセスで、何を演じるかは起動のときのコマンド行が決める（動いている間も、QMP で部品を足せる）。">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="qemu">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <strong>QEMU</strong></nav>
+<div class="draftbar compact"><p><b>ドラフト</b>: この記事は<b>著者が読者として通していません</b>。本文の出力はすべて実機の記録で、演習は模範解答で通ること・未達のときに判定が鳴ることを確かめてあります。それでも導線の不備は残っている可能性があります。詰まったら各ページ下のコメントか <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> へ。</p></div>
+<h1>QEMU</h1>
+<div class="badges"><span>中級</span><span>演習あり（コンテナ）</span><span>約3時間47分</span><span>状態: ドラフト</span></div>
+<p class="lead">このサイトの仮想マシン型の檻の中で動いている QEMU を、libvirt を通さずに qemu-system-x86_64 と qemu-img で直接打って確かめる7章。何も渡さずに組み上がる PC、端末を壊すシリアル、書いたところだけを持つディスク、命令を翻訳する CPU、プロセスの中のネットワーク、差し替えられるファームウェアを順に見て、最後に libvirt が組み立てたコマンド行を読む。仮想マシンは QEMU という1つのプロセスで、何を演じるかは起動のときのコマンド行が決める（動いている間も、QMP で部品を足せる）。</p>
+
+<div class="card"><h3>想定読者</h3><p>このサイトの実践編で docker run を打って練習機を起動したことはあるが、裏で何が動いているのか、--stop-timeout 30 や ssh linuc が何をしているのかを説明できない人。端末でコマンドを打てて、docker を動かせることが前提。</p></div>
+
+<h2 id="outcomes">得られるもの</h2>
+<ul>
+<li>何も渡さずに起動した QEMU の画面から、既定で組み上がる PC の部品を言える</li>
+<li>qcow2 の差分ディスクで土台を汚さずに起動し、-snapshot と savevm の違いをファイルの大きさで示せる</li>
+<li>練習機の NIC の名前と 10.0.2.x のアドレスが、QEMU のどの指定から来るかを説明できる</li>
+<li>libvirt が組み立てた QEMU の引数を読み、定義の XML の各行と対応づけられる</li>
+</ul>
+
+<h2 id="start">進め方</h2>
+<div class="toc">
+  <a href="/qemu/theory/"><b>理論編</b><span>全7章・約2時間33分。1章ごとに「実際に打つと何が出るか」を先に置いてある。</span></a>
+  <a href="/qemu/practice/"><b>実践編</b><span>演習6本・約1時間14分。docker か podman で檻（コンテナ）を1つ起動する。特権は渡さない。</span></a>
+</div>
+<p class="detail">完了推定時間（約3時間47分）は、各章の所要時間と演習の目安の合計です。</p>
+
+<h2 id="chapters">章</h2>
+<ol class="chlist">
+<li><a href="/qemu/theory/01-machine">何も渡さなくても、PC が1台組み上がる</a></li>
+<li><a href="/qemu/theory/02-serial">シリアルの先は、あなたの端末そのもの</a></li>
+<li><a href="/qemu/theory/03-disk">ディスクは、書いたところだけを持つファイル</a></li>
+<li><a href="/qemu/theory/04-tcg">CPU は、命令を翻訳して動いている</a></li>
+<li><a href="/qemu/theory/05-network">ネットワークも、QEMU のプロセスの中にある</a></li>
+<li><a href="/qemu/theory/06-firmware">ファームウェアは、差し替えられるファイル</a></li>
+<li><a href="/qemu/theory/07-libvirt">libvirt は、コマンド行を組み立てているだけ</a></li>
+</ol>
+
+
+
+<h2 id="related">関連記事</h2>
+<ul>
+<li><a href="/docker/">Docker</a></li>
+<li><a href="/kvm/">KVM</a></li>
+<li><a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a>（LinuC レベル1 101 主題1.01）</li>
+<li><a href="/podman/">Podman</a></li>
+</ul>
+
+<p class="detail">公開 2026-10-14 ／ 最終更新 2026-10-14 ／ 関連領域: 仮想化</p>
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

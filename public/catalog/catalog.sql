@@ -108,7 +108,7 @@ rpm -K の出力を読み、署名が確かめられたかを判断できる');
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-packages', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-disks', 'ハードウェアとディスク', 'ドラフト', 'LinuC レベル1', '101', '1.05', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-13',
+  'linuc-disks', 'ハードウェアとディスク', 'ドラフト', 'LinuC レベル1', '101', '1.05', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-14',
   'LinuC レベル1 101 試験の主題1.05（ハードウェア、パーティション、ファイルシステム）を、コンテナの中で動く仮想マシン（練習機）で確かめる8章。ディスクを分割し、フォーマットし、マウントし、ドライバを外し、USB メモリを抜き差しする。ディスクは装置・パーティション表・LVM・ファイルシステム・マウントの層が重なってできていて、各層は自分の印だけを読む。',
   'LinuC レベル1（101）の受験者で、fdisk も mount も本物のディスクで試したことが無い人。端末でコマンドを打てて、docker を動かせることが前提。',
   'USB メモリを挿したとき、カーネル・udev・modprobe が何をするかを順に言える
@@ -128,7 +128,7 @@ source と bash でファイルを読む違いを、どのシェルが読むか�
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-shell', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-network', 'ネットワークの基礎', 'ドラフト', 'LinuC レベル1', '102', '1.07', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-13',
+  'linuc-network', 'ネットワークの基礎', 'ドラフト', 'LinuC レベル1', '102', '1.07', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-14',
   'LinuC レベル1 102 試験の主題1.07（プロトコルの基礎、ネットワーク構成、問題解決、クライアント側の DNS 設定）を、仮想マシンの中に作った「社内 LAN」で確かめる9章。壊れて渡される経路と名前解決を、原因を突き止めて直す。ネットワークの見え方は道具が読んだ表で決まり、ifconfig と ip、dig と ping は同じものを別々の表から読んでいる。',
   'LinuC レベル1（102）の受験者で、ip と ifconfig、dig と ping のどれで何が分かるかで止まっている人。端末でコマンドを打てて、docker を動かせることが前提。',
   'アドレスとマスクから、ネットワークアドレス・ブロードキャスト・使える台数を出せる
@@ -139,7 +139,7 @@ INSERT INTO article_domain (slug, domain) VALUES ('linuc-network', 'ネットワ
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-network', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-admin', 'アカウント・ジョブ・ロケール', 'ドラフト', 'LinuC レベル1', '102', '1.08', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-13',
+  'linuc-admin', 'アカウント・ジョブ・ロケール', 'ドラフト', 'LinuC レベル1', '102', '1.08', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-14',
   'LinuC レベル1 102 試験の主題1.08（アカウント管理、ジョブスケジューリング、ローカライゼーションと国際化）を、コンテナの中で動く仮想マシン（練習機）で確かめる9章。ユーザを作って止め、cron と at に本物の時刻でジョブを走らせ、ロケールを生成する。管理コマンドが書き換えるのは台帳の1行だけで、それが効くかは、読む側がいつ・どの列を読むかで決まる。',
   'LinuC レベル1（102）の受験者で、useradd や crontab のオプションを、読んでも覚えられない人。端末でコマンドを打てて、docker を動かせることが前提。',
   'usermod -G と -aG の違いを、結果の台帳で説明できる
@@ -149,7 +149,7 @@ INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficult
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-admin', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-services', '時刻・ログ・メール', 'ドラフト', 'LinuC レベル1', '102', '1.09', '初級', '演習あり（コンテナ）', '2026-10-12', '2026-10-13',
+  'linuc-services', '時刻・ログ・メール', 'ドラフト', 'LinuC レベル1', '102', '1.09', '初級', '演習あり（コンテナ）', '2026-10-12', '2026-10-14',
   'LinuC レベル1 102 試験の主題1.09（システム時刻の管理、システムのログ、MTA の基本）を、systemd が動くコンテナの中で打って確かめる7章。timedatectl も journalctl も systemctl も動く。送り手は中身とラベルだけを渡し、宛先を決めているのは受け手側にある設定ファイルだ。',
   'LinuC レベル1（102）の受験者で、出題範囲を読んで「そういうことができるんだな」で止まっている人。端末でコマンドを打てて、docker を動かせることが前提。',
   'chrony に基準を設定して同期させ、chronyc で状態を読み分けられる
@@ -200,6 +200,53 @@ WASM が「できないこと」を、檻の形として説明できる
 INSERT INTO article_domain (slug, domain) VALUES ('wasm', 'ウェブ');
 INSERT INTO article_domain (slug, domain) VALUES ('wasm', 'セキュリティ');
 
+INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
+  'kvm', 'KVM', 'ドラフト', NULL, NULL, NULL, '中級', '演習あり（仮想マシン）', '2026-10-14', '2026-10-14',
+  'このサイトの練習機を動かしている QEMU と、それを速くする KVM を、同じ練習機を TCG と KVM で起動して比べながら確かめる6章。CPU の仮想化支援の印は CPU の自己申告で、KVM の入口は /dev/kvm というファイル1つであり、コンテナに渡すとはそのファイルと開く許可を渡すことで特権は増えないことを、エラーの文言と持てる特権の上限（CapBnd）で示す。練習機の中から見える「どのハイパーバイザーか」の名前は QEMU の名乗りで消せることも確かめ、このサイトの仮想マシン型の檻が KVM を使わない理由（全員に同じ画面・権限ゼロ）と、その代償の時間も測る。',
+  'このサイトの実践編で docker run を打って練習機を動かしているが、KVM や --device /dev/kvm が何をしているかを説明できない人。Linux の端末と docker を使えることが前提で、KVM の演習には /dev/kvm のある Linux の PC が要る（無くても TCG の演習と理論編は進められる）。',
+  'CPU の仮想化支援の印（vmx / svm）が CPUID の申告であることを、TCG の練習機の出力で説明できる
+コンテナで /dev/kvm を開くまでの関門を、エラーの文言（No such file・Permission denied・Operation not permitted）で見分けられる
+QEMU が KVM を使っているかを /proc/PID/fd で確かめ（練習機の中の名乗りは決め手にならない）、起動の時間がどこで縮むかを測れる
+このサイトの仮想マシン型の檻が KVM を使わない理由と代償を、数字で言える');
+INSERT INTO article_domain (slug, domain) VALUES ('kvm', '仮想化');
+INSERT INTO article_domain (slug, domain) VALUES ('kvm', 'サーバー');
+
+
+INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
+  'qemu', 'QEMU', 'ドラフト', NULL, NULL, NULL, '中級', '演習あり（コンテナ）', '2026-10-14', '2026-10-14',
+  'このサイトの仮想マシン型の檻の中で動いている QEMU を、libvirt を通さずに qemu-system-x86_64 と qemu-img で直接打って確かめる7章。何も渡さずに組み上がる PC、端末を壊すシリアル、書いたところだけを持つディスク、命令を翻訳する CPU、プロセスの中のネットワーク、差し替えられるファームウェアを順に見て、最後に libvirt が組み立てたコマンド行を読む。仮想マシンは QEMU という1つのプロセスで、何を演じるかは起動のときのコマンド行が決める（動いている間も、QMP で部品を足せる）。',
+  'このサイトの実践編で docker run を打って練習機を起動したことはあるが、裏で何が動いているのか、--stop-timeout 30 や ssh linuc が何をしているのかを説明できない人。端末でコマンドを打てて、docker を動かせることが前提。',
+  '何も渡さずに起動した QEMU の画面から、既定で組み上がる PC の部品を言える
+qcow2 の差分ディスクで土台を汚さずに起動し、-snapshot と savevm の違いをファイルの大きさで示せる
+練習機の NIC の名前と 10.0.2.x のアドレスが、QEMU のどの指定から来るかを説明できる
+libvirt が組み立てた QEMU の引数を読み、定義の XML の各行と対応づけられる');
+INSERT INTO article_domain (slug, domain) VALUES ('qemu', '仮想化');
+
+
+INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
+  'docker', 'Docker', 'ドラフト', NULL, NULL, NULL, '中級', '演習あり（仮想マシン）', '2026-10-14', '2026-10-14',
+  'このサイトの実践編で打つ docker run が何をしているのかを、仮想マシン（練習機）の中に入れた本物の docker で確かめる7章。コンテナのプロセスを練習機の ps で見つけ、イメージを tar に書き出して指紋を計算し、公開したポートの宛先の書き換えを iptables の数えで見る。docker は自分では何も閉じ込めず、カーネルに頼んで1つのプロセスに名前空間・cgroup・overlay を付けているだけで、コンテナの中身も力も、起動するときに渡したもので決まる。',
+  'docker run は打てるが、その1行が何をしているのか（なぜ docker stop が10秒かかるのか、なぜファイアウォールの INPUT で閉じたポートに外から届くのか）を人に説明できない人。端末でコマンドを打てて、docker か podman でコンテナを動かせることが前提。',
+  'コンテナが練習機の上の1つのプロセスであることを、ps と /proc の名前空間・cgroup で示せる
+タグとダイジェストの違いを、名前を付け替えた結果とイメージの中の指紋で説明できる
+ファイアウォールの INPUT で塞いだポートに外から届く理由を、DNAT の後のパケットの道で説明できる
+--cap-add・--device・--user が渡すもの（減らすもの）を CapEff と /dev で測り、--privileged がそれをどこまで広げるかを練習機の root と比べて言える');
+INSERT INTO article_domain (slug, domain) VALUES ('docker', '仮想化');
+INSERT INTO article_domain (slug, domain) VALUES ('docker', 'サーバー');
+INSERT INTO article_domain (slug, domain) VALUES ('docker', 'セキュリティ');
+
+INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
+  'podman', 'Podman', 'ドラフト', NULL, NULL, NULL, '中級', '演習あり（仮想マシン）', '2026-10-14', '2026-10-14',
+  'このサイトの檻を docker の代わりに動かせる podman が、docker とどこまで同じでどこから違うのかを、練習機（仮想マシン）の中の本物の podman（rootless）で確かめる7章。デーモンのいない作り、コンテナの中の root が外では本人になるユーザ名前空間、ユーザの systemd に任せる動かし方を、プロセスと UID の番号で見る。podman は打った人の権限のまま、打った人の置き場所に、打った人の systemd の下でコンテナを作る。',
+  'docker の代わりに podman を打てるが、rootless だと何が違うのか、なぜログアウトでコンテナが止まるのかを人に説明できない人。端末でコマンドを打てて、docker か podman でコンテナを動かせることが前提（Docker の記事を先に読むと比べやすい）。',
+  'podman にデーモンがいないことを、conmon とプロセスの親子で示せる
+rootless のコンテナの中の UID が外で何番になるかを、UID の対応表から計算できる
+rootless のコンテナがログアウトで止まる理由を説明し、linger と quadlet で動かし続けられる
+docker と podman で、既定の特権・ping の許し方・exec の umask の決まり方・印のファイルがどう違うかを示せる');
+INSERT INTO article_domain (slug, domain) VALUES ('podman', '仮想化');
+INSERT INTO article_domain (slug, domain) VALUES ('podman', 'サーバー');
+INSERT INTO article_domain (slug, domain) VALUES ('podman', 'セキュリティ');
+
 INSERT INTO article_related (slug, related) VALUES ('linuc-boot', 'linuc-disks');
 INSERT INTO article_related (slug, related) VALUES ('linuc-boot', 'linuc-security');
 INSERT INTO article_related (slug, related) VALUES ('linuc-files', 'linuc-admin');
@@ -223,6 +270,24 @@ INSERT INTO article_related (slug, related) VALUES ('linuc-security', 'linuc-adm
 INSERT INTO article_related (slug, related) VALUES ('linuc-security', 'linuc-network');
 INSERT INTO article_related (slug, related) VALUES ('linuc-oss', 'linuc-packages');
 INSERT INTO article_related (slug, related) VALUES ('sqlite', 'linuc-files');
+INSERT INTO article_related (slug, related) VALUES ('kvm', 'linuc-boot');
+INSERT INTO article_related (slug, related) VALUES ('linuc-boot', 'kvm');
+INSERT INTO article_related (slug, related) VALUES ('kvm', 'qemu');
+INSERT INTO article_related (slug, related) VALUES ('qemu', 'kvm');
+INSERT INTO article_related (slug, related) VALUES ('qemu', 'linuc-boot');
+INSERT INTO article_related (slug, related) VALUES ('linuc-boot', 'qemu');
+INSERT INTO article_related (slug, related) VALUES ('docker', 'podman');
+INSERT INTO article_related (slug, related) VALUES ('docker', 'linuc-boot');
+INSERT INTO article_related (slug, related) VALUES ('docker', 'qemu');
+INSERT INTO article_related (slug, related) VALUES ('docker', 'kvm');
+INSERT INTO article_related (slug, related) VALUES ('podman', 'docker');
+INSERT INTO article_related (slug, related) VALUES ('podman', 'linuc-boot');
+INSERT INTO article_related (slug, related) VALUES ('kvm', 'docker');
+INSERT INTO article_related (slug, related) VALUES ('kvm', 'podman');
+INSERT INTO article_related (slug, related) VALUES ('qemu', 'docker');
+INSERT INTO article_related (slug, related) VALUES ('qemu', 'podman');
+INSERT INTO article_related (slug, related) VALUES ('linuc-boot', 'docker');
+INSERT INTO article_related (slug, related) VALUES ('linuc-boot', 'podman');
 
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-boot', 1, 'virsh は電源を入れ、止まるよう頼むだけ', '/linuc-boot/theory/01-virsh', 25);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-boot', 2, '入れるかは受け取る側のファイルが決める', '/linuc-boot/theory/02-ssh', 20);
@@ -323,6 +388,33 @@ INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('wasm', 2, '能力は
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('wasm', 3, '越えるのは数値だけ', '/wasm/theory/03-memory', 14);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('wasm', 4, 'ホストが違うと動かない', '/wasm/theory/04-host', 14);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('wasm', 5, 'バイナリを読む', '/wasm/theory/05-binary', 18);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('kvm', 1, '仮想化支援機能は、CPU の自己申告', '/kvm/theory/01-cpu', 25);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('kvm', 2, 'KVM の入口は /dev/kvm ひとつ', '/kvm/theory/02-dev-kvm', 25);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('kvm', 3, 'QEMU は、頼まれたときだけ KVM を使う', '/kvm/theory/03-accel', 20);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('kvm', 4, '速くなるのは、CPU が命令を実行する部分だけ', '/kvm/theory/04-speed', 20);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('kvm', 5, '中から見える CPU は、アクセラレータで変わる', '/kvm/theory/05-guest', 25);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('kvm', 6, 'このサイトの練習機が KVM を使わない理由', '/kvm/theory/06-site', 15);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('qemu', 1, '何も渡さなくても、PC が1台組み上がる', '/qemu/theory/01-machine', 15);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('qemu', 2, 'シリアルの先は、あなたの端末そのもの', '/qemu/theory/02-serial', 20);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('qemu', 3, 'ディスクは、書いたところだけを持つファイル', '/qemu/theory/03-disk', 30);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('qemu', 4, 'CPU は、命令を翻訳して動いている', '/qemu/theory/04-tcg', 18);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('qemu', 5, 'ネットワークも、QEMU のプロセスの中にある', '/qemu/theory/05-network', 25);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('qemu', 6, 'ファームウェアは、差し替えられるファイル', '/qemu/theory/06-firmware', 25);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('qemu', 7, 'libvirt は、コマンド行を組み立てているだけ', '/qemu/theory/07-libvirt', 20);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('docker', 1, 'コンテナは、練習機の上で動く1つのプロセス', '/docker/theory/01-process', 20);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('docker', 2, 'コンテナの PID 1 は、合図を無視する', '/docker/theory/02-pid1', 20);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('docker', 3, 'イメージを決めるのは、名前ではなくダイジェスト', '/docker/theory/03-image', 25);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('docker', 4, 'コンテナの書き込みは、イメージの上の1枚に入る', '/docker/theory/04-storage', 27);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('docker', 5, 'ポートの公開は、宛先の書き換え', '/docker/theory/05-ports', 22);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('docker', 6, 'ビルドのキャッシュは、変えた段から後ろを全部作り直す', '/docker/theory/06-build', 20);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('docker', 7, '渡したものだけが、コンテナの力になる', '/docker/theory/07-privileges', 25);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('podman', 1, 'podman には、頼む相手のデーモンがいない', '/podman/theory/01-daemonless', 18);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('podman', 2, 'コンテナの中の root は、外では student', '/podman/theory/02-userns', 22);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('podman', 3, 'イメージの置き場所は、ユーザごとに別', '/podman/theory/03-storage', 18);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('podman', 4, 'rootless のネットワークは、カーネルの外で中継される', '/podman/theory/04-network', 22);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('podman', 5, 'pod は、ネットワークを分け合うコンテナの組', '/podman/theory/05-pod', 20);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('podman', 6, 'ログアウトしても動かし続けるのは、systemd の仕事', '/podman/theory/06-systemd', 27);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('podman', 7, '同じコマンドで、違う仕組み', '/podman/theory/07-compat', 25);
 
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-boot', 'linuc-boot', '01', '練習機に電源を入れ、自動で起動するようにする', 10);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-boot', 'linuc-boot', '02', 'RSA の鍵で、パスワードなしで入れるようにする', 12);
@@ -407,3 +499,28 @@ INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('wasm', 'wasm', '02
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('wasm', 'wasm', '03', '数値2つで文字列を渡す', 12);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('wasm', 'wasm', '04', '同じ .wasm を2つのホストに渡す', 15);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('wasm', 'wasm', '05', '実行する前に調べる', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('kvm', 'kvm', '01', '練習機を TCG で起動し、中から見える CPU を確かめる', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('kvm', 'kvm', '02', 'この檻の lab が /dev/kvm を開けるようにする', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('kvm', 'kvm', '03', '同じ練習機を KVM で起動し直し、起動の速さを比べる', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('kvm', 'kvm', '04', '練習機に、あなたの PC の CPU をそのまま見せる', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('kvm', 'kvm', '05', '練習機の CPU から、仮想化支援の印を消す', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('qemu', 'qemu', '01', '画面の無い PC を後ろで動かし、QMP で尋ねられるようにする', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('qemu', 'qemu', '02', '土台を汚さずに、自分の練習機のディスクを作って起動する', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('qemu', 'qemu', '03', 'ログインした直後の練習機を、メモリごと保存する', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('qemu', 'qemu', '04', 'TCG が最初に翻訳した命令を、記録に残す', 8);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('qemu', 'qemu', '05', '外から ssh で練習機に入れるようにする', 15);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('qemu', 'qemu', '06', '練習機を UEFI で起動し、ブートの項目を NVRAM のファイルに残す', 15);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('docker', 'docker', '01', 'メモリの上限を付けたコンテナを動かす', 8);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('docker', 'docker', '02', 'docker stop が TERM で終わるコンテナを動かす', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('docker', 'docker', '03', '付け替えられた名前を、中身に戻す', 8);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('docker', 'docker', '04', 'コンテナを消しても残るデータを置く', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('docker', 'docker', '05', '練習機の外から届くように、ポートを公開する', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('docker', 'docker', '06', 'キャッシュが効く順に Dockerfile を並べ替える', 15);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('docker', 'docker', '07', '必要な特権だけを渡して起動する', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('podman', 'podman', '01', 'コンテナの親の conmon を突き止める', 8);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('podman', 'podman', '02', '中の UID 1000 が書けるディレクトリを用意する', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('podman', 'podman', '03', 'student のイメージを root の置き場所へ運ぶ', 8);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('podman', 'podman', '04', 'rootless のまま、8080 番で公開する', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('podman', 'podman', '05', 'pod の中で、127.0.0.1 で届くようにする', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('podman', 'podman', '06', 'quadlet で、ログアウトしても動き続けるサービスにする', 15);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('podman', 'podman', '07', 'docker の CLI で、podman のコンテナを動かす', 10);

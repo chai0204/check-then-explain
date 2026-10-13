@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KVM — 確かめて説明する</title>
+<meta name="description" content="このサイトの練習機を動かしている QEMU と、それを速くする KVM を、同じ練習機を TCG と KVM で起動して比べながら確かめる6章。CPU の仮想化支援の印は CPU の自己申告で、KVM の入口は /dev/kvm というファイル1つであり、コンテナに渡すとはそのファイルと開く許可を渡すことで特権は増えないことを、エラーの文言と持てる特権の上限（CapBnd）で示す。練習機の中から見える「どのハイパーバイザーか」の名前は QEMU の名乗りで消せることも確かめ、このサイトの仮想マシン型の檻が KVM を使わない理由（全員に同じ画面・権限ゼロ）と、その代償の時間も測る。">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="kvm">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <strong>KVM</strong></nav>
+<div class="draftbar compact"><p><b>ドラフト</b>: この記事は<b>著者が読者として通していません</b>。本文の出力はすべて実機の記録で、演習は模範解答で通ること・未達のときに判定が鳴ることを確かめてあります。それでも導線の不備は残っている可能性があります。詰まったら各ページ下のコメントか <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> へ。</p></div>
+<h1>KVM</h1>
+<div class="badges"><span>中級</span><span>演習あり（仮想マシン）</span><span>約3時間4分</span><span>状態: ドラフト</span></div>
+<p class="lead">このサイトの練習機を動かしている QEMU と、それを速くする KVM を、同じ練習機を TCG と KVM で起動して比べながら確かめる6章。CPU の仮想化支援の印は CPU の自己申告で、KVM の入口は /dev/kvm というファイル1つであり、コンテナに渡すとはそのファイルと開く許可を渡すことで特権は増えないことを、エラーの文言と持てる特権の上限（CapBnd）で示す。練習機の中から見える「どのハイパーバイザーか」の名前は QEMU の名乗りで消せることも確かめ、このサイトの仮想マシン型の檻が KVM を使わない理由（全員に同じ画面・権限ゼロ）と、その代償の時間も測る。</p>
+
+<div class="card"><h3>想定読者</h3><p>このサイトの実践編で docker run を打って練習機を動かしているが、KVM や --device /dev/kvm が何をしているかを説明できない人。Linux の端末と docker を使えることが前提で、KVM の演習には /dev/kvm のある Linux の PC が要る（無くても TCG の演習と理論編は進められる）。</p></div>
+
+<h2 id="outcomes">得られるもの</h2>
+<ul>
+<li>CPU の仮想化支援の印（vmx / svm）が CPUID の申告であることを、TCG の練習機の出力で説明できる</li>
+<li>コンテナで /dev/kvm を開くまでの関門を、エラーの文言（No such file・Permission denied・Operation not permitted）で見分けられる</li>
+<li>QEMU が KVM を使っているかを /proc/PID/fd で確かめ（練習機の中の名乗りは決め手にならない）、起動の時間がどこで縮むかを測れる</li>
+<li>このサイトの仮想マシン型の檻が KVM を使わない理由と代償を、数字で言える</li>
+</ul>
+
+<h2 id="start">進め方</h2>
+<div class="toc">
+  <a href="/kvm/theory/"><b>理論編</b><span>全6章・約2時間10分。1章ごとに「実際に打つと何が出るか」を先に置いてある。</span></a>
+  <a href="/kvm/practice/"><b>実践編</b><span>演習5本・約54分。docker か podman で、練習機（仮想マシン）入りの檻を1つ起動する。イメージ約2GB・起動から ssh まで約30秒。KVM も特権も要らない。</span></a>
+</div>
+<p class="detail">完了推定時間（約3時間4分）は、各章の所要時間と演習の目安の合計です。</p>
+
+<h2 id="chapters">章</h2>
+<ol class="chlist">
+<li><a href="/kvm/theory/01-cpu">仮想化支援機能は、CPU の自己申告</a></li>
+<li><a href="/kvm/theory/02-dev-kvm">KVM の入口は /dev/kvm ひとつ</a></li>
+<li><a href="/kvm/theory/03-accel">QEMU は、頼まれたときだけ KVM を使う</a></li>
+<li><a href="/kvm/theory/04-speed">速くなるのは、CPU が命令を実行する部分だけ</a></li>
+<li><a href="/kvm/theory/05-guest">中から見える CPU は、アクセラレータで変わる</a></li>
+<li><a href="/kvm/theory/06-site">このサイトの練習機が KVM を使わない理由</a></li>
+</ol>
+
+
+
+<h2 id="related">関連記事</h2>
+<ul>
+<li><a href="/docker/">Docker</a></li>
+<li><a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a>（LinuC レベル1 101 主題1.01）</li>
+<li><a href="/podman/">Podman</a></li>
+<li><a href="/qemu/">QEMU</a></li>
+</ul>
+
+<p class="detail">公開 2026-10-14 ／ 最終更新 2026-10-14 ／ 関連領域: サーバー・仮想化</p>
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/kvm/">KVM</a> · <a href="/kvm/theory/">理論編 目次</a> · <a href="/kvm/practice/">実践編</a> · <a href="/kvm/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

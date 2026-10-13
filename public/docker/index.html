@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Docker — 確かめて説明する</title>
+<meta name="description" content="このサイトの実践編で打つ docker run が何をしているのかを、仮想マシン（練習機）の中に入れた本物の docker で確かめる7章。コンテナのプロセスを練習機の ps で見つけ、イメージを tar に書き出して指紋を計算し、公開したポートの宛先の書き換えを iptables の数えで見る。docker は自分では何も閉じ込めず、カーネルに頼んで1つのプロセスに名前空間・cgroup・overlay を付けているだけで、コンテナの中身も力も、起動するときに渡したもので決まる。">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="docker">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <strong>Docker</strong></nav>
+<div class="draftbar compact"><p><b>ドラフト</b>: この記事は<b>著者が読者として通していません</b>。本文の出力はすべて実機の記録で、演習は模範解答で通ること・未達のときに判定が鳴ることを確かめてあります。それでも導線の不備は残っている可能性があります。詰まったら各ページ下のコメントか <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> へ。</p></div>
+<h1>Docker</h1>
+<div class="badges"><span>中級</span><span>演習あり（仮想マシン）</span><span>約3時間52分</span><span>状態: ドラフト</span></div>
+<p class="lead">このサイトの実践編で打つ docker run が何をしているのかを、仮想マシン（練習機）の中に入れた本物の docker で確かめる7章。コンテナのプロセスを練習機の ps で見つけ、イメージを tar に書き出して指紋を計算し、公開したポートの宛先の書き換えを iptables の数えで見る。docker は自分では何も閉じ込めず、カーネルに頼んで1つのプロセスに名前空間・cgroup・overlay を付けているだけで、コンテナの中身も力も、起動するときに渡したもので決まる。</p>
+
+<div class="card"><h3>想定読者</h3><p>docker run は打てるが、その1行が何をしているのか（なぜ docker stop が10秒かかるのか、なぜファイアウォールの INPUT で閉じたポートに外から届くのか）を人に説明できない人。端末でコマンドを打てて、docker か podman でコンテナを動かせることが前提。</p></div>
+
+<h2 id="outcomes">得られるもの</h2>
+<ul>
+<li>コンテナが練習機の上の1つのプロセスであることを、ps と /proc の名前空間・cgroup で示せる</li>
+<li>タグとダイジェストの違いを、名前を付け替えた結果とイメージの中の指紋で説明できる</li>
+<li>ファイアウォールの INPUT で塞いだポートに外から届く理由を、DNAT の後のパケットの道で説明できる</li>
+<li>--cap-add・--device・--user が渡すもの（減らすもの）を CapEff と /dev で測り、--privileged がそれをどこまで広げるかを練習機の root と比べて言える</li>
+</ul>
+
+<h2 id="start">進め方</h2>
+<div class="toc">
+  <a href="/docker/theory/"><b>理論編</b><span>全7章・約2時間39分。1章ごとに「実際に打つと何が出るか」を先に置いてある。</span></a>
+  <a href="/docker/practice/"><b>実践編</b><span>演習7本・約1時間13分。docker か podman で、練習機（仮想マシン）入りの檻を1つ起動する。イメージ約2GB・起動から ssh まで約30秒。KVM も特権も要らない。</span></a>
+</div>
+<p class="detail">完了推定時間（約3時間52分）は、各章の所要時間と演習の目安の合計です。</p>
+
+<h2 id="chapters">章</h2>
+<ol class="chlist">
+<li><a href="/docker/theory/01-process">コンテナは、練習機の上で動く1つのプロセス</a></li>
+<li><a href="/docker/theory/02-pid1">コンテナの PID 1 は、合図を無視する</a></li>
+<li><a href="/docker/theory/03-image">イメージを決めるのは、名前ではなくダイジェスト</a></li>
+<li><a href="/docker/theory/04-storage">コンテナの書き込みは、イメージの上の1枚に入る</a></li>
+<li><a href="/docker/theory/05-ports">ポートの公開は、宛先の書き換え</a></li>
+<li><a href="/docker/theory/06-build">ビルドのキャッシュは、変えた段から後ろを全部作り直す</a></li>
+<li><a href="/docker/theory/07-privileges">渡したものだけが、コンテナの力になる</a></li>
+</ol>
+
+
+
+<h2 id="related">関連記事</h2>
+<ul>
+<li><a href="/kvm/">KVM</a></li>
+<li><a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a>（LinuC レベル1 101 主題1.01）</li>
+<li><a href="/podman/">Podman</a></li>
+<li><a href="/qemu/">QEMU</a></li>
+</ul>
+
+<p class="detail">公開 2026-10-14 ／ 最終更新 2026-10-14 ／ 関連領域: サーバー・セキュリティ・仮想化</p>
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/docker/">Docker</a> · <a href="/docker/theory/">理論編 目次</a> · <a href="/docker/practice/">実践編</a> · <a href="/docker/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

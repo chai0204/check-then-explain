@@ -44,7 +44,7 @@ rpm -K の出力を読み、署名が確かめられたかを判断できる');
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-packages', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-disks', 'ハードウェアとディスク', 'ドラフト', 'LinuC レベル1', '101', '1.05', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-13',
+  'linuc-disks', 'ハードウェアとディスク', 'ドラフト', 'LinuC レベル1', '101', '1.05', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-14',
   'LinuC レベル1 101 試験の主題1.05（ハードウェア、パーティション、ファイルシステム）を、コンテナの中で動く仮想マシン（練習機）で確かめる8章。ディスクを分割し、フォーマットし、マウントし、ドライバを外し、USB メモリを抜き差しする。ディスクは装置・パーティション表・LVM・ファイルシステム・マウントの層が重なってできていて、各層は自分の印だけを読む。',
   'LinuC レベル1（101）の受験者で、fdisk も mount も本物のディスクで試したことが無い人。端末でコマンドを打てて、docker を動かせることが前提。',
   'USB メモリを挿したとき、カーネル・udev・modprobe が何をするかを順に言える
@@ -64,7 +64,7 @@ source と bash でファイルを読む違いを、どのシェルが読むか�
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-shell', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-network', 'ネットワークの基礎', 'ドラフト', 'LinuC レベル1', '102', '1.07', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-13',
+  'linuc-network', 'ネットワークの基礎', 'ドラフト', 'LinuC レベル1', '102', '1.07', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-14',
   'LinuC レベル1 102 試験の主題1.07（プロトコルの基礎、ネットワーク構成、問題解決、クライアント側の DNS 設定）を、仮想マシンの中に作った「社内 LAN」で確かめる9章。壊れて渡される経路と名前解決を、原因を突き止めて直す。ネットワークの見え方は道具が読んだ表で決まり、ifconfig と ip、dig と ping は同じものを別々の表から読んでいる。',
   'LinuC レベル1（102）の受験者で、ip と ifconfig、dig と ping のどれで何が分かるかで止まっている人。端末でコマンドを打てて、docker を動かせることが前提。',
   'アドレスとマスクから、ネットワークアドレス・ブロードキャスト・使える台数を出せる
@@ -75,7 +75,7 @@ INSERT INTO article_domain (slug, domain) VALUES ('linuc-network', 'ネットワ
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-network', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-admin', 'アカウント・ジョブ・ロケール', 'ドラフト', 'LinuC レベル1', '102', '1.08', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-13',
+  'linuc-admin', 'アカウント・ジョブ・ロケール', 'ドラフト', 'LinuC レベル1', '102', '1.08', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-14',
   'LinuC レベル1 102 試験の主題1.08（アカウント管理、ジョブスケジューリング、ローカライゼーションと国際化）を、コンテナの中で動く仮想マシン（練習機）で確かめる9章。ユーザを作って止め、cron と at に本物の時刻でジョブを走らせ、ロケールを生成する。管理コマンドが書き換えるのは台帳の1行だけで、それが効くかは、読む側がいつ・どの列を読むかで決まる。',
   'LinuC レベル1（102）の受験者で、useradd や crontab のオプションを、読んでも覚えられない人。端末でコマンドを打てて、docker を動かせることが前提。',
   'usermod -G と -aG の違いを、結果の台帳で説明できる
@@ -85,7 +85,7 @@ INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficult
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-admin', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-services', '時刻・ログ・メール', 'ドラフト', 'LinuC レベル1', '102', '1.09', '初級', '演習あり（コンテナ）', '2026-10-12', '2026-10-13',
+  'linuc-services', '時刻・ログ・メール', 'ドラフト', 'LinuC レベル1', '102', '1.09', '初級', '演習あり（コンテナ）', '2026-10-12', '2026-10-14',
   'LinuC レベル1 102 試験の主題1.09（システム時刻の管理、システムのログ、MTA の基本）を、systemd が動くコンテナの中で打って確かめる7章。timedatectl も journalctl も systemctl も動く。送り手は中身とラベルだけを渡し、宛先を決めているのは受け手側にある設定ファイルだ。',
   'LinuC レベル1（102）の受験者で、出題範囲を読んで「そういうことができるんだな」で止まっている人。端末でコマンドを打てて、docker を動かせることが前提。',
   'chrony に基準を設定して同期させ、chronyc で状態を読み分けられる
@@ -136,6 +136,53 @@ WASM が「できないこと」を、檻の形として説明できる
 INSERT INTO article_domain (slug, domain) VALUES ('wasm', 'ウェブ');
 INSERT INTO article_domain (slug, domain) VALUES ('wasm', 'セキュリティ');
 
+INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
+  'kvm', 'KVM', 'ドラフト', NULL, NULL, NULL, '中級', '演習あり（仮想マシン）', '2026-10-14', '2026-10-14',
+  'このサイトの練習機を動かしている QEMU と、それを速くする KVM を、同じ練習機を TCG と KVM で起動して比べながら確かめる6章。CPU の仮想化支援の印は CPU の自己申告で、KVM の入口は /dev/kvm というファイル1つであり、コンテナに渡すとはそのファイルと開く許可を渡すことで特権は増えないことを、エラーの文言と持てる特権の上限（CapBnd）で示す。練習機の中から見える「どのハイパーバイザーか」の名前は QEMU の名乗りで消せることも確かめ、このサイトの仮想マシン型の檻が KVM を使わない理由（全員に同じ画面・権限ゼロ）と、その代償の時間も測る。',
+  'このサイトの実践編で docker run を打って練習機を動かしているが、KVM や --device /dev/kvm が何をしているかを説明できない人。Linux の端末と docker を使えることが前提で、KVM の演習には /dev/kvm のある Linux の PC が要る（無くても TCG の演習と理論編は進められる）。',
+  'CPU の仮想化支援の印（vmx / svm）が CPUID の申告であることを、TCG の練習機の出力で説明できる
+コンテナで /dev/kvm を開くまでの関門を、エラーの文言（No such file・Permission denied・Operation not permitted）で見分けられる
+QEMU が KVM を使っているかを /proc/PID/fd で確かめ（練習機の中の名乗りは決め手にならない）、起動の時間がどこで縮むかを測れる
+このサイトの仮想マシン型の檻が KVM を使わない理由と代償を、数字で言える');
+INSERT INTO article_domain (slug, domain) VALUES ('kvm', '仮想化');
+INSERT INTO article_domain (slug, domain) VALUES ('kvm', 'サーバー');
+
+
+INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
+  'qemu', 'QEMU', 'ドラフト', NULL, NULL, NULL, '中級', '演習あり（コンテナ）', '2026-10-14', '2026-10-14',
+  'このサイトの仮想マシン型の檻の中で動いている QEMU を、libvirt を通さずに qemu-system-x86_64 と qemu-img で直接打って確かめる7章。何も渡さずに組み上がる PC、端末を壊すシリアル、書いたところだけを持つディスク、命令を翻訳する CPU、プロセスの中のネットワーク、差し替えられるファームウェアを順に見て、最後に libvirt が組み立てたコマンド行を読む。仮想マシンは QEMU という1つのプロセスで、何を演じるかは起動のときのコマンド行が決める（動いている間も、QMP で部品を足せる）。',
+  'このサイトの実践編で docker run を打って練習機を起動したことはあるが、裏で何が動いているのか、--stop-timeout 30 や ssh linuc が何をしているのかを説明できない人。端末でコマンドを打てて、docker を動かせることが前提。',
+  '何も渡さずに起動した QEMU の画面から、既定で組み上がる PC の部品を言える
+qcow2 の差分ディスクで土台を汚さずに起動し、-snapshot と savevm の違いをファイルの大きさで示せる
+練習機の NIC の名前と 10.0.2.x のアドレスが、QEMU のどの指定から来るかを説明できる
+libvirt が組み立てた QEMU の引数を読み、定義の XML の各行と対応づけられる');
+INSERT INTO article_domain (slug, domain) VALUES ('qemu', '仮想化');
+
+
+INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
+  'docker', 'Docker', 'ドラフト', NULL, NULL, NULL, '中級', '演習あり（仮想マシン）', '2026-10-14', '2026-10-14',
+  'このサイトの実践編で打つ docker run が何をしているのかを、仮想マシン（練習機）の中に入れた本物の docker で確かめる7章。コンテナのプロセスを練習機の ps で見つけ、イメージを tar に書き出して指紋を計算し、公開したポートの宛先の書き換えを iptables の数えで見る。docker は自分では何も閉じ込めず、カーネルに頼んで1つのプロセスに名前空間・cgroup・overlay を付けているだけで、コンテナの中身も力も、起動するときに渡したもので決まる。',
+  'docker run は打てるが、その1行が何をしているのか（なぜ docker stop が10秒かかるのか、なぜファイアウォールの INPUT で閉じたポートに外から届くのか）を人に説明できない人。端末でコマンドを打てて、docker か podman でコンテナを動かせることが前提。',
+  'コンテナが練習機の上の1つのプロセスであることを、ps と /proc の名前空間・cgroup で示せる
+タグとダイジェストの違いを、名前を付け替えた結果とイメージの中の指紋で説明できる
+ファイアウォールの INPUT で塞いだポートに外から届く理由を、DNAT の後のパケットの道で説明できる
+--cap-add・--device・--user が渡すもの（減らすもの）を CapEff と /dev で測り、--privileged がそれをどこまで広げるかを練習機の root と比べて言える');
+INSERT INTO article_domain (slug, domain) VALUES ('docker', '仮想化');
+INSERT INTO article_domain (slug, domain) VALUES ('docker', 'サーバー');
+INSERT INTO article_domain (slug, domain) VALUES ('docker', 'セキュリティ');
+
+INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
+  'podman', 'Podman', 'ドラフト', NULL, NULL, NULL, '中級', '演習あり（仮想マシン）', '2026-10-14', '2026-10-14',
+  'このサイトの檻を docker の代わりに動かせる podman が、docker とどこまで同じでどこから違うのかを、練習機（仮想マシン）の中の本物の podman（rootless）で確かめる7章。デーモンのいない作り、コンテナの中の root が外では本人になるユーザ名前空間、ユーザの systemd に任せる動かし方を、プロセスと UID の番号で見る。podman は打った人の権限のまま、打った人の置き場所に、打った人の systemd の下でコンテナを作る。',
+  'docker の代わりに podman を打てるが、rootless だと何が違うのか、なぜログアウトでコンテナが止まるのかを人に説明できない人。端末でコマンドを打てて、docker か podman でコンテナを動かせることが前提（Docker の記事を先に読むと比べやすい）。',
+  'podman にデーモンがいないことを、conmon とプロセスの親子で示せる
+rootless のコンテナの中の UID が外で何番になるかを、UID の対応表から計算できる
+rootless のコンテナがログアウトで止まる理由を説明し、linger と quadlet で動かし続けられる
+docker と podman で、既定の特権・ping の許し方・exec の umask の決まり方・印のファイルがどう違うかを示せる');
+INSERT INTO article_domain (slug, domain) VALUES ('podman', '仮想化');
+INSERT INTO article_domain (slug, domain) VALUES ('podman', 'サーバー');
+INSERT INTO article_domain (slug, domain) VALUES ('podman', 'セキュリティ');
+
 INSERT INTO article_related (slug, related) VALUES ('linuc-boot', 'linuc-disks');
 INSERT INTO article_related (slug, related) VALUES ('linuc-boot', 'linuc-security');
 INSERT INTO article_related (slug, related) VALUES ('linuc-files', 'linuc-admin');
@@ -159,3 +206,21 @@ INSERT INTO article_related (slug, related) VALUES ('linuc-security', 'linuc-adm
 INSERT INTO article_related (slug, related) VALUES ('linuc-security', 'linuc-network');
 INSERT INTO article_related (slug, related) VALUES ('linuc-oss', 'linuc-packages');
 INSERT INTO article_related (slug, related) VALUES ('sqlite', 'linuc-files');
+INSERT INTO article_related (slug, related) VALUES ('kvm', 'linuc-boot');
+INSERT INTO article_related (slug, related) VALUES ('linuc-boot', 'kvm');
+INSERT INTO article_related (slug, related) VALUES ('kvm', 'qemu');
+INSERT INTO article_related (slug, related) VALUES ('qemu', 'kvm');
+INSERT INTO article_related (slug, related) VALUES ('qemu', 'linuc-boot');
+INSERT INTO article_related (slug, related) VALUES ('linuc-boot', 'qemu');
+INSERT INTO article_related (slug, related) VALUES ('docker', 'podman');
+INSERT INTO article_related (slug, related) VALUES ('docker', 'linuc-boot');
+INSERT INTO article_related (slug, related) VALUES ('docker', 'qemu');
+INSERT INTO article_related (slug, related) VALUES ('docker', 'kvm');
+INSERT INTO article_related (slug, related) VALUES ('podman', 'docker');
+INSERT INTO article_related (slug, related) VALUES ('podman', 'linuc-boot');
+INSERT INTO article_related (slug, related) VALUES ('kvm', 'docker');
+INSERT INTO article_related (slug, related) VALUES ('kvm', 'podman');
+INSERT INTO article_related (slug, related) VALUES ('qemu', 'docker');
+INSERT INTO article_related (slug, related) VALUES ('qemu', 'podman');
+INSERT INTO article_related (slug, related) VALUES ('linuc-boot', 'docker');
+INSERT INTO article_related (slug, related) VALUES ('linuc-boot', 'podman');
