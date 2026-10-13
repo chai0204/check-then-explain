@@ -34,6 +34,7 @@ PAIRS=(
   "linuc-packages  lab-linuc-packages-deb:1.0.1  $REPO:packages-deb-1.0.1"
   "linuc-packages  lab-linuc-packages-rpm:1.0.1  $REPO:packages-rpm-1.0.1"
   "linuc-boot      lab-linuc-boot:1.0.0          $REPO:boot-1.0.0"
+  "linuc-boot      lab-linuc-boot:1.0.1          $REPO:boot-1.0.1"
   "linuc-disks     lab-linuc-disks:1.0.0         $REPO:disks-1.0.0"
   "linuc-network   lab-linuc-network:1.0.0       $REPO:network-1.0.0"
   "linuc-admin     lab-linuc-admin:1.0.0         $REPO:admin-1.0.0"
