@@ -227,7 +227,7 @@ $ bash need.sh alice bob 2&gt; /dev/null; echo "終了ステータス $?"
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>引数を空白で切り、引用符を外すのは<b>呼んだ側</b>のシェル。スクリプトは切られた後の語の並びを受け取る</li><li><code>$0</code> は呼ばれた名前、<code>$1</code>〜<code>$9</code> と <code>${10}</code> 以降が位置パラメータ、<code>$#</code> が数</li><li>配列の要素は <code>${a[1]}</code>（添字は 0 から）。<code>$a[1]</code> は先頭の要素に文字 <code>[1]</code> が付くだけ。全部は <code>${a[@]}</code>、数は <code>${#a[@]}</code></li><li><code>"$@"</code> は受け取った区切りのまま、<code>"$*"</code> は1つにまとめ、引用符なしの <code>$*</code>・<code>$@</code> は切り直す。渡すなら <code>"$@"</code></li><li><code>shift</code> は先頭を捨てて詰め、<code>$#</code> を減らす。詰めすぎると、bash では何もせず 1 を返して続き、sh（dash）ではエラーでスクリプトが終わる</li><li>引数の数は <code>[ $# -ne 1 ]</code> などで確かめ、使い方は <code>&gt;&amp;2</code>、終了は <code>exit 1</code></li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.2@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.2@sha256:edb99156f4bdca3dcce3465064acd8f7a8c7bb9938ff849de56db8d8574b19ce / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-shell/theory/04-script">← 4. 先頭行を読むのはカーネルで、bash ではない</a><a href="/linuc-shell/theory/06-status">次: 6. スクリプトが返せるのは、0〜255 の数1つ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

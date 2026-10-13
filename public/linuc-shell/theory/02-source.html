@@ -336,7 +336,7 @@ bash: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin=/usr/local/sb
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>bash ファイル</code> は子のプロセスに読ませる。<code>source ファイル</code>・<code>. ファイル</code> はいまのシェルに読ませる。設定の読み直しは後者</li><li>子に渡るのは <code>export</code> した環境変数の<b>コピー</b>だけ。子が変えても親は変わらない</li><li><code>declare -p 名前</code> の <code>-x</code> が環境変数の印。<code>env</code> は環境変数だけを出す</li><li>alias は子に渡らない。bash のスクリプトでは既定で展開されない（<code>shopt -s expand_aliases</code> で有効になる。sh（dash）は展開する）。だから対話シェルごとに読まれる <code>~/.bashrc</code> に書く</li><li>alias をそのときだけ避けるのは <code>\ls</code>・<code>command ls</code>・フルパス。<code>unalias</code> は定義ごと消す。<code>alias ll='ls -l'</code> も <code>x=1</code> も <code>=</code> の前後に空白を入れない</li><li><code>~/.bashrc</code> の <code>HISTSIZE=0</code> は、履歴を覚えずファイルにも書かない。プロンプトは <code>PS1</code></li><li>PATH は <code>:</code> 区切りで左から探す。先頭に足すと優先、末尾に足すと後回し。手で足した PATH は次のログインで消える</li><li><code>source</code> は bash の別名。sh（dash）で使えるのは <code>.</code> だけ</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.2@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.2@sha256:edb99156f4bdca3dcce3465064acd8f7a8c7bb9938ff849de56db8d8574b19ce / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-shell/theory/01-startup">← 1. 読まれる起動ファイルは、シェルの生まれ方で決まる</a><a href="/linuc-shell/theory/03-lists">次: 3. &amp;&amp; と || は、直前の数だけを見ている →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
