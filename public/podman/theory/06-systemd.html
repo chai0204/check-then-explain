@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6. ログアウトしても動かし続けるのは、systemd の仕事 — 確かめて説明する Podman</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="6" data-theme="podman">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <a href="/podman/theory/">理論編</a> › 第6章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/">詳しく</a></p>
+</div>
+<h1>6. ログアウトしても動かし続けるのは、systemd の仕事</h1>
+<p class="lead">rootless の podman のコンテナは、student の systemd（user@1000.service）の下で動いている（第1章）。その systemd は、student がログインしている間だけ動く。
+だから <b>ログアウトすると、コンテナも止まる</b>。動かし続けるには、student の systemd をログインと関係なく動かし（linger）、
+コンテナを systemd のサービスとして書く（<b>quadlet</b>）。落ちたコンテナの起動し直し（<code>--restart</code>）は podman にもあるが、
+練習機の起動のときにコンテナを立ち上げ直す常駐の係（docker なら dockerd）が podman にはいないので、その仕事を systemd に任せる。</p>
+<div class="badges"><span>前提: 第1章（conmon と user@1000.service）</span><span>所要 27分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>ログアウトで rootless のコンテナが止まることを、ログインし直して確かめられる</li>
+<li><code>loginctl enable-linger</code> が何を変えるかを、ログアウトの後のコンテナの状態で示せる</li>
+<li>quadlet の <code>.container</code> ファイルから、systemd のサービスが作られる仕組みを、作られた unit から読める</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: quadlet の全項目（<code>.volume</code>・<code>.network</code>・<code>.kube</code>）、<code>podman generate systemd</code>（古いやり方）、
+<code>podman auto-update</code>、root の quadlet（<code>/etc/containers/systemd</code>）。</div></div>
+
+<h2 id="logout">ログアウトすると、コンテナはどうなるか</h2>
+<div class="sgoal"><b>この節で分かること</b>: student の systemd とコンテナの寿命の関係。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>podman run -d</code> で裏で動かしたコンテナは、端末を閉じてもログアウトしても動き続ける（docker の <code>-d</code> と同じで、そのためのオプションだ）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ loginctl show-user student -p Linger
+Linger=no</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman run -d --name p6 alpine:3.24.2 sleep 3600
+ba62326e75af4df877c5372c4ce6e66c8e0e033d63e32f10fb71fd1c6c8d2338
+$ podman ps --format '{{.Names}}: {{.Status}}'
+p6: Up 3 seconds
+$ exit
+logout
+Connection to 127.0.0.1 closed.</code></pre>
+<p>外に出て15秒待ってから入り直す（student の systemd は、最後のログインが終わってから10秒で止まる）。</p>
+<pre data-where="外（lab@host）"><code>$ sleep 15
+$ ssh linuc
+...</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman ps -a --format '{{.Names}}: {{.Status}}'
+p6: Created</code></pre>
+<div class="then"><b>だめな理由</b>: 動いていた <code>p6</code> は、ログインし直すと <code>Created</code>（作られただけ）になっていた。
+最後のログインが終わると、logind は student の systemd（user@1000.service）を止め、その下のかごにいた conmon とコンテナのプロセスも止められた。
+実行中の記録（<code>/run/user/1000</code> の下）もそのとき消えたので、podman にはディスクの記録（作ったこと）しか残っていない。
+<b><code>-d</code> は端末から切り離すだけで、student の systemd が止まれば、その下のコンテナも止まる</b>。
+docker のコンテナは root の containerd の下にいるので、ログインと関係なく動き続ける。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman rm p6
+p6</code></pre>
+
+<h2 id="linger">linger — ログインが無くても systemd を動かしておく</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>loginctl enable-linger</code> で、コンテナの寿命がどう変わるか。</div>
+<p><b>linger</b> は「ログインしていなくても、そのユーザの systemd を動かしておく」という logind の設定である。自分の分は自分で入れられる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ loginctl enable-linger
+$ loginctl show-user student -p Linger
+Linger=yes</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman run -d --name p6 alpine:3.24.2 sleep 3600
+68e90a933430147a42a35536df4531652ad696f5ef829021b584b158ea5a0e0c
+$ exit
+logout
+Connection to 127.0.0.1 closed.</code></pre>
+<pre data-where="外（lab@host）"><code>$ sleep 15
+$ ssh linuc
+...</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman ps -a --format '{{.Names}}: {{.Status}}'
+p6: Up 21 seconds
+$ podman rm -f -t 0 p6
+p6</code></pre>
+<p>linger を入れると、ログアウトして15秒たっても <code>p6</code> は動き続けていた。linger のユーザの systemd は、練習機の起動と一緒に立ち上がり、ログアウトしても止まらない。</p>
+<div class="analogy"><b>たとえ</b>: student の systemd は、<b>student が在室している間だけ開いている事務所</b>に近い。rootless のコンテナは、その事務所の中で動く仕事である。
+最後の人が帰ると、事務所は電気を消して閉まり、中の仕事も止まる。linger は「人がいなくても事務所を開けておく」という届けである。
+<br>ただし<b>崩れる点</b>: 事務所なら閉まっても机の上の書きかけは残るが、systemd が止まると <code>/run/user/1000</code> の下の実行中の記録は消える。
+戻ってきたとき、仕事は「途中で止まった」ではなく「作っただけ」に見える。</div>
+
+<h2 id="quadlet">quadlet — コンテナを systemd のサービスとして書く</h2>
+<div class="sgoal"><b>この節で分かること</b>: quadlet のファイルから、どんな systemd のサービスが作られるか。</div>
+<p>linger だけでは、練習機を起動し直したときにコンテナを起動する人がいない。podman にはデーモンがいないので、機械の起動のときに立ち上がって「動いていたコンテナ」を起動し直す係もいない。
+落ちたときの起動し直しなら、podman にも docker と同じ <code>--restart</code> がある。終了コードが 0 以外なら2回まで起動し直す（<code>on-failure:2</code>）コンテナで確かめる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman run -d --name rs --restart=on-failure:2 alpine:3.24.2 sh -c 'exit 3'
+96750c08bf4292026fbb3740f8a1eee14d45f3677b485fd862d58568a90a52dd
+$ sleep 15
+$ podman inspect rs --format '{{.RestartCount}} {{.State.Status}} {{.State.ExitCode}}'
+2 exited 3
+$ podman rm rs
+rs</code></pre>
+<p>systemd のサービスにしていないのに、<code>rs</code> は2回起動し直され（<code>RestartCount</code> が 2）、3回目に終わったところで止まった（<code>exited</code>、終了コード 3）。
+コンテナが終わると conmon が podman（<code>podman container cleanup</code>）を呼び、そこで方針を見て起動し直している。
+podman に無いのは「機械の起動のときに立ち上げ直す」常駐の係のほうで、それを systemd に任せる（podman の <code>podman-restart.service</code> か、次の quadlet）。
+systemd の下で動かすなら、<code>--restart</code> ではなく systemd の <code>Restart=</code> を使うのが podman の勧めである。</p>
+<p>podman は、決まった場所の <code>.container</code> ファイルを読んでサービスの定義（unit）を作る仕組み、<b>quadlet</b> を持っている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ mkdir -p ~/.config/containers/systemd</code></pre>
+<p>このディレクトリに、動かしたいコンテナを書いたファイルを置く。中身は <code>[Container]</code> に podman run の材料（イメージ・コマンド・公開するポート）、<code>[Service]</code> と <code>[Install]</code> に systemd への頼みを書く（httpd は既定の 80 番で待ち受ける）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ cat &gt; ~/.config/containers/systemd/web.container &lt;&lt;'EOF'
+&gt; [Unit]
+&gt; Description=busybox httpd (quadlet)
+&gt; [Container]
+&gt; Image=docker.io/library/busybox:1.38.0
+&gt; Exec=httpd -f -h /etc
+&gt; PublishPort=127.0.0.1:8082:80
+&gt; [Service]
+&gt; Restart=always
+&gt; [Install]
+&gt; WantedBy=default.target
+&gt; EOF
+$ systemctl --user daemon-reload
+$ systemctl --user cat web.service | grep -E '^(ExecStart|Restart|WantedBy)='
+Restart=always
+ExecStart=/usr/bin/podman run --name=systemd-%N --cidfile=%t/%N.cid --replace --rm --cgroups=split --sdnotify=conmon -d --publish 127.0.0.1:8082:80 docker.io/library/busybox:1.38.0 httpd -f -h /etc
+WantedBy=default.target
+$ ls /run/user/1000/systemd/generator/default.target.wants/
+web.service</code></pre>
+<p><code>systemctl --user daemon-reload</code> のときに、quadlet（systemd の generator として動く）が <code>web.container</code> を読み、<code>web.service</code> という unit を作った。
+中身を見ると、<code>ExecStart=</code> は <b><code>podman run</code> の1行</b>で、<code>.container</code> に書いた項目がそのままオプションになっている（<code>--name=systemd-%N</code> の <code>%N</code> はサービスの名前 web）。
+<code>[Install]</code> の <code>WantedBy=default.target</code> は、generator が <code>default.target.wants/</code> に置いたリンクになった。student の systemd が起動するたびに（linger なら練習機の起動のたびに）、web.service も起動する。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ systemctl --user start web.service
+$ systemctl --user is-active web.service
+active
+$ curl -s http://127.0.0.1:8082/hostname
+9967b3b5471c
+$ podman ps --format '{{.Names}}  {{.Ports}}'
+systemd-web  127.0.0.1:8082-&gt;80/tcp</code></pre>
+<p>コンテナの名前は <code>systemd-web</code> だった。落ちたらどうなるかを、外から KILL を送って確かめる（<code>podman kill</code> の既定は KILL）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman kill systemd-web
+systemd-web
+$ sleep 5
+$ systemctl --user show -p NRestarts -p ActiveState web.service
+NRestarts=1
+ActiveState=active
+$ curl -s http://127.0.0.1:8082/hostname
+d18d70c50fac</code></pre>
+<p>systemd は止まったことに気づき（コンテナの終わりを conmon から知らされる）、<code>Restart=always</code> に従って起動し直した（<code>NRestarts=1</code>）。
+返ってきたホスト名が前と違うのは、起動し直したのが<b>新しいコンテナ</b>だからである（<code>podman run --rm --replace</code> で作り直している）。</p>
+<div class="analogy"><b>たとえ</b>: quadlet は、<b>手書きの作業メモを、事務所の正式な業務手順書に清書してくれる係</b>に近い。メモ（<code>.container</code>）には「何を動かすか」だけを書けば、
+清書（unit）には「いつ始めるか・止まったらどうするか・誰の業務か」が systemd の書式で入る。
+<br>ただし<b>崩れる点</b>: 清書係は一度書いたら終わりだが、quadlet は <code>daemon-reload</code> のたびに書き直す。作られた unit を手で直しても次の reload で消えるので、直すのはいつもメモ（<code>.container</code>）のほうである。</div>
+<div class="analogy"><b>たとえ</b>: <code>Restart=always</code> は、<b>倒れた看板を立て直す警備員</b>に近い。看板（コンテナ）が倒れる（終わる）たびに、すぐに立て直す。
+<br>ただし<b>崩れる点</b>: 警備員は同じ看板を立て直すが、quadlet の unit は <code>--rm --replace</code> で毎回新しいコンテナを作るので、立て直した看板は別物になる（ID もホスト名も変わる）。看板に書いたもの（コンテナの書き込み用の層）は残らない。</div>
+<p>片付ける。サービスを止め、メモを消して reload すると、unit も消える。linger も元に戻す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ systemctl --user stop web.service
+$ rm ~/.config/containers/systemd/web.container
+$ systemctl --user daemon-reload
+$ loginctl disable-linger
+$ loginctl show-user student -p Linger
+Linger=no
+$ podman ps -a
+CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES</code></pre>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/podman/practice/">演習06</a>で、quadlet のファイルを書いて web サーバをサービスにし、ログアウトしても動き続けるようにする。</div>
+
+<div class="quiz"><b>確認</b>
+<p>rootless の podman で動かしていた web サーバが、ssh を切った後しばらくして止まった。docker で同じことをしたときは止まらなかった。なぜか。</p>
+<details><summary>答え</summary>
+<p>rootless のコンテナは student の systemd（user@1000.service）の下で動いていて、その systemd は最後のログインが終わると止まる（既定では10秒後）。
+docker のコンテナは root の containerd の下にいるので、ログインと関係が無い。<code>loginctl enable-linger</code> で student の systemd を動かしておけば止まらない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>~/.config/containers/systemd/web.container</code> を書いたのに、<code>systemctl --user start web.service</code> が「unit が無い」と言った。何を忘れているか。</p>
+<details><summary>答え</summary>
+<p><code>systemctl --user daemon-reload</code>。quadlet は systemd の generator として動き、reload のときに <code>.container</code> を読んで unit を作る。
+書いただけでは unit はまだ無い（ファイルの書き間違いがあっても unit が作られない）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>rootless のコンテナは student の systemd の下で動く。最後のログインが終わると、その systemd ごと止まる</li>
+<li><code>loginctl enable-linger</code> は、ログインが無くても student の systemd を動かしておく（練習機の起動時にも立ち上がる）</li>
+<li>落ちたときの起動し直し（<code>--restart</code>）は podman 自身もできるが、練習機の起動のときに立ち上げ直す係はいない。quadlet は <code>.container</code> から、<code>podman run</code> を1行に書いた systemd の unit を作り、起動・停止・再起動を systemd に任せる</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:podman-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・podman 4.9.3）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/podman/theory/05-pod">← 5. pod は、ネットワークを分け合うコンテナの組</a><a href="/podman/theory/07-compat">次: 7. 同じコマンドで、違う仕組み →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/podman/">Podman</a> · <a href="/podman/theory/">理論編 目次</a> · <a href="/podman/practice/">実践編</a> · <a href="/podman/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/podman/chapters.js"></script>
+<script src="/podman/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

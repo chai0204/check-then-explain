@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理論編 — 確かめて説明する Docker</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="docker">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/docker/">Docker</a> › <strong>理論編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文に載せた出力はすべて実機の記録で、読者と同じ入り方（端末つき・1つのシェルで第1章から順に）で通しに打った記録と突き合わせてあります。
+   演習7本は、模範解答どおりに通ること・未達のときに判定が鳴ることの両方を確認してあります。
+   それでも <b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、著者が読者として通した段階で
+   <b>4回に分けて不備が出ました</b>（説明の順序・リンク切れ・前提の省略・判定の誤り）。
+   同じ種類のものが残っていると考えてください。</p>
+<p>詰まったところ・本文と違う出力が出たところは、
+   <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   各ページ下のコメントに書いてください。それが直す順番になります。</p>
+</div>
+
+<h1>理論編 — Docker</h1>
+<p class="lead">このサイトの実践編では、<code>docker run …</code> を打って檻を起動してもらっています。
+その1行が何をしているのかを、<strong>練習機（仮想マシン）の中に入れた本物の docker</strong> で確かめる7章。
+コンテナのプロセスを練習機の <code>ps</code> で見つけ、イメージを tar に書き出して指紋を計算し、公開したポートの宛先の書き換えを iptables の数えで見ます。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<h2 id="spine">この7章を貫いている1つの事実</h2>
+<div class="goal">
+<p><b>docker は自分では何も閉じ込めない。練習機のカーネルに頼んで、1つのプロセスに「見え方の区切り」（名前空間）・「使える量の区切り」（cgroup）・
+「重ねたファイルの木」（overlay）を付けているだけで、コンテナの中身も力も、起動するときに渡したもの（ダイジェスト・ボリューム・ポート・特権）で決まる。</b></p>
+<p>だから、コンテナを止めるのはプロセスへの合図で（第2章）、中身を決めるのはファイルの指紋で（第3章）、書き込みは重ねた1枚に入り（第4章）、
+ポートの公開はカーネルの宛先の書き換えで（第5章）、コンテナの力は渡したケーパビリティと装置の分だけになる（第7章）。
+<code>docker run</code> のオプションの多くは、この「何を渡すか」を決めるためにあります。</p>
+<div class="skip"><b>ここで覚えなくていいこと</b>:
+docker の全サブコマンドとオプションの一覧、Compose・Swarm・Kubernetes、イメージのレジストリの運用（push・認証・署名）、
+Docker Desktop の内部（Mac や Windows の上の Linux の仮想マシン）、Windows コンテナ。必要になったら、この7章の仕組みの上に足せます。</div>
+</div>
+
+<h2 id="scope">この記事で扱うこと・扱わないこと</h2>
+<div class="scroll"><table>
+<tr><th>扱うこと</th><th>章</th><th>実際に打つもの</th></tr>
+<tr><td>コンテナは練習機の上の1つのプロセス（名前空間・cgroup を <code>/proc</code> で見る）</td><td><a href="/docker/theory/01-process">1</a></td><td><code>ps</code> <code>/proc/PID/ns</code> <code>/proc/PID/cgroup</code> <code>--memory</code></td></tr>
+<tr><td>dockerd → containerd → shim → runc の関係</td><td><a href="/docker/theory/01-process">1</a></td><td><code>ps -C</code> <code>/run/docker.sock</code> <code>runc state</code></td></tr>
+<tr><td>PID 1 とシグナル、<code>docker stop</code> の待ち時間、<code>--init</code></td><td><a href="/docker/theory/02-pid1">2</a></td><td><code>docker stop</code> <code>--stop-timeout</code> <code>--init</code> <code>kill</code></td></tr>
+<tr><td><code>docker exec</code> の umask と TERM が <code>docker run -it</code> と違う理由（このサイトの記録で実際に踏んだ）</td><td><a href="/docker/theory/02-pid1">2</a></td><td><code>docker exec</code> と <code>-it</code>、containerd の <code>UMask=</code></td></tr>
+<tr><td>イメージは層（tar と JSON）で、名前ではなくダイジェストで固定できる</td><td><a href="/docker/theory/03-image">3</a></td><td><code>docker tag</code> <code>docker save</code> <code>jq</code> <code>sha256sum</code></td></tr>
+<tr><td>overlay（lowerdir・upperdir・whiteout）</td><td><a href="/docker/theory/04-storage">4</a></td><td><code>docker diff</code> <code>findmnt -N</code></td></tr>
+<tr><td>ボリュームとバインドマウント</td><td><a href="/docker/theory/04-storage">4</a></td><td><code>-v 名前:</code> <code>-v パス:</code> <code>--mount</code></td></tr>
+<tr><td>ポートの公開（docker0・veth・iptables の DNAT）</td><td><a href="/docker/theory/05-ports">5</a></td><td><code>-p</code> <code>iptables -t nat</code> <code>ip link</code></td></tr>
+<tr><td>Dockerfile のビルドとキャッシュ</td><td><a href="/docker/theory/06-build">6</a></td><td><code>docker build</code> <code>docker history</code></td></tr>
+<tr><td><code>--privileged</code>・<code>--cap-add</code>・<code>--device</code>・<code>--user</code> が何を渡すか、docker グループ</td><td><a href="/docker/theory/07-privileges">7</a></td><td><code>CapEff</code> <code>capsh --decode</code> <code>/dev</code> <code>Seccomp</code> と AppArmor（<code>--privileged</code> は打たず、渡される側の練習機の root と比べる）</td></tr>
+</table></div>
+<p class="detail">扱わないもの: Compose・Swarm・Kubernetes、レジストリへの push と認証、Docker Desktop の中身、Windows コンテナ、rootless の docker（rootless は <a href="/podman/">Podman の記事</a>で扱います）。</p>
+
+<h2 id="site">このサイトの檻は、docker をどう使っているか</h2>
+<p>実践編の起動コマンドのオプションを、1つずつこの記事の章で確かめられます。2つの型があります。</p>
+<pre><code>docker run --rm -it --name lab-… --hostname linuc \
+  -v lab-…-work:/home/lab/work \
+  -v lab-…-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab-linuc:…@sha256:…                 # コンテナ型（檻そのものがコンテナ）
+
+docker run -d --name lab-… --hostname host --stop-timeout 30 \
+  -v lab-…-vm:/home/lab/vm \
+  -v lab-…-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab:…@sha256:…                       # 仮想マシン型（コンテナの中で QEMU が練習機を動かす）
+docker exec -it lab-… bash -l</code></pre>
+<div class="scroll"><table>
+<tr><th>オプション</th><th>意味</th><th>なぜこのサイトはそう書くか</th><th>確かめる章</th></tr>
+<tr><td><code>--rm</code></td><td>コンテナが終わったら、コンテナ（書き込み用の層）を消す</td><td>コンテナ型は終わるたびに作り直してよい。残したいもの（作業・進捗）はボリュームに置いてある</td><td><a href="/docker/theory/04-storage">4</a></td></tr>
+<tr><td><code>-it</code></td><td><code>-i</code> 標準入力をつなぐ・<code>-t</code> 端末を割り当てる（TERM も渡る）</td><td>コンテナ型は PID 1 のシェルにそのまま入る。端末があると TERM=xterm になり、本文と同じ表示になる</td><td><a href="/docker/theory/02-pid1">2</a></td></tr>
+<tr><td><code>-d</code> と <code>docker exec -it … bash -l</code></td><td>裏で動かし、後から別のプロセスとして入る</td><td>仮想マシン型は練習機を動かし続ける。入るシェルは <code>exec</code> で足す（PID 1 の子ではなく shim の子）</td><td><a href="/docker/theory/01-process">1</a>・<a href="/docker/theory/02-pid1">2</a></td></tr>
+<tr><td><code>--name lab-…</code></td><td>コンテナに名前を付ける</td><td>本文の <code>docker exec</code>・<code>stop</code> で同じ名前を使えるように</td><td><a href="/docker/theory/01-process">1</a></td></tr>
+<tr><td><code>--hostname linuc</code> / <code>host</code></td><td>uts の名前空間のホスト名を決める（付けないとコンテナ ID の先頭12文字）</td><td>プロンプトと出力に出るホスト名を、全員でそろえる</td><td><a href="/docker/theory/01-process">1</a></td></tr>
+<tr><td><code>--stop-timeout 30</code></td><td><code>docker stop</code> が TERM の後 KILL まで待つ秒数（既定 10）</td><td>TERM を受けた起動スクリプト（PID 1 の tini の子。<code>--init</code> の代わりにイメージが tini を PID 1 に置いている）が、練習機を正常に止めるのに十数秒かかる。10秒では電源を抜くのと同じになる</td><td><a href="/docker/theory/02-pid1">2</a></td></tr>
+<tr><td><code>-v lab-…:/home/lab/…</code></td><td>名前付きボリューム（コンテナを作るときに空なら、イメージの中身とディレクトリの持ち主・権限が写される）</td><td>イメージが用意した持ち主（lab）のまま書け、読者の PC のディレクトリに触れない。バインドマウントは使わない</td><td><a href="/docker/theory/04-storage">4</a></td></tr>
+<tr><td><code>…@sha256:…</code></td><td>名前とダイジェストの両方で指す（取るのはダイジェストのほう）</td><td>半年後も、全員が同じ中身を取る</td><td><a href="/docker/theory/03-image">3</a></td></tr>
+<tr><td>（この2つの型が書かないもの）<code>--privileged</code>・<code>--cap-add</code>・<code>--device</code>・<code>-p</code>・バインドマウント</td><td>特権・装置・ポート・ホストのファイルを渡す</td><td>読者の PC に何も渡させない。仮想マシン型なら、中の root が何をしても読者の PC の特権を借りない。
+例外は2つで、<a href="/linuc-services/practice/">LinuC 1.09</a> は <code>--cap-add SYS_ADMIN</code>、<a href="/kvm/practice/">KVM の記事</a>は <code>--device /dev/kvm</code> と <code>--group-add</code> を渡し、どちらも何を渡したかを測って見せる</td><td><a href="/docker/theory/05-ports">5</a>・<a href="/docker/theory/07-privileges">7</a></td></tr>
+</table></div>
+<p>この記事の檻も仮想マシン型で、練習機の中で dockerd を動かしています。コンテナの中で dockerd を動かすには <code>--privileged</code> が要りますが、
+練習機（QEMU の完全エミュレーション）の中なら要りません。檻の作りは <a href="/qemu/">QEMU の記事</a>、KVM を使わない理由は <a href="/kvm/">KVM の記事</a>にあります。</p>
+
+<h2 id="chapters">章</h2>
+<div class="toc">
+<ol>
+<li><a href="/docker/theory/01-process">コンテナは、練習機の上で動く1つのプロセス</a> —
+    <span class="detail">中の PID 1 は <code>sleep</code> そのもので、カーネルは練習機のもの。docker CLI → dockerd → containerd → shim → runc（20分）</span></li>
+<li><a href="/docker/theory/02-pid1">コンテナの PID 1 は、合図を無視する</a> —
+    <span class="detail"><code>docker stop</code> が10秒かかって 137 で終わる。<code>docker exec</code> の umask は containerd から来る（20分）</span></li>
+<li><a href="/docker/theory/03-image">イメージを決めるのは、名前ではなくダイジェスト</a> —
+    <span class="detail"><code>docker tag</code> 1回で <code>alpine:3.24.2</code> が BusyBox を起動する。ファイル名は中身の SHA-256（25分）</span></li>
+<li><a href="/docker/theory/04-storage">コンテナの書き込みは、イメージの上の1枚に入る</a> —
+    <span class="detail">消したファイルは upperdir の whiteout になる。ボリュームには、空のときだけ中身が写る（27分）</span></li>
+<li><a href="/docker/theory/05-ports">ポートの公開は、宛先の書き換え</a> —
+    <span class="detail">INPUT で塞いでも外から届く。DNAT の後は INPUT を通らない（22分）</span></li>
+<li><a href="/docker/theory/06-build">ビルドのキャッシュは、変えた段から後ろを全部作り直す</a> —
+    <span class="detail">スクリプトを1行直すと、関係の無い RUN まで作り直される（20分）</span></li>
+<li><a href="/docker/theory/07-privileges">渡したものだけが、コンテナの力になる</a> —
+    <span class="detail">中の root は練習機の UID 0。<code>CapEff</code> で、渡した特権を数える（25分）</span></li>
+</ol>
+</div>
+<p><a href="/docker/theory/glossary">用語辞書</a> — 本文の点線付きの語をクリックすると引けます。</p>
+
+<h2 id="cage">檻で再現できないもの</h2>
+<div class="scroll"><table>
+<tr><th>もの</th><th>なぜ再現できないか</th><th>代わりにしたこと</th></tr>
+<tr><td>レジストリからの取得（<code>docker pull</code>）と送り出し（<code>push</code>）</td>
+    <td>取得の結果は読者のネットワークとレジストリの状態で変わる（取得の回数の制限もある）。練習機は Docker Hub に届かないようにしてあり（ほかのレジストリには届くが、本文では使わない）、使うイメージ2つはディスクに入れてある</td>
+    <td>第3章で、取りに行く操作が全員に同じ失敗を出すことと、取った中身の正体（指紋の束）を <code>docker save</code> で確かめた</td></tr>
+<tr><td>Docker Desktop（Mac・Windows）の中の仮想マシン</td>
+    <td>Docker Desktop は Linux の仮想マシンを1台隠し持ち、その中で dockerd を動かしている。中身は製品と版で違う</td>
+    <td>この記事の練習機が、その「隠れた仮想マシン」の役を見える形でしている。第1章の <code>uname -r</code> の説明</td></tr>
+<tr><td>あなたの PC の docker と同じ版・同じ設定</td>
+    <td>docker の版で既定値が変わる（イメージの置き場所が containerd か overlay2 か、<code>docker images</code> の表示、<code>.NetworkSettings.IPAddress</code> の有無）。containerd の umask も環境で違う</td>
+    <td>本文で、版によって変わる行にはそう書いた（第2・3・5章）。練習機の docker は Ubuntu の docker.io 29.1.3</td></tr>
+</table></div>
+
+<h2 id="use">実務のどこで効くか</h2>
+<div class="scroll"><table>
+<tr><th>場面</th><th>ここで効く理由</th><th>見落としやすい点</th><th>関連する章</th></tr>
+<tr><td><code>docker stop</code> がいつも10秒かかる</td><td>PID 1 が TERM を受け取っていない</td><td>シェルを挟んで起動すると、アプリが PID 1 にならず TERM が届かない</td><td>2</td></tr>
+<tr><td>昨日と同じタグなのに動きが違う</td><td>タグは付け替えられる札</td><td>ダイジェストまで書かない限り、中身は固定されない</td><td>3</td></tr>
+<tr><td>サーバのファイアウォールで閉じたはずのポートに届く</td><td>外からの接続は DNAT で宛先が書き換わり、INPUT を通らない</td><td><code>-p 8080:80</code> は全部のアドレスで待ち受ける。<code>127.0.0.1:</code> を付ける</td><td>5</td></tr>
+<tr><td>CI のビルドが遅い</td><td>変えた段から後ろは全部作り直し</td><td><code>COPY . .</code> を前に置くと、どのファイルの変更でも依存のインストールが走る</td><td>6</td></tr>
+<tr><td>「sudo の代わりに docker グループに入れておいた」</td><td>docker グループは root と同等</td><td>dockerd はホストのどのディレクトリでもコンテナに見せる</td><td>7</td></tr>
+</table></div>
+
+<h2 id="next">手を動かす</h2>
+<p>読んだあと、同じ操作を自分でやる演習が7本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。</p>
+<p><a href="/docker/practice/">実践編（檻の入り方と演習7本）→</a></p>
+
+<!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
+<nav class="pager"><a href="/docker/">← Docker（記事のホーム）</a><a href="/docker/theory/01-process">第1章から読む →</a></nav>
+<!-- /catalog:pager -->
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/docker/">Docker</a> · <a href="/docker/theory/">理論編 目次</a> · <a href="/docker/practice/">実践編</a> · <a href="/docker/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

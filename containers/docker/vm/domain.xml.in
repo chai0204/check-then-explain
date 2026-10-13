@@ -1,0 +1,48 @@
+<!--
+  docker の記事の練習機の定義（libvirt session モード）。@VMDIR@ は vm が置き換える。
+  土台（containers/linuc-machine/host/etc/domain.xml.in）との違いは1つだけ: 外（lab@host）の 127.0.0.1:8080 を
+  練習機の 8080 番へ転送する（第5章: 練習機の外から公開したポートを叩き、iptables の INPUT を通らないことを確かめる）。
+  コースごとにディスクや NIC を足すときは、コースの層でこのファイルを上書きする。
+
+  - type='qemu'       : KVM ではなく TCG（完全エミュレーション）。/dev/kvm を借りない
+  - firmware='efi'    : UEFI で起動する。ESP と efibootmgr を本物で見せるため（UEFI には acpi が必須）
+  - serial / console  : virsh console で GRUB の画面とログインプロンプトが見える
+  - guest_agent       : 判定（lab check）はここ経由。読者がネットワークや sshd を壊しても判定できる
+  - rng               : 乱数源。ssh の鍵や gpg の鍵生成が entropy 待ちで止まらないように
+  - qemu:commandline  : ssh 用の NIC。libvirt 推奨の passt は docker の中で起動できなかったので、
+                        QEMU 内蔵の slirp にポート転送を直接渡している（127.0.0.1:2222 → 仮想マシンの 22）
+-->
+<domain type='qemu' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
+  <name>linuc</name>
+  <title>LinuC 練習機</title>
+  <memory unit='MiB'>1536</memory>
+  <vcpu>2</vcpu>
+  <os firmware='efi'>
+    <type arch='x86_64' machine='q35'>hvm</type>
+    <nvram>@VMDIR@/linuc_VARS.fd</nvram>
+  </os>
+  <features><acpi/></features>
+  <cpu mode='maximum'/>
+  <clock offset='utc'/>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <devices>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' discard='unmap'/>
+      <source file='@VMDIR@/linuc.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+    <serial type='pty'/>
+    <console type='pty'/>
+    <channel type='unix'>
+      <target type='virtio' name='org.qemu.guest_agent.0'/>
+    </channel>
+    <rng model='virtio'><backend model='random'>/dev/urandom</backend></rng>
+  </devices>
+  <qemu:commandline>
+    <qemu:arg value='-netdev'/>
+    <qemu:arg value='user,id=lab0,hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=tcp:127.0.0.1:8080-:8080'/>
+    <qemu:arg value='-device'/>
+    <qemu:arg value='virtio-net-pci,netdev=lab0,mac=52:54:00:12:34:56,addr=0x10'/>
+  </qemu:commandline>
+</domain>

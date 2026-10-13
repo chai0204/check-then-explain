@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. コンテナの書き込みは、イメージの上の1枚に入る — 確かめて説明する Docker</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="docker">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/docker/">Docker</a> › <a href="/docker/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/">詳しく</a></p>
+</div>
+<h1>4. コンテナの書き込みは、イメージの上の1枚に入る</h1>
+<p class="lead">コンテナの中でファイルを消しても、同じイメージから起動した次のコンテナには、そのファイルがある。
+コンテナのファイルの木は、読むだけのイメージの層の上に、コンテナ専用の書き込み用の層を1枚重ねたもの（overlay）で、
+消したことも「消した印」として上の1枚に書かれるだけである。上の1枚はコンテナと一緒に消えるので、残したいデータはコンテナの外（ボリューム）に置く。</p>
+<div class="badges"><span>前提: 第3章（イメージは層でできている）</span><span>所要 27分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>コンテナの変更が overlay の upperdir に書かれ、イメージの層（lowerdir）は変わらないことを示せる</li>
+<li>ファイルを消すと upperdir に「消した印」（whiteout）が残ることを、練習機の上のファイルで示せる</li>
+<li>名前付きボリュームとバインドマウントの違い（最初の中身・持ち主・置き場所）を、出力で説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: overlay の workdir の役目の細部、opaque ディレクトリ、ストレージドライバの種類（overlay2・btrfs・zfs など）の違い、
+ボリュームのドライバ（NFS など）、<code>docker commit</code>。</div></div>
+
+<h2 id="change">コンテナの中で消したファイル</h2>
+<div class="sgoal"><b>この節で分かること</b>: コンテナの中の変更が、イメージに届かないこと。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>コンテナはイメージから作った。だからコンテナの中で <code>/etc/motd</code> を消せば、元のイメージからも消える。
+同じイメージから次に起動するコンテナにも、もう <code>/etc/motd</code> は無いはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ docker run -d --name w1 alpine:3.24.2 sleep 1000
+6534eaca511d5a5218d35ae6f675b292a816d23ea4fa18c26ce9a31eeae9a5b1
+$ docker exec w1 rm /etc/motd
+$ docker exec w1 sh -c 'echo hello &gt; /root/note.txt'
+$ docker diff w1 | sort -k2
+C /etc
+D /etc/motd
+C /root
+A /root/note.txt
+$ docker run --rm alpine:3.24.2 cat /etc/motd
+Welcome to Alpine!
+
+The Alpine Wiki contains a large amount of how-to guides and general
+information about administrating Alpine systems.
+See &lt;https://wiki.alpinelinux.org/&gt;.
+
+You can setup the system with the command: setup-alpine
+
+You may change this message by editing /etc/motd.</code></pre>
+<div class="then"><b>だめな理由</b>: <code>docker diff</code> は、<code>w1</code> がイメージから変わったところを、足した（A）・変えた（C）・消した（D）で並べた（行の順は毎回同じとは限らないので、<code>sort -k2</code> で2列目のパスの順に並べ替えている）。
+ところが同じイメージから起動した新しいコンテナには、<code>/etc/motd</code> がそのまま残っていた。
+<b>コンテナの変更はイメージには書かれない</b>。イメージの層は読むだけで、コンテナごとに、変更を受け止める書き込み用の層が1枚ずつ上に重ねてある。</div></div>
+
+<h2 id="overlay">重ね方を、練習機の上で見る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 読むだけの層（lowerdir）と書き込み用の層（upperdir）が、練習機のどこにあるか。</div>
+<p>コンテナのファイルの木は、Linux の <b>overlay</b> ファイルシステムでマウントされている。コンテナのプロセスから見た <code>/</code> のマウントを、<code>findmnt -N</code>（そのプロセスのマウントの名前空間で見る）で読む。<code>-o FSTYPE</code> はファイルシステムの種類、<code>-o OPTIONS</code> はマウントの指定で、指定は <code>,</code> 区切りの長い1行なので <code>tr</code> で1項目1行に直している。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ pid=$(docker inspect -f '{{.State.Pid}}' w1)
+$ sudo findmnt -N $pid -n -o FSTYPE /
+overlay
+$ sudo findmnt -N $pid -n -o OPTIONS / | tr ',' '\n' | grep dir=
+lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/27/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs
+upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/fs
+workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/work</code></pre>
+<p>overlay は、下の層（<code>lowerdir</code>。<code>:</code> で区切って上から順に複数）の上に、上の層（<code>upperdir</code>）を1枚重ねて、1つの木に見せる。
+下の層は読むだけで、書き込みは全部、上の層に入る（<code>workdir</code> は overlay が作業に使う場所）。
+この docker では、層の実体は containerd の置き場所（<code>/var/lib/containerd/…overlayfs/snapshots/番号/fs</code>）にある。
+下の層は2枚で、いちばん下が Alpine の層、その上の1枚は docker が足した小さな層（<code>/etc/hosts</code> などの差し込み口）である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ up=$(sudo findmnt -N $pid -n -o OPTIONS / | tr ',' '\n' | sed -n 's/^upperdir=//p')
+$ low=$(sudo findmnt -N $pid -n -o OPTIONS / | tr ',' '\n' | sed -n 's/^lowerdir=//p' | tr ':' '\n' | tail -1)
+$ sudo ls -lR $up
+/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/fs:
+total 8
+drwxr-xr-x 2 root root 4096 Oct 14 03:43 etc
+drwx------ 2 root root 4096 Oct 14 03:43 root
+
+/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/fs/etc:
+total 0
+c--------- 2 root root 0, 0 Oct 14 03:43 motd
+
+/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/fs/root:
+total 4
+-rw-r--r-- 1 root root 6 Oct 14 03:43 note.txt
+$ sudo ls -l $low/etc/motd
+-rw-r--r-- 1 root root 284 Mar 25  2026 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs/etc/motd</code></pre>
+<p>上の層には、<code>/root/note.txt</code>（足したファイル）があり、<code>/etc/motd</code> は<b>種類が <code>c</code>（文字デバイス）で番号が 0, 0 の特別なファイル</b>になっていた。
+これが overlay の<b>消した印</b>（whiteout）で、「下の層の同じ名前のものを見せない」という意味である。下の層（Alpine の層）の <code>/etc/motd</code> は、そのまま残っている。
+ファイルを書き換えたときも同じで、下の層のファイルを上の層に写してから書き換える（copy-up）。下の層には一切書かない。</p>
+<div class="analogy"><b>たとえ</b>: overlay は、<b>印刷した地図の上に重ねた透明なシート</b>に近い。書き込みはシートの上にだけして、地図（イメージの層）は汚さない。
+地名を消したいときは、シートの上にその場所を塗りつぶす紙を貼る（whiteout）。シートを剥がせば、地図は元のままである。
+<br>ただし<b>崩れる点</b>: 透明シートなら下の地図が透けて見えるが、overlay で上の層に写したファイルは、下の同じファイルを完全に隠す（透けて混ざることはない）。
+また、何枚も重ねたシートでも、見るときにはファイル1つごとに「いちばん上にあるもの」だけが選ばれる。</div>
+<p>コンテナを消すと、上の層ごと消える。</p>
+<div class="analogy"><b>たとえ</b>: コンテナの書き込み用の層は、<b>ホテルの部屋に置かれたメモ帳</b>に近い。泊まっている間は好きに書けるが、チェックアウトする（コンテナを消す）と部屋ごと片付けられる。
+次の客（同じイメージから作った別のコンテナ）は、まっさらなメモ帳から始める。
+<br>ただし<b>崩れる点</b>: ホテルなら一時的に外出しても（止めても）部屋は片付けられないのと同じく、<code>docker stop</code> では上の層は消えない。消えるのは <code>docker rm</code> したときで、止めただけなら <code>docker start</code> で書いたものが戻ってくる。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ docker rm -f w1
+w1
+$ sudo ls $up
+ls: cannot access '/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/28/fs': No such file or directory</code></pre>
+
+<h2 id="volume">残したいものは、外に置く — ボリューム</h2>
+<div class="sgoal"><b>この節で分かること</b>: 名前付きボリュームが、練習機のどこにあり、コンテナと別に生き残ること。</div>
+<p>上の層はコンテナと一緒に消えるので、データベースのファイルのように残したいものは、コンテナの外の場所をマウントして、そこに書く。
+docker が管理する場所を名前で呼ぶのが<b>名前付きボリューム</b>である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ docker volume create notes
+notes
+$ docker run --rm -v notes:/data alpine:3.24.2 sh -c 'echo kept &gt; /data/note.txt'
+$ docker run --rm -v notes:/data alpine:3.24.2 cat /data/note.txt
+kept
+$ docker volume inspect --format '{{.Mountpoint}}' notes
+/var/lib/docker/volumes/notes/_data
+$ sudo cat /var/lib/docker/volumes/notes/_data/note.txt
+kept</code></pre>
+<p><code>--rm</code> を付けたので、書いたコンテナは終わると同時に消えた。それでも次のコンテナから読めた。
+ボリュームの実体は練習機の <code>/var/lib/docker/volumes/notes/_data</code> というただのディレクトリで、コンテナはそこを <code>/data</code> にマウントして使っていただけである。</p>
+
+<h2 id="bind">名前付きボリュームとバインドマウントは、最初の中身が違う</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>-v 名前:パス</code> と <code>-v /パス:パス</code> の違いと、このサイトの檻が名前付きボリュームを使う理由。</div>
+<p><code>-v</code> の左側が名前なら名前付きボリューム、<code>/</code> から始まるパスなら、練習機（ホスト）のそのディレクトリをそのまま見せる<b>バインドマウント</b>になる。
+中身がすでにあるディレクトリ（<code>/etc/apk</code>）に、両方をかぶせてみる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ docker run --rm alpine:3.24.2 ls /etc/apk
+arch
+keys
+protected_paths.d
+repositories
+world
+$ docker run --rm -v apkvol:/etc/apk alpine:3.24.2 ls /etc/apk
+arch
+keys
+protected_paths.d
+repositories
+world
+$ docker run --rm -v "$HOME/apkdir":/etc/apk alpine:3.24.2 ls /etc/apk
+$ ls -ld ~/apkdir
+drwxr-xr-x 2 root root 4096 Oct 14 03:43 /home/student/apkdir
+$ docker run --rm --mount type=bind,source="$HOME/nodir",target=/etc/apk alpine:3.24.2 ls /etc/apk
+docker: Error response from daemon: invalid mount config for type "bind": bind source path does not exist: /home/student/nodir
+
+Run 'docker run --help' for more information</code></pre>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>マウントした直後の中身</th><th>練習機の側</th></tr>
+<tr><td><code>-v apkvol:/etc/apk</code>（名前付きボリューム）</td><td>イメージの <code>/etc/apk</code> の中身（コンテナを作るときにボリュームが空なら、イメージの中身が写される）</td><td><code>/var/lib/docker/volumes/apkvol/_data</code>（docker が管理）</td></tr>
+<tr><td><code>-v "$HOME/apkdir":/etc/apk</code>（バインドマウント）</td><td>空。イメージの中身は<b>隠れて見えない</b></td><td>無かったディレクトリを docker が <b>root の持ち物として作った</b></td></tr>
+<tr><td><code>--mount type=bind,source=…</code>（バインドマウント）</td><td>—</td><td>無いパスは作らずに<b>止まる</b>（<code>bind source path does not exist</code>）</td></tr>
+</table></div>
+<p>名前付きボリュームに写されるのは、中身だけでなく、マウント先のディレクトリ自体の持ち主と権限もである。中身の無いディレクトリでも、持ち主と権限は写る。
+alpine の <code>/tmp</code>（中身は空で、誰でも書ける <code>drwxrwxrwt</code>）で比べる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ docker run --rm -v tmpvol:/tmp alpine:3.24.2 ls -ld /tmp
+drwxrwxrwt    2 root     root          4096 Sep 17 17:32 /tmp
+$ docker run --rm -v "$HOME/tmpdir":/tmp alpine:3.24.2 ls -ld /tmp
+drwxr-xr-x    2 root     root          4096 Oct 13 18:44 /tmp</code></pre>
+<p>名前付きボリュームの <code>/tmp</code> は、中身が空でもイメージと同じ <code>drwxrwxrwt</code> になった。バインドマウントの <code>~/tmpdir</code> は、docker が作ったときの <code>drwxr-xr-x</code> の root の持ち物のままで、イメージの権限は写らない。</p>
+<p>写すかどうかは、コンテナを作るときにボリュームが空かどうかだけで決まる。新しいかどうか、何回目かは見ない。<code>apkvol</code> を空にしてから、もう一度使う。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo find /var/lib/docker/volumes/apkvol/_data -mindepth 1 -delete
+$ sudo ls -A /var/lib/docker/volumes/apkvol/_data | wc -l
+0
+$ docker run --rm -v apkvol:/etc/apk alpine:3.24.2 ls /etc/apk
+arch
+keys
+protected_paths.d
+repositories
+world</code></pre>
+<p>中身を 0 個にした <code>apkvol</code> に、また <code>/etc/apk</code> の中身が写った。逆に、何か1つでも入っていれば写さない（次のたとえの「崩れる点」）。</p>
+<p>このサイトの仮想マシン型の檻の起動コマンドは <code>-v lab-…-vm:/home/lab/vm</code> と、名前付きボリュームを使っている。
+イメージの中で <code>/home/lab/vm</code> は lab の持ち物の空のディレクトリとして作ってあるので、空のボリュームにはその持ち主と権限が写され、檻の中の lab が書ける。
+バインドマウントにすると、持ち主は読者の PC のディレクトリのものになり、中の lab が書けないことがある（そして読者の PC のファイルを檻に直接見せることになる）。
+<b>名前付きボリュームは、イメージが用意した形を引き継ぎ、読者の PC のディレクトリに触れない</b>ので、このサイトは名前付きボリュームだけを使っている。</p>
+<div class="analogy"><b>たとえ</b>: 名前付きボリュームは<b>倉庫会社に預けた箱</b>、バインドマウントは<b>自宅の物置の扉をそのまま窓口にすること</b>に近い。
+空の箱を使うとき、倉庫会社は棚にあった見本（イメージの中身）を箱に詰め、箱の名札（持ち主と権限）も棚に合わせて渡してくれる。自宅の物置をつなげば、中は物置にあるものだけで、棚の見本は扉の向こうに隠れる。
+<br>ただし<b>崩れる点</b>: 倉庫会社は、箱が<b>空かどうかだけ</b>を見る。空ならいつでも詰め直すが、1つでも何か入っていれば何もしない。
+だからイメージを新しくしても、空でない箱の中身は古いままになる（このサイトの檻で、新しい版のイメージに替えても進捗や練習機のディスクが残るのはこのため）。</div>
+<p>この章で作ったボリュームとディレクトリを片付ける（<code>~/apkdir</code> と <code>~/tmpdir</code> は docker が root の持ち物として作ったので、消すのに <code>sudo</code> が要る）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ docker volume rm notes apkvol tmpvol
+notes
+apkvol
+tmpvol
+$ sudo rmdir ~/apkdir ~/tmpdir</code></pre>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/docker/practice/">演習04</a>で、コンテナを消しても残るデータを名前付きボリュームに置き、残っていることを練習機の上のファイルで確かめる。</div>
+
+<div class="quiz"><b>確認</b>
+<p>upperdir を <code>ls -l</code> すると、<code>c--------- … 0, 0 … motd</code> という行があった。これは何を意味するか。</p>
+<details><summary>答え</summary>
+<p>overlay の「消した印」（whiteout）である。コンテナの中で <code>/etc/motd</code> が消されたので、下の層の <code>/etc/motd</code> を見せないための印が上の層に置かれた。
+下の層（イメージ）の <code>/etc/motd</code> は消えていない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>docker run -v "$HOME/conf":/etc/myapp …</code> で起動したら、イメージに入っていたはずの設定ファイルが見えず、アプリが起動しなかった。何が起きたか。</p>
+<details><summary>答え</summary>
+<p>バインドマウントは、ホストのディレクトリをそのままかぶせる。<code>~/conf</code> が空（または無くて docker が空で作った）なので、イメージの <code>/etc/myapp</code> の中身は隠れた。
+名前付きボリュームなら、コンテナを作るときに空であればイメージの中身が写されるが、バインドマウントでは写されない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>イメージを新しい版に替えて同じ名前付きボリュームで起動したら、ボリュームの中のファイルが古い版のままだった。なぜか。</p>
+<details><summary>答え</summary>
+<p>イメージの中身がボリュームに写されるのは、コンテナを作るときにボリュームが空だった場合だけだから。前の版の中身が入っているボリュームには、新しい版の中身は写されず、前回のものがそのまま見える。
+入れ替えたいなら、ボリュームを消して作り直す（か空にする）か、中身を自分で更新する。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>コンテナのファイルの木は overlay で、読むだけのイメージの層（lowerdir）の上に、コンテナ専用の書き込み用の層（upperdir）が1枚重なっている</li>
+<li>変更は全部 upperdir に入り、消したファイルは whiteout（0, 0 の文字デバイス）になる。イメージの層は変わらない</li>
+<li>upperdir はコンテナと一緒に消える。残したいものはボリュームに置く。名前付きボリュームの実体は <code>/var/lib/docker/volumes/名前/_data</code></li>
+<li>名前付きボリュームは、コンテナを作るときに空なら、イメージの中身とマウント先のディレクトリの持ち主・権限が写される（何か入っていれば写さない）。バインドマウントはホストのディレクトリをそのままかぶせ、無ければ <code>-v</code> は root の持ち物で作り、<code>--mount</code> は止まる</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:docker-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・docker.io 29.1.3・containerd 2.2.1・runc 1.3.4）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/docker/theory/03-image">← 3. イメージを決めるのは、名前ではなくダイジェスト</a><a href="/docker/theory/05-ports">次: 5. ポートの公開は、宛先の書き換え →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/docker/">Docker</a> · <a href="/docker/theory/">理論編 目次</a> · <a href="/docker/practice/">実践編</a> · <a href="/docker/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/docker/chapters.js"></script>
+<script src="/docker/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

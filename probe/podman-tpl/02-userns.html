@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. コンテナの中の root は、外では student — 確かめて説明する Podman</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="2" data-theme="podman">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <a href="/podman/theory/">理論編</a> › 第2章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/">詳しく</a></p>
+</div>
+<h1>2. コンテナの中の root は、外では student</h1>
+<p class="lead">rootless の podman のコンテナの中で <code>id</code> を打つと、root と答える。ところがその root が作ったファイルは、練習機の上では student の持ち物になっている。
+コンテナは<b>ユーザ名前空間</b>の中で動き、中の UID を外の別の UID に読み替える表（UID の対応表）を持っている。表の材料は <code>/etc/subuid</code> に書かれた、student が使ってよい UID の範囲（サブ UID）である。</p>
+<div class="badges"><span>前提: 第1章</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>コンテナの中の UID が、練習機の上でどの UID になるかを、UID の対応表から計算できる</li>
+<li><code>/etc/subuid</code> と <code>newuidmap</code> が、対応表を作るときに何をしているかを言える</li>
+<li><code>podman unshare</code> で、コンテナと同じ見え方の中に入って、持ち主の食い違いを直せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: ユーザ名前空間の中のケーパビリティの細部、<code>--userns=keep-id</code> などの対応表の作り方の選択肢、
+ファイルシステムの ID の読み替え（idmapped mount）、<code>/etc/subgid</code> のグループ側の細部（UID と同じ形）。</div></div>
+
+<h2 id="root">中の root が作ったファイルの、外での持ち主</h2>
+<div class="sgoal"><b>この節で分かること</b>: rootless のコンテナの root が、練習機の上で誰として振る舞うか。</div>
+<p>student の持ち物のディレクトリをコンテナに見せ（バインドマウント）、中の root にファイルを作らせる。<a href="/docker/theory/07-privileges">Docker 第7章</a>と同じ実験である。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>コンテナの中で <code>id</code> が root と答えるなら、その root が作ったファイルは、docker のときと同じく練習機の上でも root（UID 0）の持ち物になるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ mkdir ~/share
+@@ podman run --rm -v "$HOME/share":/share alpine:3.24.2 sh -c 'id -u; touch /share/by-root; ls -ln /share'
+@@ ls -ln ~/share</code></pre>
+<div class="then"><b>だめな理由</b>: コンテナの中では持ち主が <code>0</code>（root）に見えるファイルが、練習機の上では <code>1000</code>（student）の持ち物だった。
+<b>rootless のコンテナの中の UID 0 は、練習機の上では student（UID 1000）である</b>。同じファイルを、中と外で別の番号で見ている。
+docker（ユーザ名前空間を区切らない）では、中の root は練習機の root そのものだった。</div></div>
+
+<h2 id="map">UID の対応表</h2>
+<div class="sgoal"><b>この節で分かること</b>: 中の UID を外の UID に読み替える表の読み方と、その表がどこから来たか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>@@ cat /proc/self/uid_map
+@@ podman unshare cat /proc/self/uid_map
+@@ grep student /etc/subuid /etc/subgid</code></pre>
+<p><code>/proc/self/uid_map</code> は「名前空間の中の UID・外の UID・個数」の3列の表である。練習機の上のシェルは、全部の UID がそのまま（0 から 4294967295 個）。
+<code>podman unshare</code> は、podman がコンテナに使うのと同じユーザ名前空間の中でコマンドを動かす。その中の表は2行だった。</p>
+<div class="scroll"><table>
+<tr><th>中の UID</th><th>外の UID</th><th>個数</th><th>意味</th></tr>
+<tr><td>0</td><td>1000</td><td>1</td><td>中の root は、外の student 自身</td></tr>
+<tr><td>1〜65536</td><td>100000〜165535</td><td>65536</td><td><code>/etc/subuid</code> の <code>student:100000:65536</code>（student が使ってよい UID の範囲）を、中の 1 から順に割り当てる</td></tr>
+</table></div>
+<p>だから中の UID 1000 は、外では 100000 + (1000 − 1) = <b>100999</b> になる。<code>/etc/subuid</code> の範囲の UID は練習機に人として登録されていない番号で、
+外から見れば「誰でもない」持ち主である。</p>
+<p>ただし、一般ユーザの student が自分で「外の 100000 番」を名乗る表を書くことは、カーネルが許さない。書くのは、root の権限を持たされた小さなプログラムである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ ls -l /usr/bin/newuidmap /usr/bin/newgidmap</code></pre>
+<p>この練習機（Ubuntu）の newuidmap と newgidmap は持ち主が root で、<code>s</code> の印（setuid）が付いている（Fedora や Arch などは setuid ではなく、ファイルのケーパビリティ（newuidmap は <code>cap_setuid</code>、newgidmap は <code>cap_setgid</code>）で必要な権限だけを持たせる）。
+呼び出した人が <code>/etc/subuid</code>（<code>/etc/subgid</code>）で許された範囲だけを、その権限で対応表に書く。rootless の podman で root の権限を使うのは、この表を書くところだけである。</p>
+<div class="analogy"><b>たとえ</b>: ユーザ名前空間は<b>劇団の役名の表</b>に近い。舞台の上（コンテナの中）では「王様」（UID 0）でも、劇場の外の名簿（練習機）では student 本人である。
+家来の役（UID 1 以上）は、劇場が student に貸し出した背番号（100000 番から）の人が演じる。
+<br>ただし<b>崩れる点</b>: 劇団なら役者が勝手に背番号を決められるが、対応表は student が自分では書けず、劇場の事務所（root の権限を持つ newuidmap）が <code>/etc/subuid</code> の貸し出し簿を見て書く。
+借りていない背番号は、舞台の上でも名乗れない。</div>
+
+<h2 id="unshare">中の UID 1000 は、外では 100999</h2>
+<div class="sgoal"><b>この節で分かること</b>: 中で root 以外の UID が書くとき、外の持ち主が食い違う問題と、その直し方。</div>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman run --rm --user 1000:1000 -v "$HOME/share":/share alpine:3.24.2 touch /share/by-1000
+@@ podman run --rm -v "$HOME/share":/share alpine:3.24.2 ls -lnd /share</code></pre>
+<p>中の UID 1000 は書けなかった。<code>~/share</code> は外では student（1000）の持ち物だが、中から見ると UID 0 の持ち物で、中の 1000（外の 100999）には書く権限が無い。
+コンテナの中で root 以外のユーザとして動くアプリ（多くのサーバがそうする）に、外のディレクトリを渡すときによく起きる。</p>
+<p>直すには、ディレクトリの持ち主を「中の 1000」にする。外の番号（100999）に <code>chown</code> するのは、student には許されていない。podman unshare の中なら、student は root なので、中の番号で <code>chown</code> できる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman unshare chown 1000:1000 ~/share
+@@ ls -lnd ~/share
+@@ podman run --rm --user 1000:1000 -v "$HOME/share":/share alpine:3.24.2 touch /share/by-1000
+@@ ls -ln ~/share
+@@ podman unshare ls -ln ~/share</code></pre>
+<p>外から見ると <code>~/share</code> の持ち主は <code>100999</code> になり、中の UID 1000 が書けるようになった。<code>podman unshare ls</code> で中から見ると、同じものが 0 と 1000 に見える。
+<b>同じファイルを、外と中で別の番号で見ている</b>のが rootless の仕組みである。</p>
+<p>片付けるとき、ここで1つ詰まる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ rm -rf ~/share
+@@ podman unshare rm -rf ~/share
+@@ ls -d ~/share</code></pre>
+<p>自分のホームの中なのに、student は <code>~/share</code> を消せなかった。<code>~/share</code> の持ち主は外では 100999 で、student ではないからだ。
+<code>podman unshare</code> の中（student が root として振る舞える名前空間）で消すと、消えた。</p>
+<div class="analogy"><b>たとえ</b>: <code>podman unshare</code> は、<b>舞台の上に上がって作業すること</b>に近い。客席（練習機）からは手の届かない大道具（100999 の持ち物）も、舞台に上がって王様（中の root）として振る舞えば動かせる。
+<br>ただし<b>崩れる点</b>: 舞台の王様でも、劇場が貸し出していない物（student の範囲の外の UID の持ち物、たとえば練習機の root のファイル）には触れない。
+中の root にできるのは、自分の範囲（1000 と 100000〜165535）の持ち物だけである。</div>
+
+<div class="analogy"><b>たとえ</b>: 100999 の持ち物は、<b>自分の部屋に置いてある、会社名義の荷物</b>に近い。部屋（<code>~/share</code> の置き場所）は自分のものでも、名義が会社（100999）の荷物は、個人（student）の判断では捨てられない。会社の担当者として振る舞えば（<code>podman unshare</code>）処分できる。
+<br>ただし<b>崩れる点</b>: 会社名義の荷物なら会社に引き取ってもらえるが、100999 は練習機の誰の名前でもない番号で、外から見ると持ち主のいない荷物になる。引き取り手は、同じ表を使う student の名前空間の中にしかいない。</div>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/podman/practice/">演習02</a>で、コンテナの中の UID 1000 が書けるディレクトリを、<code>podman unshare</code> を使って用意する。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>/etc/subuid</code> が <code>student:100000:65536</code> のとき、rootless のコンテナの中で UID 33（www-data）が作ったファイルは、練習機の上で何番の持ち物になるか。</p>
+<details><summary>答え</summary>
+<p>100032。中の 1 が外の 100000 に当たるので、中の 33 は 100000 + (33 − 1) = 100032。中の 0（root）だけは外の 1000（student）になる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>練習機の上で <code>ls -ln</code> すると、持ち主が <code>100999</code> のファイルがあり、student は消せなかった。このファイルについて何が言えるか。どう消すか。</p>
+<details><summary>答え</summary>
+<p>student の rootless のコンテナの中で、UID 1000 のプロセスが作ったファイル（または中で 1000 に chown したもの）である。
+外の student は持ち主ではないので消せない。<code>podman unshare rm …</code> で、中の root として消す。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>rootless のコンテナの中の root が、練習機の root だけが読めるファイル（たとえば <code>/root</code> の中のもの）を読めないのはなぜか。対応表から説明せよ。</p>
+<details><summary>答え</summary>
+<p>中の root は外では student（1000）で、練習機の root（外の UID 0）は対応表のどこにも出てこない。中から見ると、表に無い外の持ち主のファイルは「誰でもない」（nobody）の持ち物に見え、
+中の root の特権（ファイルの権限を越えて読む <code>CAP_DAC_OVERRIDE</code> など）は、持ち主が対応表に無いファイルには効かない。だから student に読めない練習機の root のファイルは、中の root にも読めない。
+逆に、持ち主が対応表にある番号（1000 と 100000〜165535）のファイルには中の root の特権が効くので、student 本人には読めない・消せないものでも読める・消せる（この章で、student が消せない <code>~/share</code> を <code>podman unshare rm</code> で消せたのはこれ）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>rootless のコンテナはユーザ名前空間の中で動き、中の UID 0 は外の student（1000）、中の 1〜65536 は <code>/etc/subuid</code> で借りた 100000〜165535 になる</li>
+<li>対応表は <code>/proc/PID/uid_map</code> で読める。書くのは root の権限を持つ <code>newuidmap</code> / <code>newgidmap</code>（この練習機では setuid root）で、借りた範囲しか書けない</li>
+<li>中の root 以外の UID が書くディレクトリは、<code>podman unshare chown</code> で中の番号の持ち主にする。外からは 100999 などの持ち主に見える</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:podman-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・podman 4.9.3・uidmap 4.13・crun 1.14.1）/ コンテナのイメージ alpine:3.24.2（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/podman/theory/01-daemonless">← 1. podman には、頼む相手のデーモンがいない</a><a href="/podman/theory/03-storage">次: 3. イメージの置き場所は、ユーザごとに別 →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/podman/">Podman</a> · <a href="/podman/theory/">理論編 目次</a> · <a href="/podman/practice/">実践編</a> · <a href="/podman/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/podman/chapters.js"></script>
+<script src="/podman/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

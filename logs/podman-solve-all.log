@@ -1,0 +1,328 @@
+# Podman の記事の演習 01〜07 を、解く前（✗）と模範解答の後（✔）で確かめた記録。作り方: bash probe/podman-solve-all.sh
+# 檻: lab-podman:1.0.0（docker run -d --hostname host --stop-timeout 30。ボリュームは名前なし）
+
+
+========== 環境 ==========
+
+$ lab env
+テーマ    : lab-podman 1.0.0
+イメージ  : ghcr.io/chai0204/lab:podman-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+練習機    : running
+仮想化    : TCG（完全エミュレーション。domain type=qemu） / /dev/kvm なし
+練習機の中: Ubuntu 24.04.5 LTS / カーネル 6.8.0-142-generic / podman 4.9.3 / docker のデーモン inactive
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+$ lab ls
+演習一覧
+  · 01  コンテナの親の conmon を突き止める 8分 / 影響度 B
+  · 02  中の UID 1000 が書けるディレクトリを用意する 12分 / 影響度 B
+  · 03  student のイメージを root の置き場所へ運ぶ 8分 / 影響度 B
+  · 04  rootless のまま、8080 番で公開する 10分 / 影響度 B
+  · 05  pod の中で、127.0.0.1 で届くようにする 12分 / 影響度 B
+  · 06  quadlet で、ログアウトしても動き続けるサービスにする 15分 / 影響度 B
+  · 07  docker の CLI で、podman のコンテナを動かす 10分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+
+========== 演習 01 コンテナの親の conmon を突き止める ==========
+
+$ lab check 01
+✗ 01 未達
+  判定 : 観測型（ex01 のプロセスの親を練習機の上で調べ、~/ex01-conmon.txt と比べた）
+  観測 : student の podman に ex01 という名前のコンテナが無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+
+$ podman run -d --name ex01 alpine:3.24.2 sleep 3600
+ef874bcf09c9c1be0cb287bc82065055f8d2af3ff9de456dccc6332e3a9149f2
+
+$ echo 1 > ~/ex01-conmon.txt
+
+$ lab check 01
+✗ 01 未達
+  判定 : 観測型（ex01 のプロセスの親を練習機の上で調べ、~/ex01-conmon.txt と比べた）
+  観測 : ex01 の sleep（PID 835）の親は PID 833 の conmon（その親は PID 1）
+         ~/ex01-conmon.txt の中身: 1
+         ファイルの数字が、親の PID と違う
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+
+$ ps -o ppid= -p $(podman inspect -f '{{.State.Pid}}' ex01) | tr -d ' ' > ~/ex01-conmon.txt
+
+$ ps -o pid,ppid,comm -p $(cat ~/ex01-conmon.txt)
+    PID    PPID COMMAND
+    833       1 conmon
+
+$ lab check 01
+✔ 01 達成
+  判定 : 観測型（ex01 のプロセスの親を練習機の上で調べ、~/ex01-conmon.txt と比べた）
+  観測 : ex01 の sleep（PID 835）の親は PID 833 の conmon（その親は PID 1）
+         ~/ex01-conmon.txt の中身: 833
+         → 親は conmon で、ファイルの数字と一致した（podman のプロセスは親ではない）
+
+
+========== 演習 02 中の UID 1000 が書けるディレクトリを用意する ==========
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（--user 1000:1000 のコンテナを実際に動かして ~/ex02/data に書けるかを試し、持ち主の番号を見た）
+  観測 : ~/ex02/data が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ mkdir -p ~/ex02/data && chmod 777 ~/ex02/data
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（--user 1000:1000 のコンテナを実際に動かして ~/ex02/data に書けるかを試し、持ち主の番号を見た）
+  観測 : ~/ex02/data の持ち主と権限（練習機の上）: 1000:1000 drwxrwxrwx
+         中の UID 1000 で書けるか: ok
+         持ち主は中の UID 1000（外の 100999）ではない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ rm -r ~/ex02
+
+$ mkdir -p ~/ex02/data && podman unshare chown 1000:1000 ~/ex02/data && ls -lnd ~/ex02/data
+drwxrwxr-x 2 100999 100999 4096 Oct 14 03:20 /home/student/ex02/data
+
+$ podman run --rm --user 1000:1000 -v "$HOME/ex02/data":/data alpine:3.24.2 touch /data/ok && ls -ln ~/ex02/data
+total 0
+-rw-r--r-- 1 100999 100999 0 Oct 14 03:20 ok
+
+$ lab check 02
+✔ 02 達成
+  判定 : 観測型（--user 1000:1000 のコンテナを実際に動かして ~/ex02/data に書けるかを試し、持ち主の番号を見た）
+  観測 : ~/ex02/data の持ち主と権限（練習機の上）: 100999:100999 drwxrwxr-x
+         中の UID 1000 で書けるか: ok
+         → 持ち主が中の UID 1000（外の 100999）になっていて、書けた
+
+
+========== 演習 03 student のイメージを root の置き場所へ運ぶ ==========
+
+$ lab check 03
+✗ 03 未達
+  判定 : 観測型（root の podman の置き場所を尋ね、root の podman で起動した）
+  観測 : root の置き場所に busybox:1.38.0 が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+
+$ podman save busybox:1.38.0 | sudo podman load
+Getting image source signatures
+Copying blob sha256:6cd030ace585499136a675899c23aeddcf4ae8065a8d35f016a132bfdc3b4aed
+Copying config sha256:aaef90e065235eb0b2d9938be85d1b81add2902cf89affe2cdfa19be33476ac0
+Writing manifest to image destination
+Loaded image: docker.io/library/busybox:1.38.0
+
+$ sudo podman images --digests busybox
+REPOSITORY                 TAG         DIGEST                                                                   IMAGE ID      CREATED       SIZE
+docker.io/library/busybox  1.38.0      sha256:8770c41a081d6f877b47de296ece92874bdc560a554faed767e6fa1f63e6d976  aaef90e06523  5 months ago  4.68 MB
+
+$ lab check 03
+✔ 03 達成
+  判定 : 観測型（root の podman の置き場所を尋ね、root の podman で起動した）
+  観測 : root の置き場所の busybox:1.38.0 の ID = aaef90e06523 / DIGEST = 8770c41a081d…
+         root の podman で起動 → ok
+         → student と同じ中身（ID が同じ）を運び（DIGEST は読み込んだ側で作り直されている）、root で起動できた
+
+
+========== 演習 04 rootless のまま、8080 番で公開する ==========
+
+$ lab check 04
+✗ 04 未達
+  判定 : 観測型（練習機の上で curl http://127.0.0.1:8080/ を打ち、8080 番で待ち受けているプロセスを見た）
+  観測 : curl http://127.0.0.1:8080/ → （応答なし）
+         8080 番で待ち受けているプロセス: （無い）（持ち主 ?）
+         student の podman の ex04: （無い）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+
+$ podman run -d --name ex04 -p 127.0.0.1:80:80 busybox:1.38.0 sh -c 'mkdir -p /www && echo "hello from ex04" > /www/index.html && exec httpd -f -p 80 -h /www'
+Error: rootlessport cannot expose privileged port 80, you can add 'net.ipv4.ip_unprivileged_port_start=80' to /etc/sysctl.conf (currently 1024), or choose a larger port number (>= 1024): listen tcp 127.0.0.1:80: bind: permission denied
+
+$ podman rm ex04
+ex04
+
+$ podman run -d --name ex04 -p 127.0.0.1:8080:80 busybox:1.38.0 sh -c 'mkdir -p /www && echo "hello from ex04" > /www/index.html && exec httpd -f -p 80 -h /www'
+5a1cc68aa27884bc991059ded570640b8e2554d49686a8500f1df01b0c1d1eaf
+
+$ curl -s http://127.0.0.1:8080/
+hello from ex04
+
+$ lab check 04
+✔ 04 達成
+  判定 : 観測型（練習機の上で curl http://127.0.0.1:8080/ を打ち、8080 番で待ち受けているプロセスを見た）
+  観測 : curl http://127.0.0.1:8080/ → hello from ex04
+         8080 番で待ち受けているプロセス: rootlessport（持ち主 student）
+         student の podman の ex04: ex04 127.0.0.1:8080->80/tcp
+         → rootless のまま、student の rootlessport が 8080 番で受けてコンテナに届けた
+
+$ podman rm -f -t 0 ex04
+ex04
+
+$ podman run -d --name ex04 --network pasta -p 127.0.0.1:8080:80 busybox:1.38.0 sh -c 'mkdir -p /www && echo "hello from ex04" > /www/index.html && exec httpd -f -p 80 -h /www'
+de6ca812e085293f9d7b802fa914df69640d94c5002508d24d8a6f5d03b435bb
+
+$ lab check 04
+✔ 04 達成
+  判定 : 観測型（練習機の上で curl http://127.0.0.1:8080/ を打ち、8080 番で待ち受けているプロセスを見た）
+  観測 : curl http://127.0.0.1:8080/ → hello from ex04
+         8080 番で待ち受けているプロセス: pasta.avx2（持ち主 student）
+         student の podman の ex04: ex04 127.0.0.1:8080->80/tcp
+         → rootless のまま、student の pasta.avx2 が 8080 番で受けてコンテナに届けた
+
+
+========== 演習 05 pod の中で、127.0.0.1 で届くようにする ==========
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（pod ex05 の網の名前空間の中から、実際に http://127.0.0.1/ に接続した）
+  観測 : student の podman に ex05 という pod が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+$ podman pod create --name ex05
+bd50233838c220c06c4852ca401aac92cc420bd4e1116290174ad9212235a15f
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（pod ex05 の網の名前空間の中から、実際に http://127.0.0.1/ に接続した）
+  観測 : pod ex05 のコンテナ数（infra を含む）: 1
+         pod の網の中から http://127.0.0.1/ → nsenter: neither filename nor target pid supplied for ns/net
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+$ podman run -d --pod ex05 --name ex05-web busybox:1.38.0 sh -c 'mkdir -p /www && echo "hello from ex05" > /www/index.html && exec httpd -f -p 80 -h /www'
+c29a3b7ff92bb7f2689a575664aa7807640f2af5e6bc0d2b5b2d69161645dbf8
+
+$ podman run --rm --pod ex05 alpine:3.24.2 wget -qO- http://127.0.0.1/
+hello from ex05
+
+$ lab check 05
+✔ 05 達成
+  判定 : 観測型（pod ex05 の網の名前空間の中から、実際に http://127.0.0.1/ に接続した）
+  観測 : pod ex05 のコンテナ数（infra を含む）: 2
+         pod の網の中から http://127.0.0.1/ → hello from ex05
+         → pod の網の中の 127.0.0.1 で、httpd に届いた
+
+
+========== 演習 06 quadlet で、ログアウトしても動き続けるサービスにする ==========
+
+$ lab check 06
+✗ 06 未達
+  判定 : 観測型（student の systemd に ex06.service の状態と出どころを尋ね、linger を見て、http://127.0.0.1:8086/ に接続した）
+  観測 : ex06.service の状態: inactive
+         ex06.service の出どころ: （無い）
+         student の linger: no
+         curl http://127.0.0.1:8086/hostname → （応答なし）（コンテナ systemd-ex06 のホスト名: （無い））
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+
+$ mkdir -p ~/.config/containers/systemd && printf '%s\n' '[Container]' 'Image=docker.io/library/busybox:1.38.0' 'Exec=httpd -f -h /etc' 'PublishPort=127.0.0.1:8086:80' '[Service]' 'Restart=always' '[Install]' 'WantedBy=default.target' > ~/.config/containers/systemd/ex06.container
+
+$ cat ~/.config/containers/systemd/ex06.container
+[Container]
+Image=docker.io/library/busybox:1.38.0
+Exec=httpd -f -h /etc
+PublishPort=127.0.0.1:8086:80
+[Service]
+Restart=always
+[Install]
+WantedBy=default.target
+
+$ systemctl --user daemon-reload && systemctl --user start ex06.service && curl -s http://127.0.0.1:8086/hostname
+14e597d11056
+$ lab check 06
+✗ 06 未達
+  判定 : 観測型（student の systemd に ex06.service の状態と出どころを尋ね、linger を見て、http://127.0.0.1:8086/ に接続した）
+  観測 : ex06.service の状態: active
+         ex06.service の出どころ: /home/student/.config/containers/systemd/ex06.container
+         student の linger: no
+         curl http://127.0.0.1:8086/hostname → 14e597d11056（コンテナ systemd-ex06 のホスト名: 14e597d11056）
+         linger が入っていないので、ログアウトすると student の systemd ごと止まる
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+
+$ loginctl enable-linger && loginctl show-user student -p Linger
+Linger=yes
+
+$ lab check 06
+✔ 06 達成
+  判定 : 観測型（student の systemd に ex06.service の状態と出どころを尋ね、linger を見て、http://127.0.0.1:8086/ に接続した）
+  観測 : ex06.service の状態: active
+         ex06.service の出どころ: /home/student/.config/containers/systemd/ex06.container
+         student の linger: yes
+         curl http://127.0.0.1:8086/hostname → 14e597d11056（コンテナ systemd-ex06 のホスト名: 14e597d11056）
+         → quadlet のファイルから作られたサービスが動き、ログアウトしても止まらない
+
+
+========== 演習 07 docker の CLI で、podman のコンテナを動かす ==========
+
+$ lab check 07
+✗ 07 未達
+  判定 : 観測型（student の podman に ex07 の状態と、作ったときのコマンドの記録を尋ねた）
+  観測 : student の podman に ex07 という名前のコンテナが無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+
+$ podman run -d --name ex07 alpine:3.24.2 sleep 3600
+41e13b5ac6cb9798d390fd4daad22cd481eee9fd3a7d976605d364fa39f57c1c
+
+$ lab check 07
+✗ 07 未達
+  判定 : 観測型（student の podman に ex07 の状態と、作ったときのコマンドの記録を尋ねた）
+  観測 : ex07（イメージ docker.io/library/alpine:3.24.2）が動いているか: true
+         作ったときのコマンド: [podman run -d --name ex07 alpine:3.24.2 sleep 3600]
+         podman のコマンドで作られている（docker の API の受け口を通っていない）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+
+$ podman rm -f -t 0 ex07
+ex07
+
+$ systemctl --user start podman.socket && DOCKER_HOST=unix:///run/user/1000/podman/podman.sock docker run -d --name ex07 alpine:3.24.2 sleep 3600
+c7d5af89a51c159d226a6b96771e616b168d049bfa9f7a00ef9467808659b565
+
+$ podman inspect ex07 --format '{{.Config.CreateCommand}}'
+[/usr/bin/podman --log-level=info system service]
+
+$ lab check 07
+✔ 07 達成
+  判定 : 観測型（student の podman に ex07 の状態と、作ったときのコマンドの記録を尋ねた）
+  観測 : ex07（イメージ docker.io/library/alpine:3.24.2）が動いているか: true
+         作ったときのコマンド: [/usr/bin/podman --log-level=info system service]
+         → docker の API の受け口（podman system service）を通して作られた
+
+  ════════════════════════════════════════
+   確かめて説明する Podman — 全7演習クリア
+  ════════════════════════════════════════
+
+  所要 1分（最初の達成から最後の達成まで）
+
+  自分の手で確かめたこと
+
+   ✔ 01  podman はコンテナを作ったら終わり、親として残るのは conmon（デーモンはいない）
+   ✔ 02  rootless のコンテナの中の UID は外で別の番号になり、podman unshare で中の番号の持ち主にできる
+   ✔ 03  podman のイメージはユーザごとに別の置き場所にあり、運ぶと ID は同じで DIGEST は変わりうる
+   ✔ 04  rootless のポートの公開はユーザのプロセス（rootlessport か pasta）が受け持ち、1024 番未満は使えない
+   ✔ 05  pod のコンテナは net と uts の名前空間を分け合い、名前空間は infra が持つ
+   ✔ 06  rootless のコンテナを動かし続けるのは systemd の仕事で、quadlet と linger で任せる
+   ✔ 07  podman は docker の API を真似られ、docker の CLI から頼める。ただし CLI の側の版の決まりで断られる表示もある
+
+  この7つは全部、1つの事実から出ていました。
+
+      podman には頼む相手のデーモンがいない。打った人の権限のまま、打った人の置き場所に、
+      打った人の systemd の下でコンテナを作る。中の root は外では本人で、網もユーザのプロセスが運ぶ。
+      docker と同じコマンドの形は、その上に重ねた互換の層にすぎない。
+
+  理論編の最終章に、それぞれがどう繋がるかを書いてあります → /podman/theory/07-compat
+
+
+
+========== 全問の後 ==========
+
+$ lab ls
+演習一覧
+  ✔ 01  コンテナの親の conmon を突き止める 8分 / 影響度 B
+  ✔ 02  中の UID 1000 が書けるディレクトリを用意する 12分 / 影響度 B
+  ✔ 03  student のイメージを root の置き場所へ運ぶ 8分 / 影響度 B
+  ✔ 04  rootless のまま、8080 番で公開する 10分 / 影響度 B
+  ✔ 05  pod の中で、127.0.0.1 で届くようにする 12分 / 影響度 B
+  ✔ 06  quadlet で、ログアウトしても動き続けるサービスにする 15分 / 影響度 B
+  ✔ 07  docker の CLI で、podman のコンテナを動かす 10分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手

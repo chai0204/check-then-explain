@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5. pod は、ネットワークを分け合うコンテナの組 — 確かめて説明する Podman</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="5" data-theme="podman">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <a href="/podman/theory/">理論編</a> › 第5章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/">詳しく</a></p>
+</div>
+<h1>5. pod は、ネットワークを分け合うコンテナの組</h1>
+<p class="lead">pod は、いくつかのコンテナを1つの組にしたものである。同じ pod のコンテナは、<b>同じ net の名前空間</b>（と uts の名前空間）を使うので、
+互いに <code>127.0.0.1</code> で話せて、ホスト名も同じになる。名前空間を持ち続け、pod の網の寿命の区切りになるのは、何もしない小さなコンテナ（infra。中身は pause）で、
+アプリのコンテナはそこに相乗りしている。Kubernetes の Pod と同じ考え方を、podman は1台の上で真似ている。</p>
+<div class="badges"><span>前提: 第4章</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>同じ pod のコンテナが、<code>127.0.0.1</code> で互いに届くことを示せる</li>
+<li>どの名前空間が共有されていて、どれが別かを、<code>/proc/PID/ns</code> の番号で示せる</li>
+<li>infra のコンテナと pause のイメージが何のためにあるかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>podman kube play</code>（Kubernetes の YAML から pod を作る）、pod の cgroup の上限、
+共有する名前空間の選び方（<code>--share</code>）、Kubernetes の Pod の細部。</div></div>
+
+<h2 id="create">pod を作り、2つのコンテナを入れる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じ pod のコンテナ同士が、どう話せるか。</div>
+<p>ポートの公開は、pod を作るときに pod に付ける（pod の中のコンテナは、pod の網を使うので）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman pod create --name pod1 -p 127.0.0.1:8081:80
+6c376f67625f30bd8f04a49ba6127b1507def15ab86043a8b248693b8d341de0
+$ podman ps -a --pod --format '{{.Names}}  {{.Image}}  {{.PodName}}'
+6c376f67625f-infra  localhost/podman-pause:4.9.3-0  pod1
+$ podman images
+REPOSITORY                 TAG         IMAGE ID      CREATED        SIZE
+localhost/podman-pause     4.9.3-0     cfb71834788c  3 seconds ago  835 kB
+docker.io/library/alpine   3.24.2      320994c3b997  3 weeks ago    8.72 MB
+docker.io/library/busybox  1.38.0      aaef90e06523  5 months ago   4.69 MB</code></pre>
+<p>空の pod を作っただけで、コンテナが1つ（<code>…-infra</code>）できている。中身は <code>localhost/podman-pause</code> という、この練習機で今作られたばかりのイメージである
+（podman は、何もしないで眠り続けるだけの小さなプログラム catatonit から、最初の pod のときに作る。だから CREATED が新しい）。</p>
+<div class="analogy"><b>たとえ</b>: infra のコンテナは、<b>会議室の予約だけを持ち続ける人</b>に近い。会議の出席者（アプリのコンテナ）が入れ替わっても、予約（網とホスト名の名前空間）が切れないので、同じ部屋（同じアドレス・同じ公開）をずっと使える。
+<br>ただし<b>崩れる点</b>: 予約者は会議に出なくても予約は残るが、infra のコンテナは実際に動いているプロセス（pause）で、これを止めると予約ごと（pod の網ごと）消える。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>pod は、関係するコンテナをまとめて起動・停止するための名前の束だ。コンテナ同士は、普段と同じくそれぞれ別のネットワークにいるので、相手に届くにはアドレスか名前を調べて指定する必要があるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman run -d --pod pod1 --name pod1-web busybox:1.38.0 httpd -f -h /etc
+c20f7af4f45c1217d83e60b77b82772856fec189ac5b24193b7c8fbc87feb15c
+$ podman run --rm --pod pod1 alpine:3.24.2 wget -qO- http://127.0.0.1/hostname
+pod1
+$ curl -s http://127.0.0.1:8081/hostname
+pod1</code></pre>
+<div class="then"><b>だめな理由</b>: 2つ目のコンテナ（alpine）から <code>127.0.0.1</code>、つまり「自分自身」の 80 番に接続すると、<b>別のコンテナ</b>の httpd が答えた。
+しかも返ってきたホスト名は、どちらのコンテナの名前でもなく <code>pod1</code> だった。
+<b>同じ pod のコンテナは、同じ net の名前空間（NIC・アドレス・ポートの一覧）と同じ uts の名前空間（ホスト名）を使っている</b>。だから相手のアドレスを調べる必要が無い。
+練習機からの <code>curl</code> は、pod に付けた公開（8081 番）から、同じ網の 80 番に届いた。</div></div>
+
+<h2 id="ns">何を分け合い、何を分けているか</h2>
+<div class="sgoal"><b>この節で分かること</b>: pod の中で共有される名前空間と、共有されない名前空間。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ a=$(podman inspect --format '{{.State.Pid}}' pod1-web)
+$ b=$(podman inspect --format '{{.State.Pid}}' $(podman pod inspect --format '{{.InfraContainerID}}' pod1))
+$ readlink /proc/$a/ns/net /proc/$a/ns/uts /proc/$a/ns/ipc /proc/$a/ns/pid /proc/$a/ns/mnt
+net:[4026532352]
+uts:[4026532413]
+ipc:[4026532414]
+pid:[4026532418]
+mnt:[4026532417]
+$ readlink /proc/$b/ns/net /proc/$b/ns/uts /proc/$b/ns/ipc /proc/$b/ns/pid /proc/$b/ns/mnt
+net:[4026532352]
+uts:[4026532413]
+ipc:[4026532414]
+pid:[4026532415]
+mnt:[4026532411]
+$ podman inspect --format '{{.HostConfig.NetworkMode}}' pod1-web
+container:6d8d92a5d8ffff96eb8eacce10a128b3ebc27e027d8f08574b5c2d2f936dbcfe</code></pre>
+<p>httpd（<code>$a</code>）と infra（<code>$b</code>）で、net・uts・ipc の番号は同じ、pid（プロセスの番号）と mnt（ファイルの見え方）は別だった。
+<code>NetworkMode</code> は <code>container:</code> の後に infra のコンテナの ID を書いていて、「網は infra のものを使う」という意味である。
+ファイルの木は別々なので、2つのコンテナは別のイメージ（busybox と alpine）から作れる。</p>
+<div class="scroll"><table>
+<tr><th>名前空間</th><th>同じ pod のコンテナ同士</th><th>だから</th></tr>
+<tr><td>net</td><td>共有</td><td>127.0.0.1 で互いに届く。同じポートを2つのコンテナで待ち受けることはできない</td></tr>
+<tr><td>uts</td><td>共有</td><td>ホスト名が同じ（pod の名前）</td></tr>
+<tr><td>ipc</td><td>共有（podman の既定）</td><td>共有メモリなどで話せる</td></tr>
+<tr><td>mnt</td><td>別</td><td>コンテナごとに別のイメージのファイルの木</td></tr>
+<tr><td>pid</td><td>別（podman の既定）</td><td>互いのプロセスは見えない</td></tr>
+</table></div>
+<p>infra のコンテナは、pod の名前空間を持ち続ける係である。アプリのコンテナが落ちても、何もしない infra が uts・ipc の名前空間を持ち続け、
+pod の網も infra が動いている間は保たれる（rootless の podman は、網の名前空間を <code>/run/user/1000/netns/</code> の下のファイルで固定している）。
+だから、起動し直したアプリは同じアドレス・同じ公開のまま戻れる。逆に、infra を止めると何が起きるかを確かめる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ls /run/user/1000/netns/ | wc -l
+1
+$ podman stop $(podman pod inspect --format '{{.InfraContainerID}}' pod1)
+6d8d92a5d8ffff96eb8eacce10a128b3ebc27e027d8f08574b5c2d2f936dbcfe
+$ podman ps -a --pod --format '{{.Names}}  {{.Status}}'
+6c376f67625f-infra  Exited (0) 2 seconds ago
+pod1-web  Up 15 seconds
+$ curl -s -m 5 http://127.0.0.1:8081/hostname; echo "exit=$?"
+exit=7
+$ ls /run/user/1000/netns/ | wc -l
+0</code></pre>
+<p>infra を止めると、アプリの <code>pod1-web</code> は <code>Up</code> のままなのに、pod に付けた公開（8081 番）には届かなくなった（<code>curl</code> の終了コード 7 は「つながらなかった」）。
+網を固定していたファイルも 1 個から 0 個になった。podman は infra が止まると、pod の網を片付ける（公開を受けていたプロセスも止める）。
+<b>pod の網と公開の寿命は、infra のコンテナの寿命に結び付いている</b>。</p>
+<div class="analogy"><b>たとえ</b>: pod は<b>シェアハウス</b>に近い。住人（コンテナ）は自分の部屋（mnt・pid）を持つが、玄関と住所と電話（net・uts）は1つを分け合う。
+大家（infra）は何もしないで住み続け、住人が入れ替わっても住所が変わらないようにしている。
+<br>ただし<b>崩れる点</b>: シェアハウスの住人は互いの声が聞こえるが、pod のコンテナは既定では互いのプロセスが見えない（pid は別）。
+分け合うのは網とホスト名で、生活そのものではない。</div>
+<div class="analogy"><b>たとえ</b>: pod の中の <code>127.0.0.1</code> は、<b>相部屋で1台の電話機を共用する</b>ことに近い。同じ部屋の人に内線（127.0.0.1）でかければ、相部屋の誰かが出る。
+<br>ただし<b>崩れる点</b>: 電話なら誰が出ても話せるが、ポートは早い者勝ちで、同じ番号（80 番）で2つのコンテナが待ち受けることはできない。電話機は1台でも、受話器を取れるのは1人だけである。</div>
+<p>pod ごと消す。<code>-f</code> は動いているコンテナも止めて消し、<code>-t 0</code> は止まるのを待たない。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman pod rm -f -t 0 pod1
+6c376f67625f30bd8f04a49ba6127b1507def15ab86043a8b248693b8d341de0
+$ podman ps -a
+CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES</code></pre>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/podman/practice/">演習05</a>で、web サーバと、それを 127.0.0.1 で確かめるコンテナを、1つの pod に入れる。</div>
+
+<div class="quiz"><b>確認</b>
+<p>同じ pod の中で、2つのコンテナがどちらも 80 番で待ち受けようとした。どうなるか。この章の名前空間の表から予想せよ。</p>
+<details><summary>答え</summary>
+<p>後から待ち受けようとしたほうが失敗する（アドレスがすでに使われている）。同じ pod のコンテナは net の名前空間を共有しているので、ポートの一覧も1つしか無い。
+別々のコンテナなら、それぞれ自分の網を持つので同じ番号で待ち受けられる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>pod を作っただけなのに、<code>podman ps -a</code> にコンテナが1つ増え、<code>podman images</code> に <code>localhost/podman-pause</code> が増えた。何のためか。</p>
+<details><summary>答え</summary>
+<p>pod の名前空間を持ち続け、pod の網と公開の寿命の区切りになる infra のコンテナと、その中身（何もしないで眠るだけのプログラム）である。
+アプリのコンテナが入れ替わっても、infra が動いている限り pod の網と公開は消えない（infra を止めると、podman が網を片付ける）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>pod のコンテナは net と uts（podman の既定では ipc も）の名前空間を分け合う。127.0.0.1 で互いに届き、ホスト名は pod の名前になる</li>
+<li>mnt と pid は別なので、別のイメージから作ったコンテナを1つの pod に入れられる</li>
+<li>pod の名前空間と網を保つのは infra のコンテナ（podman-pause のイメージ）。infra を止めると、アプリが動いていても pod の網と公開は片付けられる。ポートの公開は pod に付ける</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:podman-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・podman 4.9.3・catatonit 0.1.7）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/podman/theory/04-network">← 4. rootless のネットワークは、カーネルの外で中継される</a><a href="/podman/theory/06-systemd">次: 6. ログアウトしても動かし続けるのは、systemd の仕事 →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/podman/">Podman</a> · <a href="/podman/theory/">理論編 目次</a> · <a href="/podman/practice/">実践編</a> · <a href="/podman/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/podman/chapters.js"></script>
+<script src="/podman/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

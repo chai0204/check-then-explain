@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. コンテナは、練習機の上で動く1つのプロセス — 確かめて説明する Docker</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="1" data-theme="docker">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/docker/">Docker</a> › <a href="/docker/theory/">理論編</a> › 第1章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/">詳しく</a></p>
+</div>
+<h1>1. コンテナは、練習機の上で動く1つのプロセス</h1>
+<p class="lead"><code>docker run</code> を打つと、小さな計算機が1台立ち上がったように見える。
+ところが練習機の <code>ps</code> には、そのコンテナが<b>普通のプロセスとして1行で</b>並んでいる。
+カーネルは練習機のもので、コンテナが自分で持っているのは「見え方の区切り」と「使える量の区切り」だけである。</p>
+<div class="badges"><span>前提: 実践編の入口で練習機に入れた（ssh linuc）</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>コンテナが練習機の上の1つのプロセスであることを、<code>ps</code> と <code>/proc</code> の値で示せる</li>
+<li>名前空間と cgroup が、それぞれ何を区切っているかを言える</li>
+<li><code>docker</code> コマンドからコンテナのプロセスができるまでの経路（dockerd → containerd → shim → runc）を、動いているプロセスで示せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: 名前空間の全種類の細部（ipc・time・cgroup 名前空間）、cgroup v1 と v2 の違い、
+containerd の内部（スナップショッタやプラグインの構成）、OCI ランタイム仕様の項目の一覧。名前が出てくるだけで先に進める。</div></div>
+
+<h2 id="run">Alpine のコンテナを1つ起動する</h2>
+<div class="sgoal"><b>この節で分かること</b>: コンテナの中で最初に動いているもの（PID 1）と、カーネルの持ち主。</div>
+<p>この記事の端末は、すべて<b>練習機の中</b>（プロンプトが <code>student@linuc</code>）で打つ。練習機には docker と、
+小さなイメージ2つ（<code>alpine:3.24.2</code> と <code>busybox:1.38.0</code>）が最初から入っている。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>コンテナは小さな仮想マシンだ。<code>docker run alpine</code> は Alpine Linux を起動する。
+だから中では Alpine のカーネルが動き、最初に init（PID 1）が起動して、その上で頼んだコマンドが動いているはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker run -d --name c1 alpine:3.24.2 sleep 1000
+@@ docker exec c1 ps
+@@ docker exec c1 uname -r
+@@ uname -r</code></pre>
+<div class="then"><b>だめな理由</b>: コンテナの中の PID 1 は、頼んだコマンドの <code>sleep 1000</code> そのものだった。
+起動したカーネルも init も無い。<code>uname -r</code> は練習機と同じ <code>6.8.0-142-generic</code> を返した。
+<b>コンテナは自分のカーネルを持たない。練習機のカーネルの上で、<code>sleep</code> というプロセスが1つ動いているだけである。</b>
+<code>docker run -d</code> が出した長い16進数は、コンテナに付いた ID（名前とは別の、機械が使う番号）で、起動のたびに変わる（あなたの画面では本文と違う）。</div></div>
+<p>では「Alpine」はどこにあるのか。ファイルである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker exec c1 grep PRETTY_NAME /etc/os-release
+@@ grep PRETTY_NAME /etc/os-release</code></pre>
+<p>コンテナの中から見える <code>/etc/os-release</code> は Alpine のもので、練習機のものは Ubuntu のものである。
+コンテナが Alpine なのは<b>見えているファイル（ユーザランド）だけ</b>で、そのファイルはイメージから来ている（第3章・第4章）。</p>
+<div class="analogy"><b>たとえ</b>: コンテナは、劇場の<b>舞台の上の役者</b>に近い。役者（プロセス）は本物の人間で、劇場（カーネル）も本物である。
+舞台装置（名前空間）のおかげで、役者からは客席が見えず、舞台の上の世界だけが見えている。
+<br>ただし<b>崩れる点</b>: 本物の舞台装置は板と布でできているが、名前空間はカーネルが「見せるもの」を絞っているだけで、壁は無い。
+劇場の側（練習機）からは、舞台の上の役者がいつでも全部見えている（次の節）。</div>
+
+<h2 id="ps">外から見ると、ただのプロセス</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じプロセスが、中と外で別の番号を持っていること。</div>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker ps
+@@ pid=$(docker inspect -f '{{.State.Pid}}' c1)
+@@ echo $pid  ## id=pid
+@@ ps -o pid,ppid,user,cmd -p $pid  ## id=ps1</code></pre>
+<p><code>docker inspect -f</code> は、コンテナの情報から1つの項目だけを取り出す（<code>{{.State.Pid}}</code> は「練習機から見た PID」）。
+その番号で練習機の <code>ps</code> を引くと、<code>sleep 1000</code> が root のプロセスとして1行で出た。
+コンテナの中では PID 1、練習機からは PID {{pid:^(\d+)$}}。<b>同じ1つのプロセスに、番号が2つ付いている</b>。
+番号の付け方を分けているのが、次の名前空間である（あなたの画面の PID は本文と違ってよい。以下では変数 <code>$pid</code> で指す）。</p>
+
+<h2 id="ns">見え方の区切り — 名前空間</h2>
+<div class="sgoal"><b>この節で分かること</b>: 名前空間が何を区切るのかと、区切られていないものがあること。</div>
+<p>プロセスがどの名前空間に入っているかは、<code>/proc/PID/ns/</code> の下のリンクの先の番号で分かる。
+<code>$$</code> は、いま打っているシェル自身の PID である。コンテナのプロセスは root のものなので、読むのに <code>sudo</code> が要る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ readlink /proc/$$/ns/pid /proc/$$/ns/uts /proc/$$/ns/mnt /proc/$$/ns/net /proc/$$/ns/user
+@@ sudo readlink /proc/$pid/ns/pid /proc/$pid/ns/uts /proc/$pid/ns/mnt /proc/$pid/ns/net /proc/$pid/ns/user
+@@ docker exec c1 hostname
+@@ hostname</code></pre>
+<p>pid・uts・mnt・net の4つは番号が違う。<b>番号が違えば、別の名前空間にいる</b>。ところが最後の <code>user</code> だけは同じ番号だった。</p>
+<div class="scroll"><table>
+<tr><th>名前空間</th><th>区切るもの</th><th>この章で見えたこと</th></tr>
+<tr><td>pid</td><td>プロセスの番号の付け方</td><td>中では PID 1、外では別の番号</td></tr>
+<tr><td>uts</td><td>ホスト名</td><td>中のホスト名はコンテナ ID の先頭12文字、外は <code>linuc</code></td></tr>
+<tr><td>mnt</td><td>マウントの一覧（見えるファイル）</td><td>中の <code>/etc/os-release</code> は Alpine のもの</td></tr>
+<tr><td>net</td><td>NIC・IP アドレス・ポート</td><td>コンテナは自分の NIC を持つ（第5章）</td></tr>
+<tr><td>user</td><td>ユーザ ID の対応</td><td><b>区切られていない</b>。中の root（UID 0）は、練習機の root（UID 0）と同じ（第7章）</td></tr>
+</table></div>
+<p>docker は、ユーザ名前空間を既定では使わない。だからコンテナの中で root のプロセスは、練習機から見ても root である（上の <code>ps</code> の USER 列）。
+ここが Podman の rootless との大きな違いになる（<a href="/podman/theory/02-userns">Podman 第2章</a>）。</p>
+
+<h2 id="cgroup">使える量の区切り — cgroup</h2>
+<div class="sgoal"><b>この節で分かること</b>: cgroup がプロセスをどこにまとめ、どこで量を絞っているか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>@@ cat /proc/$pid/cgroup
+@@ docker run -d --name c2 --memory 64m alpine:3.24.2 sleep 1000
+@@ docker exec c2 cat /sys/fs/cgroup/memory.max
+@@ systemctl show --property=MemoryMax docker-$(docker inspect -f '{{.Id}}' c2).scope
+@@ cat /sys/fs/cgroup/system.slice/docker-$(docker inspect -f '{{.Id}}' c2).scope/memory.max</code></pre>
+<p><b>cgroup</b> は、プロセスを入れる「かご」と、かごごとに使える量（メモリ・CPU・プロセス数）を決める仕組みである。
+<code>/proc/$pid/cgroup</code> は、そのプロセスが入っているかごのパスで、コンテナ1つが <code>system.slice/docker-ID.scope</code> という1つのかごになっている。
+<code>--memory 64m</code> を付けて起動した <code>c2</code> のかごには、上限 <code>67108864</code>（64×1024×1024 バイト）が書き込まれた。</p>
+<p>同じ値が2か所から見えた。コンテナの中からは <code>/sys/fs/cgroup/memory.max</code>（かごのいちばん上に見える）、
+練習機からは <code>/sys/fs/cgroup/system.slice/docker-…scope/memory.max</code> である。
+練習機の systemd も、このかごを <code>docker-….scope</code> という名前の単位として知っている（<code>MemoryMax=</code>）。
+この docker は、かごの作成を systemd に頼む設定（cgroup ドライバ <code>systemd</code>）で動いている。</p>
+<div class="analogy"><b>たとえ</b>: cgroup は、部屋ごとの<b>ブレーカー（契約アンペア）</b>に近い。どの部屋の電気が建物のどの回路を通るかを決め、部屋ごとに上限を付けられる。
+<br>ただし<b>崩れる点</b>: ブレーカーは上限を超えると部屋全体の電気を落とすが、メモリの上限を超えたコンテナでは、カーネルがかごの中のプロセスを選んで止める（OOM killer）。
+CPU の上限なら止めずに遅くするだけで、量の種類ごとに超えたときの振る舞いが違う。</div>
+
+<h2 id="chain">docker コマンドは頼むだけ — dockerd → containerd → shim → runc</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>docker run</code> を打ってからプロセスができるまでに、誰が何をしているか。</div>
+<p><code>docker</code> コマンド（CLI）は、自分ではコンテナを作らない。ソケットを通して、root で動いている <b>dockerd</b>（docker のデーモン）に頼む。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ ls -l /run/docker.sock
+@@ id
+@@ docker version --format 'client {{.Client.Version}} / server {{.Server.Version}}'</code></pre>
+<p><code>/run/docker.sock</code> は root と docker グループだけが読み書きできるソケットで、student は docker グループに入っているので、<code>sudo</code> なしで dockerd に頼める
+（それが何を意味するかは第7章）。<code>docker version</code> が版を2つ出したのは、頼む側（client）と頼まれる側（server）が別のプログラムだからである。</p>
+<p>頼まれた dockerd も、自分ではプロセスを作らない。練習機の中で、関係するプロセスを並べる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ ps -o pid,ppid,user,comm -C dockerd,containerd,containerd-shim,sleep
+@@ runc --version
+@@ ps -C runc
+@@ sudo runc --root /run/docker/runtime-runc/moby state $(docker inspect -f '{{.Id}}' c1) | jq '{id, pid, status}'</code></pre>
+<p>並び方を読むと、役割が分かる。</p>
+<div class="scroll"><table>
+<tr><th>プログラム</th><th>役目</th><th>上の出力で見えたこと</th></tr>
+<tr><td><code>dockerd</code></td><td>docker の API を受け付ける。イメージの名前・ネットワーク・ボリュームを管理し、コンテナの実行は containerd に頼む</td><td>PPID 1（systemd が起動した）</td></tr>
+<tr><td><code>containerd</code></td><td>コンテナとイメージの実体を管理する。コンテナ1つごとに shim を起動する</td><td>PPID 1。dockerd の子ではなく、別のサービス</td></tr>
+<tr><td><code>containerd-shim-runc-v2</code></td><td>コンテナ1つに1つ付き添う。中のプロセスの親になり、終了を見届ける</td><td>コンテナが2つなので2つ。<code>sleep</code> の PPID は shim（<code>ps</code> の名前は15文字で切れて <code>containerd-shim</code>）</td></tr>
+<tr><td><code>runc</code></td><td>名前空間と cgroup を設定してプロセスを起動し、<b>すぐに終わる</b></td><td>動いている runc は無い（<code>ps -C runc</code> は見出しだけ）。それでも起動したコンテナの状態は覚えている（<code>state</code>）</td></tr>
+</table></div>
+<p>runc が「コンテナを作る」部分の本体で、その作り方は <b>OCI ランタイム仕様</b>という公開の仕様で決まっている。
+同じ仕様を満たす別のプログラム（例えば crun）に差し替えても、同じイメージが動く（Podman は既定で crun を使う。<a href="/podman/theory/01-daemonless">Podman 第1章</a>）。</p>
+<div class="analogy"><b>たとえ</b>: この経路は<b>レストラン</b>に近い。docker CLI は客の注文票、dockerd はホールで注文を受ける店員、containerd は厨房の責任者、
+shim はテーブルごとに付く給仕、runc は料理を作って皿に盛ったら厨房に戻る料理人である。
+<br>ただし<b>崩れる点</b>: 本物の厨房では責任者が抜けると料理が止まるが、containerd を再起動しても、給仕（shim）が付いているコンテナは動き続ける（第2章で実際に再起動する）。
+逆に客（CLI）は、店員（dockerd）がいなければ何も頼めない。</div>
+<p>最後に、この章で起動した2つを消す。<code>docker rm -f</code> は、動いていれば止めて（KILL を送って）から消す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker rm -f c1 c2
+@@ docker ps -a</code></pre>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/docker/practice/">演習01</a>で、メモリの上限を付けたコンテナを起動し、
+その上限が練習機のどのファイルに書かれたかを自分で探す。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>docker exec c1 ps</code> では <code>sleep 1000</code> が PID 1 で、練習機の <code>ps</code> では同じ <code>sleep 1000</code> が別の番号の PID だった。
+この2つの出力から、コンテナの中のプロセスについて何が言えるか。</p>
+<details><summary>答え</summary>
+<p>同じ1つのプロセスに、中と外で別の番号が付いている。コンテナは pid 名前空間で番号の付け方を分けているだけで、
+プロセスそのものは練習機のカーネルの上の1つのプロセスである。外からは全部見えるが、中からは外が見えない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>コンテナの中で <code>uname -r</code> が <code>6.8.0-142-generic</code> を返した。Alpine 3.24 のイメージに、このカーネルが入っているからか。</p>
+<details><summary>答え</summary>
+<p>違う。イメージにカーネルは入っていない。<code>uname</code> はカーネルに版を尋ねるシステムコールで、答えたのは練習機のカーネルである。
+あなたの PC の docker で同じことをすれば、あなたの PC のカーネルの版が出る（Docker Desktop なら、その中の Linux の版）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>名前空間の番号を並べたとき、<code>user</code> だけが練習機と同じだった。このことから、コンテナの中の root について何が予想できるか。</p>
+<details><summary>答え</summary>
+<p>ユーザの対応が区切られていないので、コンテナの中の UID 0 は練習機の UID 0 そのものだと予想できる（<code>ps</code> の USER 列も root だった）。
+できることを絞っているのは別の仕組み（ケーパビリティなど）で、それを第7章で測る。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>コンテナは練習機のカーネルの上の1つのプロセスである。PID 1 は頼んだコマンドそのもので、カーネルも init も起動しない</li>
+<li>名前空間は「見え方」を区切る（pid・uts・mnt・net）。docker は既定ではユーザ（user）を区切らない</li>
+<li>cgroup は「使える量」を区切る。コンテナ1つが1つのかご（<code>docker-ID.scope</code>）になり、上限はそのかごのファイルに書かれる</li>
+<li>docker CLI → dockerd → containerd → shim → runc の順に頼み、runc はプロセスを作ったら終わる。プロセスの親として残るのは shim である</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:docker-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・docker.io 29.1.3・containerd 2.2.1・runc 1.3.4）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/docker/theory/">← 理論編 目次</a><a href="/docker/theory/02-pid1">次: 2. コンテナの PID 1 は、合図を無視する →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/docker/">Docker</a> · <a href="/docker/theory/">理論編 目次</a> · <a href="/docker/practice/">実践編</a> · <a href="/docker/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/docker/chapters.js"></script>
+<script src="/docker/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

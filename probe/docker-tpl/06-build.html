@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6. ビルドのキャッシュは、変えた段から後ろを全部作り直す — 確かめて説明する Docker</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="6" data-theme="docker">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/docker/">Docker</a> › <a href="/docker/theory/">理論編</a> › 第6章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/">詳しく</a></p>
+</div>
+<h1>6. ビルドのキャッシュは、変えた段から後ろを全部作り直す</h1>
+<p class="lead">Dockerfile の1行は、イメージの層1枚（か設定1項目）になる。<code>docker build</code> は段ごとに「前と同じ材料か」を調べ、同じなら前回の層を使う（キャッシュ）。
+材料には<b>それより前の段が作った層</b>も入るので、1つの段が変わると、そこから後ろの段は命令が同じでも全部作り直しになる。</p>
+<div class="badges"><span>前提: 第3章（イメージは層でできている）</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>Dockerfile の各行が、イメージの層や設定になることを <code>docker history</code> で示せる</li>
+<li>キャッシュが効かなくなる条件を、作り直された段で説明できる</li>
+<li>よく変わるものを後ろに置く並べ方で、ビルドの時間が変わることを示せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: Dockerfile の全命令（<code>ARG</code>・<code>ENTRYPOINT</code>・<code>HEALTHCHECK</code> など）、マルチステージビルド、
+BuildKit のキャッシュの持ち出し（<code>--cache-to</code>）、来歴（attestation）の中身、<code>.dockerignore</code> の書き方。</div></div>
+
+<h2 id="first">Dockerfile を書いて、ビルドする</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>docker build</code> が Dockerfile を段ごとに実行していること。</div>
+<p>作業用のディレクトリに、起動すると1行出す小さなスクリプトと、Dockerfile を置く。Dockerfile は <code>cat</code> とヒアドキュメント（<code>&lt;&lt;'EOF'</code> から <code>EOF</code> まで）で書く。
+<code>RUN</code> の段の <code>sleep 10</code> は、パッケージのインストールのような「時間のかかる準備」の代わりである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ mkdir ~/app
+@@ cd ~/app
+@@ echo 'echo "app v1"' &gt; app.sh
+@@ cat &gt; Dockerfile &lt;&lt;'EOF'
+@@> FROM alpine:3.24.2
+@@> COPY app.sh /app/app.sh
+@@> RUN sleep 10 &amp;&amp; echo "dependencies installed" &gt; /app/deps.txt
+@@> CMD ["sh", "/app/app.sh"]
+@@> EOF
+@@ time docker build --progress=plain -t app:1 .  ## grep=^#[0-9]+\s\[[0-9]/[0-9]\]\s(COPY|RUN)|^#[67]\s(CACHED|DONE)|^real
+@@ docker run --rm app:1</code></pre>
+<p><code>--progress=plain</code> は、進み具合を1行ずつ書き足す表示にする指定である（付けないと、端末の上で同じ行を書き換えながら進む表示になる。中身は同じ）。
+出力は長いので、本文では <code>COPY</code> と <code>RUN</code> の段の見出し（<code>[2/3]</code>・<code>[3/3]</code>）と、その段の終わりの行（実行したら <code>DONE</code> と秒数、前回のものを使ったら <code>CACHED</code>）、全体にかかった時間（<code>real</code>）の行だけを抜き出している（<code>#6</code> などは段の通し番号）。
+3つの段（FROM・COPY・RUN）が順に実行され、<code>RUN</code> の段で10秒あまりかかった。もう一度、何も変えずにビルドする。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ time docker build --progress=plain -t app:1 .  ## grep=^#[0-9]+\s\[[0-9]/[0-9]\]\s(COPY|RUN)|^#[67]\s(CACHED|DONE)|^real</code></pre>
+<p>今度は <code>COPY</code> も <code>RUN</code> も <code>CACHED</code> で、すぐに終わった。材料が前回と同じなので、前回できた層をそのまま使ったのである。</p>
+<div class="analogy"><b>たとえ</b>: ビルドのキャッシュは、<b>料理の作り置き</b>に近い。同じレシピの同じ手順を、同じ下ごしらえの上でもう一度やるなら、冷蔵庫の作り置きを出せば済む。
+<br>ただし<b>崩れる点</b>: 人なら作り置きの味見をして「まだ使える」と判断するが、docker は中身を確かめない。命令の文字と、前の段の層と、<code>COPY</code> するファイルの中身の指紋が同じかどうかだけで決める。
+<code>RUN</code> がネットから取ってくる内容が変わっていても、命令の文字が同じなら作り置き（古い結果）を出してくる。</div>
+
+<h2 id="cache">1行直すと、どこまで作り直すか</h2>
+<div class="sgoal"><b>この節で分かること</b>: キャッシュが効かなくなる範囲。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>app.sh</code> を1行直しただけだ。変わったのは <code>app.sh</code> を写す <code>COPY</code> の段だけなので、作り直すのはその段だけで、
+<code>app.sh</code> と関係の無い <code>RUN</code> の段（10秒かかる準備）は前回のものが使われるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ echo 'echo "app v2"' &gt; app.sh
+@@ time docker build --progress=plain -t app:2 .  ## grep=^#[0-9]+\s\[[0-9]/[0-9]\]\s(COPY|RUN)|^#[67]\s(CACHED|DONE)|^real</code></pre>
+<div class="then"><b>だめな理由</b>: <code>COPY</code> だけでなく <code>RUN</code> も作り直され、また10秒あまりかかった。
+<b>ある段のキャッシュの材料には、その段の命令と、それより前の段が作った層の中身が入る</b>。<code>COPY</code> の層が変われば、その上で実行する <code>RUN</code> は
+「違う土台の上での実行」になるので、命令が同じでもキャッシュは使えない。1つの段が変わると、そこから後ろ（Dockerfile の下の行）は全部作り直しになる。</div></div>
+<div class="analogy"><b>たとえ</b>: Dockerfile の段は<b>積み木の塔</b>に近い。下の1段を差し替えたら、その上の段は同じ形の積み木でも、一度下ろして積み直すしかない。
+<br>ただし<b>崩れる点</b>: 積み木なら上の段をそのまま持ち上げて載せ替えられるが、ビルドの段は「下の段の上で実行した結果」なので載せ替えられない。
+<code>RUN</code> の結果は、下の層の中身によって変わりうるからである（docker は中身を見て判断せず、下が変わったら必ず作り直す）。</div>
+
+<h2 id="order">よく変わるものを、後ろに置く</h2>
+<div class="sgoal"><b>この節で分かること</b>: 段の並べ方で、キャッシュの効く範囲が変わること。</div>
+<p>時間のかかる準備（<code>RUN</code>）を先に、よく直すもの（<code>COPY app.sh</code>）を後ろに並べ替える。<code>RUN</code> の段が <code>/app</code> を先に作るように <code>mkdir /app</code> を足す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ cat &gt; Dockerfile &lt;&lt;'EOF'
+@@> FROM alpine:3.24.2
+@@> RUN mkdir /app &amp;&amp; sleep 10 &amp;&amp; echo "dependencies installed" &gt; /app/deps.txt
+@@> COPY app.sh /app/app.sh
+@@> CMD ["sh", "/app/app.sh"]
+@@> EOF
+@@ time docker build --progress=plain -t app:3 .  ## grep=^#[0-9]+\s\[[0-9]/[0-9]\]\s(COPY|RUN)|^#[67]\s(CACHED|DONE)|^real
+@@ echo 'echo "app v3"' &gt; app.sh
+@@ time docker build --progress=plain -t app:4 .  ## grep=^#[0-9]+\s\[[0-9]/[0-9]\]\s(COPY|RUN)|^#[67]\s(CACHED|DONE)|^real
+@@ docker run --rm app:4</code></pre>
+<p>並べ替えた直後の1回（<code>app:3</code>）は、<code>RUN</code> の段の命令が変わったので作り直しになった。
+その後で <code>app.sh</code> を直したビルド（<code>app:4</code>）では、<code>RUN</code> の段は <code>CACHED</code> で、作り直したのは後ろの <code>COPY</code> だけだった。
+変わりやすいものを Dockerfile の後ろに置くと、変わらない準備の層を毎回使い回せる。</p>
+<p>出来上がったイメージの層は、<code>docker history</code> で上（新しい段）から順に見られる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker history app:4</code></pre>
+<p>上の3行が Dockerfile の <code>CMD</code>・<code>COPY</code>・<code>RUN</code> で、その下の2行は FROM で土台にした Alpine のイメージが作られたときの記録である。
+<code>CMD</code> の行は大きさ 0B で、ファイルの層ではなく設定（第3章の config）に書かれる項目である。<code>&lt;missing&gt;</code> は「この段だけの ID は手元に無い」という意味で、層が欠けているわけではない。</p>
+<div class="analogy"><b>たとえ</b>: よく変わるものを後ろに置くのは、<b>引っ越しの荷造りで、毎日使う物をいちばん上に詰める</b>ことに近い。
+毎日の出し入れで、下の段ボールまで開け直さずに済む。
+<br>ただし<b>崩れる点</b>: 段ボールは中身を見れば上下を入れ替えられるが、Dockerfile では後ろの段が前の段の結果に頼ることがある（<code>RUN</code> が <code>COPY</code> したファイルを使う、など）。
+その場合は並べ替えられないので、写すファイルを「準備に要る分」と「よく変わる分」に分けて、2回に分けて <code>COPY</code> する。</div>
+<p>作業用のディレクトリとイメージを片付ける。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ cd
+@@ rm -r ~/app
+@@ docker rmi app:1 app:2 app:3 app:4  ## grep=^Untagged</code></pre>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/docker/practice/">演習06</a>で、渡された Dockerfile を並べ替えて、スクリプトを直しても時間のかかる段が作り直されないようにする。
+判定は、実際にスクリプトを書き換えてビルドし、その段が <code>CACHED</code> になるかを見る。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>COPY . /src</code> の次に <code>RUN npm install</code> を置いた Dockerfile がある。README を1文字直しただけで、<code>npm install</code> が毎回走る。なぜか。どう並べ替えればよいか。</p>
+<details><summary>答え</summary>
+<p><code>COPY . /src</code> はディレクトリ全体を写すので、README が変わるとその段の層が変わり、上に積む <code>RUN npm install</code> のキャッシュも使えなくなる。
+依存の一覧（<code>package.json</code> など）だけを先に <code>COPY</code> して <code>RUN npm install</code>、その後で残りを <code>COPY</code> すれば、依存の一覧が変わらない限り <code>npm install</code> の層を使い回せる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>docker history</code> で <code>CMD</code> の行の SIZE が 0B だった。この段はイメージの何を変えたのか。</p>
+<details><summary>答え</summary>
+<p>ファイルの層は作らず、イメージの設定（config）の <code>Cmd</code> の項目を変えた。起動するコマンドは、ファイルではなく設定の JSON に書かれている（第3章で <code>jq</code> で読んだ項目）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>Dockerfile の1行は、層1枚か設定1項目になる。<code>docker history</code> で上から順に見られる</li>
+<li>段のキャッシュは「命令」と「その下の層」が前回と同じときだけ使われる。1つの段が変わると、そこから後ろは全部作り直し</li>
+<li>時間のかかる準備を前に、よく変わるものを後ろに並べると、作り直しの範囲が小さくなる</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:docker-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・docker.io 29.1.3・docker-buildx 0.30.1・containerd 2.2.1）/ コンテナのイメージ alpine:3.24.2（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/docker/theory/05-ports">← 5. ポートの公開は、宛先の書き換え</a><a href="/docker/theory/07-privileges">次: 7. 渡したものだけが、コンテナの力になる →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/docker/">Docker</a> · <a href="/docker/theory/">理論編 目次</a> · <a href="/docker/practice/">実践編</a> · <a href="/docker/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/docker/chapters.js"></script>
+<script src="/docker/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

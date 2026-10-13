@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. rootless のネットワークは、カーネルの外で中継される — 確かめて説明する Podman</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="podman">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <a href="/podman/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/">詳しく</a></p>
+</div>
+<h1>4. rootless のネットワークは、カーネルの外で中継される</h1>
+<p class="lead">docker はポートを公開するとき、練習機の iptables に宛先の書き換え（DNAT）を書き、veth で練習機のブリッジにつないだ。
+rootless の podman は student の権限しか持たないので、練習機のネットワークの設定を1つも変えられない。
+代わりに、<b>ユーザの権限で動くプログラムが、パケットを受け取って中へ運ぶ</b>（slirp4netns と rootlessport、または pasta）。
+だから 1024 番未満のポートは開けず、コンテナは QEMU の練習機と同じ形の網（10.0.2.0/24）に置かれる。</p>
+<div class="badges"><span>前提: 第2章。<a href="/docker/theory/05-ports">Docker 第5章</a>を読んでいると比べやすい</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>rootless の podman が 80 番を公開できない理由を、練習機の設定の値で説明できる</li>
+<li>ポートの公開を、iptables ではなく rootlessport というプロセスが受けていることを示せる</li>
+<li>slirp4netns と pasta で、コンテナから見えるアドレスがどう違うかを示せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: slirp4netns と pasta のオプション、netavark のブリッジ（root の podman の既定の網。rootless でも <code>podman network create</code> で作った網で使う）、
+aardvark-dns による名前解決、IPv6。</div></div>
+
+<h2 id="port80">80 番を公開する</h2>
+<div class="sgoal"><b>この節で分かること</b>: 一般ユーザのコンテナが、公開できないポートがあること。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>ポートの公開は <code>-p</code> を付けるだけだ。コンテナの中の 80 番を、練習機の 80 番で公開すればよい（docker では <code>-p</code> のホスト側に何番を書いても通った）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman run -d --name web -p 127.0.0.1:80:80 busybox:1.38.0 httpd -f -h /etc
+@@ sysctl net.ipv4.ip_unprivileged_port_start
+@@ podman ps -a --format '{{.Names}}: {{.Status}}'</code></pre>
+<div class="then"><b>だめな理由</b>: <code>rootlessport cannot expose privileged port 80</code> と断られた。
+練習機のカーネルは、1024 番（<code>net.ipv4.ip_unprivileged_port_start</code>）未満のポートで待ち受けることを、特権（<code>CAP_NET_BIND_SERVICE</code>）を持つプロセスにしか許さない。
+<b>rootless の podman では、練習機の側で待ち受けるのは student のプロセス（rootlessport）なので、この決まりがそのまま効く</b>。
+docker では、待ち受けるのも宛先を書き換えるのも root の dockerd とカーネルだった。コンテナは作られたまま起動しなかった（<code>Created</code>）。</div></div>
+<p>作られただけのコンテナを消し、1024 番以上で公開し直す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman rm web
+@@ podman run -d --name web -p 127.0.0.1:8080:80 busybox:1.38.0 httpd -f -h /etc
+@@ curl -s http://127.0.0.1:8080/hostname</code></pre>
+
+<div class="analogy"><b>たとえ</b>: 1024 番未満のポートは、<b>建物の正面玄関の受付席</b>に近い。一般の入居者（一般ユーザ）は座れず、管理会社の人（特権を持つプロセス）だけが座れる。rootless の podman で受付に座るのは、入居者の代理人（rootlessport）なので、正面玄関には座れない。
+<br>ただし<b>崩れる点</b>: 本物の建物の決まりは変えにくいが、この線は練習機の設定 <code>net.ipv4.ip_unprivileged_port_start</code> の1つの値で、root なら引き直せる。ただし引き直すと、すべての入居者が座れるようになる。</div>
+
+<h2 id="relay">誰がパケットを運んでいるか</h2>
+<div class="sgoal"><b>この節で分かること</b>: rootless のポートの公開とコンテナの外への通信を、どのプロセスが受け持っているか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>@@ ps -o pid,ppid,user,comm -C rootlessport,exe,slirp4netns,conmon,httpd
+@@ ss -ltnp | grep 8080
+@@ sudo iptables -t nat -S | grep -c 8080</code></pre>
+<p>練習機の 127.0.0.1:8080 で待ち受けているのは、student の <b>rootlessport</b> だった（<code>pid=</code> と <code>fd=</code> の番号は起動のたびに変わるので、あなたの画面では本文と違う）。iptables の nat 表には 8080 の規則が1つも無い（数えると 0）。
+届いた接続は親の rootlessport が受け取る。子のプロセス（<code>exe</code> と表示される rootlessport-child）はコンテナの網の中で 80 番につなぎ、そのつながりを親に手渡すだけで、
+両側のデータを写し続けるのは親の rootlessport である（rootlesskit の port の作り）。
+コンテナの外への通信を運ぶのは <b>slirp4netns</b> で、どれも student のプロセスである。<b>練習機のカーネルの網の設定は何も変わっていない</b>。</p>
+<p>コンテナの中から、自分のアドレスを見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman exec web ip -4 addr show tap0
+@@ podman exec web ip route
+@@ podman exec web cat /etc/resolv.conf
+@@ ip -br addr show enp0s16</code></pre>
+<p>コンテナのアドレスは <code>10.0.2.100</code>、出口（ゲートウェイ）は <code>10.0.2.2</code>、DNS は <code>10.0.2.3</code> だった。そして練習機自身の NIC も <code>10.0.2.15</code> である。
+偶然ではない。slirp4netns は、QEMU が練習機に見せているユーザモードの網（<a href="/qemu/theory/">QEMU の記事</a>の 10.0.2.x）と<b>同じ部品（libslirp）</b>を使っていて、
+「NIC に見えるものの裏で、ユーザの権限で TCP/IP を話して外とつなぐ」という同じ仕組みを、コンテナに対して使っている。
+libslirp 自体は番号を決めず、呼ぶ側が渡す。slirp4netns は、番号の初期値を QEMU に合わせて自分で決めている（網 10.0.2.0/24・出口 .2・DNS .3）。
+ただし、自分に割り当てる番号は QEMU の練習機の .15 ではなく .100 である。</p>
+<div class="analogy"><b>たとえ</b>: rootless のネットワークは、<b>建物に配管工事をさせてもらえない借家人が、窓の外に自分で中継の受付を置く</b>ことに近い。
+docker（root）は建物の配管（iptables・ブリッジ）を引き直して直結できたが、借家人（student）は自分の部屋の中のこと（ユーザ名前空間の中の網）しか変えられないので、
+受付（rootlessport）が荷物を受け取って中へ運ぶ。
+<br>ただし<b>崩れる点</b>: 本物の受付は人が運ぶので遅く見えるが、運び役は同じ計算機の中のプロセスで、手渡しの手間は小さい。
+それでも、カーネルが直接書き換える docker の経路より、コピーが1回ずつ多くなる。</div>
+
+<div class="analogy"><b>たとえ</b>: slirp4netns と QEMU が同じ 10.0.2.x を使うのは、<b>後から出た家庭用ルータが、先に広まった機種と同じ初期設定の番号を、わざと名乗る</b>ことに近い。中の部品（libslirp）は同じだが、番号の初期値は slirp4netns が QEMU に合わせて決めている。
+<br>ただし<b>崩れる点</b>: 同じ番号のルータを1つの家に2台つなげばぶつかるが、こちらの 10.0.2.x は、それぞれ練習機の中・コンテナの網の名前空間の中だけで使う番号で、互いに見えないのでぶつからない。</div>
+
+<h2 id="pasta">pasta — 練習機のアドレスをそのまま見せる</h2>
+<div class="sgoal"><b>この節で分かること</b>: もう1つの rootless の網（pasta）で、コンテナから見えるものがどう違うか。</div>
+<p>この練習機の podman（4.9.3）の既定は slirp4netns で、podman 5 からは <b>pasta</b>（passt という道具の一部）が既定になった。<code>--network pasta</code> で選べる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman run --rm --network pasta alpine:3.24.2 ip -4 addr show
+@@ podman run --rm alpine:3.24.2 ip -4 addr show</code></pre>
+<p>pasta のコンテナには、練習機と同じ名前（<code>enp0s16</code>）・同じアドレス（<code>10.0.2.15</code>）の NIC が見えた。pasta は練習機のアドレスを写したように見せ、
+コンテナの通信を練習機の通信として運び直す。slirp4netns（既定）のコンテナは、自分の <code>tap0</code>（10.0.2.100）を持っていた。
+どちらも student の権限で動き、練習機の網の設定は変えない。</p>
+<div class="scroll"><table>
+<tr><th></th><th>docker（root）</th><th>podman rootless・slirp4netns</th><th>podman rootless・pasta</th></tr>
+<tr><td>コンテナの NIC</td><td>veth の片端（eth0）</td><td>tap0（10.0.2.100）</td><td>練習機の NIC の写し（enp0s16・10.0.2.15）</td></tr>
+<tr><td>ポートの公開</td><td>カーネルの DNAT（iptables）</td><td>rootlessport（ユーザのプロセス）</td><td>pasta（ユーザのプロセス）</td></tr>
+<tr><td>1024 番未満の公開</td><td>できる</td><td>できない（設定で変えられる）</td><td>できない（設定で変えられる）</td></tr>
+<tr><td>練習機の網の設定</td><td>変える（ブリッジ・veth・iptables）</td><td>変えない</td><td>変えない</td></tr>
+</table></div>
+<p>片付ける。<code>httpd</code> も PID 1 で TERM を受け取らないので、<code>-t 0</code> で待たずに止める。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman rm -f -t 0 web</code></pre>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/podman/practice/">演習04</a>で、rootless のまま、練習機の 8080 番で web サーバを公開する。</div>
+
+<div class="quiz"><b>確認</b>
+<p>rootless の podman で <code>-p 127.0.0.1:443:443</code> が断られた。直す方法を2つ挙げよ。それぞれ何を変えることになるか。</p>
+<details><summary>答え</summary>
+<p>(1) 1024 番以上（例: 8443）で公開する。練習機の側は何も変えない。(2) 練習機の <code>net.ipv4.ip_unprivileged_port_start</code> を 443 以下に下げる。
+root の作業で、値は「ここから上を許す」という1つの境目なので、443 にすれば 443〜1023 の全部のポートでの待ち受けを、練習機の全部の一般ユーザに許すことになる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>rootless の podman でポートを公開しているのに、<code>sudo iptables -t nat -S</code> にそのポートの規則が無い。どうやって届いているのか。</p>
+<details><summary>答え</summary>
+<p>練習機の側で待ち受けているのは student の rootlessport（または pasta）で、受け取った接続と、コンテナの網の中でつないだ接続の間で、ユーザの権限でデータを写している。
+カーネルの宛先の書き換え（DNAT）は使っていない。<code>ss -ltnp</code> で、そのポートの持ち主のプロセスが分かる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>rootless の podman は練習機の網の設定を変えられないので、ユーザのプロセス（slirp4netns・rootlessport、または pasta）がパケットを運ぶ</li>
+<li>だから 1024 番未満のポートは公開できない（<code>net.ipv4.ip_unprivileged_port_start</code> の決まりがそのまま効く）</li>
+<li>slirp4netns のコンテナは 10.0.2.100 を持つ。QEMU のユーザモードの網と同じ部品（libslirp）を使い、網の番号の初期値も QEMU に合わせてある（出口 .2・DNS .3）</li>
+<li>pasta は練習機の NIC とアドレスをそのまま写して見せる（podman 5 の既定）</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:podman-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・podman 4.9.3・slirp4netns 1.2.1・passt 0.0~git20240220）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/podman/theory/03-storage">← 3. イメージの置き場所は、ユーザごとに別</a><a href="/podman/theory/05-pod">次: 5. pod は、ネットワークを分け合うコンテナの組 →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/podman/">Podman</a> · <a href="/podman/theory/">理論編 目次</a> · <a href="/podman/practice/">実践編</a> · <a href="/podman/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/podman/chapters.js"></script>
+<script src="/podman/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

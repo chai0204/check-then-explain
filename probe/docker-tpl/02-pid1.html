@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. コンテナの PID 1 は、合図を無視する — 確かめて説明する Docker</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="2" data-theme="docker">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/docker/">Docker</a> › <a href="/docker/theory/">理論編</a> › 第2章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/">詳しく</a></p>
+</div>
+<h1>2. コンテナの PID 1 は、合図を無視する</h1>
+<p class="lead"><code>sleep</code> は TERM の合図で終わるプログラムである。ところが <code>sleep</code> だけのコンテナに <code>docker stop</code> を打つと、
+止まるまでにきっかり10秒かかる。コンテナの中で最初に起動したプロセスは、その名前空間の PID 1 になり、カーネルは PID 1 を特別に扱う。
+後から <code>docker exec</code> で足したプロセスも、PID 1 の子ではない。</p>
+<div class="badges"><span>前提: 第1章</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>docker stop</code> が10秒かかって終了コード 137 で終わる理由を、PID 1 とシグナルで説明できる</li>
+<li><code>--stop-timeout</code> と <code>--init</code> が、それぞれ何を変えるかを時間で示せる</li>
+<li><code>docker exec</code> で動かしたプロセスの TERM と umask が、どこから来るかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: シグナルの全種類と番号（使うのは TERM 15・KILL 9 だけ）、
+tini の作りの細部、systemd のドロップインの書式の全項目、Dockerfile の <code>STOPSIGNAL</code>。</div></div>
+
+<h2 id="stop">docker stop は、なぜ10秒かかるのか</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じ <code>sleep</code> が、練習機の上とコンテナの中で、TERM に違う反応をすること。</div>
+<p>まず練習機の上で、<code>sleep</code> に TERM（<code>kill</code> の既定の合図）を送る。
+<code>$!</code> は直前に <code>&amp;</code> で起動したプロセスの PID、<code>wait</code> はその終了コードを受け取る。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>練習機の上の <code>sleep</code> は TERM で終わった（終了コード 143 = 128 + 15。15 は TERM の番号。sh が標準エラーに出す <code>Terminated</code> の知らせは、出るときと出ないときがあるので <code>2&gt;/dev/null</code> で捨てている）。
+<code>docker stop</code> も TERM を送るのだから、<code>sleep</code> だけのコンテナはすぐに止まるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ sh -c 'sleep 1000 &amp; sleep 1; kill $!; wait $!; echo "exit=$?"' 2&gt;/dev/null
+@@ docker run -d --name c3 alpine:3.24.2 sleep 1000
+@@ time docker stop c3
+@@ docker ps -a --format '{{.Names}}: {{.Status}}'</code></pre>
+<div class="then"><b>だめな理由</b>: <code>docker stop</code> は10秒あまりかかり、コンテナの終了コードは <code>137</code>（128 + 9。9 は KILL の番号）だった。
+TERM では止まらず、10秒待った docker が KILL で止めたのである。
+<b>コンテナの中の <code>sleep</code> は PID 1 で、カーネルは PID 1 に、自分で受け取る準備をしていない合図を届けない。</b>
+<code>docker stop</code> は「止める合図を送り、決まった秒数（既定 10秒）待ち、まだ動いていれば KILL を送る」という手順で、
+止める合図はイメージに <code>STOPSIGNAL</code> の指定が無ければ TERM である（alpine には指定が無い）。TERM を無視されれば、待ち時間をまるごと使い切る。</div></div>
+
+<h2 id="pid1">PID 1 に、外から合図を送る</h2>
+<div class="sgoal"><b>この節で分かること</b>: PID 1 が TERM を無視するのは docker のせいではなく、カーネルの決まりであること。</div>
+<p>止まったコンテナは <code>docker start</code> で同じコンテナのまま起動し直せる（中のプロセスは新しく起動するので PID は変わる）。
+今度は docker を通さず、練習機の root として直接 TERM を送る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker start c3
+@@ pid=$(docker inspect -f '{{.State.Pid}}' c3)
+@@ sudo kill $pid
+@@ docker ps --format '{{.Names}}: {{.Status}}'
+@@ grep SigCgt /proc/$pid/status
+@@ sudo kill -KILL $pid
+@@ docker ps -a --format '{{.Names}}: {{.Status}}'</code></pre>
+<p>練習機の root が送った TERM でも、コンテナは <code>Up</code> のままだった。<code>SigCgt</code>（自分で受け取ると登録した合図の一覧）は全部 0 で、
+この <code>sleep</code> は TERM の受け取り方を何も決めていない。普通のプロセスなら、決めていない合図は「既定の動作」（TERM なら終了）になる。
+ところが<b>名前空間の PID 1 には既定の動作が働かない</b>。PID 1 が不意に死ぬと名前空間の全プロセスが道連れになるので、カーネルが守っている（Linux の pid_namespaces の決まり）。
+例外は KILL と STOP で、これは外（親の名前空間）から送れば必ず届く。<code>sudo kill -KILL</code> で、コンテナはすぐに <code>Exited (137)</code> になった。</p>
+<p>PID 1 が合図を受け取る準備には2通りある。1つは受け取り方（ハンドラ）を登録すること（<code>SigCgt</code> に出る）、もう1つは合図をブロックしておき、届いたものを後から取り出すこと。
+ブロックしている合図は、PID 1 でも捨てられずに保留される（Linux の kernel/signal.c の決まり）。どちらもしていない合図だけが、黙って捨てられる。</p>
+<div class="analogy"><b>たとえ</b>: 名前空間の PID 1 は、<b>船の船長</b>に近い。船長が倒れると船全体が止まるので、乗客の「降りてくれ」（TERM）は、船長が聞く準備をしていない限り届かない。
+港の当局が出す強制命令（KILL）だけは、船長の意思に関係なく実行される。
+<br>ただし<b>崩れる点</b>: 本物の船長は命令の中身を読んで判断するが、PID 1 は判断していない。受け取る準備（ハンドラの登録かブロック）をしていない合図は、カーネルが黙って捨てているだけである。
+受け取り方を登録したプログラム（多くのサーバ）なら、PID 1 でも TERM で正常に終わる。</div>
+
+<h2 id="timeout">待ち時間を変える、合図を中継させる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>--stop-timeout</code> と <code>--init</code> の効き方の違い。</div>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker rm c3
+@@ docker run -d --name c4 --stop-timeout 3 alpine:3.24.2 sleep 1000
+@@ time docker stop c4
+@@ docker run -d --name c5 --init alpine:3.24.2 sleep 1000
+@@ docker exec c5 ps
+@@ docker exec c5 grep SigCgt /proc/1/status
+@@ time docker stop c5
+@@ docker ps -a --format '{{.Names}}: {{.Status}}'
+@@ docker rm c4 c5</code></pre>
+<div class="scroll"><table>
+<tr><th>起動のしかた</th><th>PID 1</th><th>docker stop にかかった時間</th><th>終わり方</th></tr>
+<tr><td>そのまま</td><td><code>sleep</code></td><td>10秒あまり</td><td>TERM は無視され、10秒後の KILL で 137</td></tr>
+<tr><td><code>--stop-timeout 3</code></td><td><code>sleep</code></td><td>3秒あまり</td><td>待ち時間が3秒になっただけ。やはり KILL で 137</td></tr>
+<tr><td><code>--init</code></td><td><code>/sbin/docker-init</code></td><td>1秒ほど</td><td>PID 1 の docker-init が TERM を受け取って <code>sleep</code> に中継し、<code>sleep</code> が TERM で終わる。docker-init はそれを 143（128 + 15）で報告する</td></tr>
+</table></div>
+<p><code>--init</code> を付けると、docker は小さな init（<code>docker-init</code>。tini というプログラム）を PID 1 に置き、頼んだコマンドをその子にする。
+ところが docker-init の <code>SigCgt</code> も 0 だった。tini はハンドラを登録せず、合図をブロックしておき、届いたものを <code>sigtimedwait</code> という呼び出しで取り出して子に中継する（tini のソース）。
+ブロックしている合図は PID 1 でも捨てられないので、<code>SigCgt</code> が 0 でも TERM を受け取れた。<b><code>SigCgt</code> で分かるのはハンドラの有無だけ</b>で、受け取れるかどうかは、何が PID 1 かと合わせて見る。
+tini は子が終わったら後始末（終わったプロセスの回収）もする。</p>
+<p>このサイトの仮想マシン型の檻は、<code>--init</code> の代わりにイメージ自身が <code>tini</code> を PID 1 に置き（イメージの ENTRYPOINT。<a href="/linuc-boot/theory/03-container">LinuC 1.01 の第3章</a>の <code>ps -p 1</code>）、
+起動コマンドに <code>--stop-timeout 30</code> を付けている。<code>docker stop</code> の TERM を tini が子の起動スクリプト（<code>lab-vm-init</code>）に中継し、
+起動スクリプトは TERM を受け取ると練習機を正常に止めてから終わる。ただ、その正常停止に十数秒かかるので、既定の10秒では KILL に間に合わない。
+だから入口の <code>docker run</code> には <code>--stop-timeout 30</code> が付いている。</p>
+<div class="analogy"><b>たとえ</b>: <code>--stop-timeout</code> は閉店時刻の<b>「閉店まで○分」の放送</b>の長さを変えるだけで、<code>--init</code> は<b>入口に受付係を置く</b>ことに近い。
+放送を長くしても、聞く気の無い客はやはり最後に追い出される。受付係がいれば、閉店の知らせを一人ひとりに伝えてくれる。
+<br>ただし<b>崩れる点</b>: 受付係（docker-init）が伝えても、客（子のプロセス）が TERM の受け取りを無視するように作られていれば、やはり出ていかない。
+<code>--init</code> は伝える経路を作るだけで、子に TERM を聞かせる力は無い。</div>
+
+<h2 id="exec">docker exec で足したプロセスは、誰の子か</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>docker exec</code> と <code>docker run -it</code> で、端末の種類（TERM）と umask が違って見える理由。</div>
+<p>コンテナにもう1つプロセスを足すのが <code>docker exec</code> である。同じ問い（TERM・umask・端末があるか）を、入り方を変えて投げる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker run -d --name c6 alpine:3.24.2 sleep 1000
+@@ docker exec c6 sh -c 'echo "TERM=$TERM"; umask; tty'
+@@ docker exec -it c6 sh -c 'echo "TERM=$TERM"; umask; tty'
+@@ docker run --rm -it alpine:3.24.2 sh -c 'echo "TERM=$TERM"; umask; tty'
+@@ echo "TERM=$TERM"; umask; tty</code></pre>
+<p><code>-t</code>（端末を割り当てる）を付けたときだけ <code>TERM=xterm</code> になり、付けなければ TERM は空で、<code>tty</code> は <code>not a tty</code> と答えた。
+<b>TERM はコンテナの中の設定ではなく、docker が <code>-t</code> を見て渡している</b>。このサイトの記録で踏んだのはこれで、端末なしの <code>docker exec</code> で取った記録と、
+<code>docker run -it</code> の読者の画面とで、TERM が違った（TERM が違うと <code>ls</code> の色付けの有無などで表示が変わる）。</p>
+<p>umask はどれも <code>0022</code> で、練習機の student のシェル（<code>0002</code>）とは違った。umask は親から子へ受け継がれる値である。では <code>docker exec</code> のプロセスの親は誰か。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker exec -d c6 sleep 2000
+@@ ps -o pid,ppid,user,cmd -C sleep
+@@ ps -o pid,ppid,comm -C containerd-shim
+@@ grep Umask /proc/$(pgrep -x containerd)/status /proc/$(pgrep -x containerd-shim)/status</code></pre>
+<p>後から足した <code>sleep 2000</code> の親は、PID 1 の <code>sleep 1000</code> ではなく、<b>shim</b> だった（2つの PPID が同じ）。
+shim の umask は、shim を起動した containerd と同じ <code>0022</code> である。<b><code>docker exec</code> のプロセスは shim の子で、umask を shim から受け継ぐ</b>のではないか。
+containerd の umask を変えて確かめる。containerd は systemd のサービスなので、systemd の設定の追加分（ドロップイン）で <code>UMask=</code> を足し、containerd を再起動する。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ sudo mkdir -p /etc/systemd/system/containerd.service.d
+@@ printf '[Service]\nUMask=0077\n' | sudo tee /etc/systemd/system/containerd.service.d/umask.conf
+@@ sudo systemctl daemon-reload
+@@ sudo systemctl restart containerd</code></pre>
+<p>containerd を再起動しても、<code>c6</code> は動いたままか。そのうえで、新しいコンテナ <code>c7</code> を起動し、3通りの umask を比べる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker ps --format '{{.Names}}: {{.Status}}'
+@@ docker run -d --name c7 alpine:3.24.2 sleep 1000
+@@ docker exec c7 sh -c umask
+@@ docker exec c6 sh -c umask
+@@ docker run --rm alpine:3.24.2 sh -c umask</code></pre>
+<p>3つの答えがそろって説明できる。</p>
+<div class="scroll"><table>
+<tr><th>プロセス</th><th>umask</th><th>どこから来たか</th></tr>
+<tr><td>containerd を再起動した後に起動した <code>c7</code> への <code>docker exec</code></td><td><code>0077</code></td><td><code>c7</code> の shim は新しい containerd（0077）から起動し、exec のプロセスはその shim から受け継いだ</td></tr>
+<tr><td>再起動の前からある <code>c6</code> への <code>docker exec</code></td><td><code>0022</code></td><td><code>c6</code> の shim は古い containerd（0022）から起動したまま生きている（再起動しても <code>c6</code> は <code>Up</code> のままだった）</td></tr>
+<tr><td><code>docker run</code> の PID 1</td><td><code>0022</code></td><td>runc がコンテナの最初のプロセスに <code>0022</code> を明示的に設定する。親の値に左右されない</td></tr>
+</table></div>
+<p>著者の PC（NixOS の docker 29.8.0）では、containerd が umask <code>0000</code> で動いていて、<code>docker exec</code> で取った記録だけが umask <code>0000</code> になった
+（ファイルが誰でも書ける権限で作られる）。原因はコンテナの中ではなく、<b>コンテナの外の containerd の umask</b>だった。
+<code>docker run -it</code> で入る読者の PID 1 のシェルは、runc が決めた <code>0022</code> になる（runc を使う docker なら、PC に依らない）。</p>
+<p>設定を元に戻し、この章のコンテナを消す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ sudo rm /etc/systemd/system/containerd.service.d/umask.conf
+@@ sudo rmdir /etc/systemd/system/containerd.service.d
+@@ sudo systemctl daemon-reload
+@@ sudo systemctl restart containerd
+@@ docker rm -f c6 c7</code></pre>
+<div class="analogy"><b>たとえ</b>: <code>docker run</code> で生まれる PID 1 と、<code>docker exec</code> で足すプロセスは、<b>同じ家に住む、本人と後から来た客</b>に近い。
+本人の生活習慣（umask）は家を建てた大工（runc）が決めて置いたが、客は送ってきた付き添い（shim）の習慣をそのまま持ち込む。
+<br>ただし<b>崩れる点</b>: 本物の客は家に入れば家の決まりに合わせるが、プロセスは入った名前空間に合わせて umask を変えたりしない。
+受け継いだ値のまま、何もしなければ最後までその値で動く。</div>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/docker/practice/">演習02</a>で、<code>docker stop</code> がすぐに終わるコンテナと、
+待ち時間を使い切るコンテナを起動し、それぞれの止まり方を確かめる。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>docker ps -a</code> の STATUS が <code>Exited (137)</code> だった。このコンテナは、どう終わったと言えるか。<code>Exited (143)</code> ならどうか。</p>
+<details><summary>答え</summary>
+<p>137 = 128 + 9 で、KILL で殺された。<code>docker stop</code> の待ち時間切れか、<code>docker kill</code>・<code>docker rm -f</code>・外からの <code>kill -KILL</code> などである。
+143 = 128 + 15 は「TERM で終わった」という報告で、多いのは <code>--init</code> の docker-init が、子が TERM で終わったことをこの値で報告した場合（この章の <code>c5</code>）。プログラムが自分で 143 を選んで終わることもある。
+ハンドラを登録した PID 1 が TERM を受けて自分で終わるときは、そのプログラムが決めた終了コード（0 が多い）になるので、TERM で止まったコンテナがいつも 143 になるとは限らない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>あるサーバのコンテナが、<code>docker stop</code> のたびにちょうど10秒かかる。原因として何が考えられ、どう確かめればよいか。</p>
+<details><summary>答え</summary>
+<p>PID 1 が TERM を受け取っていない（受け取り方を登録していない、またはシェルが PID 1 でサーバがその子になっていて TERM が伝わらない）。
+<code>docker exec … ps</code> で PID 1 が何かを見る。練習機（ホスト）から <code>grep SigCgt /proc/PID/status</code> でハンドラの登録を見る
+（0 でも、docker-init のように合図をブロックして待つ作りなら受け取れるので、何が PID 1 かと合わせて判断する）。
+直し方は、サーバ自身を PID 1 にする（シェルを挟まない）、<code>--init</code> を付ける、などである。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>docker exec</code> で作ったファイルの権限が、<code>docker run -it</code> で作ったものと違った。コンテナの中のどの設定を見ても umask は書かれていない。どこを調べればよいか。</p>
+<details><summary>答え</summary>
+<p>コンテナの外。<code>docker exec</code> のプロセスは shim の子で、umask を shim から受け継ぐ（shim の値は、shim を起動したときの containerd の値）ので、
+ホストで <code>grep Umask /proc/$(pgrep -x containerd)/status</code> や shim の値を見る。containerd を起動した仕組み（systemd の <code>UMask=</code> など）が決めている。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>コンテナの最初のプロセスは、その名前空間の PID 1 になる。PID 1 は、受け取る準備（ハンドラの登録か、ブロックして待つ）をしていない合図（TERM を含む）を受け取らない。KILL と STOP だけは外から届く</li>
+<li><code>docker stop</code> は止める合図（<code>STOPSIGNAL</code> が無ければ TERM）→ 待つ（既定 10秒）→ KILL。<code>--stop-timeout</code> は待ち時間を、<code>--init</code> は合図を中継する init を足す</li>
+<li><code>docker exec</code> のプロセスは shim の子で、umask を shim から受け継ぐ。PID 1 の umask は runc が <code>0022</code> に決める</li>
+<li>TERM は <code>-t</code> を付けたときだけ docker が渡す。端末の有無で表示が変わるコマンドがある</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:docker-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・docker.io 29.1.3・containerd 2.2.1・runc 1.3.4）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/docker/theory/01-process">← 1. コンテナは、練習機の上で動く1つのプロセス</a><a href="/docker/theory/03-image">次: 3. イメージを決めるのは、名前ではなくダイジェスト →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/docker/">Docker</a> · <a href="/docker/theory/">理論編 目次</a> · <a href="/docker/practice/">実践編</a> · <a href="/docker/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/docker/chapters.js"></script>
+<script src="/docker/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

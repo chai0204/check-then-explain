@@ -1,0 +1,368 @@
+# Docker の記事の演習 01〜07 を、解く前（✗）と模範解答の後（✔）で確かめた記録。作り方: bash probe/docker-solve-all.sh
+# 檻: lab-docker:1.0.0（docker run -d --hostname host --stop-timeout 30。ボリュームは名前なし）
+
+
+========== 環境 ==========
+
+$ lab env
+テーマ    : lab-docker 1.0.0
+イメージ  : ghcr.io/chai0204/lab:docker-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+練習機    : running
+仮想化    : TCG（完全エミュレーション。domain type=qemu） / /dev/kvm なし
+練習機の中: Ubuntu 24.04.5 LTS / カーネル 6.8.0-142-generic / docker 29.1.3 / podman 4.9.3
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+$ lab ls
+演習一覧
+  · 01  メモリの上限を付けたコンテナを動かす 8分 / 影響度 B
+  · 02  docker stop が TERM で終わるコンテナを動かす 10分 / 影響度 B
+  · 03  付け替えられた名前を、中身に戻す 8分 / 影響度 B
+  · 04  コンテナを消しても残るデータを置く 10分 / 影響度 B
+  · 05  練習機の外から届くように、ポートを公開する 12分 / 影響度 B
+  · 06  キャッシュが効く順に Dockerfile を並べ替える 15分 / 影響度 B
+  · 07  必要な特権だけを渡して起動する 10分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+
+========== 演習 01 メモリの上限を付けたコンテナを動かす ==========
+
+$ lab check 01
+✗ 01 未達
+  判定 : 観測型（練習機の docker に ex01 の状態を尋ね、cgroup のファイルを読んだ）
+  観測 : ex01 という名前のコンテナが無い（docker inspect ex01: error: no such object: ex01）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+
+$ docker run -d --name ex01 --memory 64m alpine:3.24.2 sleep 3600
+449062cc2ba74e8e00e07e34cfee2da34b4dc5cdd980630a7fe079bc94bd051d
+
+$ lab check 01
+✗ 01 未達
+  判定 : 観測型（練習機の docker に ex01 の状態を尋ね、cgroup のファイルを読んだ）
+  観測 : ex01（イメージ alpine:3.24.2・コマンド sleep）が動いているか: true
+         /sys/fs/cgroup/system.slice/docker-449062cc2ba7….scope/memory.max = 67108864
+         上限は 100663296（96 × 1024 × 1024）ではない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+
+$ docker rm -f ex01
+ex01
+
+$ docker run -d --name ex01 --memory 96m busybox:1.38.0 sleep 3600
+0963524af774a8751abc8dd76bd9b275d985e9ea6972669cff5450098a87899d
+
+$ lab check 01
+✗ 01 未達
+  判定 : 観測型（練習機の docker に ex01 の状態を尋ね、cgroup のファイルを読んだ）
+  観測 : ex01（イメージ busybox:1.38.0・コマンド sleep）が動いているか: true
+         イメージが alpine:3.24.2 の中身（294b683cb724）ではない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+
+$ docker rm -f ex01
+ex01
+
+$ docker run -d --name ex01 --memory 96m alpine:3.24.2 sleep 3600
+05587e47e76676eb2c2e4b8a8dc15db5d375340e196501c65eb7f19593b929ef
+
+$ cat /sys/fs/cgroup/system.slice/docker-$(docker inspect -f '{{.Id}}' ex01).scope/memory.max
+100663296
+
+$ lab check 01
+✔ 01 達成
+  判定 : 観測型（練習機の docker に ex01 の状態を尋ね、cgroup のファイルを読んだ）
+  観測 : ex01（イメージ alpine:3.24.2・コマンド sleep）が動いているか: true
+         /sys/fs/cgroup/system.slice/docker-05587e47e766….scope/memory.max = 100663296
+         → ex01 のかごに 96MiB の上限が書かれている
+
+
+========== 演習 02 docker stop が TERM で終わるコンテナを動かす ==========
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（ex02 に docker stop を打ち、かかった時間と終了コードを見た。見た後は docker start で起動し直した）
+  観測 : ex02 という名前のコンテナが無い（docker inspect ex02: error: no such object: ex02）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ docker run -d --name ex02 alpine:3.24.2 sleep 3600
+b22d1ac18d6b2836a72a7ff0801ece149a5f17fef2b1a97f74e4f814244c7de6
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（ex02 に docker stop を打ち、かかった時間と終了コードを見た。見た後は docker start で起動し直した）
+  観測 : docker stop ex02 に 11.8 秒、終了コード 137（--init なし）
+         137 = 128 + 9。TERM は届かず、待ち時間の後に KILL で止められた
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ docker rm -f ex02
+ex02
+
+$ docker run -d --name ex02 --init --stop-signal HUP alpine:3.24.2 sleep 3600
+704a3152ca8a2ea81b9035eccfc8bc92aef4959d806933d0755c0dbc3720812b
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（ex02 に docker stop を打ち、かかった時間と終了コードを見た。見た後は docker start で起動し直した）
+  観測 : docker stop が最初に送る合図が TERM ではない（--stop-signal / STOPSIGNAL が HUP）
+         この演習は、TERM で終わるようにすること
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ docker rm -f ex02
+ex02
+
+$ docker run -d --name ex02 --init alpine:3.24.2 sleep 3600
+1f01acdc27abd66a39156700f95c95f24e18cc84a33c2adbf51fbc75f52de651
+
+$ docker exec ex02 ps
+PID   USER     TIME  COMMAND
+    1 root      0:00 /sbin/docker-init -- sleep 3600
+    7 root      0:00 sleep 3600
+    8 root      0:00 ps
+
+$ lab check 02
+✔ 02 達成
+  判定 : 観測型（ex02 に docker stop を打ち、かかった時間と終了コードを見た。見た後は docker start で起動し直した）
+  観測 : docker stop ex02 に 1.9 秒、終了コード 143（--init あり）
+         143 = 128 + 15。TERM で終わったという報告（--init の docker-init は、子が TERM で終わったことをこの値で報告する）
+         （判定の後、docker start ex02 で起動し直しました）
+
+$ docker ps --format '{{.Names}}: {{.Status}}' --filter name=ex02
+ex02: Up 2 seconds
+
+
+========== 演習 03 付け替えられた名前を、中身に戻す ==========
+
+$ docker tag busybox:1.38.0 ex03:base
+
+$ lab check 03
+✗ 03 未達
+  判定 : 観測型（ex03:base が指す中身のダイジェストを尋ね、その中身を起動した）
+  観測 : ex03:base が指す中身 = sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+         docker run --rm ex03:base cat /etc/alpine-release → cat: can't open '/etc/alpine-release': No such file or directory
+         Alpine 3.24.2 の中身（sha256:294b683cb724…）ではない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+
+$ docker tag 294b683cb724 ex03:base
+
+$ docker image inspect ex03:base --format '{{.Id}}'
+sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+
+$ lab check 03
+✔ 03 達成
+  判定 : 観測型（ex03:base が指す中身のダイジェストを尋ね、その中身を起動した）
+  観測 : ex03:base が指す中身 = sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+         docker run --rm ex03:base cat /etc/alpine-release → 3.24.2
+         → 名前が Alpine 3.24.2 の中身（ダイジェスト一致）を指している
+
+
+========== 演習 04 コンテナを消しても残るデータを置く ==========
+
+$ lab check 04
+✗ 04 未達
+  判定 : 観測型（練習機の上のボリュームの置き場所を読み、ボリュームを使うコンテナを数えた）
+  観測 : ex04-data という名前付きボリュームが無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+
+$ docker run -d --name ex04-writer -v ex04-data:/data alpine:3.24.2 sh -c "echo \"keep me\" > /data/memo.txt; sleep 3600"
+0f8ade6fccc3c9c8f5c4e8df3a7fd3ac1312c0400273b71bcc55345e94429825
+
+$ lab check 04
+✗ 04 未達
+  判定 : 観測型（練習機の上のボリュームの置き場所を読み、ボリュームを使うコンテナを数えた）
+  観測 : /var/lib/docker/volumes/ex04-data/_data/memo.txt → 「keep me」
+         ex04-data を使っているコンテナ: ex04-writer 
+         ex04-data を使っているコンテナが残っている
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+
+$ docker rm -f ex04-writer
+ex04-writer
+
+$ sudo cat /var/lib/docker/volumes/ex04-data/_data/memo.txt
+keep me
+
+$ lab check 04
+✔ 04 達成
+  判定 : 観測型（練習機の上のボリュームの置き場所を読み、ボリュームを使うコンテナを数えた）
+  観測 : /var/lib/docker/volumes/ex04-data/_data/memo.txt → 「keep me」
+         ex04-data を使っているコンテナ: 無し
+         → 書いたコンテナはもう無いが、データはボリュームに残っている
+
+
+========== 演習 05 練習機の外から届くように、ポートを公開する ==========
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（外の lab@host から実際に curl http://127.0.0.1:8080/ を打ち、ex05 の公開の設定を尋ねた）
+  観測 : ex05 が無いか、80 番を公開していない（docker port ex05 80: Error response from daemon: No such container: ex05）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+$ docker run -d --name ex05 -p 8080:80 busybox:1.38.0 sh -c 'mkdir -p /www && echo "hello from ex05" > /www/index.html && exec httpd -f -p 80 -h /www'
+9ac1cff57672ae05104f9831c1fc4bf711233c6fe3676baae51a75b154459f00
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（外の lab@host から実際に curl http://127.0.0.1:8080/ を打ち、ex05 の公開の設定を尋ねた）
+  観測 : docker port ex05 80 → 0.0.0.0:8080 [::]:8080 
+         外から curl http://127.0.0.1:8080/ → hello from ex05
+         全部のアドレス（0.0.0.0 / ::）で待ち受けている
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+$ docker rm -f ex05
+ex05
+
+$ docker run -d --name ex05 -p 10.0.2.15:8080:80 busybox:1.38.0 sh -c 'mkdir -p /www && echo "hello from ex05" > /www/index.html && exec httpd -f -p 80 -h /www'
+f3e0a949bba2a1c67602639959d3c60af116d4a78bd2eafbe7e96e9db1b68949
+
+$ docker port ex05
+80/tcp -> 10.0.2.15:8080
+
+$ curl -s http://127.0.0.1:8080/
+hello from ex05
+
+$ lab check 05
+✔ 05 達成
+  判定 : 観測型（外の lab@host から実際に curl http://127.0.0.1:8080/ を打ち、ex05 の公開の設定を尋ねた）
+  観測 : docker port ex05 80 → 10.0.2.15:8080 
+         外から curl http://127.0.0.1:8080/ → hello from ex05
+         → 10.0.2.15:8080 だけで公開し、外からの接続がコンテナに届いた
+
+
+========== 演習 06 キャッシュが効く順に Dockerfile を並べ替える ==========
+
+$ lab check 06
+✗ 06 未達
+  判定 : 観測型（~/ex06 を写した場所で greet.sh を書き換えて実際にビルドし、段ごとのキャッシュの印と、出来たイメージの出力を見た）
+  観測 : ~/ex06 に Dockerfile と greet.sh が無い（課題の【準備】の段階）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+
+$ mkdir -p ~/ex06 && cd ~/ex06 && echo 'echo "hello, $(cat /opt/ready.txt)"' > greet.sh && printf '%s\n' 'FROM alpine:3.24.2' 'COPY greet.sh /opt/greet.sh' 'RUN sleep 8 && echo "ready" > /opt/ready.txt' 'CMD ["sh", "/opt/greet.sh"]' > Dockerfile && docker build -q -t ex06:1 . && docker run --rm ex06:1
+sha256:83fb13c802c6401f8ead112469e95fe7925acf582caba7563297a780bdb7e891
+hello, ready
+
+$ lab check 06
+✗ 06 未達
+  判定 : 観測型（~/ex06 を写した場所で greet.sh を書き換えて実際にビルドし、段ごとのキャッシュの印と、出来たイメージの出力を見た）
+  観測 : greet.sh を書き換えた後のビルドで、[3/3] RUN sleep 8 && echo "ready" > /opt/ready.txt
+         → 作り直された（CACHED ではない）
+         出来たイメージの出力: hello, ready
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+
+$ cd ~/ex06 && printf '%s\n' 'FROM alpine:3.24.2' 'RUN mkdir -p /opt' 'COPY greet.sh /opt/greet.sh' 'RUN sleep 8 && echo "ready" > /opt/ready.txt' 'CMD ["sh", "/opt/greet.sh"]' > Dockerfile && docker build -q -t ex06:1 . && docker run --rm ex06:1
+sha256:c6ca3ad8af00b3da4c4b8066331015607d4af956c241911d33c89aa5f0bc9078
+hello, ready
+
+$ lab check 06
+✗ 06 未達
+  判定 : 観測型（~/ex06 を写した場所で greet.sh を書き換えて実際にビルドし、段ごとのキャッシュの印と、出来たイメージの出力を見た）
+  観測 : greet.sh を書き換えた後のビルドで、[4/4] RUN sleep 8 && echo "ready" > /opt/ready.txt
+         → 作り直された（CACHED ではない）
+         出来たイメージの出力: hello, ready
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+
+$ cd ~/ex06 && printf '%s\n' 'FROM alpine:3.24.2' 'RUN sleep 8 && echo "ready" > /opt/ready.txt' 'COPY greet.sh /opt/greet.sh' 'CMD ["sh", "/opt/greet.sh"]' > Dockerfile && cat Dockerfile && docker build -q -t ex06:1 . && docker run --rm ex06:1
+FROM alpine:3.24.2
+RUN sleep 8 && echo "ready" > /opt/ready.txt
+COPY greet.sh /opt/greet.sh
+CMD ["sh", "/opt/greet.sh"]
+sha256:a23b5b6550d8533634bd82a8306880fc54db27f8ad2b0e9c8aa2ebdc204f7328
+hello, ready
+
+$ lab check 06
+✔ 06 達成
+  判定 : 観測型（~/ex06 を写した場所で greet.sh を書き換えて実際にビルドし、段ごとのキャッシュの印と、出来たイメージの出力を見た）
+  観測 : greet.sh を書き換えた後のビルドで、[2/3] RUN sleep 8 && echo "ready" > /opt/ready.txt
+         → CACHED（前回の層を使った）
+         出来たイメージの出力: hello, ready
+         → greet.sh を直しても、時間のかかる RUN の段（sleep 8）は作り直されない
+
+
+========== 演習 07 必要な特権だけを渡して起動する ==========
+
+$ lab check 07
+✗ 07 未達
+  判定 : 観測型（ex07 に渡した特権の一覧を尋ね、ex07 の中で仮想の NIC を作って消した）
+  観測 : ex07 という名前のコンテナが無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+
+$ docker run -d --name ex07 --privileged alpine:3.24.2 sleep 3600
+b8f46acc753bc4c19170c62d743c223c2a291139792ffcb39b515f6a54d89eca
+
+$ lab check 07
+✗ 07 未達
+  判定 : 観測型（ex07 に渡した特権の一覧を尋ね、ex07 の中で仮想の NIC を作って消した）
+  観測 : ex07 動いている=true / --privileged=true / 足したケーパビリティ=null
+         --privileged で起動している（全部を渡している）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+
+$ docker rm -f ex07
+ex07
+
+$ docker run -d --name ex07 --cap-add ALL alpine:3.24.2 sleep 3600
+1547cf30afe8c2dcc962dac9ce204443894857f8e4d52b1cef1468bccd717a7c
+
+$ lab check 07
+✗ 07 未達
+  判定 : 観測型（ex07 に渡した特権の一覧を尋ね、ex07 の中で仮想の NIC を作って消した）
+  観測 : ex07 動いている=true / --privileged=false / 足したケーパビリティ=["ALL"]
+         ex07 の PID 1 の CapEff=000001ffffffffff / 中で ip link add … type dummy → ok
+         ALL は1つではなく全部のケーパビリティを足す（CapEff が全部の 000001ffffffffff になる）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+
+$ docker rm -f ex07
+ex07
+
+$ docker run -d --name ex07 --cap-add NET_ADMIN alpine:3.24.2 sleep 3600
+2b70256b23891131cec5217a43df23238174cdd300a3cb7b5d84cab8be50e414
+
+$ docker exec ex07 grep CapEff /proc/self/status
+CapEff:	00000000a80435fb
+
+$ lab check 07
+✔ 07 達成
+  判定 : 観測型（ex07 に渡した特権の一覧を尋ね、ex07 の中で仮想の NIC を作って消した）
+  観測 : ex07 動いている=true / --privileged=false / 足したケーパビリティ=["CAP_NET_ADMIN"]
+         ex07 の PID 1 の CapEff=00000000a80435fb / 中で ip link add … type dummy → ok
+         → ケーパビリティを1つだけ足して、ネットワークの設定が通った
+
+  ════════════════════════════════════════
+   確かめて説明する Docker — 全7演習クリア
+  ════════════════════════════════════════
+
+  所要 5分（最初の達成から最後の達成まで）
+
+  自分の手で確かめたこと
+
+   ✔ 01  コンテナの使える量は cgroup のかごで決まり、上限は練習機のファイル（memory.max）に書かれる
+   ✔ 02  コンテナの PID 1 は受け取る準備をしていない合図を受け取らず、docker stop は待った後に KILL する
+   ✔ 03  名前（タグ）は中身を指す札で、中身はダイジェスト（ID）で決まる
+   ✔ 04  コンテナの書き込み用の層はコンテナと一緒に消え、残したいものはボリュームに置く
+   ✔ 05  ポートの公開はカーネルの宛先の書き換え（DNAT）で、待ち受けるアドレスで届く範囲を絞る
+   ✔ 06  ビルドのキャッシュは変わった段から後ろで使えなくなるので、よく変わるものを後ろに置く
+   ✔ 07  --cap-add は特権を1つずつ足し、何が増えたかは CapEff で測れる
+
+  この7つは全部、1つの事実から出ていました。
+
+      docker は自分では何も閉じ込めない。練習機のカーネルに頼んで、1つのプロセスに
+      見え方の区切り（名前空間）・使える量の区切り（cgroup）・重ねたファイルの木（overlay）を付けているだけだ。
+      コンテナの中身も力も、起動するときに渡したもの（ダイジェスト・ボリューム・ポート・特権）で決まる。
+
+  理論編の最終章に、それぞれがどう繋がるかを書いてあります → /docker/theory/07-privileges
+
+
+
+========== 全問の後 ==========
+
+$ lab ls
+演習一覧
+  ✔ 01  メモリの上限を付けたコンテナを動かす 8分 / 影響度 B
+  ✔ 02  docker stop が TERM で終わるコンテナを動かす 10分 / 影響度 B
+  ✔ 03  付け替えられた名前を、中身に戻す 8分 / 影響度 B
+  ✔ 04  コンテナを消しても残るデータを置く 10分 / 影響度 B
+  ✔ 05  練習機の外から届くように、ポートを公開する 12分 / 影響度 B
+  ✔ 06  キャッシュが効く順に Dockerfile を並べ替える 15分 / 影響度 B
+  ✔ 07  必要な特権だけを渡して起動する 10分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手

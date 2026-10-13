@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. podman には、頼む相手のデーモンがいない — 確かめて説明する Podman</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="1" data-theme="podman">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <a href="/podman/theory/">理論編</a> › 第1章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/">詳しく</a></p>
+</div>
+<h1>1. podman には、頼む相手のデーモンがいない</h1>
+<p class="lead"><code>docker</code> コマンドは root で動く dockerd に頼むだけだった。<code>podman</code> コマンドは、頼む相手を持たない。
+自分でコンテナを作り、見張り役の小さなプロセス（<b>conmon</b>）を1つ残して、すぐに終わる。
+コンテナの一覧も、デーモンに尋ねるのではなく、ディスクに書いた記録を自分で読んでいる。</p>
+<div class="badges"><span>前提: 実践編の入口で練習機に入れた（ssh linuc）。<a href="/docker/theory/01-process">Docker 第1章</a>を読んでいると比べやすい</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>podman でコンテナを動かしている間、podman のプロセスが残っていないことを <code>ps</code> で示せる</li>
+<li>コンテナのプロセスの親が conmon で、conmon が OCI ランタイム（crun）を呼んだことを、引数から読める</li>
+<li>デーモンが無いので、コンテナの状態がどこに書かれ、誰の systemd の下で動いているかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: conmon の全オプション、podman の状態のデータベースの中身、
+crun と runc の実装の違い、<code>podman system service</code>（docker 互換の API。第7章で少しだけ使う）。</div></div>
+
+<h2 id="none">docker のデーモンは止まっている</h2>
+<div class="sgoal"><b>この節で分かること</b>: この練習機では、docker のデーモンが動いていないこと。</div>
+<p>この記事の練習機は Docker の記事と同じディスクで、docker も入っている。ただし初回の準備で、docker のデーモンは止めてある。
+この記事の端末は、すべて<b>練習機の中</b>（プロンプトが <code>student@linuc</code>）で打つ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ systemctl is-active docker.service containerd.service
+@@ docker ps</code></pre>
+<p>dockerd も containerd も止まっていて、<code>docker</code> コマンドは頼む相手がいないので何もできない。</p>
+
+<h2 id="run">podman でコンテナを動かし、プロセスを並べる</h2>
+<div class="sgoal"><b>この節で分かること</b>: podman のコンテナが動いている間に、何のプロセスが残っているか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>podman も docker と同じだ。<code>podman run -d</code> は裏で動いているデーモンに頼んでいて、コンテナはそのデーモンの子として動いているはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman run -d --name p1 alpine:3.24.2 sleep 1000
+@@ podman ps
+@@ ps -o pid,ppid,user,comm -C podman,conmon,sleep,catatonit,dockerd</code></pre>
+<div class="then"><b>だめな理由</b>: コンテナは動いているのに、<code>podman</code> という名前のプロセスはどこにもいない。dockerd もいない。
+<code>sleep 1000</code> の親は <b><code>conmon</code></b> で、conmon の親は PID 1（練習機の systemd）である（シェルから起動したとき。第6章の quadlet で起動すると、conmon の親は student の systemd になる）。
+<b><code>podman run -d</code> はコンテナを作り、見張り役の conmon を残して、自分は終わった</b>。頼む相手のデーモンは最初からいない。
+<code>catatonit</code> は、student のユーザ名前空間（第2章）を保っておくための、何もしないプロセスである。</div></div>
+
+<div class="analogy"><b>たとえ</b>: <code>podman run -d</code> は、<b>料理を届けたら帰る出前の配達員</b>に近い。料理（コンテナ）は客の家に残り、配達員（podman コマンド）は店に戻る。お皿を下げる係（conmon）だけが、食べ終わるのを待っている。
+<br>ただし<b>崩れる点</b>: 配達員は二度と関わらないが、podman は、お皿を下げる係（conmon）から呼び戻される（<code>--exit-command</code>）。後始末と記録は、もう一度起動した podman がする。</div>
+
+<h2 id="conmon">conmon は、何を見張っているか</h2>
+<div class="sgoal"><b>この節で分かること</b>: conmon の役目と、コンテナを作った OCI ランタイム。</div>
+<pre data-where="練習機の中（student@linuc）"><code>@@ ps -o args= -C conmon | tr ' ' '\n' | grep -A1 -E '^-(c|r|b|n|l)$|^--exit-command$'
+@@ podman info --format '{{.Host.OCIRuntime.Name}} / {{.Host.Conmon.Version}}'</code></pre>
+<p>conmon の引数を1つ1行に分け、意味のあるものだけを、その次の行の値と一緒に抜き出した（<code>--</code> の行は、grep が抜き出した組の区切りに入れたもの）。<code>-c</code> はコンテナの ID、<code>-n</code> は名前、<code>-r /usr/bin/crun</code> はコンテナを作る <b>OCI ランタイム</b>、
+<code>-b</code> はコンテナの設定の置き場所（バンドル）、<code>-l journald</code> はコンテナの出力の送り先、<code>--exit-command</code> はコンテナが終わったときに呼ぶもの（<code>/usr/bin/podman</code>）である。</p>
+<div class="scroll"><table>
+<tr><th>docker（<a href="/docker/theory/01-process">Docker 第1章</a>）</th><th>podman</th><th>役目</th></tr>
+<tr><td>docker CLI → dockerd → containerd</td><td>podman（コマンドそのもの）</td><td>頼みを受けて、コンテナを作る準備をする。podman は自分でやる</td></tr>
+<tr><td>containerd-shim</td><td>conmon</td><td>コンテナ1つに1つ付き添い、プロセスの親になり、終了の記録を残す</td></tr>
+<tr><td>runc</td><td>crun</td><td>名前空間と cgroup を設定してプロセスを作り、すぐ終わる（どちらも OCI ランタイム仕様を満たす）</td></tr>
+</table></div>
+<p>conmon が残るのは、コンテナのプロセスの親になって、その終わり（終了コード）を受け取るためである。デーモンがいないので、
+受け取った終了コードはファイルに書き、<code>--exit-command</code> で podman をもう一度呼んで、後始末と記録を頼む。</p>
+<div class="analogy"><b>たとえ</b>: docker は<b>常駐の管理人がいる駐車場</b>、podman は<b>コインパーキング</b>に近い。管理人（dockerd）がいれば、車の出し入れは全部管理人に頼む。
+コインパーキングでは、利用者（podman コマンド）が自分で車を停め、車ごとに付いた精算機（conmon）が出庫を見張って記録する。
+<br>ただし<b>崩れる点</b>: 精算機は出庫したら料金を計算して終わるが、conmon はコンテナが終わると podman を呼び直して後始末を頼む。
+見張り役から利用者の道具が呼ばれる、という逆向きの呼び出しがある。</div>
+
+<h2 id="state">デーモンがいないのに、一覧はどこから来るか</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>podman ps</code> が読んでいる記録と、コンテナが入っている cgroup の場所。</div>
+<pre data-where="練習機の中（student@linuc）"><code>@@ ls ~/.local/share/containers/storage
+@@ ls -l ~/.local/share/containers/storage/db.sql
+@@ cat /proc/$(podman inspect -f '{{.State.Pid}}' p1)/cgroup</code></pre>
+<p><code>podman ps</code> は、student のホームの下の記録（<code>db.sql</code> という SQLite のデータベースと、<code>/run/user/1000/</code> の下の実行時の記録）を、毎回自分で読んでいる。
+コンテナのプロセスは、練習機の <code>system.slice</code>（root のサービスの置き場所）ではなく、
+<b>student の systemd</b>（<code>user@1000.service</code>）の下のかごに入っている。student のログインに結びついたこの systemd が、第6章の主役になる。</p>
+<div class="analogy"><b>たとえ</b>: デーモンのいない podman の一覧は、<b>共有の台帳ノート</b>に近い。誰か（podman コマンド）が車を停めるたびにノートに書き、一覧が要るときはノートを開いて読む。
+<br>ただし<b>崩れる点</b>: ノートは書いた人がいなくても残るが、podman の記録の一部（<code>/run/user/1000/</code> の下）は、student の systemd が止まると消える。
+ノートの半分が鉛筆書きで、ログアウトすると消えるようなものだ（第6章で実際に消える）。</div>
+<p>最後に片付ける。<code>-t 0</code> は「止まるまで待つ時間を 0 秒に」で、<code>sleep</code> が TERM を受け取らない（PID 1 の決まり。<a href="/docker/theory/02-pid1">Docker 第2章</a>）ので、待たずに KILL する。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman rm -f -t 0 p1
+@@ podman ps -a</code></pre>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/podman/practice/">演習01</a>で、podman のコンテナを起動し、その親の conmon の PID を自分で突き止める。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>podman run -d</code> の後、<code>ps -C podman</code> に何も出なかった。それでもコンテナが動き続けているのはなぜか。</p>
+<details><summary>答え</summary>
+<p>コンテナのプロセスの親は conmon で、podman コマンドではないから。podman はコンテナを作って conmon を残し、自分は終わる。
+conmon は（シェルから起動したなら PID 1 の）systemd の子として動き続け、コンテナの終了を見届ける。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>docker で dockerd を止めると <code>docker ps</code> は何も答えられないが、podman ではそういうことが起きない。なぜか。</p>
+<details><summary>答え</summary>
+<p>podman には頼む相手のデーモンがいないから。<code>podman ps</code> はディスクの上の記録（<code>~/.local/share/containers/storage/db.sql</code> など）を自分で読む。
+止めて困るような常駐のプロセスが無い。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>コンテナのプロセスの cgroup が <code>/user.slice/user-1000.slice/user@1000.service/…</code> だった。docker のコンテナ（<code>/system.slice/docker-….scope</code>）と比べて、何が違うと言えるか。</p>
+<details><summary>答え</summary>
+<p>docker のコンテナは root の systemd のサービスの置き場所（system.slice）に入り、podman の rootless のコンテナは student 自身の systemd（user@1000.service）の下に入る。
+コンテナが student の持ち物として扱われていて、student の systemd が止まれば一緒に止まりうる（第6章）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>podman には頼む相手のデーモンがいない。podman コマンドがコンテナを作り、conmon を残して終わる</li>
+<li>conmon はコンテナ1つに1つ付き添い、プロセスの親になって終了を見届ける（docker の shim にあたる）。作るのは crun（docker の runc にあたる）</li>
+<li>一覧や状態は、ディスク（<code>~/.local/share/containers/storage</code>）と <code>/run/user/1000</code> の記録を、podman が毎回読む</li>
+<li>rootless のコンテナは、student の systemd（user@1000.service）の下のかごで動く</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:podman-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・podman 4.9.3・conmon 2.1.10・crun 1.14.1・netavark 1.4.0）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/podman/theory/">← 理論編 目次</a><a href="/podman/theory/02-userns">次: 2. コンテナの中の root は、外では student →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/podman/">Podman</a> · <a href="/podman/theory/">理論編 目次</a> · <a href="/podman/practice/">実践編</a> · <a href="/podman/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/podman/chapters.js"></script>
+<script src="/podman/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

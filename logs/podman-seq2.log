@@ -1,0 +1,548 @@
+# 本文の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run -d --hostname host --stop-timeout 30、
+# /home/lab/vm と /home/lab/.lab にボリューム）と同じ入り方（docker exec -it … bash -l → ssh linuc。端末あり・
+# TERM=xterm）の、練習機の中の1つの対話のログインシェルに、第1章から順に通して打った記録。
+# 端末 80 桁 × 24 行。作り方: python3 -I probe/docker-seq.py --slug podman --src pages（イメージ lab-podman:1.0.0）
+
+
+========== 1. 01-daemonless.html ==========
+
+$ systemctl is-active docker.service containerd.service
+inactive
+inactive
+
+$ docker ps
+Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
+
+$ podman run -d --name p1 alpine:3.24.2 sleep 1000
+e9849bbb0ee8c795b0ae6846ac67aa79206e65db6f6ee7b07116ddccbd62e148
+
+$ podman ps
+CONTAINER ID  IMAGE                            COMMAND     CREATED        STATUS        PORTS       NAMES
+e9849bbb0ee8  docker.io/library/alpine:3.24.2  sleep 1000  4 seconds ago  Up 3 seconds              p1
+
+$ ps -o pid,ppid,user,comm -C podman,conmon,sleep,catatonit,dockerd
+    PID    PPID USER     COMMAND
+    804       1 student  catatonit
+    823       1 student  conmon
+    825     823 student  sleep
+
+$ ps -o args= -C conmon | tr ' ' '\n' | grep -A1 -E '^-(c|r|b|n|l)$|^--exit-command$'
+-c
+e9849bbb0ee8c795b0ae6846ac67aa79206e65db6f6ee7b07116ddccbd62e148
+--
+-r
+/usr/bin/crun
+-b
+/home/student/.local/share/containers/storage/overlay-containers/e9849bbb0ee8c795b0ae6846ac67aa79206e65db6f6ee7b07116ddccbd62e148/userdata
+--
+-n
+p1
+--
+-l
+journald
+--
+--exit-command
+/usr/bin/podman
+
+$ podman info --format '{{.Host.OCIRuntime.Name}} / {{.Host.Conmon.Version}}'
+crun / conmon version 2.1.10, commit: unknown
+
+$ ls ~/.local/share/containers/storage
+db.sql                 networks            overlay-images  userns.lock
+defaultNetworkBackend  overlay             overlay-layers
+libpod                 overlay-containers  storage.lock
+
+$ ls -l ~/.local/share/containers/storage/db.sql
+-rw-r--r-- 1 student student 122880 Oct 14 03:21 /home/student/.local/share/containers/storage/db.sql
+
+$ cat /proc/$(podman inspect -f '{{.State.Pid}}' p1)/cgroup
+0::/user.slice/user-1000.slice/user@1000.service/user.slice/libpod-e9849bbb0ee8c795b0ae6846ac67aa79206e65db6f6ee7b07116ddccbd62e148.scope/container
+
+$ podman rm -f -t 0 p1
+p1
+
+$ podman ps -a
+CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
+
+
+========== 2. 02-userns.html ==========
+
+$ mkdir ~/share
+
+$ podman run --rm -v "$HOME/share":/share alpine:3.24.2 sh -c 'id -u; touch /share/by-root; ls -ln /share'
+0
+total 0
+-rw-r--r--    1 0        0                0 Oct 13 18:22 by-root
+
+$ ls -ln ~/share
+total 0
+-rw-r--r-- 1 1000 1000 0 Oct 14 03:22 by-root
+
+$ cat /proc/self/uid_map
+         0          0 4294967295
+
+$ podman unshare cat /proc/self/uid_map
+         0       1000          1
+         1     100000      65536
+
+$ grep student /etc/subuid /etc/subgid
+/etc/subuid:student:100000:65536
+/etc/subgid:student:100000:65536
+
+$ ls -l /usr/bin/newuidmap /usr/bin/newgidmap
+-rwsr-xr-x 1 root root 41864 May 30  2024 /usr/bin/newgidmap
+-rwsr-xr-x 1 root root 41864 May 30  2024 /usr/bin/newuidmap
+
+$ podman run --rm --user 1000:1000 -v "$HOME/share":/share alpine:3.24.2 touch /share/by-1000
+touch: /share/by-1000: Permission denied
+
+$ podman run --rm -v "$HOME/share":/share alpine:3.24.2 ls -lnd /share
+drwxrwxr-x    2 0        0             4096 Oct 13 18:22 /share
+
+$ podman unshare chown 1000:1000 ~/share
+
+$ ls -lnd ~/share
+drwxrwxr-x 2 100999 100999 4096 Oct 14 03:22 /home/student/share
+
+$ podman run --rm --user 1000:1000 -v "$HOME/share":/share alpine:3.24.2 touch /share/by-1000
+
+$ ls -ln ~/share
+total 0
+-rw-r--r-- 1 100999 100999 0 Oct 14 03:22 by-1000
+-rw-r--r-- 1   1000   1000 0 Oct 14 03:22 by-root
+
+$ podman unshare ls -ln ~/share
+total 0
+-rw-r--r-- 1 1000 1000 0 Oct 14 03:22 by-1000
+-rw-r--r-- 1    0    0 0 Oct 14 03:22 by-root
+
+$ rm -rf ~/share
+rm: cannot remove '/home/student/share/by-root': Permission denied
+rm: cannot remove '/home/student/share/by-1000': Permission denied
+
+$ podman unshare rm -rf ~/share
+
+$ ls -d ~/share
+ls: cannot access '/home/student/share': No such file or directory
+
+
+========== 3. 03-storage.html ==========
+
+$ podman images
+REPOSITORY                 TAG         IMAGE ID      CREATED       SIZE
+docker.io/library/alpine   3.24.2      320994c3b997  3 weeks ago   8.72 MB
+docker.io/library/busybox  1.38.0      aaef90e06523  5 months ago  4.69 MB
+
+$ sudo podman images
+REPOSITORY  TAG         IMAGE ID    CREATED     SIZE
+
+$ podman info --format '{{.Store.GraphRoot}}'
+/home/student/.local/share/containers/storage
+
+$ sudo podman info --format '{{.Store.GraphRoot}}'
+/var/lib/containers/storage
+
+$ du -sh ~/.local/share/containers/storage
+14M	/home/student/.local/share/containers/storage
+
+$ podman images --digests alpine
+REPOSITORY                TAG         DIGEST                                                                   IMAGE ID      CREATED      SIZE
+docker.io/library/alpine  3.24.2      sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6  320994c3b997  3 weeks ago  8.72 MB
+
+$ podman save alpine:3.24.2 | sudo podman load
+Getting image source signatures
+Copying blob 74d97c428c51 done   |
+Copying config 320994c3b9 done   |
+Writing manifest to image destination
+Loaded image: docker.io/library/alpine:3.24.2
+
+$ sudo podman images --digests alpine
+REPOSITORY                TAG         DIGEST                                                                   IMAGE ID      CREATED      SIZE
+docker.io/library/alpine  3.24.2      sha256:4d5cf6fa4d69da5c2b2a04a7ac06083e9d567e768c4f44c4333bb335a0226b06  320994c3b997  3 weeks ago  8.71 MB
+
+$ sudo podman rmi alpine:3.24.2
+Untagged: docker.io/library/alpine:3.24.2
+Deleted: 320994c3b997e2ec6433f717f153e108023c5bec8fefa8d76b83451d16d05ea8
+
+$ sudo podman images
+REPOSITORY  TAG         IMAGE ID    CREATED     SIZE
+
+
+========== 4. 04-network.html ==========
+
+$ podman run -d --name web -p 127.0.0.1:80:80 busybox:1.38.0 httpd -f -h /etc
+Error: rootlessport cannot expose privileged port 80, you can add 'net.ipv4.ip_unprivileged_port_start=80' to /etc/sysctl.conf (currently 1024), or choose a larger port number (>= 1024): listen tcp 127.0.0.1:80: bind: permission denied
+
+$ sysctl net.ipv4.ip_unprivileged_port_start
+net.ipv4.ip_unprivileged_port_start = 1024
+
+$ podman ps -a --format '{{.Names}}: {{.Status}}'
+web: Created
+
+$ podman rm web
+web
+
+$ podman run -d --name web -p 127.0.0.1:8080:80 busybox:1.38.0 httpd -f -h /etc
+dba79eb6314e4cc8c933ec115f9feac69e3f95725a45cedfda5372ca2d75f950
+
+$ curl -s http://127.0.0.1:8080/hostname
+dba79eb6314e
+
+$ ps -o pid,ppid,user,comm -C rootlessport,exe,slirp4netns,conmon,httpd
+    PID    PPID USER     COMMAND
+   1287       1 student  slirp4netns
+   1289       1 student  rootlessport
+   1294    1289 student  exe
+   1303       1 student  conmon
+   1305    1303 student  httpd
+
+$ ss -ltnp | grep 8080
+LISTEN 0      4096       127.0.0.1:8080      0.0.0.0:*    users:(("rootlessport",pid=1289,fd=5))
+
+$ sudo iptables -t nat -S | grep -c 8080
+0
+
+$ podman exec web ip -4 addr show tap0
+2: tap0: <BROADCAST,UP,LOWER_UP> mtu 65520 qdisc fq_codel qlen 1000
+    inet 10.0.2.100/24 brd 10.0.2.255 scope global tap0
+       valid_lft forever preferred_lft forever
+
+$ podman exec web ip route
+default via 10.0.2.2 dev tap0
+10.0.2.0/24 dev tap0 scope link  src 10.0.2.100
+
+$ podman exec web cat /etc/resolv.conf
+nameserver 10.0.2.3
+nameserver 10.0.2.3
+
+$ ip -br addr show enp0s16
+enp0s16          UP             10.0.2.15/24 metric 100 fec0::5054:ff:fe12:3456/64 fe80::5054:ff:fe12:3456/64
+
+$ podman run --rm --network pasta alpine:3.24.2 ip -4 addr show
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN qlen 1000
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+2: enp0s16: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 65520 qdisc fq_codel state UNKNOWN qlen 1000
+    inet 10.0.2.15/24 brd 10.0.2.255 scope global enp0s16
+       valid_lft forever preferred_lft forever
+
+$ podman run --rm alpine:3.24.2 ip -4 addr show
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN qlen 1000
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+2: tap0: <BROADCAST,UP,LOWER_UP> mtu 65520 qdisc fq_codel state UNKNOWN qlen 1000
+    inet 10.0.2.100/24 brd 10.0.2.255 scope global tap0
+       valid_lft forever preferred_lft forever
+
+$ podman rm -f -t 0 web
+web
+
+
+========== 5. 05-pod.html ==========
+
+$ podman pod create --name pod1 -p 127.0.0.1:8081:80
+8ef4f2c8a7142b0f6428e068538c35432cad9133aa0e27e135defd632d4aaecb
+
+$ podman ps -a --pod --format '{{.Names}}  {{.Image}}  {{.PodName}}'
+8ef4f2c8a714-infra  localhost/podman-pause:4.9.3-0  pod1
+
+$ podman images
+REPOSITORY                 TAG         IMAGE ID      CREATED        SIZE
+localhost/podman-pause     4.9.3-0     944ccfdda183  3 seconds ago  835 kB
+docker.io/library/alpine   3.24.2      320994c3b997  3 weeks ago    8.72 MB
+docker.io/library/busybox  1.38.0      aaef90e06523  5 months ago   4.69 MB
+
+$ podman run -d --pod pod1 --name pod1-web busybox:1.38.0 httpd -f -h /etc
+c5ad753fd6bdfb3d783edde0a636748d0cce32466f1d558f758e0436a02348b1
+
+$ podman run --rm --pod pod1 alpine:3.24.2 wget -qO- http://127.0.0.1/hostname
+pod1
+
+$ curl -s http://127.0.0.1:8081/hostname
+pod1
+
+$ a=$(podman inspect --format '{{.State.Pid}}' pod1-web)
+
+$ b=$(podman inspect --format '{{.State.Pid}}' $(podman pod inspect --format '{{.InfraContainerID}}' pod1))
+
+$ readlink /proc/$a/ns/net /proc/$a/ns/uts /proc/$a/ns/ipc /proc/$a/ns/pid /proc/$a/ns/mnt
+net:[4026532353]
+uts:[4026532413]
+ipc:[4026532414]
+pid:[4026532418]
+mnt:[4026532417]
+
+$ readlink /proc/$b/ns/net /proc/$b/ns/uts /proc/$b/ns/ipc /proc/$b/ns/pid /proc/$b/ns/mnt
+net:[4026532353]
+uts:[4026532413]
+ipc:[4026532414]
+pid:[4026532415]
+mnt:[4026532411]
+
+$ podman inspect --format '{{.HostConfig.NetworkMode}}' pod1-web
+container:fa43f0ac192ae8809731c8eb598c2fd958dba6b1853a7e9cd439604f2f1d788e
+
+$ ls /run/user/1000/netns/ | wc -l
+1
+
+$ podman stop $(podman pod inspect --format '{{.InfraContainerID}}' pod1)
+fa43f0ac192ae8809731c8eb598c2fd958dba6b1853a7e9cd439604f2f1d788e
+
+$ podman ps -a --pod --format '{{.Names}}  {{.Status}}'
+8ef4f2c8a714-infra  Exited (0) 1 second ago
+pod1-web  Up 14 seconds
+
+$ curl -s -m 5 http://127.0.0.1:8081/hostname; echo "exit=$?"
+exit=7
+
+$ ls /run/user/1000/netns/ | wc -l
+0
+
+$ podman pod rm -f -t 0 pod1
+8ef4f2c8a7142b0f6428e068538c35432cad9133aa0e27e135defd632d4aaecb
+
+$ podman ps -a
+CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
+
+
+========== 6. 06-systemd.html ==========
+
+$ loginctl show-user student -p Linger
+Linger=no
+
+$ podman run -d --name p6 alpine:3.24.2 sleep 3600
+c44ff9a831e454e3b8873d44b21fa6a56c1468459168fef9c44c40c997e19c15
+
+$ podman ps --format '{{.Names}}: {{.Status}}'
+p6: Up 2 seconds
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ sleep 15
+
+$ ssh linuc
+
+  練習機（Ubuntu 24.04 / 仮想マシン）— Docker と Podman の記事
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:21:34 2026 from 10.0.2.2
+
+$ podman ps -a --format '{{.Names}}: {{.Status}}'
+p6: Created
+
+$ podman rm p6
+p6
+
+$ loginctl enable-linger
+
+$ loginctl show-user student -p Linger
+Linger=yes
+
+$ podman run -d --name p6 alpine:3.24.2 sleep 3600
+b912a9be9d0e7cf71e8ad221359eed9e561a68775461e7ad99536c220dcc28b9
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ sleep 15
+
+$ ssh linuc
+
+  練習機（Ubuntu 24.04 / 仮想マシン）— Docker と Podman の記事
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+Last login: Wed Oct 14 03:24:00 2026 from 10.0.2.2
+
+$ podman ps -a --format '{{.Names}}: {{.Status}}'
+p6: Up 21 seconds
+
+$ podman rm -f -t 0 p6
+p6
+
+$ podman run -d --name rs --restart=on-failure:2 alpine:3.24.2 sh -c 'exit 3'
+5182d64e5307131936895e4947a94e598fbdd31b50e4bc0378adf2e150d746eb
+
+$ sleep 15
+
+$ podman inspect rs --format '{{.RestartCount}} {{.State.Status}} {{.State.ExitCode}}'
+2 exited 3
+
+$ podman rm rs
+rs
+
+$ mkdir -p ~/.config/containers/systemd
+
+$ cat > ~/.config/containers/systemd/web.container <<'EOF'
+> [Unit]
+> Description=busybox httpd (quadlet)
+> [Container]
+> Image=docker.io/library/busybox:1.38.0
+> Exec=httpd -f -h /etc
+> PublishPort=127.0.0.1:8082:80
+> [Service]
+> Restart=always
+> [Install]
+> WantedBy=default.target
+> EOF
+
+$ systemctl --user daemon-reload
+
+$ systemctl --user cat web.service | grep -E '^(ExecStart|Restart|WantedBy)='
+Restart=always
+ExecStart=/usr/bin/podman run --name=systemd-%N --cidfile=%t/%N.cid --replace --rm --cgroups=split --sdnotify=conmon -d --publish 127.0.0.1:8082:80 docker.io/library/busybox:1.38.0 httpd -f -h /etc
+WantedBy=default.target
+
+$ ls /run/user/1000/systemd/generator/default.target.wants/
+web.service
+
+$ systemctl --user start web.service
+
+$ systemctl --user is-active web.service
+active
+
+$ curl -s http://127.0.0.1:8082/hostname
+59914b88ab73
+
+$ podman ps --format '{{.Names}}  {{.Ports}}'
+systemd-web  127.0.0.1:8082->80/tcp
+
+$ podman kill systemd-web
+systemd-web
+
+$ sleep 5
+
+$ systemctl --user show -p NRestarts -p ActiveState web.service
+NRestarts=1
+ActiveState=active
+
+$ curl -s http://127.0.0.1:8082/hostname
+9672488e2ad0
+
+$ systemctl --user stop web.service
+
+$ rm ~/.config/containers/systemd/web.container
+
+$ systemctl --user daemon-reload
+
+$ loginctl disable-linger
+
+$ loginctl show-user student -p Linger
+Linger=no
+
+$ podman ps -a
+CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
+
+
+========== 7. 07-compat.html ==========
+
+$ podman run --rm alpine:3.24.2 grep CapEff /proc/self/status
+CapEff:	00000000800405fb
+
+$ capsh --decode=00000000800405fb
+0x00000000800405fb=cap_chown,cap_dac_override,cap_fowner,cap_fsetid,cap_kill,cap_setgid,cap_setuid,cap_setpcap,cap_net_bind_service,cap_sys_chroot,cap_setfcap
+
+$ podman run --rm alpine:3.24.2 ls /run/.containerenv
+/run/.containerenv
+
+$ podman run --rm alpine:3.24.2 ls /.dockerenv
+ls: /.dockerenv: No such file or directory
+
+$ podman run --rm alpine:3.24.2 sh -c 'cat /proc/sys/net/ipv4/ping_group_range; ping -c1 -q 127.0.0.1 >/dev/null 2>&1 && echo ping-ok || echo ping-ng'
+0	0
+ping-ok
+
+$ podman run --rm --user 1000:1000 alpine:3.24.2 sh -c 'ping -c1 -q 127.0.0.1 >/dev/null 2>&1 && echo ping-ok || echo ping-ng'
+ping-ng
+
+$ podman run --rm --user 1000:1000 --cap-add NET_RAW alpine:3.24.2 sh -c 'ping -c1 -q 127.0.0.1 >/dev/null 2>&1 && echo ping-ok || echo ping-ng'
+ping-ok
+
+$ podman run -d --name p7 alpine:3.24.2 sleep 1000
+ffe5984358a1646f9d48314418505911af40d95e35760ec701852b91b5cd42ba
+
+$ podman exec p7 sh -c 'umask; echo "TERM=$TERM"'
+0022
+TERM=
+
+$ umask
+0002
+
+$ grep Umask /proc/$(pgrep -x conmon)/status
+Umask:	0022
+
+$ podman exec -d p7 sleep 2000
+e732df1efc99e37ae0c364543c66f3f59934dad94e08272d6a71a38df0dd9904
+
+$ ps -o pid,ppid,comm -C sleep,conmon
+    PID    PPID COMMAND
+   2315       1 conmon
+   2318    2315 sleep
+   2353       1 conmon
+   2356    2353 sleep
+
+$ podman run -d --name p7u --umask 0077 alpine:3.24.2 sleep 1000
+4d101f88e6a87349aea2bceef86087af900711e75d04a68f0e0dbca80f0310ae
+
+$ podman exec p7u sh -c umask
+0077
+
+$ grep Umask /proc/$(podman inspect -f '{{.State.ConmonPid}}' p7u)/status
+Umask:	0022
+
+$ podman inspect p7 p7u --format '{{.Name}} {{.Config.Umask}}'
+p7 0022
+p7u 0077
+
+$ podman rm -f -t 0 p7u
+p7u
+
+$ time podman stop p7
+WARN[0010] StopSignal SIGTERM failed to stop container p7 in 10 seconds, resorting to SIGKILL
+p7
+
+real	0m11.672s
+user	0m1.048s
+sys	0m1.276s
+
+$ podman rm p7
+p7
+
+$ systemctl --user start podman.socket
+
+$ ls -l /run/user/1000/podman/podman.sock
+srw-rw---- 1 student student 0 Oct 14 03:26 /run/user/1000/podman/podman.sock
+
+$ export DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
+
+$ docker version --format '{{.Server.Version}} / API {{.Server.APIVersion}}'
+4.9.3 / API 1.41
+
+$ docker run --rm alpine:3.24.2 cat /etc/alpine-release
+3.24.2
+
+$ docker images
+API version 1.41 is not supported by this client: the minimum supported API version is 1.44
+
+$ docker images --format '{{.Repository}}:{{.Tag}}'
+alpine:3.24.2
+busybox:1.38.0
+localhost/podman-pause:4.9.3-0
+
+$ DOCKER_API_VERSION=1.41 docker images
+                                                            i Info →   U  In Use
+IMAGE                           ID             DISK USAGE   CONTENT SIZE   EXTRA
+docker.io/library/alpine:3.24.2
+                                320994c3b997       8.72MB             0B
+docker.io/library/busybox:1.38.0
+                                aaef90e06523       4.69MB             0B
+localhost/podman-pause:4.9.3-0
+                                944ccfdda183        835kB             0B
+
+$ unset DOCKER_HOST
+
+$ systemctl --user stop podman.socket podman.service

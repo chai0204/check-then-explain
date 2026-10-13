@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. イメージの置き場所は、ユーザごとに別 — 確かめて説明する Podman</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="podman">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <a href="/podman/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/">詳しく</a></p>
+</div>
+<h1>3. イメージの置き場所は、ユーザごとに別</h1>
+<p class="lead">docker のイメージは、練習機に1か所（root の dockerd の置き場所）しかない。podman のイメージは、<b>使うユーザごとに別の置き場所</b>にある。
+student の podman に入っているイメージは、同じ練習機の <code>sudo podman</code>（root の podman）からは見えない。
+置き場所から置き場所へは、イメージを書き出して読み込めば運べるが、運び方によって変わるものと変わらないものがある。</p>
+<div class="badges"><span>前提: 第2章</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>rootless と root の podman が、別の置き場所（<code>~/.local/share/containers/storage</code> と <code>/var/lib/containers/storage</code>）を使うことを示せる</li>
+<li>イメージを <code>podman save</code> と <code>podman load</code> で別の置き場所へ運べる</li>
+<li>運んだ後に、イメージの ID（設定の指紋）は変わらず、ダイジェスト（設計図の指紋）が変わりうる理由を言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: storage.conf の全項目、ストレージドライバ（overlay と vfs）の選び方、<code>podman image scp</code>、
+追加の読み取り専用の置き場所（additional image stores）。</div></div>
+
+<h2 id="where">student と root は、別のイメージを見ている</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じ練習機の podman が、ユーザによって違う一覧を出すこと。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>イメージは練習機に入っているのだから、student の <code>podman</code> でも、root の <code>sudo podman</code> でも、同じイメージが見えるはずだ（docker なら、誰が打っても同じ一覧が出る）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman images
+REPOSITORY                 TAG         IMAGE ID      CREATED       SIZE
+docker.io/library/alpine   3.24.2      320994c3b997  3 weeks ago   8.72 MB
+docker.io/library/busybox  1.38.0      aaef90e06523  5 months ago  4.69 MB
+$ sudo podman images
+REPOSITORY  TAG         IMAGE ID    CREATED     SIZE</code></pre>
+<div class="then"><b>だめな理由</b>: student の podman には2つのイメージがあるのに、<code>sudo podman</code> の一覧は空だった。
+<b>podman はデーモンを持たず、打った人の置き場所を直接読む</b>ので、student と root は別の置き場所を使っている。
+docker は誰が打っても1つの dockerd に頼むので、置き場所も1つだった（<a href="/docker/theory/03-image">Docker 第3章</a>）。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman info --format '{{.Store.GraphRoot}}'
+/home/student/.local/share/containers/storage
+$ sudo podman info --format '{{.Store.GraphRoot}}'
+/var/lib/containers/storage
+$ du -sh ~/.local/share/containers/storage
+14M	/home/student/.local/share/containers/storage</code></pre>
+<p>student の置き場所はホームの下の <code>~/.local/share/containers/storage</code>、root の置き場所は <code>/var/lib/containers/storage</code> である。
+student のイメージの層は、第2章のユーザ名前空間の中で展開されている（イメージの中の root の持ち物は、外では student の持ち物として置かれる）。</p>
+<div class="analogy"><b>たとえ</b>: podman の置き場所は、<b>社員ごとの机の引き出し</b>に近い。docker は総務の<b>共有の倉庫</b>（root の dockerd）で、誰が頼んでも同じ棚から出てくる。
+引き出しの中身は、本人が開けたときにしか見えない。
+<br>ただし<b>崩れる点</b>: 引き出しは物として分かれているが、podman の置き場所はディレクトリが違うだけで、練習機の root ならどの引き出しの中も読める。
+分かれているのは「podman が、打った人の置き場所だけを読む」という決まりのほうである。</div>
+
+<h2 id="move">別の置き場所へ運ぶ</h2>
+<div class="sgoal"><b>この節で分かること</b>: イメージを運んだとき、変わるものと変わらないもの。</div>
+<p><code>podman save</code> はイメージを tar にして標準出力に書き、<code>podman load</code> は標準入力から読み込む。パイプでつなげば、student の置き場所から root の置き場所へ運べる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ podman images --digests alpine
+REPOSITORY                TAG         DIGEST                                                                   IMAGE ID      CREATED      SIZE
+docker.io/library/alpine  3.24.2      sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6  320994c3b997  3 weeks ago  8.72 MB
+$ podman save alpine:3.24.2 | sudo podman load
+Getting image source signatures
+Copying blob 74d97c428c51 done   |
+Copying config 320994c3b9 done   |
+Writing manifest to image destination
+Loaded image: docker.io/library/alpine:3.24.2
+$ sudo podman images --digests alpine
+REPOSITORY                TAG         DIGEST                                                                   IMAGE ID      CREATED      SIZE
+docker.io/library/alpine  3.24.2      sha256:4d5cf6fa4d69da5c2b2a04a7ac06083e9d567e768c4f44c4333bb335a0226b06  320994c3b997  3 weeks ago  8.71 MB</code></pre>
+<p>運んだ後も、IMAGE ID（<code>320994c3b997</code>）は同じだった。ところが DIGEST は <code>294b683c…</code> から別の値に変わった。</p>
+<div class="scroll"><table>
+<tr><th>値</th><th>何の指紋か</th><th>運んで変わったか</th><th>理由</th></tr>
+<tr><td>IMAGE ID</td><td>設定（config）の JSON</td><td>変わらない</td><td>設定の中身（起動するコマンド、層の diff_ids）は運んでも同じ</td></tr>
+<tr><td>DIGEST</td><td>取ってきたときの目録・設計図</td><td>変わった</td><td><code>podman save</code> は既定で昔の docker の形（docker-archive）で書き出し、読み込んだ側で設計図を作り直す。層も圧縮しない形で入れ直すので、設計図に書かれる層の指紋が変わる</td></tr>
+</table></div>
+<p>読み込むときの <code>Copying blob 74d97c428c51</code> は、<a href="/docker/theory/03-image">Docker 第3章</a>で計算した「展開した tar の指紋」（diff_ids）と同じ値である。
+運び方を変えれば DIGEST はまた変わるが、層の中身（diff_ids）と設定（ID）は変わらない。<b>中身を確かめたいときは、どの指紋を比べているのかを意識する</b>。
+レジストリから取った <code>294b683c…</code> と同じであることを保証したいなら、運ぶ途中で作り直さない方法（同じレジストリから同じダイジェストで取る）を使う。</p>
+<p>docker と podman でも、同じイメージに別の ID が付く。<a href="/docker/theory/03-image">Docker 第3章</a>の docker（29.1.3。イメージの置き場所が containerd）は目録のダイジェストを ID にしていた（<code>294b683cb724</code>）が、podman は設定の指紋を ID にしている（<code>320994c3b997</code>）。
+docker でも、古い置き場所（overlay2）のまま 29 に上げたものは podman と同じく設定の指紋を ID にする（containerd の置き場所は、29 を新しく入れたときの既定）。</p>
+<div class="analogy"><b>たとえ</b>: イメージを運ぶのは、<b>書類一式をコピーして別の部署に送る</b>ことに近い。中身の書類（設定と層）は同じでも、送り状（設計図）は送る側が作り直すので、送り状の通し番号（DIGEST）は変わる。
+<br>ただし<b>崩れる点</b>: 書類のコピーなら紙が変わっても中身は同じと言えるが、イメージの層は「圧縮したかどうか」で指紋が変わるので、どの形で比べているかを決めないと「同じ」と言えない。</div>
+<div class="analogy"><b>たとえ</b>: docker と podman の ID の違いは、<b>同じ本に、図書館ごとに別の請求記号が付く</b>ことに近い。docker は目録の指紋を、podman は設定の指紋を、その本の番号として棚に貼る。
+<br>ただし<b>崩れる点</b>: 請求記号は図書館が勝手に決める番号だが、ここではどちらも中身の指紋の一部で、計算し直せば同じ値が出る。違うのは「どの部分の指紋を ID と呼ぶか」という決め方だけである。</div>
+<p>root の置き場所に運んだものを消す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo podman rmi alpine:3.24.2
+Untagged: docker.io/library/alpine:3.24.2
+Deleted: 320994c3b997e2ec6433f717f153e108023c5bec8fefa8d76b83451d16d05ea8
+$ sudo podman images
+REPOSITORY  TAG         IMAGE ID    CREATED     SIZE</code></pre>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/podman/practice/">演習03</a>で、student の置き場所の busybox を root の置き場所へ運び、root の podman で動かす。</div>
+
+<div class="quiz"><b>確認</b>
+<p>student で <code>podman pull</code> したイメージが、<code>sudo podman run</code> では「取ってこようとして」失敗した。なぜか。</p>
+<details><summary>答え</summary>
+<p>student の podman と root の podman は別の置き場所を使うので、root の置き場所にはそのイメージが無い。root は自分の置き場所に無い名前をレジストリへ取りに行った
+（この練習機は Docker Hub に届かないので失敗する）。<code>podman save | sudo podman load</code> で運ぶか、root でも取ってくる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>運んだ後のイメージで、IMAGE ID は同じなのに DIGEST が違った。中身は同じと言ってよいか。</p>
+<details><summary>答え</summary>
+<p>設定（ID）と層の中身（diff_ids）が同じなので、コンテナとして動く中身は同じである。違うのは、運ぶときに作り直した設計図（DIGEST）の指紋だけ。
+ただし「レジストリの <code>@sha256:294b…</code> と同じもの」を名指しする用途（起動コマンドへのダイジェストの記入）には、作り直した後の DIGEST は使えない。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>podman のイメージの置き場所はユーザごとに別。rootless は <code>~/.local/share/containers/storage</code>、root は <code>/var/lib/containers/storage</code></li>
+<li><code>podman save | sudo podman load</code> で運べる。ID（設定の指紋）と diff_ids は変わらず、DIGEST（設計図の指紋）は運び方で変わる</li>
+<li>docker と podman は、同じイメージに別の ID を付けることがある（containerd の置き場所の docker 29 は目録のダイジェスト、podman は設定の指紋）</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:podman-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・podman 4.9.3・crun 1.14.1）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/podman/theory/02-userns">← 2. コンテナの中の root は、外では student</a><a href="/podman/theory/04-network">次: 4. rootless のネットワークは、カーネルの外で中継される →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/podman/">Podman</a> · <a href="/podman/theory/">理論編 目次</a> · <a href="/podman/practice/">実践編</a> · <a href="/podman/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/podman/chapters.js"></script>
+<script src="/podman/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

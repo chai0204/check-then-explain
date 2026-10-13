@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5. ポートの公開は、宛先の書き換え — 確かめて説明する Docker</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="5" data-theme="docker">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/docker/">Docker</a> › <a href="/docker/theory/">理論編</a> › 第5章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/">詳しく</a></p>
+</div>
+<h1>5. ポートの公開は、宛先の書き換え</h1>
+<p class="lead"><code>-p 10.0.2.15:8080:80</code> でポートを公開すると、練習機の 8080 番に届いたパケットが、コンテナの 80 番へ行く。
+これは docker が中継しているのではなく、練習機のカーネルが<b>パケットの宛先を書き換えている</b>（DNAT）。
+宛先が書き換わったパケットは「練習機あて」ではなくなるので、練習機あての受け付けを決める INPUT の規則では止まらない。</p>
+<div class="badges"><span>前提: 第1章（net の名前空間）</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>コンテナの NIC が、veth の組と docker0 のブリッジで練習機につながっていることを示せる</li>
+<li><code>-p</code> の公開が、iptables の nat 表の DNAT 規則として書かれることを示せる</li>
+<li>INPUT で塞いでも公開したポートに外から届く理由を、パケットが通る道で説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: iptables の全部のチェイン（DOCKER-CT・DOCKER-BRIDGE など）の役目、nftables との関係、
+ユーザ定義のネットワーク（<code>docker network create</code>）と名前解決、IPv6、overlay ネットワーク（Swarm）。</div></div>
+
+<h2 id="publish">ポートを公開して、届くことを確かめる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 公開したポートが、練習機のどこで待ち受けているように見えるか。</div>
+<p>BusyBox の小さな web サーバ（<code>httpd</code>）を、コンテナの 80 番（httpd の既定）で動かす。<code>-f</code> は「裏に回らず、前で動き続ける」（PID 1 が終わるとコンテナが終わるため）、<code>-h /etc</code> は「<code>/etc</code> の中のファイルを配る」という意味で、
+<code>/hostname</code> を頼むとコンテナのホスト名が返ってくる。公開する先は、練習機の外向きの NIC（enp0s16）のアドレス <code>10.0.2.15</code> の 8080 番にする。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker run -d --name web -p 10.0.2.15:8080:80 busybox:1.38.0 httpd -f -h /etc
+@@ docker ps --format '{{.Names}}  {{.Ports}}'
+@@ curl -s http://10.0.2.15:8080/hostname
+@@ sudo ss -ltnp | grep 8080</code></pre>
+<p>練習機の 8080 番で、<code>docker-proxy</code> というプロセスが待ち受けている。これだけ見ると、docker が 8080 番で受けて中へ中継しているように見える。</p>
+<p>この檻は、外（lab@host）の 127.0.0.1:8080 を練習機の 8080 番へ転送するように QEMU を設定してある（<a href="/docker/practice/#about">実践編の「この檻について」</a>）。
+外から届くかも試すには、練習機から <code>exit</code> で外に出て打つ。</p>
+
+<h2 id="input">外から来たパケットは、INPUT を通らない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 練習機のファイアウォールで塞いだつもりのポートに、外から届いてしまう理由。</div>
+<p>iptables の filter 表の <b>INPUT</b> チェインは、「この計算機あてに届いたパケット」を受け付けるかどうかを決める規則の列である。8080 番あてを全部捨てる規則を、先頭に入れる。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>練習機の 8080 番で待っているのは docker-proxy だ。だから練習機のファイアウォールで 8080 番あてを捨てれば（INPUT で DROP）、外からは届かなくなるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ sudo iptables -I INPUT -p tcp --dport 8080 -j DROP
+@@ sudo iptables -L INPUT -n --line-numbers
+@@ exit</code></pre>
+<pre data-where="外（lab@host）"><code>@@ curl -s http://127.0.0.1:8080/hostname
+@@ ssh linuc  ## elide</code></pre>
+<div class="then"><b>だめな理由</b>: 8080 番あてを捨てる規則を入れたのに、外からの <code>curl</code> にはコンテナのホスト名が返ってきた。
+外から来たパケットは、INPUT に着く前に<b>宛先を 10.0.2.15:8080 からコンテナの 172.17.0.2:80 に書き換えられていた</b>。
+宛先がコンテナになったパケットは「練習機あて」ではなく「練習機を通り抜けて別の相手へ行くもの」になり、INPUT ではなく FORWARD を通る。
+docker-proxy は、この書き換えの規則に当てはまらない接続（コンテナから練習機のアドレスあてに戻ってくる接続など）のための補助で、外からの接続はそもそも受け取っていない。
+ただし docker-proxy が受ける接続は「練習機あて」なので、そちらには INPUT の規則が効く（この節の最後で確かめる）。素朴な考えは、半分だけ当たっている。</div></div>
+<div class="analogy"><b>たとえ</b>: INPUT と FORWARD は、空港の<b>入国審査と乗り継ぎ</b>に近い。入国審査（INPUT）は「この国に入る人」だけを調べ、乗り継ぎの客（FORWARD）は審査を通らずに次の便へ向かう。
+DNAT は、到着した客の行き先を「この国」から「乗り継ぎの先」に書き換える係で、書き換えられた客は入国審査の列に並ばない。
+<br>ただし<b>崩れる点</b>: 空港の乗り継ぎ客は自分が乗り継ぐと知っているが、パケットは行き先を書き換えられたことを知らない。送った側から見れば、ずっと 10.0.2.15:8080 と話している。</div>
+<p>練習機に戻ったので、パケットの数を数える。<code>-v</code> を付けると、規則ごとに当てはまったパケットの数（pkts）が出る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ sudo iptables -L INPUT -n -v --line-numbers | head -3
+@@ sudo iptables -t nat -L DOCKER -n -v</code></pre>
+<p>INPUT の DROP の規則は 0 パケットで、何も捨てていない。nat 表の DOCKER チェインの DNAT の規則は2パケットを数えた。nat 表の規則が見るのは接続ごとの最初の1パケットだけなので、これは2つの接続（前の節の練習機の中からの <code>curl</code> と、外からの <code>curl</code>）である。
+<code>! docker0</code> は「docker0 から入ってきたもの以外」、<code>to:172.17.0.2:80</code> が書き換えた後の宛先である。</p>
+<p>では、DNAT の規則に当てはまらない接続はどうか。コンテナから練習機のアドレス（10.0.2.15:8080）あてに接続すると、docker0 から入ってくるので <code>! docker0</code> の規則に当たらず、宛先は書き換わらない。
+練習機あてのまま docker-proxy が受けることになる。<code>-T 3</code> は3秒で諦める指定である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker run --rm alpine:3.24.2 wget -qO- -T 3 http://10.0.2.15:8080/hostname</code></pre>
+<p>今度は届かなかった（時間切れ）。docker-proxy に向かう接続は練習機あてのパケットなので INPUT を通り、先頭の DROP で捨てられた。
+<b>INPUT を通らないのは、DNAT で宛先が書き換わった接続だけ</b>で、docker-proxy が受ける接続（コンテナから練習機のアドレスあて、127.0.0.1 に公開したポートあてなど）には、INPUT の規則が効く。</p>
+<div class="analogy"><b>たとえ</b>: DNAT は、マンションの<b>郵便受けの転送届</b>に近い。管理人（カーネル）は、8080 号室あての郵便を見たとたんに宛先を「コンテナ様」に書き換え、建物の中を通して届ける。
+玄関の受付（INPUT）は「この建物の住人あて」の郵便だけを調べるので、転送届で宛先が書き換わった郵便は受付を通らない。
+<br>ただし<b>崩れる点</b>: 本物の転送届は住人が自分で出すが、DNAT の規則は docker（root の dockerd）が、<code>-p</code> を見て勝手に書く。
+練習機の管理者が INPUT に書いた規則と、docker が nat 表に書いた規則は、互いに相手を知らない。</div>
+<p>あなたの PC で <code>docker run -p 8080:80</code> と書くと、待ち受けるアドレスは全部（<code>0.0.0.0</code>）になり、LAN の誰からでも届く。
+ufw や firewalld で 8080 番を INPUT で閉じていても、外からの接続は DNAT されるので、上と同じ理由で届いてしまう（root で動く docker が iptables で公開する場合。rootless の docker は公開の仕組みが違う）。
+docker の文書は、公開したコンテナへの接続を絞りたいなら <code>DOCKER-USER</code> というチェインに規則を書くよう案内している。</p>
+
+<h2 id="veth">コンテナの NIC と、docker0 のブリッジ</h2>
+<div class="sgoal"><b>この節で分かること</b>: 書き換えた後の宛先（172.17.0.2）が、練習機からどうつながっているか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>@@ docker inspect -f '{{.NetworkSettings.IPAddress}}' web
+@@ docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' web
+@@ docker exec web ip addr show eth0
+@@ ip -br addr show docker0
+@@ ip -br link show master docker0</code></pre>
+<p class="detail">MAC アドレス（<code>link/ether</code> の後ろ）・<code>veth…</code> の名前・<code>fe80::</code> で始まる IPv6 のアドレスは、起動のたびに乱数から作られるので、あなたの画面では本文と違う。172.17.0.x のアドレスは同じになる。</p>
+<p>古い記事でよく見る <code>{{.NetworkSettings.IPAddress}}</code> は、この docker（29.1.3）では項目が無いと言われて失敗した。アドレスはネットワークごとに持つ形（<code>.NetworkSettings.Networks</code> の下）に移っていて、<code>range</code> で回すと 172.17.0.2 が出た。</p>
+<p>コンテナの中の <code>eth0</code>（172.17.0.2）と、練習機の <code>veth…</code> は、<b>veth</b>（仮想の LAN ケーブルの両端）の組である。
+<code>eth0@if…</code> と <code>veth…@if…</code> の番号は、ケーブルの反対の端の番号を指し合っている。練習機の側の端は <code>docker0</code> というブリッジ（仮想のスイッチ）に挿さっていて
+（<code>master docker0</code>）、docker0 自身は 172.17.0.1 を持つ。練習機のカーネルは、172.17.0.0/16 へのパケットを docker0 に流す。</p>
+<div class="scroll"><table>
+<tr><th>段</th><th>どこで</th><th>何が起きるか</th></tr>
+<tr><td>1</td><td>enp0s16 に着く</td><td>宛先 10.0.2.15:8080 のパケットが届く</td></tr>
+<tr><td>2</td><td>nat 表の PREROUTING → DOCKER</td><td>DNAT の規則で、宛先を 172.17.0.2:80 に書き換える</td></tr>
+<tr><td>3</td><td>経路の選択</td><td>宛先が練習機自身ではなくなったので、INPUT ではなく FORWARD へ。172.17.0.0/16 は docker0 へ</td></tr>
+<tr><td>4</td><td>filter 表の FORWARD → DOCKER-FORWARD など</td><td>docker が書いた規則が、公開したポートあてだけを通す</td></tr>
+<tr><td>5</td><td>docker0 → veth → コンテナの eth0</td><td>コンテナの名前空間の中で、httpd の 80 番が受け取る</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: veth の組は<b>両端に差し込み口のある1本の LAN ケーブル</b>、docker0 は<b>練習機の中のスイッチ</b>に近い。
+コンテナを1つ作るたびにケーブルを1本用意し、片方をコンテナの部屋（net の名前空間）に、もう片方をスイッチに挿す。
+<br>ただし<b>崩れる点</b>: 本物のケーブルは部屋の壁に穴を開けて通すが、veth の片端は名前空間に「移される」だけで、物は何も無い。
+そして docker0 は普通のスイッチと違い、練習機のカーネルの経路と iptables の規則の一部として、宛先の書き換えや選別を受ける。</div>
+<p>入れた規則を消し、さっき届かなかったコンテナからの接続をもう一度試してから、コンテナを片付ける。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ sudo iptables -D INPUT -p tcp --dport 8080 -j DROP
+@@ docker run --rm alpine:3.24.2 wget -qO- -T 3 http://10.0.2.15:8080/hostname
+@@ docker rm -f web</code></pre>
+<p>DROP の規則を消すと、コンテナからの接続も届いた（返ってきたのは <code>web</code> のホスト名）。</p>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/docker/practice/">演習05</a>で、練習機の外（lab@host）から届くようにポートを公開する。判定は外から実際に接続して確かめる。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>sudo iptables -t nat -L DOCKER -n -v</code> の DNAT の行の pkts が、外から <code>curl</code> するたびに増えた。INPUT の DROP の行は 0 のままだった。この2つから何が言えるか。</p>
+<details><summary>答え</summary>
+<p>外からの接続は、nat 表で宛先をコンテナに書き換えられ、INPUT を通らずに FORWARD へ回った。INPUT の規則は、練習機自身あてのパケットにしか効かないので、DNAT される接続（外からの接続）からは公開したポートを守れない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>-p 8080:80</code> と <code>-p 127.0.0.1:8080:80</code> は、何が違うか。この章の規則の書き方から予想せよ。</p>
+<details><summary>答え</summary>
+<p>前者は待ち受けるアドレスを指定していないので、全部のアドレス（0.0.0.0）あての 8080 番が対象になり、LAN からも届く。
+後者は宛先が 127.0.0.1 のものだけが対象になり、その計算機の中からしか届かない（DNAT の規則の destination の列が変わる）。
+ただし、同じ LAN の別の計算機が宛先を 127.0.0.1 にした細工のパケットを送ってくる場合まで docker が塞ぐようになったのは、docker 28.0 からである。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>コンテナは自分の net の名前空間に NIC（eth0）を持ち、veth の組で練習機の docker0（ブリッジ）につながっている</li>
+<li><code>-p アドレス:ホスト側:コンテナ側</code> は、nat 表の DOCKER チェインに DNAT の規則として書かれる。宛先を書き換えるのはカーネルである</li>
+<li>DNAT で宛先が書き換わったパケット（外からの接続）は INPUT を通らない。ホストのファイアウォールで閉じても、公開したポートには外から届く。docker-proxy が受ける接続（コンテナから練習機のアドレスあてなど）には INPUT が効く。絞るなら待ち受けるアドレス（<code>127.0.0.1:</code>）か DOCKER-USER で</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:docker-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・docker.io 29.1.3・containerd 2.2.1・runc 1.3.4・iptables 1.8.10）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/docker/theory/04-storage">← 4. コンテナの書き込みは、イメージの上の1枚に入る</a><a href="/docker/theory/06-build">次: 6. ビルドのキャッシュは、変えた段から後ろを全部作り直す →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/docker/">Docker</a> · <a href="/docker/theory/">理論編 目次</a> · <a href="/docker/practice/">実践編</a> · <a href="/docker/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/docker/chapters.js"></script>
+<script src="/docker/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,25 @@
+# 入口の画面: 読者と同じ起動・同じ入り方（docker exec -it … bash -l。端末 80 桁 × 24 行）で、
+# 外に入ったときに出る表示と、最初の ssh linuc の表示。作り方: python3 -I probe/docker-seq.py --entry
+
+========== 外（lab@host）に入ったときの表示 ==========
+
+練習機 linuc: running（エージェント 応答あり / ssh 待ち受け中）
+  vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
+
+
+── lab-podman 1.0.0 ────────────────────────────────────────
+lab-podman  進捗 0/7
+  次 → 01 「コンテナの親の conmon を突き止める」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-podman-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+========== 練習機に入る ==========
+
+$ ssh linuc
+
+  練習機（Ubuntu 24.04 / 仮想マシン）— Docker と Podman の記事
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console

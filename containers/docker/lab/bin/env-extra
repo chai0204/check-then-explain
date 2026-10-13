@@ -1,0 +1,17 @@
+#!/bin/bash
+# lab env の追加行（docker の記事）。練習機の動き方（TCG か KVM か）と、練習機の中の docker の版を出す。
+#   KVM を足して起動した読者は、時間の出る行や CPU まわりの画面が本文と変わるので、それが分かる行を出す。
+export LIBVIRT_DEFAULT_URI=qemu:///session
+st=$(virsh domstate linuc 2>/dev/null | head -1)
+dt=$(virsh dumpxml linuc 2>/dev/null | sed -n "s/^<domain type='\([a-z]*\)'.*/\1/p" | head -1)
+case "$dt" in
+  qemu) acc="TCG（完全エミュレーション。domain type=qemu）" ;;
+  kvm)  acc="KVM（domain type=kvm）" ;;
+  *)    acc="不明" ;;
+esac
+printf '練習機    : %s\n' "${st:-未定義}"
+printf '仮想化    : %s / /dev/kvm %s\n' "$acc" "$([ -e /dev/kvm ] && echo あり || echo なし)"
+if [ "$st" = running ]; then
+  g=$(lab-guest '. /etc/os-release; echo "$PRETTY_NAME / カーネル $(uname -r) / docker $(docker version --format "{{.Server.Version}}" 2>/dev/null || echo 停止中) / podman $(podman --version | cut -d" " -f3)"' 2>/dev/null)
+  printf '練習機の中: %s\n' "${g:-応答なし（起動の途中か、止まっている）}"
+fi

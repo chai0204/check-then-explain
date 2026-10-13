@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理論編 — 確かめて説明する Podman</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="podman">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <strong>理論編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文に載せた出力はすべて実機の記録で、読者と同じ入り方（端末つき・1つのシェルで第1章から順に）で通しに打った記録と突き合わせてあります。
+   演習7本は、模範解答どおりに通ること・未達のときに判定が鳴ることの両方を確認してあります。
+   それでも <b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、著者が読者として通した段階で
+   <b>4回に分けて不備が出ました</b>（説明の順序・リンク切れ・前提の省略・判定の誤り）。
+   同じ種類のものが残っていると考えてください。</p>
+<p>詰まったところ・本文と違う出力が出たところは、
+   <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   各ページ下のコメントに書いてください。それが直す順番になります。</p>
+</div>
+
+<h1>理論編 — Podman</h1>
+<p class="lead">このサイトの実践編の起動コマンドは、<code>docker</code> を <code>podman</code> に読み替えても動きます。
+その podman が docker とどこまで同じで、どこから違うのかを、<strong>練習機（仮想マシン）の中に入れた本物の podman（rootless）</strong>で確かめる7章。
+デーモンのいない作り、一般ユーザのままのコンテナ（rootless）、ユーザの systemd に任せる動かし方を、プロセスと UID の番号で見ます。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<h2 id="spine">この7章を貫いている1つの事実</h2>
+<div class="goal">
+<p><b>podman には頼む相手のデーモンがいない。打った人の権限のまま、打った人の置き場所に、打った人の systemd の下でコンテナを作る。</b></p>
+<p>だから、コンテナの親は付き添いの conmon で（第1章）、中の root は外では本人で（第2章）、イメージはユーザごとに別の置き場所にあり（第3章）、
+網はユーザのプロセスが運び（第4章）、ログアウトすれば本人の systemd と一緒に止まる（第6章）。
+docker と同じコマンドの形は、その上に重ねた互換の層で、既定値や API の版までは同じではない（第7章）。</p>
+<div class="skip"><b>ここで覚えなくていいこと</b>:
+podman の全サブコマンド、netavark のブリッジ（root の podman の既定の網。rootless でも <code>podman network create</code> で作った網で使う）、<code>podman kube play</code> と Kubernetes、
+Podman Desktop や macOS・Windows の podman machine、buildah・skopeo。必要になったら、この7章の仕組みの上に足せます。</div>
+</div>
+
+<h2 id="scope">この記事で扱うこと・扱わないこと</h2>
+<div class="scroll"><table>
+<tr><th>扱うこと</th><th>章</th><th>実際に打つもの</th></tr>
+<tr><td>デーモンが無い（conmon が付き添い、crun が作る）</td><td><a href="/podman/theory/01-daemonless">1</a></td><td><code>ps -C conmon</code> <code>podman info</code> <code>/proc/PID/cgroup</code></td></tr>
+<tr><td>rootless（ユーザ名前空間・<code>/etc/subuid</code>・<code>newuidmap</code>・<code>podman unshare</code>）。コンテナの中の root は外では誰か</td><td><a href="/podman/theory/02-userns">2</a></td><td><code>/proc/self/uid_map</code> <code>podman unshare chown</code></td></tr>
+<tr><td>保存場所（<code>~/.local/share/containers</code>）と、ユーザごとに別であること</td><td><a href="/podman/theory/03-storage">3</a></td><td><code>podman info</code> <code>podman save | sudo podman load</code></td></tr>
+<tr><td>rootless のネットワーク（slirp4netns と pasta、rootlessport）</td><td><a href="/podman/theory/04-network">4</a></td><td><code>-p</code> <code>ss -ltnp</code> <code>--network pasta</code></td></tr>
+<tr><td>pod（infra のコンテナと、分け合う名前空間）</td><td><a href="/podman/theory/05-pod">5</a></td><td><code>podman pod create</code> <code>--pod</code> <code>/proc/PID/ns</code></td></tr>
+<tr><td>systemd との統合（linger と quadlet）</td><td><a href="/podman/theory/06-systemd">6</a></td><td><code>loginctl enable-linger</code> <code>.container</code> <code>systemctl --user</code></td></tr>
+<tr><td>docker との互換と違い（同じコマンドで動く・<code>podman exec</code> の umask はコンテナの <code>--umask</code>（既定 0022）から・<code>ping_group_range</code>・API の版）</td><td><a href="/podman/theory/07-compat">7</a></td><td><code>CapEff</code> <code>DOCKER_HOST</code> <code>podman.socket</code></td></tr>
+<tr><td>このサイトの檻が podman rootless でも同じオプションで動く理由</td><td><a href="/podman/theory/07-compat">7</a></td><td>（下の表）</td></tr>
+</table></div>
+
+<h2 id="site">このサイトの檻を podman で動かすと</h2>
+<p>この記事の檻（lab-podman:1.0.0）は、<code>docker</code> を <code>podman</code> に読み替えた同じオプション（名前付きボリュームも同じ）で、rootless の podman（5.8.6）でも起動することを確かめてあります
+（<code>logs/podman-rootless.log</code>。起動から ssh まで36秒、<code>podman exec</code> の umask は <code>0022</code>、<code>podman stop</code> は5秒で終了コード 0）。
+Docker の記事の檻（lab-docker:1.0.0）も、同じ方法で確かめてあります（<code>logs/docker-rootless.log</code>）。</p>
+<pre><code>podman run -d --name lab-… --hostname host --stop-timeout 30 \
+  -v lab-…-vm:/home/lab/vm \
+  -v lab-…-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab:…@sha256:…
+podman exec -it lab-… bash -l</code></pre>
+<div class="scroll"><table>
+<tr><th>起動コマンドの部分</th><th>rootless の podman では</th><th>章</th></tr>
+<tr><td>特権を求めない（<code>--privileged</code>・<code>--cap-add</code>・<code>--device</code> が無い。このサイトの例外は、<code>--cap-add SYS_ADMIN</code> の LinuC 1.09 と <code>--device /dev/kvm</code> の KVM の記事で、rootless の podman での動きはこの記事では確かめていない）</td><td>rootless で渡せないものを、最初から頼んでいない。檻の中の lab は一般ユーザなので、既定のケーパビリティの差（docker 14個・podman 11個）にも触れない</td><td><a href="/podman/theory/07-compat">7</a></td></tr>
+<tr><td><code>-v 名前:/home/lab/…</code></td><td>名前付きボリュームは、檻を起動した人の rootless の置き場所（<code>~/.local/share/containers/storage/volumes</code>）に作られ、ユーザ名前空間の中でイメージの持ち主（lab）がそのまま写される。バインドマウントだと、外の持ち主と中の持ち主の食い違い（100999 問題）が起きうる</td><td><a href="/podman/theory/02-userns">2</a>・<a href="/podman/theory/03-storage">3</a></td></tr>
+<tr><td><code>-p</code> が無い</td><td>1024 番未満の公開の制限も、rootlessport の中継も関係しない</td><td><a href="/podman/theory/04-network">4</a></td></tr>
+<tr><td><code>--stop-timeout 30</code>・<code>--hostname host</code>・<code>-d</code>・<code>exec -it</code></td><td>podman にも同じオプションがあり、同じ意味で効く</td><td><a href="/podman/theory/07-compat">7</a></td></tr>
+<tr><td>（ログアウトしたら）</td><td>rootless の podman のコンテナは、本人の systemd が止まると一緒に止まる。檻を動かしたままログアウトするなら <code>loginctl enable-linger</code></td><td><a href="/podman/theory/06-systemd">6</a></td></tr>
+</table></div>
+<p>docker の側からの見方（同じ起動コマンドの各オプションの意味）は、<a href="/docker/theory/">Docker の記事の理論編</a>の表にあります。</p>
+
+<h2 id="chapters">章</h2>
+<div class="toc">
+<ol>
+<li><a href="/podman/theory/01-daemonless">podman には、頼む相手のデーモンがいない</a> —
+    <span class="detail">コンテナが動いている間、podman のプロセスはいない。親は conmon（18分）</span></li>
+<li><a href="/podman/theory/02-userns">コンテナの中の root は、外では student</a> —
+    <span class="detail">中の root が作ったファイルが、外では student の持ち物。中の 1000 は外の 100999（22分）</span></li>
+<li><a href="/podman/theory/03-storage">イメージの置き場所は、ユーザごとに別</a> —
+    <span class="detail"><code>sudo podman images</code> が空。運ぶと ID は同じで DIGEST が変わる（18分）</span></li>
+<li><a href="/podman/theory/04-network">rootless のネットワークは、カーネルの外で中継される</a> —
+    <span class="detail">80 番は公開できない。コンテナは QEMU と同じ形の 10.0.2.x の網に置かれる（22分）</span></li>
+<li><a href="/podman/theory/05-pod">pod は、ネットワークを分け合うコンテナの組</a> —
+    <span class="detail">別のコンテナの httpd に 127.0.0.1 で届き、ホスト名は pod の名前（20分）</span></li>
+<li><a href="/podman/theory/06-systemd">ログアウトしても動かし続けるのは、systemd の仕事</a> —
+    <span class="detail">ログアウトするとコンテナが止まる。linger と quadlet で systemd に任せる（27分）</span></li>
+<li><a href="/podman/theory/07-compat">同じコマンドで、違う仕組み</a> —
+    <span class="detail">既定の特権は11個で、ping を許すグループも違う。docker の CLI から podman を使え、CLI の側の版の決まりで一覧だけ断られる（25分）</span></li>
+</ol>
+</div>
+<p><a href="/podman/theory/glossary">用語辞書</a> — 本文の点線付きの語をクリックすると引けます。</p>
+
+<h2 id="cage">檻で再現できないもの</h2>
+<div class="scroll"><table>
+<tr><th>もの</th><th>なぜ再現できないか</th><th>代わりにしたこと</th></tr>
+<tr><td>podman 5 の既定（pasta が rootless の網の既定 など）</td>
+    <td>練習機の podman は Ubuntu 24.04 の 4.9.3。podman 5 は Ubuntu 24.04 の apt に無い</td>
+    <td>第4章で、4.9.3 でも <code>--network pasta</code> で pasta を選んで確かめた。違いは本文に版を書いた</td></tr>
+<tr><td>macOS・Windows の podman（podman machine）</td>
+    <td>podman machine は Linux の仮想マシンを1台隠し持ち、その中で podman を動かす。中身は製品と版で違う</td>
+    <td>この記事の練習機が、その「隠れた仮想マシン」の役を見える形でしている</td></tr>
+<tr><td>レジストリからの取得（<code>podman pull</code>）</td>
+    <td>結果が読者のネットワークとレジストリの状態で変わる。練習機は Docker Hub に届かないようにしてある（ほかのレジストリには届くが、本文と演習では使わない）</td>
+    <td>第3章で、置き場所から置き場所へ運ぶ方法（<code>save</code> と <code>load</code>）を確かめた</td></tr>
+<tr><td>練習機の再起動をまたいだ quadlet のサービスの自動起動</td>
+    <td>練習機の再起動（KVM なしで1分前後）を本文の流れに入れると、読者の待ち時間が長くなる</td>
+    <td>第6章で、起動のときに読まれるリンク（<code>default.target.wants/</code>）が作られることと、linger を確かめた</td></tr>
+</table></div>
+
+<h2 id="use">実務のどこで効くか</h2>
+<div class="scroll"><table>
+<tr><th>場面</th><th>ここで効く理由</th><th>見落としやすい点</th><th>関連する章</th></tr>
+<tr><td>rootless のコンテナに渡したディレクトリに、アプリが書けない</td><td>中の UID は外では別の番号になる</td><td>中の root 以外のユーザで動くアプリは、外の 100000 番台の持ち主が要る</td><td>2</td></tr>
+<tr><td>ssh を切ったらサーバのコンテナが止まった</td><td>本人の systemd ごと止まる</td><td>docker からの乗り換えで起きやすい。linger とサービス化が要る</td><td>6</td></tr>
+<tr><td>80 番・443 番で公開できない</td><td>一般ユーザは 1024 番未満で待ち受けられない</td><td>前段に root のリバースプロキシを置くか、設定を変える（全員に許すことになる）</td><td>4</td></tr>
+<tr><td>docker 用のツールを podman で使いたい</td><td>podman は docker の API を真似られる</td><td>真似ているのは API の版の範囲まで。ツールの側が古い版のサーバを断ることもある（docker の CLI 29 の既定の <code>images</code> など）</td><td>7</td></tr>
+</table></div>
+
+<h2 id="next">手を動かす</h2>
+<p>読んだあと、同じ操作を自分でやる演習が7本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。</p>
+<p><a href="/podman/practice/">実践編（檻の入り方と演習7本）→</a></p>
+
+<!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
+<nav class="pager"><a href="/podman/">← Podman（記事のホーム）</a><a href="/podman/theory/01-daemonless">第1章から読む →</a></nav>
+<!-- /catalog:pager -->
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/podman/">Podman</a> · <a href="/podman/theory/">理論編 目次</a> · <a href="/podman/practice/">実践編</a> · <a href="/podman/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. イメージを決めるのは、名前ではなくダイジェスト — 確かめて説明する Docker</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="docker">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/docker/">Docker</a> › <a href="/docker/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/">詳しく</a></p>
+</div>
+<h1>3. イメージを決めるのは、名前ではなくダイジェスト</h1>
+<p class="lead"><code>alpine:3.24.2</code> という名前は、1コマンドで別のイメージに付け替えられる。名前を付け替えると、同じ <code>docker run alpine:3.24.2</code> が
+別の中身を起動する。イメージの正体は、中身から計算した指紋（<b>ダイジェスト</b>）で、イメージそのものは、その指紋を名前にした JSON と tar の束である。</p>
+<div class="badges"><span>前提: 第1章</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>タグ（<code>alpine:3.24.2</code>）とダイジェスト（<code>sha256:…</code>）の違いを、付け替えた結果で説明できる</li>
+<li>イメージを <code>docker save</code> で書き出し、目録（index）→ 設計図（manifest）→ 設定（config）と層（layer）をたどれる</li>
+<li>ファイル名の16進数が、そのファイルの中身の SHA-256 であることを、自分で計算して確かめられる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: OCI イメージ仕様の各項目、メディアタイプの一覧、来歴（attestation）の中身、
+レジストリの API。この章で使うのは「中身の指紋をファイル名にして、指紋で次のファイルを指す」という1つの形だけである。</div></div>
+
+<h2 id="tag">名前を付け替える</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>名前:タグ</code> は中身ではなく、中身を指す札であること。</div>
+<p>練習機に入っているイメージを、ダイジェスト付きで並べる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ docker images --digests
+REPOSITORY   TAG       DIGEST                                                                    IMAGE ID       CREATED        SIZE
+alpine       3.24.2    sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6   294b683cb724   3 weeks ago    13MB
+busybox      1.38.0    sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e   fd7dc98638c8   5 months ago   6.81MB</code></pre>
+<p>行ごとに、名前（REPOSITORY と TAG）・ダイジェスト（DIGEST）・ID（IMAGE ID）がある。この docker（29.1.3。イメージの置き場所が containerd）では、
+ID はダイジェストそのもので、一覧では先頭12文字に縮めて表示している。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>alpine:3.24.2</code> と書けば、中身は Alpine 3.24.2 に決まっている。バージョン番号まで書いたのだから、誰がいつ起動しても同じものが動くはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ docker run --rm alpine:3.24.2 cat /etc/alpine-release
+3.24.2
+$ docker tag busybox:1.38.0 alpine:3.24.2
+$ docker run --rm alpine:3.24.2 cat /etc/alpine-release
+cat: can't open '/etc/alpine-release': No such file or directory
+$ docker images --digests alpine
+REPOSITORY   TAG       DIGEST                                                                    IMAGE ID       CREATED        SIZE
+alpine       3.24.2    sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e   fd7dc98638c8   5 months ago   6.81MB</code></pre>
+<div class="then"><b>だめな理由</b>: <code>docker tag</code> を1回打っただけで、同じ <code>docker run --rm alpine:3.24.2</code> が BusyBox の中身を起動し、
+<code>/etc/alpine-release</code> が無いと言われた。<code>alpine:3.24.2</code> の行の DIGEST と IMAGE ID は、節の最初の一覧の busybox の行と同じ（<code>sha256:fd7dc986…</code> と <code>fd7dc98638c8</code>）になった（<code>docker images</code> の後ろに名前を書くと、その名前の行だけが出る）。
+<b>タグは中身を指す札にすぎず、いつでも別の中身に付け替えられる</b>。手元で誰かが付け替えなくても、レジストリの上でも同じことが起きる
+（<code>alpine:3.24</code> は 3.24.3 が出れば付け替えられる。<code>3.24.2</code> のような細かい番号のタグでも、付け替えないという約束は無い。変わらないと約束されているのはダイジェストだけである）。</div></div>
+<p>では元の Alpine はどこへ行ったか。消えてはいない。名前が付いていないだけである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ docker images -a
+                                                            i Info →   U  In Use
+IMAGE            ID             DISK USAGE   CONTENT SIZE   EXTRA
+alpine:3.24.2    fd7dc98638c8       6.81MB         2.23MB
+busybox:1.38.0   fd7dc98638c8       6.81MB         2.23MB
+&lt;untagged&gt;       294b683cb724         13MB         3.94MB
+$ docker run --rm alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 cat /etc/alpine-release
+Unable to find image 'alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6' locally
+docker: Error response from daemon: failed to resolve reference "docker.io/library/alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6": failed to do request: Head "https://registry-1.docker.io/v2/library/alpine/manifests/sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6": dial tcp 0.0.0.0:443: connect: connection refused
+
+Run 'docker run --help' for more information
+$ docker run --rm 294b683cb724 cat /etc/alpine-release
+3.24.2</code></pre>
+<p><code>-a</code> を付けると、名前の無いイメージ（<code>&lt;untagged&gt;</code>）として ID <code>294b683cb724</code> が見えた。
+ダイジェストで <code>alpine@sha256:294b…</code> と指すと、docker は手元に「その名前（alpine）でそのダイジェスト」のものが無いので取りに行こうとし、失敗した
+（この練習機は Docker Hub に届かないようにしてある。あなたの PC なら、Docker Hub からこのダイジェストの目録を取り、そこから自分の CPU の種類の中身をたどる。
+CPU の種類が同じ（この練習機と同じ amd64）なら、取れれば必ず同じ中身になる。目録は CPU の種類ごとの設計図の一覧なので、arm64 の PC は同じ <code>294b…</code> から別の中身をたどる。次の節で中を見る）。
+ID で指せば、手元の名前の無いイメージがそのまま動いた。元に戻す。</p>
+<div class="analogy"><b>たとえ</b>: 名前を付け替えられたイメージは、<b>ラベルを別の瓶に貼り替えられた保存瓶</b>に近い。「梅干し」のラベルが別の瓶に移っても、元の瓶の中身は棚に残っている。
+ラベルの無い瓶は、棚の番号（ID）で呼べば取り出せる。
+<br>ただし<b>崩れる点</b>: 保存瓶なら中身を見れば梅干しだと分かるが、docker は中身を見て名前を推し量ったりしない。この docker では、ラベル（タグ）を剥がされたイメージは、ID で指さない限りたどれない（ダイジェスト付きの名前 <code>alpine@sha256:…</code> でも、手元では見つからなかった。
+この docker は、手元のイメージを「その名前（alpine）が付いた記録」の中からしか探さない）。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ docker tag 294b683cb724 alpine:3.24.2
+$ docker images --digests
+REPOSITORY   TAG       DIGEST                                                                    IMAGE ID       CREATED        SIZE
+alpine       3.24.2    sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6   294b683cb724   3 weeks ago    13MB
+busybox      1.38.0    sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e   fd7dc98638c8   5 months ago   6.81MB</code></pre>
+<p>このサイトの実践編の起動コマンドが、イメージを <code>ghcr.io/chai0204/lab:…-1.0.0@sha256:…</code> と<b>名前とダイジェストの両方</b>で書いているのはこのためである。
+名前は人が読むため、ダイジェストは中身を1つに決めるため。両方書くと、docker はダイジェストのほうで取る（名前のタグは無視する）。</p>
+<div class="analogy"><b>たとえ</b>: タグは<b>本棚の見出し札</b>、ダイジェストは<b>本の ISBN と中身全体の指紋を合わせたもの</b>に近い。
+見出し札「3.24.2」は、誰かが別の本の前に差し替えれば、その本を指す。指紋は本の中身から計算するので、中身が1文字でも違えば変わる。
+<br>ただし<b>崩れる点</b>: ISBN は出版社が割り当てる番号だが、ダイジェストは誰も割り当てない。中身から誰でも同じ計算で出せる値で、
+だから手元で計算し直して確かめられる（次の節でやる）。</div>
+
+<h2 id="save">イメージを書き出して、中を見る</h2>
+<div class="sgoal"><b>この節で分かること</b>: イメージが「JSON のファイルと tar のファイルの束」であること。</div>
+<p><code>docker save</code> は、イメージを1つの tar ファイルに書き出す。作業用のディレクトリで書き出して、中身を並べる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ mkdir ~/img
+$ cd ~/img
+$ docker save alpine:3.24.2 -o alpine.tar
+$ tar tvf alpine.tar
+drwxr-xr-x 0/0               0 1970-01-01 09:00 blobs/
+drwxr-xr-x 0/0               0 1970-01-01 09:00 blobs/sha256/
+-r--r--r-- 0/0            9218 1970-01-01 09:00 blobs/sha256/294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+-r--r--r-- 0/0             611 1970-01-01 09:00 blobs/sha256/320994c3b997e2ec6433f717f153e108023c5bec8fefa8d76b83451d16d05ea8
+-r--r--r-- 0/0             838 1970-01-01 09:00 blobs/sha256/350f747a86e8774d359a4f452dec12a2585e73bf072e71c5f628455843b88c71
+-r--r--r-- 0/0            5639 1970-01-01 09:00 blobs/sha256/6d0606d1815c86bb4dc32b5568ec3171a50eae0ed0a3c62bdfde5104c299931d
+-r--r--r-- 0/0           79673 1970-01-01 09:00 blobs/sha256/797dd00a0fc71633e5e0b005b3d0e5b67a47d56961231f44932cc2f5d281acf8
+-r--r--r-- 0/0            1022 1970-01-01 09:00 blobs/sha256/d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395
+-r--r--r-- 0/0         3849738 1970-01-01 09:00 blobs/sha256/e2de96513ba9eb53b431787ec8a65cdde380ac4772a3e4c4b714dcfde2a102b5
+-r--r--r-- 0/0             241 1970-01-01 09:00 blobs/sha256/e7c84494fb9316d55ed928c53b6c17b67e6cb907f1cf349a10041b7f4f4c11e3
+-rw-r--r-- 0/0             423 1970-01-01 09:00 index.json
+-rw-r--r-- 0/0             212 1970-01-01 09:00 manifest.json
+-r--r--r-- 0/0              30 1970-01-01 09:00 oci-layout
+$ tar xf alpine.tar</code></pre>
+<p>入っていたのは、<code>blobs/sha256/</code> の下の16進数の名前のファイル（ブロブ）が8つと、案内の JSON（<code>index.json</code>・<code>manifest.json</code>・<code>oci-layout</code>）である。
+ディレクトリの形は OCI（Open Container Initiative）のイメージの置き方（image layout）で、<code>manifest.json</code> は昔の docker の <code>docker load</code> のために足されたもの。
+入り口の <code>index.json</code> から、ダイジェストを1つずつたどる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ jq . index.json
+{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.oci.image.index.v1+json",
+  "manifests": [
+    {
+      "mediaType": "application/vnd.oci.image.index.v1+json",
+      "digest": "sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
+      "size": 9218,
+      "annotations": {
+        "containerd.io/distribution.source.docker.io": "library/alpine",
+        "io.containerd.image.name": "docker.io/library/alpine:3.24.2",
+        "org.opencontainers.image.ref.name": "3.24.2"
+      }
+    }
+  ]
+}
+$ jq -r '.manifests[] | [.digest[7:19], .platform.os + "/" + .platform.architecture + (.platform.variant // "")] | @tsv' blobs/sha256/294b*
+d56c381f961d	linux/amd64
+350f747a86e8	unknown/unknown
+d3c3fda3e4d3	linux/armv6
+e1ca081cf7a9	unknown/unknown
+0a13654ecd9b	linux/armv7
+01d8e8fcca00	unknown/unknown
+260479a1cfaf	linux/arm64v8
+ecc9a3031ac9	unknown/unknown
+c54a80678a9e	linux/386
+5a8286dbe5f6	unknown/unknown
+...
+$ docker image inspect alpine:3.24.2 --format '{{.Os}}/{{.Architecture}}'
+linux/amd64</code></pre>
+<p><code>index.json</code> は、ダイジェスト <code>294b683c…</code> のファイルを指していた。そのファイル（<b>イメージの目録</b>、image index）は、
+CPU の種類ごとの設計図の一覧で、<code>linux/amd64</code> のものは <code>d56c381f961d…</code> である（<code>unknown/unknown</code> の行は、各設計図に付いた来歴の記録）。
+練習機は x86_64 なので、docker は amd64 の分だけを取ってきてある（<code>docker image inspect</code> の答えも <code>linux/amd64</code>）。<code>docker images</code> が出していた ID <code>294b683cb724</code> は、この目録のダイジェストだった。
+arm64 の PC が同じ <code>294b…</code> を指定すれば、arm64 の行の設計図をたどり、別の層を取る。<b>目録のダイジェストが1つに決めるのは、CPU の種類ごとの中身の一覧</b>である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ jq . blobs/sha256/d56c*
+{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.oci.image.manifest.v1+json",
+  "config": {
+    "mediaType": "application/vnd.oci.image.config.v1+json",
+    "digest": "sha256:320994c3b997e2ec6433f717f153e108023c5bec8fefa8d76b83451d16d05ea8",
+    "size": 611
+  },
+  "layers": [
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:e2de96513ba9eb53b431787ec8a65cdde380ac4772a3e4c4b714dcfde2a102b5",
+      "size": 3849738
+    }
+  ],
+  "annotations": {
+    "com.docker.official-images.bashbrew.arch": "amd64",
+    "org.opencontainers.image.base.name": "scratch",
+    "org.opencontainers.image.created": "2026-09-17T20:36:57Z",
+    "org.opencontainers.image.revision": "1c744e2d49059e51b063a11a6e3e18c9ccf04ab8",
+    "org.opencontainers.image.source": "https://github.com/alpinelinux/docker-alpine.git#1c744e2d49059e51b063a11a6e3e18c9ccf04ab8:x86_64",
+    "org.opencontainers.image.url": "https://hub.docker.com/_/alpine",
+    "org.opencontainers.image.version": "3.24.2"
+  }
+}
+$ jq '{Cmd: .config.Cmd, diff_ids: .rootfs.diff_ids}' blobs/sha256/3209*
+{
+  "Cmd": [
+    "/bin/sh"
+  ],
+  "diff_ids": [
+    "sha256:74d97c428c51a828f9051a7a40a53ff1fc99e54fc30323ce36760701b0b7f711"
+  ]
+}</code></pre>
+<p>amd64 の<b>設計図</b>（manifest）は、設定（config）1つと層（layers）1つを、大きさとダイジェストで指している。
+<b>設定</b>（config）には、起動するコマンド（<code>Cmd</code>）と、層の一覧が書かれている。Alpine のイメージは層が1枚だけである。</p>
+
+<h2 id="digest">ファイル名は、中身の指紋</h2>
+<div class="sgoal"><b>この節で分かること</b>: ダイジェストを自分で計算して確かめる方法と、層の指紋が2種類あること。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ sha256sum blobs/sha256/e2de*
+e2de96513ba9eb53b431787ec8a65cdde380ac4772a3e4c4b714dcfde2a102b5  blobs/sha256/e2de96513ba9eb53b431787ec8a65cdde380ac4772a3e4c4b714dcfde2a102b5
+$ file blobs/sha256/e2de*
+blobs/sha256/e2de96513ba9eb53b431787ec8a65cdde380ac4772a3e4c4b714dcfde2a102b5: gzip compressed data, original size modulo 2^32 8704000
+$ gunzip -c blobs/sha256/e2de* | sha256sum
+74d97c428c51a828f9051a7a40a53ff1fc99e54fc30323ce36760701b0b7f711  -
+$ tar tzf blobs/sha256/e2de* | head -5
+bin/
+bin/arch
+bin/ash
+bin/base64
+bin/bbconfig
+$ docker image inspect alpine:3.24.2 --format '{{json .RootFS.Layers}}'
+["sha256:74d97c428c51a828f9051a7a40a53ff1fc99e54fc30323ce36760701b0b7f711"]</code></pre>
+<p>層のファイルの SHA-256 を計算すると、ファイル名と同じ値が出た。<b>名前が中身の指紋なので、受け取った側は計算し直すだけで、途中で1バイトも変わっていないことを確かめられる</b>。
+docker もレジストリから取るたびに同じ計算をしている。設計図が層をこの値で指し、目録が設計図を、タグを付ける前の名前（<code>@sha256:</code>）が目録を指すので、
+いちばん上のダイジェスト1つが決まれば、CPU の種類ごとに、下のファイルは全部1つに決まる。</p>
+<p>層には指紋が2つある。gzip で圧縮したファイルの指紋（ブロブの名前 <code>e2de9651…</code>。転送と保存に使う）と、
+展開した tar の指紋（<code>74d97c42…</code>。設定の <code>diff_ids</code> と <code>docker image inspect</code> の <code>Layers</code> に出るもの。ファイルの並びの正体を表す）である。
+展開すると、中身は Alpine のディレクトリの木（<code>bin/</code>・<code>etc/</code>…）を入れた、普通の tar だった。</p>
+<div class="analogy"><b>たとえ</b>: イメージの束は、<b>中身の指紋を背表紙に書いた本の、目次の目次</b>に近い。目録が設計図の背表紙を、設計図が設定と層の背表紙を書いている。
+いちばん外の目録の指紋を1つ控えておけば、届いた本が全部本物かを、背表紙と中身を見比べるだけで確かめられる。
+<br>ただし<b>崩れる点</b>: 本なら背表紙の文字を書き換えれば偽物を作れるが、指紋は中身から計算し直せるので、背表紙（ファイル名）を書き換えても計算が合わなくなって見破られる。
+守れないのは、いちばん外の指紋を最初にどこから知ったか（書いてある場所が信用できるか）だけである。</div>
+<p>作業用のディレクトリを片付ける。<code>tar tvf</code> の一覧のとおり、ブロブは読むだけの権限（<code>-r--r--r--</code>）で書き出されるので、
+<code>rm -r</code> だけだと1つずつ「書き込み禁止のファイルを消してよいか」と聞かれる。<code>-f</code> を付けて、聞かずに消す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ cd
+$ rm -rf ~/img</code></pre>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/docker/practice/">演習03</a>で、別の中身に付け替えられた名前を、ダイジェストを手がかりに元の中身へ戻す。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>docker images --digests alpine</code> で、<code>alpine</code> の行の DIGEST と IMAGE ID が、<code>busybox</code> の行と同じだった。この出力から何が言えるか。</p>
+<details><summary>答え</summary>
+<p>その名前（<code>alpine:3.24.2</code>）は、busybox と同じ中身に付いた札である。ダイジェストは中身から計算した指紋なので、ダイジェストが同じなら中身は1つしかない。
+名前が alpine でも、中で動くのは BusyBox である。名前と中身の対応は手元でいくらでも変わるので、中身を確かめるには名前ではなくダイジェストを見る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>同じ <code>alpine:3.24.2</code> を起動したのに、Aさんと Bさんで動きが違った。中身が同じかどうかを、どのコマンドの何で確かめればよいか。</p>
+<details><summary>答え</summary>
+<p><code>docker images --digests</code> の DIGEST と、CPU の種類（<code>docker image inspect alpine:3.24.2 --format '{{.Os}}/{{.Architecture}}'</code>）を比べる。
+目録のダイジェストと CPU の種類が両方同じなら中身は同じで、違いは起動のしかた（環境・ボリューム・オプション）にある。
+ID（<code>.Id</code>）は、docker の版とイメージの置き場所の設定で、目録のダイジェストだったり設定の指紋だったりするので、PC の間で比べる値には使わない。
+ダイジェストが違えば、名前が別の中身に付いている。それ以降は <code>alpine:3.24.2@sha256:…</code> のように<b>ダイジェストまで書いて</b>起動すれば、中身が1つに決まる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>層のブロブのファイル名と <code>sha256sum</code> の結果は一致したが、<code>docker image inspect</code> の <code>Layers</code> の値とは違った。どちらかが壊れているのか。</p>
+<details><summary>答え</summary>
+<p>壊れていない。ファイル名は圧縮した tar の指紋、<code>Layers</code>（diff_ids）は展開した tar の指紋で、同じ層を別の形で測っている。
+<code>gunzip -c … | sha256sum</code> が diff_ids と一致したことで、両方が同じ層を指していると確かめられた。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li><code>名前:タグ</code> は中身を指す札で、手元でもレジストリでも付け替えられる。中身を1つに決めるのはダイジェスト（目録のダイジェストなら、CPU の種類ごとに1つ）</li>
+<li>イメージは、中身の SHA-256 を名前にした JSON と tar の束である。目録 → 設計図 → 設定と層、とダイジェストでたどれる</li>
+<li>ダイジェストは誰でも計算し直せるので、受け取った中身が変わっていないことを確かめられる</li>
+<li>層には、圧縮したものの指紋（転送・保存用）と、展開した tar の指紋（diff_ids）の2つがある</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:docker-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・docker.io 29.1.3・containerd 2.2.1・runc 1.3.4）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/docker/theory/02-pid1">← 2. コンテナの PID 1 は、合図を無視する</a><a href="/docker/theory/04-storage">次: 4. コンテナの書き込みは、イメージの上の1枚に入る →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/docker/">Docker</a> · <a href="/docker/theory/">理論編 目次</a> · <a href="/docker/practice/">実践編</a> · <a href="/docker/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/docker/chapters.js"></script>
+<script src="/docker/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

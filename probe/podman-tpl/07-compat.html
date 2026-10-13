@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>7. 同じコマンドで、違う仕組み — 確かめて説明する Podman</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="7" data-theme="podman">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <a href="/podman/theory/">理論編</a> › 第7章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/">詳しく</a></p>
+</div>
+<h1>7. 同じコマンドで、違う仕組み</h1>
+<p class="lead">podman のコマンドの形は docker とほぼ同じで、このサイトの檻も <code>docker</code> を <code>podman</code> に読み替えるだけで起動する。
+podman は docker の API の真似もでき、docker の CLI から podman にコンテナを作らせることさえできる。
+けれども、中で渡している特権・置いている印・止め方・API の版は、docker と同じではない。同じ画面を期待してよいところと、いけないところを数字で分ける。</p>
+<div class="badges"><span>前提: 第1〜6章。<a href="/docker/theory/07-privileges">Docker 第7章</a>を読んでいると比べやすい</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>podman と docker で、既定のケーパビリティ・<code>ping</code> の許し方・コンテナの中の印のファイル・<code>exec</code> の umask の決まり方が、どう同じでどう違うかを示せる</li>
+<li>docker の CLI を podman の API につないで使え、そのときに起きる版の食い違いを説明できる</li>
+<li>このサイトの檻が、docker でも rootless の podman でも同じオプションで動く理由を言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>podman-docker</code> パッケージ（<code>docker</code> という名前で podman を呼ぶ）、docker compose と podman compose の違い、
+API の各版で何が変わったかの一覧、Docker Desktop と Podman Desktop。</div></div>
+
+<h2 id="same">同じ形のコマンド、違う中身</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じ <code>run</code> でも、コンテナに渡る特権と、中に置かれる印が違うこと。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>podman は docker と同じコマンドが打てる「docker の別名」だ。同じ <code>run</code> を打てば、コンテナの中は docker と同じになるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman run --rm alpine:3.24.2 grep CapEff /proc/self/status
+@@ capsh --decode=00000000800405fb
+@@ podman run --rm alpine:3.24.2 ls /run/.containerenv
+@@ podman run --rm alpine:3.24.2 ls /.dockerenv</code></pre>
+<div class="then"><b>だめな理由</b>: コンテナの中の root のケーパビリティは <code>00000000800405fb</code> の11個で、docker の既定（<code>00000000a80425fb</code> の14個。<a href="/docker/theory/07-privileges">Docker 第7章</a>）より
+<code>cap_net_raw</code>（ping などの生のパケット）・<code>cap_mknod</code>（装置のファイルを作る）・<code>cap_audit_write</code> の3つが少ない。
+コンテナの中の印も違い、podman は <code>/run/.containerenv</code> を置き、docker の <code>/.dockerenv</code> は無い。
+<b>コマンドの形が同じでも、既定値は別々の人が別々に決めている</b>。このサイトの <code>lab env</code> は、この2つの印のファイルでランタイムを見分けている。</div></div>
+<p><code>cap_net_raw</code> が無いなら、podman のコンテナでは <code>ping</code> が打てないのか。中の root と、UID 1000 で比べる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman run --rm alpine:3.24.2 sh -c 'cat /proc/sys/net/ipv4/ping_group_range; ping -c1 -q 127.0.0.1 &gt;/dev/null 2&gt;&amp;1 &amp;&amp; echo ping-ok || echo ping-ng'
+@@ podman run --rm --user 1000:1000 alpine:3.24.2 sh -c 'ping -c1 -q 127.0.0.1 &gt;/dev/null 2&gt;&amp;1 &amp;&amp; echo ping-ok || echo ping-ng'
+@@ podman run --rm --user 1000:1000 --cap-add NET_RAW alpine:3.24.2 sh -c 'ping -c1 -q 127.0.0.1 &gt;/dev/null 2&gt;&amp;1 &amp;&amp; echo ping-ok || echo ping-ng'</code></pre>
+<p>中の root の <code>ping</code> は、<code>cap_net_raw</code> が無くても通った。podman はコンテナの <code>net.ipv4.ping_group_range</code> を <code>0 0</code>（グループ 0 だけ）にしていて、
+グループ 0 の root は、特権の要らない ping 専用のソケット（ICMP のソケット）で ping できる。UID 1000 にすると断られ、<code>--cap-add NET_RAW</code> を足すと通った。
+docker はこの値を <code>0 2147483647</code>（全部のグループ）にしているので、一般ユーザでも通る（<a href="/docker/theory/07-privileges">Docker 第7章</a>の <code>--user</code> の節）。
+<b>差は、ケーパビリティよりも <code>ping_group_range</code> の値にある</b>。</p>
+
+<div class="analogy"><b>たとえ</b>: podman と docker は、<b>ボタンの配置が同じ、別のメーカーのリモコン</b>に近い。押し方（コマンドの形）は同じでも、中の初期設定（既定のケーパビリティ・印のファイル）はメーカーがそれぞれ決めている。
+<br>ただし<b>崩れる点</b>: リモコンなら同じボタンで同じテレビが動くが、podman と docker は動かす相手からして違う（デーモンの有無・ユーザ名前空間・置き場所）。ボタンが同じでも、押した先で起きることの仕組みは別物である。</div>
+
+<h2 id="exec">止め方と、exec の umask</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>stop</code> と <code>exec</code> で、docker と同じところと違うところ。</div>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman run -d --name p7 alpine:3.24.2 sleep 1000
+@@ podman exec p7 sh -c 'umask; echo "TERM=$TERM"'
+@@ umask
+@@ grep Umask /proc/$(pgrep -x conmon)/status</code></pre>
+<p><code>exec</code> の umask は <code>0022</code>、端末なしでは TERM が空、という点は docker と同じだった（<a href="/docker/theory/02-pid1">Docker 第2章</a>）。
+conmon はいま打った podman から生まれたのに、打ったシェルの umask（<code>0002</code>）ではなく <code>0022</code> で動いていた。では、<code>exec</code> のプロセスは誰の子で、umask はどこから来るのか。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman exec -d p7 sleep 2000
+@@ ps -o pid,ppid,comm -C sleep,conmon</code></pre>
+<p>後から足した <code>sleep 2000</code> の親（PPID）は、PID 1 の <code>sleep 1000</code> の親とは別の conmon だった。
+podman は <code>exec</code> のたびに、その <code>exec</code> のためだけの conmon を起動する（docker の <code>exec</code> のプロセスは、コンテナの shim の子だった）。
+次に、コンテナの umask の設定（<code>--umask</code>）を変えたコンテナと比べる。<code>.State.ConmonPid</code> は、そのコンテナの conmon の PID である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ podman run -d --name p7u --umask 0077 alpine:3.24.2 sleep 1000
+@@ podman exec p7u sh -c umask
+@@ grep Umask /proc/$(podman inspect -f '{{.State.ConmonPid}}' p7u)/status
+@@ podman inspect p7 p7u --format '{{.Name}} {{.Config.Umask}}'
+@@ podman rm -f -t 0 p7u</code></pre>
+<p><code>--umask 0077</code> で作った <code>p7u</code> への <code>exec</code> は <code>0077</code> になったが、<code>p7u</code> の conmon は <code>0022</code> のままだった。
+<b>podman の <code>exec</code> の umask は、conmon から受け継ぐのではなく、コンテナの umask の設定（<code>--umask</code>。既定 <code>0022</code>）を、podman が <code>exec</code> のたびに crun へ渡して決めている</b>。
+docker の <code>exec</code> が shim から受け継いだのと、値は同じ <code>0022</code> でも決まり方が違う。最後に <code>p7</code> を止める。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ time podman stop p7
+@@ podman rm p7</code></pre>
+<p><code>stop</code> は docker と同じく TERM → 10秒待つ → KILL で、PID 1 の <code>sleep</code> は TERM を受け取らないので10秒あまりかかった。
+違うのは、podman が <b>KILL に切り替えたことを警告で知らせる</b>ことである（docker は黙って KILL する）。</p>
+
+<h2 id="api">docker の CLI から、podman に頼む</h2>
+<div class="sgoal"><b>この節で分かること</b>: podman が docker の API を真似られることと、その限界。</div>
+<p>podman は、頼まれたときだけ起動する docker 互換の API の受け口（ソケット）を、student の systemd のサービスとして持っている。
+この練習機には docker の CLI も入っているので、<code>DOCKER_HOST</code> でつなぐ先を podman のソケットに変えると、docker の CLI が podman に頼むようになる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>@@ systemctl --user start podman.socket
+@@ ls -l /run/user/1000/podman/podman.sock
+@@ export DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
+@@ docker version --format '{{.Server.Version}} / API {{.Server.APIVersion}}'
+@@ docker run --rm alpine:3.24.2 cat /etc/alpine-release
+@@ docker images
+@@ docker images --format '{{.Repository}}:{{.Tag}}'
+@@ DOCKER_API_VERSION=1.41 docker images
+@@ unset DOCKER_HOST
+@@ systemctl --user stop podman.socket podman.service</code></pre>
+<p>dockerd は止まっているのに、docker の CLI で <code>run</code> が動いた。答えたのは podman 4.9.3 で、docker の API の <b>1.41 版</b>として振る舞っている。
+ところが <code>docker images</code> は「この CLI は 1.44 版より古い API を使えない」と断った。断ったのは podman ではなく、docker の CLI（29.1.3）のほうである。
+この CLI は、1.44 版より古いサーバとの版合わせを断る決まりを持っている。ほとんどのコマンド（<code>run</code> など）は、その断りを無視して版の番号なしで頼むので動くが、
+既定の <code>docker images</code>（木の形の一覧）だけは版合わせをやり直して、断りをそのまま出す。<code>--format</code> を付けた一覧は出た。
+使う版を <code>DOCKER_API_VERSION=1.41</code> で決め打ちすると、版合わせ自体をしないので、同じ木の形の一覧が出た（IMAGE ID は podman の値の <code>320994c3b997</code>。第3章）。
+新しい表示が 1.44 版の機能を要るのではない。<b>互換は「API の何版として振る舞うか」の範囲までで、相手の版をどう扱うかはクライアントの側の決まりでも変わる</b>。</p>
+<div class="analogy"><b>たとえ</b>: podman の docker 互換の API は、<b>通訳つきの窓口</b>に近い。docker の CLI（客）は、いつもの言葉（docker の API）で話しかければ用が足りる。
+<br>ただし<b>崩れる点</b>: 窓口の通訳が「1.41 版の世代です」と名乗ると、客（docker の CLI 29）のほうが「1.44 版より古い通訳は相手にしない」という決まりを持っている。
+それでも、たいていの用事は構わず話しかけて通じてしまい、一覧（既定の <code>images</code>）を頼むときだけ、その決まりを持ち出して断る。断っているのは窓口ではなく客である。</div>
+
+<h2 id="site">このサイトの檻は、なぜ podman でもそのまま動くのか</h2>
+<div class="sgoal"><b>この節で分かること</b>: このサイトの起動コマンドが、docker と rootless の podman の両方で同じ画面になる条件。</div>
+<p>この記事の檻（lab-podman:1.0.0）は、<code>docker</code> を <code>podman</code> に読み替えた同じオプション（<code>-d --name … --hostname host --stop-timeout 30 -v 名前:/home/lab/vm -v 名前:/home/lab/.lab</code>）で、
+rootless の podman（5.8.6）でも起動することを確かめてある（著者の記録 <code>logs/podman-rootless.log</code>: 起動から ssh まで36秒、<code>lab env</code> のランタイムは podman、
+<code>exec</code> の umask <code>0022</code>、<code>CapBnd</code> は podman の既定の <code>00000000800405fb</code>、<code>podman stop</code> は5秒で終了コード 0）。そのまま動く理由は、この記事で見たことで説明できる。</p>
+<div class="scroll"><table>
+<tr><th>起動コマンドの部分</th><th>podman rootless で</th><th>関係する章</th></tr>
+<tr><td>特権を1つも求めない（<code>--privileged</code>・<code>--cap-add</code>・<code>--device</code> が無い。このサイトの例外は、<code>--cap-add SYS_ADMIN</code> の LinuC 1.09 と <code>--device /dev/kvm</code> の KVM の記事で、rootless の podman での動きはこの記事では確かめていない）</td><td>rootless で渡せないものを、最初から頼んでいない。中の lab は一般ユーザなので、既定のケーパビリティの差（14個と11個）にも触れない</td><td>第2章・この章</td></tr>
+<tr><td><code>-v 名前:/home/lab/vm</code>（名前付きボリューム）</td><td>檻を起動した人の rootless の置き場所（<code>~/.local/share/containers/storage/volumes</code>）に作られ、ユーザ名前空間の中でイメージの持ち主（lab）がそのまま写される（記録の <code>ls -ld /home/lab/vm</code>）</td><td>第2章・第3章</td></tr>
+<tr><td><code>-p</code> が無い</td><td>1024 番未満の公開の制限も、rootlessport の中継も関係しない。練習機への ssh は檻の中で閉じている</td><td>第4章</td></tr>
+<tr><td><code>--stop-timeout 30</code>・<code>--hostname host</code></td><td>podman にも同じオプションがあり、同じ意味で効く</td><td>この章</td></tr>
+<tr><td>練習機は QEMU の完全エミュレーション（TCG）</td><td>/dev/kvm も特権も要らないので、rootless でも動き方が変わらない</td><td>—</td></tr>
+</table></div>
+<p>逆に言うと、<code>-p 80:80</code> を使う檻なら rootless の podman では起動できず（1024 番未満）、<code>--device</code> を使う檻は、読者の PC の装置と権限しだいで動き方が変わる。
+読者に何も渡させない作りは、安全のためだけでなく、<b>docker と podman のどちらでも同じ画面を出すため</b>でもある。</p>
+
+<div class="analogy"><b>たとえ</b>: 読者に何も渡させない檻は、<b>電池でもコンセントでも動く電化製品</b>に近い。特別な部品（特権・装置・小さい番号のポート）を要求しないので、どちらの電源（docker・podman rootless）でも同じに動く。
+<br>ただし<b>崩れる点</b>: 電化製品なら電源で動き方は変わらないが、rootless の podman で動かした檻は、ログアウトで止まりうる（第6章）。電源の種類による違いが、1つだけ残る。</div>
+
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/podman/practice/">演習07</a>で、docker の CLI を podman のソケットにつなぎ、docker のコマンドで podman のコンテナを動かす。</div>
+
+<div class="quiz"><b>確認</b>
+<p>docker では動いていた、コンテナの中の一般ユーザ（<code>--user 1000</code>）の <code>ping</code> が、rootless の podman では「許可されていない」と失敗した。何が違うと考えられるか。どう確かめるか。</p>
+<details><summary>答え</summary>
+<p><code>net.ipv4.ping_group_range</code> の値が違う。docker は <code>0 2147483647</code>（全部のグループが特権なしの ICMP のソケットを使える）、podman は <code>0 0</code>（グループ 0 だけ）にしている。
+コンテナの中で <code>cat /proc/sys/net/ipv4/ping_group_range</code> を打てば分かる。一般ユーザの <code>CapEff</code> はどちらも 0 なので、ケーパビリティを比べても差は出ない。
+podman で通すなら <code>--cap-add NET_RAW</code> を足す（この章で確かめた）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>docker の CLI を podman のソケットにつないだら、<code>docker run</code> は動くのに <code>docker images</code> だけが API の版の誤りで止まった。この出力から何が言えるか。</p>
+<details><summary>答え</summary>
+<p>podman は docker の API を 1.41 版として真似ていて、docker の CLI（29.1.3）は 1.44 版より古いサーバとの版合わせを断る決まりを持っている。
+ほとんどのコマンドはその断りを無視して動くが、既定の <code>images</code> の表示だけが断りを出す。断っているのは CLI の側で、podman が足りないのではない。
+<code>DOCKER_API_VERSION=1.41</code> で使う版を決め打ちするか、<code>--format</code> を付けると出る。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul>
+<li>podman のコマンドの形は docker とほぼ同じだが、既定値は別（ケーパビリティ 11個と14個、<code>ping_group_range</code> の <code>0 0</code> と <code>0 2147483647</code>、<code>/run/.containerenv</code> と <code>/.dockerenv</code>）</li>
+<li><code>exec</code> の umask は、docker は shim から受け継ぎ、podman はコンテナの <code>--umask</code>（既定 0022）を渡して決める。値は同じ 0022 でも決まり方が違う。TERM の決まりと <code>stop</code> の TERM → 10秒 → KILL は docker と同じで、podman は KILL に切り替えたことを警告する</li>
+<li>podman は docker の API を（1.41 版として）真似られ、docker の CLI から使える。ただし docker の CLI 29 は古い版のサーバとの版合わせを断る決まりを持ち、既定の <code>images</code> の表示だけが断られる</li>
+<li>この記事の檻は読者に何も渡させないので、docker でも rootless の podman でも同じオプション・同じ画面で動く</li>
+</ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:podman-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・podman 4.9.3・docker.io 29.1.3 の CLI・libcap2-bin の capsh）/ コンテナのイメージ alpine:3.24.2（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<nav class="pager"><a href="/podman/theory/06-systemd">← 6. ログアウトしても動かし続けるのは、systemd の仕事</a><a href="/podman/practice/">実践編へ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/podman/">Podman</a> · <a href="/podman/theory/">理論編 目次</a> · <a href="/podman/practice/">実践編</a> · <a href="/podman/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/podman/chapters.js"></script>
+<script src="/podman/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>
