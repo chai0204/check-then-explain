@@ -4,6 +4,9 @@
 # パッケージは足さない。出題範囲の19個のフィルタも grep / sed / xargs / vim / nano も
 # lab-linuc-base に全部入っていて、man も全部読める（実測 2026-10-13）。
 # 足すのは練習用のテキスト（~/text）と演習（/lab）だけ。
+#
+# 1.0.1（2026-10-13）: 事実確認で見つかった誤りを、演習の解答とヒント（lab/）で直した。
+#   ~/text の層は 1.0.0 と同じ（キャッシュのまま。本文に載せた日付も変わらない）。
 FROM lab-linuc-base:1.0.0
 USER root
 
@@ -31,6 +34,6 @@ USER lab
 LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-explain
 LABEL org.opencontainers.image.description="LinuC 主題1.03（GNU と Unix のコマンド）を手で確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
-ENV LAB_THEME=linuc-text LAB_VERSION=1.0.0 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:text-1.0.0
+ENV LAB_THEME=linuc-text LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:text-1.0.1
 CMD ["/bin/bash", "-l"]

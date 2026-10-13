@@ -156,9 +156,23 @@ $ stat -c "%A %s %n" ro.txt
 @@</code></pre>
 <div class="then"><b>だめな理由</b>: <code>:w</code> は <code>E45: 'readonly' option is set (add ! to override)</code> で断られたが、<code>:w!</code> は書けた。
 <code>apple</code> の行が消え、大きさが 25 から 19 バイトに変わったのに、権限は <code>-r--r--r--</code> のままである。
-このファイルの持ち主は <code>lab</code> 自身で、持ち主はいつでも権限を変えられる。vim は <code>!</code> を付けられると、
-<b>一時的に書き込み権を足して書き、元の権限に戻している</b>。<code>444</code> は「うっかり書かない」ための印で、持ち主に対する鍵ではない。
+このファイルの持ち主は <code>lab</code> 自身で、持ち主はいつでも権限を変えられる。vim は <code>!</code> を付けられると書き込みを押し通し、
+<b>書き終えたファイルに元の権限（444）を付け直す</b>（どう書いたかは次の記録で確かめる）。<code>444</code> は「うっかり書かない」ための印で、持ち主に対する鍵ではない。
 シェルの <code>&gt;&gt;</code> は権限を変えようとしないので、そのまま断られた。</div></div>
+<p>「どう書いたか」は i ノード番号で分かる。ハードリンク（同じ実体に付いた2つ目の名前。第6章）がある場合と比べた。</p>
+<pre><code>@@+
+$ cp memo.txt ro3.txt; chmod 444 ro3.txt
+$ ls -i ro3.txt
+$ vim ro3.txt
+$ ls -i ro3.txt
+$ stat -c "%A %s %n" ro3.txt
+$ cp memo.txt ro4.txt; chmod 444 ro4.txt; ln ro4.txt ro4-link.txt
+$ ls -i ro4.txt ro4-link.txt
+$ vim ro4.txt
+$ ls -i ro4.txt ro4-link.txt
+$ stat -c "%A %s %n" ro4.txt ro4-link.txt
+@@</code></pre>
+<p>ハードリンクの無い <code>ro3.txt</code> は i ノード番号が変わった（番号そのものは環境ごとに違う。見るのは変わったかどうか）。vim は元のファイルを脇へ退避して<b>新しいファイルを書き</b>、元と同じ権限を付けている。ハードリンクのある <code>ro4.txt</code> は番号が変わらず、もう1つの名前 <code>ro4-link.txt</code> からも書き換えた中身（19 バイト）が見える。こちらは同じ実体を<b>その場で書き換え</b>ていて、そのために一時的に書き込み権を足し、書き終えてから元の権限に戻している。どちらで書くかは、vim の設定 <code>backupcopy</code>（既定は <code>auto</code>）がファイルの状況を見て決める。</p>
 <p>Ex モード（<code>vim -es</code>）で同じことをすると、結果が変わった。</p>
 <pre><code>@@
 $ cp memo.txt ro2.txt; chmod 444 ro2.txt
@@ -177,8 +191,9 @@ $ grep -n -A3 "jump to the last known cursor" /usr/share/vim/vim91/defaults.vim
 <p><code>v1.txt</code> は前の節で <code>j dd</code> をして2行目で閉じたファイルで、開き直すとカーソルは2行目から始まった（開いた直後の行番号をファイルに書き出して確かめた）。Ubuntu の vim は、設定ファイルが無いと <code>defaults.vim</code> を読み、この振る舞いを入れる。2回目に開いたファイルで打ち始めるときは、まず <code>gg</code> で1行目へ移るとよい。</p>
 <div class="analogy"><b>たとえ</b>: 自分の部屋のドアに<b>「立入禁止」の札</b>を掛けておくのに近い。他人には効くが、部屋の主は札を外して入り、出るときに掛け直せる。
 <code>:w!</code> はその「外して入って掛け直す」を、vim が代わりにやっている。
-<br>ただし<b>崩れる点</b>: 札なら外したことに誰かが気づくかもしれないが、ファイルの権限は元に戻されるので、後から <code>ls -l</code> を見ても書き換えた跡が残らない。
-変わったのは中身と大きさと更新時刻だけである。</div>
+<br>ただし<b>崩れる点</b>: 札を外して入るのは、ハードリンクがあってその場で書き換えるときだけである。ハードリンクが無ければ vim は、
+隣に同じ部屋を建てて中身を移し、同じ札を掛けて元の部屋を取り壊す（i ノード番号が変わる）。どちらの場合も権限は元どおりなので、
+<code>ls -l</code> の権限の欄には書き換えた跡が残らない。変わったのは中身・大きさ・更新時刻と、建て替えたときは i ノード番号である。</div>
 
 <h2 id="nano">nano — 画面にキーが書いてあるエディタ</h2>
 <div class="sgoal"><b>この節で分かること</b>: nano の基本操作と、vi との違い。</div>
@@ -203,7 +218,7 @@ $ cat n2.txt
 
 <h2 id="editor">標準のエディタを切り替える — EDITOR</h2>
 <div class="sgoal"><b>この節で分かること</b>: プログラムが「どのエディタを開くか」をどこで決めているか。</div>
-<p><code>crontab -e</code>、<code>visudo</code>、<code>sudoedit</code>、<code>less</code> の <kbd>v</kbd>、bash の <code>fc</code> などは、途中でエディタを開く。開くエディタは、環境変数 <code>VISUAL</code> か <code>EDITOR</code> で決まる。何も設定していないときに何が開くかは、OS が決めている。</p>
+<p><code>crontab -e</code>、<code>visudo</code>、<code>sudoedit</code>、<code>less</code> の <kbd>v</kbd>、bash の <code>fc</code> などは、途中でエディタを開く。どれを開くかは、たいてい環境変数 <code>VISUAL</code> か <code>EDITOR</code> を見て決める。見る順番はプログラムごとに違い、<code>sensible-editor</code> は <code>VISUAL</code> → <code>EDITOR</code> の順、bash の <code>fc</code> は <code>FCEDIT</code> → <code>EDITOR</code> の順（<code>VISUAL</code> は見ない）である。何も設定していないときに何が開くかは、OS が決めている。</p>
 <pre><code>@@
 $ ls -l /usr/bin/vi /etc/alternatives/vi
 $ ls -l /usr/bin/editor /etc/alternatives/editor
@@ -213,7 +228,7 @@ $ editor --version | head -1
 $ echo "[$EDITOR]"
 @@</code></pre>
 <p><code>vi</code> も <code>editor</code> も、<code>/etc/alternatives/</code> を経由したシンボリックリンクだった（Debian 系の「代替」の仕組み）。<code>vi</code> の実体は vim で、<code>editor</code> は nano を指している。nano の優先度（40）が vim（30）より高いからだ。Debian 系のプログラムは、<code>EDITOR</code> が空だと <code>/usr/bin/editor</code> を開くので、<b>この檻では何も設定しなければ nano が開く</b>（昔ながらの Unix の既定は vi）。</p>
-<p>ここで第1章の話がそのまま効く。<code>sensible-editor</code> は <code>EDITOR</code> を読んで起動するプログラムで、<code>--version</code> を渡すと、起動したエディタが名乗る。</p>
+<p>ここで第1章の話がそのまま効く。<code>sensible-editor</code> は Debian 系で「その人の標準のエディタ」を開くプログラムで、<code>VISUAL</code> → <code>EDITOR</code> の順に見る。<code>--version</code> を渡すと、起動したエディタが名乗る。</p>
 <pre><code>@@
 $ EDITOR=vi sensible-editor --version | head -1
 $ EDITOR=nano sensible-editor --version | head -1
@@ -226,6 +241,24 @@ $ unset EDITOR
 $ command -v emacs; echo "exit=$?"
 @@</code></pre>
 <p><code>EDITOR=vi</code> とだけ打った後の子プロセス（<code>bash -c</code>）は nano を開いた。シェル変数のままでは子に届かないからだ。<code>export</code> した後は vim を開いた。だから標準のエディタを切り替えるときは <code>export EDITOR=vi</code>（nano にするなら <code>export EDITOR=nano</code>、emacs を入れてあれば <code>export EDITOR=emacs</code>）と書き、ずっと使うなら <code>~/.bashrc</code> にも書いておく。システム全体の既定を変えるのは <code>update-alternatives --config editor</code>（root が要る）である。<code>command -v emacs</code> が何も出さず終了コード 1 になったのは、この檻に emacs が無いからだ。</p>
+<p>見る順番も確かめておく。<code>VISUAL</code> と <code>EDITOR</code> の両方があると、<code>sensible-editor</code> は <code>VISUAL</code> を使う。</p>
+<pre><code>@@+
+$ VISUAL=nano EDITOR=vi sensible-editor --version < /dev/null | head -1
+@@</code></pre>
+<p>ここまで <code>&lt; /dev/null</code> を付けてきたのには理由がある。<code>VISUAL</code> も <code>EDITOR</code> も無く、<code>~/.selected_editor</code> も無いとき、標準入力が端末だと <code>sensible-editor</code> は、エディタを開く前に選択画面（<code>select-editor</code>）を出す。端末の上で打った記録で見る（プロンプトは <code>$ </code> にそろえてある）。</p>
+<pre><code>{{SESSION+ 2-12}}
+...
+{{SESSION+ 58-65}}</code></pre>
+<p>選んだものは <code>~/.selected_editor</code> に保存され、以後は（<code>VISUAL</code> と <code>EDITOR</code> が無ければ）<code>/usr/bin/editor</code> より優先される。標準入力を端末から外した <code>&lt; /dev/null</code> でも vim が開くようになった。ファイルを消すと元に戻る（この檻はホームディレクトリをボリュームに置いていないので、起動し直しても消える）。</p>
+<p>もう1つの落とし穴は <code>sudo</code> である。<code>sudo</code> はコマンドを root で動かす前に、環境変数を入れ直す（<code>env_reset</code>）。Ubuntu の既定の <code>/etc/sudoers</code> では、<code>EDITOR</code> を引き継ぐ行（<code>env_keep</code>）はコメントになっている。</p>
+<pre><code>@@+
+$ sudo grep -n -E "env_reset|EDITOR" /etc/sudoers
+$ export EDITOR=vi
+$ sudo env | grep "^EDITOR="; echo "exit=$?"
+$ sudo EDITOR=vi env | grep "^EDITOR="
+$ unset EDITOR
+@@</code></pre>
+<p><code>export</code> した <code>EDITOR</code> は、<code>sudo</code> の先のプログラム（ここでは <code>env</code>）に届かなかった。だから <code>sudo visudo</code> のエディタを変えるなら、<code>sudo EDITOR=nano visudo</code> のように <code>sudo</code> の後ろで渡す（この檻の <code>lab</code> は sudo で何でも実行できる設定なので、こう渡せる）。<code>sudoedit</code> は sudo を呼んだ人の <code>SUDO_EDITOR</code> <code>VISUAL</code> <code>EDITOR</code> を見てエディタを選ぶので、<code>export</code> だけで効く。</p>
 <div class="analogy"><b>たとえ</b>: 出前を頼むときの<b>「いつもの店」のメモ</b>に近い。メモ（<code>EDITOR</code>）があればその店に、無ければ町内会が決めた既定の店（<code>/usr/bin/editor</code>）に頼む。
 <br>ただし<b>崩れる点</b>: 家族なら台所のメモを見に行けるが、子プロセスが見られるのは、生まれたときに手渡された写し（環境変数）だけである。
 冷蔵庫に貼っただけのメモ（シェル変数）は、子には見えない。</div>
@@ -247,10 +280,12 @@ $ command -v emacs; echo "exit=$?"
 <p>B。<code>:e!</code> は vi を開いたまま、保存済みの内容を読み直す（実測の <code>q2.txt</code> は2行消した後でも元のまま）。
 <code>:q!</code> は捨てて終わる。<code>u</code> は直前の1つの変更だけを取り消す。</p></details></div>
 <div class="quiz"><b>確認</b>
-<p><code>crontab -e</code> や <code>visudo</code> で起動するエディタを nano にしたい。bash で設定する方法を答えよ。</p>
+<p><code>crontab -e</code> で起動するエディタを nano にしたい。bash で設定する方法を答えよ。また、<code>sudo visudo</code> で nano を使うにはどうするか（Ubuntu の既定の sudoers の場合）。</p>
 <details><summary>答え</summary>
-<p><code>export EDITOR=nano</code>（<code>VISUAL</code> を見るプログラムもあるので、両方設定してもよい）。
-ずっと使うなら <code>~/.bashrc</code> に書く。<code>export</code> を付けないと子プロセスに渡らず、実測では既定の nano（この檻の場合）が開いた。</p></details></div>
+<p><code>export EDITOR=nano</code>（<code>VISUAL</code> を先に見るプログラムもあるので、両方設定してもよい）。
+ずっと使うなら <code>~/.bashrc</code> に書く。<code>export</code> を付けないと子プロセスに渡らず、実測では既定の nano（この檻の場合）が開いた。
+<code>sudo visudo</code> には、export した <code>EDITOR</code> は届かない。sudo が環境変数を入れ直す（<code>env_reset</code>）からで、実測でも <code>sudo env</code> に <code>EDITOR</code> は無かった。
+<code>sudo EDITOR=nano visudo</code> のように、sudo の後ろで渡す。</p></details></div>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-text/">演習08</a>は、vi で TODO ファイルを指定どおりに4か所直す課題で、判定は保存されたファイルの中身を読む。
 <a href="/linuc-text/">演習01</a>は <code>EDITOR</code> を vi にして子プロセスに渡す課題で、判定が実際に <code>sensible-editor</code> を起動して、どのエディタが名乗るかを見る。</div>
@@ -279,8 +314,8 @@ $ command -v emacs; echo "exit=$?"
 </div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>vi はモードで同じキーの意味が変わる。<code>i</code> <code>a</code> <code>o</code> <code>O</code> で挿入、<code>ESC</code> でノーマル、<code>:</code> でコマンドライン</li><li><code>h j k l</code> で動く。<code>dd</code> は切り取り、<code>yy</code> は写し、<code>p</code> / <code>P</code> で貼る。<code>c</code> <code>d</code> <code>y</code> は動きのキーと組み合わせる（<code>cw</code> <code>d$</code> <code>yw</code>）</li><li><code>/</code> は下向き、<code>?</code> は上向きに探す。<code>n</code> で次</li><li><code>:q!</code> は捨てて終わる、<code>:e!</code> は読み直す、<code>ZZ</code> は保存して終わる。<code>:w!</code> は持ち主なら読み取り専用のファイルにも書き、権限は元に戻る</li><li>nano は <code>^O</code> 保存、<code>^X</code> 終了。標準のエディタは <code>export EDITOR=…</code> で変える。Ubuntu の既定は <code>/usr/bin/editor</code>（alternatives）経由で nano</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>vi はモードで同じキーの意味が変わる。<code>i</code> <code>a</code> <code>o</code> <code>O</code> で挿入、<code>ESC</code> でノーマル、<code>:</code> でコマンドライン</li><li><code>h j k l</code> で動く。<code>dd</code> は切り取り、<code>yy</code> は写し、<code>p</code> / <code>P</code> で貼る。<code>c</code> <code>d</code> <code>y</code> は動きのキーと組み合わせる（<code>cw</code> <code>d$</code> <code>yw</code>）</li><li><code>/</code> は下向き、<code>?</code> は上向きに探す。<code>n</code> で次</li><li><code>:q!</code> は捨てて終わる、<code>:e!</code> は読み直す、<code>ZZ</code> は保存して終わる。<code>:w!</code> は持ち主なら読み取り専用のファイルにも書き、権限は 444 のまま（ハードリンクが無ければ新しいファイルとして書くので i ノード番号が変わる）</li><li>nano は <code>^O</code> 保存、<code>^X</code> 終了。標準のエディタは <code>export EDITOR=…</code> で変える（<code>VISUAL</code> を先に見るプログラムもある。sudo を通すなら <code>sudo EDITOR=… コマンド</code>）。Ubuntu の既定は <code>/usr/bin/editor</code>（alternatives）経由で nano</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/09-regex">← 9. . は何にでも当たる1文字</a><a href="/linuc-text/">次: 実践編（演習8本） →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

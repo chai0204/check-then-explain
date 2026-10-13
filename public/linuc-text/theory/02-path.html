@@ -56,7 +56,7 @@ hello from ./hello.sh</code></pre>
 <tr><td><code>hello.sh</code></td><td>探す（カレントは探さない）</td><td>要る</td><td>子プロセス</td></tr>
 <tr><td><code>./hello.sh</code></td><td>探さない（<code>/</code> を含むので、その場所を開く）</td><td>要る</td><td>子プロセス</td></tr>
 <tr><td><code>bash hello.sh</code></td><td><code>bash</code> を探す</td><td>要らない（読むだけ）</td><td>子プロセス（新しい bash）</td></tr>
-<tr><td><code>. hello.sh</code> / <code>source hello.sh</code></td><td>—</td><td>要らない</td><td><b>今のシェル</b>（次の節）</td></tr>
+<tr><td><code>. hello.sh</code> / <code>source hello.sh</code></td><td>探す（bash だけは、PATH に無ければカレントも探す）。確実に目の前のファイルを読むなら <code>. ./hello.sh</code></td><td>要らない</td><td><b>今のシェル</b>（次の節）</td></tr>
 </table></div>
 <div class="analogy"><b>たとえ</b>: 電話の<b>短縮ダイヤル</b>に近い。名前だけで掛けられるのは、登録簿（<code>PATH</code>）に載っている相手だけで、
 目の前の机に名刺が置いてあっても、登録していなければ掛からない。番号を全部押せば（<code>./hello.sh</code> や絶対パス）、登録簿は使われない。
@@ -121,7 +121,7 @@ $ . cdtest.sh
 スクリプトの中では /tmp
 $ pwd
 /tmp</code></pre>
-<p><code>bash cdtest.sh</code> は子の bash の中で <code>/tmp</code> に移ったが、終わって戻ってくると親は <code>~/text</code> のままだった。<code>.</code>（ドット。<code>source</code> と同じ）は、ファイルを<b>今のシェルで</b>読み込んで実行する。だから <code>cd</code> が今のシェルに効いた。<code>~/.bashrc</code> を書き換えた後に <code>. ~/.bashrc</code> と打つのは、この性質を使っている。</p>
+<p><code>bash cdtest.sh</code> は子の bash の中で <code>/tmp</code> に移ったが、終わって戻ってくると親は <code>~/text</code> のままだった。<code>.</code>（ドット。<code>source</code> と同じ）は、ファイルを<b>今のシェルで</b>読み込んで実行する。だから <code>cd</code> が今のシェルに効いた。名前に <code>/</code> が無いとき、bash はまず <code>PATH</code> の中を探し、見つからなければカレントディレクトリのファイルを読む（ここはそれで見つかった）。<code>sh</code>（dash）や <code>bash --posix</code> はカレントを探さないので、目の前のファイルを確実に読むなら <code>. ./cdtest.sh</code> と書く。<code>~/.bashrc</code> を書き換えた後に <code>. ~/.bashrc</code> と打つのは、この性質を使っている。</p>
 <p>最後に、<code>PATH</code> にディレクトリを足すと、名前だけで動くようになることを確かめる。</p>
 <pre><code>$ cd ~/text
 $ PATH="$PATH:$HOME/text"
@@ -133,7 +133,7 @@ $ cd /; hello.sh; cd ~/text
 hello from /home/lab/text/hello.sh</code></pre>
 <p><code>PATH</code> はもともと環境変数なので、書き換えた値は子プロセスにも渡る（第1章）。<code>hashed</code> は「一度見つけた場所を覚えておいた」という意味で、次からは探し直さない。引用符の中で <code>~</code> は展開されないので、<code>$HOME</code> と書いている。</p>
 <div class="quiz"><b>確認</b>
-<p>カレントディレクトリにある実行権付きのスクリプト <code>run.sh</code> を実行する打ち方として正しいものを、すべて選べ（カレントディレクトリは <code>PATH</code> に含まれていない）。</p>
+<p>カレントディレクトリにある、実行権付きの bash スクリプト <code>run.sh</code>（1行目は <code>#!/bin/bash</code>）を実行する打ち方として正しいものを、すべて選べ（カレントディレクトリは <code>PATH</code> に含まれていない）。</p>
 <p>A. <code>run.sh</code>　B. <code>./run.sh</code>　C. <code>bash run.sh</code>　D. <code>$PWD/run.sh</code></p>
 <details><summary>答え</summary>
 <p>B・C・D。A は <code>PATH</code> の中だけを探すので <code>command not found</code>（終了コード 127）になる。
@@ -245,7 +245,7 @@ exit</code></pre>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>名前だけのコマンドは、シェルが <code>PATH</code> の並びの中だけを前から探す。カレントディレクトリは探さない</li><li><code>/</code> を含む名前は <code>PATH</code> を使わない。だから <code>./hello.sh</code>。127 は見つからない、126 は実行できない</li><li><code>bash file</code> は実行権が要らず子で動く。<code>. file</code>（<code>source</code>）は今のシェルで動くので <code>cd</code> や変数が残る</li><li>絶対パスは <code>/</code> から、相対パスは <code>pwd</code> から数える。<code>.</code> と <code>..</code> は実在する名前</li><li><code>!!</code> <code>!番号</code> <code>!文字列</code> はシェルが展開してから実行する。<code>HISTCONTROL=ignoreboth</code> で空白始まりと連続した重複は残らない</li><li><code>.bash_history</code> に書かれるのはシェルの終了時</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:9c9a949ec6906e708b0cf8ae6e454596ad4f574a18b4734f0cef2e9650ecfc6c / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/01-quote">← 1. 引用符と変数は、コマンドに届く前に片づく</a><a href="/linuc-text/theory/03-man">次: 3. man が説明しているのは、打ったものと別物のことがある →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

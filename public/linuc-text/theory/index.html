@@ -23,7 +23,7 @@
 
 <h1>理論編 — GNU と Unix のコマンド</h1>
 <p class="lead">LinuC レベル1 <strong>101 試験・主題1.03</strong>（コマンドライン・フィルタ・リダイレクトとパイプ・正規表現・vi）を、
-全部コンテナの中で実際に打って確かめる10章。101 試験の中でいちばん重い主題（重要度の合計 15）です。
+全部コンテナの中で実際に打って確かめる10章。101 試験で2番目に重い主題です（重要度の合計 15。最も重いのは主題1.01 の 16）。
 読むだけで終わらせないために、<strong>1章ごとに「実際に打つと何が出るか」を先に置いて</strong>います。</p>
 
 <div class="promise">
@@ -118,14 +118,14 @@ vim の設定とプラグイン、emacs のキー操作の細部。どれも主�
 <tr><th>語</th><th>一行の意味</th><th>章</th></tr>
 <tr><td colspan="3"><b>1.03.1 コマンドラインの操作</b></td></tr>
 <tr><td><code>echo</code></td><td>引数を空白1つでつないで出す。<code>-n</code> 改行しない、<code>-e</code> <code>\t</code> などを解釈する</td><td><a href="/linuc-text/theory/01-quote">1</a></td></tr>
-<tr><td>引用符</td><td><code>'...'</code> は何も展開しない。<code>"..."</code> は <code>$</code> だけ展開する。<code>\</code> は直後の1文字の意味を消す</td><td><a href="/linuc-text/theory/01-quote#quote">1</a></td></tr>
+<tr><td>引用符</td><td><code>'...'</code> は何も展開しない。<code>"..."</code> は <code>$</code>（変数・<code>$(...)</code>）と <code>`...`</code> を展開し、空白で区切らず <code>*</code> も展開しない。<code>\</code> は直後の1文字の意味を消す</td><td><a href="/linuc-text/theory/01-quote#quote">1</a></td></tr>
 <tr><td><code>set</code></td><td>引数なしでシェル変数・環境変数・関数を全部出す。<code>set -o</code> でオプション（<code>noclobber</code> など）</td><td><a href="/linuc-text/theory/01-quote#export">1</a></td></tr>
 <tr><td><code>unset</code></td><td>変数を消す</td><td><a href="/linuc-text/theory/01-quote#scope">1</a></td></tr>
 <tr><td><code>export</code></td><td>シェル変数を環境変数にし、子プロセスに渡す。<code>export -p</code> で一覧</td><td><a href="/linuc-text/theory/01-quote#export">1</a></td></tr>
-<tr><td><code>env</code></td><td>環境変数だけを出す。<code>env 変数=値 コマンド</code> で環境を変えて起動、<code>-i</code> で空にして起動</td><td><a href="/linuc-text/theory/01-quote#scope">1</a></td></tr>
+<tr><td><code>env</code></td><td>環境変数だけを出す（<code>printenv</code> も同じ）。<code>env 変数=値 コマンド</code> で環境を変えて起動、<code>-i</code> で空にして起動</td><td><a href="/linuc-text/theory/01-quote#scope">1</a></td></tr>
 <tr><td><code>bash</code></td><td>新しいシェル（子プロセス）を起動する。<code>bash file</code> は実行権が無くても動く</td><td><a href="/linuc-text/theory/02-path#notfound">2</a></td></tr>
 <tr><td><code>pwd</code></td><td>カレントディレクトリの絶対パスを出す（組み込みコマンド）</td><td><a href="/linuc-text/theory/02-path#paths">2</a></td></tr>
-<tr><td><code>.</code></td><td>① 今いるディレクトリ（<code>./hello.sh</code>）② ファイルを今のシェルで実行する（<code>. file</code> = <code>source file</code>）</td><td><a href="/linuc-text/theory/02-path#type">2</a></td></tr>
+<tr><td><code>.</code></td><td>① 今いるディレクトリ（<code>./hello.sh</code>）② ファイルを今のシェルで実行する（<code>. file</code> = <code>source file</code>。名前に <code>/</code> が無ければ bash は PATH → カレントの順に探す。確実なのは <code>. ./file</code>）</td><td><a href="/linuc-text/theory/02-path#type">2</a></td></tr>
 <tr><td>絶対パス / 相対パス</td><td><code>/</code> から書く場所 / 今いる場所から数える場所（<code>..</code> は1つ上）</td><td><a href="/linuc-text/theory/02-path#paths">2</a></td></tr>
 <tr><td><code>history</code></td><td>履歴を番号付きで出す。<code>!!</code> 直前、<code>!番号</code>、<code>!文字列</code> で再実行。<code>-c</code> で消す</td><td><a href="/linuc-text/theory/02-path#history">2</a></td></tr>
 <tr><td><code>.bash_history</code></td><td>履歴の保存先（変数 <code>HISTFILE</code>）。シェルの終了時に書かれる</td><td><a href="/linuc-text/theory/02-path#history">2</a></td></tr>
@@ -164,7 +164,7 @@ vim の設定とプラグイン、emacs のキー操作の細部。どれも主�
 <tr><td><code>egrep</code></td><td><code>grep -E</code>（拡張正規表現。<code>+ ? { } | ( )</code> がそのまま使える）と同じ</td><td><a href="/linuc-text/theory/09-regex#ere">9</a></td></tr>
 <tr><td><code>fgrep</code></td><td><code>grep -F</code>（正規表現として読まず、文字どおりに探す）と同じ</td><td><a href="/linuc-text/theory/09-regex#ere">9</a></td></tr>
 <tr><td><code>regex(7)</code></td><td><code>man 7 regex</code>。正規表現の規則の一次資料（セクション7）</td><td><a href="/linuc-text/theory/09-regex#sed">9</a></td></tr>
-<tr><td><code>sed</code>（正規表現）</td><td>既定は基本正規表現、<code>-E</code> で拡張。<code>( )</code> で囲んだ部分を <code>\1</code> で使う</td><td><a href="/linuc-text/theory/09-regex#sed">9</a></td></tr>
+<tr><td><code>sed</code>（正規表現）</td><td>既定は基本正規表現、<code>-E</code> で拡張。<code>-E</code> なら <code>( )</code>、基本正規表現なら <code>\( \)</code> で囲んだ部分を <code>\1</code> で使う</td><td><a href="/linuc-text/theory/09-regex#sed">9</a></td></tr>
 <tr><td colspan="3"><b>1.03.5 エディタを使った基本的なファイル編集の実行</b></td></tr>
 <tr><td><code>i</code> / <code>a</code> / <code>o</code></td><td>カーソルの前 / 後ろ / 下に新しい行を開いて、挿入モードへ（<code>O</code> は上に開く）</td><td><a href="/linuc-text/theory/10-vi#mode">10</a></td></tr>
 <tr><td><code>ESC</code></td><td>ノーマルモードに戻る</td><td><a href="/linuc-text/theory/10-vi#mode">10</a></td></tr>
@@ -190,8 +190,8 @@ vim の設定とプラグイン、emacs のキー操作の細部。どれも主�
     <td><code>sed -i.bak</code> で、エディタを開かずに同じ変更を何台にも当てられる</td>
     <td><code>^</code> で位置を決めないと別の行も変わる。<code>-i</code> はファイルを作り直すので、ハードリンクは古いまま残る</td><td>6・9</td></tr>
 <tr><td>スクリプトの出力を残す</td>
-    <td><code>&gt; log 2&gt;&amp;1</code> で、成功も失敗も1つのファイルに順番どおり残る</td>
-    <td><code>2&gt;&amp;1</code> を先に書くとエラーだけ消える。<code>&gt;</code> は毎回空にする</td><td>7</td></tr>
+    <td><code>&gt; log 2&gt;&amp;1</code> で、成功も失敗も1つのファイルに、書かれた順に残る</td>
+    <td><code>2&gt;&amp;1</code> を先に書くとエラーだけ画面に残る。<code>&gt;</code> は毎回空にする。標準出力をためてから書くプログラムでは、エラーの行が先に入ることがある</td><td>7</td></tr>
 <tr><td>大量のファイルをまとめて処理する</td>
     <td><code>find ... | xargs</code> で、何千ものファイルに1つのコマンドを当てられる</td>
     <td>名前の空白で割れる。<code>-print0</code> と <code>-0</code> を常に付ける習慣にする</td><td>8</td></tr>

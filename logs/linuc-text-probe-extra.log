@@ -1,0 +1,202 @@
+
+── lab-linuc-text 1.0.1 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 3. man の読み方（追加の記録） ==========
+
+$ cd ~/text
+
+$ ls /usr/share/man/man3 | wc -l
+20
+
+$ ls /usr/share/man/man3 | head -3
+filefuncs.3am.gz
+fnmatch.3am.gz
+fork.3am.gz
+
+── lab-linuc-text 1.0.1 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 6. sed と整形（追加の記録） ==========
+
+$ cd ~/text
+
+$ sed "s/^(port)=/\1: /" app.conf; echo "exit=$?"
+sed: -e expression #1, char 16: invalid reference \1 on `s' command's RHS
+exit=1
+
+$ sed "s/^\(port\)=/\1: /" app.conf | grep "^port:"
+port: 8080
+
+$ sed -E "s/^(port)=/\1: /" app.conf | grep "^port:"
+port: 8080
+
+── lab-linuc-text 1.0.1 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 8. パイプと xargs と tee（追加の記録） ==========
+
+$ cd ~/text
+
+$ seq 1 300000 | xargs echo | wc -l
+16
+
+$ printf "%s\n" "it's.txt" | xargs echo; echo "exit=$?"
+xargs: unmatched single quote; by default quotes are special to xargs unless you use the -0 option
+exit=1
+
+$ printf "%s\n" "it's.txt" | xargs -d "\n" echo
+it's.txt
+
+── lab-linuc-text 1.0.1 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 10. vi とエディタの切り替え（追加の記録） ==========
+
+$ cd ~/text
+
+$ cp memo.txt ro3.txt; chmod 444 ro3.txt
+
+$ ls -i ro3.txt
+18370605 ro3.txt
+
+$ vim ro3.txt
+（打鍵: dd :w!⏎ :q⏎）
+
+$ ls -i ro3.txt
+18370608 ro3.txt
+
+$ stat -c "%A %s %n" ro3.txt
+-r--r--r-- 19 ro3.txt
+
+$ cp memo.txt ro4.txt; chmod 444 ro4.txt; ln ro4.txt ro4-link.txt
+
+$ ls -i ro4.txt ro4-link.txt
+18370609 ro4-link.txt
+18370609 ro4.txt
+
+$ vim ro4.txt
+（打鍵: dd :w!⏎ :q⏎）
+
+$ ls -i ro4.txt ro4-link.txt
+18370609 ro4-link.txt
+18370609 ro4.txt
+
+$ stat -c "%A %s %n" ro4.txt ro4-link.txt
+-r--r--r-- 19 ro4.txt
+-r--r--r-- 19 ro4-link.txt
+
+$ VISUAL=nano EDITOR=vi sensible-editor --version < /dev/null | head -1
+ GNU nano, version 7.2
+
+$ sudo grep -n -E "env_reset|EDITOR" /etc/sudoers
+9:Defaults	env_reset
+23:#Defaults:%sudo env_keep += "EDITOR"
+
+$ export EDITOR=vi
+
+$ sudo env | grep "^EDITOR="; echo "exit=$?"
+exit=1
+
+$ sudo EDITOR=vi env | grep "^EDITOR="
+EDITOR=vi
+
+$ unset EDITOR
+
+--- ここから下は、端末（pty）の上で対話シェルを動かし、1行ずつ打鍵した記録 ---
+lab@linuc:~/text$  export PROMPT_COMMAND='PS1="\$ "'
+$ echo "[$EDITOR]"; ls ~/.selected_editor
+[]
+ls: cannot access '/home/lab/.selected_editor': No such file or directory
+$ sensible-editor --version
+
+Select an editor.  To change later, run 'select-editor'.
+  1. /bin/nano        <---- easiest
+  2. /usr/bin/vim.basic
+
+Choose 1-2 [1]: 2
+VIM - Vi IMproved 9.1 (2024 Jan 02, compiled Aug 24 2026 22:13:04)
+Included patches: 1-16, 647, 678, 697
+Modified by team+vim@tracker.debian.org
+Compiled by team+vim@tracker.debian.org
+Huge version without GUI.  Features included (+) or not (-):
++acl               +file_in_path      +mouse_urxvt       -tag_any_white
++arabic            +find_in_path      +mouse_xterm       -tcl
++autocmd           +float             +multi_byte        +termguicolors
++autochdir         +folding           +multi_lang        +terminal
+-autoservername    -footer            -mzscheme          +terminfo
+-balloon_eval      +fork()            +netbeans_intg     +termresponse
++balloon_eval_term +gettext           +num64             +textobjects
+-browse            -hangul_input      +packages          +textprop
+++builtin_terms    +iconv             +path_extra        +timers
++byte_offset       +insert_expand     -perl              +title
++channel           +ipv6              +persistent_undo   -toolbar
++cindent           +job               +popupwin          +user_commands
+-clientserver      +jumplist          +postscript        +vartabs
+-clipboard         +keymap            +printer           +vertsplit
++cmdline_compl     +lambda            +profile           +vim9script
++cmdline_hist      +langmap           -python            +viminfo
++cmdline_info      +libcall           +python3           +virtualedit
++comments          +linebreak         +quickfix          +visual
++conceal           +lispindent        +reltime           +visualextra
++cryptv            +listcmds          +rightleft         +vreplace
++cscope            +localmap          -ruby              +wildignore
++cursorbind        -lua               +scrollbind        +wildmenu
++cursorshape       +menu              +signs             +windows
++dialog_con        +mksession         +smartindent       +writebackup
++diff              +modify_fname      +sodium            -X11
++digraphs          +mouse             -sound             +xattr
+-dnd               -mouseshape        +spell             -xfontset
+-ebcdic            +mouse_dec         +startuptime       -xim
++emacs_tags        +mouse_gpm         +statusline        -xpm
++eval              -mouse_jsbterm     -sun_workshop      -xsmp
++ex_extra          +mouse_netterm     +syntax            -xterm_clipboard
++extra_search      +mouse_sgr         +tag_binary        -xterm_save
+-farsi             -mouse_sysmouse    -tag_old_static    
+   system vimrc file: "/etc/vim/vimrc"
+     user vimrc file: "$HOME/.vimrc"
+ 2nd user vimrc file: "~/.vim/vimrc"
+      user exrc file: "$HOME/.exrc"
+       defaults file: "$VIMRUNTIME/defaults.vim"
+  fall-back for $VIM: "/usr/share/vim"
+Compilation: gcc -c -I. -Iproto -DHAVE_CONFIG_H -Wdate-time -g -O2 -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -ffile-prefix-map=/build/vim-tepDcz/vim-9.1.0016=. -flto=auto -ffat-lto-objects -fstack-protector-strong -fstack-clash-protection -Wformat -Werror=format-security -fcf-protection -fdebug-prefix-map=/build/vim-tepDcz/vim-9.1.0016=/usr/src/vim-2:9.1.0016-1ubuntu7.20 -DSYS_VIMRC_FILE=\"/etc/vim/vimrc\" -DSYS_GVIMRC_FILE=\"/etc/vim/gvimrc\" -D_REENTRANT -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=1 
+Linking: gcc -Wl,-Bsymbolic-functions -flto=auto -ffat-lto-objects -Wl,-z,relro -Wl,-z,now -Wl,--as-needed -o vim -lm -ltinfo -lselinux -lsodium -lacl -lattr -lgpm -L/usr/lib/python3.12/config-3.12-x86_64-linux-gnu -lpython3.12 -ldl -lm 
+$ cat ~/.selected_editor
+# Generated by /usr/bin/select-editor
+SELECTED_EDITOR="/usr/bin/vim.basic"
+$ sensible-editor --version < /dev/null | head -1
+VIM - Vi IMproved 9.1 (2024 Jan 02, compiled Aug 24 2026 22:13:04)
+$ rm ~/.selected_editor
+$ sensible-editor --version < /dev/null | head -1
+ GNU nano, version 7.2
+$ exit
+exit
+--- 対話の記録ここまで ---

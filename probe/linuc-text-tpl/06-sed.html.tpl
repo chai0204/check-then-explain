@@ -47,13 +47,19 @@ $ sed "s/=/ = /g" app.conf
 $ sed "s/port/PORT/" app.conf
 $ sed "s/^port=/PORT=/" app.conf
 @@</code></pre>
-<p><code>port</code> とだけ書くと <code>port_admin</code> にも当たる。<code>^</code>（行頭）を付けて <code>^port=</code> と書けば、<code>port=</code> で始まる行だけに当たる。<code>/</code> を含む文字列を置き換えるときは、区切りを別の文字にしてよい。<code>(...)</code> で囲んだ部分は <code>\1</code> <code>\2</code> で置き換え側に持ち込める（<code>-E</code> は拡張正規表現。第9章）。</p>
+<p><code>port</code> とだけ書くと <code>port_admin</code> にも当たる。<code>^</code>（行頭）を付けて <code>^port=</code> と書けば、<code>port=</code> で始まる行だけに当たる。<code>/</code> を含む文字列を置き換えるときは、区切りを別の文字にしてよい。<code>-E</code>（拡張正規表現。第9章）を付けると、<code>(...)</code> で囲んだ部分を <code>\1</code> <code>\2</code> で置き換え側に持ち込める。</p>
 <pre><code>@@
 $ sed "s|http://localhost|https://example.com|" app.conf | tail -1
 $ sed -E "s/^([a-z_]+)=(.*)$/\1: \2/" app.conf
 $ sed "y/abc/ABC/" fruits.txt
 @@</code></pre>
 <p><code>y/abc/ABC/</code> は1文字ずつの置き換えで、<code>tr abc ABC</code> と同じことをする。</p>
+<p><code>-E</code> を付けない既定の<b>基本正規表現</b>では、<code>( )</code> はただの文字で、まとめるには <code>\( \)</code> と書く。<code>( )</code> のまま <code>\1</code> を使うと、<code>sed</code> は「参照する組が無い」と拒否する。</p>
+<pre><code>@@+
+$ sed "s/^(port)=/\1: /" app.conf; echo "exit=$?"
+$ sed "s/^\(port\)=/\1: /" app.conf | grep "^port:"
+$ sed -E "s/^(port)=/\1: /" app.conf | grep "^port:"
+@@</code></pre>
 
 <h2 id="address">行を選ぶ — 行番号とパターン</h2>
 <div class="sgoal"><b>この節で分かること</b>: どの行にコマンドを当てるかの指定と、<code>-n</code> の意味。</div>
@@ -188,7 +194,7 @@ D は1文字ずつの置き換え（<code>tr</code> と同じ）で、<code>foo<
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>sed</code> はファイルを読んで、結果を標準出力に流すだけ。ファイルを変えるのは <code>-i</code></li><li><code>s/A/B/</code> は各行の最初の1か所、<code>g</code> で全部。<code>^</code> で行頭に限る。<code>-n</code> と <code>p</code> で選んだ行だけ出す。<code>d</code> で消す</li><li>行の指定は <code>3</code> <code>2,4</code> <code>$</code> <code>/パターン/</code></li><li><code>-i</code> は新しいファイルに書いて付け替える（i ノード番号が変わる）。<code>-i.bak</code> で元を残す</li><li><code>expand</code> は TAB を空白に、<code>unexpand</code> は行頭の空白を TAB に（<code>-a</code> で全部）。<code>fmt -w</code> は空白の位置で折り返す</li><li><code>pr</code> はヘッダ付きのページを組む。<code>split</code> は既定で1000行ずつ <code>xaa</code> <code>xab</code> …</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/05-columns">← 5. uniq は隣どうししか比べない</a><a href="/linuc-text/theory/07-redirect">次: 7. リダイレクトは、左から順に配線する →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

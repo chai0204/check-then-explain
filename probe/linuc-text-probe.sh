@@ -5,7 +5,7 @@
 # 走らせ方: bash probe/linuc-text-run.sh probe （章ごとの起動から、章ページの作り直しまでやる）
 # 中でやっていること（章ごとに新しいコンテナで走らせる。前の章の残り物が次の章の出力を変えないように）:
 #   docker run -d --name linuc-text-probe-N --hostname linuc \
-#     -v /home/lab/work -v /home/lab/.lab lab-linuc-text:1.0.0 sleep infinity
+#     -v /home/lab/work -v /home/lab/.lab lab-linuc-text:1.0.1 sleep infinity
 #   docker cp probe/linuc-text-probe.sh linuc-text-probe-N:/tmp/probe.sh
 #   docker exec -u lab -w /home/lab linuc-text-probe-N bash -l -i /tmp/probe.sh N >> logs/linuc-text-probe.log
 #   docker rm -f -v linuc-text-probe-N

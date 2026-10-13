@@ -15,7 +15,7 @@
 <div class="badges"><span>前提: 第2章（type）</span><span>前提: 檻が起動している</span><span>所要 14分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.03.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>組み込みコマンドの説明は <code>help</code> で、外部コマンドの説明は <code>man</code> で引くと使い分けられる</li><li>セクション番号（1・5・7・8）を指定して、同じ名前の別のページを開ける</li><li>名前を知らないときに <code>man -k</code>（<code>apropos</code>）で、名前を知っているときに <code>man -f</code>（<code>whatis</code>）で探せる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: man ページの書き方（groff）、<code>MANPATH</code> と <code>/etc/manpath.config</code> の細部、<code>info</code> コマンド、<code>mandb</code> による索引の作り直し。日本語の man ページはこの檻には入れていない（試験は英語の man を前提にしない）。</div></div>
+<div class="skip"><b>ここで覚えなくていいこと</b>: man ページの書き方（groff）、<code>MANPATH</code> と <code>/etc/manpath.config</code> の細部、<code>info</code> コマンド、<code>mandb</code> による索引の作り直し。日本語の man ページはこの檻には入れていない。</div></div>
 
 <h2 id="builtin">説明書と、打ったものが食い違う</h2>
 <div class="sgoal"><b>この節で分かること</b>: man が説明していないコマンドがあることと、その見分け方。</div>
@@ -48,7 +48,7 @@ $ type cd
 $ help cd | head -3
 $ man bash | grep -E "^ +history \[n\]"
 @@</code></pre>
-<p><code>cd</code> も <code>history</code> も組み込みコマンドで、独立した man ページを持たない。説明は <code>help</code> か、<code>man bash</code> の中（SHELL BUILTIN COMMANDS の節）にある。</p>
+<p><code>cd</code> も <code>history</code> も組み込みコマンドで、Ubuntu では独立した man ページが無い（RHEL 系の bash パッケージのように、組み込みコマンドの名前で man ページを入れているディストリビューションもある）。どの環境でも確実に引けるのは <code>help</code> で、まとまった説明は <code>man bash</code> の中（SHELL BUILTIN COMMANDS の節）にある。</p>
 <div class="analogy"><b>たとえ</b>: ホテルの部屋に<b>備え付けのドライヤー</b>と、フロントで貸し出す<b>高機能なドライヤー</b>があり、
 説明書はフロントの機種のものしか置いていない状況に近い。「ターボボタン」と書いてあっても、手元の備え付けには付いていない。
 <br>ただし<b>崩れる点</b>: ドライヤーは見た目で別物と分かるが、コマンドは名前が同じで画面からは区別できない。
@@ -79,7 +79,11 @@ $ ls -d /usr/share/man/man[0-9]
 <tr><td>7</td><td>概念・規約・その他</td><td><code>regex(7)</code> <code>hier(7)</code></td></tr>
 <tr><td>8</td><td>管理者用のコマンド</td><td><code>useradd(8)</code> <code>mount(8)</code></td></tr>
 </table></div>
-<p>セクション3はこの檻には入れていない（プログラムを書く人向けの <code>manpages-dev</code> が要る）。だから <code>printf</code> はセクション1しか見つからない。</p>
+<p>セクション3の中心になる C ライブラリ関数のページ（プログラムを書く人向けの <code>manpages-dev</code>）は、この檻には入れていない。だから <code>printf</code> はセクション1しか見つからない。セクション3の棚が空なのではなく、ほかのパッケージが入れたページ（<code>gawk</code> の拡張など）は20ある。</p>
+<pre><code>@@+
+$ ls /usr/share/man/man3 | wc -l
+$ ls /usr/share/man/man3 | head -3
+@@</code></pre>
 <pre><code>@@
 $ man -f printf
 $ man -w 3 printf; echo "exit=$?"
@@ -143,15 +147,15 @@ $ man ls | grep -A1 -E "^ +-a, --all"
 <div class="quiz"><b>確認</b>
 <p><code>man cd</code> が <code>No manual entry for cd</code> になった。理由と、<code>cd</code> の説明を読む方法を答えよ。</p>
 <details><summary>答え</summary>
-<p><code>cd</code> は bash の組み込みコマンドで、独立した man ページが無いため（<code>type cd</code> で <code>shell builtin</code> と出る）。
-<code>help cd</code> か、<code>man bash</code> の SHELL BUILTIN COMMANDS の節で読む。</p></details></div>
+<p><code>cd</code> は bash の組み込みコマンドで、Ubuntu には独立した man ページが無いため（<code>type cd</code> で <code>shell builtin</code> と出る）。
+どの環境でも確実なのは <code>help cd</code>。まとまった説明は <code>man bash</code> の SHELL BUILTIN COMMANDS の節にある。</p></details></div>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-text/">演習03</a>で <code>uniq</code> の数え方に詰まったら、<code>man uniq</code> を開いて <code>/count</code> と探してみる。
 ヒントを読む前に man で答えにたどり着けるかが、この章の練習になる。</div>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>名前だけで打ったコマンドが組み込みなら、man の説明は別物（外部コマンド）のもの。<code>type</code> で確かめ、組み込みは <code>help</code> で引く</li><li>同じ名前のページがセクションごとにある。1 はコマンド、5 はファイルの書式、7 は概念（<code>regex(7)</code>）、8 は管理コマンド</li><li><code>man 5 passwd</code> のように番号を指定して開く。<code>man -f</code>（<code>whatis</code>）でどのセクションにあるかを見る</li><li>名前を知らないときは <code>man -k</code>（<code>apropos</code>）で一行説明から探す</li><li>開いた後は <code>/</code> で探して <code>n</code> で次、<code>q</code> で閉じる</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/02-path">← 2. コマンドを探すのはシェルで、カレントは探さない</a><a href="/linuc-text/theory/04-lines">次: 4. 1行とは、改行で終わっている範囲のこと →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

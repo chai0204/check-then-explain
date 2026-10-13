@@ -35,11 +35,12 @@ ls: cannot access 'nosuch.txt': No such file or directory</code></pre>
 <pre><code>  0番 標準入力        どこから読むか（既定は端末のキーボード）
   1番 標準出力        結果をどこへ書くか（既定は端末の画面）
   2番 標準エラー出力  エラーや警告をどこへ書くか（既定も端末の画面）</code></pre>
-<p>1番と2番はどちらも画面につながっているので、ふだんは混ざって見える。<code>&gt; out.txt</code>（<code>1&gt;</code> の略）は1番だけを付け替えたので、<code>ls</code> のエラーは2番を通って画面に残った。<code>2&gt; err.txt</code> は2番だけを付け替えた。<code>ls</code> 自身はどちらの場合も同じように「1番に結果、2番にエラー」を書いただけで、行き先が変わったことを知らない。</p>
+<p>1番と2番はどちらも画面につながっているので、ふだんは混ざって見える。<code>&gt; out.txt</code>（<code>1&gt;</code> の略）は1番だけを付け替えたので、<code>ls</code> のエラーは2番を通って画面に残った。<code>2&gt; err.txt</code> は2番だけを付け替えた。書く先（画面かファイルか）を選んだのはシェルで、<code>ls</code> はどちらの場合も同じように「1番に結果、2番にエラー」を書いただけである。ただしコマンドは、1番の先が端末かどうかを調べることはできる。<code>ls</code> は端末なら名前を横に並べ、ファイルやパイプなら1行に1つずつ出す（第4章の <code>less</code> がパイプの途中で画面を開かなかったのも同じ仕組み）。</p>
 <div class="analogy"><b>たとえ</b>: 郵便受けが<b>2つある家</b>に近い。ふつうの郵便（1番）と督促状（2番）は別の箱に届き、
 どちらも初めは同じ玄関先（画面）に置いてある。<code>&gt;</code> は「ふつうの郵便だけ別の住所へ転送して」という届けで、督促状は玄関に届き続ける。
-<br>ただし<b>崩れる点</b>: 郵便は差出人が宛先を書くが、ここでは差出人（コマンド）は「1番の箱」「2番の箱」と書くだけで、
-その箱がどこにつながっているかを知らない。転送の届けを出すのはシェルである。</div>
+<br>ただし<b>崩れる点</b>: 郵便は差出人が宛先を書くが、ここでは差出人（コマンド）は「1番の箱」「2番の箱」に入れるだけで、
+転送の届けを出す（行き先を決める）のはシェルである。それでも差出人は、箱が玄関（端末）に置かれたままかどうかだけはのぞいて確かめられ、
+<code>ls</code> のようにそれで出し方を変えるコマンドもある。</div>
 
 <h2 id="order">2&gt;&amp;1 は、書く順番で結果が変わる</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>2&gt;&amp;1</code> の正確な意味と、リダイレクトが処理される順番。</div>
@@ -62,6 +63,7 @@ fruits.txt</code></pre>
 <tr><td><code>2&gt;&amp;1 &gt; only.txt</code></td><td>2番 → 1番の今の先（画面）</td><td>1番 → only.txt</td><td>結果は only.txt、エラーは画面</td></tr>
 </table></div>
 <p>bash には、両方を1つのファイルへ送る短い書き方 <code>&amp;&gt;</code> もある。</p>
+<p class="detail">1つのファイルにまとめたときの行の順番は「書かれた順」である。<code>ls</code> はエラーを先に出すので、端末でもファイルでもエラーが上に来た。標準出力をためておいてまとめて書くプログラム（出力先が端末でないときの C のプログラムの多く）では、画面で見た順と違い、エラーの行が先に入ることがある。</p>
 <pre><code>$ ls fruits.txt nosuch.txt &amp;&gt; amp.txt
 $ cat amp.txt
 ls: cannot access 'nosuch.txt': No such file or directory
@@ -121,7 +123,7 @@ $ cat &lt;&lt; 'EOF'
 hello, $HOME
 $ tr a-z A-Z &lt;&lt;&lt; "here string"
 HERE STRING</code></pre>
-<p>終わりの印を引用符で囲むと（<code>'EOF'</code>）、中の <code>$HOME</code> は展開されない。第1章の引用符の規則が、ここでもそのまま効いている。<code>&lt;&lt;&lt;</code>（ヒアストリング）は1行だけを渡す bash の書き方である。</p>
+<p>終わりの印を引用符で囲むと（<code>'EOF'</code>）、中の <code>$HOME</code> は展開されない。第1章の引用符の規則が、ここでもそのまま効いている。<code>&lt;&lt;&lt;</code>（ヒアストリング）は、続く1つの文字列を（展開した後で）末尾に改行を1つ足して標準入力に渡す bash の書き方である。文字列が改行を含んでいれば、渡る行も複数になる。</p>
 
 <h2 id="truncate">読みながら同じファイルに書くと、空になる</h2>
 <div class="sgoal"><b>この節で分かること</b>: リダイレクトの処理がコマンドより先に起きることの、いちばん痛い結果。</div>
@@ -175,7 +177,7 @@ exit=0</code></pre>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>出力の口は2本ある。1番が標準出力、2番が標準エラー出力。0番が標準入力</li><li><code>&gt;</code>（<code>1&gt;</code>）は1番だけ、<code>2&gt;</code> は2番だけを付け替える。<code>&gt;&gt;</code> は追記、<code>&lt;</code> は0番</li><li><code>2&gt;&amp;1</code> は「2番を、いま1番が向いている先へ」。リダイレクトは左から順に処理されるので、<code>&gt; f 2&gt;&amp;1</code> と <code>2&gt;&amp;1 &gt; f</code> は違う。<code>&amp;&gt; f</code> は前者と同じ</li><li>リダイレクトはコマンドより先に処理される。だから <code>sort f &gt; f</code> は空になる（<code>sort -o</code> を使う）</li><li>捨てるなら <code>/dev/null</code>。上書きを防ぐ <code>set -o noclobber</code> と、それを越える <code>&gt;|</code></li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:9c9a949ec6906e708b0cf8ae6e454596ad4f574a18b4734f0cef2e9650ecfc6c / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/06-sed">← 6. sed は書き換えた結果を見せるだけ</a><a href="/linuc-text/theory/08-pipe">次: 8. xargs は空白で区切って引数にする →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

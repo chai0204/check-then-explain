@@ -7,7 +7,7 @@
 # 走らせ方: bash probe/linuc-text-run.sh solve
 # 中でやっていること（読者と同じ起動オプション。1つのコンテナで最初から最後まで通す）:
 #   docker run -d --name linuc-text-solve --hostname linuc \
-#     -v /home/lab/work -v /home/lab/.lab lab-linuc-text:1.0.0 sleep infinity
+#     -v /home/lab/work -v /home/lab/.lab lab-linuc-text:1.0.1 sleep infinity
 #   docker cp probe/linuc-text-solve-all.sh linuc-text-solve:/tmp/solve.sh
 #   docker exec -u lab -w /home/lab linuc-text-solve bash -l -i /tmp/solve.sh > logs/linuc-text-solve-all.log
 #   docker rm -f -v linuc-text-solve

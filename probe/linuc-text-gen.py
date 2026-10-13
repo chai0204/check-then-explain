@@ -16,19 +16,25 @@
   そのまま写す行                   ← $ で始まらない行は手で書いたとおり出す（ログにある行か ... だけにする）
   @@</code></pre>
   {{SESSION a-b}}                  ← 対話の記録（pty の上で打鍵した部分）の a〜b 行目をそのまま写す
+
+  追加の記録（logs/linuc-text-probe-extra.log。事実確認で直した箇所の裏付け）から引くときは、
+  ブロックを <pre><code>@@+ … @@</code></pre>、対話の記録を {{SESSION+ a-b}} と書く。
 """
 import html, re, sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 LOG = REPO / "logs" / "linuc-text-probe.log"
+EXTRA = REPO / "logs" / "linuc-text-probe-extra.log"
 SESSION_BEGIN = "--- ここから下は、端末（pty）の上で対話シェルを動かし、1行ずつ打鍵した記録 ---"
 SESSION_END = "--- 対話の記録ここまで ---"
 
 
-def sections():
+def sections(path=LOG):
     secs, cur, name = {}, [], None
-    for line in LOG.read_text(encoding="utf-8").split("\n"):
+    if not path.exists():
+        return secs
+    for line in path.read_text(encoding="utf-8").split("\n"):
         m = re.match(r"^========== (\d+)\. ", line)
         if m:
             if name is not None:
@@ -131,24 +137,30 @@ def render_block(body, recs, ch, seen):
 
 def main():
     secs = sections()
+    xsecs = sections(EXTRA)
     for tpl in sys.argv[1:]:
         tpl = Path(tpl)
         ch = int(tpl.name[:2])
         recs, session = records(secs[ch])
+        xrecs, xsession = records(xsecs.get(ch, []))
         src = tpl.read_text(encoding="utf-8")
 
-        seen = {}
+        seen, xseen = {}, {}
 
         def blk(m):
-            return "<pre><code>" + render_block(m.group(1).strip("\n"), recs, ch, seen) + "</code></pre>"
+            extra = m.group(1) == "+"
+            body = m.group(2).strip("\n")
+            out = render_block(body, xrecs, ch, xseen) if extra else render_block(body, recs, ch, seen)
+            return "<pre><code>" + out + "</code></pre>"
 
-        src = re.sub(r"<pre><code>@@\n(.*?)\n@@</code></pre>", blk, src, flags=re.S)
+        src = re.sub(r"<pre><code>@@(\+?)\n(.*?)\n@@</code></pre>", blk, src, flags=re.S)
 
         def ses(m):
-            a, b = int(m.group(1)), int(m.group(2))
-            return "\n".join(esc(l) for l in session[a - 1:b])
+            lines = xsession if m.group(1) == "+" else session
+            a, b = int(m.group(2)), int(m.group(3))
+            return "\n".join(esc(l) for l in lines[a - 1:b])
 
-        src = re.sub(r"\{\{SESSION (\d+)-(\d+)\}\}", ses, src)
+        src = re.sub(r"\{\{SESSION(\+?) (\d+)-(\d+)\}\}", ses, src)
         if "@@" in src or "⟪" in src:
             sys.exit(f"{tpl.name}: 置き換え残りがある")
         dst = REPO / "public" / "linuc-text" / "theory" / tpl.name.replace(".tpl", "")

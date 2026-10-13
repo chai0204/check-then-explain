@@ -48,7 +48,11 @@ $ echo a b c | xargs -n 1 echo
 $ echo a b c | xargs -n 2 echo
 $ printf "%s\n" apple banana | xargs -I{} echo "果物: {}"
 @@</code></pre>
-<p>既定では、受け取ったもの全部を1回のコマンドの引数に並べる。<code>-n 1</code> は「1回に1つずつ」で、<code>echo</code> が3回起動した。<code>-I{}</code> は1行ずつ、<code>{}</code> の位置に差し込んで起動する。</p>
+<p>既定では、受け取ったものをできるだけまとめて、1回のコマンドの引数に並べる。<code>-n 1</code> は「1回に1つずつ」で、<code>echo</code> が3回起動した。<code>-I{}</code> は1行ずつ、<code>{}</code> の位置に差し込んで起動する。</p>
+<p>「まとめて」には上限がある。1回のコマンド行の長さには限りがあり、<code>xargs</code> は超える分を何回かに分けて起動する。30万個の数を渡すと、<code>echo</code> は16回起動して16行を出した。</p>
+<pre><code>@@+
+$ seq 1 300000 | xargs echo | wc -l
+@@</code></pre>
 
 <h2 id="space">名前の中の空白も、区切りになる</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>xargs</code> が名前を壊す仕組みと、壊さない渡し方。</div>
@@ -75,6 +79,11 @@ $ find files -name "*.tmp" -exec ls -l {} +
 $ printf "%s\n" "files/old data.tmp" | xargs -d "\n" ls -l
 @@</code></pre>
 <p><code>find -exec コマンド {} +</code> は <code>xargs</code> を通さず、<code>find</code> が名前を直接引数に並べる。<code>xargs -d "\n"</code> は「改行だけで区切る」という GNU の書き方である（改行を含む名前には効かない）。</p>
+<p><code>xargs</code> は既定で<b>引用符</b>（<code>'</code> と <code>"</code>）も特別な文字として読む。名前にアポストロフィが1つあるだけで、対になる引用符が無いと言って止まる。<code>-0</code> か <code>-d</code> を付けると、引用符もただの文字として扱う。</p>
+<pre><code>@@+
+$ printf "%s\n" "it's.txt" | xargs echo; echo "exit=$?"
+$ printf "%s\n" "it's.txt" | xargs -d "\n" echo
+@@</code></pre>
 <p>消すときにこれを間違えると、消したつもりのファイルが残る。</p>
 <pre><code>@@
 $ find files -name "*.tmp" | sort | xargs rm; echo "exit=$?"
@@ -108,7 +117,7 @@ $ echo "ここは $(pwd)"
 $ echo "ここは `pwd`"
 $ echo "果物は $(wc -l < fruits.txt) 行"
 @@</code></pre>
-<p><code>$(コマンド)</code> と <code>`コマンド`</code>（バッククォート）は、中のコマンドを先に実行し、その出力（最後の改行を除く）で置き換える。<b>コマンド置換</b>と呼ぶ。<code>$(...)</code> は入れ子にでき、読みやすいので、新しく書くならこちらを使う。</p>
+<p><code>$(コマンド)</code> と <code>`コマンド`</code>（バッククォート）は、中のコマンドを先に実行し、その出力（末尾の改行はすべて除く）で置き換える。<b>コマンド置換</b>と呼ぶ。<code>$(...)</code> は入れ子にでき、読みやすいので、新しく書くならこちらを使う。</p>
 <pre><code>@@
 $ wc -l $(find files -name "*.txt" | sort)
 @@</code></pre>
@@ -135,7 +144,7 @@ $ wc -l $(find files -name "*.txt" | sort)
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>|</code> は左の1番を右の0番につなぐ。2番は通らない（<code>2&gt;&amp;1 |</code> か <code>|&amp;</code>）。パイプの終了コードは最後のコマンドのもの</li><li><code>xargs</code> は標準入力を区切って引数に並べる。区切りは空白と改行なので、名前の空白でも割れる</li><li>名前を壊さずに渡すには <code>find -print0 | xargs -0</code>（区切りを NUL にする）か <code>find -exec ... {} +</code></li><li><code>-n 数</code> は1回に渡す数、<code>-I{}</code> は1行ずつ差し込み</li><li><code>tee</code> は画面とファイルの両方へ（<code>-a</code> で追記）。<code>$(...)</code> と <code>`...`</code> はコマンド置換で、引用符が無いと空白で区切られる</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/07-redirect">← 7. リダイレクトは、左から順に配線する</a><a href="/linuc-text/theory/09-regex">次: 9. . は何にでも当たる1文字 →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

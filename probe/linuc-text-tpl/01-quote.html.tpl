@@ -30,7 +30,7 @@ $ echo \$HOME
 <p>4回とも打ったのは <code>echo</code> で、<code>echo</code> は受け取った文字をそのまま出すだけのコマンドである。出力が違うのは、<b>受け取ったものが違うから</b>だ。</p>
 <ul>
 <li><code>'$HOME'</code>（シングルクォート）: 中の文字に一切手を付けない。<code>echo</code> は <code>$HOME</code> という5文字を受け取った</li>
-<li><code>"$HOME"</code>（ダブルクォート）: <code>$</code> で始まる変数だけは値に置き換える。<code>echo</code> は <code>/home/lab</code> を受け取った</li>
+<li><code>"$HOME"</code>（ダブルクォート）: <code>$</code> で始まるもの（変数と <code>$(...)</code>）と、バッククォート <code>`...`</code> だけは置き換える。<code>echo</code> は <code>/home/lab</code> を受け取った</li>
 <li><code>\$</code>（バックスラッシュ）: 直後の1文字だけ、特別な意味を消す</li>
 </ul>
 <p>どの場合も、<code>echo</code> には引用符そのものは届いていない。引用符は<b>シェルへの指示</b>で、読まれたあと消される。<code>$(...)</code> と <code>`...`</code>（コマンド置換）も同じ規則に従う。</p>
@@ -51,7 +51,7 @@ $ echo "*.csv"
 @@</code></pre>
 <p>引用符の無い <code>a     b</code> は、シェルが空白で区切って <code>a</code> と <code>b</code> の2つの引数にした。<code>echo</code> は引数を空白1つでつないで出すので、5つあった空白が1つになる。変数を引用符なしで書いた <code>echo $msg</code> も同じで、<b>変数を展開した後にもう一度区切られる</b>。<code>*.csv</code> は、シェルが <code>~/text</code> の中のファイル名に置き換えてから <code>echo</code> に渡した（第9章で、これが <code>grep</code> を壊すところを見る）。</p>
 <div class="scroll"><table>
-<tr><th>書き方</th><th><code>$変数</code> と <code>$(...)</code></th><th>空白で区切る</th><th><code>*</code> をファイル名にする</th></tr>
+<tr><th>書き方</th><th><code>$変数</code>・<code>$(...)</code>・<code>`...`</code></th><th>空白で区切る</th><th><code>*</code> をファイル名にする</th></tr>
 <tr><td><code>'...'</code> シングルクォート</td><td>しない</td><td>しない</td><td>しない</td></tr>
 <tr><td><code>"..."</code> ダブルクォート</td><td>する</td><td>しない</td><td>しない</td></tr>
 <tr><td>引用符なし</td><td>する</td><td>する</td><td>する</td></tr>
@@ -121,7 +121,7 @@ $ echo $SHLVL; bash -c "echo \$SHLVL"
 <tr><td><code>export 変数</code> / <code>export 変数=値</code></td><td>環境変数にする（子に渡す印を付ける）</td><td>以後に起動する子プロセスすべて</td></tr>
 <tr><td><code>unset 変数</code></td><td>変数を消す</td><td>シェル変数でも環境変数でも消える</td></tr>
 <tr><td><code>set</code></td><td>引数なしなら一覧を出す</td><td>シェル変数・環境変数・関数のすべて</td></tr>
-<tr><td><code>env</code></td><td>引数なしなら一覧を出す</td><td>環境変数だけ</td></tr>
+<tr><td><code>env</code> / <code>printenv</code></td><td>引数なしなら一覧を出す（<code>printenv 名前</code> は1つだけ）</td><td>環境変数だけ</td></tr>
 <tr><td><code>export -p</code></td><td>一覧を出す</td><td>環境変数だけ（<code>declare -x</code> の形）</td></tr>
 </table></div>
 <div class="analogy"><b>たとえ</b>: 部署異動するときの<b>引き継ぎ書類</b>に近い。
@@ -175,15 +175,15 @@ $ bash -x child.sh
 <div class="quiz"><b>確認</b>
 <p>環境変数だけを一覧表示するコマンドを2つ挙げよ。シェル変数も含めて表示するのはどれか。</p>
 <details><summary>答え</summary>
-<p>環境変数だけ: <code>env</code>（引数なし）と <code>export -p</code>。シェル変数も含めるのは <code>set</code>（引数なし）。
+<p>環境変数だけ: <code>env</code>（引数なし）、<code>printenv</code>（引数なし）、<code>export -p</code>（<code>declare -x</code> も同じ一覧を出す）。このうち2つを挙げれば正解。シェル変数も含めるのは <code>set</code>（引数なし）。
 実測では <code>LOCAL_ONLY=here</code> が <code>set</code> にだけ出て、<code>env</code> には出なかった。</p></details></div>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-text/">演習01</a>は、エディタの指定（<code>EDITOR</code>）を子プロセスに渡す課題である。
 判定は <code>lab check</code> 自身が子プロセスとして見えた値で行うので、<code>export</code> を忘れると必ず鳴る。</div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>引用符はシェルへの指示で、読まれたあと消える。コマンドに届くのは展開した後の文字列だけ</li><li><code>'...'</code> は何も展開しない。<code>"..."</code> は <code>$</code> だけ展開し、空白で区切らない。引用符なしは展開して、空白で区切って、<code>*</code> もファイル名にする</li><li><code>変数=値</code> はシェル変数。子プロセスに渡すには <code>export</code> して環境変数にする</li><li><code>set</code> は全部、<code>env</code> と <code>export -p</code> は環境変数だけを出す。<code>unset</code> で消す</li><li><code>変数=値 コマンド</code> はそのコマンドにだけ渡す。ただし引数の展開はその前に済んでいる</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>引用符はシェルへの指示で、読まれたあと消える。コマンドに届くのは展開した後の文字列だけ</li><li><code>'...'</code> は何も展開しない。<code>"..."</code> は <code>$</code>（変数・<code>$(...)</code>）と <code>`...`</code> を展開し、空白で区切らず、<code>*</code> も展開しない。引用符なしは展開して、空白で区切って、<code>*</code> もファイル名にする</li><li><code>変数=値</code> はシェル変数。子プロセスに渡すには <code>export</code> して環境変数にする</li><li><code>set</code> は全部、<code>env</code> と <code>export -p</code> は環境変数だけを出す。<code>unset</code> で消す</li><li><code>変数=値 コマンド</code> はそのコマンドにだけ渡す。ただし引数の展開はその前に済んでいる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/">← 理論編 目次</a><a href="/linuc-text/theory/02-path">次: 2. コマンドを探すのはシェルで、カレントは探さない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

@@ -89,7 +89,7 @@ $ grep -E "ERROR|WARN" server.log
 $ grep "ERROR|WARN" server.log; echo "exit=$?"
 $ grep "ERROR\|WARN" server.log
 @@</code></pre>
-<p><code>-E</code> を付けない <code>grep</code> は<b>基本正規表現</b>（BRE）で読む。基本正規表現では <code>|</code> はただの文字なので、「<code>ERROR|WARN</code> という11文字」を探して見つからなかった（終了コード 1 は「見つからない」）。<code>-E</code> は<b>拡張正規表現</b>（ERE）で読み、<code>|</code> が「どちらか」になる。GNU の <code>grep</code> は基本正規表現でも <code>\|</code> と書けば同じ意味に読む。</p>
+<p><code>-E</code> を付けない <code>grep</code> は<b>基本正規表現</b>（BRE）で読む。基本正規表現では <code>|</code> はただの文字なので、「<code>ERROR|WARN</code> という10文字」を探して見つからなかった（終了コード 1 は「見つからない」）。<code>-E</code> は<b>拡張正規表現</b>（ERE）で読み、<code>|</code> が「どちらか」になる。GNU の <code>grep</code> は基本正規表現でも <code>\|</code> と書けば同じ意味に読む。</p>
 <pre><code>@@
 $ grep "ap+le" fruits.txt; echo "exit=$?"
 $ grep -E "ap+le" fruits.txt
@@ -106,7 +106,7 @@ $ grep "[0-9]\{3\}" server.log | head -3
 <tr><td>まとめる</td><td><code>(A|B)</code></td><td><code>\(A\|B\)</code></td></tr>
 <tr><td><code>.</code> <code>*</code> <code>^</code> <code>$</code> <code>[ ]</code></td><td colspan="2">どちらも同じ意味</td></tr>
 </table></div>
-<p><code>egrep</code> は <code>grep -E</code>、<code>fgrep</code> は <code>grep -F</code> と同じものである。中身を見ると、どちらも1行の小さなスクリプトだった。</p>
+<p><code>egrep</code> は <code>grep -E</code>、<code>fgrep</code> は <code>grep -F</code> と同じものである。中身を見ると、どちらも3行の小さなシェルスクリプトで、仕事をしているのは最後の1行（<code>exec grep -E "$@"</code> / <code>exec grep -F "$@"</code>）だけだった。</p>
 <pre><code>@@
 $ egrep "ERROR|WARN" server.log
 $ cat /usr/bin/egrep
@@ -170,7 +170,7 @@ $ sed -n "/^b/p" fruits.txt
 $ sed -E "s/^([0-9-]+) ([0-9:]+) /\2 /" server.log | head -2
 $ sed "s/[0-9]\{1,\}/N/g" ips.txt
 @@</code></pre>
-<p><code>sed</code> も既定は基本正規表現で、<code>-E</code> で拡張正規表現になる。<code>( )</code> で囲んだ部分は <code>\1</code> <code>\2</code> で置き換え側に使える（2行目は日付の欄を落とした）。正規表現の規則の正式な説明は <code>regex(7)</code>、つまり <code>man 7 regex</code> にある（第3章）。</p>
+<p><code>sed</code> も既定は基本正規表現で、<code>-E</code> で拡張正規表現になる。<code>-E</code> のときは <code>( )</code> で囲んだ部分を <code>\1</code> <code>\2</code> で置き換え側に使える（2行目は日付の欄を落とした）。基本正規表現では <code>\( \)</code> と書く（第6章）。正規表現の規則の正式な説明は <code>regex(7)</code>、つまり <code>man 7 regex</code> にある（第3章）。</p>
 <pre><code>@@
 $ man 7 regex | grep -A1 "^NAME"
 $ man grep | grep -E "^ +-[EFGP], --"
@@ -185,7 +185,7 @@ C の後半 <code>grep -v '$'</code> は全行に当たる <code>$</code> を除
 <p>拡張正規表現を使うための <code>grep</code> のオプションと、同じ働きをする古いコマンド名を答えよ。正規表現を使わず文字どおりに探す場合はどうか。</p>
 <details><summary>答え</summary>
 <p>拡張正規表現は <code>grep -E</code> で、古い名前は <code>egrep</code>。文字どおりに探すのは <code>grep -F</code> で、古い名前は <code>fgrep</code>。
-この檻の <code>/usr/bin/egrep</code> は <code>exec grep -E "$@"</code> の1行を実行するだけのスクリプトだった。</p></details></div>
+この檻の <code>/usr/bin/egrep</code> は3行のシェルスクリプトで、実際の仕事は <code>exec grep -E "$@"</code> の1行だけだった。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>拡張正規表現 <code>^[0-9]{3}-[0-9]{4}$</code> に一致するものをすべて選べ。</p>
 <p>A. <code>123-4567</code>　B. <code>1234-567</code>　C. <code>〒123-4567</code>　D. <code>123-45678</code></p>
@@ -202,7 +202,7 @@ C は先頭に別の文字があり、D は末尾が5桁なので外れる。</p
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>grep</code> のパターンは正規表現。<code>.</code> は任意の1文字で、行のどこかに当たれば出る。文字どおりなら <code>-F</code> か <code>\.</code>、行全体なら <code>-x</code>、単語なら <code>-w</code></li><li><code>^</code> 行頭、<code>$</code> 行末、<code>*</code> 直前の0回以上（だから <code>x*</code> は全行に当たる）、<code>[ ]</code> どれか1文字、<code>[^ ]</code> それ以外の1文字</li><li>基本正規表現（<code>grep</code>）では <code>+ ? { } | ( )</code> に <code>\</code> が要る。拡張（<code>grep -E</code> = <code>egrep</code>）では要らない。<code>grep -F</code> = <code>fgrep</code></li><li><code>-v -i -n -c -l -r -o</code> の意味</li><li>パターンは引用符で囲む。囲まないと <code>*</code> がシェルのワイルドカードとして先に展開される</li><li>規則の一次資料は <code>regex(7)</code>（<code>man 7 regex</code>）。<code>sed</code> も同じ正規表現を使う</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-text/theory/08-pipe">← 8. xargs は空白で区切って引数にする</a><a href="/linuc-text/theory/10-vi">次: 10. :w! は、読み取り専用のファイルにも書く →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
