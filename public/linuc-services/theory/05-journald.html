@@ -194,7 +194,7 @@ journal はどこに保存されているか。</p>
 設定ファイルを読んでも分からない、という点が要点である。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>同じ1行が rsyslog と journald の両方に入る。実測でどちらも1件だった</li><li>journald はテキストではなくバイナリで、項目ごとに保存する（<code>-o verbose</code> で <code>_PID</code>・<code>_BOOT_ID</code>・<code>PRIORITY</code> などが見える）</li><li><code>Storage=auto</code>（既定）は <code>/var/log/journal</code> の<b>有無</b>で保存先が決まる。設定ファイルを読んでも分からない</li><li>journald は起動のたびに自分の上限をログに書く。<code>max 8.0M</code> を見れば設定が効いたか確かめられる</li><li>journal は logrotate の対象ではない。自分で <code>SystemMaxUse=</code> を持ち、<code>--vacuum-size</code> で捨てる</li><li>rsyslog では行に残らない priority が、journald では <code>-p</code> で絞り込みに使える</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:da71ddd5786ef105ed8dfa8836c5fdfb3c94a9d9fedbfc0b52b2d56f19ab6ded / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/04-rsyslog">← 4. ログの宛先は、受け手の表が決める</a><a href="/linuc-services/theory/06-logrotate">次: 6. 捨てる判断も、受け手側にある →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

@@ -265,7 +265,7 @@ apt はこれを <code>…/ubuntu/dists/noble/main/binary-amd64/Packages</code> 
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/etc/apt/sources.list</code> の1行は「種類（<code>deb</code> / <code>deb-src</code>）・URI・ディストリビューション・コンポーネント」。Ubuntu 24.04 は <code>/etc/apt/sources.list.d/*.sources</code> の deb822 形式が既定</li><li>apt が引くのは <code>/var/lib/apt/lists/</code> の目録の写し。ソースを書いただけでは写しは変わらず、<code>apt update</code> で初めて取りに行く</li><li>署名の無い目録は <code>is not signed</code> で受け取らない。<code>Signed-By</code> で鍵を指定するのが本来の形で、<code>[trusted=yes]</code> は確かめるのをやめる指示</li><li>ファイル名からパッケージを引くとき、入っているものなら <code>dpkg -S</code>（台帳）、入っていなくてよいなら <code>apt-file search</code>（目録の Contents）</li><li>Contents は Packages とは別の、大きな目録。<code>apt-file update</code> か <code>apt update</code> で取る</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt-file 3.3 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（ネットにつながった状態） / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0@sha256:556b75a379fdee91de07d7b828b45545cfd71f206c7c9761d9c375825c604457 / Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt-file 3.3 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（ネットにつながった状態） / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/02-apt">← 2. apt は目録を読んで、台帳に書く</a><a href="/linuc-packages/theory/04-dpkg">次: 4. dpkg は依存を読めるが、取りに行かない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
