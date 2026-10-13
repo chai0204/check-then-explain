@@ -61,6 +61,7 @@ R 'bash --version'
 R 'grep -A9 "15. Disclaimer of Warranty" /usr/share/common-licenses/GPL-3'
 R 'grep -A1 "BECAUSE THE PROGRAM IS LICENSED FREE OF CHARGE" /usr/share/common-licenses/GPL-2'
 R 'grep -iL warrant /usr/share/common-licenses/*'
+R 'grep -A2 "The Document may include Warranty Disclaimers" /usr/share/common-licenses/GFDL-1.3'
 R 'grep -A1 "You may charge any price" /usr/share/common-licenses/GPL-3'
 
 S "1d. ライセンスはたくさんある・開発は続いている（1.11.1 多くのライセンスが存在・継続した開発）"
@@ -92,6 +93,7 @@ R 'grep -il affero /usr/share/doc/*/copyright | wc -l'
 R 'wc -l /usr/share/common-licenses/GPL-3 /usr/share/common-licenses/LGPL-3'
 R 'grep -A2 "This version of the GNU Lesser" /usr/share/common-licenses/LGPL-3'
 R 'grep -A13 "4. Combined Works." /usr/share/common-licenses/LGPL-3'
+R 'grep -A15 "d) Do one of the following" /usr/share/common-licenses/LGPL-3'
 R 'grep -A3 "GNU C Library is free software" /usr/share/doc/libc6/copyright'
 R "grep -A8 '^1.10. \"Modifications\"' /usr/share/common-licenses/MPL-2.0"
 R 'grep -A4 "^3.3. Distribution of a Larger Work" /usr/share/common-licenses/MPL-2.0'
@@ -99,7 +101,7 @@ R "grep -B7 '^License: MPL' /usr/share/doc/libffi8/copyright"
 R "grep -hE '^License: GPL-[23]\+?\$' /usr/share/doc/*/copyright | sort | uniq -c"
 R "grep -B1 -A3 'or any later version\" applies' /usr/share/common-licenses/GPL-3"
 
-S "3. 何をしてもいいのは、パブリックドメインだけ（1.11.1 BSD / MIT / Apache / パブリックドメイン）"
+S "3. 持ち主がいないのは、パブリックドメインだけ（1.11.1 BSD / MIT / Apache / パブリックドメイン）"
 R "grep -n '^License: Expat' /usr/share/doc/apt/copyright"
 R 'sed -n 102,121p /usr/share/doc/apt/copyright'
 R 'cat /usr/share/common-licenses/BSD'
@@ -110,8 +112,10 @@ R 'sed -n 90,106p /usr/share/common-licenses/Apache-2.0'
 R 'grep -A2 "(d) If the Work includes a" /usr/share/common-licenses/Apache-2.0'
 R 'grep -A5 "You may add Your own copyright statement" /usr/share/common-licenses/Apache-2.0'
 R 'sed -n 74,88p /usr/share/common-licenses/Apache-2.0'
-R 'grep -ic patent /usr/share/common-licenses/BSD /usr/share/common-licenses/Apache-2.0 /usr/share/common-licenses/GPL-3'
+R 'grep -ic patent /usr/share/common-licenses/BSD /usr/share/common-licenses/Apache-2.0 /usr/share/common-licenses/MPL-2.0 /usr/share/common-licenses/GPL-3'
+R 'grep -A5 "^5.2. If You initiate litigation" /usr/share/common-licenses/MPL-2.0'
 R 'sed -n 102,121p /usr/share/doc/apt/copyright | grep -ic patent'
+R "grep -B2 -A2 '^License: configure' /usr/share/doc/sensible-utils/copyright"
 R "grep -A2 '^Files: \*\$' /usr/share/doc/libselinux1/copyright"
 R "grep -A11 '^License: public-domain' /usr/share/doc/libselinux1/copyright"
 R "grep -n 'is in the public domain' /usr/share/doc/liblzma5/copyright | head -3"
@@ -120,6 +124,9 @@ R 'grep -A3 "^Certain owners wish" /usr/share/common-licenses/CC0-1.0'
 R 'grep -A6 "^3. Public License Fallback" /usr/share/common-licenses/CC0-1.0'
 R "grep -A4 '^License: Beerware' /usr/share/doc/libmd0/copyright"
 R "grep -B1 -h '^ Permission is hereby granted, free of charge' /usr/share/doc/*/copyright | grep '^License:' | sort | uniq -c | sort -rn"
+R "grep -n -e '^License: MIT/X11\$' -e '^License: X11\$' -e 'Except as contained' /usr/share/doc/ncurses-bin/copyright"
+R 'sed -n 63,67p /usr/share/doc/ncurses-bin/copyright'
+R "grep -c 'Except as contained' /usr/share/doc/apt/copyright /usr/share/doc/util-linux/copyright"
 R "ldd /bin/ls | awk '{print \$1}'"
 R 'dpkg -S libselinux.so.1 libc.so.6 libpcre2-8.so.0'
 R "grep -m1 -H '^License:' /usr/share/doc/coreutils/copyright /usr/share/doc/libselinux1/copyright /usr/share/doc/libpcre2-8-0/copyright"

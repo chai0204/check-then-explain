@@ -3,6 +3,6 @@
 window.CHAPTERS = [
   { n: 1, url: "/linuc-oss/theory/01-owner",      t: "オープンソースには、持ち主がいる" },
   { n: 2, url: "/linuc-oss/theory/02-copyleft",   t: "コピーレフトは、配るときに効く" },
-  { n: 3, url: "/linuc-oss/theory/03-permissive", t: "「何をしてもいい」は、パブリックドメインだけ" },
+  { n: 3, url: "/linuc-oss/theory/03-permissive", t: "持ち主がいないのは、パブリックドメインだけ" },
   { n: 4, url: "/linuc-oss/theory/04-community",  t: "報告先は、ソフトの中に書いてある" },
 ];

@@ -139,7 +139,7 @@ $ dpkg-query -W -f='${Original-Maintainer}\n' | sort | uniq -c | sort -rn | head
       4 Ncurses Maintainers &lt;ncurses@packages.debian.org&gt;
       4 Debian SELinux maintainers &lt;selinux-devel@lists.alioth.debian.org&gt;
       4 Debian GnuTLS Maintainers &lt;pkg-gnutls-maint@lists.alioth.debian.org&gt;</code></pre>
-<p>92 パッケージのうち 90 の責任者は、1人ではなく「Ubuntu Developers」というメーリングリスト（チーム）である。一方、元の Debian 側（<code>Original-Maintainer</code>）にはチームと個人が混ざっている。</p>
+<p>92 パッケージのうち 87 の責任者は「Ubuntu Developers」、3 は「Ubuntu Core developers」で、どちらも1人ではなく、同じメーリングリスト（<code>ubuntu-devel-discuss@lists.ubuntu.com</code>）を宛先にしたチームである。一方、元の Debian 側（<code>Original-Maintainer</code>）にはチームと個人が混ざっている。</p>
 <p>この層の連なりが働いた記録が、手元に残っている。</p>
 <pre><code>$ dpkg -s liblzma5 | grep -E '^(Version|Maintainer|Original-Maintainer):'
 Maintainer: Ubuntu Developers &lt;ubuntu-devel-discuss@lists.ubuntu.com&gt;
@@ -250,7 +250,7 @@ or available locally via: info '(coreutils) ls invocation'</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: 主題1.11 の4章が、同じ1つの形をしていること。</div>
 <div class="scroll"><table>
 <tr><th>章</th><th>誰が（持ち主）</th><th>何を書いたか</th><th>どこに一緒に入っていたか</th></tr>
-<tr><td>1</td><td>FSF などの著作権者</td><td>使ってよいという許可、無保証、写しを渡すこと</td><td><code>--version</code>、<code>/usr/share/doc/*/copyright</code></td></tr>
+<tr><td>1</td><td>FSF などの著作権者</td><td>写して・改変して・配ってよいという許可、無保証、写しを渡すこと</td><td><code>--version</code>、<code>/usr/share/doc/*/copyright</code></td></tr>
 <tr><td>2</td><td>GPL のソフトの著作権者</td><td>配るなら同じ条件で、ソースも渡すこと</td><td><code>/usr/share/common-licenses/GPL-3</code></td></tr>
 <tr><td>3</td><td>MIT・BSD・Apache の著作権者（パブリックドメインは持ち主なし）</td><td>表示を残すこと（パブリックドメインは条件なし）</td><td>copyright の許諾文</td></tr>
 <tr><td>4</td><td>上流・Debian・Ubuntu の各層</td><td>報告先と連絡先</td><td><code>--help</code>、<code>/etc/os-release</code>、<code>Upstream-Contact:</code></td></tr>
@@ -284,7 +284,7 @@ or available locally via: info '(coreutils) ls invocation'</code></pre>
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>1つのパッケージには、上流（作った人）・Debian・Ubuntu の層がある。版番号 <code>5.2.21-2ubuntu4</code> がその順に並んでいる</li><li>報告先は1つではない。<code>bash --help</code> は上流（bashbug → <code>bug-bash@gnu.org</code>）を、<code>/etc/os-release</code> は Ubuntu（Launchpad）を指す。不具合の出どころで窓口を選ぶ</li><li>コミュニティの場は、メーリングリスト（メールで議論・報告）、掲示板（利用者どうしの質問と回答）、開発サイト（ソースの保管・課題管理・変更の提案）</li><li>開発体制は、個人中心・チーム・財団・企業とプロジェクトごとに違う。役割としてメンテナ・コミッタ・コントリビュータがある。方針が合わなければフォークできる</li><li>良いバグ報告は、具体的な件名・版・環境・再現の手順・期待と実際の結果。bashbug の下書きがその形をしている</li><li>エコシステムへの参加は、使用・紹介・バグ報告から。翻訳や文書、修正の提案もある</li><li>4章すべてが「持ち主が条件を書いて出した許可で、その条件と連絡先はソフトと一緒に配られている」という1つの形だった</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3（Docker Hub 公式の素のイメージ。このコースは専用イメージを作らない）/ Ubuntu 24.04.5 LTS / base-files 13ubuntu10.5 / bash 5.2.21-2ubuntu4 / coreutils 9.4-3ubuntu6.3 / dpkg 1.22.6ubuntu6.6 / libc6 2.39-0ubuntu8.9 / apt は使わない（イメージに入っているファイルを読むだけ）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
-<nav class="pager"><a href="/linuc-oss/theory/03-permissive">← 3. 「何をしてもいい」は、パブリックドメインだけ</a><a href="/linuc-oss/">入口（起動のしかた）へ →</a></nav>
+<nav class="pager"><a href="/linuc-oss/theory/03-permissive">← 3. 持ち主がいないのは、パブリックドメインだけ</a><a href="/linuc-oss/">入口（起動のしかた）へ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>

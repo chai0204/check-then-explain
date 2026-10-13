@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>3. 「何をしてもいい」と書いてあるのは、パブリックドメインだけ — 確かめて説明する LinuC 主題1.11</title>
+<title>3. 持ち主がいないのは、パブリックドメインだけ — 確かめて説明する LinuC 主題1.11</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="3" data-theme="linuc-oss">
@@ -10,16 +10,16 @@
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-oss/theory/">詳しく</a></p>
 </div>
-<h1>3. 「何をしてもいい」と書いてあるのは、パブリックドメインだけ</h1>
-<p class="lead">MIT も BSD も、許可の文のあとに条件が付いている。「この表示を残すこと」。素の Ubuntu 1台を探して、条件の付かない「好きにしてよい」が見つかったのは、パブリックドメインのファイルだけだった。</p>
+<h1>3. 持ち主がいないのは、パブリックドメインだけ</h1>
+<p class="lead">MIT も BSD も Apache も、許可の文のあとに条件が付いている。「この表示を残すこと」。条件の無い許可もまれにあるが、それにも持ち主がいる。素の Ubuntu 1台を探して、持ち主のいない「好きにしてよい」が見つかったのは、パブリックドメインのファイルだけだった。</p>
 <div class="badges"><span>前提: 第2章まで読了</span><span>前提: 素の Ubuntu を起動できる（任意）</span><span>所要 16分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.11.1（重要度2）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>MIT・BSD・Apache が再配布のときに求めるものを、条文から言える</li><li>Apache License 2.0 の特許条項が何を許し、いつ失効するかを言える</li><li>パブリックドメインが、他のライセンスとどこで違うかを説明できる</li></ul>
+<ul><li>MIT・BSD・Apache が再配布のときに求めるものを、条文から言える</li><li>Apache License 2.0 の特許条項が何を許し、いつ失効するかを言える</li><li>パブリックドメインが、条件の少ないライセンスとどこで違うか（持ち主がいるかどうか）を説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: BSD の各版の歴史（宣伝の条件が外れた経緯）、Apache の NOTICE ファイルの書き方、パブリックドメインの国ごとの扱い、ライセンス同士の互換性の一覧は扱わない。試験に要るのは、条件の数と中身、そして特許条項があるかどうかである。</div></div>
 
 <h2 id="mit">MIT にも、条件がある</h2>
 <div class="sgoal"><b>この節で分かること</b>: コピーレフトの無いライセンスにも条件があること。</div>
-<p>第2章の最後の表で、BSD・MIT・Apache は「コピーレフトが及ばない」側にあった。改変版を同じ条件で配る義務が無いライセンスで、<b>許可型</b>（パーミッシブ）と呼ぶ。LinuC の出題範囲は「BSD 系（MIT、Apache V2）」とまとめている。</p>
+<p>第2章の最後の表で、BSD・MIT・Apache は「コピーレフトが及ばない」側にあった。改変版を同じ条件で配る義務が無いライセンスで、<b>非コピーレフト型</b>、または<b>許可型</b>（パーミッシブ）と呼ぶ。LinuC の出題範囲は「BSD 系（MIT、Apache V2）」とまとめている。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>コピーレフトが無いなら、ソースを公開する義務も無い。MIT のコードは、何も気にせず自分の製品に入れてよい。守ることは何もない。</p>
 <pre><code>$ grep -n '^License: Expat' /usr/share/doc/apt/copyright
@@ -50,7 +50,7 @@ License: Expat
 <b>上の著作権表示とこの許諾文を、すべての写し（または主要な部分）に含めること</b>。
 製品に組み込んで配るなら、表示も一緒に配る。何も書かずに使えば、許可の条件を満たしていない。
 ここで <code>Expat</code> と呼ばれているのが、試験で MIT ライセンスと呼ばれるものである（名前の話は後の節で数える）。</div></div>
-<p>「何をしてもいい」に最も近い言い回しを探すと、冗談のようなライセンスが見つかる。</p>
+<p>「好きにしてよい」とそのまま書いたライセンスもある。冗談のようなものだ。</p>
 <pre><code>$ grep -A4 '^License: Beerware' /usr/share/doc/libmd0/copyright
 License: Beerware
  "THE BEER-WARE LICENSE" (Revision 42):
@@ -147,7 +147,7 @@ $ grep -A2 "(d) If the Work includes a" /usr/share/common-licenses/Apache-2.0
       reproduction, and distribution of the Work otherwise complies with
       the conditions stated in this License.</code></pre>
 <p>自分の改変部分に自分の著作権表示を付け、改変部分や派生物全体に別の条件を付けてよい。ただし元の作品については、上の4つの条件を守る。</p>
-<p>Apache だけが持つものが、第3条の<b>特許条項</b>である。</p>
+<p>許可型の3つの中で Apache だけが持つものが、第3条の<b>特許条項</b>である。</p>
 <pre><code>$ sed -n 74,88p /usr/share/common-licenses/Apache-2.0
    3. Grant of Patent License. Subject to the terms and conditions of
       this License, each Contributor hereby grants to You a perpetual,
@@ -165,13 +165,22 @@ $ grep -A2 "(d) If the Work includes a" /usr/share/common-licenses/Apache-2.0
       granted to You under this License for that Work shall terminate
       as of the date such litigation is filed.</code></pre>
 <p>前半は「各貢献者は、自分の貢献に必要な範囲で、持っている特許を無償で使わせる」。後半は「<b>この作品が特許を侵害していると誰かを訴えたら、あなたへの特許の許可は、訴えた日に終わる</b>」。著作権だけでなく特許についても許可を出し、許可を盾にした訴訟には許可の取り消しで応じる。</p>
-<pre><code>$ grep -ic patent /usr/share/common-licenses/BSD /usr/share/common-licenses/Apache-2.0 /usr/share/common-licenses/GPL-3
+<pre><code>$ grep -ic patent /usr/share/common-licenses/BSD /usr/share/common-licenses/Apache-2.0 /usr/share/common-licenses/MPL-2.0 /usr/share/common-licenses/GPL-3
 /usr/share/common-licenses/BSD:0
 /usr/share/common-licenses/Apache-2.0:6
+/usr/share/common-licenses/MPL-2.0:10
 /usr/share/common-licenses/GPL-3:26
 $ sed -n 102,121p /usr/share/doc/apt/copyright | grep -ic patent
 0</code></pre>
-<p>BSD と MIT（Expat）は、特許（patent）について1語も書いていない。許可型の3つのうち、特許を明示的に扱うのは Apache だけである。なお GPL-3 も第11条（<code>11. Patents.</code>、第2章の目次）で特許を扱っている。</p>
+<p>BSD と MIT（Expat）は、特許（patent）について1語も書いていない。許可型の3つのうち、特許を明示的に扱うのは Apache だけである。ただし特許の条項そのものは Apache だけのものではない。GPL-3 は第11条（<code>11. Patents.</code>、第2章の目次）で、MPL-2.0 は 2.1 (b) の特許の許可と、次の 5.2 で特許を扱っている。</p>
+<pre><code>$ grep -A5 "^5.2. If You initiate litigation" /usr/share/common-licenses/MPL-2.0
+5.2. If You initiate litigation against any entity by asserting a patent
+infringement claim (excluding declaratory judgment actions,
+counter-claims, and cross-claims) alleging that a Contributor Version
+directly or indirectly infringes any patent, then the rights granted to
+You by any and all Contributors for the Covered Software under Section
+2.1 of this License shall terminate.</code></pre>
+<p>「貢献者の版が特許を侵害していると訴えたら、すべての貢献者から 2.1 で受けていた許可が終わる」。Apache の第3条と同じ、訴えたら終わる形の条項である。</p>
 <div class="scroll"><table>
 <tr><th></th><th>MIT（Expat）</th><th>BSD（3条項）</th><th>Apache 2.0</th></tr>
 <tr><td>著作権表示と許諾文を残す</td><td>する</td><td>する（ソースでもバイナリでも）</td><td>する（特許・商標・帰属の表示も）</td></tr>
@@ -185,9 +194,17 @@ $ sed -n 102,121p /usr/share/doc/apt/copyright | grep -ic patent
 <div class="analogy"><b>たとえ</b>: Apache の特許条項は、<b>休戦の約束</b>に近い。「この道具に入っている私たちの特許は、自由に使ってよい。ただし、この道具のことで誰かを特許で訴えたら、あなたへの許可は取り消す」。
 <br>ただし<b>崩れる点</b>: 休戦は双方が合意して結ぶが、この条項は貢献者から使う人へ一方的に出される。使う人は何にも署名せず、受け取った時点で効いている。</div>
 
-<h2 id="pd">条件が無いのは、パブリックドメインだけ</h2>
+<h2 id="pd">持ち主がいないのは、パブリックドメインだけ</h2>
 <div class="sgoal"><b>この節で分かること</b>: パブリックドメインが「許可」ではなく「持ち主がいない」状態であること。</div>
-<p>では、条件の付かない「好きにしてよい」はどこにあるか。xz の圧縮ライブラリ（liblzma5）の copyright を見る。</p>
+<p>条件の付かない許可も、まれにある。</p>
+<pre><code>$ grep -B2 -A2 '^License: configure' /usr/share/doc/sensible-utils/copyright
+Files: configure
+Copyright: 1992-1996, 1998-2012, Free Software Foundation, Inc.
+License: configure
+ This configure script is free software; the Free Software Foundation
+ gives unlimited permission to copy, distribute and modify it.</code></pre>
+<p>「この configure スクリプトについて、FSF は写すこと・配ること・改変することを無制限に許す」。表示を残せという条件すら無い。イメージの外にも、0BSD のように条件を1つも持たない許可型のライセンスがある。それでも <code>Copyright:</code> の行には持ち主（FSF）がいて、許しているのはその持ち主である。<b>条件が無いことと、持ち主がいないことは別の話</b>である。</p>
+<p>持ち主そのものがいないのが、パブリックドメインである。xz の圧縮ライブラリ（liblzma5）の copyright を見る。</p>
 <pre><code>$ grep -n 'is in the public domain' /usr/share/doc/liblzma5/copyright | head -3
 23:   - liblzma is in the public domain.
 217: This file is in the public domain
@@ -200,7 +217,7 @@ License: PD
  You can do whatever you want with this file.
 Comment:</code></pre>
 <p><code>You can do whatever you want with this file.</code> — Beerware と同じ「好きにしてよい」だが、<b>前にも後ろにも条件が付いていない</b>。その前の行は <code>This file has been put in the public domain.</code>（このファイルはパブリックドメインに置かれた）。<code>License: PD</code> の PD は public domain の略である。</p>
-<p><b>パブリックドメイン</b>は、著作権が無い状態を指す。持ち主がいないので、許可を出す人も、条件を付ける人もいない。だから条件が無い。ここが、許可型のライセンスとの決定的な違いである。許可型は「持ち主が、ほぼ何でも許す」、パブリックドメインは「許す持ち主がいない」。</p>
+<p><b>パブリックドメイン</b>は、著作権が無い状態を指す。持ち主がいないので、許可を出す人も、条件を付ける人もいない。ここが、許可型のライセンスや、上の configure のような条件の無い許可との決定的な違いである。どちらも「持ち主が許す」形で、パブリックドメインは「許す持ち主がいない」。</p>
 <p>SELinux のライブラリ（libselinux1。<code>ls</code> がこれを使っていることは、この章の最後で確かめる）も、そう書いている。</p>
 <pre><code>$ grep -A2 '^Files: \*$' /usr/share/doc/libselinux1/copyright
 Files: *
@@ -219,7 +236,7 @@ License: public-domain
  disclaims all, warranties, express, implied, statutory, or otherwise
  with respect to the software, including noninfringement and the implied
  warranties of merchantability and fitness for a particular purpose.</code></pre>
-<p><code>public domain software, i.e. not copyrighted</code>（パブリックドメインのソフト、つまり著作権が無い）。作ったのは米国家安全保障局（NSA）で、米国では連邦政府の職員が職務で作った著作物には著作権が生じない。持ち主がいないことにも、こうして理由がある。それでも直後に <code>Warranty Exclusion</code>（保証の除外）が続き、<code>may contain "bugs"</code>（バグを含むかもしれない）と書いている。<b>条件が無くなっても、無保証は残る</b>。</p>
+<p><code>public domain software, i.e. not copyrighted</code>（パブリックドメインのソフト、つまり著作権が無い）。作ったのは米国家安全保障局（NSA）で、米国では連邦政府の職員が職務で作った著作物には著作権が生じない。持ち主がいないことにも、こうして理由がある。それでも直後に <code>Warranty Exclusion</code>（保証の除外）を置き、<code>may contain "bugs"</code>（バグを含むかもしれない）と書いている。パブリックドメインのソフトでも、libselinux のように無保証の文を付けているものがある（上の liblzma の段落には付いていない）。</p>
 <p>パブリックドメインになる道は3つある。持ち主が権利を手放す、保護期間が切れる、そして上のように最初から著作権が生じない。1つ目のための文書が CC0 で、第1章で冒頭を読んだ。</p>
 <pre><code>$ grep -A3 "^Certain owners wish" /usr/share/common-licenses/CC0-1.0
 Certain owners wish to permanently relinquish those rights to a Work for
@@ -238,19 +255,36 @@ irrevocable and unconditional license to exercise Affirmer's Copyright and</code
 <div class="analogy"><b>たとえ</b>: 道端に置かれた「<b>ご自由にお持ちください</b>」の箱に近い。持ち帰る人に条件は無く、誰の許可もいらない。
 <br>ただし<b>崩れる点</b>: 箱の中身は持っていけば無くなるが、パブリックドメインのコードは誰が使っても減らない。また、箱の品物は置いた人が手放したものだが、パブリックドメインには「最初から誰のものにもならなかった」もの（NSA のライブラリ）も含まれる。</div>
 
-<h2 id="names">同じ許諾文に、5つの名前</h2>
+<h2 id="names">書き出しが同じ許諾文に、5つの名前</h2>
 <div class="sgoal"><b>この節で分かること</b>: ライセンスの名前が揃っていないこと、だから本文で判断すること。</div>
-<p>第1章で、<code>License:</code> の書き方が 155 通りあった。その中には、中身が同じものに別の名前を付けた例が混じっている。MIT の許諾文の書き出し <code>Permission is hereby granted, free of charge</code> で探して、直前の <code>License:</code> 行を数える。</p>
+<p>第1章で、<code>License:</code> の書き方が 155 通りあった。その中には、書き出しが同じ許諾文に別々の名前を付けた例が混じっている。MIT の許諾文の書き出し <code>Permission is hereby granted, free of charge</code> で探して、直前の <code>License:</code> 行を数える。</p>
 <pre><code>$ grep -B1 -h '^ Permission is hereby granted, free of charge' /usr/share/doc/*/copyright | grep '^License:' | sort | uniq -c | sort -rn
      13 License: X11
      11 License: Expat
       7 License: MIT
       4 License: MIT/X11
       1 License: installsh</code></pre>
-<p>書き出しがまったく同じ許諾文に、パッケージによって5つの名前が付いている。試験で「MIT ライセンス」と呼ばれるものは、実物の copyright では <code>Expat</code> とも <code>X11</code> とも書かれる。BSD でも <code>BSD-3-clause</code> と <code>BSD-3-Clause</code> が別の行として数えられていた。</p>
+<p>書き出しがまったく同じ許諾文に、パッケージによって5つの名前が付いている。試験で「MIT ライセンス」と呼ばれるものは、実物の copyright では <code>Expat</code> とも書かれる。では、中身も同じか。<code>MIT/X11</code> と <code>X11</code> の名前を使っている ncurses の copyright を見る。</p>
+<pre><code>$ grep -n -e '^License: MIT/X11$' -e '^License: X11$' -e 'Except as contained' /usr/share/doc/ncurses-bin/copyright
+11:License: MIT/X11
+15:License: X11
+21:License: MIT/X11
+41: Except as contained in this notice, the name(s) of the above copyright
+46:License: X11
+64: Except as contained in this notice, the name of the X Consortium shall not
+$ sed -n 63,67p /usr/share/doc/ncurses-bin/copyright
+ .
+ Except as contained in this notice, the name of the X Consortium shall not
+ be used in advertising or otherwise to promote the sale, use or other deal-
+ ings in this Software without prior written authorization from the X Consor-
+ tium.
+$ grep -c 'Except as contained' /usr/share/doc/apt/copyright /usr/share/doc/util-linux/copyright
+/usr/share/doc/apt/copyright:0
+/usr/share/doc/util-linux/copyright:0</code></pre>
+<p>11 行目と 15 行目は「どのファイルがどのライセンスか」を示す行で、本文は 21 行目（MIT/X11）と 46 行目（X11）から始まる。どちらの本文も、最後に <code>Except as contained in this notice</code> で始まる段落を持っている。「著作権者（X11 では X Consortium）の名前を、書面の許可なく宣伝に使わない」という、<b>もう1つの条件</b>である。<code>Expat</code> の apt と <code>MIT</code> の util-linux の許諾文には、この段落が無い（0件）。<b>名前が違うと、中身も違うことがある。</b>BSD でも <code>BSD-3-clause</code> と <code>BSD-3-Clause</code> が別の行として数えられていた（こちらは大文字と小文字の違いだけ）。</p>
 <p><b>ライセンスは名前ではなく本文で判断する</b>。名前は人が付けたラベルで、効力を持つのは本文である。copyright ファイルが全文を載せるか、<code>/usr/share/common-licenses/</code> の全文を指しているのはそのためである。</p>
-<div class="analogy"><b>たとえ</b>: 同じ料理が、店によって「肉じゃが」「牛じゃが」「じゃが煮」と呼ばれているのに近い。名前で注文すると、別の店では通じないことがある。
-<br>ただし<b>崩れる点</b>: 料理なら少々違っても食べられるが、ライセンスは1文違えば条件が変わる。だから「たぶん同じ」で済ませず、本文を突き合わせる。</div>
+<div class="analogy"><b>たとえ</b>: 書き出しが同じレシピが、店によって「肉じゃが」「牛じゃが」と呼ばれ、牛じゃがの店だけ最後に一手間足している状態に近い。名前を見ても、どちらに一手間があるかは分からない。
+<br>ただし<b>崩れる点</b>: 料理の一手間は味が少し変わるだけだが、ライセンスの1段落は、守る条件が1つ増えることを意味する。だから名前で「たぶん同じ」と済ませず、本文を突き合わせる。</div>
 
 <h2 id="mix">1つのコマンドに、4つのライセンス</h2>
 <div class="sgoal"><b>この節で分かること</b>: 種類の違うライセンスが、1つのプログラムの中で組み合わさっていること。</div>
@@ -273,12 +307,12 @@ $ grep -m1 -H '^License:' /usr/share/doc/coreutils/copyright /usr/share/doc/libs
 <p><code>ldd</code> の出力の1列目だけを <code>awk</code> で取り出した（2列目以降にはメモリ上の番地が出て、起動のたびに変わる）。<code>linux-vdso.so.1</code> はカーネルが用意する仮想的なもので、<code>ld-linux</code> は読み込みを担う部品なので、ここでは残りの3つを見る。libc6 のライセンスは第2章で見た。</p>
 <div class="scroll"><table>
 <tr><th>部品</th><th>パッケージ</th><th>ライセンス</th><th>分類</th></tr>
-<tr><td><code>ls</code> 本体</td><td>coreutils</td><td><code>GPL-3+</code></td><td>コピーレフト（作品全体）</td></tr>
-<tr><td><code>libc.so.6</code></td><td>libc6</td><td>LGPL 2.1 以降</td><td>コピーレフト（ライブラリ部分）</td></tr>
-<tr><td><code>libpcre2-8.so.0</code></td><td>libpcre2-8-0</td><td>BSD 3条項の一種</td><td>許可型</td></tr>
-<tr><td><code>libselinux.so.1</code></td><td>libselinux1</td><td><code>public-domain</code></td><td>持ち主がいない</td></tr>
+<tr><td><code>ls</code> 本体</td><td>coreutils</td><td><code>GPL-3+</code></td><td>コピーレフト型（作品全体）</td></tr>
+<tr><td><code>libc.so.6</code></td><td>libc6</td><td>LGPL 2.1 以降</td><td>準コピーレフト型（ライブラリ部分）</td></tr>
+<tr><td><code>libpcre2-8.so.0</code></td><td>libpcre2-8-0</td><td>BSD 3条項の一種</td><td>非コピーレフト型（許可型）</td></tr>
+<tr><td><code>libselinux.so.1</code></td><td>libselinux1</td><td><code>public-domain</code></td><td>持ち主がいない（パブリックドメイン）</td></tr>
 </table></div>
-<p>GPL のプログラムが、LGPL・BSD 系・パブリックドメインの部品を使って動いている。許可型やパブリックドメインのコードは、GPL のプログラムとも組み合わせられる。そしてこの <code>ls</code> をバイナリで配る人は、持ち主のいる3つの部品それぞれの条件を守る必要がある（パブリックドメインの部品には条件が無い）。GPL-3 第4条の「ライセンスの写しを渡す」、BSD の条件2の「文書などに載せる」。<code>/usr/share/doc/*/copyright</code> が最小のイメージにも残っているのは、そのためである。</p>
+<p>GPL のプログラムが、LGPL・BSD 系・パブリックドメインの部品を使って動いている。ここにある BSD 3条項の一種やパブリックドメインのコードは、GPL のプログラムと組み合わせられている。ただし、許可型ならどれでも GPL と組み合わせられるわけではない。FSF は、宣伝の条件を持つ4条項の BSD や、GPLv2 のプログラムに Apache 2.0 のコードを組み合わせることを、条件がぶつかるとして認めていない。そしてこの <code>ls</code> をバイナリで配る人は、持ち主のいる3つの部品それぞれの条件を守る必要がある（パブリックドメインの部品には条件が無い）。GPL-3 第4条の「ライセンスの写しを渡す」、BSD の条件2の「文書などに載せる」。<code>/usr/share/doc/*/copyright</code> が最小のイメージにも残っているのは、そのためである。</p>
 <div class="note try"><b>手を動かす</b>:
 このコースには演習がない。素の Ubuntu で <code>ldd /bin/ls | awk '{print $1}'</code> から始めて、この表の4行を自分で辿る。
 <code>/bin/ls</code> を <code>/usr/bin/grep</code> や <code>/bin/tar</code> に変えると、部品の組み合わせが変わる。どれも読むだけのコマンドである。起動のしかたは<a href="/linuc-oss/">入口</a>にある。</div>
@@ -309,7 +343,7 @@ A は許可型のライセンスの説明で、持ち主がいる点がパブリ
 そして、大学や貢献者の名前を許可なく宣伝に使わない（条件3）。ソースコードを公開する必要は無い。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>許可型（BSD 系）にも条件はある。MIT（Expat）は「著作権表示と許諾文をすべての写しに含める」、Beerware でさえ「表示を残す限り」</li><li>BSD（3条項）の条件は、表示を残す・バイナリなら文書に載せる・名前を宣伝に使わない、の3つ。4条項版には宣伝の条件がもう1つある</li><li>Apache License 2.0 の条件は、写しを渡す・改変したファイルに明記・表示を残す・NOTICE を含める、の4つ。改変版の条件は自分で決めてよい</li><li>Apache の特許条項は、貢献者の特許を無償で使わせ、その作品で特許訴訟を起こした者への許可を訴えた日に終わらせる。MIT と BSD は特許に触れていない</li><li>パブリックドメインは「許可」ではなく「著作権が無い」状態。持ち主がいないので条件も無い。それでも無保証の文は付いている</li><li>同じ許諾文に X11・Expat・MIT など5つの名前が付いていた。ライセンスは名前ではなく本文で判断する</li><li><code>ls</code> 1つの中に GPL・LGPL・BSD 系・パブリックドメインが同居している。配る人は、持ち主のいる部品すべての条件を守る</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>非コピーレフト型（許可型・BSD 系）にも条件はある。MIT（Expat）は「著作権表示と許諾文をすべての写しに含める」、Beerware でさえ「表示を残す限り」</li><li>BSD（3条項）の条件は、表示を残す・バイナリなら文書に載せる・名前を宣伝に使わない、の3つ。4条項版には宣伝の条件がもう1つある</li><li>Apache License 2.0 の条件は、写しを渡す・改変したファイルに明記・表示を残す・NOTICE を含める、の4つ。改変版の条件は自分で決めてよい</li><li>Apache の特許条項は、貢献者の特許を無償で使わせ、その作品で特許訴訟を起こした者への許可を訴えた日に終わらせる。許可型の中では Apache だけで、MIT と BSD は特許に触れていない（MPL-2.0 と GPL-3 にも特許の条項がある）</li><li>パブリックドメインは「許可」ではなく「著作権が無い」状態。持ち主がいないので条件も無い。条件の無い許可（FSF の configure など）とは、持ち主がいるかどうかで違う。libselinux のように無保証の文を付けているものもある</li><li>書き出しが同じ許諾文に X11・Expat・MIT など5つの名前が付いていた。X11 と MIT/X11 の本文には、名前を宣伝に使わないという条件がもう1つあった。ライセンスは名前ではなく本文で判断する</li><li><code>ls</code> 1つの中に GPL・LGPL・BSD 系・パブリックドメインが同居している。配る人は、持ち主のいる部品すべての条件を守る</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3（Docker Hub 公式の素のイメージ。このコースは専用イメージを作らない）/ Ubuntu 24.04.5 LTS / base-files 13ubuntu10.5 / bash 5.2.21-2ubuntu4 / coreutils 9.4-3ubuntu6.3 / dpkg 1.22.6ubuntu6.6 / libc6 2.39-0ubuntu8.9 / apt は使わない（イメージに入っているファイルを読むだけ）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-oss/theory/02-copyleft">← 2. コピーレフトは、配るときに効く</a><a href="/linuc-oss/theory/04-community">次: 4. 報告先は、ソフトの中に書いてある →</a></nav>
 <section id="comments">
