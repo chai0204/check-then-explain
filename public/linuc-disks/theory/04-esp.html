@@ -11,10 +11,10 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
 </div>
 <h1>4. 起動の入口は、マウントしなくても見つかる</h1>
-<p class="lead">練習機の <code>/etc/fstab</code> から <code>/boot/efi</code> の行を消して再起動しても、練習機はふつうに起動する。UEFI のファームウェアは Linux より先に動き、ESP をパーティションの<b>種類</b>で見つけて、自分で中の FAT を読むからだ。マウントは、Linux が中身を書き換えるときの都合にすぎない。</p>
-<div class="badges"><span>前提: 第3章まで読了</span><span>前提: 練習機が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<p class="lead">練習機の <code>/etc/fstab</code> から <code>/boot/efi</code> の行を消して再起動しても、練習機はふつうに起動する。ESP の種類の印を書き換えて再起動しても、まだ起動する。UEFI のファームウェアは Linux より先に動き、NVRAM の名簿に書かれた「どの区画（PARTUUID）の、どのファイルか」を頼りに、自分で中の FAT を読むからだ。マウントは、Linux が中身を書き換えるときの都合にすぎない。</p>
+<div class="badges"><span>前提: 第3章まで読了</span><span>前提: 練習機が起動している</span><span>所要 24分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>UEFI が起動のときに何をどの順に読むか（NVRAM → GPT → ESP）を言える</li><li><code>/</code>・<code>/boot</code>・<code>/var</code>・<code>/home</code>・スワップを別々のパーティションにする理由を、用途で説明できる</li><li>gdisk で GPT の表を作り、種類（EF00・8200・8300）を割り当てられる</li></ul>
+<ul><li>UEFI が起動のときに何をどの順に読むか（NVRAM → GPT → ESP）を言え、ESP の種類の印（EF00）が何のためにあるかを説明できる</li><li><code>/</code>・<code>/boot</code>・<code>/var</code>・<code>/home</code>・スワップを別々のパーティションにする理由を、用途で説明できる</li><li>gdisk で GPT の表を作り、種類（EF00・8200・8300）を割り当てられる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: Secure Boot と shim の署名の検証、GRUB の設定ファイルの書き方、BIOS（レガシー）での起動の流れの細部は扱わない。起動の流れそのものは主題1.01 のコースで扱う。ここで要るのは「ファームウェアは何を手がかりに ESP を見つけるか」だけである。</div></div>
 
 <h2 id="layout">練習機のディスクは、どう切られているか</h2>
@@ -38,7 +38,7 @@ Filesystem      Size  Used Avail Use% Mounted on
 $ swapon --show
 $ free -h
                total        used        free      shared  buff/cache   available
-Mem:           1.4Gi       238Mi       1.1Gi       784Ki       195Mi       1.2Gi
+Mem:           1.4Gi       237Mi       1.1Gi       788Ki       196Mi       1.2Gi
 Swap:             0B          0B          0B</code></pre>
 <p>練習機（Ubuntu 24.04 のクラウドイメージ）は、ディスクを4つに分けている。</p>
 <div class="scroll"><table>
@@ -48,11 +48,11 @@ Swap:             0B          0B          0B</code></pre>
 <tr><td>vda1</td><td>Linux filesystem</td><td>ext4 → <code>/</code></td><td>それ以外の全部</td></tr>
 <tr><td>vda14</td><td>BIOS boot</td><td>（ファイルシステム無し）</td><td>BIOS で GPT のディスクから起動するときに GRUB が使う小さな区画。UEFI では使わない</td></tr>
 </table></div>
-<p><code>/var</code> と <code>/home</code> は分けていない。スワップも無い（<code>Swap: 0B</code>）。クラウドのサーバは1台を1つの用途に使い捨てることが多く、小さく作っておいて足りなくなれば作り直すからである。分ける理由は、この章の後半で表にする。</p>
+<p><code>/var</code> と <code>/home</code> は分けていない。スワップも無い（<code>Swap: 0B</code>）。クラウドのサーバは1台を1つの用途に使い捨てることが多く、小さく作っておいて足りなくなれば作り直すからである。LinuC の公式セミナーの資料には「少なくとも <code>/</code> とスワップの2つ」という形が出てくるが、スワップが無くても Linux は動く（この練習機がそう。スワップは後からファイルでも足せる。第7章）。分ける理由は、この章の後半で表にする。</p>
 
 <h2 id="esp">ESP の中身と、ファームウェアの名簿</h2>
 <div class="sgoal"><b>この節で分かること</b>: ファームウェアが「どこの何を」起動するかを、何で指しているか。</div>
-<p>ESP の中を見る。<code>/boot/efi</code> は <code>umask=0077</code> でマウントされているので、root でないと中が読めない。</p>
+<p>ESP（EFI System Partition）は、UEFI で起動するための FAT の区画である。中を見る。<code>/boot/efi</code> は <code>umask=0077</code> でマウントされているので、root でないと中が読めない。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls /boot/efi
 ls: cannot open directory '/boot/efi': Permission denied
 $ sudo ls -R /boot/efi/EFI
@@ -84,8 +84,8 @@ configfile $prefix/grub.cfg
 $ sudo iconv -f UTF-16 -t UTF-8 /boot/efi/EFI/ubuntu/BOOTX64.CSV
 shimx64.efi,Ubuntu,,This is the boot entry for Ubuntu</code></pre>
 <p><code>search.fs_uuid a5eecc38-…</code> は <code>vda16</code>（<code>/boot</code>）の UUID である。起動の流れは、ファームウェア → ESP の shim → GRUB → <code>/boot</code> のカーネル、となる。どの段も、次の段を<b>番号（GUID・UUID）で</b>探している。</p>
-<p>もう1つ、<code>efibootmgr</code> の1行目に注目する。<code>BootCurrent: 0001</code>、つまり今回の起動は <code>Ubuntu</code>（0002）ではなく、ファームウェアがディスクを見て自分で作った候補 <code>UEFI Misc Device</code> から始まっている。練習機の NVRAM は最初の起動のときに空の雛形から作られるので、Ubuntu の候補はまだ無かった。ファームウェアは ESP の決まった場所（<code>\EFI\BOOT\BOOTX64.EFI</code>）を自分で探して起動し、その途中で shim の fallback が <code>BOOTX64.CSV</code>（「shimx64.efi を Ubuntu という名前で登録せよ」）を読んで <code>Boot0002</code> を足した。次の起動からは 0002 になるはずで、この章の再起動のあとで確かめる（ここまでにコンテナを止めて起動し直した人は、この時点ですでに 0002 になっている）。</p>
-<div class="analogy"><b>たとえ</b>: 建物の<b>守衛と来客名簿</b>に近い。守衛（ファームウェア）は名簿（NVRAM）を見て、図面の記号（GPT の種類と番号）で玄関（ESP）を探し、担当者（ブートローダ）を呼び出す。名簿に無ければ、決まった受付（<code>\EFI\BOOT\</code>）に行く。
+<p>もう1つ、<code>efibootmgr</code> の1行目に注目する。<code>BootCurrent: 0001</code>、つまり今回の起動は <code>Ubuntu</code>（0002）ではなく、ファームウェアがディスクを見て自分で作った候補 <code>UEFI Misc Device</code> から始まっている。練習機の NVRAM は最初の起動のときに空の雛形から作られるので、Ubuntu の候補はまだ無かった。名簿に使える候補が無いとき、ファームウェアはディスクの FAT を探して、決まった場所（<code>\EFI\BOOT\BOOTX64.EFI</code>）のファイルを起動する。今回もそうして起動し、その途中で shim の fallback が <code>BOOTX64.CSV</code>（「shimx64.efi を Ubuntu という名前で登録せよ」）を読んで <code>Boot0002</code> を足した。次の起動からは 0002 になるはずで、この章の再起動のあとで確かめる（ここまでにコンテナを止めて起動し直した人は、この時点ですでに 0002 になっている）。</p>
+<div class="analogy"><b>たとえ</b>: 建物の<b>守衛と来客名簿</b>に近い。守衛（ファームウェア）は名簿（NVRAM）に書かれた部屋番号（PARTUUID）と担当者の名前（ファイルのパス）で、担当者（ブートローダ）を呼び出す。名簿に無ければ、決まった受付（<code>\EFI\BOOT\</code>）に行く。
 <br>ただし<b>崩れる点</b>: 守衛なら建物の中の事情（どの部屋を誰が使っているか）も聞けるが、ファームウェアは Linux の設定（<code>/etc/fstab</code> やマウント）を一切読まない。読むのは NVRAM と、表と、ESP の中身だけである。</div>
 
 <h2 id="naive">マウントを外すと、起動できなくなる？</h2>
@@ -99,14 +99,15 @@ $ grep UEFI /etc/fstab
 <p>ESP は起動に使う区画で、Linux はそれを <code>/boot/efi</code> にマウントしている。
 起動するときにマウントされていなければ、ブートローダが読めず、練習機は起動できなくなるはずだ。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo reboot
-Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 11:42:17 JST):
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 19:28:51 JST):
 
 The system will reboot now!</code></pre>
 <p>ssh が切れて外に戻る。少し待ってから、外で起動を待つ（<code>vm start</code> は、動いている練習機なら起動し終わるまで待つだけ）。</p>
 <pre data-where="外（lab@host）"><code>$ vm start
 練習機はもう動いています
   起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
-練習機が起動しました（20秒）
+  起動中… 20秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+練習機が起動しました（26秒）
   入るには:  ssh linuc   （抜けるときは exit）</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ findmnt -o TARGET,SOURCE,FSTYPE /boot/efi
 $ ls -la /boot/efi
@@ -120,11 +121,11 @@ BootCurrent: 0002   ← Ubuntu の候補（0002）で起動した
 Timeout: 0 seconds
 BootOrder: 0002,0001,0000</code></pre>
 <div class="then"><b>だめな理由</b>: ふつうに起動し、<code>running</code>（不具合なし）になった。<code>/boot/efi</code> は空のディレクトリのままである。
-ファームウェアは Linux が動き出す<b>前</b>に、GPT の表から種類が EFI System の区画を見つけ、中の FAT を自分で読んで shim を起動している。
+ファームウェアは Linux が動き出す<b>前</b>に、NVRAM の候補が指す区画を GPT の表から PARTUUID で見つけ、中の FAT を自分で読んで shim を起動している。
 <code>/etc/fstab</code> とマウントは、そのあとで Linux が使うものなので、起動には関わらない。
 <code>/boot/efi</code> にマウントするのは、パッケージの更新で GRUB や shim を<b>書き換える</b>ときのためである。
 そして今回の起動は <code>BootCurrent: 0002</code>、前の起動で shim が登録した Ubuntu の候補からだった。</div></div>
-<p>戻しておく。<code>/etc/fstab</code> を書き換えたら、起動時のマウントを受け持つ systemd に読み直させる。</p>
+<p>戻しておく。<code>/etc/fstab</code> は起動のたびに読み直される（systemd が起動の初めに fstab からマウントの手順を作り直す）ので、次の起動には何もしなくても効く。ただし、いま動いている systemd は書き換えを知らないままなので、<code>daemon-reload</code> で読み直させておく（しないと、<code>mount</code> が「fstab が変わった」と注意を出す。第8章）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo cp /etc/fstab.bak /etc/fstab
 $ sudo systemctl daemon-reload
 $ sudo mount /boot/efi
@@ -134,14 +135,74 @@ TARGET    SOURCE     FSTYPE
 <div class="analogy"><b>たとえ</b>: 店の<b>搬入口</b>に近い。棚の商品（ブートローダ）を入れ替えるときは搬入口（マウント）を使うが、客（ファームウェア）は正面玄関から入ってきて棚の商品を手に取る。搬入口を閉めても、店は開いている。
 <br>ただし<b>崩れる点</b>: 搬入口を閉めたままだと、商品の入れ替え（GRUB や shim の更新）が失敗する。起動には要らないが、外したまま運用してよいわけではない。</div>
 
+
+<h2 id="type">種類の印は、誰のためか</h2>
+<div class="sgoal"><b>この節で分かること</b>: ESP の種類の印（EF00）を、起動のときに誰が見ているか。</div>
+<p>ESP の種類 <b>EFI System</b>（gdisk のコードで EF00）は、UEFI の仕様が決めた「ここが ESP」という印である。ではファームウェアは、起動のときにこの印を見ているのか。<code>vda15</code> の種類を Linux filesystem（8300）に書き換えて、再起動してみる（あとで戻す）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo sgdisk -i 15 /dev/vda
+Partition GUID code: C12A7328-F81F-11D2-BA4B-00A0C93EC93B (EFI system partition)
+Partition unique GUID: 9606BC98-2904-4577-9584-A8310313A04C
+First sector: 10240 (at 5.0 MiB)
+Last sector: 227327 (at 111.0 MiB)
+Partition size: 217088 sectors (106.0 MiB)
+Attribute flags: 0000000000000000
+Partition name: ''
+$ sudo sgdisk -t 15:8300 /dev/vda
+Warning: The kernel is still using the old partition table.
+The new table will be used at the next reboot or after you
+run partprobe(8) or kpartx(8)
+The operation has completed successfully.
+$ lsblk -o NAME,PARTTYPENAME /dev/vda
+NAME    PARTTYPENAME
+vda     
+├─vda1  Linux filesystem
+├─vda14 BIOS boot
+├─vda15 Linux filesystem
+└─vda16 Linux extended boot
+$ sudo reboot
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 19:30:00 JST):
+
+The system will reboot now!</code></pre>
+<pre data-where="外（lab@host）"><code>$ vm start
+練習機はもう動いています
+  起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+練習機が起動しました（18秒）
+  入るには:  ssh linuc   （抜けるときは exit）</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo efibootmgr | head -3
+BootCurrent: 0002
+Timeout: 0 seconds
+BootOrder: 0002,0001,0000
+$ lsblk -o NAME,PARTTYPENAME,MOUNTPOINTS /dev/vda
+NAME    PARTTYPENAME        MOUNTPOINTS
+vda                         
+├─vda1  Linux filesystem    /
+├─vda14 BIOS boot           
+├─vda15 Linux filesystem    /boot/efi
+└─vda16 Linux extended boot /boot</code></pre>
+<p><code>sgdisk -i</code> の <code>Partition unique GUID</code> が PARTUUID で、名簿の <code>Boot0002</code> に書かれた <code>9606bc98-…</code> と同じである。種類を書き換えたときの <code>Warning</code> は「動いているカーネルは、まだ前の表を使っている」という意味で、区画の位置は変えていないので、ここでは困らない。そして起動した。種類は Linux filesystem のまま、候補は同じ <code>0002</code> で、<code>/boot/efi</code> も（<code>/etc/fstab</code> はラベルで指しているので）マウントされている。この練習機のファームウェア（OVMF）は、名簿の候補が指す PARTUUID とファイルのパスで読みに行き、区画の種類は確かめなかった。種類の印を頼りにするのは、OS のインストーラや、ESP を探して更新する道具のほうである。だから ESP を作るときは、仕様どおり EF00 を付ける。戻しておく。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo sgdisk -t 15:ef00 /dev/vda
+Warning: The kernel is still using the old partition table.
+The new table will be used at the next reboot or after you
+run partprobe(8) or kpartx(8)
+The operation has completed successfully.
+$ lsblk -o NAME,PARTTYPENAME /dev/vda
+NAME    PARTTYPENAME
+vda     
+├─vda1  Linux filesystem
+├─vda14 BIOS boot
+├─vda15 EFI System
+└─vda16 Linux extended boot</code></pre>
+<div class="analogy"><b>たとえ</b>: 建物の<b>通用口の札</b>に近い。扉に「通用口」の札を貼っておくのが決まりで、新しく来た工事業者（インストーラ）はその札で扉を探す。
+<br>ただし<b>崩れる点</b>: 毎朝来る守衛（ファームウェア）は、名簿に書いた扉の番号で入るので、札を剥がしても入ってくる。札が要らないわけではなく、札を見る相手が違う。</div>
+
 <h2 id="allocate">/・/boot・/var・/home・スワップを分ける理由</h2>
 <div class="sgoal"><b>この節で分かること</b>: 用途に合わせてパーティションを割り当てる考え方と、gdisk での作り方。</div>
-<p>新しいサーバのディスクを設計するとき、区画をどう分けるかは「いっぱいになったら何が困るか」「作り直すとき何を残したいか」で決める。</p>
+<p>分けるのは必須ではない。<code>/</code> 1つ（UEFI で起動するならそれに ESP）でも Linux は動く。分けておくと、溢れたり壊れたりしたときの被害がその区画で止まり、<code>fsck</code> などの修復も区画ごとに短く済む。新しいサーバのディスクを設計するとき、区画をどう分けるかは「いっぱいになったら何が困るか」「作り直すとき何を残したいか」で決める。</p>
 <div class="scroll"><table>
 <tr><th>区画</th><th>入るもの</th><th>分ける理由</th></tr>
-<tr><td>ESP</td><td>ブートローダ（FAT）</td><td>UEFI で起動するなら必須。ファームウェアが種類で探す</td></tr>
+<tr><td>ESP</td><td>ブートローダ（FAT）</td><td>UEFI で起動するなら必須。種類に EF00（EFI System）の印を付ける。ファームウェアは NVRAM の候補（PARTUUID とファイルのパス）で読みに行く</td></tr>
 <tr><td><code>/boot</code></td><td>カーネル・initramfs・GRUB の設定</td><td><code>/</code> を LVM や暗号化にしたとき、GRUB が読める単純な形で残すため</td></tr>
-<tr><td>スワップ</td><td>メモリから追い出したページ</td><td>メモリが足りないときの逃げ場。休止（ハイバネート）にはメモリと同じくらい要る（第7章）</td></tr>
+<tr><td>スワップ</td><td>メモリから追い出したページ</td><td>メモリが足りないときの逃げ場。休止（ハイバネート）するならメモリ以上の大きさが要る（第7章）</td></tr>
 <tr><td><code>/</code></td><td>OS とプログラム</td><td>ほかが溢れても、これが溢れなければシステムは動く</td></tr>
 <tr><td><code>/var</code></td><td>ログ・メールの待ち行列・データベースなど、増え続けるもの</td><td>ログが溢れても <code>/</code> を道連れにしない</td></tr>
 <tr><td><code>/home</code></td><td>利用者のファイル</td><td>OS を入れ直しても残す。利用者が溢れさせても OS に響かない</td></tr>
@@ -174,7 +235,7 @@ Partition number (1-128, default 1):
 First sector (34-4194270, default = 2048) or {+-}size{KMGTP}: 
 Last sector (2048-4194270, default = 4192255) or {+-}size{KMGTP}: +100M   ← +100M: ESP の大きさ
 Current type is 8300 (Linux filesystem)
-Hex code or GUID (L to show codes, Enter = 8300): ef00   ← ef00: 種類を ESP にする（これが目印になる）
+Hex code or GUID (L to show codes, Enter = 8300): ef00   ← ef00: 種類を EFI System にする（仕様が決めた ESP の印）
 Changed type of partition to 'EFI system partition'
 
 ...
@@ -189,7 +250,7 @@ Changed type of partition to 'Linux filesystem'
 Command (? for help): p
 Disk /dev/vdb: 4194304 sectors, 2.0 GiB
 Sector size (logical/physical): 512/512 bytes
-Disk identifier (GUID): 052C472B-056E-4DE7-9804-E7C2FC9B4B57
+Disk identifier (GUID): 24CF2DEB-99F8-422E-98B2-52E307D2039C
 Partition table holds up to 128 entries
 Main partition table begins at sector 2 and ends at sector 33
 First usable sector is 34, last usable sector is 4194270
@@ -246,7 +307,7 @@ Number  Start   End     Size   File system  Name                  Flags
 <div class="quiz"><b>確認</b>
 <p>UEFI のファームウェアが起動のときに ESP を見つける手がかりは何か。ESP の中のファイルシステムは何か。</p>
 <details><summary>答え</summary>
-<p>GPT の表に書かれたパーティションの種類（EFI System。gdisk のコードで EF00、GUID は C12A7328-…）。中は FAT（ふつう FAT32）。<code>/etc/fstab</code> やマウント先（<code>/boot/efi</code>）は手がかりにならない。ファームウェアは Linux より先に動くので、それらを読めない。</p></details></div>
+<p>ふつうは NVRAM の起動の候補（<code>efibootmgr</code> の <code>Boot0002</code> など）に書かれた、区画の <b>PARTUUID</b> とファイルのパス（<code>\EFI\ubuntu\shimx64.efi</code>）。候補が無ければ、ディスクの FAT を探して決まった場所（<code>\EFI\BOOT\BOOTX64.EFI</code>）を起動する。中は FAT（ふつう FAT32）。GPT の種類 EF00（EFI System）は仕様が決めた ESP の印で、作るときには付けるが、この練習機のファームウェアは起動のときに種類を確かめなかった。<code>/etc/fstab</code> やマウント先（<code>/boot/efi</code>）は手がかりにならない。ファームウェアは Linux より先に動くので、それらを読めない。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>/var</code> を <code>/</code> と別のパーティションにすると、どんな事故を防げるか。</p>
 <details><summary>答え</summary>
@@ -254,11 +315,11 @@ Number  Start   End     Size   File system  Name                  Flags
 <div class="quiz"><b>確認</b>
 <p><code>efibootmgr</code> の出力の BootOrder と BootCurrent は何を表すか。</p>
 <details><summary>答え</summary>
-<p>BootOrder は、ファームウェアが起動の候補を試す順番。BootCurrent は、今回の起動で実際に使われた候補。どちらもディスクではなく NVRAM にある。練習機の最初の起動では、BootOrder の先頭は 0002 なのに BootCurrent は 0001 だった（起動の途中で 0002 が登録されたため）。</p></details></div>
+<p>BootOrder は、ファームウェアが起動の候補を試す順番で、NVRAM に書かれていて電源を切っても残る。BootCurrent は、今回の起動で実際に使われた候補で、起動のたびにファームウェアが設定する（残しておく値ではない）。どちらもディスクの上には無い。練習機の最初の起動では、BootOrder の先頭は 0002 なのに BootCurrent は 0001 だった（起動の途中で 0002 が登録されたため）。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>UEFI のファームウェアは NVRAM の候補（<code>efibootmgr</code>）を見て、GPT の表から種類が EFI System の区画（ESP）を探し、中の FAT を自分で読んでブートローダを起動する</li><li>候補は区画を「GPT の何番目・PARTUUID」で指す。<code>/dev/vda15</code> という名前も <code>/boot/efi</code> というマウント先も知らない</li><li><code>/boot/efi</code> のマウントを外しても起動する。マウントは、Linux がブートローダを<b>書き換える</b>ときのため</li><li><code>/</code>・<code>/boot</code>・<code>/var</code>・<code>/home</code>・スワップは「溢れたら困るもの」「残したいもの」で分ける</li><li>GPT は gdisk で切り、種類を4文字のコードで付ける（EF00・8200・8300）。表を作り直しても、中身は前のまま残る</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.0@sha256:a5ab400fa07c076927eadf21ef9bb42b3bf70a1c2abae93fab24a21f50ecf96b / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション、UEFI は OVMF）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・efibootmgr 18・gdisk 1.0.10・parted 3.6 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>UEFI のファームウェアは NVRAM の候補（<code>efibootmgr</code>）に書かれた PARTUUID とファイルのパスで、ESP の中の FAT を自分で読んでブートローダを起動する。候補が無ければ <code>\EFI\BOOT\BOOTX64.EFI</code> を探す</li><li>ESP の種類 EF00（EFI System）は仕様が決めた印で、作るときは付ける。ただしこの練習機のファームウェアは、起動のときに種類を確かめなかった（書き換えても起動した）</li><li>候補は区画を「GPT の何番目・PARTUUID」で指す。<code>/dev/vda15</code> という名前も <code>/boot/efi</code> というマウント先も知らない</li><li><code>/boot/efi</code> のマウントを外しても起動する。マウントは、Linux がブートローダを<b>書き換える</b>ときのため</li><li>分けるのは必須ではない（<code>/</code> 1つと、UEFI なら ESP でも動く）。<code>/</code>・<code>/boot</code>・<code>/var</code>・<code>/home</code>・スワップは「溢れたら困るもの」「残したいもの」で分け、被害と修復をその区画で止める</li><li>GPT は gdisk で切り、種類を4文字のコードで付ける（EF00・8200・8300）。表を作り直しても、中身は前のまま残る</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション、UEFI は OVMF）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・efibootmgr 18・gdisk 1.0.10・parted 3.6 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-disks/theory/03-partition">← 3. パーティションの表は、目次にすぎない</a><a href="/linuc-disks/theory/05-lvm">次: 5. LV を広げても、ファイルシステムは広がらない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

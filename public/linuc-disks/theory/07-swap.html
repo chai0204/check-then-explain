@@ -11,25 +11,25 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
 </div>
 <h1>7. tmpfs は、メモリを先に取らない</h1>
-<p class="lead">メモリが 1.4GiB しかない練習機に、<code>size=4G</code> の tmpfs をマウントできる。マウントしても <code>free</code> の数字は1つも変わらない。tmpfs の size は上限で、メモリは書いた分だけ使われる。スワップも同じで、<code>mkswap</code> しただけではスワップは1バイトも増えない。</p>
-<div class="badges"><span>前提: 第6章まで読了</span><span>前提: 演習04 の切り方になっている</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<p class="lead">メモリが 1.4GiB しかない練習機に、<code>size=4G</code> の tmpfs をマウントできる。マウントしても <code>free</code> の数字はほとんど動かない。tmpfs の size は上限で、メモリは書いた分だけ使われる。スワップも同じで、<code>mkswap</code> しただけではスワップは1バイトも増えない。</p>
+<div class="badges"><span>前提: 第6章まで読了</span><span>前提: 演習04 の切り方になっている</span><span>所要 17分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>mkswap</code>・<code>swapon</code>・<code>swapoff</code> の役割を言い分けられ、スワップをパーティションでもファイルでも作れる</li><li>起動時に使うスワップを <code>/etc/fstab</code> に書き、再起動せずに確かめられる</li><li>tmpfs がメモリの上のファイルシステムで、size が上限であることを説明できる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: スワップの使われやすさの調整（<code>vm.swappiness</code>）、zram・zswap、休止（ハイバネート）の設定は扱わない。スワップを「どれくらいの大きさにするか」の目安は、本文の表だけでよい。</div></div>
+<div class="skip"><b>ここで覚えなくていいこと</b>: スワップの使われやすさの調整（<code>vm.swappiness</code>）、zram・zswap、休止（ハイバネート）の設定は扱わない。スワップを「どれくらいの大きさにするか」は、本文の1行の目安だけでよい。</div></div>
 
 <h2 id="swap">スワップは、作る・使い始める・外すが別のコマンド</h2>
 <div class="sgoal"><b>この節で分かること</b>: スワップ領域を使えるようになるまでの3段階。</div>
-<p>スワップは、メモリが足りないときにしばらく使われていないページを書き出しておくディスクの領域である。第4章で見たとおり、練習機にはまだ無い。第4章で切った <code>vdb3</code>（種類 Linux swap）をスワップにする。</p>
+<p>スワップは、メモリが足りないときにしばらく使われていないページを書き出しておくディスクの領域である。大きさに決まりは無く、任意に決めてよい（昔の目安はメモリの1〜2倍。休止（ハイバネート）するなら、メモリの中身を全部書き出すのでメモリ以上が要る）。第4章で見たとおり、練習機にはまだ無い。第4章で切った <code>vdb3</code>（種類 Linux swap）をスワップにする。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ free -h
                total        used        free      shared  buff/cache   available
-Mem:           1.4Gi       254Mi       1.1Gi       804Ki       202Mi       1.1Gi
+Mem:           1.4Gi       250Mi       1.1Gi       804Ki       202Mi       1.1Gi
 Swap:             0B          0B          0B
 $ sudo mkswap -L SWAP /dev/vdb3
 Setting up swapspace version 1, size = 256 MiB (268431360 bytes)
-LABEL=SWAP, UUID=0c9279db-9da9-402f-afe7-2fcb3eeef276
+LABEL=SWAP, UUID=d6988a49-5d82-4426-978f-377b5dce03f2
 $ free -h
                total        used        free      shared  buff/cache   available
-Mem:           1.4Gi       256Mi       1.1Gi       804Ki       202Mi       1.1Gi
+Mem:           1.4Gi       254Mi       1.1Gi       804Ki       202Mi       1.1Gi
 Swap:             0B          0B          0B   ← mkswap しても 0B のまま</code></pre>
 <p><code>mkswap</code> はスワップ領域の<b>形</b>を作るだけで（ファイルシステムの mkfs に当たる）、使い始めるのは <code>swapon</code> である。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo swapon /dev/vdb3
@@ -44,17 +44,17 @@ Filename				Type		Size		Used		Priority
 /dev/vdb3                               partition	262140		0		-2
 $ free -h
                total        used        free      shared  buff/cache   available
-Mem:           1.4Gi       252Mi       1.1Gi       804Ki       202Mi       1.1Gi
+Mem:           1.4Gi       251Mi       1.1Gi       804Ki       202Mi       1.1Gi
 Swap:          255Mi          0B       255Mi</code></pre>
-<p>使われているスワップは <code>swapon --show</code>・<code>/proc/swaps</code>・<code>swapon -s</code>（<code>/proc/swaps</code> と同じ形）で見られる。PRIO は優先度で、何も指定しないと -2 のような負の数が順に付く。</p>
+<p>使われているスワップは <code>swapon --show</code>・<code>/proc/swaps</code>・<code>swapon -s</code>（<code>/proc/swaps</code> と同じ形）で見られる。PRIO は優先度で、指定しなければカーネルが負の数を付ける（あとから有効にしたものほど小さい）。<code>swapon</code> の man は既定を -1 と書いているが、この練習機では -2 になった。</p>
 <p>スワップはファイルでも作れる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo dd if=/dev/zero of=/swapfile bs=1M count=128 status=none
 $ ls -l /swapfile
--rw-r--r-- 1 root root 134217728 Oct 13 11:46 /swapfile
+-rw-r--r-- 1 root root 134217728 Oct 13 19:34 /swapfile
 $ sudo mkswap /swapfile
 mkswap: /swapfile: insecure permissions 0644, fix with: chmod 0600 /swapfile
 Setting up swapspace version 1, size = 128 MiB (134213632 bytes)
-no label, UUID=205fce88-8104-48d8-af8c-a43bd76ae187
+no label, UUID=f70849cc-bcc0-43e6-bc33-dd0418ef7f1e
 $ sudo chmod 600 /swapfile
 $ sudo swapon -p 10 /swapfile
 $ swapon --show
@@ -65,10 +65,10 @@ $ sudo swapoff /swapfile
 $ sudo rm /swapfile</code></pre>
 <p><code>mkswap</code> が <code>insecure permissions 0644</code> と注意した。スワップにはメモリの中身（パスワードを含むかもしれない）が書き出されるので、root 以外に読めてはいけない。<code>-p 10</code> で優先度を付けると、数の大きいほうから使われる。<code>swapoff</code> で外す。</p>
 <div class="analogy"><b>たとえ</b>: 書類を逃がす<b>段ボール箱が2つ</b>あるとき、手の届く近い箱（優先度の高いほう）から詰めていくのに近い。近い箱がいっぱいになってから、遠い箱を使う。
-<br>ただし<b>崩れる点</b>: 人なら同じ距離の箱が2つあればどちらか一方から詰めるが、カーネルは優先度が同じスワップには<b>交互に</b>書く（<code>swapon</code> の man に書かれている）。速さの同じディスクを同じ優先度にすると、両方へ分けて書ける。</div>
+<br>ただし<b>崩れる点</b>: 人なら同じ距離の箱が2つあればどちらか一方から詰めるが、カーネルは優先度が同じスワップには<b>交互に</b>書く（システムコールの swapon(2) の man に書かれている）。速さの同じディスクを同じ優先度にすると、両方へ分けて書ける。</div>
 <p>起動するたびに使うスワップは <code>/etc/fstab</code> に書く。マウントポイントの欄は <code>none</code>、種類は <code>swap</code>。デバイス名ではなく、<code>mkswap</code> が書き込んだ UUID で指す（理由は第8章）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb3)  none  swap  sw  0  0" | sudo tee -a /etc/fstab
-UUID=0c9279db-9da9-402f-afe7-2fcb3eeef276  none  swap  sw  0  0
+UUID=d6988a49-5d82-4426-978f-377b5dce03f2  none  swap  sw  0  0
 $ sudo systemctl daemon-reload
 $ sudo swapoff /dev/vdb3
 $ swapon --show
@@ -76,7 +76,7 @@ $ sudo swapon -a
 $ swapon --show
 NAME      TYPE      SIZE USED PRIO
 /dev/vdb3 partition 256M   0B   -2</code></pre>
-<p><code>/etc/fstab</code> を書き換えたら、起動時にそれを読む systemd に <code>daemon-reload</code> で読み直させる（理由は第8章）。<code>swapon -a</code> は「<code>/etc/fstab</code> のスワップを全部有効にする」で、起動のときにも同じことが起きる。外してから <code>-a</code> で戻ってくれば、書いた行が効いていると再起動せずに確かめられる（第8章の最後で再起動して確かめる）。</p>
+<p><code>daemon-reload</code> は、いま動いている systemd に <code>/etc/fstab</code> を読み直させる（次の起動では、書いただけで効く。理由は第8章）。<code>swapon -a</code> は「<code>/etc/fstab</code> のスワップを全部有効にする」で、起動のときにも同じことが起きる。外してから <code>-a</code> で戻ってくれば、書いた行が効いていると再起動せずに確かめられる（第8章の最後で再起動して確かめる）。</p>
 <div class="scroll"><table>
 <tr><th>コマンド</th><th>すること</th></tr>
 <tr><td><code>mkswap 区画かファイル</code></td><td>スワップの形を作る。UUID を表示する（<code>-L</code> でラベル）</td></tr>
@@ -102,7 +102,7 @@ TARGET           FSTYPE   SIZE
 └─/run/user/1000 tmpfs  142.5M
 $ free -m
                total        used        free      shared  buff/cache   available
-Mem:            1424         252        1118           0         202        1172
+Mem:            1424         251        1118           0         203        1173
 Swap:            255           0         255</code></pre>
 <p>メモリは全部で 1424MiB しかない。そこに 4GiB の tmpfs を作る。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
@@ -115,16 +115,16 @@ Filesystem      Size  Used Avail Use% Mounted on
 tmpfs           4.0G     0  4.0G   0% /mnt/ram
 $ free -m
                total        used        free      shared  buff/cache   available
-Mem:            1424         252        1118           0         202        1172
+Mem:            1424         252        1117           0         203        1172
 Swap:            255           0         255</code></pre>
-<div class="then"><b>だめな理由</b>: マウントでき、<code>df</code> には 4.0G と出て、<code>free</code> の数字は変わらない。
+<div class="then"><b>だめな理由</b>: マウントでき、<code>df</code> には 4.0G と出て、<code>free</code> の数字はほとんど動かない（used が 1MiB 動いただけで、4GiB とは桁が違う）。
 <b>tmpfs の size は上限</b>で、作った時点ではメモリを1バイトも取らない。書いた分だけ、その場でメモリ（ページキャッシュ）を使う。
 だから実際のメモリより大きな size も書けてしまう。</div></div>
 <p>300MiB 書いてみる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo dd if=/dev/zero of=/mnt/ram/fill bs=1M count=300 status=none
 $ free -m
                total        used        free      shared  buff/cache   available
-Mem:            1424         552         817         300         503         872   ← shared が 300 増え、available が減った
+Mem:            1424         554         815         300         504         870   ← shared が 300 増え、available が減った
 Swap:            255           0         255
 $ df -h /mnt/ram
 Filesystem      Size  Used Avail Use% Mounted on
@@ -132,7 +132,7 @@ tmpfs           4.0G  300M  3.8G   8% /mnt/ram
 $ sudo umount /mnt/ram
 $ free -m
                total        used        free      shared  buff/cache   available
-Mem:            1424         254        1116           0         203        1170
+Mem:            1424         252        1117           0         203        1172
 Swap:            255           0         255</code></pre>
 <p>書いた 300MiB は <code>free</code> の shared（tmpfs などの共有メモリ）に出て、available（使える量）がそのぶん減った。外すと、中身ごと消えてメモリが戻る。<b>tmpfs の中身は、外すか再起動すると消える</b>。メモリが足りなくなれば、tmpfs の中身もスワップに追い出される。</p>
 <div class="scroll"><table>
@@ -153,15 +153,15 @@ Swap:            255           0         255</code></pre>
 <div class="quiz"><b>確認</b>
 <p>スワップが2つあり、<code>swapon --show</code> の PRIO が 10 と -2 だった。どちらから使われるか。</p>
 <details><summary>答え</summary>
-<p>数の大きい 10 のほうから使われる。優先度は <code>swapon -p</code> か、<code>/etc/fstab</code> のオプション <code>pri=10</code> で付ける。付けなければ、有効にした順に -2・-3… と負の数が付く。</p></details></div>
+<p>数の大きい 10 のほうから使われる。優先度は <code>swapon -p</code> か、<code>/etc/fstab</code> のオプション <code>pri=10</code> で付ける。付けなければカーネルが負の数を付け、あとから有効にしたものほど小さくなる（この練習機では -2 から）。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>メモリが 2GiB のマシンで <code>mount -t tmpfs -o size=8G tmpfs /mnt/t</code> を実行した。マウントできるか。マウントした直後のメモリの使用量はどうなるか。</p>
 <details><summary>答え</summary>
-<p>マウントできる。size は上限なので、直後のメモリの使用量は変わらない。書き込んだ分だけメモリを使い、外すか再起動すると中身は消える。</p></details></div>
+<p>マウントできる。size は上限なので、直後のメモリの使用量はほとんど変わらない。書き込んだ分だけメモリを使い、外すか再起動すると中身は消える。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>スワップは <code>mkswap</code>（形を作る）→ <code>swapon</code>（使い始める）→ <code>swapoff</code>（やめる）。<code>mkswap</code> だけでは使われない</li><li>使っているスワップは <code>swapon --show</code>・<code>swapon -s</code>・<code>/proc/swaps</code>・<code>free</code> で見る。優先度は数の大きいほうから</li><li>スワップはファイルでも作れる。権限は 600 にする（<code>mkswap</code> が注意する）</li><li>起動時に使うものは <code>/etc/fstab</code> に <code>UUID=…  none  swap  sw  0  0</code>。<code>swapon -a</code> で再起動せずに確かめられる</li><li>tmpfs はメモリの上のファイルシステム。size は上限で、書いた分だけメモリを使い、外すか再起動すると消える</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.0@sha256:a5ab400fa07c076927eadf21ef9bb42b3bf70a1c2abae93fab24a21f50ecf96b / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic（メモリ 1536MiB）・util-linux 2.39.3 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>スワップは <code>mkswap</code>（形を作る）→ <code>swapon</code>（使い始める）→ <code>swapoff</code>（やめる）。<code>mkswap</code> だけでは使われない</li><li>使っているスワップは <code>swapon --show</code>・<code>swapon -s</code>・<code>/proc/swaps</code>・<code>free</code> で見る。優先度は数の大きいほうから。大きさは任意（休止するならメモリ以上）</li><li>スワップはファイルでも作れる。権限は 600 にする（<code>mkswap</code> が注意する）</li><li>起動時に使うものは <code>/etc/fstab</code> に <code>UUID=…  none  swap  sw  0  0</code>。<code>swapon -a</code> で再起動せずに確かめられる</li><li>tmpfs はメモリの上のファイルシステム。size は上限で、書いた分だけメモリを使い、外すか再起動すると消える</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic（メモリ 1536MiB）・util-linux 2.39.3 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-disks/theory/06-mkfs">← 6. ファイルシステムは、作った大きさより小さく見える</a><a href="/linuc-disks/theory/08-mount">次: 8. マウントは、名前ではなく中身の印で指す →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

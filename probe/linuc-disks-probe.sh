@@ -7,7 +7,7 @@
 #
 # 走らせ方（読者の起動コマンドと同じオプション。名前とボリューム名だけ probe 用。KVM なし）:
 #   docker run -d --name linuc-disks-probe --hostname host --stop-timeout 30 \
-#     -v linuc-disks-probe-vm:/home/lab/vm -v linuc-disks-probe-state:/home/lab/.lab lab-linuc-disks:1.0.0
+#     -v linuc-disks-probe-vm:/home/lab/vm -v linuc-disks-probe-state:/home/lab/.lab lab-linuc-disks:1.0.1
 #   docker exec linuc-disks-probe vm start            # 起動と初回の準備（provision.sh）を待つ
 #   docker cp probe/linuc-disks-probe.sh linuc-disks-probe:/tmp/probe.sh
 #   docker exec -u lab -w /home/lab linuc-disks-probe bash -l /tmp/probe.sh > logs/linuc-disks-probe.log 2>&1
@@ -52,6 +52,14 @@ T() {
   ssh -q linuc "( $feed ) | TERM=xterm script -qfec $(printf %q "stty cols 200 rows 50; $cmd") /dev/null" 2>&1 \
     | tr -d '\r' | sed -E "$CLEAN"
   LAST=${PIPESTATUS[0]}
+}
+# GS … 練習機の中で、続けて打つ複数のコマンドを「1つのシェル」で流す。cd などのシェルの状態が次の行へ持ち越される
+#        （G は1行ごとに別の ssh なので持ち越されない。読者は1つのシェルで打ち続けるので、状態に依存する並びは GS で取る）
+GS() {
+  local s='R(){ printf "\n\$ %s\n" "$1"; eval "$1"; }' c
+  for c in "$@"; do s+="; R $(printf %q "$c")"; done
+  ssh -q -tt linuc "stty cols 80 rows 24; export TERM=xterm; bash -lic $(printf %q "$s")" < /dev/null 2>&1 \
+    | tr -d '\r' | sed -E "$CLEAN"
 }
 W() { sleep "$1"; }
 
@@ -113,6 +121,7 @@ S "第2章 ドライバは、外しても戻ってくる（1.05.1）"
 G 'lsmod | head -5'
 G 'lsmod | wc -l'
 G 'grep -E "/(vfat|ext4|sr_mod)\.ko" /lib/modules/$(uname -r)/modules.builtin'
+G 'cat /proc/sys/kernel/modprobe'
 G 'lspci -k -s 00:1f.2'
 G 'lsmod | grep ahci'
 G 'sudo modprobe -r ahci'
@@ -162,7 +171,7 @@ G 'modinfo usb_storage | grep -m3 alias'
 G 'grep -n "kmod load" /usr/lib/udev/rules.d/80-drivers.rules | head -1'
 G 'ls /etc/modprobe.d/'
 G 'cat /etc/modules'
-# 止める（1回目）: blacklist を書いただけ
+# 止める（1回目）: blacklist usb_storage を新しいファイルに書く（新しいファイルには udev が自分で気づく）
 G 'echo "blacklist usb_storage" | sudo tee /etc/modprobe.d/lab-usb.conf'
 G 'sudo modprobe -r uas'
 H 'virsh detach-device linuc ~/vm/extra/usb-a.xml'
@@ -170,17 +179,16 @@ W 4
 H 'virsh attach-device linuc ~/vm/extra/usb-a.xml'
 W 10
 G 'lsmod | grep -E "usb_storage|uas"'
-# 止める（2回目）: udev に設定を読み直させる
-G 'sudo systemctl restart systemd-udevd'
+G 'modprobe --show-depends uas'
+# 止める（2回目）: 同じファイルを書き換えて uas も足す（書き換えには udev が気づかない）
+G 'printf "blacklist usb_storage\nblacklist uas\n" | sudo tee /etc/modprobe.d/lab-usb.conf'
 G 'sudo modprobe -r uas'
 H 'virsh detach-device linuc ~/vm/extra/usb-a.xml'
 W 4
 H 'virsh attach-device linuc ~/vm/extra/usb-a.xml'
 W 10
 G 'lsmod | grep -E "usb_storage|uas"'
-G 'modprobe --show-depends uas'
-# 止める（3回目）: install で読み込みそのものを失敗させる
-G 'echo "install usb_storage /bin/false" | sudo tee /etc/modprobe.d/lab-usb.conf'
+# 止める（3回目）: udev に読み直させる
 G 'sudo systemctl restart systemd-udevd'
 G 'sudo modprobe -r uas'
 H 'virsh detach-device linuc ~/vm/extra/usb-a.xml'
@@ -190,7 +198,15 @@ W 10
 G 'lsmod | grep -E "usb_storage|uas"'
 G 'lsusb -t'
 G 'lsblk -d -o NAME,TRAN,SIZE,SERIAL'
+# blacklist は手の modprobe を止めない。install は modprobe を止めるが insmod は止めない
 G 'sudo modprobe usb_storage'
+G 'lsmod | grep -E "usb_storage|uas"'
+G 'sudo modprobe -r usb_storage'
+G 'echo "install usb_storage /bin/false" | sudo tee /etc/modprobe.d/lab-usb-install.conf'
+G 'sudo modprobe usb_storage'
+G 'sudo insmod /lib/modules/$(uname -r)/kernel/drivers/usb/storage/usb-storage.ko.zst'
+G 'lsmod | grep -E "usb_storage|uas"'
+G 'sudo rmmod usb_storage'
 H 'virsh detach-device linuc ~/vm/extra/usb-a.xml'
 W 4
 G 'busctl list --no-pager | grep -E "^org\.freedesktop\.(systemd1|login1|hostname1|timedate1|network1)"'
@@ -217,6 +233,9 @@ G 'sudo gdisk -l /dev/vdb'
 G 'sudo parted /dev/vdb print'
 G 'sudo parted /dev/vdb rm 6'
 G 'sudo parted /dev/vdb print'
+G 'sudo parted /dev/vdb mkpart logical 403MiB 503MiB'
+G 'sudo parted /dev/vdb print'
+G 'sudo parted -l'
 G 'sudo fdisk -l /dev/vdd'
 
 S "第4章 起動の入口は、マウントしなくても見つかる（1.05.2）"
@@ -245,6 +264,16 @@ G 'sudo cp /etc/fstab.bak /etc/fstab'
 G 'sudo systemctl daemon-reload'
 G 'sudo mount /boot/efi'
 G 'findmnt -o TARGET,SOURCE,FSTYPE /boot/efi'
+G 'sudo sgdisk -i 15 /dev/vda'
+G 'sudo sgdisk -t 15:8300 /dev/vda'
+G 'lsblk -o NAME,PARTTYPENAME /dev/vda'
+G 'sudo reboot'
+W 20
+H 'vm start'
+G 'sudo efibootmgr | head -3'
+G 'lsblk -o NAME,PARTTYPENAME,MOUNTPOINTS /dev/vda'
+G 'sudo sgdisk -t 15:ef00 /dev/vda'
+G 'lsblk -o NAME,PARTTYPENAME /dev/vda'
 T 'sudo gdisk /dev/vdb' o Y n '' '' +100M ef00 n '' '' +300M 8300 n '' '' +256M 8200 n '' '' +600M 8300 n '' '' +400M 8300 n '' '' '' '' p w Y
 G 'lsblk -o NAME,SIZE,FSTYPE,PARTTYPENAME /dev/vdb'
 G 'sudo parted /dev/vdb print'
@@ -313,10 +342,19 @@ G 'sudo mount /dev/vdb6 /mnt'
 G 'df -h /mnt'
 G 'df -m /mnt'
 G 'sudo tune2fs -l /dev/vdb6 | grep -E "^(Block count|Reserved block count|Block size|Reserved blocks uid)"'
+G 'cat /sys/fs/ext4/vdb6/reserved_clusters'
+G 'sudo tune2fs -m 0 /dev/vdb6'
+G 'df -m /mnt'
 G 'sudo tune2fs -m 1 /dev/vdb6'
 G 'df -m /mnt'
+G 'df -i /mnt'
+G 'sudo du -sh /mnt'
 G 'sudo umount /mnt'
 G 'for p in 1 2 4 5 6; do sudo mount /dev/vdb$p /mnt && df -h --output=source,fstype,size,used,avail /mnt | tail -1; sudo umount /mnt; done'
+G 'sudo mount /dev/vdb4 /mnt'
+G 'sudo xfs_io -x -c resblks /mnt'
+G 'df -i /mnt'
+G 'sudo umount /mnt'
 G 'sudo dumpe2fs -h /dev/vdb2 2>/dev/null | grep -i features'
 G 'sudo dumpe2fs -h /dev/vdb6 2>/dev/null | grep -i features'
 T 'sudo fsck /dev/vdb6'
@@ -368,13 +406,11 @@ G 'ls /mnt/newroot'
 G 'sudo mount /dev/vdb4 /mnt/newroot'
 G 'ls -a /mnt/newroot'
 G 'findmnt -o TARGET,SOURCE,FSTYPE /mnt/newroot'
-G 'cd /mnt/newroot && sudo umount /mnt/newroot'
-G 'sudo umount /mnt/newroot'
+GS 'cd /mnt/newroot' 'sudo umount /mnt/newroot' 'cd' 'sudo umount /mnt/newroot'
 G 'ls /mnt/newroot'
 G 'sudo rm /mnt/newroot/HIDDEN'
 # 第2章で止めた USB メモリのドライバを戻す
-G 'sudo rm /etc/modprobe.d/lab-usb.conf'
-G 'sudo systemctl restart systemd-udevd'
+G 'sudo rm /etc/modprobe.d/lab-usb.conf /etc/modprobe.d/lab-usb-install.conf'
 H 'virsh attach-device linuc ~/vm/extra/usb-a.xml'
 W 10
 G 'lsblk -d -o NAME,TRAN,SIZE,SERIAL /dev/sdb'
@@ -397,6 +433,7 @@ G 'cat /media/stick/who.txt'
 G 'findmnt -o TARGET,SOURCE,FSTYPE /media/stick'
 G 'sudo umount /media/stick'
 G 'sudo blkid /dev/sdb /dev/sdc'
+G 'sudo findfs LABEL=STICK_A'
 G 'ls -l /dev/disk/by-label/'
 G 'sudo mount LABEL=STICK_A /media/stick'
 G 'cat /media/stick/who.txt'
@@ -428,6 +465,18 @@ G 'mount | grep /media/cdrom'
 G 'lsmod | grep isofs'
 G 'ls -l /media/cdrom'
 G 'umount /media/cdrom'
+# ISO のファイルを、ファイルのままマウントする（-o loop。最近の mount はファイルを渡すと自分で loop を使う）
+G 'sudo dd if=/dev/sr0 of=media.iso'
+G 'sudo mount -o loop media.iso /mnt'
+G 'findmnt -o TARGET,SOURCE,FSTYPE /mnt'
+G 'losetup -l'
+G 'ls /mnt'
+G 'sudo umount /mnt'
+G 'sudo mount media.iso /mnt'
+G 'findmnt -o TARGET,SOURCE,FSTYPE /mnt'
+G 'sudo umount /mnt'
+G 'losetup -l'
+G 'sudo rm media.iso'
 G 'echo "LABEL=STICK_A  /media/stick  vfat  user,noauto  0  0" | sudo tee -a /etc/fstab'
 G 'sudo systemctl daemon-reload'
 G 'mount /media/stick'

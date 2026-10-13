@@ -12,10 +12,10 @@
 </div>
 <h1>8. マウントは、名前ではなく中身の印で指す</h1>
 <p class="lead">USB メモリ A を <code>/dev/sdb</code> としてフォーマットした。抜いて B を挿し、A を挿し直すと、<code>/dev/sdb</code> は B になっていた。<code>/dev/sdb</code> は「何番目に見つかったか」で付く名前で、ディスクの持ち物ではない。持ち物は中身に書いた UUID とラベルだけである。そしてそのラベルが、練習機自身の <code>/boot</code> を危うくしていた。</p>
-<div class="badges"><span>前提: 第7章まで読了</span><span>前提: 練習機が起動している</span><span>所要 28分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="badges"><span>前提: 第7章まで読了</span><span>前提: 練習機が起動している</span><span>所要 30分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>mount</code>・<code>umount</code> とマウントポイントの関係を説明でき、<code>umount</code> が断る理由を言える</li><li><code>/etc/fstab</code> の6列を書け、UUID とラベルで指せる。<code>nofail</code>・<code>noauto</code>・<code>user</code> の意味を言える</li><li>一般ユーザが取り外せるメディアを <code>/media</code> の下にマウントできるように設定できる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: systemd の <code>.mount</code> ユニットの書き方、autofs、NFS などネットワーク越しのファイルシステム、マウントの名前空間は扱わない。<code>/etc/fstab</code> を書いたあと systemd に読み直させる1行（<code>daemon-reload</code>）だけ覚えればよい。</div></div>
+<div class="skip"><b>ここで覚えなくていいこと</b>: systemd の <code>.mount</code> ユニットの書き方、autofs、NFS などネットワーク越しのファイルシステム、マウントの名前空間は扱わない。<code>/etc/fstab</code> を書いたあと、いま動いている systemd に読み直させる1行（<code>daemon-reload</code>）だけ覚えればよい。</div></div>
 
 <h2 id="mountpoint">マウントポイントは、ただのディレクトリ</h2>
 <div class="sgoal"><b>この節で分かること</b>: マウントの前後で、ディレクトリに何が起きるか。</div>
@@ -34,21 +34,22 @@ $ findmnt -o TARGET,SOURCE,FSTYPE /mnt/newroot
 TARGET       SOURCE    FSTYPE
 /mnt/newroot /dev/vdb4 xfs</code></pre>
 <p>マウントポイントは、前もって作っておくただのディレクトリである。マウントすると、そのディレクトリにもともとあった <code>HIDDEN</code> は見えなくなった。消えたのではなく、上にかぶさっただけである。</p>
-<pre data-where="練習機の中（student@linuc）"><code>$ cd /mnt/newroot &amp;&amp; sudo umount /mnt/newroot
+<pre data-where="練習機の中（student@linuc）"><code>$ cd /mnt/newroot
+$ sudo umount /mnt/newroot
 umount: /mnt/newroot: target is busy.
+$ cd
 $ sudo umount /mnt/newroot
 $ ls /mnt/newroot
 HIDDEN
 $ sudo rm /mnt/newroot/HIDDEN</code></pre>
-<p>中で作業しているプロセス（カレントディレクトリがその中にあるシェルも含む）があると、<code>umount</code> は <code>target is busy</code> で断る。外すと <code>HIDDEN</code> がまた見えた。</p>
+<p>中で作業しているプロセス（カレントディレクトリがその中にあるシェルも含む）があると、<code>umount</code> は <code>target is busy</code> で断る。ここでは自分のシェルが中にいたので、<code>cd</code>（引数なしでホームへ戻る）で外に出てから外した。外すと <code>HIDDEN</code> がまた見えた。</p>
 <div class="analogy"><b>たとえ</b>: 壁の<b>釘に掛ける額縁</b>に近い。額縁（ファイルシステム）を掛けると、後ろの壁（もとのディレクトリの中身）は見えなくなるが、壁が消えたわけではない。
 <br>ただし<b>崩れる点</b>: 額縁は誰かが見ていても外せるが、マウントは誰かが中にいると外せない。</div>
 
 <h2 id="naive">/dev/sdb は、いつも同じ USB メモリ？</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>/dev/sdb</code> のような名前が、何で決まっているか。</div>
-<p>USB メモリを2本使う。第2章の最後で <code>usb_storage</code> を止めた人は、先に戻す（止めていなければ <code>rm</code> は失敗するだけで害は無い）。</p>
-<pre data-where="練習機の中（student@linuc）"><code>$ sudo rm /etc/modprobe.d/lab-usb.conf
-$ sudo systemctl restart systemd-udevd</code></pre>
+<p>USB メモリを2本使う。第2章で <code>/etc/modprobe.d/</code> に置いた2つのファイルを消して、<code>usb_storage</code> が読み込まれるように戻す。ファイルを消したことには udev が自分で気づくので、再起動は要らない（第2章。置いていない人の <code>rm</code> は失敗するだけで害は無い）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo rm /etc/modprobe.d/lab-usb.conf /etc/modprobe.d/lab-usb-install.conf</code></pre>
 <p>A を挿して FAT にし、目印のファイルを書く。</p>
 <pre data-where="外（lab@host）"><code>$ virsh attach-device linuc ~/vm/extra/usb-a.xml
 Device attached successfully</code></pre>
@@ -97,33 +98,35 @@ A を抜いたあいだに B が <code>sdb</code> を取り、あとから来た
 <code>/etc/fstab</code> に <code>/dev/sdb</code> と書いておくと、挿す順番しだいで別のディスクがマウントされる。</div></div>
 <p>ディスクの持ち物は、中に書いた印だけである。<code>blkid</code> で読み、udev がそこから作った別名で確かめる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo blkid /dev/sdb /dev/sdc
-/dev/sdb: LABEL="STICK_B" UUID="8aed2560-5886-49a8-99cd-70276d07e13e" BLOCK_SIZE="4096" TYPE="ext4"
-/dev/sdc: SEC_TYPE="msdos" LABEL_FATBOOT="STICK_A" LABEL="STICK_A" UUID="BC85-F592" BLOCK_SIZE="512" TYPE="vfat"
+/dev/sdb: LABEL="STICK_B" UUID="57709cda-d84d-4899-9a7a-680061bd0758" BLOCK_SIZE="4096" TYPE="ext4"
+/dev/sdc: SEC_TYPE="msdos" LABEL_FATBOOT="STICK_A" LABEL="STICK_A" UUID="9636-FC6C" BLOCK_SIZE="512" TYPE="vfat"
+$ sudo findfs LABEL=STICK_A
+/dev/sdc
 $ ls -l /dev/disk/by-label/
 total 0
-lrwxrwxrwx 1 root root 10 Oct 13 11:45 BOOT -&gt; ../../vdb2   ← BOOT は vdb2 を指している（次の節で見る）
-lrwxrwxrwx 1 root root 10 Oct 13 11:45 ESP -&gt; ../../vdb1
-lrwxrwxrwx 1 root root 10 Oct 13 11:45 HOME -&gt; ../../vdb6
-lrwxrwxrwx 1 root root 10 Oct 13 11:42 KEEP -&gt; ../../vdd2
-lrwxrwxrwx 1 root root  9 Oct 13 11:42 LINUC_MEDIA -&gt; ../../sr0
-lrwxrwxrwx 1 root root 10 Oct 13 11:45 ROOT -&gt; ../../vdb4
-lrwxrwxrwx 1 root root  9 Oct 13 11:48 STICK_A -&gt; ../../sdc
-lrwxrwxrwx 1 root root  9 Oct 13 11:48 STICK_B -&gt; ../../sdb
-lrwxrwxrwx 1 root root 10 Oct 13 11:46 SWAP -&gt; ../../vdb3
-lrwxrwxrwx 1 root root 11 Oct 13 11:42 UEFI -&gt; ../../vda15
-lrwxrwxrwx 1 root root 10 Oct 13 11:45 VAR -&gt; ../../vdb5
-lrwxrwxrwx 1 root root 10 Oct 13 11:42 cloudimg-rootfs -&gt; ../../vda1
+lrwxrwxrwx 1 root root 10 Oct 13 19:33 BOOT -&gt; ../../vdb2   ← BOOT は vdb2 を指している（次の節で見る）
+lrwxrwxrwx 1 root root 10 Oct 13 19:33 ESP -&gt; ../../vdb1
+lrwxrwxrwx 1 root root 10 Oct 13 19:33 HOME -&gt; ../../vdb6
+lrwxrwxrwx 1 root root 10 Oct 13 19:30 KEEP -&gt; ../../vdd2
+lrwxrwxrwx 1 root root  9 Oct 13 19:30 LINUC_MEDIA -&gt; ../../sr0
+lrwxrwxrwx 1 root root 10 Oct 13 19:33 ROOT -&gt; ../../vdb4
+lrwxrwxrwx 1 root root  9 Oct 13 19:35 STICK_A -&gt; ../../sdc
+lrwxrwxrwx 1 root root  9 Oct 13 19:35 STICK_B -&gt; ../../sdb
+lrwxrwxrwx 1 root root 10 Oct 13 19:33 SWAP -&gt; ../../vdb3
+lrwxrwxrwx 1 root root 11 Oct 13 19:30 UEFI -&gt; ../../vda15
+lrwxrwxrwx 1 root root 10 Oct 13 19:33 VAR -&gt; ../../vdb5
+lrwxrwxrwx 1 root root 10 Oct 13 19:30 cloudimg-rootfs -&gt; ../../vda1
 $ sudo mount LABEL=STICK_A /media/stick
 $ cat /media/stick/who.txt
 これは A
 $ sudo umount /media/stick</code></pre>
-<p><code>LABEL=STICK_A</code> と書けば、何番目に挿しても A を指せる。UUID（VFAT では短い番号）も同じように使える。</p>
+<p><code>findfs</code> は、ラベルや UUID から「いまどの装置か」を引く（<code>findfs UUID=…</code> も使える）。<code>LABEL=STICK_A</code> と書けば、何番目に挿しても A を指せる。UUID（VFAT では作った時刻から作る短い番号）も同じように使える。</p>
 <div class="analogy"><b>たとえ</b>: 駐車場の<b>何番目に停めたか</b>と、車の<b>ナンバープレート</b>に近い。「3番目の車」は来た順で変わるが、ナンバーは車に付いている。
 <br>ただし<b>崩れる点</b>: ナンバーは役所が重ならないように配るが、ラベルは人が付ける名前なので<b>重なりうる</b>。次の節で、この練習機に実際に重なったラベルがあった。</div>
 
 <h2 id="label">ラベルは重なる。UUID は重ならない（ふつうは）</h2>
 <div class="sgoal"><b>この節で分かること</b>: ラベルで指すときの落とし穴と、ラベルの付け替え方。</div>
-<p>さっきの <code>/dev/disk/by-label/</code> に <code>BOOT -&gt; ../../vdb2</code> とあった。第6章で、新しいサーバの <code>/boot</code> のつもりで <code>vdb2</code> に BOOT と付けたものである。ところが練習機自身の <code>/etc/fstab</code> も、<code>/boot</code> を <code>LABEL=BOOT</code> で探している（第4章）。<code>/etc/fstab</code> を検査する <code>findmnt --verify</code> を打つ。</p>
+<p>さっきの <code>/dev/disk/by-label/</code> に <code>BOOT -&gt; ../../vdb2</code> とあった。第6章で、新しいサーバの <code>/boot</code> のつもりで <code>vdb2</code> に BOOT と付けたものである。ところが練習機自身の <code>/etc/fstab</code> も、<code>/boot</code> を <code>LABEL=BOOT</code> で探している（第4章）。<code>/etc/fstab</code> を検査する <code>findmnt --verify</code> を打ち、ラベルの持ち主を <code>blkid</code> で探す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo findmnt --verify
 /boot
    [W] ext4 does not match with on-disk ext3
@@ -131,10 +134,10 @@ $ sudo umount /media/stick</code></pre>
 0 parse errors, 0 errors, 1 warning
 $ sudo blkid -t LABEL=BOOT
 /dev/vda16: LABEL="BOOT" UUID="a5eecc38-8587-4601-9295-c92dabc20612" BLOCK_SIZE="4096" TYPE="ext4" PARTUUID="ce13a6f1-b3f2-4c7a-b3db-6d75505ad739"
-/dev/vdb2: LABEL="BOOT" UUID="74c6caf1-aba6-4c82-8dbd-44a78984fc01" SEC_TYPE="ext2" BLOCK_SIZE="4096" TYPE="ext3" PARTLABEL="Linux filesystem" PARTUUID="5deb915b-df21-474b-8c75-62ec2696b68a"
+/dev/vdb2: LABEL="BOOT" UUID="22d4f1ec-1bd3-4377-90e8-ffb5f3da688b" SEC_TYPE="ext2" BLOCK_SIZE="4096" TYPE="ext3" PARTLABEL="Linux filesystem" PARTUUID="8992bca9-9950-4342-bea4-d4f42e92998f"
 $ sudo blkid -L BOOT
 /dev/vdb2</code></pre>
-<p>BOOT というラベルが2つあり、<code>LABEL=BOOT</code> は新しい <code>vdb2</code>（ext3）のほうを指していた。いまの <code>/boot</code> は起動のときにマウントしたものなので無事だが、<b>次に再起動したら、練習機の <code>/boot</code> に空の ext3 がマウントされたかもしれない</b>。著者は第8章を書くまで気づかなかった。ラベルを付け替える。ext 系は <code>e2label</code>（<code>tune2fs -L</code> でも同じ）、XFS は <code>xfs_admin -L</code>（<code>-l</code> で読む）である。</p>
+<p><code>findmnt --verify</code> が注意したのは「<code>/boot</code> の行は ext4 と書いてあるのに、指した先のディスクの上は ext3」という<b>種類の食い違い</b>で、ラベルが重なっていることそのものは言っていない（たまたま種類が違ったので気づけた）。重なりを確かめるのは <code>blkid -t LABEL=…</code> か <code>/dev/disk/by-label/</code> である。BOOT というラベルが2つあり、<code>LABEL=BOOT</code> は新しい <code>vdb2</code>（ext3）のほうを指していた。いまの <code>/boot</code> は起動のときにマウントしたものなので無事だが、<b>次に再起動したら、練習機の <code>/boot</code> に空の ext3 がマウントされたかもしれない</b>。著者は第8章を書くまで気づかなかった。ラベルを付け替える。ext 系は <code>e2label</code>（<code>tune2fs -L</code> でも同じ）、XFS は <code>xfs_admin -L</code>（<code>-l</code> で読む）である。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo e2label /dev/vdb2 NEWBOOT
 $ sudo e2label /dev/vdb2
 NEWBOOT
@@ -149,7 +152,7 @@ Success, no errors or warnings detected</code></pre>
 <tr><td>UUID</td><td><code>UUID=…</code></td><td>mkfs し直したとき。ディスクを丸ごと複製すると重なる</td><td>mkfs のたびに違う値</td></tr>
 </table></div>
 <div class="analogy"><b>たとえ</b>: <b>手書きの名札</b>と<b>マイナンバー</b>に近い。名札は読みやすく付け替えも簡単だが、同じ名前の人がいれば取り違える。番号は覚えにくいが重ならない。
-<br>ただし<b>崩れる点</b>: マイナンバーは役所が重ならないように管理するが、UUID は mkfs が乱数で決めるだけである。ディスクを <code>dd</code> で丸ごと写すと、同じ UUID が2つになる。そのときは <code>tune2fs -U</code> などで振り直す。</div>
+<br>ただし<b>崩れる点</b>: マイナンバーは役所が重ならないように管理するが、UUID は mkfs が乱数（VFAT では作った時刻）で決めるだけである。ディスクを <code>dd</code> で丸ごと写すと、同じ UUID が2つになる。そのときは <code>tune2fs -U</code> などで振り直す。</div>
 
 <h2 id="fstab">/etc/fstab の6列</h2>
 <div class="sgoal"><b>この節で分かること</b>: 起動時のマウントの書き方と、書いたあとの確かめ方。</div>
@@ -157,15 +160,15 @@ Success, no errors or warnings detected</code></pre>
 LABEL=cloudimg-rootfs	/	 ext4	discard,commit=30,errors=remount-ro	0 1
 LABEL=BOOT	/boot	ext4	defaults	0 2
 LABEL=UEFI	/boot/efi	vfat	umask=0077	0 1
-UUID=0c9279db-9da9-402f-afe7-2fcb3eeef276  none  swap  sw  0  0</code></pre>
+UUID=d6988a49-5d82-4426-978f-377b5dce03f2  none  swap  sw  0  0</code></pre>
 <pre><code>LABEL=BOOT    /boot   ext4   defaults   0   2
 ──────────    ─────   ────   ────────   ─   ─
-何を           どこに  種類   オプション  │   └ 起動時に fsck する順番（/ は 1、ほかは 2、調べないなら 0）
+何を           どこに  種類   オプション  │   └ 起動時に fsck する順番（勧めは / が 1、ほかは 2。調べないなら 0）
 （デバイス・                              └ dump でバックアップするか（0 = しない）
  UUID=・LABEL=）</code></pre>
-<p>第7章のスワップの行も入っている。<code>vdb6</code>（HOME）を <code>/srv/home</code> に、UUID で書き足す。<code>nofail</code> は「見つからなくても起動を止めない」。付けないと、ディスクが無いときに起動が止まる。</p>
+<p>fsck の順番は、fstab(5) が「/ は 1、ほかは 2」を勧めているが、決まりではない。練習機の <code>/boot/efi</code> の行は <code>0 1</code> になっていて、これは Ubuntu の雛形がこう書いているものである。第7章のスワップの行も入っている。<code>vdb6</code>（HOME）を <code>/srv/home</code> に、UUID で書き足す。<code>nofail</code> は「見つからなくても起動を止めない」。付けないと、ディスクが無いときに起動が止まる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb6)  /srv/home  ext4  defaults,nofail  0  2" | sudo tee -a /etc/fstab
-UUID=6eb166fa-bfb8-44d5-aac4-8712be4be5df  /srv/home  ext4  defaults,nofail  0  2
+UUID=76a62184-3385-4cff-ad77-c76946332553  /srv/home  ext4  defaults,nofail  0  2
 $ sudo mkdir -p /srv/home
 $ sudo mount -a
 mount: (hint) your fstab has been modified, but systemd still uses
@@ -175,7 +178,7 @@ TARGET    SOURCE    FSTYPE
 /srv/home /dev/vdb6 ext4
 $ sudo systemctl daemon-reload</code></pre>
 <p><code>mount -a</code> は「<code>/etc/fstab</code> のうち、まだマウントされていない行を全部マウントする」（<code>noauto</code> の行は除く）で、起動のときにも同じことが起きる。<b>書いたら再起動の前に <code>mount -a</code> と <code>findmnt --verify</code> で確かめる</b>。</p>
-<p>そして <code>mount</code> が <code>(hint)</code> を出した。「<code>/etc/fstab</code> は書き換えられたが、systemd はまだ古い版を使っている」。起動時のマウントは、<code>/etc/fstab</code> そのものではなく、systemd がそこから作ったマウントの設定（ユニット）で行われる。その作り直しが <code>systemctl daemon-reload</code> である。<code>mount</code> コマンド自身は毎回 <code>/etc/fstab</code> を読むので、いまのマウントには困らない。困るのは次の起動である。</p>
+<p>そして <code>mount</code> が <code>(hint)</code> を出した。「<code>/etc/fstab</code> は書き換えられたが、systemd はまだ古い版を使っている」。起動時のマウントは、<code>/etc/fstab</code> そのものではなく、systemd がそこから作ったマウントの設定（ユニット）で行われる。systemd は<b>起動のたびに</b> <code>/etc/fstab</code> からこの設定を作り直すので、次の起動には書いただけで効く。困るのは、いま動いている systemd が古い表のままでいることで、systemd を通した操作（<code>systemctl</code> でのマウントなど）が書き換える前の表で動く。いま動いている systemd に作り直させるのが <code>systemctl daemon-reload</code> である。<code>mount</code> コマンド自身は毎回 <code>/etc/fstab</code> を読むので、いまのマウントには困らない。</p>
 <p>マウントしたまま、オプションを変えることもできる（<code>remount</code>）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mount -o remount,ro /srv/home
 $ sudo touch /srv/home/test
@@ -183,16 +186,16 @@ touch: cannot touch '/srv/home/test': Read-only file system
 $ sudo mount -o remount,rw /srv/home
 $ sudo touch /srv/home/test
 $ ls -l /dev/disk/by-uuid/ | grep vdb
-lrwxrwxrwx 1 root root 10 Oct 13 11:46 0c9279db-9da9-402f-afe7-2fcb3eeef276 -&gt; ../../vdb3
-lrwxrwxrwx 1 root root 10 Oct 13 11:45 6082e166-6679-4353-877b-6670c224ff0a -&gt; ../../vdb5
-lrwxrwxrwx 1 root root 10 Oct 13 11:45 6eb166fa-bfb8-44d5-aac4-8712be4be5df -&gt; ../../vdb6
-lrwxrwxrwx 1 root root 10 Oct 13 11:45 74c6caf1-aba6-4c82-8dbd-44a78984fc01 -&gt; ../../vdb2
-lrwxrwxrwx 1 root root 10 Oct 13 11:45 86222446-c3ab-455d-a1f4-f79cdf37961b -&gt; ../../vdb4
-lrwxrwxrwx 1 root root 10 Oct 13 11:45 B4B6-B341 -&gt; ../../vdb1</code></pre>
+lrwxrwxrwx 1 root root 10 Oct 13 19:33 0487f66c-a470-468c-b92d-7424b72de8ae -&gt; ../../vdb4
+lrwxrwxrwx 1 root root 10 Oct 13 19:33 22d4f1ec-1bd3-4377-90e8-ffb5f3da688b -&gt; ../../vdb2
+lrwxrwxrwx 1 root root 10 Oct 13 19:33 76a62184-3385-4cff-ad77-c76946332553 -&gt; ../../vdb6
+lrwxrwxrwx 1 root root 10 Oct 13 19:33 793b9022-3f71-4534-b0e7-a4df1aad7578 -&gt; ../../vdb5
+lrwxrwxrwx 1 root root 10 Oct 13 19:33 8E04-78D2 -&gt; ../../vdb1
+lrwxrwxrwx 1 root root 10 Oct 13 19:33 d6988a49-5d82-4426-978f-377b5dce03f2 -&gt; ../../vdb3</code></pre>
 
 <h2 id="media">一般ユーザが、取り外せるメディアをマウントする</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>/media</code> と、<code>user</code>・<code>noauto</code> の役目。</div>
-<p><code>/media</code> は、取り外せるメディア（CD・USB メモリ）をマウントする場所として決められたディレクトリである（<code>/mnt</code> は一時的に手でつなぐ場所）。デスクトップの Linux では、挿すと udisks2 が <code>/media/&lt;ユーザ&gt;/&lt;ラベル&gt;</code> に自動でマウントする（第2章の D-Bus の話）。練習機には udisks2 が無いので、<code>/etc/fstab</code> で許す。まず一般ユーザのまま打つ。</p>
+<p><code>/media</code> は、取り外せるメディア（CD・USB メモリ）をマウントする場所として決められたディレクトリである（<code>/mnt</code> は一時的に手でつなぐ場所）。デスクトップの Linux では、挿すと udisks2 が自動でマウントする（第2章の D-Bus の話。マウント先は Ubuntu・Debian では <code>/media/&lt;ユーザ&gt;/&lt;ラベル&gt;</code>、RHEL 系と udisks2 の既定では <code>/run/media/&lt;ユーザ&gt;/&lt;ラベル&gt;</code>）。練習機には udisks2 が無いので、<code>/etc/fstab</code> で許す。まず一般ユーザのまま打つ。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ mount /media/cdrom
 mount: /media/cdrom: can't find in /etc/fstab.</code></pre>
 <p>一般ユーザの <code>mount</code> は、<code>/etc/fstab</code> に書かれた行のうち、許された行しか通らない。光学ドライブの行を書く。</p>
@@ -210,6 +213,33 @@ total 1
 -r--r--r-- 1 root root 227 Oct 13 09:00 README.TXT
 $ umount /media/cdrom</code></pre>
 <p>student のまま、マウントも外すこともできた。<code>mount</code> の表示に、書いていない <code>nosuid,nodev,noexec</code> と、誰がマウントしたか（<code>user=student</code>）が出ている。<code>user</code> を付けると、他人のメディアで権限を奪われないよう、この3つが自動で付く。<code>noauto</code> は「起動時と <code>mount -a</code> ではマウントしない」で、メディアが入っていないかもしれない装置に付ける。</p>
+<p>光学メディアの中身をファイル（ISO イメージ）に写したものも、そのままマウントできる。ファイルを装置に見せかける<b>ループデバイス</b>（第1章で見た <code>loop0</code>〜）を使うので、オプションは <code>-o loop</code> である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo dd if=/dev/sr0 of=media.iso
+736+0 records in
+736+0 records out
+376832 bytes (377 kB, 368 KiB) copied, 0.0204182 s, 18.5 MB/s
+$ sudo mount -o loop media.iso /mnt
+mount: /mnt: WARNING: source write-protected, mounted read-only.
+$ findmnt -o TARGET,SOURCE,FSTYPE /mnt
+TARGET
+     SOURCE     FSTYPE
+/mnt /dev/loop0 iso9660
+$ losetup -l
+NAME       SIZELIMIT OFFSET AUTOCLEAR RO BACK-FILE               DIO LOG-SEC
+/dev/loop0         0      0         1  0 /home/student/media.iso   0     512
+$ ls /mnt
+README.TXT
+$ sudo umount /mnt
+$ sudo mount media.iso /mnt
+mount: /mnt: WARNING: source write-protected, mounted read-only.
+$ findmnt -o TARGET,SOURCE,FSTYPE /mnt
+TARGET
+     SOURCE     FSTYPE
+/mnt /dev/loop0 iso9660
+$ sudo umount /mnt
+$ losetup -l
+$ sudo rm media.iso</code></pre>
+<p>SOURCE が <code>/dev/loop0</code> になっている。<code>losetup -l</code> で、どのファイルがどのループデバイスにつながっているかが見える。いまの <code>mount</code> は、ふつうのファイルを渡されると自分でループデバイスを用意するので、<code>-o loop</code> を省いてもマウントできた。外すと、ループデバイスも一緒に片づく（AUTOCLEAR が 1。外したあとの <code>losetup -l</code> は空）。どちらも <code>WARNING</code> が出たのは、ループデバイスは書き込める（RO が 0）のに、中の iso9660 が書き込みのマウントを受け付けず、mount が読み取り専用でやり直したからである。</p>
 <p>FAT の USB メモリでも同じことをする。VFAT はファイルに所有者を持たないので、誰がマウントしたかで見え方が変わる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ echo "LABEL=STICK_A  /media/stick  vfat  user,noauto  0  0" | sudo tee -a /etc/fstab
 LABEL=STICK_A  /media/stick  vfat  user,noauto  0  0
@@ -217,14 +247,14 @@ $ sudo systemctl daemon-reload
 $ mount /media/stick
 $ ls -l /media/stick
 total 2
--rwxrwxr-x 1 student student 12 Oct 13 11:47 who.txt
+-rwxrwxr-x 1 student student 12 Oct 13 19:35 who.txt
 $ touch /media/stick/mine.txt
 $ umount /media/stick
 $ sudo mount /media/stick
 $ ls -l /media/stick
 total 2
--rwxr-xr-x 1 root root  0 Oct 13 11:49 mine.txt
--rwxr-xr-x 1 root root 12 Oct 13 11:47 who.txt
+-rwxr-xr-x 1 root root  0 Oct 13 19:37 mine.txt
+-rwxr-xr-x 1 root root 12 Oct 13 19:35 who.txt
 $ sudo umount /media/stick
 $ sudo findmnt --verify
 Success, no errors or warnings detected</code></pre>
@@ -233,8 +263,10 @@ Success, no errors or warnings detected</code></pre>
 <tr><th>オプション</th><th>意味</th></tr>
 <tr><td><code>defaults</code></td><td>rw・suid・dev・exec・auto・nouser・async をまとめた既定</td></tr>
 <tr><td><code>noauto</code></td><td>起動時と <code>mount -a</code> ではマウントしない</td></tr>
-<tr><td><code>user</code></td><td>一般ユーザがマウントできる。外せるのはマウントした本人（と root）。nosuid・nodev・noexec が付く</td></tr>
-<tr><td><code>users</code></td><td>一般ユーザがマウントでき、誰でも外せる</td></tr>
+<tr><td><code>user</code></td><td>一般ユーザがマウントできる。外せるのはマウントした本人（と root）。nosuid・nodev・noexec が付く（後ろに <code>exec</code> などを書けば打ち消せる）</td></tr>
+<tr><td><code>users</code></td><td>一般ユーザがマウントでき、誰でも外せる。<code>user</code> と同じく nosuid・nodev・noexec が付く</td></tr>
+<tr><td><code>noexec</code></td><td>その中のプログラムを実行させない（<code>exec</code> で許す）</td></tr>
+<tr><td><code>nosuid</code> / <code>nodev</code></td><td>その中の set-user-ID を効かせない / その中のデバイスファイルを使わせない</td></tr>
 <tr><td><code>nofail</code></td><td>見つからなくても起動を止めない</td></tr>
 <tr><td><code>ro</code> / <code>rw</code></td><td>読み取り専用 / 読み書き</td></tr>
 <tr><td><code>sw</code></td><td>スワップの行に書く慣習の値</td></tr>
@@ -251,13 +283,13 @@ Device detached successfully
 $ virsh detach-device linuc ~/vm/extra/usb-b.xml
 Device detached successfully</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo reboot
-Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 11:49:33 JST):
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-13 19:37:28 JST):
 
 The system will reboot now!</code></pre>
 <pre data-where="外（lab@host）"><code>$ vm start
 練習機はもう動いています
   起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
-練習機が起動しました（22秒）
+練習機が起動しました（19秒）
   入るには:  ssh linuc   （抜けるときは exit）</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ findmnt -o TARGET,SOURCE,FSTYPE /srv/home
 TARGET    SOURCE    FSTYPE
@@ -288,13 +320,13 @@ Filesystem      Size  Used Avail Use% Mounted on
 <tr><td>1</td><td>HDD か SSD かはカーネルが測る</td><td>装置の申告（rotational）</td><td>中身のファイルは同じ種類</td></tr>
 <tr><td>2</td><td>ドライバを外せば装置は使えない</td><td>装置の種類（modalias）と udev の表</td><td>次に挿せば、表どおりに読み込まれる</td></tr>
 <tr><td>3</td><td>パーティションを消せば中身も消える</td><td>表の1行（開始位置と大きさ）</td><td>ext4 の中身はそのまま</td></tr>
-<tr><td>4</td><td>ESP はマウントしないと起動に使えない</td><td>GPT の種類と PARTUUID</td><td>マウント（/etc/fstab）は起動に関わらない</td></tr>
+<tr><td>4</td><td>ESP はマウントしないと起動に使えない</td><td>NVRAM の候補（PARTUUID とファイルのパス）</td><td>マウント（/etc/fstab）も、種類の印も、起動には関わらなかった</td></tr>
 <tr><td>5</td><td>LV を広げれば使える量も増える</td><td>ext4 が自分で書いた大きさ</td><td>箱が広がっても中身はそのまま</td></tr>
-<tr><td>6</td><td>Size − Used が使える量</td><td>ext4 の予約ブロック</td><td>区画の大きさ ≠ 使える量</td></tr>
+<tr><td>6</td><td>Size − Used が使える量</td><td>ext4 の予約ブロック（と自分用の取り置き）</td><td>区画の大きさ ≠ 使える量</td></tr>
 <tr><td>7</td><td>tmpfs の size だけメモリを取る</td><td>書いた量</td><td>size は上限で、確保ではない</td></tr>
 <tr><td>8</td><td>/dev/sdb はいつも同じディスク</td><td>中に書いた UUID・ラベル</td><td>名前は見つかった順で付く</td></tr>
 </table></div>
-<div class="goal"><p><b>ディスクは、装置・パーティション表・LVM・ファイルシステム・マウントの層が重なってできている。各層は自分の印（装置の申告・表の種類・UUID）だけを読み、隣の層を勝手には書き換えない。だから1つの層を変えたら、隣の層は自分で合わせる。名前や見かけの大きさは、どの層から見たかで変わる。</b></p>
+<div class="goal"><p><b>ディスクは、装置・パーティション表・LVM・ファイルシステム・マウントの層が重なってできている。各層は自分の印（装置の申告・表の行・UUID）だけを読み、隣の層を勝手には書き換えない。だから1つの層を変えたら、隣の層は自分で合わせる。名前や見かけの大きさは、どの層から見たかで変わる。</b></p>
 <p>試験の問題も、この層のどこを尋ねているかで解ける。「パーティションを広げたのにファイルシステムが…」なら層をまたいでいないか、「起動時にマウントされない」なら <code>/etc/fstab</code> の層か、を先に考える。</p></div>
 
 <div class="quiz"><b>確認</b>
@@ -302,9 +334,9 @@ Filesystem      Size  Used Avail Use% Mounted on
 <details><summary>答え</summary>
 <p>UUID がこの値のファイルシステムを、<code>/srv/home</code> に、ext4 として、既定のオプションで（見つからなくても起動を止めずに）マウントする。dump はしない（0）。起動時の fsck は 2 番目のグループ（/ の後）で行う。</p></details></div>
 <div class="quiz"><b>確認</b>
-<p>一般ユーザが CD-ROM をマウントでき、マウントしたユーザ以外も外せるようにしたい。起動時にはマウントしない。オプションの欄に何を書くか。</p>
+<p>一般ユーザが CD-ROM を読み取り専用でマウントでき、マウントしたユーザ以外も外せるようにしたい。起動時にはマウントしない。オプションの欄に何を書くか。</p>
 <details><summary>答え</summary>
-<p><code>ro,users,noauto</code>（読み取り専用・誰でもマウントと取り外しができる・起動時にマウントしない）。<code>user</code> なら、外せるのはマウントした本人と root だけになる。</p></details></div>
+<p><code>ro,users,noauto</code>（読み取り専用・誰でもマウントと取り外しができる・起動時にマウントしない）。<code>users</code> は nosuid・nodev・noexec も一緒に付ける。<code>user</code> なら、外せるのはマウントした本人と root だけになる。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>umount /data</code> が <code>target is busy</code> で失敗した。何が考えられるか。</p>
 <details><summary>答え</summary>
@@ -312,11 +344,11 @@ Filesystem      Size  Used Avail Use% Mounted on
 <div class="quiz"><b>確認</b>
 <p><code>/etc/fstab</code> にディスクの行を書き足した。再起動の前にしておくとよいことを2つ挙げよ。</p>
 <details><summary>答え</summary>
-<p><code>findmnt --verify</code> で書き間違い（存在しない UUID・ラベルの重なり・種類の食い違い）を調べることと、<code>mount -a</code> で実際にマウントできるかを試すこと。起動時のマウントを受け持つ systemd には <code>systemctl daemon-reload</code> で読み直させる。消えるかもしれないディスクの行には <code>nofail</code> を付ける。</p></details></div>
+<p><code>findmnt --verify</code> で書き間違い（見つからない UUID やラベル・種類の食い違いなど）を調べることと、<code>mount -a</code> で実際にマウントできるかを試すこと。ラベルの重なりは <code>findmnt --verify</code> では出ないので、<code>blkid -t LABEL=…</code> で確かめる。いま動いている systemd には <code>systemctl daemon-reload</code> で読み直させる（次の起動では、書いただけで効く）。消えるかもしれないディスクの行には <code>nofail</code> を付ける。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>マウントポイントは前もって作るただのディレクトリで、もとの中身は隠れるだけ。中にプロセスがいると <code>umount</code> は断る</li><li><code>/dev/sdb</code> は見つかった順に付く名前で、挿す順番で別のディスクを指す。<code>/etc/fstab</code> では UUID かラベルで指す（<code>blkid</code>・<code>/dev/disk/by-uuid/</code>・<code>by-label/</code>）</li><li>ラベルは重なりうる。重なると <code>LABEL=</code> の行が別のディスクを指す。<code>findmnt --verify</code> が見つける。付け替えは <code>e2label</code>・<code>xfs_admin -L</code></li><li><code>/etc/fstab</code> は6列（何を・どこに・種類・オプション・dump・fsck の順番）。書いたら <code>mount -a</code> と <code>findmnt --verify</code> で確かめ、<code>daemon-reload</code></li><li>一般ユーザに許すのは <code>user</code>（本人が外せる）・<code>users</code>（誰でも外せる）。取り外せるメディアには <code>noauto</code>。マウント先は <code>/media</code> の下</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.0@sha256:a5ab400fa07c076927eadf21ef9bb42b3bf70a1c2abae93fab24a21f50ecf96b / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・util-linux 2.39.3・e2fsprogs 1.47.0・xfsprogs 6.6.0・dosfstools 4.2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>マウントポイントは前もって作るただのディレクトリで、もとの中身は隠れるだけ。中にプロセスがいると <code>umount</code> は断る</li><li><code>/dev/sdb</code> は見つかった順に付く名前で、挿す順番で別のディスクを指す。<code>/etc/fstab</code> では UUID かラベルで指す（<code>blkid</code>・<code>/dev/disk/by-uuid/</code>・<code>by-label/</code>）</li><li>ラベルは重なりうる。重なると <code>LABEL=</code> の行が別のディスクを指す。<code>findmnt --verify</code> は重なりそのものは言わない（今回は種類の食い違いで気づいた）。重なりは <code>blkid -t LABEL=…</code>・<code>/dev/disk/by-label/</code> で確かめ、<code>e2label</code>・<code>xfs_admin -L</code> で付け替える。<code>findfs</code> はラベルや UUID から装置の名前を引く</li><li><code>/etc/fstab</code> は6列（何を・どこに・種類・オプション・dump・fsck の順番）。書いたら <code>mount -a</code> と <code>findmnt --verify</code> で確かめる。次の起動には書いただけで効き、いま動いている systemd には <code>daemon-reload</code> で読み直させる</li><li>一般ユーザに許すのは <code>user</code>（本人が外せる）・<code>users</code>（誰でも外せる）で、どちらも nosuid・nodev・noexec を付ける。取り外せるメディアには <code>noauto</code>（起動時と <code>mount -a</code> で飛ばす）。マウント先は <code>/media</code> の下。ISO のファイルは <code>-o loop</code>（いまの mount は省いても自分で使う）</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・util-linux 2.39.3・e2fsprogs 1.47.0・xfsprogs 6.6.0・dosfstools 4.2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-disks/theory/07-swap">← 7. tmpfs は、メモリを先に取らない</a><a href="/linuc-disks/theory/">理論編 目次へ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

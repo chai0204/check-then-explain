@@ -35,5 +35,5 @@ if [ -n "$bc" ] && [ -n "$rc" ]; then
 fi
 [ "$ng" = 0 ] || exit 1
 echo "       5つの種類のファイルシステムができ、vdb6 は root 用の予約が 1% になっている"
-echo "       → df の Avail が Size − Used より小さかった分の正体は、この予約"
+echo "       → df の Avail が Size − Used より小さかった分の大半は、この予約（残りは ext4 が自分用に取る reserved_clusters）"
 exit 0

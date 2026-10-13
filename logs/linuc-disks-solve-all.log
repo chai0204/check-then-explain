@@ -104,8 +104,6 @@ exit=1
 $ echo "blacklist usb_storage" | sudo tee /etc/modprobe.d/lab-usb.conf
 blacklist usb_storage
 
-$ sudo systemctl restart systemd-udevd
-
 $ sudo modprobe -r uas
 
 $ echo "--- blacklist usb_storage だけ（uas の依存で読み込まれるはず）---"; lab check 02; echo "exit=$?"
@@ -120,14 +118,62 @@ $ echo "--- blacklist usb_storage だけ（uas の依存で読み込まれるは
   → この事実から何が欠けているか考えてください。詰まったら lab hint 02
 exit=1
 
-$ echo "install usb_storage /bin/false" | sudo tee /etc/modprobe.d/lab-usb.conf
-install usb_storage /bin/false
+$ printf "blacklist usb_storage\nblacklist uas\n" | sudo tee /etc/modprobe.d/lab-usb.conf
+blacklist usb_storage
+blacklist uas
+
+$ sudo modprobe -r uas
+
+$ echo "--- 同じファイルを書き換えて uas も足しただけ（udev が書き換えに気づかないはず）---"; lab check 02; echo "exit=$?"
+--- 同じファイルを書き換えて uas も足しただけ（udev が書き換えに気づかないはず）---
+✗ 02 未達
+  判定 : 観測型（判定の中で USB メモリを1本挿し、練習機がそれをどう扱ったかを見て、抜いた）
+  観測 : USB 機器として   = 見えた（/sys/bus/usb/devices/2-1）
+         付いたドライバ   = usb-storage
+         ディスクとして   = /dev/sdb
+         読み込まれていたモジュール = uas usb_storage
+         → 挿した USB メモリが、ディスクとして使える状態になった
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+exit=1
 
 $ sudo systemctl restart systemd-udevd
 
 $ sudo modprobe -r uas
 
-$ lab check 02; echo "exit=$?"
+$ echo "--- ヒント2のとおり udev を再起動した ---"; lab check 02; echo "exit=$?"
+--- ヒント2のとおり udev を再起動した ---
+✔ 02 達成
+  判定 : 観測型（判定の中で USB メモリを1本挿し、練習機がそれをどう扱ったかを見て、抜いた）
+  観測 : USB 機器として   = 見えた（/sys/bus/usb/devices/2-1）
+         付いたドライバ   = なし
+         ディスクとして   = 現れなかった
+         読み込まれていたモジュール = なし
+         USB 機器としては見えるが、ドライバが付かず、ディスクにならなかった
+         → 装置はある。使えなくしたのは、カーネルにドライバを読み込ませる側の設定
+exit=0
+
+$ sudo rm /etc/modprobe.d/lab-usb.conf
+
+$ echo "--- ファイルを消しただけ（udev が気づいて、また使えるようになるはず）---"; lab check 02; echo "exit=$?"
+--- ファイルを消しただけ（udev が気づいて、また使えるようになるはず）---
+✗ 02 未達
+  判定 : 観測型（判定の中で USB メモリを1本挿し、練習機がそれをどう扱ったかを見て、抜いた）
+  観測 : USB 機器として   = 見えた（/sys/bus/usb/devices/2-1）
+         付いたドライバ   = usb-storage
+         ディスクとして   = /dev/sdb
+         読み込まれていたモジュール = uas usb_storage
+         → 挿した USB メモリが、ディスクとして使える状態になった
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+exit=1
+
+$ printf "blacklist usb_storage\nblacklist uas\n" | sudo tee /etc/modprobe.d/lab-usb.conf
+blacklist usb_storage
+blacklist uas
+
+$ sudo modprobe -r uas
+
+$ echo "--- 模範解答: 新しいファイルに2行（udev の再起動なし）---"; lab check 02; echo "exit=$?"
+--- 模範解答: 新しいファイルに2行（udev の再起動なし）---
 ✔ 02 達成
   判定 : 観測型（判定の中で USB メモリを1本挿し、練習機がそれをどう扱ったかを見て、抜いた）
   観測 : USB 機器として   = 見えた（/sys/bus/usb/devices/2-1）
@@ -268,7 +314,7 @@ $ lab check 04; echo "exit=$?"
          vdb5         400 MiB  Linux filesystem
          vdb6         390 MiB  Linux filesystem
          GPT に6つ、種類と大きさが課題の表どおりに並んでいる
-         → ESP は中身ではなく、表に書いた種類（EF00）で見つけられる場所になった
+         → ESP の印（EF00）を付けた区画ができた。中身（FAT）は演習06 で作る
 exit=0
 
 
@@ -368,7 +414,7 @@ $ sudo mkfs -t ext3 -L NEWBOOT /dev/vdb2
 mke2fs 1.47.0 (5-Feb-2023)
 Discarding device blocks: done                            
 Creating filesystem with 76800 4k blocks and 76800 inodes
-Filesystem UUID: 5f0185ca-5789-41ca-b218-2cd0ec6f9a58
+Filesystem UUID: a88ab091-8475-4fde-8241-a7a469c03b6a
 Superblock backups stored on blocks: 
 	32768
 
@@ -403,7 +449,7 @@ NOTE: several default settings have changed in version 5.15, please make sure
       - enabled free-space-tree (-R free-space-tree)
 
 Label:              VAR
-UUID:               e7111fb5-da0e-4c22-a98c-fe631a4057c4
+UUID:               1391b907-1bca-48aa-b1de-16c6fb0a98ec
 Node size:          16384
 Sector size:        4096
 Filesystem size:    400.00MiB
@@ -426,7 +472,7 @@ $ sudo mkfs.ext4 -L HOME /dev/vdb6
 mke2fs 1.47.0 (5-Feb-2023)
 Discarding device blocks: done                            
 Creating filesystem with 100091 4k blocks and 100096 inodes
-Filesystem UUID: 914c73e2-5dae-4667-a4f8-f39f9c1373cb
+Filesystem UUID: e00179ab-a3a8-4b28-938f-7d546123320a
 Superblock backups stored on blocks: 
 	32768, 98304
 
@@ -457,12 +503,12 @@ Setting reserved blocks percentage to 1% (1000 blocks)
 $ lsblk -o NAME,FSTYPE,LABEL,UUID /dev/vdb
 NAME   FSTYPE LABEL   UUID
 vdb                   
-├─vdb1 vfat           6294-DF0B
-├─vdb2 ext3   NEWBOOT 5f0185ca-5789-41ca-b218-2cd0ec6f9a58
+├─vdb1 vfat           A9C7-CADD
+├─vdb2 ext3   NEWBOOT a88ab091-8475-4fde-8241-a7a469c03b6a
 ├─vdb3                
-├─vdb4 xfs    ROOT    f1519527-47ea-48dc-8f76-b8a37ff1bbb6
-├─vdb5 btrfs  VAR     e7111fb5-da0e-4c22-a98c-fe631a4057c4
-└─vdb6 ext4   HOME    914c73e2-5dae-4667-a4f8-f39f9c1373cb
+├─vdb4 xfs    ROOT    efb59abb-8027-4e7a-90a5-dd0fcbd50fcb
+├─vdb5 btrfs  VAR     1391b907-1bca-48aa-b1de-16c6fb0a98ec
+└─vdb6 ext4   HOME    e00179ab-a3a8-4b28-938f-7d546123320a
 
 $ lab check 06; echo "exit=$?"
 ✔ 06 達成
@@ -474,7 +520,7 @@ $ lab check 06; echo "exit=$?"
          vdb6 = ext4 ラベル HOME
          vdb6 の予約ブロック = 1000 / 100091 ブロック（1.0%）
          5つの種類のファイルシステムができ、vdb6 は root 用の予約が 1% になっている
-         → df の Avail が Size − Used より小さかった分の正体は、この予約
+         → df の Avail が Size − Used より小さかった分の大半は、この予約（残りは ext4 が自分用に取る reserved_clusters）
 exit=0
 
 
@@ -494,7 +540,7 @@ exit=1
 
 $ sudo mkswap -L SWAP /dev/vdb3
 Setting up swapspace version 1, size = 256 MiB (268431360 bytes)
-LABEL=SWAP, UUID=4a63fb2a-a9a0-4e5c-a3df-b4b4ffe9a91b
+LABEL=SWAP, UUID=13f4aee2-4e39-4f95-a968-da336911cf3e
 
 $ sudo swapon /dev/vdb3
 
@@ -515,14 +561,14 @@ $ echo "--- swapon しただけ（/etc/fstab に無い）---"; lab check 07; ech
 exit=1
 
 $ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb3)  none  swap  sw  0  0" | sudo tee -a /etc/fstab
-UUID=4a63fb2a-a9a0-4e5c-a3df-b4b4ffe9a91b  none  swap  sw  0  0
+UUID=13f4aee2-4e39-4f95-a968-da336911cf3e  none  swap  sw  0  0
 
 $ lab check 07; echo "exit=$?"
 ✔ 07 達成
   判定 : 観測型（vdb3 をいったん swapoff し、起動時と同じ swapon -a を1回実行して、戻るかを見た）
   観測 : vdb3 の中身              = swap
          判定の前に使われていたか = いいえ
-         /etc/fstab のスワップの行 = UUID=4a63fb2a-a9a0-4e5c-a3df-b4b4ffe9a91b（実体: /dev/vdb3）
+         /etc/fstab のスワップの行 = UUID=13f4aee2-4e39-4f95-a968-da336911cf3e（実体: /dev/vdb3）
          swapon -a の後に使われているか = はい
          /etc/fstab の行から vdb3 が有効になった → 再起動しても、このスワップは使われる
 exit=0
@@ -582,23 +628,23 @@ $ lab check 08; echo "exit=$?"
    確かめて説明する LinuC 主題1.05 — 全8演習クリア
   ════════════════════════════════════════
 
-  所要 2分（最初の達成から最後の達成まで）
+  所要 3分（最初の達成から最後の達成まで）
 
   自分の手で確かめたこと
 
    ✔ 01  カーネルは HDD か SSD かを測らず、装置の申告をそのまま信じること
    ✔ 02  外したドライバは挿し直すと udev が読み込み直し、止めるには読み込む側の表を書き換えること
    ✔ 03  パーティションを消しても中身は消えず、同じ位置に表の行を書き戻せば読めること
-   ✔ 04  ESP は中身でもマウントでもなく、GPT に書いた種類で見つけられること
+   ✔ 04  ESP は EF00 の印を付けた FAT の区画で、ファームウェアはマウントとは無関係に NVRAM の候補でそこを読むこと
    ✔ 05  LV を広げてもファイルシステムは広がらず、中身は別に広げる必要があること
-   ✔ 06  ext4 は root 用に 5% を予約しており、df の Avail はその分だけ少なく見えること
+   ✔ 06  ext4 は root 用の予約（既定 5%）と自分用の取り置きのぶん、df の Avail が Size − Used より少なく見えること
    ✔ 07  mkswap は形を作るだけで、使い始めるのは swapon、起動時に使うのは /etc/fstab であること
    ✔ 08  一般ユーザにマウントを許すのは sudo ではなく /etc/fstab の user オプションであること
 
   この8つは全部、1つの事実から出ていました。
 
       ディスクは、装置・パーティション表・LVM・ファイルシステム・マウントの層が重なってできている。
-      各層は自分の印（装置の申告・表の種類・UUID）だけを読み、隣の層を勝手には書き換えない。
+      各層は自分の印（装置の申告・表の行・UUID）だけを読み、隣の層を勝手には書き換えない。
       だから1つの層を変えたら、隣の層は自分で合わせる。名前や見かけの大きさは、どの層から見たかで変わる。
 
   理論編の最終章に、それぞれがどう繋がるかを書いてあります → /linuc-disks/theory/08-mount
@@ -641,7 +687,7 @@ $ lab check; echo "exit=$?"
          vdb5         400 MiB  Linux filesystem
          vdb6         390 MiB  Linux filesystem
          GPT に6つ、種類と大きさが課題の表どおりに並んでいる
-         → ESP は中身ではなく、表に書いた種類（EF00）で見つけられる場所になった
+         → ESP の印（EF00）を付けた区画ができた。中身（FAT）は演習06 で作る
 ✔ 05 達成
   判定 : 観測型（LVM の表と、vg0/data の中の ext4 の大きさを別々に読んで比べた）
   観測 : vg0 の物理ボリューム = /dev/sda /dev/vdc
@@ -658,12 +704,12 @@ $ lab check; echo "exit=$?"
          vdb6 = ext4 ラベル HOME
          vdb6 の予約ブロック = 1000 / 100091 ブロック（1.0%）
          5つの種類のファイルシステムができ、vdb6 は root 用の予約が 1% になっている
-         → df の Avail が Size − Used より小さかった分の正体は、この予約
+         → df の Avail が Size − Used より小さかった分の大半は、この予約（残りは ext4 が自分用に取る reserved_clusters）
 ✔ 07 達成
   判定 : 観測型（vdb3 をいったん swapoff し、起動時と同じ swapon -a を1回実行して、戻るかを見た）
   観測 : vdb3 の中身              = swap
          判定の前に使われていたか = はい
-         /etc/fstab のスワップの行 = UUID=4a63fb2a-a9a0-4e5c-a3df-b4b4ffe9a91b（実体: /dev/vdb3）
+         /etc/fstab のスワップの行 = UUID=13f4aee2-4e39-4f95-a968-da336911cf3e（実体: /dev/vdb3）
          swapon -a の後に使われているか = はい
          /etc/fstab の行から vdb3 が有効になった → 再起動しても、このスワップは使われる
 ✔ 08 達成

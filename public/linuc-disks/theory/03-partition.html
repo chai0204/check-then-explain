@@ -12,9 +12,9 @@
 </div>
 <h1>3. パーティションの表は、目次にすぎない</h1>
 <p class="lead">fdisk でパーティションを消し、同じ位置に作り直すと、中に書いたファイルがそのまま読める。消したのはディスクの先頭にある 64 バイトの表の1行で、中身には1バイトも触れていないからだ。</p>
-<div class="badges"><span>前提: 第2章まで読了</span><span>前提: 練習機が起動している</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="badges"><span>前提: 第2章まで読了</span><span>前提: 練習機が起動している</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>fdisk でパーティションを作る・消す・書き込む操作（n・d・p・w）ができる</li><li>MBR の表がどこにあり、基本パーティションが4つまでの理由を説明できる。5つ目以降を拡張・論理パーティションで作れる</li><li>fdisk・gdisk・parted の違い（扱える形式・書き込むタイミング）を言える</li></ul>
+<ul><li>fdisk でパーティションを作る・消す・書き込む操作（n・d・p・w）ができる</li><li>MBR の表がどこにあり、基本パーティション（プライマリパーティション）が4つまでの理由を説明できる。5つ目以降を拡張・論理パーティションで作れる</li><li>fdisk・gdisk・parted の違い（扱える形式・書き込むタイミング）を、いまの版と試験の例題の両方で言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: CHS（シリンダ・ヘッド・セクタ）での位置の書き方、EBR の連鎖の細かい形、<code>sfdisk</code> のスクリプトの書式、パーティションの種類の番号の一覧（83・82・8e・5・ef だけ覚えればよい）は扱わない。</div></div>
 
 <h2 id="create">fdisk で切る</h2>
@@ -32,7 +32,7 @@ Changes will remain in memory only, until you decide to write them.
 Be careful before using the write command.
 
 Device does not contain a recognized partition table.
-Created a new DOS (MBR) disklabel with disk identifier 0xa741c5ae.   ← 表が無かったので、空の MBR の表をメモリの上に作った
+Created a new DOS (MBR) disklabel with disk identifier 0xb047a4c1.   ← 表が無かったので、空の MBR の表をメモリの上に作った
 
 Command (m for help): n   ← n: 新しいパーティション
 Partition type
@@ -51,7 +51,7 @@ Units: sectors of 1 * 512 = 512 bytes
 Sector size (logical/physical): 512 bytes / 512 bytes
 I/O size (minimum/optimal): 512 bytes / 512 bytes
 Disklabel type: dos
-Disk identifier: 0xa741c5ae
+Disk identifier: 0xb047a4c1
 
 Device     Boot Start    End Sectors  Size Id Type
 /dev/vdb1        2048 411647  409600  200M 83 Linux
@@ -144,7 +144,7 @@ fdisk 自身もそれを知っていて、「中に ext4 の印（signature）�
 
 <h2 id="bytes">表の実体は、先頭の 64 バイト</h2>
 <div class="sgoal"><b>この節で分かること</b>: MBR の表がどこにあり、なぜ4行しか無いか。</div>
-<p>MBR（Master Boot Record）はディスクの先頭のセクタ（512 バイト）のことで、表はその 446 バイト目からの 64 バイトにある。読んでみる。</p>
+<p>MBR（Master Boot Record）はディスクの先頭のセクタ（512 バイト）のことで、中は3つに分かれている。先頭の 446 バイトが BIOS で起動するためのプログラム（ブートローダの入口）、続く 64 バイトが表（16 バイト × 4行）、最後の 2 バイトが印（<code>55 aa</code>）である。0 から数えて 446 バイト目から、表と印の 66 バイトを読んでみる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo dd if=/dev/vdb bs=1 skip=446 count=66 status=none | od -A d -t x1
 0000000 00 00 21 02 83 06 46 98 00 08 00 00 00 40 06 00   ← 1行目（16 バイト）が vdb1
 0000016 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ← 2行目は空
@@ -157,7 +157,7 @@ fdisk 自身もそれを知っていて、「中に ext4 の印（signature）�
 │   CHS     83=   CHS       0x00000800   0x00064000
 起動フラグ  Linux            = 2048       = 409600 セクタ（200MiB）
                               （下位のバイトが先に並ぶ）</code></pre>
-<p>1行 16 バイトで、64 バイトには4行しか入らない。だから <b>MBR の基本パーティションは4つまで</b>である。位置と大きさは 32 ビットのセクタ数なので、扱えるのは 2<sup>32</sup> × 512 バイト = <b>2TiB まで</b>。最後の <code>55 aa</code> は「ここに MBR がある」という印である。</p>
+<p>1行 16 バイトで、64 バイトには4行しか入らない。だから <b>MBR の基本パーティション（プライマリパーティション）は4つまで</b>である。位置と大きさは 32 ビットのセクタ数なので、扱えるのは 2<sup>32</sup> × 512 バイト = <b>2TiB まで</b>。最後の <code>55 aa</code> は「ここに MBR がある」という印である。</p>
 
 <h2 id="extended">5つ目からは、拡張パーティションの中に作る</h2>
 <div class="sgoal"><b>この節で分かること</b>: 4つの制限の越え方と、論理パーティションの番号。</div>
@@ -203,7 +203,7 @@ Units: sectors of 1 * 512 = 512 bytes
 Sector size (logical/physical): 512 bytes / 512 bytes
 I/O size (minimum/optimal): 512 bytes / 512 bytes
 Disklabel type: dos
-Disk identifier: 0xa741c5ae
+Disk identifier: 0xb047a4c1
 
 Device     Boot  Start     End Sectors  Size Id Type
 /dev/vdb1         2048  411647  409600  200M 83 Linux
@@ -211,13 +211,13 @@ Device     Boot  Start     End Sectors  Size Id Type
 /dev/vdb3       616448 4194303 3577856  1.7G  5 Extended
 /dev/vdb5       618496  823295  204800  100M 83 Linux
 /dev/vdb6       825344 1030143  204800  100M 83 Linux</code></pre>
-<p>拡張パーティション（<code>vdb3</code>、種類 5 の Extended）は、残りの空きを全部抱える<b>入れ物</b>で、それ自体にはファイルシステムを作らない。中に作った論理パーティションは、4 が空いていても <b>5 から</b>番号が付く（1〜4 は基本パーティションのために取ってある）。論理パーティションの位置は、拡張の中に置かれた小さな表（EBR）を順にたどって決まる。開始位置が 616448 ではなく 618496 から始まっているのは、その小さな表の置き場所を空けたからである。</p>
+<p>拡張パーティション（<code>vdb3</code>、種類 5 の Extended）は、残りの空きを全部抱える<b>入れ物</b>で、それ自体にはファイルシステムを作らない。拡張パーティションは1つのディスクに<b>1つまで</b>で、基本パーティションの4つの枠のうち1つを使う。だから MBR で区画をいちばん多く作る形は「基本3つ＋拡張1つ（中に論理を複数）」になる。中に作った論理パーティションは、4 が空いていても <b>5 から</b>番号が付く（1〜4 は基本パーティションのために取ってある）。論理パーティションの位置は、拡張の中に置かれた小さな表（EBR）を順にたどって決まる。開始位置が 616448 ではなく 618496 から始まっているのは、その小さな表の置き場所を空けたからである。</p>
 <div class="analogy"><b>たとえ</b>: 棚板が4枚しかない<b>本棚</b>に近い。5種類目の本を置きたければ、棚板の1枚を<b>引き出し</b>に替えて、その中を仕切って並べる。
 <br>ただし<b>崩れる点</b>: 本棚の引き出しは開ければ中が全部見えるが、論理パーティションの位置は、引き出しの中に順につないだ小さな表（EBR）を先頭からたどらないと分からない。だから途中の1つが壊れると、その先の論理パーティションも見失う。</div>
 
 <h2 id="tools">fdisk・gdisk・parted</h2>
 <div class="sgoal"><b>この節で分かること</b>: 3つの道具の違いと、どれで同じ表を読めるか。</div>
-<p>同じ表を3つの道具で読む。<code>gdisk</code> は GPT（第4章）専用の道具で、MBR を見ると「メモリの上で GPT に変換して」表示する（<code>w</code> を打たなければディスクは変わらない）。</p>
+<p>同じ表を3つの道具で読む。いまの版では、<code>fdisk</code> は MBR も GPT（第4章）も扱い、<code>gdisk</code> は GPT のための道具、<code>parted</code> は両方を扱う。<code>gdisk</code> は MBR を見ると「メモリの上で GPT に変換して」表示する（<code>w</code> を打たなければディスクは変わらない）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo gdisk -l /dev/vdb
 GPT fdisk (gdisk) version 1.0.10
 
@@ -235,7 +235,7 @@ in memory.
 
 Disk /dev/vdb: 4194304 sectors, 2.0 GiB
 Sector size (logical/physical): 512/512 bytes
-Disk identifier (GUID): BEE035D7-4CC3-4C0D-AC8C-76964683841F
+Disk identifier (GUID): 7BDA6B83-2873-4955-85E9-50952E36AD55
 Partition table holds up to 128 entries
 Main partition table begins at sector 2 and ends at sector 33
 First usable sector is 34, last usable sector is 4194270
@@ -276,13 +276,92 @@ Number  Start   End     Size    Type      File system  Flags
  2      211MB   316MB   105MB   primary
  3      316MB   2147MB  1832MB  extended
  5      317MB   422MB   105MB   logical</code></pre>
+<p>消した6番を parted で作り直す。<code>mkpart</code> には、区画の種類（MBR では <code>primary</code>・<code>extended</code>・<code>logical</code>）と、始まりと終わりの位置を渡す。これも打った瞬間に書く。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo parted /dev/vdb mkpart logical 403MiB 503MiB
+Information: You may need to update /etc/fstab.
+$ sudo parted /dev/vdb print
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdb: 2147MB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start   End     Size    Type      File system  Flags
+ 1      1049kB  211MB   210MB   primary   ext4
+ 2      211MB   316MB   105MB   primary
+ 3      316MB   2147MB  1832MB  extended
+ 5      317MB   422MB   105MB   logical
+ 6      423MB   527MB   105MB   logical</code></pre>
+<p>位置を MiB で渡したので、fdisk で作ったときと同じ 423MB〜527MB に戻った。<code>parted -l</code> は、つながっているディスクの表を全部まとめて出す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo parted -l
+Error: /dev/sda: unrecognised disk label
+Model: ATA QEMU HARDDISK (scsi)
+Disk /dev/sda: 1074MB
+Sector size (logical/physical): 512B/512B
+Partition Table: unknown
+Disk Flags: 
+
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdd: 268MB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start  End    Size   Type     File system  Flags
+ 2      106MB  211MB  105MB  primary  ext4
+
+
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdb: 2147MB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start   End     Size    Type      File system  Flags
+ 1      1049kB  211MB   210MB   primary   ext4
+ 2      211MB   316MB   105MB   primary
+ 3      316MB   2147MB  1832MB  extended
+ 5      317MB   422MB   105MB   logical
+ 6      423MB   527MB   105MB   logical
+
+
+Warning: Unable to open /dev/sr0 read-write (Read-only file system).  /dev/sr0
+has been opened read-only.
+Error: /dev/sr0: unrecognised disk label
+Model: QEMU QEMU DVD-ROM (scsi)
+Disk /dev/sr0: 377kB
+Sector size (logical/physical): 2048B/2048B
+Partition Table: unknown
+Disk Flags: 
+
+Error: /dev/vdc: unrecognised disk label
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdc: 1074MB
+Sector size (logical/physical): 512B/512B
+Partition Table: unknown
+Disk Flags: 
+
+Model: Virtio Block Device (virtblk)
+Disk /dev/vda: 21.5GB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start   End     Size    File system  Name  Flags
+14      1049kB  5243kB  4194kB                     bios_grub
+15      5243kB  116MB   111MB   fat32              boot, esp
+16      116MB   1074MB  957MB   ext4               bls_boot
+ 1      1075MB  21.5GB  20.4GB  ext4</code></pre>
+<p>表の無いディスク（<code>sda</code>・<code>vdc</code>）と光学ドライブは <code>unrecognised disk label</code>（読み取り専用の <code>sr0</code> は、その前に「書き込みでは開けなかった」と断っている）。<code>vda</code> は gpt、<code>vdb</code> と <code>vdd</code> は msdos（MBR）と読めた。</p>
 <div class="scroll"><table>
 <tr><th></th><th>fdisk</th><th>gdisk</th><th>parted</th></tr>
-<tr><td>扱える表</td><td>MBR と GPT（<code>o</code> / <code>g</code> で作る）</td><td>GPT（MBR は変換して読む）</td><td>MBR（msdos）と GPT（gpt）</td></tr>
+<tr><td>扱える表（いまの版）</td><td>MBR と GPT（<code>o</code> / <code>g</code> で作る）</td><td>GPT（MBR は変換して読む）</td><td>MBR（msdos）と GPT（gpt）</td></tr>
+<tr><td>試験の例題での扱い</td><td><b>MBR 用（GPT 非対応）</b></td><td>GPT 用</td><td>MBR と GPT の両方</td></tr>
 <tr><td>書き込むとき</td><td><code>w</code> を打ったとき</td><td><code>w</code> を打ったとき</td><td><b>コマンドを打った瞬間</b></td></tr>
-<tr><td>使い方</td><td>対話（1文字のキー）。<code>-l</code> で一覧</td><td>対話（1文字のキー）。<code>-l</code> で一覧。<code>sgdisk</code> は一括版</td><td>対話でも、引数に続けて書いても使える（<code>parted /dev/vdb rm 6</code>）</td></tr>
+<tr><td>使い方</td><td>対話（1文字のキー）。<code>-l</code> で一覧</td><td>対話（1文字のキー）。<code>-l</code> で一覧。<code>sgdisk</code> は一括版</td><td>対話でも、引数に続けて書いても使える（<code>parted /dev/vdb rm 6</code>）。<code>-l</code> で全部のディスクの一覧</td></tr>
 <tr><td>大きさの単位</td><td>セクタ。<code>+200M</code> で MiB</td><td>セクタ。<code>+100M</code> で MiB</td><td>MB・GB（<code>unit</code> で変えられる）</td></tr>
 </table></div>
+<div class="note"><b>試験では</b>: LinuC の例題は、fdisk＝MBR 用（GPT 非対応）、gdisk＝GPT 用、parted＝MBR と GPT の両方、という組で出る。fdisk が GPT を扱えるようになった util-linux 2.23（2013年。CentOS 7 の fdisk はこの版で、GPT にはまだ「試験的」と警告を出していた）より前の姿である。出題範囲の説明も、GPT の道具としては gdisk と parted を挙げている。組み合わせを選ぶ問題では、fdisk を MBR 専用として答える。</div>
 <div class="analogy"><b>たとえ</b>: fdisk と gdisk は<b>下書きしてから清書する</b>書き方、parted は<b>ペンで直接書く</b>書き方に近い。下書きなら破り捨てられるが、ペンは書いた瞬間に残る。
 <br>ただし<b>崩れる点</b>: ペンで書いた字は消せないが、parted で消した区画も、中身はまだディスクに残っている（この章の前半と同じ）。消えたのは表の1行だけで、同じ位置で作り直せば読める。</div>
 <p>演習03 のディスク <code>vdd</code> を見ておく。先頭の 100MiB に、表の行が無い区画がある。</p>
@@ -303,7 +382,7 @@ Device     Boot  Start    End Sectors  Size Id Type
 <div class="quiz"><b>確認</b>
 <p>MBR のディスクで、基本パーティションを3つ作ったあと、さらに3つ作りたい。どうするか。新しくできるパーティションの番号は何番になるか。</p>
 <details><summary>答え</summary>
-<p>4つ目を拡張パーティションにして、その中に論理パーティションを3つ作る。論理パーティションの番号は 5・6・7（4 が空いていても 5 から始まる）。MBR の表は 64 バイトで4行しか書けないので、基本パーティションは4つまでである。</p></details></div>
+<p>4つ目を拡張パーティションにして、その中に論理パーティションを3つ作る。論理パーティションの番号は 5・6・7（4 が空いていても 5 から始まる）。MBR の表は 64 バイトで4行しか書けないので、基本パーティションは4つまでで、拡張パーティションはそのうちの1つの枠を使って1つだけ作れる。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>fdisk でパーティションを作る操作をしたが、まだ <code>w</code> を打っていない。この状態で <code>q</code> を打つと、ディスクはどうなるか。parted で <code>rm 6</code> を打った場合はどうか。</p>
 <details><summary>答え</summary>
@@ -314,8 +393,8 @@ Device     Boot  Start    End Sectors  Size Id Type
 <p>取り戻せる可能性が高い。消えたのは表の1行で、中身は残っている。同じ開始位置・同じ大きさで作り直せばよい。作り直すとき fdisk が「中のファイルシステムの印を消すか」と聞いてくるので、N と答える。<code>mkfs</code> をすると中身は失われる。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>パーティションテーブルは「どこからどこまで」を書いた目次で、fdisk・gdisk・parted が書き換えるのはこの目次だけ。中身には触れない</li><li>消したパーティションも、同じ位置に行を書き戻せば読める。作り直すときに「印を消すか」と聞かれたら N</li><li>MBR の表は先頭のセクタの 64 バイト（16 バイト × 4行）。だから基本パーティションは4つまでで、2TiB まで</li><li>5つ目以降は、拡張パーティション（種類 5）の中に論理パーティションとして作る。番号は 5 から</li><li>fdisk と gdisk は <code>w</code> で書き、parted は打った瞬間に書く。gdisk は GPT 専用、fdisk と parted は両方扱える</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.0@sha256:a5ab400fa07c076927eadf21ef9bb42b3bf70a1c2abae93fab24a21f50ecf96b / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・fdisk（util-linux）2.39.3・gdisk 1.0.10・parted 3.6 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>パーティションテーブルは「どこからどこまで」を書いた目次で、fdisk・gdisk・parted が書き換えるのは基本的にこの目次だけ。ただし対話の fdisk は、新しい表を作るときはディスクに残った古い印を消し、作った区画に印が見つかると消すか聞いてくる（<code>-w</code> / <code>-W</code> で変えられる）</li><li>消したパーティションも、同じ位置に行を書き戻せば読める。作り直すときに「印を消すか」と聞かれたら N</li><li>MBR は先頭のセクタ（512 バイト）で、起動のためのプログラム 446 バイト・表 64 バイト（16 バイト × 4行）・印 2 バイト（<code>55 aa</code>）。表が4行なので基本パーティション（プライマリパーティション）は4つまでで、2TiB まで</li><li>5つ目以降は、拡張パーティション（種類 5。1つのディスクに1つまで）の中に論理パーティションとして作る。番号は 5 から</li><li>fdisk と gdisk は <code>w</code> で書き、parted は打った瞬間に書く（<code>mkpart</code> で作り、<code>rm</code> で消し、<code>-l</code> で全部のディスクを一覧）。いまの版では gdisk は GPT 用、fdisk と parted は両方扱う。試験の例題は fdisk＝MBR 用・gdisk＝GPT 用・parted＝両方の組で出るので、そのとおりに答える</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・fdisk（util-linux）2.39.3・gdisk 1.0.10・parted 3.6 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-disks/theory/02-modules">← 2. ドライバは、外しても戻ってくる</a><a href="/linuc-disks/theory/04-esp">次: 4. 起動の入口は、マウントしなくても見つかる →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

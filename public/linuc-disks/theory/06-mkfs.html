@@ -11,11 +11,11 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
 </div>
 <h1>6. ファイルシステムは、作った大きさより小さく見える</h1>
-<p class="lead">390MiB の区画に ext4 を作ると、<code>df</code> の Size は 350M になる。さらに Size から Used を引いても、Avail（使える量）と合わない。ext4 は root のために 5% を取っておき、一般ユーザにはそのぶんを見せないからだ。ファイルシステムは、区画の中にさらに自分の管理情報と取り置きを置く。</p>
-<div class="badges"><span>前提: 第5章まで読了</span><span>前提: 演習04 の切り方になっている</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<p class="lead">390MiB の区画に ext4 を作ると、<code>df</code> の Size は 350M になる。さらに Size から Used を引いても、Avail（使える量）と合わない。ext4 は root のために 5% を取っておき、さらに自分の作業のためにも少し取り置いて、一般ユーザにはそのぶんを見せないからだ。ファイルシステムは、区画の中にさらに自分の管理情報と取り置きを置く。</p>
+<div class="badges"><span>前提: 第5章まで読了</span><span>前提: 演習04 の切り方になっている</span><span>所要 24分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>mkfs で ext3・ext4・XFS・VFAT・Btrfs を作り分けられる（<code>mkfs -t 種類</code> と <code>mkfs.種類</code> の関係も）</li><li><code>df</code> の Size・Used・Avail の関係を説明でき、ext4 の予約ブロックを <code>tune2fs</code> で読んで変えられる</li><li>ext3 と ext4 の違い、XFS・VFAT・Btrfs の特徴を言える。<code>fsck</code> がファイルシステムの種類ごとに別物であることを知っている</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: ジャーナルや inode の内部の形、mkfs の細かいオプション（ブロックの大きさ <code>-b</code>、inode の数 <code>-N</code> など）、Btrfs のサブボリュームを操作するコマンドは扱わない。tmpfs とスワップは第7章で扱う。</div></div>
+<ul><li>mkfs で ext3・ext4・XFS・VFAT・Btrfs を作り分けられる（<code>mkfs -t 種類</code> と <code>mkfs.種類</code> の関係も）</li><li><code>df</code> の Size・Used・Avail の関係を説明でき、ext4 の予約ブロックを <code>tune2fs</code> で読んで変えられる。<code>df -i</code>（inode の数）と <code>du</code>（ファイルを足した量）の違いを言える</li><li>ext3 と ext4 の違い、XFS・VFAT・Btrfs の特徴を言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: ジャーナルや inode の内部の形、mkfs の細かいオプション（ブロックの大きさ <code>-b</code>、inode の数 <code>-N</code> など）、Btrfs のサブボリュームを操作するコマンドは扱わない。<code>fsck</code>・<code>xfs_repair</code> による検査と修復は、Version 10.0 の出題範囲では 101 ではなく 201（2.02.2）に入っているので、この章では「種類ごとに別の道具」であることを見るだけにとどめる。tmpfs とスワップは第7章で扱う。</div></div>
 
 <h2 id="mkfs">mkfs は、種類ごとの道具を呼ぶ入口</h2>
 <div class="sgoal"><b>この節で分かること</b>: 5種類のファイルシステムの作り方と、作ったときに何が書かれるか。</div>
@@ -27,20 +27,20 @@
 <p>ESP（<code>vdb1</code>）から始める。第4章で見たとおり、ここには第3章の ext4 の印が残っている。<code>wipefs</code>（引数だけなら消さずに一覧を出す）で見てから、FAT32 を作る。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo wipefs /dev/vdb1
 DEVICE OFFSET TYPE UUID                                 LABEL
-vdb1   0x438  ext4 a8de5231-01ff-4280-9c3c-ee8a1fc7c48f   ← 第3章の ext4 の印（場所 0x438 = 1080 バイト目）
+vdb1   0x438  ext4 0582cb3c-806f-4ab5-8f84-5cff0cbebac6   ← 第3章の ext4 の印（場所 0x438 = 1080 バイト目）
 $ sudo mkfs.vfat -F 32 -n ESP /dev/vdb1
 mkfs.fat 4.2 (2021-01-31)
 $ sudo wipefs /dev/vdb1
 DEVICE OFFSET TYPE UUID      LABEL
-vdb1   0x52   vfat B4B6-B341 ESP
-vdb1   0x0    vfat B4B6-B341 ESP
-vdb1   0x1fe  vfat B4B6-B341 ESP</code></pre>
+vdb1   0x52   vfat 8E04-78D2 ESP
+vdb1   0x0    vfat 8E04-78D2 ESP
+vdb1   0x1fe  vfat 8E04-78D2 ESP</code></pre>
 <p>FAT を作ると、古い ext4 の印は消えた。<code>-F 32</code> は FAT32、<code>-n</code> はラベル（VFAT だけ <code>-n</code> で、ほかは <code>-L</code>）。残りの4つを作る。<code>/boot</code> 用は、試験に出る ext3 にしておく。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mkfs -t ext3 -L BOOT /dev/vdb2
 mke2fs 1.47.0 (5-Feb-2023)
 Discarding device blocks: done                            
 Creating filesystem with 76800 4k blocks and 76800 inodes
-Filesystem UUID: 74c6caf1-aba6-4c82-8dbd-44a78984fc01
+Filesystem UUID: 22d4f1ec-1bd3-4377-90e8-ffb5f3da688b
 Superblock backups stored on blocks: 
 	32768
 
@@ -72,7 +72,7 @@ NOTE: several default settings have changed in version 5.15, please make sure
       - enabled free-space-tree (-R free-space-tree)
 
 Label:              VAR
-UUID:               6082e166-6679-4353-877b-6670c224ff0a
+UUID:               793b9022-3f71-4534-b0e7-a4df1aad7578
 Node size:          16384
 Sector size:        4096
 Filesystem size:    400.00MiB
@@ -93,7 +93,7 @@ $ sudo mkfs.ext4 -L HOME /dev/vdb6
 mke2fs 1.47.0 (5-Feb-2023)
 Discarding device blocks: done                            
 Creating filesystem with 99840 4k blocks and 99840 inodes
-Filesystem UUID: 6eb166fa-bfb8-44d5-aac4-8712be4be5df
+Filesystem UUID: 76a62184-3385-4cff-ad77-c76946332553
 Superblock backups stored on blocks: 
 	32720, 98160
 
@@ -104,13 +104,13 @@ Writing superblocks and filesystem accounting information: done
 $ lsblk -o NAME,FSTYPE,LABEL,UUID /dev/vdb
 NAME   FSTYPE LABEL UUID
 vdb                 
-├─vdb1 vfat   ESP   B4B6-B341
-├─vdb2 ext3   BOOT  74c6caf1-aba6-4c82-8dbd-44a78984fc01
+├─vdb1 vfat   ESP   8E04-78D2
+├─vdb2 ext3   BOOT  22d4f1ec-1bd3-4377-90e8-ffb5f3da688b
 ├─vdb3              
-├─vdb4 xfs    ROOT  86222446-c3ab-455d-a1f4-f79cdf37961b
-├─vdb5 btrfs  VAR   6082e166-6679-4353-877b-6670c224ff0a
-└─vdb6 ext4   HOME  6eb166fa-bfb8-44d5-aac4-8712be4be5df</code></pre>
-<p>どれも、作ったときに <b>UUID</b>（乱数の番号）を決めて中に書き込んでいる。UUID は作るたびに変わるので、あなたの画面では違う値になる。ext3 と ext4 の出力の <code>Superblock backups stored on blocks</code> は、管理情報（スーパーブロック）の写しをディスクの途中にも置いたという意味で、先頭が壊れたときに <code>e2fsck -b</code> で使う。mkfs.btrfs の <code>SSD detected: no</code> は、第1章の rotational を読んだ結果である（演習01 で vdb を SSD 扱いにした練習機では、同じ行が <code>yes</code> になった）。</p>
+├─vdb4 xfs    ROOT  0487f66c-a470-468c-b92d-7424b72de8ae
+├─vdb5 btrfs  VAR   793b9022-3f71-4534-b0e7-a4df1aad7578
+└─vdb6 ext4   HOME  76a62184-3385-4cff-ad77-c76946332553</code></pre>
+<p>どれも、作ったときに <b>UUID</b>（区画を見分ける番号）を決めて中に書き込んでいる。ext3・ext4・XFS・Btrfs は 128 ビットの乱数（<code>xxxxxxxx-xxxx-…</code> の形）で、VFAT は作った時刻から作る 32 ビットのボリューム ID（<code>XXXX-XXXX</code> の形）である。どちらも作るたびに変わるので、あなたの画面では違う値になる。ext3 と ext4 の出力の <code>Superblock backups stored on blocks</code> は、管理情報（スーパーブロック）の写しをディスクの途中にも置いたという意味で、先頭が壊れたときに <code>e2fsck -b</code> で使う。mkfs.btrfs の <code>SSD detected: no</code> は、第1章の rotational を読んだ結果である（演習01 で vdb を SSD 扱いにした練習機では、同じ行が <code>yes</code> になった）。</p>
 <div class="analogy"><b>たとえ</b>: 区画が<b>空き地</b>なら、mkfs は<b>倉庫を建てる</b>作業に近い。棚の配置図（管理情報）と番地（UUID）と看板（ラベル）を書いた時点で、空き地は「倉庫の形式」を持つ。建て方（ext4・XFS・…）で棚の並べ方が違う。
 <br>ただし<b>崩れる点</b>: 倉庫を建て替えれば古い荷物は壊れるとすぐ分かるが、mkfs は前に何があったかを聞かずに上書きすることがある（mkfs.vfat は何も聞かなかった）。mkfs は「中身を消す」操作だと覚えておく。</div>
 
@@ -128,22 +128,40 @@ Filesystem     1M-blocks  Used Available Use% Mounted on
 /dev/vdb6            350     1       323   1% /mnt   ← 350 − 1 = 349 のはずが 323</code></pre>
 <div class="then"><b>だめな理由</b>: Size が 390 より小さく、さらに Size − Used と Avail が 26MiB 合わない。
 Size が小さいのは、ext4 が区画の中に管理情報（inode の表やジャーナル）を置いているから。
-26MiB 合わないのは、ext4 が<b>root のために 5% を取っておく</b>（予約ブロック）からである。
-ディスクがいっぱいになっても root とデーモンが書けるように、一般ユーザにはそのぶんを Avail に見せない。</div></div>
-<p>予約の量は ext4 の管理情報に書いてあり、<code>tune2fs -l</code> で読める。<code>tune2fs -m</code> で割合を変えられる（作り直す必要は無く、マウントしたままでよい）。</p>
+26MiB 合わない分の大半は、ext4 が<b>root のために 5% を取っておく</b>（予約ブロック）からである。
+ディスクがいっぱいになっても root とデーモンが書けるように、一般ユーザにはそのぶんを Avail に見せない。
+残りは、ext4 が自分の作業のために取り置く分である（下で確かめる）。</div></div>
+<p>予約の量は ext4 の管理情報に書いてあり、<code>tune2fs -l</code> で読める。ext4 自身の取り置きは <code>/sys/fs/ext4/&lt;装置&gt;/reserved_clusters</code> に出ている。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo tune2fs -l /dev/vdb6 | grep -E "^(Block count|Reserved block count|Block size|Reserved blocks uid)"
 Block count:              99840
 Reserved block count:     4909
 Block size:               4096
 Reserved blocks uid:      0 (user root)
-$ sudo tune2fs -m 1 /dev/vdb6
+$ cat /sys/fs/ext4/vdb6/reserved_clusters
+1996</code></pre>
+<p>root のための予約は 4909 ブロック × 4KiB ≈ 19MiB。ext4 自身の取り置きは 1996 ブロック × 4KiB ≈ 8MiB で、全体（99840 ブロック）の 2% に当たる（大きなファイルシステムでも 4096 ブロックまで）。2つを足すと、ほぼ 26MiB の差になる（<code>df</code> は MiB に丸めて表示するので、1 くらいはずれる）。予約の割合は <code>tune2fs -m</code> で変えられる（作り直す必要は無く、マウントしたままでよい）。0 にしてみる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo tune2fs -m 0 /dev/vdb6
+tune2fs 1.47.0 (5-Feb-2023)
+Setting reserved blocks percentage to 0% (0 blocks)
+$ df -m /mnt
+Filesystem     1M-blocks  Used Available Use% Mounted on
+/dev/vdb6            350     1       342   1% /mnt</code></pre>
+<p>予約を 0 にしても、Size − Used と Avail はまだ 7MiB 合わない（<code>df</code> は MiB に丸めて表示する）。これが ext4 自身の取り置きで、<code>tune2fs</code> では消せない。演習06 に合わせて 1% にしておく。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo tune2fs -m 1 /dev/vdb6
 tune2fs 1.47.0 (5-Feb-2023)
 Setting reserved blocks percentage to 1% (998 blocks)
 $ df -m /mnt
 Filesystem     1M-blocks  Used Available Use% Mounted on
-/dev/vdb6            350     1       338   1% /mnt
+/dev/vdb6            350     1       338   1% /mnt</code></pre>
+<p>1% にすると、Avail は最初の 323 から 338 に増えた。データだけを置く区画なら予約を減らしてよいが、<code>/</code> や <code>/var</code> では残しておく。</p>
+<p>ついでに、<code>df</code> の別の数え方と、<code>du</code> を見ておく。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ df -i /mnt
+Filesystem     Inodes IUsed IFree IUse% Mounted on
+/dev/vdb6       99840    11 99829    1% /mnt
+$ sudo du -sh /mnt
+20K	/mnt
 $ sudo umount /mnt</code></pre>
-<p>4909 ブロック × 4KiB ≈ 19MiB が予約されていた。1% にすると Avail が 15MiB 増えた。データだけを置く区画なら予約を減らしてよいが、<code>/</code> や <code>/var</code> では残しておく。</p>
+<p><code>df -i</code> は容量ではなく <b>inode</b>（ファイル1つに1つ要る管理情報）の数を出す。ext4 は作ったときに inode の数が決まり（ここでは 99840 個）、使い切ると、容量が空いていてもファイルを作れなくなる。<code>du</code> は、見えるファイルを1つずつ足した量である（作ったばかりの ext4 には <code>lost+found</code> しか無く、20K）。<code>df</code> の Used（24K）はファイルシステムが答える使用量で、数え方が違うので一致するとは限らない。</p>
 <p>5つのファイルシステムを、1つずつマウントして比べる（区画の大きさは 100・300・600・400・390MiB）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ for p in 1 2 4 5 6; do sudo mount /dev/vdb$p /mnt &amp;&amp; df -h --output=source,fstype,size,used,avail /mnt | tail -1; sudo umount /mnt; done
 /dev/vdb1      vfat   99M   512   99M
@@ -151,9 +169,18 @@ $ sudo umount /mnt</code></pre>
 /dev/vdb4      xfs   536M   41M  496M
 /dev/vdb5      btrfs  400M  5.8M  319M
 /dev/vdb6      ext4  350M   24K  338M</code></pre>
-<p>VFAT は管理情報が小さく、ほぼ区画の大きさのまま使える。XFS は作った直後から 41M を Used に数える（ジャーナルなどの管理情報を Used として見せる）。Btrfs は管理情報を2重に持つ（<code>Metadata: DUP</code>）ぶん、Avail が少ない。<b>同じ大きさの区画でも、使える量はファイルシステムの種類で変わる</b>。</p>
+<p>VFAT は管理情報が小さく、ほぼ区画の大きさのまま使える。XFS は、ジャーナル（<code>mkfs.xfs</code> の出力の <code>log</code> の <code>blocks=16384</code> = 64MiB）を Size から除いたうえで（600 − 64 = 536M）、作った直後から 41M を Used に数える。その大半は、XFS が自分の作業のために取り置く予約である。Btrfs は管理情報を2重に持つ（<code>Metadata: DUP</code>）ぶん、Avail が少ない。<b>同じ大きさの区画でも、使える量はファイルシステムの種類で変わる</b>。XFS の予約は <code>xfs_io</code> で読める。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mount /dev/vdb4 /mnt
+$ sudo xfs_io -x -c resblks /mnt
+reserved blocks = 7680
+available reserved blocks = 7680
+$ df -i /mnt
+Filesystem     Inodes IUsed  IFree IUse% Mounted on
+/dev/vdb4      307200     3 307197    1% /mnt
+$ sudo umount /mnt</code></pre>
+<p>7680 ブロック × 4KiB = 30MiB が XFS の予約で、41M の Used の大半を占める。XFS の <code>df -i</code> の数（307200）は上限で、inode は必要になったときに作る（作った直後に使っているのは 3 個）。</p>
 <div class="analogy"><b>たとえ</b>: 満員電車の<b>乗務員用の扉</b>に近い。乗客で埋まっても、乗務員が通る隙間だけは空けておく。乗客から見れば、その隙間は「無い」のと同じである。
-<br>ただし<b>崩れる点</b>: 扉は目に見えるが、予約ブロックは <code>df</code> の Size にも Used にも出ない。Avail が減っていることでしか見えない。</div>
+<br>ただし<b>崩れる点</b>: 扉は目に見えるが、ext4 の予約ブロックは <code>df</code> の Size にも Used にも出ない。Avail が減っていることでしか見えない（XFS の予約は逆に Used に数えられる）。</div>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-disks/">演習06</a>は、5種類のファイルシステムを作り、vdb6 の予約を 1% にする課題である。
 判定は各区画の先頭の印と、ext4 の管理情報を直接読んで確かめる。</div>
@@ -171,14 +198,14 @@ Journal features:         journal_64bit journal_checksum_v3</code></pre>
 <div class="scroll"><table>
 <tr><th>種類</th><th>作るコマンド</th><th>特徴</th><th>この章の記録で見えたこと</th></tr>
 <tr><td>ext3</td><td><code>mkfs -t ext3</code>（<code>mke2fs -j</code>）</td><td>ext2 ＋ ジャーナル。古い <code>/boot</code> などで使われた</td><td>features に extent が無い</td></tr>
-<tr><td>ext4</td><td><code>mkfs.ext4</code></td><td>ext3 の後継。extent・大きな容量。縮小もできる（外してから）。Ubuntu の既定</td><td>root 用の予約 5%（<code>tune2fs -m</code> で変更）</td></tr>
-<tr><td>XFS</td><td><code>mkfs.xfs</code></td><td>大きなファイル・並列の書き込みに強い。RHEL の既定。<b>縮小できない</b>。調べるのは <code>xfs_repair</code></td><td>作った直後から 41M を Used に数える</td></tr>
+<tr><td>ext4</td><td><code>mkfs.ext4</code></td><td>ext3 の後継。extent・大きな容量。縮小もできる（外してから）。Ubuntu の既定</td><td>root 用の予約 5%（<code>tune2fs -m</code> で変更）と、自分用の取り置き 2%</td></tr>
+<tr><td>XFS</td><td><code>mkfs.xfs</code></td><td>大きなファイル・並列の書き込みに強い。RHEL の既定。<b>縮小できない</b>。調べるのは <code>xfs_repair</code></td><td>ジャーナルを Size から除き、作った直後から 41M（大半は予約の 30MiB）を Used に数える</td></tr>
 <tr><td>VFAT</td><td><code>mkfs.vfat</code>（<code>-F 32</code> で FAT32）</td><td>Windows・カメラ・ESP と共通。所有者とパーミッションを持たない（第8章）。FAT32 は 1ファイル 4GiB まで</td><td>管理情報が小さく、ほぼ区画の大きさで使える</td></tr>
 <tr><td>Btrfs</td><td><code>mkfs.btrfs</code></td><td>書き込みのたびに別の場所へ書く（コピーオンライト）。スナップショット・サブボリューム・検査値を持つ</td><td>管理情報を2重（DUP）に持つ</td></tr>
 </table></div>
 
 <h2 id="fsck">fsck は、種類ごとに別のもの</h2>
-<div class="sgoal"><b>この節で分かること</b>: ファイルシステムの検査の道具と、その注意。</div>
+<div class="sgoal"><b>この節で分かること</b>: ファイルシステムの検査の道具と、その注意（検査と修復は 201 の範囲。ここでは道具の違いだけ）。</div>
 <p><code>fsck</code> も入口で、種類ごとの道具（<code>fsck.ext4</code> = <code>e2fsck</code> など）を呼ぶ。検査はマウントを外した状態で行う。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo fsck /dev/vdb6
 fsck from util-linux 2.39.3
@@ -222,17 +249,17 @@ repair a damaged filesystem, see btrfs(8) subcommand 'check'.</code></pre>
 <details><summary>答え</summary>
 <p><code>mkfs.ext4 /dev/sdb1</code> と <code>mke2fs -t ext4 /dev/sdb1</code>。<code>mkfs</code> は入口で、<code>-t</code> で指定した種類の道具（<code>/sbin/mkfs.ext4</code>）を呼ぶ。ext3 なら <code>mkfs -t ext3</code>・<code>mkfs.ext3</code>・<code>mke2fs -j</code>。</p></details></div>
 <div class="quiz"><b>確認</b>
-<p>ext4 の <code>df</code> で、Size − Used より Avail が小さい。何が原因か。データ専用の区画で、その差を無くすコマンドは何か。</p>
+<p>ext4 の <code>df</code> で、Size − Used より Avail が小さい。何が原因か。データ専用の区画で、その差を減らすコマンドは何か。</p>
 <details><summary>答え</summary>
-<p>root のための予約ブロック（既定で 5%）。一般ユーザに見せる Avail からは除かれる。<code>tune2fs -m 0 /dev/…</code> で無くせる（実測では <code>-m 1</code> で 1% にした）。数は <code>tune2fs -l</code> の Reserved block count で読める。</p></details></div>
+<p>大半は root のための予約ブロック（既定で 5%）で、一般ユーザに見せる Avail からは除かれる。数は <code>tune2fs -l</code> の Reserved block count で読め、<code>tune2fs -m 0 /dev/…</code> で無くせる（実測では <code>-m 1</code> で 1% にした）。残りは ext4 が自分の作業のために取り置く分（<code>reserved_clusters</code>。全体の 2%、多くても 4096 ブロック）で、<code>-m 0</code> にしても残る（実測で 7MiB）。だから差は 0 にはならない。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>XFS の区画に <code>fsck</code> を打ったら、案内が出て終了コード 0 で終わった。この区画を検査するにはどうするか。</p>
 <details><summary>答え</summary>
 <p><code>xfs_repair</code> を使う（マウントを外して。直さずに調べるだけなら <code>-n</code>）。<code>fsck.xfs</code> は何もしない道具で、XFS は自分の検査をマウントのときのジャーナルで済ませる設計になっている。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>mkfs</code> は入口で、<code>mkfs -t 種類</code> = <code>mkfs.種類</code>。作ると UUID が決まり、ラベルは <code>-L</code>（VFAT は <code>-n</code>）で付ける</li><li>ファイルシステムは区画の中に管理情報を置くので、<code>df</code> の Size は区画より小さい。どれだけ小さいかは種類で違う</li><li>ext4 は root 用に 5% を予約する。Avail はそのぶん小さい。<code>tune2fs -l</code> で読み、<code>tune2fs -m</code> で変える</li><li>ext3 = ext2 ＋ ジャーナル、ext4 は extent などを足した後継。XFS は縮小できず、Btrfs はコピーオンライトでスナップショットを持ち、VFAT は所有者とパーミッションを持たない</li><li><code>fsck</code> も入口。ext 系は <code>e2fsck</code> が走るが、XFS と Btrfs は何もせずに成功を返す。調べるのは <code>xfs_repair</code>・<code>btrfs check</code></li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.0@sha256:a5ab400fa07c076927eadf21ef9bb42b3bf70a1c2abae93fab24a21f50ecf96b / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・e2fsprogs 1.47.0・xfsprogs 6.6.0・btrfs-progs 6.6.3・dosfstools 4.2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>mkfs</code> は入口で、<code>mkfs -t 種類</code> = <code>mkfs.種類</code>。作ると UUID が決まり、ラベルは <code>-L</code>（VFAT は <code>-n</code>）で付ける</li><li>ファイルシステムは区画の中に管理情報を置くので、<code>df</code> の Size は区画より小さい。どれだけ小さいかは種類で違う</li><li>ext4 は root 用に 5% を予約し、さらに自分の作業用に 2%（多くても 4096 ブロック）を取り置く。Avail はそのぶん小さい。予約は <code>tune2fs -l</code> で読み、<code>tune2fs -m</code> で変える（取り置きは <code>-m 0</code> でも残る）</li><li><code>df -i</code> は inode の数（ext4 は作ったときに決まる）、<code>du</code> はファイルを1つずつ足した量で、<code>df</code> の Used とは数え方が違う</li><li>ext3 = ext2 ＋ ジャーナル、ext4 は extent などを足した後継。XFS は縮小できず、Btrfs はコピーオンライトでスナップショットを持ち、VFAT は所有者とパーミッションを持たない</li><li>XFS はジャーナルを Size から除き、予約（<code>xfs_io</code> の resblks）を Used に数える</li><li><code>fsck</code> も入口（検査と修復は 201 の範囲）。ext 系は <code>e2fsck</code> が走るが、XFS と Btrfs は何もせずに成功を返す。調べるのは <code>xfs_repair</code>・<code>btrfs check</code></li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・e2fsprogs 1.47.0・xfsprogs 6.6.0・btrfs-progs 6.6.3・dosfstools 4.2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-disks/theory/05-lvm">← 5. LV を広げても、ファイルシステムは広がらない</a><a href="/linuc-disks/theory/07-swap">次: 7. tmpfs は、メモリを先に取らない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

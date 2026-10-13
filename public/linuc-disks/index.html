@@ -60,21 +60,21 @@ QEMU が CPU を丸ごとソフトウェアで真似する（完全エミュレ�
 <pre><code>docker run -d --name lab-linuc-disks --hostname host --stop-timeout 30 \
   -v lab-linuc-disks-vm:/home/lab/vm \
   -v lab-linuc-disks-state:/home/lab/.lab \
-  ghcr.io/chai0204/lab-linuc:disks-1.0.0@sha256:a5ab400fa07c076927eadf21ef9bb42b3bf70a1c2abae93fab24a21f50ecf96b
+  ghcr.io/chai0204/lab-linuc:disks-1.0.1@sha256:__DIGEST__
 
 docker exec -it lab-linuc-disks bash -l</code></pre>
 <ul>
 <li>コンテナを起動すると、中で練習機も起動します。KVM を使わない完全エミュレーションなので、<b>起動に 40〜90 秒</b>かかります。</li>
 <li><code>--stop-timeout 30</code> は必須です（権限ではありません）。<code>docker stop</code> したとき、練習機を正常に止めるのに約 13 秒かかり、docker の既定の猶予 10 秒では電源を抜かれてしまうためです。</li>
 <li>Linux で <code>--device /dev/kvm</code> を足すと起動が数秒になりますが、<code>/proc/cpuinfo</code> などの表示が変わります。本文の出力は KVM なしで取ったものです。</li>
-<li>podman でも同じオプションが使えるはずです（<code>podman run --stop-timeout 30 …</code>）。著者は docker でだけ確かめました。</li>
+<li>podman でも、同じオプションのまま <code>docker</code> を <code>podman</code> に替えて起動できるはずです。同じ土台（仮想マシン型の檻の共通部分）を使う別のコースの檻は、podman 5.8.6（rootless）で起動・練習機への ssh・<code>podman stop</code> まで確かめてあります（<code>logs/linuc-machine-podman.log</code>）。<b>このコースの檻そのものは、podman ではまだ確かめていません</b>。</li>
 </ul>
 <p>入ると、練習機の状態と現在地が出ます。</p>
 <pre><code>練習機 linuc: running（エージェント 応答あり / ssh 待ち受け中）
   vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
 
 
-── lab-linuc-disks 1.0.0 ────────────────────────────────────────
+── lab-linuc-disks 1.0.1 ────────────────────────────────────────
 lab-linuc-disks  進捗 0/8
   次 → 01 「vdb を SSD として扱わせる（再起動しても）」 (目安 10分 / 影響度 B)
   lab start 01 で課題を開く
@@ -87,7 +87,7 @@ lab-linuc-disks  進捗 0/8
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 13 11:36:25 2026 from 10.0.2.2
+Last login: Tue Oct 13 19:22:29 2026 from 10.0.2.2
 student@linuc:~$ exit
 logout
 Connection to 127.0.0.1 closed.</code></pre>
@@ -136,8 +136,8 @@ Connection to 127.0.0.1 closed.</code></pre>
 <li><code>lab env</code> の全文（外で打つ）</li>
 </ol>
 <pre><code>$ lab env
-テーマ    : lab-linuc-disks 1.0.0
-イメージ  : ghcr.io/chai0204/lab-linuc:disks-1.0.0
+テーマ    : lab-linuc-disks 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:disks-1.0.1
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -157,7 +157,7 @@ docker volume rm lab-linuc-disks-vm lab-linuc-disks-state     # 練習機のデ�
 <p>イメージは <code>docker rmi</code> で消せます。
 母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。</p>
 
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.0@sha256:a5ab400fa07c076927eadf21ef9bb42b3bf70a1c2abae93fab24a21f50ecf96b / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で演習8本を完走（podman は未確認）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で演習8本を完走（podman は未確認）/ 検証日 2026-10-13</div>
 
 <section id="comments">
 <h2>コメント</h2>

@@ -5,7 +5,7 @@
 #
 # 走らせ方（probe と同じ。新しいボリュームで、練習機は工場出荷時の状態から始める）:
 #   docker run -d --name linuc-disks-solve --hostname host --stop-timeout 30 \
-#     -v linuc-disks-solve-vm:/home/lab/vm -v linuc-disks-solve-state:/home/lab/.lab lab-linuc-disks:1.0.0
+#     -v linuc-disks-solve-vm:/home/lab/vm -v linuc-disks-solve-state:/home/lab/.lab lab-linuc-disks:1.0.1
 #   docker exec linuc-disks-solve vm start
 #   docker cp probe/linuc-disks-solve-all.sh linuc-disks-solve:/tmp/solve.sh
 #   docker exec -u lab -w /home/lab linuc-disks-solve bash -l /tmp/solve.sh > logs/linuc-disks-solve-all.log 2>&1
@@ -45,13 +45,21 @@ H 'lab check 01; echo "exit=$?"'
 S "C. 演習02 — USB メモリを挿し直しても使えなくする"
 H 'lab check 02; echo "exit=$?"'
 G 'echo "blacklist usb_storage" | sudo tee /etc/modprobe.d/lab-usb.conf'
-G 'sudo systemctl restart systemd-udevd'
 G 'sudo modprobe -r uas'
 H 'echo "--- blacklist usb_storage だけ（uas の依存で読み込まれるはず）---"; lab check 02; echo "exit=$?"'
-G 'echo "install usb_storage /bin/false" | sudo tee /etc/modprobe.d/lab-usb.conf'
+G 'printf "blacklist usb_storage\nblacklist uas\n" | sudo tee /etc/modprobe.d/lab-usb.conf'
+G 'sudo modprobe -r uas'
+H 'echo "--- 同じファイルを書き換えて uas も足しただけ（udev が書き換えに気づかないはず）---"; lab check 02; echo "exit=$?"'
 G 'sudo systemctl restart systemd-udevd'
 G 'sudo modprobe -r uas'
-H 'lab check 02; echo "exit=$?"'
+H 'echo "--- ヒント2のとおり udev を再起動した ---"; lab check 02; echo "exit=$?"'
+# ファイルを消したことには udev が自分で気づく（使えるように戻るはず）。
+# そのあと模範解答どおり、新しいファイルに2行を書く（udev の再起動なし）
+G 'sudo rm /etc/modprobe.d/lab-usb.conf'
+H 'echo "--- ファイルを消しただけ（udev が気づいて、また使えるようになるはず）---"; lab check 02; echo "exit=$?"'
+G 'printf "blacklist usb_storage\nblacklist uas\n" | sudo tee /etc/modprobe.d/lab-usb.conf'
+G 'sudo modprobe -r uas'
+H 'echo "--- 模範解答: 新しいファイルに2行（udev の再起動なし）---"; lab check 02; echo "exit=$?"'
 
 S "D. 演習03 — 消してしまったパーティションを取り戻す"
 H 'lab check 03; echo "exit=$?"'

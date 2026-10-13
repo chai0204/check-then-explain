@@ -37,22 +37,22 @@ TARGET
 <p>見出しの <code>TARGET</code> だけが1行目に出て、残りが2行目に回っている。これは util-linux 2.39 の <code>findmnt</code> や <code>lsblk</code> が<b>端末に</b>表を出すときの癖で、いちばん左の列の中身がすべて見出しより短いと、その見出しだけを折り返す（パイプに流すと1行に収まる）。このコースの記録は、読者と同じ端末の条件で取ってあるので、この折り返しもそのまま載せている。</p>
 <p><code>proc</code>・<code>sysfs</code>・<code>devtmpfs</code> は、どれもカーネルがメモリの上に作るファイルシステムである。たとえば CPU の情報のファイルは、大きさが 0 なのに中身がある。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls -l /proc/cpuinfo
--r--r--r-- 1 root root 0 Oct 13 11:35 /proc/cpuinfo
+-r--r--r-- 1 root root 0 Oct 13 19:21 /proc/cpuinfo
 $ grep -m1 "model name" /proc/cpuinfo
 model name	: QEMU TCG CPU version 2.5+
 $ grep -c ^processor /proc/cpuinfo
 2
 $ head -3 /proc/meminfo
-MemTotal:        1459128 kB
-MemFree:         1177460 kB
-MemAvailable:    1217252 kB</code></pre>
+MemTotal:        1459124 kB
+MemFree:         1176520 kB
+MemAvailable:    1216776 kB</code></pre>
 <p>読んだ瞬間にカーネルが答えを作るので、大きさを持たない。CPU は <code>QEMU TCG CPU</code> で、これは QEMU が CPU の命令をソフトウェアで翻訳しながら動かしている（完全エミュレーション）という意味である。KVM を使う読者は、ここに自分の CPU の名前が出る。</p>
 <p>出題範囲の「ハードウェアの情報の取得」には、装置ごとの割り当ても入る。<b>割り込み</b>（IRQ。装置が CPU に「用がある」と知らせる番号）、<b>I/O ポート</b>（CPU が装置とやりとりする番地）、<b>DMA</b>（装置が CPU を通さずメモリに読み書きする通り道）である。どれも <code>/proc</code> で読める。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ head -4 /proc/interrupts
            CPU0       CPU1       
-  0:        302          0   IO-APIC   2-edge      timer
+  0:        329          0   IO-APIC   2-edge      timer
   1:          9          0   IO-APIC   1-edge      i8042
-  4:        492          0   IO-APIC   4-edge      ttyS0
+  4:        582          0   IO-APIC   4-edge      ttyS0
 $ head -5 /proc/ioports
 0000-0000 : PCI Bus 0000:00
   0000-0000 : dma1
@@ -89,16 +89,16 @@ loop1  loop3  loop5  loop7  sr0  vdb  vdd
 $ cat /sys/block/vdb/size
 4194304
 $ ls -l /dev/vda /dev/sda /dev/sr0
-brw-rw---- 1 root disk    8, 0 Oct 13 11:36 /dev/sda
-brw-rw---- 1 root cdrom  11, 0 Oct 13 11:36 /dev/sr0
-brw-rw---- 1 root disk  253, 0 Oct 13 11:36 /dev/vda</code></pre>
+brw-rw---- 1 root disk    8, 0 Oct 13 19:22 /dev/sda
+brw-rw---- 1 root cdrom  11, 0 Oct 13 19:22 /dev/sr0
+brw-rw---- 1 root disk  253, 0 Oct 13 19:22 /dev/vda</code></pre>
 <div class="scroll"><table>
 <tr><th>窓</th><th>見せ方</th><th>この記録で読めたこと</th></tr>
 <tr><td><code>/proc</code>（procfs）</td><td>カーネルの状態を表にしたファイル</td><td><code>/proc/partitions</code> にカーネルが知っているディスクとパーティションの一覧（大きさは 1KiB 単位）</td></tr>
 <tr><td><code>/sys</code>（sysfs）</td><td>装置ごとのディレクトリと、属性ごとのファイル</td><td><code>/sys/block/vdb/size</code> は 4194304（512 バイトのセクタの数。つまり 2GiB）</td></tr>
 <tr><td><code>/dev</code>（devtmpfs）</td><td>装置への入り口になるデバイスファイル</td><td>先頭の <code>b</code> がブロックデバイス、<code>8, 0</code> がメジャー番号とマイナー番号</td></tr>
 </table></div>
-<p><code>/dev/sda</code> の <code>8, 0</code> は「SCSI ディスクのドライバ（8）の0番目」、<code>/dev/vda</code> の <code>253, 0</code> は virtio のディスクのドライバ、<code>/dev/sr0</code> の <code>11, 0</code> は光学ドライブのドライバを指す。デバイスファイルは中身を持たず、この番号で「どのドライバの何番目か」を指しているだけである。<code>/sys/block</code> の <code>loop0</code>〜<code>loop7</code> は、ファイルをディスクとして見せるための仮の装置で、ここでは使わない。</p>
+<p><code>/dev/sda</code> の <code>8, 0</code> は「SCSI ディスクのドライバ（8）の0番目」、<code>/dev/vda</code> の <code>253, 0</code> は virtio のディスクのドライバ（virtio の番号は決まっておらず、起動のときに空いている番号から割り当てられる。この練習機では 253 になった）、<code>/dev/sr0</code> の <code>11, 0</code> は光学ドライブのドライバを指す。デバイスファイルは中身を持たず、この番号で「どのドライバの何番目か」を指しているだけである。<code>/sys/block</code> の <code>loop0</code>〜<code>loop7</code> は、ファイルをディスクとして見せるための仮の装置で、ここでは使わない。</p>
 <div class="analogy"><b>たとえ</b>: 工場の<b>計器盤</b>に近い。<code>/proc</code> は全体の表示板、<code>/sys</code> は機械ごとの計器、<code>/dev</code> は機械を動かすレバーである。計器は読めば今の値を示すが、紙に記録されているわけではない。
 <br>ただし<b>崩れる点</b>: 計器は読むだけのものだが、<code>/sys</code> のいくつかのファイルは root が書き込める。書くとカーネルの扱いがその場で変わる（この章の後半でやる）。</div>
 
@@ -153,7 +153,7 @@ $ lsusb -t
 
 <h2 id="rota">HDD か SSD か</h2>
 <div class="sgoal"><b>この節で分かること</b>: カーネルが「回転するディスクかどうか」を何で決めているか。</div>
-<p>HDD は円盤を回して磁気ヘッドを動かすので、離れた場所を続けて読むと遅い。SSD は半導体なので、どこを読んでも速さがほぼ同じである。カーネルは、どちらかによって読み書きの並べ方（I/O スケジューラ）を変える。その区別が <code>lsblk</code> の <b>ROTA</b>（rotational = 回転する）列に出る。</p>
+<p>HDD は円盤を回して磁気ヘッドを動かすので、離れた場所を続けて読むと遅い。SSD は半導体なので、どこを読んでも速さがほぼ同じである。カーネルは装置ごとに「回転するかどうか」の印を持っていて、カーネル自身や道具が振る舞いを決める手がかりにする（第6章の <code>mkfs.btrfs</code> も、これを読んで <code>SSD detected</code> と表示する）。その印が <code>lsblk</code> の <b>ROTA</b>（rotational = 回転する）列に出る。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>練習機のディスクは、どれも外側の同じ種類のファイルで、置き場所も同じ（著者の PC の SSD）である。
 カーネルが実際の速さを測って判断するのなら、全部同じ答えになるはずだ。少なくとも、同じ種類のファイルに違う答えは出ないだろう。</p>
@@ -172,13 +172,13 @@ SATA の装置は、自分の回転数を答える欄を持っていて（ATA �
 virtio のディスクにはその欄が無いので、既定の「回転する」になる。</div></div>
 <p>外側で確かめる。5本のファイルは同じ種類（qcow2）で、違いは定義の中の1語だけである。</p>
 <pre data-where="外（lab@host）"><code>$ ls -l ~/vm/extra/*.qcow2
--rw-r--r-- 1 lab lab  196624 Oct 13 11:35 /home/lab/vm/extra/sda.qcow2
--rw-r--r-- 1 lab lab  196616 Oct 13 11:35 /home/lab/vm/extra/usb-a.qcow2
--rw-r--r-- 1 lab lab  196616 Oct 13 11:35 /home/lab/vm/extra/usb-b.qcow2
--rw-r--r-- 1 lab lab  196616 Oct 13 11:35 /home/lab/vm/extra/usb-check.qcow2
--rw-r--r-- 1 lab lab  196640 Oct 13 11:35 /home/lab/vm/extra/vdb.qcow2
--rw-r--r-- 1 lab lab  196624 Oct 13 11:35 /home/lab/vm/extra/vdc.qcow2
--rw-r--r-- 1 lab lab 1048576 Oct 13 11:36 /home/lab/vm/extra/vdd.qcow2
+-rw-r--r-- 1 lab lab  196624 Oct 13 19:21 /home/lab/vm/extra/sda.qcow2
+-rw-r--r-- 1 lab lab  196616 Oct 13 19:21 /home/lab/vm/extra/usb-a.qcow2
+-rw-r--r-- 1 lab lab  196616 Oct 13 19:21 /home/lab/vm/extra/usb-b.qcow2
+-rw-r--r-- 1 lab lab  196616 Oct 13 19:21 /home/lab/vm/extra/usb-check.qcow2
+-rw-r--r-- 1 lab lab  196640 Oct 13 19:21 /home/lab/vm/extra/vdb.qcow2
+-rw-r--r-- 1 lab lab  196624 Oct 13 19:21 /home/lab/vm/extra/vdc.qcow2
+-rw-r--r-- 1 lab lab 1048576 Oct 13 19:22 /home/lab/vm/extra/vdd.qcow2
 $ virsh dumpxml linuc | grep rotation_rate
       &lt;target dev='sda' bus='sata' rotation_rate='1'/&gt;</code></pre>
 <p><code>rotation_rate='1'</code> は「回転数 1」という特別な値で、SATA の決まりでは「回転しない装置」を意味する。QEMU はそう答え、カーネルはそれを <code>/sys</code> に書いた。<code>lsblk</code> はそのファイルを読んでいるだけである。</p>
@@ -207,9 +207,9 @@ vdb    0</code></pre>
 実践編の<a href="/linuc-disks/">演習01</a>は、vdb を「再起動しても SSD として扱われる」状態にする課題である。
 判定は再起動の代わりに、起動時と同じ知らせを udev に1回送って、値が 0 に書き換わるかを見る。</div>
 
-<h2 id="optical">光学ドライブは、取り外せて書けない装置</h2>
+<h2 id="optical">この光学ドライブは、取り外せて書けない装置</h2>
 <div class="sgoal"><b>この節で分かること</b>: 光学ドライブの「読み取り専用」と「取り外せる」が、どこで決まっているか。</div>
-<p>さっきの表で <code>sr0</code> は RM（removable = 取り外せる）が 1、RO（read only = 読み取り専用）が 1 だった。中には ISO9660 という CD のファイルシステムが入っている。マウントして読む。</p>
+<p>さっきの表で <code>sr0</code> は RM（removable = 取り外せる）が 1、RO（read only = 読み取り専用）が 1 だった。中には ISO9660 という CD のファイルシステムが入っている（DVD や BD のデータは、UDF という別のファイルシステムで書かれることが多い）。マウントして読む。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mount /dev/sr0 /mnt
 mount: /mnt: WARNING: source write-protected, mounted read-only.
 $ cat /mnt/README.TXT
@@ -220,7 +220,7 @@ LinuC 練習用の光学メディア（CD-ROM のイメージ）
 $ touch /mnt/test.txt
 touch: cannot touch '/mnt/test.txt': Read-only file system
 $ sudo umount /mnt</code></pre>
-<p><code>mount</code> に読み取り専用を頼んでいないのに、<code>WARNING: source write-protected, mounted read-only.</code> と言って勝手にそうした。装置が書き込みを受け付けないので、mount のほうが合わせたのである。書けない理由はファイルの権限ではなく装置の性質なので、<code>Read-only file system</code> と出る。</p>
+<p><code>mount</code> に読み取り専用を頼んでいないのに、<code>WARNING: source write-protected, mounted read-only.</code> と言って勝手にそうした。この光学ドライブは QEMU が見せる <b>DVD-ROM</b>（さっきの表の MODEL の <code>QEMU DVD-ROM</code>。書き込む機能を持たないドライブ）で、カーネルは装置を読み取り専用（RO=1）として扱う。書き込みでは開けないので、mount は読み取り専用でやり直したのである（中の iso9660 も、書き込みのマウントを受け付けない。第8章で、書き込める装置の上でも同じ注意が出るのを見る）。書き込めるドライブなら RO は 0 になる。<code>touch</code> が失敗したのはファイルの権限のせいではなく、読み取り専用でマウントされているからなので、<code>Read-only file system</code> と出る。</p>
 <p>メディアを抜く。外で光学ドライブを「開ける」。</p>
 <pre data-where="外（lab@host）"><code>$ virsh change-media linuc sdb --eject
 Successfully ejected media.</code></pre>
@@ -255,8 +255,8 @@ sr0 rom   1  1  368K</code></pre>
 <p>PCI は <code>lspci -k</code>（1台に絞るなら <code>-s 00:1f.2</code> のように番号を付ける）。USB は <code>lsusb -t</code>。どちらも <code>/sys</code> の情報を読んで並べている。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/proc</code>（カーネルの状態の表）・<code>/sys</code>（装置ごとの属性）・<code>/dev</code>（装置の入り口）は、どれもカーネルがメモリの上に作る窓で、ディスクの上には無い</li><li><code>/proc/cpuinfo</code> のサイズが 0 なのは、読んだ瞬間に作られるから</li><li><code>lspci -k</code> で PCI の装置と付いているドライバ、<code>lsusb -t</code> で USB のつながりとドライバが分かる</li><li>HDD か SSD か（<code>lsblk</code> の ROTA）は、カーネルが測ったのではなく<b>装置の申告</b>。<code>/sys/block/&lt;装置&gt;/queue/rotational</code> に出ていて、root は書き換えられる（再起動で戻る）</li><li>光学ドライブは RM=1・RO=1。書けないのは装置の性質で、メディアを抜いても装置は残る</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.0@sha256:a5ab400fa07c076927eadf21ef9bb42b3bf70a1c2abae93fab24a21f50ecf96b / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・util-linux 2.39.3・pciutils 3.10.0・usbutils 017 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/proc</code>（カーネルの状態の表）・<code>/sys</code>（装置ごとの属性）・<code>/dev</code>（装置の入り口）は、どれもカーネルがメモリの上に作る窓で、ディスクの上には無い</li><li><code>/proc/cpuinfo</code> のサイズが 0 なのは、読んだ瞬間に作られるから</li><li><code>lspci -k</code> で PCI の装置と付いているドライバ、<code>lsusb -t</code> で USB のつながりと付いているドライバの名前が分かる（読み込まれているモジュールの一覧は、第2章の <code>lsmod</code>）</li><li>HDD か SSD か（<code>lsblk</code> の ROTA）は、カーネルが測ったのではなく<b>装置の申告</b>。<code>/sys/block/&lt;装置&gt;/queue/rotational</code> に出ていて、root は書き換えられる（再起動で戻る）</li><li>この練習機の光学ドライブ（QEMU の DVD-ROM）は RM=1・RO=1。RO=1 なのは書き込む機能の無いドライブだからで、書き込めるドライブなら 0 になる。メディアを抜いても装置は残り、<code>lsblk</code> の SIZE は前のメディアの大きさを出し続けた</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・util-linux 2.39.3・pciutils 3.10.0・usbutils 017 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-disks/theory/">← 理論編 目次</a><a href="/linuc-disks/theory/02-modules">次: 2. ドライバは、外しても戻ってくる →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
