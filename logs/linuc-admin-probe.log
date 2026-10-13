@@ -1,0 +1,1118 @@
+
+
+========== 0. 環境（検証環境ブロックの版の出どころ） ==========
+
+$ lab env
+テーマ    : lab-linuc-admin 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:admin-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+練習機    : running（エージェント 応答あり / ssh 待ち受け中）
+KVM       : なし（TCG。本文と同じ条件）
+QEMU      : 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+練習機の中: Ubuntu 24.04.5 LTS / カーネル 6.8.0-142-generic
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+$ vm status
+練習機     : linuc
+状態       : running
+エージェント: 応答あり
+ssh        : 待ち受け中（127.0.0.1:2222 → 練習機の 22）
+ディスク   : /home/lab/vm/linuc.qcow2（土台 /var/lib/lab-vm/linuc-guest.qcow2）
+
+$ bash -lic exit 2>/dev/null
+練習機 linuc: running（エージェント 応答あり / ssh 待ち受け中）
+  vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
+
+
+── lab-linuc-admin 1.0.0 ────────────────────────────────────────
+lab-linuc-admin  進捗 0/8
+  次 → 01 「ユーザを1人、使える状態で作る」 (目安 12分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-admin-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+student@linuc:~$ exit
+logout
+
+$ . /etc/os-release; echo "$PRETTY_NAME"
+Ubuntu 24.04.5 LTS
+
+$ uname -r
+6.8.0-142-generic
+
+$ dpkg-query -W -f "\${Package} \${Version}\n" passwd adduser cron anacron at locales libc-bin openssh-server sudo
+adduser 3.137ubuntu1
+anacron 2.3-39ubuntu2
+at 3.2.5-2.1ubuntu3
+cron 3.0pl1-184ubuntu2
+libc-bin 2.39-0ubuntu8.9
+locales 2.39-0ubuntu8.9
+openssh-server 1:9.6p1-3ubuntu13.19
+passwd 1:4.13+dfsg1-4ubuntu3.2
+sudo 1.9.15p5-3ubuntu5.24.04.3
+
+
+========== 第1章 台帳は3枚に分かれている（1.08.1） ==========
+
+$ id
+uid=1000(student) gid=1000(student) groups=1000(student),4(adm),27(sudo)
+
+$ id -u; id -g; id -G; id -nG
+1000
+1000
+1000 4 27
+student adm sudo
+
+$ grep '^student:' /etc/passwd
+student:x:1000:1000:LinuC student:/home/student:/bin/bash
+
+$ head -3 /etc/passwd
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+
+$ awk -F: '$3 >= 1000' /etc/passwd
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+student:x:1000:1000:LinuC student:/home/student:/bin/bash
+bob:x:1001:1001:Bob (lab 02):/home/bob:/bin/bash
+dave:x:1002:1002:Dave (lab 03):/home/dave:/bin/bash
+eve:x:1003:1003:Eve (lab 06):/home/eve:/bin/bash
+
+$ ls -l /etc/passwd /etc/shadow /etc/group /etc/gshadow
+-rw-r--r-- 1 root root    804 Oct 13 11:38 /etc/group
+-rw-r----- 1 root shadow  669 Oct 13 11:38 /etc/gshadow
+-rw-r--r-- 1 root root   1642 Oct 13 11:38 /etc/passwd
+-rw-r----- 1 root shadow  901 Oct 13 11:38 /etc/shadow
+
+$ grep '^student:' /etc/shadow
+grep: /etc/shadow: Permission denied
+
+$ sudo grep '^student:' /etc/shadow
+student:$y$j9T$zeB7kAA87DbMW.lomNUkh1$NBqSAf/88BS9vHtwcATjPukJ8Y3XB3oXLNYtJHmdSi4:20739:0:99999:7:::
+
+$ date -d '1970-01-01 +20739 days' +%F
+2026-10-13
+
+$ grep -E '^(adm|sudo|student):' /etc/group
+adm:x:4:student
+sudo:x:27:student
+student:x:1000:
+
+$ getent group student
+student:x:1000:
+
+$ id student
+uid=1000(student) gid=1000(student) groups=1000(student),4(adm),27(sudo)
+
+$ getent passwd student | cut -d: -f4
+1000
+
+$ getent group 1000
+student:x:1000:
+
+$ getent group proj-a proj-b bob
+proj-a:x:1101:bob
+proj-b:x:1102:bob
+bob:x:1001:
+
+$ id bob
+uid=1001(bob) gid=1001(bob) groups=1001(bob),1101(proj-a),1102(proj-b)
+
+$ grep -E '^(passwd|group|shadow|gshadow):' /etc/nsswitch.conf
+passwd:         files
+group:          files
+shadow:         files
+gshadow:        files
+
+$ getent passwd bob
+bob:x:1001:1001:Bob (lab 02):/home/bob:/bin/bash
+
+$ getent passwd 1002
+dave:x:1002:1002:Dave (lab 03):/home/dave:/bin/bash
+
+$ getent passwd nosuchuser; echo $?
+2
+
+$ sudo getent shadow bob
+bob:!:20739:0:99999:7:::
+
+
+========== 第2章 useradd は頼まれたことしかしない（1.08.1） ==========
+
+$ sudo useradd alice
+
+$ getent passwd alice
+alice:x:1004:1004::/home/alice:/bin/sh
+
+$ ls -ld /home/alice
+ls: cannot access '/home/alice': No such file or directory
+
+$ sudo -iu alice pwd
+sudo: unable to change directory to /home/alice: No such file or directory
+/home/student
+
+$ id alice
+uid=1004(alice) gid=1004(alice) groups=1004(alice)
+
+$ sudo grep '^alice:' /etc/shadow
+alice:!:20739:0:99999:7:::
+
+$ useradd -D
+GROUP=100
+HOME=/home
+INACTIVE=-1
+EXPIRE=
+SHELL=/bin/sh
+SKEL=/etc/skel
+CREATE_MAIL_SPOOL=no
+LOG_INIT=yes
+
+$ ls -l /etc/default/useradd
+-rw-r--r-- 1 root root 1117 Feb 22  2024 /etc/default/useradd
+
+$ grep -vE '^\s*#|^\s*$' /etc/default/useradd
+SHELL=/bin/sh
+
+$ grep -E '^(UID_MIN|UID_MAX|GID_MIN|USERGROUPS_ENAB|HOME_MODE)' /etc/login.defs
+HOME_MODE	0750
+UID_MIN			 1000
+UID_MAX			60000
+GID_MIN			 1000
+USERGROUPS_ENAB yes
+
+$ sudo userdel alice
+
+$ sudo useradd -m -s /bin/bash alice
+
+$ getent passwd alice
+alice:x:1004:1004::/home/alice:/bin/bash
+
+$ ls -ld /home/alice
+drwxr-x--- 2 alice alice 4096 Oct 13 11:39 /home/alice
+
+$ sudo ls -la /home/alice
+total 20
+drwxr-x--- 2 alice alice 4096 Oct 13 11:39 .
+drwxr-xr-x 7 root  root  4096 Oct 13 11:39 ..
+-rw-r--r-- 1 alice alice  220 Mar 31  2024 .bash_logout
+-rw-r--r-- 1 alice alice 3771 Mar 31  2024 .bashrc
+-rw-r--r-- 1 alice alice  807 Mar 31  2024 .profile
+
+$ ls -la /etc/skel
+total 20
+drwxr-xr-x  2 root root 4096 Oct 13 09:56 .
+drwxr-xr-x 85 root root 4096 Oct 13 11:39 ..
+-rw-r--r--  1 root root  220 Mar 31  2024 .bash_logout
+-rw-r--r--  1 root root 3771 Mar 31  2024 .bashrc
+-rw-r--r--  1 root root  807 Mar 31  2024 .profile
+
+$ echo 'ようこそ。困ったことがあれば管理者へ。' | sudo tee /etc/skel/memo.txt
+ようこそ。困ったことがあれば管理者へ。
+
+$ sudo useradd -m -s /bin/bash -c 'Carol Lab' carol
+
+$ sudo ls -1A /home/alice /home/carol
+/home/alice:
+.bash_logout
+.bashrc
+.profile
+
+/home/carol:
+.bash_logout
+.bashrc
+.profile
+memo.txt
+
+$ getent passwd carol
+carol:x:1005:1005:Carol Lab:/home/carol:/bin/bash
+
+$ sudo useradd -D -s /bin/bash
+
+$ sudo useradd -D | grep SHELL
+SHELL=/bin/bash
+
+$ ls -l /etc/default/useradd
+-rw------- 1 root root 1209 Oct 13 11:39 /etc/default/useradd
+
+$ sudo useradd -D -s /bin/sh
+
+$ useradd -D | grep SHELL
+SHELL=/bin/bash
+
+$ sudo useradd -D | grep SHELL
+SHELL=/bin/sh
+
+$ sudo chmod 644 /etc/default/useradd
+
+$ useradd -D | grep SHELL
+SHELL=/bin/sh
+
+$ sudo adduser --disabled-password --comment '' kai
+info: Adding user `kai' ...
+info: Selecting UID/GID from range 1000 to 59999 ...
+info: Adding new group `kai' (1006) ...
+info: Adding new user `kai' (1006) with group `kai (1006)' ...
+info: Creating home directory `/home/kai' ...
+info: Copying files from `/etc/skel' ...
+info: Adding new user `kai' to supplemental / extra groups `users' ...
+info: Adding user `kai' to group `users' ...
+
+$ getent passwd kai
+kai:x:1006:1006:,,,:/home/kai:/bin/bash
+
+$ id kai
+uid=1006(kai) gid=1006(kai) groups=1006(kai),100(users)
+
+$ sudo userdel -r kai
+userdel: kai mail spool (/var/mail/kai) not found
+
+
+========== 第3章 所属は書いた通りに置き換わる（1.08.1） ==========
+
+$ sudo groupadd proj-x
+
+$ sudo groupadd -g 1200 proj-y
+
+$ getent group proj-x proj-y
+proj-x:x:1103:
+proj-y:x:1200:
+
+$ sudo usermod -aG proj-x,proj-y alice
+
+$ id alice
+uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y)
+
+$ sudo groupadd ops
+
+$ sudo usermod -G ops alice
+
+$ id alice
+uid=1004(alice) gid=1004(alice) groups=1004(alice),1201(ops)
+
+$ getent group proj-x proj-y ops
+proj-x:x:1103:
+proj-y:x:1200:
+ops:x:1201:alice
+
+$ sudo usermod -aG proj-x,proj-y alice
+
+$ id alice
+uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y),1201(ops)
+
+$ sudo usermod -aG proj-x student; id -nG; id -nG student
+student adm sudo
+student adm sudo proj-x
+
+$ id -nG
+student adm sudo proj-x
+
+$ sudo gpasswd -d student proj-x
+Removing user student from group proj-x
+
+$ sudo groupmod -n operators ops
+
+$ getent group operators
+operators:x:1201:alice
+
+$ id alice
+uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y),1201(operators)
+
+$ sudo groupdel alice
+groupdel: cannot remove the primary group of user 'alice'
+
+$ sudo groupdel operators
+
+$ id alice
+uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y)
+
+$ sudo -u carol touch /tmp/carol-was-here
+
+$ ls -l /tmp/carol-was-here
+-rw-rw-r-- 1 carol carol 0 Oct 13 11:40 /tmp/carol-was-here
+
+$ sudo userdel carol
+
+$ ls -ld /home/carol
+drwxr-x--- 2 1005 1005 4096 Oct 13 11:39 /home/carol
+
+$ ls -l /tmp/carol-was-here
+-rw-rw-r-- 1 1005 1005 0 Oct 13 11:40 /tmp/carol-was-here
+
+$ sudo find / -xdev -nouser
+/home/carol
+/home/carol/.profile
+/home/carol/memo.txt
+/home/carol/.bashrc
+/home/carol/.bash_logout
+/tmp/carol-was-here
+
+$ sudo useradd -m erin
+
+$ id erin
+uid=1005(erin) gid=1005(erin) groups=1005(erin)
+
+$ ls -l /home
+total 28
+drwxr-x--- 2 alice   alice   4096 Oct 13 11:39 alice
+drwxr-x--- 2 bob     bob     4096 Oct 13 11:38 bob
+drwxr-x--- 2 erin    erin    4096 Oct 13 11:39 carol
+drwxr-x--- 3 dave    dave    4096 Oct 13 11:38 dave
+drwxr-x--- 2 erin    erin    4096 Oct 13 11:40 erin
+drwxr-x--- 2 eve     eve     4096 Oct 13 11:38 eve
+drwxr-x--- 5 student student 4096 Oct 13 11:38 student
+
+$ ls -l /tmp/carol-was-here
+-rw-rw-r-- 1 erin erin 0 Oct 13 11:40 /tmp/carol-was-here
+
+$ sudo userdel -r erin
+userdel: erin mail spool (/var/mail/erin) not found
+
+$ sudo rm -r /home/carol /tmp/carol-was-here
+
+$ ls -1 /home
+alice
+bob
+dave
+eve
+student
+
+
+========== 第4章 ロックは扉を1つ閉めるだけ（1.08.1） ==========
+
+$ sudo passwd -S alice
+alice L 2026-10-13 0 99999 7 -1
+
+$ sudo grep '^alice:' /etc/shadow
+alice:!:20739:0:99999:7:::
+
+$ sudo passwd alice
+New password: 
+Retype new password: 
+passwd: password updated successfully
+
+$ sudo passwd -S alice
+alice P 2026-10-13 0 99999 7 -1
+
+$ sudo grep '^alice:' /etc/shadow
+alice:$y$j9T$AbkbtBGaz4UeaY92K5zmH.$QdW8eKwklmc/fAiak7grze1WtGIeY0yW3hyg4Cyw50B:20739:0:99999:7:::
+
+$ sudo install -d -m 700 -o alice -g alice /home/alice/.ssh
+
+$ sudo install -m 600 -o alice -g alice ~/.ssh/authorized_keys /home/alice/.ssh/
+
+$ ssh -l alice linuc id
+uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y)
+
+$ sudo passwd -l alice
+passwd: password changed.
+
+$ sudo passwd -S alice
+alice L 2026-10-13 0 99999 7 -1
+
+$ sudo grep '^alice:' /etc/shadow
+alice:!$y$j9T$AbkbtBGaz4UeaY92K5zmH.$QdW8eKwklmc/fAiak7grze1WtGIeY0yW3hyg4Cyw50B:20739:0:99999:7:::
+
+$ ssh -l alice linuc id
+uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y)
+
+$ sudo usermod -e 1 alice
+
+$ sudo grep '^alice:' /etc/shadow
+alice:!$y$j9T$AbkbtBGaz4UeaY92K5zmH.$QdW8eKwklmc/fAiak7grze1WtGIeY0yW3hyg4Cyw50B:20739:0:99999:7::1:
+
+$ ssh -l alice linuc id
+Your account has expired; please contact your system administrator.
+Connection closed by 127.0.0.1 port 2222
+
+$ sudo su - alice -c id
+Your account has expired; please contact your system administrator.
+su: Authentication failure
+
+$ sudo chage -l alice
+Last password change					: Oct 13, 2026
+Password expires					: never
+Password inactive					: never
+Account expires						: Jan 02, 1970
+Minimum number of days between password change		: 0
+Maximum number of days between password change		: 99999
+Number of days of warning before password expires	: 7
+
+$ sudo usermod -e '' alice
+
+$ ssh -l alice linuc id
+uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y)
+
+$ sudo usermod -s /usr/sbin/nologin alice
+
+$ ssh -l alice linuc id
+This account is currently not available.
+
+$ sudo usermod -s /bin/bash alice
+
+$ sudo passwd -u alice
+passwd: password changed.
+
+$ sudo passwd -S alice
+alice P 2026-10-13 0 99999 7 -1
+
+$ sudo passwd -e alice
+passwd: password changed.
+
+$ sudo passwd -S alice
+alice P 1970-01-01 0 99999 7 -1
+
+$ ssh -l alice linuc id
+You are required to change your password immediately (administrator enforced).
+WARNING: Your password has expired.
+Password change required but no TTY available.
+
+$ sudo passwd -d alice
+passwd: password changed.
+
+$ sudo passwd -S alice
+alice NP 1970-01-01 0 99999 7 -1
+
+$ sudo passwd -l alice; sudo passwd -u alice
+passwd: password changed.
+passwd: unlocking the password would result in a passwordless account.
+You should set a password with usermod -p to unlock the password of this account.
+
+
+========== 第5章 crontab には「誰が」の列が無い（1.08.2） ==========
+
+$ crontab -l
+no crontab for student
+
+$ ls -l /usr/bin/crontab
+-rwxr-sr-x 1 root crontab 39664 Mar 31  2024 /usr/bin/crontab
+
+$ ls -ld /var/spool/cron/crontabs
+drwx-wx--T 2 root crontab 4096 Mar 31  2024 /var/spool/cron/crontabs
+
+$ echo '* * * * * date >> /tmp/tick.txt' | crontab -
+
+$ crontab -l
+* * * * * date >> /tmp/tick.txt
+
+$ sudo ls -l /var/spool/cron/crontabs
+total 4
+-rw------- 1 student crontab 207 Oct 13 11:41 student
+
+$ sudo cat /var/spool/cron/crontabs/student
+# DO NOT EDIT THIS FILE - edit the master and reinstall.
+# (- installed on Tue Oct 13 11:41:20 2026)
+# (Cron version -- $Id: crontab.c,v 2.13 1994/01/17 03:20:37 vixie Exp $)
+* * * * * date >> /tmp/tick.txt
+
+$ cat /tmp/tick.txt
+Tue Oct 13 11:42:01 JST 2026
+
+$ journalctl -u cron -n 3 --no-pager
+Oct 13 11:42:01 linuc CRON[1743]: pam_unix(cron:session): session opened for user student(uid=1000) by student(uid=0)
+Oct 13 11:42:01 linuc CRON[1744]: (student) CMD (date >> /tmp/tick.txt)
+Oct 13 11:42:01 linuc CRON[1743]: pam_unix(cron:session): session closed for user student
+
+$ grep -vE '^\s*#|^\s*$' /etc/crontab
+SHELL=/bin/sh
+17 *	* * *	root	cd / && run-parts --report /etc/cron.hourly
+25 6	* * *	root	test -x /usr/sbin/anacron || { cd / && run-parts --report /etc/cron.daily; }
+47 6	* * 7	root	test -x /usr/sbin/anacron || { cd / && run-parts --report /etc/cron.weekly; }
+52 6	1 * *	root	test -x /usr/sbin/anacron || { cd / && run-parts --report /etc/cron.monthly; }
+
+$ echo '* * * * * student date >> /tmp/tick2.txt 2>&1' | crontab -
+
+$ crontab -l
+* * * * * student date >> /tmp/tick2.txt 2>&1
+
+$ cat /tmp/tick2.txt
+/bin/sh: 1: student: not found
+
+$ cat /tmp/tick.txt
+Tue Oct 13 11:42:01 JST 2026
+
+$ ls -l /etc/cron.d
+total 8
+-rw-r--r-- 1 root root 219 Nov 17  2023 anacron
+-rw-r--r-- 1 root root 201 Apr  8  2024 e2scrub_all
+
+$ cat /etc/cron.d/e2scrub_all
+30 3 * * 0 root test -e /run/systemd/system || SERVICE_MODE=1 /usr/lib/x86_64-linux-gnu/e2fsprogs/e2scrub_all_cron
+10 3 * * * root test -e /run/systemd/system || SERVICE_MODE=1 /sbin/e2scrub_all -A -r
+
+$ echo '* * * * * root id -un >> /tmp/cron-d.txt' | sudo tee /etc/cron.d/lab-demo
+* * * * * root id -un >> /tmp/cron-d.txt
+
+$ echo '* * * * * root id -un >> /tmp/cron-dot.txt' | sudo tee /etc/cron.d/lab.demo
+* * * * * root id -un >> /tmp/cron-dot.txt
+
+$ echo '* * * * * id -un >> /tmp/cron-nouser.txt' | sudo tee /etc/cron.d/lab-nouser
+* * * * * id -un >> /tmp/cron-nouser.txt
+
+$ echo '* * * * * env > /tmp/cron-env.txt' | crontab -
+
+$ cat /tmp/cron-d.txt
+root
+
+$ ls -l /tmp/cron-dot.txt /tmp/cron-nouser.txt
+ls: cannot access '/tmp/cron-dot.txt': No such file or directory
+ls: cannot access '/tmp/cron-nouser.txt': No such file or directory
+
+$ journalctl -u cron -n 30 --no-pager | grep -E 'lab|ERROR'
+Oct 13 11:44:01 linuc cron[426]: Error: bad username; while reading /etc/cron.d/lab-nouser
+Oct 13 11:44:01 linuc cron[426]: (*system*lab-nouser) ERROR (Syntax error, this crontab file will be ignored)
+
+$ cat /tmp/cron-env.txt
+HOME=/home/student
+LOGNAME=student
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+LANG=C.UTF-8
+SHELL=/bin/sh
+PWD=/home/student
+
+$ echo $SHELL
+/bin/bash
+
+$ crontab -r
+
+$ crontab -l
+no crontab for student
+
+$ sudo rm /etc/cron.d/lab-demo /etc/cron.d/lab.demo /etc/cron.d/lab-nouser
+
+$ ls -l /etc/cron.allow /etc/cron.deny
+ls: cannot access '/etc/cron.allow': No such file or directory
+ls: cannot access '/etc/cron.deny': No such file or directory
+
+$ echo student | sudo tee /etc/cron.deny
+student
+
+$ crontab -l
+You (student) are not allowed to use this program (crontab)
+See crontab(1) for more information
+
+$ sudo rm /etc/cron.deny
+
+$ crontab -l
+no crontab for student
+
+
+========== 第6章 毎日の仕事は、名前で選ばれる（1.08.2） ==========
+
+$ ls -l /etc/cron.daily
+total 24
+-rwxr-xr-x 1 root root  311 Sep 25  2023 0anacron
+-rwxr-xr-x 1 root root  376 Jul 29 23:09 apport
+-rwxr-xr-x 1 root root 1478 Mar 22  2024 apt-compat
+-rwxr-xr-x 1 root root  123 Feb  5  2024 dpkg
+-rw-r--r-- 1 root root  165 Oct 13 11:38 lab-backup.sh
+-rwxr-xr-x 1 root root 1395 Mar 30  2024 man-db
+
+$ grep run-parts /etc/crontab
+17 *	* * *	root	cd / && run-parts --report /etc/cron.hourly
+25 6	* * *	root	test -x /usr/sbin/anacron || { cd / && run-parts --report /etc/cron.daily; }
+47 6	* * 7	root	test -x /usr/sbin/anacron || { cd / && run-parts --report /etc/cron.weekly; }
+52 6	1 * *	root	test -x /usr/sbin/anacron || { cd / && run-parts --report /etc/cron.monthly; }
+
+$ grep -vE '^\s*#|^\s*$' /etc/anacrontab
+SHELL=/bin/sh
+HOME=/root
+LOGNAME=root
+1	5	cron.daily	run-parts --report /etc/cron.daily
+7	10	cron.weekly	run-parts --report /etc/cron.weekly
+@monthly	15	cron.monthly	run-parts --report /etc/cron.monthly
+
+$ journalctl -u anacron -b --no-pager
+Oct 13 11:38:34 linuc systemd[1]: Started anacron.service - Run anacron jobs.
+Oct 13 11:38:35 linuc anacron[419]: Anacron 2.3 started on 2026-10-13
+Oct 13 11:38:35 linuc anacron[419]: Will run job `cron.daily' in 5 min.
+Oct 13 11:38:35 linuc anacron[419]: Will run job `cron.weekly' in 10 min.
+Oct 13 11:38:35 linuc anacron[419]: Will run job `cron.monthly' in 15 min.
+Oct 13 11:38:35 linuc anacron[419]: Jobs will be executed sequentially
+Oct 13 11:43:34 linuc anacron[419]: Job `cron.daily' started
+Oct 13 11:43:34 linuc anacron[1904]: Updated timestamp for job `cron.daily' to 2026-10-13
+Oct 13 11:43:34 linuc anacron[419]: Job `cron.daily' terminated
+Oct 13 11:48:34 linuc anacron[419]: Job `cron.weekly' started
+Oct 13 11:48:34 linuc anacron[419]: Job `cron.weekly' terminated
+Oct 13 11:53:34 linuc anacron[419]: Job `cron.monthly' started
+Oct 13 11:53:34 linuc anacron[419]: Job `cron.monthly' terminated
+Oct 13 11:53:34 linuc anacron[419]: Normal exit (3 jobs run)
+Oct 13 11:53:34 linuc systemd[1]: anacron.service: Killing process 3116 (anacron) with signal SIGKILL.
+Oct 13 11:53:34 linuc systemd[1]: anacron.service: Deactivated successfully.
+Oct 13 11:53:34 linuc systemd[1]: anacron.service: Consumed 1.023s CPU time.
+
+$ systemctl list-timers anacron.timer --no-pager --full
+NEXT                         LEFT LAST                           PASSED UNIT          ACTIVATES
+Tue 2026-10-13 12:34:09 JST 40min Tue 2026-10-13 11:40:12 JST 13min ago anacron.timer anacron.service
+
+1 timers listed.
+Pass --all to see loaded but inactive timers, too.
+
+$ sudo ls -l /var/spool/anacron
+total 12
+-rw------- 1 root root 9 Oct 13 11:43 cron.daily
+-rw------- 1 root root 9 Oct 13 11:53 cron.monthly
+-rw------- 1 root root 9 Oct 13 11:48 cron.weekly
+
+$ sudo cat /var/spool/anacron/cron.daily
+20261013
+
+$ printf '#!/bin/sh\ndate >> /tmp/daily.txt\n' | sudo tee /etc/cron.daily/hello.sh
+#!/bin/sh
+date >> /tmp/daily.txt
+
+$ sudo chmod 755 /etc/cron.daily/hello.sh
+
+$ run-parts --test /etc/cron.daily
+/etc/cron.daily/0anacron
+/etc/cron.daily/apport
+/etc/cron.daily/apt-compat
+/etc/cron.daily/dpkg
+/etc/cron.daily/man-db
+
+$ run-parts --list /etc/cron.daily
+/etc/cron.daily/0anacron
+/etc/cron.daily/apport
+/etc/cron.daily/apt-compat
+/etc/cron.daily/dpkg
+/etc/cron.daily/man-db
+
+$ sudo mv /etc/cron.daily/hello.sh /etc/cron.daily/hello
+
+$ run-parts --test /etc/cron.daily
+/etc/cron.daily/0anacron
+/etc/cron.daily/apport
+/etc/cron.daily/apt-compat
+/etc/cron.daily/dpkg
+/etc/cron.daily/hello
+/etc/cron.daily/man-db
+
+$ sudo chmod 644 /etc/cron.daily/hello
+
+$ run-parts --test /etc/cron.daily
+/etc/cron.daily/0anacron
+/etc/cron.daily/apport
+/etc/cron.daily/apt-compat
+/etc/cron.daily/dpkg
+/etc/cron.daily/man-db
+
+$ run-parts --list /etc/cron.daily
+/etc/cron.daily/0anacron
+/etc/cron.daily/apport
+/etc/cron.daily/apt-compat
+/etc/cron.daily/dpkg
+/etc/cron.daily/hello
+/etc/cron.daily/man-db
+
+$ sudo chmod 755 /etc/cron.daily/hello
+
+$ sudo anacron -n -d
+Anacron 2.3 started on 2026-10-13
+Normal exit (0 jobs run)
+
+$ sudo anacron -f -n -s -d
+Anacron 2.3 started on 2026-10-13
+Will run job `cron.daily'
+Will run job `cron.weekly'
+Will run job `cron.monthly'
+Jobs will be executed sequentially
+Job `cron.daily' started
+Job `cron.daily' terminated
+Job `cron.weekly' started
+Job `cron.weekly' terminated
+Job `cron.monthly' started
+Job `cron.monthly' terminated
+Normal exit (3 jobs run)
+
+$ cat /tmp/daily.txt
+Tue Oct 13 11:53:59 JST 2026
+
+$ sudo cat /var/spool/anacron/cron.daily
+20261013
+
+$ tail -1 /etc/cron.daily/0anacron
+anacron -u cron.daily
+
+$ sudo anacron -T; echo $?
+0
+
+$ sudo rm /etc/cron.daily/hello
+
+
+========== 第7章 at は、いまの環境ごと持っていく（1.08.2） ==========
+
+$ systemctl is-active atd
+active
+
+$ at now + 1 minute
+warning: commands will be executed using /bin/sh
+at Tue Oct 13 11:55:00 2026
+at> date > /tmp/at.txt
+at> <EOT>
+job 1 at Tue Oct 13 11:55:00 2026
+
+$ atq
+1	Tue Oct 13 11:55:00 2026 a student
+
+$ export LAB_NOTE=hello; echo 'echo late > /tmp/at-late.txt' | at 23:59
+warning: commands will be executed using /bin/sh
+job 2 at Tue Oct 13 23:59:00 2026
+
+$ atq
+1	Tue Oct 13 11:55:00 2026 a student
+2	Tue Oct 13 23:59:00 2026 a student
+
+$ at -c 2 | head -4
+#!/bin/sh
+# atrun uid=1000 gid=1000
+# mail student 0
+umask 2
+
+$ at -c 2 | grep LAB_NOTE
+LAB_NOTE=hello; export LAB_NOTE
+
+$ at -c 2 | tail -6
+cd /home/student || {
+	 echo 'Execution directory inaccessible' >&2
+	 exit 1
+}
+echo late > /tmp/at-late.txt
+
+
+$ sudo ls -l /var/spool/cron/atjobs
+total 8
+-rwx------ 1 student daemon 878 Oct 13 11:54 a0000101c7b18f
+-rwx------ 1 student daemon 885 Oct 13 11:54 a0000201c7b463
+
+$ atrm 2
+
+$ atq
+1	Tue Oct 13 11:55:00 2026 a student
+
+$ cat /tmp/at.txt
+Tue Oct 13 11:55:00 JST 2026
+
+$ atq
+
+$ echo 'uptime > /tmp/batch.txt' | batch
+warning: commands will be executed using /bin/sh
+job 3 at Tue Oct 13 11:55:00 2026
+
+$ cat /tmp/batch.txt
+ 11:55:12 up 16 min,  0 user,  load average: 0.28, 0.35, 0.32
+
+$ ls -l /etc/at.allow /etc/at.deny
+ls: cannot access '/etc/at.allow': No such file or directory
+-rw-r----- 1 root daemon 144 Apr  1  2024 /etc/at.deny
+
+$ sudo head -5 /etc/at.deny
+alias
+backup
+bin
+daemon
+ftp
+
+$ sudo mv /etc/at.deny /etc/at.deny.orig
+
+$ atq
+You do not have permission to use atq.
+
+$ echo 'date' | at now + 5 minutes
+You do not have permission to use at.
+
+$ sudo atq
+
+$ crontab -l
+no crontab for student
+
+$ sudo touch /etc/at.deny
+
+$ atq; echo $?
+0
+
+$ echo root | sudo tee /etc/at.allow
+root
+
+$ atq
+You do not have permission to use atq.
+
+$ sudo rm /etc/at.allow /etc/at.deny
+
+$ sudo mv /etc/at.deny.orig /etc/at.deny
+
+$ atq; echo $?
+0
+
+
+========== 第8章 ロケールは、名前で指しているだけ（1.08.3） ==========
+
+$ locale
+LANG=C.UTF-8
+LANGUAGE=
+LC_CTYPE="C.UTF-8"
+LC_NUMERIC="C.UTF-8"
+LC_TIME="C.UTF-8"
+LC_COLLATE="C.UTF-8"
+LC_MONETARY="C.UTF-8"
+LC_MESSAGES="C.UTF-8"
+LC_PAPER="C.UTF-8"
+LC_NAME="C.UTF-8"
+LC_ADDRESS="C.UTF-8"
+LC_TELEPHONE="C.UTF-8"
+LC_MEASUREMENT="C.UTF-8"
+LC_IDENTIFICATION="C.UTF-8"
+LC_ALL=
+
+$ cat /etc/default/locale
+LANG=C.UTF-8
+
+$ locale -a
+C
+C.utf8
+POSIX
+
+$ LANG=ja_JP.UTF-8 date; echo $?
+Tue Oct 13 11:55:49 JST 2026
+0
+
+$ LANG=ja_JP.UTF-8 locale
+locale: Cannot set LC_CTYPE to default locale: No such file or directory
+locale: Cannot set LC_MESSAGES to default locale: No such file or directory
+locale: Cannot set LC_ALL to default locale: No such file or directory
+LANG=ja_JP.UTF-8
+LANGUAGE=
+LC_CTYPE="ja_JP.UTF-8"
+LC_NUMERIC="ja_JP.UTF-8"
+LC_TIME="ja_JP.UTF-8"
+LC_COLLATE="ja_JP.UTF-8"
+LC_MONETARY="ja_JP.UTF-8"
+LC_MESSAGES="ja_JP.UTF-8"
+LC_PAPER="ja_JP.UTF-8"
+LC_NAME="ja_JP.UTF-8"
+LC_ADDRESS="ja_JP.UTF-8"
+LC_TELEPHONE="ja_JP.UTF-8"
+LC_MEASUREMENT="ja_JP.UTF-8"
+LC_IDENTIFICATION="ja_JP.UTF-8"
+LC_ALL=
+
+$ grep ja_JP /etc/locale.gen
+# ja_JP.EUC-JP EUC-JP
+# ja_JP.UTF-8 UTF-8
+
+$ sudo locale-gen ja_JP.UTF-8
+Generating locales (this might take a while)...
+  ja_JP.UTF-8... done
+Generation complete.
+
+$ grep ja_JP /etc/locale.gen
+# ja_JP.EUC-JP EUC-JP
+ja_JP.UTF-8 UTF-8
+
+$ locale -a
+C
+C.utf8
+POSIX
+ja_JP.utf8
+
+$ LANG=ja_JP.UTF-8 date
+2026年 10月 13日 火曜日 11:55:58 JST
+
+$ LANG=ja_JP.UTF-8 ls -l /etc/hostname
+-rw-r--r-- 1 root root 6 10月 13 09:46 /etc/hostname
+
+$ LANG=ja_JP.UTF-8 printf "%'d\n" 1234567
+1,234,567
+
+$ LANG=C printf "%'d\n" 1234567
+1234567
+
+$ LANG=ja_JP.UTF-8 ls /nonexistent
+ls: cannot access '/nonexistent': No such file or directory
+
+$ LANG=ja_JP.UTF-8 dpkg -s nonexistent-pkg
+dpkg-query: パッケージ 'nonexistent-pkg' はまだインストールされておらず情報の利用は不可能です
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+
+$ ls -1 /usr/share/locale/ja/LC_MESSAGES/
+apt.mo
+dpkg.mo
+firewalld.mo
+libapt-pkg6.0.mo
+
+$ LANG=ja_JP.UTF-8 LC_TIME=C date
+Tue Oct 13 11:56:03 JST 2026
+
+$ LANG=C LC_ALL=ja_JP.UTF-8 date
+2026年 10月 13日 火曜日 11:56:04 JST
+
+$ LANG=ja_JP.UTF-8 LC_TIME=C locale
+LANG=ja_JP.UTF-8
+LANGUAGE=
+LC_CTYPE="ja_JP.UTF-8"
+LC_NUMERIC="ja_JP.UTF-8"
+LC_TIME=C
+LC_COLLATE="ja_JP.UTF-8"
+LC_MONETARY="ja_JP.UTF-8"
+LC_MESSAGES="ja_JP.UTF-8"
+LC_PAPER="ja_JP.UTF-8"
+LC_NAME="ja_JP.UTF-8"
+LC_ADDRESS="ja_JP.UTF-8"
+LC_TELEPHONE="ja_JP.UTF-8"
+LC_MEASUREMENT="ja_JP.UTF-8"
+LC_IDENTIFICATION="ja_JP.UTF-8"
+LC_ALL=
+
+$ LANG=ja_JP.UTF-8 date | awk '{print $2}'
+10月
+
+$ LANG=C date | awk '{print $2}'
+Oct
+
+$ sudo localedef -i en_US -f UTF-8 en_US.UTF-8
+
+$ locale -a
+C
+C.utf8
+POSIX
+en_US.utf8
+ja_JP.utf8
+
+$ printf '%s\n' b A a B | LANG=C sort | paste -sd ' '
+A B a b
+
+$ printf '%s\n' b A a B | LANG=en_US.UTF-8 sort | paste -sd ' '
+a A b B
+
+$ printf '%s\n' b A a B | LANG=ja_JP.UTF-8 sort | paste -sd ' '
+A B a b
+
+$ localectl
+System Locale: LANG=C.UTF-8
+    VC Keymap: (unset)
+   X11 Layout: us
+    X11 Model: pc105
+
+$ sudo localectl set-locale LANG=ja_JP.UTF-8
+
+$ cat /etc/default/locale
+LANG=ja_JP.UTF-8
+
+$ echo $LANG; date
+ja_JP.UTF-8
+2026年 10月 13日 火曜日 11:56:22 JST
+
+$ sudo localectl set-locale LANG=C.UTF-8
+
+$ echo $LANG; date
+C.UTF-8
+Tue Oct 13 11:56:25 JST 2026
+
+
+========== 第9章 文字コードは、読む側が決める（1.08.3） ==========
+
+$ printf 'A' | od -An -tx1
+ 41
+
+$ printf 'あ' | od -An -tx1
+ e3 81 82
+
+$ printf 'é' | od -An -tx1
+ c3 a9
+
+$ printf '\u3042\n'
+あ
+
+$ printf 'あ' | iconv -f UTF-8 -t UTF-16BE | od -An -tx1
+ 30 42
+
+$ printf 'あ' | iconv -f UTF-8 -t SHIFT_JIS | od -An -tx1
+ 82 a0
+
+$ printf 'あ' | iconv -f UTF-8 -t EUC-JP | od -An -tx1
+ a4 a2
+
+$ printf 'あ' | iconv -f UTF-8 -t ISO-2022-JP | od -An -tx1
+ 1b 24 42 24 22 1b 28 42
+
+$ echo こんにちは | iconv -f SHIFT_JIS -t UTF-8
+縺薙ｓ縺ｫ縺｡縺ｯ
+
+$ echo こんにちは | iconv -f SHIFT_JIS -t UTF-8 | iconv -f UTF-8 -t SHIFT_JIS
+こんにちは
+
+$ echo こんにちは | od -An -tx1
+ e3 81 93 e3 82 93 e3 81 ab e3 81 a1 e3 81 af 0a
+
+$ echo こんにちは | iconv -f SHIFT_JIS -t UTF-8 | iconv -f UTF-8 -t SHIFT_JIS | od -An -tx1
+ e3 81 93 e3 82 93 e3 81 ab e3 81 a1 e3 81 af 0a
+
+$ mkdir -p ~/enc
+
+$ printf '日本語のメモ\n' > ~/enc/utf8.txt
+
+$ iconv -f UTF-8 -t SHIFT_JIS ~/enc/utf8.txt > ~/enc/sjis.txt
+
+$ iconv -f UTF-8 -t EUC-JP ~/enc/utf8.txt > ~/enc/euc.txt
+
+$ iconv -f UTF-8 -t ISO-2022-JP ~/enc/utf8.txt > ~/enc/jis.txt
+
+$ cd ~/enc && file *.txt
+euc.txt:  OpenPGP Public Key
+jis.txt:  ASCII text, with escape sequences
+sjis.txt: Non-ISO extended-ASCII text
+utf8.txt: Unicode text, UTF-8 text
+
+$ cd ~/enc && wc -c *.txt
+13 euc.txt
+19 jis.txt
+13 sjis.txt
+19 utf8.txt
+64 total
+
+$ cat -v ~/enc/sjis.txt
+M-^SM-zM-^V{M-^LM-jM-^BM-LM-^CM-^AM-^CM-^B
+
+$ od -c ~/enc/jis.txt
+0000000 033   $   B   F   |   K   \   8   l   $   N   %   a   %   b 033
+0000020   (   B  \n
+0000023
+
+$ iconv -f SHIFT_JIS -t UTF-8 ~/enc/sjis.txt
+日本語のメモ
+
+$ iconv -f EUC-JP -t UTF-8 ~/enc/sjis.txt > /dev/null; echo $?
+iconv: illegal input sequence at position 1
+1
+
+$ printf 'こんにちは\n' | iconv -f UTF-8 -t ISO-8859-1 > /dev/null; echo $?
+iconv: illegal input sequence at position 0
+1
+
+$ printf 'café\n' | iconv -f UTF-8 -t ISO-8859-1 | od -An -tx1
+ 63 61 66 e9 0a
+
+$ printf 'こんにちは\n' | iconv -f UTF-8 -t ASCII//TRANSLIT; echo $?
+?????
+0
+
+$ printf 'café\n' | iconv -f UTF-8 -t ASCII//TRANSLIT
+cafe
+
+$ iconv -l | grep -E '^(SHIFT_JIS|EUC-JP|ISO-2022-JP|ISO-8859-1|UTF-8|ASCII)//'
+ASCII//
+EUC-JP//
+ISO-2022-JP//
+ISO-8859-1//
+SHIFT_JIS//
+UTF-8//

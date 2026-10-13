@@ -1,0 +1,625 @@
+
+
+########## A. 何もしていない状態で lab check（全部 ✗ になるはず。04 は cron を最大 75 秒待つ） ##########
+
+$ lab check; echo "exit=$?"
+✗ 01 未達
+  判定 : 観測型（練習機の中で、frank の台帳の行・ホームの中身・パスワードの状態を見た）
+  観測 : getent passwd frank → 何も返らない（frank という行が台帳に無い）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+✗ 02 未達
+  判定 : 観測型（練習機の中で getent と id を引き、台帳から見た bob の所属を確かめた）
+  観測 : getent group devs → （何も返らない）
+         id bob → uid=1001(bob) gid=1001(bob) groups=1001(bob),1101(proj-a),1102(proj-b)
+         グループ devs が無い
+         bob は devs に入っていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+✗ 03 未達
+  判定 : 観測型（外から dave の鍵で ssh し、中で root から su - dave して、実際に入れるかを見た）
+  観測 : ssh -l dave linuc（鍵）→ IN-AS-dave
+         su - dave（練習機の中、root から）→ IN-AS-dave
+         passwd -S dave → dave L 2026-10-13 0 99999 7 -1
+         アカウントの有効期限 → never
+         ログインシェル → /bin/bash
+         → 鍵での ssh で dave としてコマンドが動いた
+         → su - dave で dave としてコマンドが動いた
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+✗ 04 未達
+  判定 : 観測型（cron が実際にジョブを動かし、2つのファイルが増えるかを見た）
+  待機 : cron は毎分0秒に起きます。次の実行を待っています（最大 75 秒）…
+  観測 : /home/student/tick.log → 無い
+         /var/log/lab-whoami.log → 無い
+         /var/log/lab-whoami.log の最後の行 → （無い）
+         /etc/cron.d/lab-whoami → 無い
+         → tick.log ができていない
+         → lab-whoami.log ができていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+✗ 05 未達
+  判定 : 観測型（run-parts --test に選ばれるかを聞き、スクリプトが走った跡を見た）
+  観測 : run-parts --test /etc/cron.daily が選んだもの:
+           /etc/cron.daily/0anacron
+           /etc/cron.daily/apport
+           /etc/cron.daily/apt-compat
+           /etc/cron.daily/dpkg
+           /etc/cron.daily/man-db
+         /etc/cron.daily の lab-backup → -rw-r--r-- lab-backup.sh
+         /var/backups/lab-backup.log → 0 行（最後: なし）
+         → run-parts は lab-backup を選ばない（毎日の実行で飛ばされる）
+         → スクリプトが走った跡が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+✗ 06 未達
+  判定 : 観測型（3人それぞれとして atq と crontab -l を実際に打ち、断られるかを見た）
+  観測 : eve     at → 使える / crontab → 使える
+         → eve が at を使える
+         → eve が crontab を使える
+         bob     at → 使える / crontab → 使える
+         student at → 使える / crontab → 使える
+         ある許可ファイル: /etc/at.deny
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+✗ 07 未達
+  判定 : 観測型（lab-report を3通りのロケールで呼び、出力を比べた）
+  観測 : locale -a の ja_JP.utf8 → 無い
+         LANG=C.UTF-8        で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         LANG=ja_JP.UTF-8    で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         LC_ALL=ja_JP.UTF-8  で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         → ja_JP.UTF-8 が生成されていないので、日本語ロケールで呼んでも差が出ない（確かめられない）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+✗ 08 未達
+  判定 : 観測型（/home/student/lab08/utf8/ の各ファイルを UTF-8 として読み、元のファイルを正しい文字コードで読んだ文と比べた）
+  観測 : utf8/a.txt → 無い
+         utf8/b.txt → 無い
+         utf8/c.txt → 無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 08
+exit=1
+
+
+########## B. 演習01 — ユーザを1人、使える状態で作る ##########
+
+$ useradd -D | grep -E "SHELL|SKEL"; ls -A /etc/skel
+SHELL=/bin/sh
+SKEL=/etc/skel
+.bash_logout
+.bashrc
+.profile
+
+$ sudo useradd frank
+
+$ getent passwd frank; ls -ld /home/frank
+frank:x:1004:1004::/home/frank:/bin/sh
+ls: cannot access '/home/frank': No such file or directory
+
+$ lab check 01; echo "exit=$?"
+✗ 01 未達
+  判定 : 観測型（練習機の中で、frank の台帳の行・ホームの中身・パスワードの状態を見た）
+  観測 : getent passwd frank → frank:x:1004:1004::/home/frank:/bin/sh
+         ログインシェルの欄が /bin/bash ではない（/bin/sh）
+         /home/frank → ディレクトリが存在しない（台帳に書いてあるだけ）
+         /etc/skel/README.txt → 無い
+         /home/frank/README.txt → 無い
+         passwd -S frank → frank L 2026-10-13 0 99999 7 -1
+         パスワードの欄がロック（L）のまま。このままではパスワードでログインできない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+exit=1
+
+$ sudo userdel frank
+
+$ echo 'はじめに読んでください。' | sudo tee /etc/skel/README.txt
+はじめに読んでください。
+
+$ sudo useradd -m -s /bin/bash frank
+
+$ lab check 01; echo "exit=$?"
+✗ 01 未達
+  判定 : 観測型（練習機の中で、frank の台帳の行・ホームの中身・パスワードの状態を見た）
+  観測 : getent passwd frank → frank:x:1004:1004::/home/frank:/bin/bash
+         /home/frank → 存在する（所有者 frank）
+         /home/frank/.bashrc → ある（/etc/skel から写された）
+         /etc/skel/README.txt → ある
+         /home/frank/README.txt → ある（所有者 frank）
+         passwd -S frank → frank L 2026-10-13 0 99999 7 -1
+         パスワードの欄がロック（L）のまま。このままではパスワードでログインできない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+exit=1
+
+$ sudo passwd frank
+New password: 
+Retype new password: 
+passwd: password updated successfully
+
+$ getent passwd frank; sudo ls -A /home/frank; sudo passwd -S frank
+frank:x:1004:1004::/home/frank:/bin/bash
+.bash_logout
+.bashrc
+.profile
+README.txt
+frank P 2026-10-13 0 99999 7 -1
+
+$ lab check 01; echo "exit=$?"
+✔ 01 達成
+  判定 : 観測型（練習機の中で、frank の台帳の行・ホームの中身・パスワードの状態を見た）
+  観測 : getent passwd frank → frank:x:1004:1004::/home/frank:/bin/bash
+         /home/frank → 存在する（所有者 frank）
+         /home/frank/.bashrc → ある（/etc/skel から写された）
+         /etc/skel/README.txt → ある
+         /home/frank/README.txt → ある（所有者 frank）
+         passwd -S frank → frank P 2026-10-13 0 99999 7 -1
+         台帳の行・ホームの実物・skel の写し・パスワードの4つがそろっている
+         → useradd が書いたのは台帳の行。ホームと中身は -m を付けたから作られた
+exit=0
+
+
+########## C. 演習02 — 所属を足す（今の所属は残す） ##########
+
+$ id bob
+uid=1001(bob) gid=1001(bob) groups=1001(bob),1101(proj-a),1102(proj-b)
+
+$ sudo groupadd -g 2000 devs
+
+$ sudo usermod -G devs bob; id bob
+uid=1001(bob) gid=1001(bob) groups=1001(bob),2000(devs)
+
+$ lab check 02; echo "exit=$?"
+✗ 02 未達
+  判定 : 観測型（練習機の中で getent と id を引き、台帳から見た bob の所属を確かめた）
+  観測 : getent group devs → devs:x:2000:bob
+         id bob → uid=1001(bob) gid=1001(bob) groups=1001(bob),2000(devs)
+         bob は proj-a に入っていない
+         bob は proj-b に入っていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+exit=1
+
+$ sudo usermod -aG proj-a,proj-b bob; id bob
+uid=1001(bob) gid=1001(bob) groups=1001(bob),1101(proj-a),1102(proj-b),2000(devs)
+
+$ lab check 02; echo "exit=$?"
+✔ 02 達成
+  判定 : 観測型（練習機の中で getent と id を引き、台帳から見た bob の所属を確かめた）
+  観測 : getent group devs → devs:x:2000:bob
+         id bob → uid=1001(bob) gid=1001(bob) groups=1001(bob),1101(proj-a),1102(proj-b),2000(devs)
+         bob は proj-a・proj-b に残ったまま devs にも入っている（主グループは bob のまま）
+         → 所属の一覧は書き足された。置き換えられてはいない
+exit=0
+
+
+########## D. 演習03 — dave を一時停止する ##########
+
+$ ssh -l dave linuc id
+uid=1002(dave) gid=1002(dave) groups=1002(dave)
+
+$ sudo passwd -l dave; sudo passwd -S dave
+passwd: password changed.
+dave L 2026-10-13 0 99999 7 -1
+
+$ lab check 03; echo "exit=$?"
+✗ 03 未達
+  判定 : 観測型（外から dave の鍵で ssh し、中で root から su - dave して、実際に入れるかを見た）
+  観測 : ssh -l dave linuc（鍵）→ IN-AS-dave
+         su - dave（練習機の中、root から）→ IN-AS-dave
+         passwd -S dave → dave L 2026-10-13 0 99999 7 -1
+         アカウントの有効期限 → never
+         ログインシェル → /bin/bash
+         → 鍵での ssh で dave としてコマンドが動いた
+         → su - dave で dave としてコマンドが動いた
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+exit=1
+
+$ sudo usermod -e 1 dave; sudo chage -l dave | grep "Account expires"
+Account expires						: Jan 02, 1970
+
+$ ssh -l dave linuc id
+Your account has expired; please contact your system administrator.
+Connection closed by 127.0.0.1 port 2222
+
+$ lab check 03; echo "exit=$?"
+✔ 03 達成
+  判定 : 観測型（外から dave の鍵で ssh し、中で root から su - dave して、実際に入れるかを見た）
+  観測 : ssh -l dave linuc（鍵）→ Your account has expired; please contact your system administrator. Connection closed by 127.0.0.1 port 2222
+         su - dave（練習機の中、root から）→ Your account has expired; please contact your system administrator. su: Authentication failure
+         passwd -S dave → dave L 2026-10-13 0 99999 7 -1
+         アカウントの有効期限 → Jan 02, 1970
+         ログインシェル → /bin/bash
+         台帳の行・ホーム・ファイル・鍵は残ったまま、ssh でも su でも dave として動けない
+         → 止めたのはパスワードの欄ではなく、アカウントそのもの（期限かシェル）
+exit=0
+
+
+########## E. 演習04 — 2種類の表に、毎分のジョブを置く ##########
+
+$ echo '* * * * * student date >> /home/student/tick.log' | crontab -
+
+$ echo '* * * * * id -un >> /var/log/lab-whoami.log' | sudo tee /etc/cron.d/lab-whoami
+* * * * * id -un >> /var/log/lab-whoami.log
+
+$ lab check 04; echo "exit=$?"
+✗ 04 未達
+  判定 : 観測型（cron が実際にジョブを動かし、2つのファイルが増えるかを見た）
+  待機 : cron は毎分0秒に起きます。次の実行を待っています（最大 75 秒）…
+  観測 : /home/student/tick.log → 0 行（所有者 student・最後に書かれたのは 46 秒前）
+         /var/log/lab-whoami.log → 無い
+         /var/log/lab-whoami.log の最後の行 → （無い）
+         /etc/cron.d/lab-whoami → -rw-r--r-- root root /etc/cron.d/lab-whoami
+         → tick.log はあるが 0 行（ジョブは動いたが date の出力が入っていない）
+         → lab-whoami.log ができていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+exit=1
+
+$ cat /home/student/tick.log; ls -l /home/student/tick.log
+-rw-rw-r-- 1 student student 0 Oct 13 11:03 /home/student/tick.log
+
+$ journalctl -u cron -n 20 --no-pager | grep -E 'lab-whoami|ERROR'
+Oct 13 11:03:01 linuc cron[432]: Error: bad username; while reading /etc/cron.d/lab-whoami
+Oct 13 11:03:01 linuc cron[432]: (*system*lab-whoami) ERROR (Syntax error, this crontab file will be ignored)
+
+$ echo '* * * * * date >> /home/student/tick.log' | crontab -
+
+$ echo '* * * * * root id -un >> /var/log/lab-whoami.log' | sudo tee /etc/cron.d/lab-whoami
+* * * * * root id -un >> /var/log/lab-whoami.log
+
+$ lab check 04; echo "exit=$?"
+✔ 04 達成
+  判定 : 観測型（cron が実際にジョブを動かし、2つのファイルが増えるかを見た）
+  待機 : cron は毎分0秒に起きます。次の実行を待っています（最大 75 秒）…
+  観測 : /home/student/tick.log → 1 行（所有者 student・最後に書かれたのは 4 秒前）
+         /var/log/lab-whoami.log → 1 行（所有者 root・最後に書かれたのは 4 秒前）
+         /var/log/lab-whoami.log の最後の行 → root
+         /etc/cron.d/lab-whoami → -rw-r--r-- root root /etc/cron.d/lab-whoami
+         student の表のジョブは student として、/etc/cron.d のジョブは root として、毎分動いている
+         → 誰として動くかは、表の置き場所（と /etc/cron.d の6列目）が決めた
+exit=0
+
+
+########## F. 演習05 — 置いてあるのに走らないスクリプトを、毎日の実行に入れる ##########
+
+$ ls -l /etc/cron.daily/lab-backup.sh; run-parts --test /etc/cron.daily
+-rw-r--r-- 1 root root 165 Oct 13 10:59 /etc/cron.daily/lab-backup.sh
+/etc/cron.daily/0anacron
+/etc/cron.daily/apport
+/etc/cron.daily/apt-compat
+/etc/cron.daily/dpkg
+/etc/cron.daily/man-db
+
+$ sudo chmod 755 /etc/cron.daily/lab-backup.sh; run-parts --test /etc/cron.daily
+/etc/cron.daily/0anacron
+/etc/cron.daily/apport
+/etc/cron.daily/apt-compat
+/etc/cron.daily/dpkg
+/etc/cron.daily/man-db
+
+$ lab check 05; echo "exit=$?"
+✗ 05 未達
+  判定 : 観測型（run-parts --test に選ばれるかを聞き、スクリプトが走った跡を見た）
+  観測 : run-parts --test /etc/cron.daily が選んだもの:
+           /etc/cron.daily/0anacron
+           /etc/cron.daily/apport
+           /etc/cron.daily/apt-compat
+           /etc/cron.daily/dpkg
+           /etc/cron.daily/man-db
+         /etc/cron.daily の lab-backup → -rwxr-xr-x lab-backup.sh
+         /var/backups/lab-backup.log → 0 行（最後: なし）
+         → run-parts は lab-backup を選ばない（毎日の実行で飛ばされる）
+         → スクリプトが走った跡が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+exit=1
+
+$ sudo mv /etc/cron.daily/lab-backup.sh /etc/cron.daily/lab-backup; run-parts --test /etc/cron.daily
+/etc/cron.daily/0anacron
+/etc/cron.daily/apport
+/etc/cron.daily/apt-compat
+/etc/cron.daily/dpkg
+/etc/cron.daily/lab-backup
+/etc/cron.daily/man-db
+
+$ lab check 05; echo "exit=$?"
+✗ 05 未達
+  判定 : 観測型（run-parts --test に選ばれるかを聞き、スクリプトが走った跡を見た）
+  観測 : run-parts --test /etc/cron.daily が選んだもの:
+           /etc/cron.daily/0anacron
+           /etc/cron.daily/apport
+           /etc/cron.daily/apt-compat
+           /etc/cron.daily/dpkg
+           /etc/cron.daily/lab-backup
+           /etc/cron.daily/man-db
+         /etc/cron.daily の lab-backup → -rwxr-xr-x lab-backup
+         /var/backups/lab-backup.log → 0 行（最後: なし）
+         → スクリプトが走った跡が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+exit=1
+
+$ sudo anacron -f -n -s -d
+Anacron 2.3 started on 2026-10-13
+Will run job `cron.daily'
+Will run job `cron.weekly'
+Will run job `cron.monthly'
+Jobs will be executed sequentially
+Job `cron.daily' started
+Job `cron.daily' terminated
+Job `cron.weekly' started
+Job `cron.weekly' terminated
+Job `cron.monthly' started
+Job `cron.monthly' terminated
+Normal exit (3 jobs run)
+
+$ cat /var/backups/lab-backup.log
+2026-10-13 11:14:51 lab-backup ran
+
+$ lab check 05; echo "exit=$?"
+✔ 05 達成
+  判定 : 観測型（run-parts --test に選ばれるかを聞き、スクリプトが走った跡を見た）
+  観測 : run-parts --test /etc/cron.daily が選んだもの:
+           /etc/cron.daily/0anacron
+           /etc/cron.daily/apport
+           /etc/cron.daily/apt-compat
+           /etc/cron.daily/dpkg
+           /etc/cron.daily/lab-backup
+           /etc/cron.daily/man-db
+         /etc/cron.daily の lab-backup → -rwxr-xr-x lab-backup
+         /var/backups/lab-backup.log → 1 行（最後: 2026-10-13 11:14:51 lab-backup ran）
+         run-parts が lab-backup を選び、実際に走った跡もある
+         → 毎日の実行に入るかどうかを決めたのは、置き場所ではなく run-parts の選び方（名前と実行権）
+exit=0
+
+
+########## G. 演習06 — eve だけに at と crontab を使わせない ##########
+
+$ echo eve | sudo tee /etc/at.allow
+eve
+
+$ lab check 06; echo "exit=$?"
+✗ 06 未達
+  判定 : 観測型（3人それぞれとして atq と crontab -l を実際に打ち、断られるかを見た）
+  観測 : eve     at → 使える / crontab → 使える
+         → eve が at を使える
+         → eve が crontab を使える
+         bob     at → 断られた（You do not have permission to use atq.） / crontab → 使える
+         → bob も at を断られている
+         student at → 断られた（You do not have permission to use atq.） / crontab → 使える
+         → student も at を断られている
+         ある許可ファイル: /etc/at.allow /etc/at.deny
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+exit=1
+
+$ sudo rm /etc/at.allow
+
+$ echo eve | sudo tee -a /etc/at.deny; echo eve | sudo tee /etc/cron.deny
+eve
+eve
+
+$ lab check 06; echo "exit=$?"
+✔ 06 達成
+  判定 : 観測型（3人それぞれとして atq と crontab -l を実際に打ち、断られるかを見た）
+  観測 : eve     at → 断られた（You do not have permission to use atq.） / crontab → 断られた（You (eve) are not allowed to use this program (crontab)）
+         bob     at → 使える / crontab → 使える
+         student at → 使える / crontab → 使える
+         ある許可ファイル: /etc/at.deny /etc/cron.deny
+         eve だけが at と crontab の両方を断られ、bob と student は使える
+         → 誰に使わせるかは、at と cron がそれぞれ自分の許可ファイルを読んで決めた
+exit=0
+
+
+########## H. 演習07 — どう呼ばれても同じ出力にする ##########
+
+$ cat /usr/local/bin/lab-report; lab-report
+#!/bin/bash
+# 毎朝の点検メモを作るスクリプト（演習07）。
+# 呼ぶ人のロケールによって出力が変わってしまう。誰がどう呼んでも同じ出力にしたい。
+mon=$(date | awk '{print $2}')      # 今月の英語3文字（Oct など）を取り出すつもり
+echo "今月のログ: /var/log/archive/$mon"
+echo "当番の順: $(printf '%s\n' bob Alice dave Carol | sort | paste -sd ' ')"
+今月のログ: /var/log/archive/Oct
+当番の順: Alice Carol bob dave
+
+$ lab check 07; echo "exit=$?"
+✗ 07 未達
+  判定 : 観測型（lab-report を3通りのロケールで呼び、出力を比べた）
+  観測 : locale -a の ja_JP.utf8 → 無い
+         LANG=C.UTF-8        で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         LANG=ja_JP.UTF-8    で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         LC_ALL=ja_JP.UTF-8  で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         → ja_JP.UTF-8 が生成されていないので、日本語ロケールで呼んでも差が出ない（確かめられない）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+exit=1
+
+$ sudo locale-gen ja_JP.UTF-8
+Generating locales (this might take a while)...
+  ja_JP.UTF-8... done
+Generation complete.
+
+$ LANG=ja_JP.UTF-8 lab-report
+今月のログ: /var/log/archive/10月
+当番の順: Alice Carol bob dave
+
+$ lab check 07; echo "exit=$?"
+✗ 07 未達
+  判定 : 観測型（lab-report を3通りのロケールで呼び、出力を比べた）
+  観測 : locale -a の ja_JP.utf8 → ja_JP.utf8
+         LANG=C.UTF-8        で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         LANG=ja_JP.UTF-8    で呼ぶと → 今月のログ: /var/log/archive/10月 ／ 当番の順: Alice Carol bob dave
+         LC_ALL=ja_JP.UTF-8  で呼ぶと → 今月のログ: /var/log/archive/10月 ／ 当番の順: Alice Carol bob dave
+         → LANG を変えると出力が変わる
+         → LC_ALL を変えると出力が変わる
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+exit=1
+
+$ sudo sed -i '2i export LANG=C' /usr/local/bin/lab-report; head -3 /usr/local/bin/lab-report
+#!/bin/bash
+export LANG=C
+# 毎朝の点検メモを作るスクリプト（演習07）。
+
+$ lab check 07; echo "exit=$?"
+✗ 07 未達
+  判定 : 観測型（lab-report を3通りのロケールで呼び、出力を比べた）
+  観測 : locale -a の ja_JP.utf8 → ja_JP.utf8
+         LANG=C.UTF-8        で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         LANG=ja_JP.UTF-8    で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         LC_ALL=ja_JP.UTF-8  で呼ぶと → 今月のログ: /var/log/archive/10月 ／ 当番の順: Alice Carol bob dave
+         → LC_ALL を変えると出力が変わる
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+exit=1
+
+$ sudo sed -i 's/^export LANG=C$/export LC_ALL=C/' /usr/local/bin/lab-report; head -3 /usr/local/bin/lab-report
+#!/bin/bash
+export LC_ALL=C
+# 毎朝の点検メモを作るスクリプト（演習07）。
+
+$ lab check 07; echo "exit=$?"
+✔ 07 達成
+  判定 : 観測型（lab-report を3通りのロケールで呼び、出力を比べた）
+  観測 : locale -a の ja_JP.utf8 → ja_JP.utf8
+         LANG=C.UTF-8        で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         LANG=ja_JP.UTF-8    で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         LC_ALL=ja_JP.UTF-8  で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         3通りとも同じ出力で、今月の欄は Oct（C ロケールの表記）
+         → スクリプトが自分で LC_ALL を決めたので、呼ぶ側のロケールが届かなくなった
+exit=0
+
+
+########## I. 演習08 — 文字コードのそろわない3つのファイルを UTF-8 にする ##########
+
+$ cd ~/lab08 && file *.txt
+a.txt: Non-ISO extended-ASCII text
+b.txt: ISO-8859 text
+c.txt: ASCII text, with escape sequences
+
+$ mkdir -p ~/lab08/utf8 && cd ~/lab08 && iconv -f ISO-8859-1 -t UTF-8 b.txt > utf8/b.txt; cat utf8/b.txt
+¥µ¡¼¥Ð°Ü¹Ô¤Î¼ê½ç½ñ¡ÊÂè2ÈÇ¡Ë¡£
+ºî¶È¤ÏÌë´Ö¤Ë¹Ô¤¦¡£
+
+$ lab check 08; echo "exit=$?"
+✗ 08 未達
+  判定 : 観測型（/home/student/lab08/utf8/ の各ファイルを UTF-8 として読み、元のファイルを正しい文字コードで読んだ文と比べた）
+  観測 : utf8/a.txt → 無い
+         utf8/b.txt → UTF-8 としては読めるが、元の文と違う（1行目: ¥µ¡¼¥Ð°Ü¹Ô¤Î¼ê½ç½ñ¡ÊÂè2ÈÇ¡Ë¡£）
+         utf8/c.txt → 無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 08
+exit=1
+
+$ cd ~/lab08 && iconv -f SHIFT_JIS -t UTF-8 a.txt > utf8/a.txt && iconv -f EUC-JP -t UTF-8 b.txt > utf8/b.txt && iconv -f ISO-2022-JP -t UTF-8 c.txt > utf8/c.txt && cat utf8/*.txt
+会議メモ: 来週の月曜に棚卸し。
+担当は佐藤さん。
+サーバ移行の手順書（第2版）。
+作業は夜間に行う。
+件名: 定期点検のお知らせ
+本文: 10月20日に停電があります。
+
+$ lab check 08; echo "exit=$?"
+✔ 08 達成
+  判定 : 観測型（/home/student/lab08/utf8/ の各ファイルを UTF-8 として読み、元のファイルを正しい文字コードで読んだ文と比べた）
+  観測 : utf8/a.txt → UTF-8 で、元の文と一致
+         utf8/b.txt → UTF-8 で、元の文と一致
+         utf8/c.txt → UTF-8 で、元の文と一致
+         3つとも、元のバイト列を正しい文字コードで読んで UTF-8 に書き直せている
+         → ファイルは自分の文字コードを名乗らない。読み方を決めたのは iconv -f に渡した名前
+
+  ════════════════════════════════════════
+   確かめて説明する LinuC 主題1.08 — 全8演習クリア
+  ════════════════════════════════════════
+
+  所要 13分（最初の達成から最後の達成まで）
+
+  自分の手で確かめたこと
+
+   ✔ 01  useradd は -m を付けないとホームを作らず、/etc/skel は作った瞬間にだけ写されること
+   ✔ 02  usermod -G は「この一覧にする」で、足すときは -aG と書くこと
+   ✔ 03  passwd -l は鍵の ssh を止めず、usermod -e 1 なら ssh でも su でも入れなくなること
+   ✔ 04  誰として動くかは、crontab の置き場所と /etc/cron.d の6列目で決まること
+   ✔ 05  run-parts は名前に . を含むファイルを選ばず、今日の分は anacron -f で走らせられること
+   ✔ 06  allow があれば allow だけが読まれ、deny しか無ければ deny に書いた人だけが断られること
+   ✔ 07  LANG=C だけでは呼ぶ側の LC_ALL に負け、スクリプトの中で LC_ALL=C を決めれば出力がそろうこと
+   ✔ 08  file は文字コードを当て推量でしか言えず、正しい -f を渡したときだけ元の文に戻ること
+
+  この8つは全部、1つの事実から出ていました。
+
+      管理コマンドが書き換えるのは、台帳（/etc やスプールにあるテキスト）の1行だけである。
+      その1行が効くかどうかは、台帳を読む側（ログイン・cron・at・プログラム）が、いつ・どの列を読むかで決まる。
+
+  理論編の最終章に、それぞれがどう繋がるかを書いてあります → /linuc-admin/theory/09-iconv
+
+exit=0
+
+
+########## J. 全部まとめて（全問 ✔ と、完走の表示） ##########
+
+$ lab check; echo "exit=$?"
+✔ 01 達成
+  判定 : 観測型（練習機の中で、frank の台帳の行・ホームの中身・パスワードの状態を見た）
+  観測 : getent passwd frank → frank:x:1004:1004::/home/frank:/bin/bash
+         /home/frank → 存在する（所有者 frank）
+         /home/frank/.bashrc → ある（/etc/skel から写された）
+         /etc/skel/README.txt → ある
+         /home/frank/README.txt → ある（所有者 frank）
+         passwd -S frank → frank P 2026-10-13 0 99999 7 -1
+         台帳の行・ホームの実物・skel の写し・パスワードの4つがそろっている
+         → useradd が書いたのは台帳の行。ホームと中身は -m を付けたから作られた
+✔ 02 達成
+  判定 : 観測型（練習機の中で getent と id を引き、台帳から見た bob の所属を確かめた）
+  観測 : getent group devs → devs:x:2000:bob
+         id bob → uid=1001(bob) gid=1001(bob) groups=1001(bob),1101(proj-a),1102(proj-b),2000(devs)
+         bob は proj-a・proj-b に残ったまま devs にも入っている（主グループは bob のまま）
+         → 所属の一覧は書き足された。置き換えられてはいない
+✔ 03 達成
+  判定 : 観測型（外から dave の鍵で ssh し、中で root から su - dave して、実際に入れるかを見た）
+  観測 : ssh -l dave linuc（鍵）→ Your account has expired; please contact your system administrator. Connection closed by 127.0.0.1 port 2222
+         su - dave（練習機の中、root から）→ Your account has expired; please contact your system administrator. su: Authentication failure
+         passwd -S dave → dave L 2026-10-13 0 99999 7 -1
+         アカウントの有効期限 → Jan 02, 1970
+         ログインシェル → /bin/bash
+         台帳の行・ホーム・ファイル・鍵は残ったまま、ssh でも su でも dave として動けない
+         → 止めたのはパスワードの欄ではなく、アカウントそのもの（期限かシェル）
+✔ 04 達成
+  判定 : 観測型（cron が実際にジョブを動かし、2つのファイルが増えるかを見た）
+  観測 : /home/student/tick.log → 12 行（所有者 student・最後に書かれたのは 40 秒前）
+         /var/log/lab-whoami.log → 12 行（所有者 root・最後に書かれたのは 40 秒前）
+         /var/log/lab-whoami.log の最後の行 → root
+         /etc/cron.d/lab-whoami → -rw-r--r-- root root /etc/cron.d/lab-whoami
+         student の表のジョブは student として、/etc/cron.d のジョブは root として、毎分動いている
+         → 誰として動くかは、表の置き場所（と /etc/cron.d の6列目）が決めた
+✔ 05 達成
+  判定 : 観測型（run-parts --test に選ばれるかを聞き、スクリプトが走った跡を見た）
+  観測 : run-parts --test /etc/cron.daily が選んだもの:
+           /etc/cron.daily/0anacron
+           /etc/cron.daily/apport
+           /etc/cron.daily/apt-compat
+           /etc/cron.daily/dpkg
+           /etc/cron.daily/lab-backup
+           /etc/cron.daily/man-db
+         /etc/cron.daily の lab-backup → -rwxr-xr-x lab-backup
+         /var/backups/lab-backup.log → 1 行（最後: 2026-10-13 11:14:51 lab-backup ran）
+         run-parts が lab-backup を選び、実際に走った跡もある
+         → 毎日の実行に入るかどうかを決めたのは、置き場所ではなく run-parts の選び方（名前と実行権）
+✔ 06 達成
+  判定 : 観測型（3人それぞれとして atq と crontab -l を実際に打ち、断られるかを見た）
+  観測 : eve     at → 断られた（You do not have permission to use atq.） / crontab → 断られた（You (eve) are not allowed to use this program (crontab)）
+         bob     at → 使える / crontab → 使える
+         student at → 使える / crontab → 使える
+         ある許可ファイル: /etc/at.deny /etc/cron.deny
+         eve だけが at と crontab の両方を断られ、bob と student は使える
+         → 誰に使わせるかは、at と cron がそれぞれ自分の許可ファイルを読んで決めた
+✔ 07 達成
+  判定 : 観測型（lab-report を3通りのロケールで呼び、出力を比べた）
+  観測 : locale -a の ja_JP.utf8 → ja_JP.utf8
+         LANG=C.UTF-8        で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         LANG=ja_JP.UTF-8    で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         LC_ALL=ja_JP.UTF-8  で呼ぶと → 今月のログ: /var/log/archive/Oct ／ 当番の順: Alice Carol bob dave
+         3通りとも同じ出力で、今月の欄は Oct（C ロケールの表記）
+         → スクリプトが自分で LC_ALL を決めたので、呼ぶ側のロケールが届かなくなった
+✔ 08 達成
+  判定 : 観測型（/home/student/lab08/utf8/ の各ファイルを UTF-8 として読み、元のファイルを正しい文字コードで読んだ文と比べた）
+  観測 : utf8/a.txt → UTF-8 で、元の文と一致
+         utf8/b.txt → UTF-8 で、元の文と一致
+         utf8/c.txt → UTF-8 で、元の文と一致
+         3つとも、元のバイト列を正しい文字コードで読んで UTF-8 に書き直せている
+         → ファイルは自分の文字コードを名乗らない。読み方を決めたのは iconv -f に渡した名前
+exit=0
+
+$ lab ls
+演習一覧
+  ✔ 01  ユーザを1人、使える状態で作る  12分 / 影響度 B
+  ✔ 02  今の所属を残したまま、グループを1つ足す 10分 / 影響度 B
+  ✔ 03  アカウントを消さずに一時停止する 12分 / 影響度 B
+  ✔ 04  2種類の表に、毎分のジョブを置く 15分 / 影響度 B
+  ✔ 05  置いてあるのに走らないスクリプトを、毎日の実行に入れる 12分 / 影響度 B
+  ✔ 06  1人だけ、at と crontab を使えなくする 10分 / 影響度 B
+  ✔ 07  呼ぶ人のロケールに左右されないスクリプトにする 12分 / 影響度 B
+  ✔ 08  文字コードのそろわない3つのファイルを UTF-8 にする 12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手

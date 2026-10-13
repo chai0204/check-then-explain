@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. useradd は、頼まれたことしかしない — 確かめて説明する LinuC 主題1.08</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="2" data-theme="linuc-admin">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-admin/theory/">理論編</a> › 第2章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/">詳しく</a></p>
+</div>
+<h1>2. useradd は、頼まれたことしかしない</h1>
+<p class="lead"><code>sudo useradd alice</code> は何も言わずに成功する。台帳の6列目には <code>/home/alice</code> と書かれる。ところが、そのディレクトリはどこにも無い。<code>useradd</code> が書いたのは台帳の行だけで、ホームを作れとは頼まれていないからである。</p>
+<div class="badges"><span>前提: 第1章まで読了</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.08.1（重要度5）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>useradd</code> の主なオプション（<code>-m</code> <code>-s</code> <code>-d</code> <code>-g</code> <code>-G</code> <code>-u</code> <code>-c</code> <code>-k</code> <code>-D</code>）を使い分けられる</li><li>既定値が <code>/etc/default/useradd</code>・<code>/etc/login.defs</code>・<code>/etc/skel</code> のどこから来るかを言える</li><li><code>useradd</code> と <code>adduser</code> の違いを説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>/etc/login.defs</code> の全項目、<code>newusers</code> による一括作成、ホームディレクトリの暗号化は扱わない。パスワードの付け方と止め方は第4章でまとめて扱う。</div></div>
+
+<h2 id="nohome">作ったのに、ホームが無い</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>useradd</code> が実際にやったことと、やらなかったこと。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>useradd alice</code> でユーザができたなら、ホーム <code>/home/alice</code> もできていて、
+そのユーザとしてすぐに使える状態になっているはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo useradd alice
+@@ getent passwd alice
+@@ ls -ld /home/alice
+@@ sudo -iu alice pwd
+</code></pre>
+<div class="then"><b>だめな理由</b>: 台帳の6列目に <code>/home/alice</code> と<b>書かれただけ</b>で、ディレクトリは作られていない。
+alice として入ろうとすると <code>cd</code> に失敗し、元の場所（<code>/home/student</code>）に取り残される。
+7列目のシェルも <code>/bin/bash</code> ではなく <code>/bin/sh</code> になっている。
+<code>useradd</code> は台帳に行を書くコマンドで、ホームを作るのは <code>-m</code> を付けたときだけである
+（Ubuntu の場合。RHEL 系は <code>/etc/login.defs</code> の <code>CREATE_HOME yes</code> により <code>-m</code> なしでも作る）。</div></div>
+<p>書かれたのは <code>/etc/passwd</code> の1行だけではない。主グループと、パスワードの欄も作られている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ id alice
+@@ sudo grep '^alice:' /etc/shadow
+</code></pre>
+<p>UID と同じ番号 1004 の私的グループ <code>alice</code> ができ、<code>/etc/shadow</code> の2列目は <code>!</code>（パスワードが無い・ロック）である。パスワードも頼まれていないので付けていない。</p>
+<div class="analogy"><b>たとえ</b>: 住民票に住所を登録するのに近い。登録すれば住所は書類に載るが、その部屋が建つわけではない。
+<br>ただし<b>崩れる点</b>: 役所は実在しない住所を受け付けないが、<code>useradd</code> は存在しないディレクトリをそのまま台帳に書き、警告も出さない。確かめる役は自分にある。</div>
+
+<h2 id="defaults">既定値は3か所から来る</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/bin/sh</code> や UID 1004 がどこで決まったか。</div>
+<p>オプションを付けなかった項目は既定値になる。既定値は <code>useradd -D</code> で見られる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ useradd -D
+@@ ls -l /etc/default/useradd
+@@ grep -vE '^\s*#|^\s*$' /etc/default/useradd
+</code></pre>
+<p><code>/etc/default/useradd</code> で有効な行は <code>SHELL=/bin/sh</code> の1行だけで、残りは <code>useradd</code> に組み込まれた値である。
+ところが <code>GROUP=100</code>（<code>users</code>）と出ているのに、alice の主グループは 1004 だった。これを決めているのはもう1つのファイルである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ grep -E '^(UID_MIN|UID_MAX|GID_MIN|USERGROUPS_ENAB|HOME_MODE)' /etc/login.defs
+</code></pre>
+<p><code>USERGROUPS_ENAB yes</code> のとき、<code>useradd</code> はユーザと同じ名前のグループを作って主グループにする（ユーザプライベートグループ）。<code>GROUP=100</code> は、これを切ったとき（<code>-N</code>）にだけ使われる。</p>
+<div class="scroll"><table>
+<tr><th>既定</th><th>決めている場所</th><th>この練習機の値</th></tr>
+<tr><td>ログインシェル</td><td><code>/etc/default/useradd</code> の <code>SHELL=</code></td><td><code>/bin/sh</code></td></tr>
+<tr><td>ホームの親</td><td><code>/etc/default/useradd</code> の <code>HOME=</code>（無ければ組み込みの値）</td><td><code>/home</code></td></tr>
+<tr><td>ホームに写すひな形</td><td><code>/etc/default/useradd</code> の <code>SKEL=</code></td><td><code>/etc/skel</code></td></tr>
+<tr><td>UID・GID の範囲</td><td><code>/etc/login.defs</code> の <code>UID_MIN</code> / <code>UID_MAX</code> / <code>GID_MIN</code></td><td>1000〜60000</td></tr>
+<tr><td>同名の私的グループを作るか</td><td><code>/etc/login.defs</code> の <code>USERGROUPS_ENAB</code></td><td><code>yes</code></td></tr>
+<tr><td>ホームの権限</td><td><code>/etc/login.defs</code> の <code>HOME_MODE</code></td><td><code>0750</code></td></tr>
+</table></div>
+
+<h2 id="skel">-m を付けると、ひな形が写される</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/etc/skel</code> がいつ、どう使われるか。</div>
+<p>いったん消して、ホームとシェルを頼んで作り直す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo userdel alice
+@@ sudo useradd -m -s /bin/bash alice
+@@ getent passwd alice
+@@ ls -ld /home/alice
+@@ sudo ls -la /home/alice
+</code></pre>
+<p>ホームができ、権限は <code>HOME_MODE</code> どおり <code>drwxr-x---</code>（0750）になった。中の3つのファイルは <code>/etc/skel</code>（スケルトンディレクトリ。新しいホームのひな形）から写されたもので、日付は元のファイルのまま、所有者だけが alice に変わっている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ ls -la /etc/skel
+</code></pre>
+<p>ひな形にファイルを1つ足してから、もう1人作る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ echo 'ようこそ。困ったことがあれば管理者へ。' | sudo tee /etc/skel/memo.txt
+@@ sudo useradd -m -s /bin/bash -c 'Carol Lab' carol
+@@ sudo ls -1A /home/alice /home/carol
+@@ getent passwd carol
+</code></pre>
+<p>carol には <code>memo.txt</code> があり、先に作った alice には無い。<code>/etc/skel</code> は<b>ホームを作るその瞬間にだけ</b>写される。あとからひな形を変えても、もういるユーザには届かない。<code>-c</code> で渡した文字列は5列目（コメント）に入った。</p>
+<div class="scroll"><table>
+<tr><th>オプション</th><th>意味</th></tr>
+<tr><td><code>-m</code> / <code>-M</code></td><td>ホームを作る（<code>/etc/skel</code> を写す）／作らない</td></tr>
+<tr><td><code>-d /path</code></td><td>ホームの場所（既定は <code>/home/ユーザ名</code>）</td></tr>
+<tr><td><code>-k /dir</code></td><td><code>/etc/skel</code> の代わりに写すひな形（<code>-m</code> と一緒に使う）</td></tr>
+<tr><td><code>-s /bin/bash</code></td><td>ログインシェル</td></tr>
+<tr><td><code>-u 1500</code></td><td>UID を指定する</td></tr>
+<tr><td><code>-g グループ</code></td><td>主グループ（すでにあるグループを指定）</td></tr>
+<tr><td><code>-G a,b</code></td><td>副グループ（カンマ区切り）</td></tr>
+<tr><td><code>-c 'コメント'</code></td><td>5列目のコメント（GECOS）</td></tr>
+<tr><td><code>-e 2026-12-31</code></td><td>アカウントの有効期限（<code>/etc/shadow</code> の8列目。第4章）</td></tr>
+<tr><td><code>-D</code></td><td>既定値を表示する。<code>-D -s /bin/bash</code> のように付けると既定値を変える</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 新入社員に渡す「初期配布セット」のひな形に近い。人事が箱の中身を決めておき、入社した日に同じものを1箱ずつ渡す。
+<br>ただし<b>崩れる点</b>: 配布物は会社の備品のままだが、写されたファイルは所有者ごと新しいユーザのものになる（<code>alice alice</code>）。本人が書き換えても消しても、ひな形には影響しない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-admin/">演習01</a>は、ホーム・シェル・ひな形に足したファイル・パスワードがそろったユーザを1人作る課題である。
+判定は台帳の行だけでなく、ホームの実物と中身を見る。</div>
+
+<h2 id="dash-d">useradd -D で既定を変えると、一般ユーザには読めなくなる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 既定値の確かめ方には落とし穴があること。</div>
+<p>既定のシェルを <code>/bin/bash</code> に変えてみる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo useradd -D -s /bin/bash
+@@ sudo useradd -D | grep SHELL
+@@ ls -l /etc/default/useradd
+</code></pre>
+<p>値は変わった。ところがファイルの権限が <code>-rw-r--r--</code> から <code>-rw-------</code> に変わり、大きさも日付も変わっている。<code>useradd -D</code> はファイルを書き直すときに、root しか読めない権限で作り直す。元に戻してから、一般ユーザのまま既定値を見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo useradd -D -s /bin/sh
+@@ useradd -D | grep SHELL
+@@ sudo useradd -D | grep SHELL
+</code></pre>
+<p>同じコマンドが、<code>sudo</code> の有無で違うことを言う。本当の値は <code>/bin/sh</code> である。student の <code>useradd</code> はファイルを読めず、<b>読めないとは言わずに</b>組み込みの値（<code>/bin/bash</code>）を表示した。権限を戻すと一致する。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo chmod 644 /etc/default/useradd
+@@ useradd -D | grep SHELL
+</code></pre>
+<p>既定値を確かめるときは <code>sudo useradd -D</code> で見るか、ファイルそのものを <code>sudo</code> で読む。表示しているプログラムが台帳を読めているかどうかは、出力からは分からない。</p>
+
+<h2 id="adduser">adduser は、まとめてやる別の道具</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>useradd</code> と <code>adduser</code> の関係。</div>
+<p>Debian 系には <code>adduser</code> という別のコマンドがある。ふつうは対話でパスワードや氏名を聞いてくるが、ここでは聞かれないように2つのオプションを付ける。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo adduser --disabled-password --comment '' kai
+@@ getent passwd kai
+@@ id kai
+</code></pre>
+<p>何も頼んでいないのに、ホームを作り、<code>/etc/skel</code> を写し、シェルを <code>/bin/bash</code> にし、<code>users</code> グループにも入れた。<code>adduser</code> は <code>/etc/adduser.conf</code> の方針に従って、中で <code>useradd</code> などを順に呼ぶ「窓口」である。5列目の <code>,,,</code> は、対話で聞くはずだった氏名・部屋番号・電話番号の欄が空のまま書かれた跡である。</p>
+<div class="scroll"><table>
+<tr><th></th><th><code>useradd</code></th><th><code>adduser</code>（Debian 系）</th></tr>
+<tr><td>位置づけ</td><td>台帳を書く本体（全ディストリビューション共通）</td><td>方針どおりに本体を呼ぶ窓口</td></tr>
+<tr><td>ホーム</td><td><code>-m</code> を付けたときだけ</td><td>作る</td></tr>
+<tr><td>シェル</td><td><code>/etc/default/useradd</code>（ここでは <code>/bin/sh</code>）</td><td><code>/etc/adduser.conf</code>（既定 <code>/bin/bash</code>）</td></tr>
+<tr><td>パスワード</td><td>付けない（<code>!</code>）</td><td>対話で聞く</td></tr>
+<tr><td>設定ファイル</td><td><code>/etc/default/useradd</code>・<code>/etc/login.defs</code></td><td><code>/etc/adduser.conf</code></td></tr>
+</table></div>
+<p>RHEL 系の <code>adduser</code> は <code>useradd</code> への別名（シンボリックリンク）で、動きは <code>useradd</code> と同じになる。試験で問われるのは <code>useradd</code> のオプションである。最後に kai を消しておく。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo userdel -r kai
+</code></pre>
+<p><code>-r</code> はホームとメールスプールも消す指定で、メールスプールは最初から無かったと言っている（<code>CREATE_MAIL_SPOOL=no</code>）。<code>userdel</code> は第3章で詳しく見る。</p>
+<div class="analogy"><b>たとえ</b>: 書類に直接書き込む（<code>useradd</code>）か、窓口の係員に「新人1名」と頼む（<code>adduser</code>）かの違いに近い。係員は社内の決まり（<code>/etc/adduser.conf</code>）に従って、必要な書類を順に書いてくれる。
+<br>ただし<b>崩れる点</b>: 係員は書き終えた書類を見せてくれるが、<code>adduser</code> も最終的には同じ台帳（<code>/etc/passwd</code> など）に同じ形の行を書くだけで、別の種類のユーザができるわけではない。</div>
+
+<div class="quiz"><b>確認</b>
+<p>ユーザ <code>taro</code> を、ホームディレクトリを作成し、ログインシェルを <code>/bin/bash</code>、副グループを <code>wheel</code> と <code>dev</code> にして作成したい。正しいコマンドはどれか。</p>
+<p>A. <code>useradd -d -s /bin/bash -g wheel,dev taro</code>　B. <code>useradd -m -s /bin/bash -G wheel,dev taro</code>　C. <code>useradd -k -b /bin/bash -G wheel,dev taro</code>　D. <code>useradd -m -s /bin/bash -g wheel -g dev taro</code></p>
+<details><summary>答え</summary>
+<p>B。ホームを作るのは <code>-m</code>、シェルは <code>-s</code>、副グループは <code>-G</code>（カンマ区切り）。
+<code>-g</code> は主グループで、1つしか指定できない。<code>-d</code> はホームの場所を指定するだけで、作るかどうかは <code>-m</code> で決まる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/skel</code> に <code>.vimrc</code> を追加した。すでにいるユーザ alice のホームにも <code>.vimrc</code> が配られるか。</p>
+<details><summary>答え</summary>
+<p>配られない。<code>/etc/skel</code> は <code>useradd -m</code> がホームを作る瞬間にだけ写される。この章では memo.txt を足したあとに作った carol だけが持っていた。
+既存のユーザに配るなら、管理者が手でコピーして所有者を直す（<code>cp</code> と <code>chown</code>）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>useradd</code> で作成するユーザの既定のログインシェルを確認・変更するコマンドと、その値が書かれるファイルを答えよ。</p>
+<details><summary>答え</summary>
+<p>確認は <code>useradd -D</code>、変更は <code>useradd -D -s /bin/bash</code>。値は <code>/etc/default/useradd</code> の <code>SHELL=</code> に書かれる。
+この練習機では <code>useradd -D -s</code> がファイルを root だけが読める権限で書き直したので、確認は <code>sudo useradd -D</code> で行う。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>useradd</code> は台帳（<code>/etc/passwd</code>・<code>/etc/shadow</code>・<code>/etc/group</code>）に行を書く。ホームは <code>-m</code> を付けたときだけ作る</li><li>既定値は <code>/etc/default/useradd</code>（シェル・ひな形）と <code>/etc/login.defs</code>（UID の範囲・私的グループ・ホームの権限）から来る。確かめるのは <code>useradd -D</code></li><li><code>/etc/skel</code> はホームを作る瞬間にだけ写される。所有者は新しいユーザになる</li><li>作ったばかりのユーザはパスワードが無い（<code>/etc/shadow</code> の2列目が <code>!</code>）</li><li><code>adduser</code> は Debian 系の窓口で、ホーム・シェル・パスワードまでまとめて面倒を見る。本体は <code>useradd</code></li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / adduser 3.137ubuntu1 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-admin/theory/01-ledger">← 1. ユーザの台帳は3枚に分かれている</a><a href="/linuc-admin/theory/03-membership">次: 3. 所属は、書いたとおりに置き換わる →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-admin/theory/">理論編 目次</a> · <a href="/linuc-admin/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-admin/chapters.js"></script>
+<script src="/linuc-admin/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

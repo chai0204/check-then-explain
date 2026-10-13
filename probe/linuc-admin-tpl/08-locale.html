@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>8. ロケールは、名前で指しているだけ — 確かめて説明する LinuC 主題1.08</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="8" data-theme="linuc-admin">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-admin/theory/">理論編</a> › 第8章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/">詳しく</a></p>
+</div>
+<h1>8. ロケールは、名前で指しているだけ</h1>
+<p class="lead"><code>LANG=ja_JP.UTF-8 date</code> は、何も言わずに英語の日付を出し、終了コード 0 で終わる。<code>ja_JP.UTF-8</code> という名前のロケールが、この練習機にはまだ生成されていないからである。<code>LANG</code> は名前で指すだけで、その名前の実体（コンパイル済みのデータ）が無ければ、プログラムは黙って C ロケールで動く。</p>
+<div class="badges"><span>前提: 第7章まで読了</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.08.3（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>LANG</code>・<code>LC_*</code>・<code>LC_ALL</code> の関係（強さの順）を説明できる</li><li><code>locale</code> と <code>locale -a</code> で、設定と生成済みのロケールを確かめられる</li><li><code>locale-gen</code>・<code>localedef</code> でロケールを生成できる</li><li>スクリプトで <code>LANG=C</code>（<code>LC_ALL=C</code>）を使う理由を、出力の違いで示せる</li><li>国際化（i18n）とローカライゼーション（l10n）の違いを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>LANGUAGE</code> 変数、gettext の仕組み、日本語入力（IM）は扱わない。タイムゾーンは主題1.09.1 の範囲（<a href="/linuc-services/theory/02-timezone">1.09 の第2章</a>）。</div></div>
+
+<h2 id="locale">いまのロケールを見る</h2>
+<div class="sgoal"><b>この節で分かること</b>: ロケールがいくつもの分野（カテゴリ）に分かれていること。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ locale
+@@ cat /etc/default/locale
+@@ locale -a
+</code></pre>
+<p><code>locale</code> は、いまのシェルのロケールを分野ごとに表示する。引用符 <code>"…"</code> 付きの値は「自分では設定されていないので <code>LANG</code> から引き継いだ」という意味である。<code>LANG</code> の値は、ログインのときに <code>/etc/default/locale</code>（システムの既定）から読み込まれた。<code>locale -a</code> は、この練習機に<b>生成済み</b>のロケールの一覧で、いまは C 系の3つしか無い。</p>
+<div class="scroll"><table>
+<tr><th>変数</th><th>決めるもの</th><th>影響を受ける例</th></tr>
+<tr><td><code>LC_CTYPE</code></td><td>文字の種類（どのバイト列が1文字か）</td><td><code>wc -m</code>、正規表現の <code>[[:alpha:]]</code></td></tr>
+<tr><td><code>LC_NUMERIC</code></td><td>数の書き方（小数点・桁区切り）</td><td><code>printf "%'d"</code></td></tr>
+<tr><td><code>LC_TIME</code></td><td>日時の書き方</td><td><code>date</code>、<code>ls -l</code> の日付</td></tr>
+<tr><td><code>LC_COLLATE</code></td><td>並び順</td><td><code>sort</code>、<code>ls</code> の並び</td></tr>
+<tr><td><code>LC_MONETARY</code></td><td>通貨の書き方</td><td>—</td></tr>
+<tr><td><code>LC_MESSAGES</code></td><td>メッセージの言語</td><td>エラーメッセージ</td></tr>
+<tr><td><code>LANG</code></td><td>上のどれも設定されていないときの既定</td><td>—</td></tr>
+<tr><td><code>LC_ALL</code></td><td>設定すると、全分野をこの値で上書き</td><td>—</td></tr>
+</table></div>
+
+<h2 id="name">生成していないロケールを指すと、黙って C になる</h2>
+<div class="sgoal"><b>この節で分かること</b>: ロケールの「名前」と「実体」が別であること。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>日本語の表示にしたければ、<code>LANG=ja_JP.UTF-8</code> を付けて実行すればよい。
+使えない名前を指定したなら、エラーになって教えてくれるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ LANG=ja_JP.UTF-8 date; echo $?
+@@ LANG=ja_JP.UTF-8 locale
+</code></pre>
+<div class="then"><b>だめな理由</b>: <code>date</code> は英語で表示し、終了コードは 0 だった。警告も出していない。
+<code>locale</code> に聞いて初めて「<code>Cannot set LC_CTYPE to default locale: No such file or directory</code>」と分かる。
+<code>LANG</code> に書いたのは名前で、その名前のデータは<b>生成しないと存在しない</b>。見つからないとき、C ライブラリは黙って C ロケール（<code>POSIX</code>）で動き、
+多くのプログラムはそれを報告しない（bash はスクリプトの起動時に警告を出すことがあるが、<code>date</code> は何も言わない）。<code>locale</code> の表示が <code>"ja_JP.UTF-8"</code> になっているのは、変数の値を写しているだけである。</div></div>
+<div class="analogy"><b>たとえ</b>: レストランで「日本語のメニューをください」と頼むのに近い。店に日本語版が無ければ、店員は黙っていつもの英語のメニューを持ってくる。
+<br>ただし<b>崩れる点</b>: 店員なら「日本語版はありません」と言ってくれることもあるが、多くのプログラムは何も言わない。頼んだ側が <code>locale -a</code> で、店に何があるかを先に確かめるしかない。</div>
+
+<h2 id="gen">ロケールを生成する</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>locale-gen</code> と <code>localedef</code> がすること。</div>
+<p>Debian 系では、生成するロケールの一覧が <code>/etc/locale.gen</code> にある。いまは全部コメントになっている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ grep ja_JP /etc/locale.gen
+@@ sudo locale-gen ja_JP.UTF-8
+@@ grep ja_JP /etc/locale.gen
+@@ locale -a
+</code></pre>
+<p><code>locale-gen</code> は <code>/etc/locale.gen</code> の該当行のコメントを外し、データを生成した。一覧での名前は <code>ja_JP.utf8</code>（小文字・ハイフン無し）に正規化されている。もう一度同じことをする。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ LANG=ja_JP.UTF-8 date
+@@ LANG=ja_JP.UTF-8 ls -l /etc/hostname
+@@ LANG=ja_JP.UTF-8 printf "%'d\n" 1234567
+@@ LANG=C printf "%'d\n" 1234567
+</code></pre>
+<p>日時（<code>LC_TIME</code>）と桁区切り（<code>LC_NUMERIC</code>）が日本の書き方になった。ところがメッセージ（<code>LC_MESSAGES</code>）は、プログラムによって変わったり変わらなかったりする。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ LANG=ja_JP.UTF-8 ls /nonexistent
+@@ LANG=ja_JP.UTF-8 dpkg -s nonexistent-pkg
+@@ ls -1 /usr/share/locale/ja/LC_MESSAGES/
+</code></pre>
+<p><code>ls</code> は英語のまま、<code>dpkg</code> は日本語になった。メッセージの翻訳はロケールのデータではなく、プログラムごとの翻訳ファイル（<code>.mo</code>）に入っていて、この練習機には dpkg や apt の分しか無い。ここに2つの言葉の違いがある。</p>
+<ul>
+<li><b>国際化</b>（internationalization。i と n の間が18文字なので <b>i18n</b>）は、プログラムが言語や地域の違いを<b>差し替えられるように作っておく</b>こと。<code>ls</code> も <code>date</code> もロケールに従って表示を変える作りになっている</li>
+<li><b>ローカライゼーション</b>（localization。<b>l10n</b>）は、ある言語・地域向けの<b>中身を用意する</b>こと。<code>ja_JP</code> の日付の書き方のデータや、日本語の翻訳ファイルがそれにあたる</li>
+</ul>
+<p>ロケールを生成すると書式の中身はそろうが、翻訳は別に入れないと届かない。Ubuntu では翻訳を言語ごとのパッケージ（言語パック）にまとめて配っていて、システムを日本語にするときは、ロケールの生成と既定の <code>LANG</code> の設定（この章の最後の節）に加えて、それを入れる。この練習機には入れていない。生成には、もっと低い層の <code>localedef</code> も使える（<code>locale-gen</code> は <code>/etc/locale.gen</code> を読んでこれを呼んでいる）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo localedef -i en_US -f UTF-8 en_US.UTF-8
+@@ locale -a
+</code></pre>
+<p><code>-i</code> はロケールの定義（入力）、<code>-f</code> は文字コード（charmap）、最後が作るロケールの名前である。</p>
+<div class="analogy"><b>たとえ</b>: 国際化は、字幕を差し替えられる映画プレーヤーを作ることに近い。ローカライゼーションは、日本語の字幕ファイルを用意することである。
+<br>ただし<b>崩れる点</b>: 映画の字幕は1本のファイルで全部そろうが、Linux では日付や数の書き方（ロケールのデータ）と、メッセージの翻訳（プログラムごとの <code>.mo</code>）が別々に配られる。片方だけそろうことがふつうに起きる。</div>
+
+<h2 id="order">LC_ALL は、LANG と LC_* より強い</h2>
+<div class="sgoal"><b>この節で分かること</b>: 変数が複数あるとき、どれが効くか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ LANG=ja_JP.UTF-8 LC_TIME=C date
+@@ LANG=C LC_ALL=ja_JP.UTF-8 date
+@@ LANG=ja_JP.UTF-8 LC_TIME=C locale
+</code></pre>
+<p>分野ごとの <code>LC_TIME</code> は <code>LANG</code> より強く、<code>LC_ALL</code> はその両方より強い。<code>locale</code> の表示では、自分で設定した <code>LC_TIME=C</code> だけが引用符なしになっている。</p>
+<div class="analogy"><b>たとえ</b>: <code>LANG</code> は会社の標準ルール、<code>LC_TIME</code> などは部署ごとの例外ルール、<code>LC_ALL</code> は社長の一斉指示に近い。一斉指示が出ていれば、部署の例外も標準ルールも見ない。
+<br>ただし<b>崩れる点</b>: 社長の指示は全社に届くが、<code>LC_ALL</code> が届くのはそれを設定したプロセスと、そこから起動した子プロセスだけである。スクリプトの中で設定すれば、そのスクリプトの中だけで効く（第7章の at は、投入したときの値を持っていく）。</div>
+<pre><code>LC_ALL   ＞   LC_TIME など個別の LC_*   ＞   LANG
+（全部を上書き）  （その分野だけ）                （何も無いときの既定）</code></pre>
+
+<h2 id="langc">スクリプトで LANG=C を使う理由</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じスクリプトが、呼ぶ人のロケールで別の結果を出すこと。</div>
+<p>コマンドの出力を切り出して使うスクリプトは、出力の形が変わると壊れる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ LANG=ja_JP.UTF-8 date | awk '{print $2}'
+@@ LANG=C date | awk '{print $2}'
+</code></pre>
+<p>月を取り出したつもりが、日本語の環境では <code>10月</code> になる。並び順も変わる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ printf '%s\n' b A a B | LANG=C sort | paste -sd ' '
+@@ printf '%s\n' b A a B | LANG=en_US.UTF-8 sort | paste -sd ' '
+@@ printf '%s\n' b A a B | LANG=ja_JP.UTF-8 sort | paste -sd ' '
+</code></pre>
+<p>C ロケールの <code>sort</code> は文字コードの順（大文字が全部先）で、en_US.UTF-8 は辞書の順（大文字と小文字を並べる）である。ja_JP.UTF-8 はこの4文字については C と同じ順になった。並び順はロケールごとの規則（<code>LC_COLLATE</code>）で決まり、「日本語か英語か」では決まらない。だからスクリプトの頭でロケールを固定し、誰が呼んでも同じ形の出力にする。それが「スクリプトでは <code>LANG=C</code>」と言われる理由である。ただし呼ぶ側が <code>LC_ALL</code> を設定していると <code>LANG</code> は負けるので、確実に固定するなら <code>LC_ALL=C</code> と書く。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-admin/">演習07</a>は、呼ぶ人のロケールで出力が変わってしまうスクリプトを直す課題である。
+判定は <code>LANG</code> と <code>LC_ALL</code> を変えて3通りに呼び、出力が同じかを比べる。</div>
+
+<h2 id="default">システムの既定は localectl で変える</h2>
+<div class="sgoal"><b>この節で分かること</b>: ログインしたときの <code>LANG</code> がどこから来るか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ localectl
+@@ sudo localectl set-locale LANG=ja_JP.UTF-8
+@@ cat /etc/default/locale
+</code></pre>
+<p><code>localectl set-locale</code> は <code>/etc/default/locale</code> を書き換える（RHEL 系では <code>/etc/locale.conf</code>）。このファイルはログインのときに読まれるので、いまのシェルには効かない。<code>exit</code> して入り直す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ echo $LANG; date
+</code></pre>
+<p>新しいログインでは日本語になった。この教材の出力は C.UTF-8 で取っているので、元に戻して入り直す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo localectl set-locale LANG=C.UTF-8
+@@ echo $LANG; date  ## n=2
+</code></pre>
+
+<div class="quiz"><b>確認</b>
+<p><code>LANG=ja_JP.UTF-8</code>、<code>LC_TIME=C</code> が設定され、<code>LC_ALL</code> は設定されていない。<code>date</code> の表示と、エラーメッセージの言語はそれぞれ何で決まるか。</p>
+<details><summary>答え</summary>
+<p><code>date</code> の日時の書き方は <code>LC_TIME=C</code> で決まり、英語の形になる（個別の <code>LC_*</code> は <code>LANG</code> より強い）。
+メッセージは <code>LC_MESSAGES</code> が設定されていないので <code>LANG</code> の ja_JP.UTF-8 に従う（ただし翻訳ファイルがあるプログラムだけ日本語になる）。
+<code>LC_ALL</code> を設定すると、両方ともその値で上書きされる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>システムで利用できる（生成済みの）ロケールの一覧を表示するコマンドはどれか。</p>
+<p>A. <code>locale</code>　B. <code>locale -a</code>　C. <code>localectl status</code>　D. <code>echo $LANG</code></p>
+<details><summary>答え</summary>
+<p>B。A は<b>いまの設定</b>（変数の値）を表示するだけで、その名前が生成済みかは分からない。C はシステムの既定、D は変数の値。
+この章では <code>LANG=ja_JP.UTF-8</code> と設定できても、<code>locale -a</code> に無いあいだは C で動いていた。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>シェルスクリプトの先頭で <code>LANG=C</code>（あるいは <code>LC_ALL=C</code>）を設定することが多い理由を説明せよ。</p>
+<details><summary>答え</summary>
+<p>コマンドの出力の形（日付の書式・並び順・数の書き方・メッセージ）がロケールで変わり、出力を <code>awk</code> や <code>grep</code> で切り出す処理が、
+呼ぶ人の環境によって壊れるから。C ロケールに固定すれば、誰が呼んでも同じ形になる。呼ぶ側の <code>LC_ALL</code> まで抑えるなら <code>LC_ALL=C</code> にする。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>「i18n」と「l10n」の違いを説明せよ。</p>
+<details><summary>答え</summary>
+<p>i18n（国際化）は、プログラムを言語や地域に合わせて差し替えられるように作ること。l10n（ローカライゼーション）は、特定の言語・地域向けの翻訳や書式を用意すること。
+数字は先頭と末尾の文字の間の文字数（internationalization の 18、localization の 10）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>ロケールは分野ごとの変数（<code>LC_CTYPE</code> <code>LC_TIME</code> <code>LC_COLLATE</code> <code>LC_MESSAGES</code> など）でできていて、強さは <code>LC_ALL</code> ＞ <code>LC_*</code> ＞ <code>LANG</code></li><li><code>LANG</code> は名前を指すだけ。生成していないロケールを指すと、<b>多くのプログラムは黙って C で動く</b>。生成済みかは <code>locale -a</code> で見る</li><li>生成は <code>locale-gen</code>（Debian 系。<code>/etc/locale.gen</code>）か <code>localedef -i 定義 -f 文字コード 名前</code></li><li>メッセージの翻訳はロケールとは別の翻訳ファイルで、プログラムごとにある（i18n は仕組み、l10n は中身）</li><li>スクリプトは <code>LANG=C</code>（確実には <code>LC_ALL=C</code>）で出力の形を固定する</li><li>システムの既定は <code>localectl set-locale</code> で <code>/etc/default/locale</code> に書き、次のログインから効く</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ locales 2.39-0ubuntu8.9 / libc-bin 2.39-0ubuntu8.9 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-admin/theory/07-at">← 7. 拒否リストを消すと、誰も使えなくなる</a><a href="/linuc-admin/theory/09-iconv">次: 9. 文字コードは、読む側が決める →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-admin/theory/">理論編 目次</a> · <a href="/linuc-admin/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-admin/chapters.js"></script>
+<script src="/linuc-admin/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

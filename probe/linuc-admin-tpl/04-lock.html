@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. ロックは、扉を1つ閉めるだけ — 確かめて説明する LinuC 主題1.08</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="linuc-admin">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-admin/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/">詳しく</a></p>
+</div>
+<h1>4. ロックは、扉を1つ閉めるだけ</h1>
+<p class="lead"><code>passwd -l alice</code> は成功し、<code>passwd -S</code> は <code>L</code>（ロック）と答える。それでも alice は ssh の鍵で入れる。ロックが閉めたのは「パスワード」という扉1つで、鍵の扉はその列を読まないからである。アカウントを一時停止するなら、どの扉からも必ず読まれる列を変える。</p>
+<div class="badges"><span>前提: 第3章まで読了（alice がいる）</span><span>前提: 外の端末と練習機の中の両方を開いておく</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.08.1（重要度5）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>passwd</code> の <code>-l</code> <code>-u</code> <code>-S</code> <code>-d</code> <code>-e</code> が <code>/etc/shadow</code> のどこを変えるかを言える</li><li>アカウントを消さずに一時停止する方法（有効期限・ログインシェル）を選べる</li><li>ロック・期限切れ・シェルの拒否が、ログインのどの段で効くかを説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: PAM の設定ファイルの書き方、<code>sshd_config</code> の <code>DenyUsers</code>、失敗回数によるロック（<code>pam_faillock</code>）、パスワードの強度の検査は扱わない。<code>chage</code> のオプション一式は主題1.10（セキュリティ）の範囲で、ここでは読むのに使うだけ。</div></div>
+
+<h2 id="status">作ったばかりのユーザは、最初からロックされている</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>passwd -S</code> の読み方と、パスワードを付けたときの <code>/etc/shadow</code> の変化。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo passwd -S alice
+@@ sudo grep '^alice:' /etc/shadow
+</code></pre>
+<p><code>passwd -S</code> は <code>/etc/shadow</code> の行を読みやすく直して表示する。2つ目の欄が状態で、<code>L</code> はロック（2列目が <code>!</code> で始まる）、<code>P</code> は使えるパスワードがある、<code>NP</code> はパスワードが空。3つ目以降は最終変更日・最短日数・有効日数・警告日数・猶予日数で、<code>/etc/shadow</code> の3〜7列目に対応する。</p>
+<p>パスワードを付ける。<code>passwd</code> は2回聞いてくる。打った文字は画面に出ない。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo passwd alice
+@@ sudo passwd -S alice
+@@ sudo grep '^alice:' /etc/shadow
+</code></pre>
+<p>2列目の <code>!</code> が、<code>$y$</code> で始まるハッシュ（yescrypt）に置き換わった。状態は <code>P</code> になった。</p>
+
+<h2 id="key">鍵を渡すと、パスワードを使わずに入れる</h2>
+<div class="sgoal"><b>この節で分かること</b>: ssh の鍵認証が、パスワードの列を使わないこと。</div>
+<p>外の端末（<code>lab@host</code>）から student で入れているのは、外の鍵が student の <code>~/.ssh/authorized_keys</code> に登録してあるからである。同じものを alice にも置く。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo install -d -m 700 -o alice -g alice /home/alice/.ssh
+@@ sudo install -m 600 -o alice -g alice ~/.ssh/authorized_keys /home/alice/.ssh/
+</code></pre>
+<p>外の端末で、ユーザを alice に変えて入る（<code>-l</code> はログインするユーザ名）。コマンドを1つだけ実行して戻ってくる形にしておく。</p>
+<pre data-where="外（lab@host）"><code>
+@@ ssh -l alice linuc id
+</code></pre>
+
+<h2 id="lock">passwd -l でロックしても、鍵では入れる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>passwd -l</code> が何を止めて、何を止めないか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>しばらく使わせたくないユーザは <code>passwd -l</code> でロックすればよい。
+<code>passwd -S</code> が <code>L</code> と言っていれば、そのユーザはもう入れないはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo passwd -l alice
+@@ sudo passwd -S alice
+@@ sudo grep '^alice:' /etc/shadow
+</code></pre>
+<pre data-where="外（lab@host）"><code>
+@@ ssh -l alice linuc id
+</code></pre>
+<div class="then"><b>だめな理由</b>: 入れた。<code>passwd -l</code> がしたのは、<code>/etc/shadow</code> の2列目（ハッシュ）の頭に <code>!</code> を1文字足すことだけである。
+こうすると、どんなパスワードを打ってもハッシュが一致しなくなる。だから止まるのは<b>パスワードで入る経路だけ</b>で、
+鍵の照合は2列目を読まないので素通りする。<code>man passwd</code> にもそう書いてある
+（<i>Note that this does not disable the account. The user may still be able to login using another authentication token (e.g. an SSH key).</i>）。</div></div>
+<div class="analogy"><b>たとえ</b>: 暗証番号で開くドアと、カードキーで開くドアが並んでいる建物に近い。暗証番号を無効にしても、カードキーのドアは開く。
+<br>ただし<b>崩れる点</b>: 建物なら「この人は入館禁止」と警備員に伝えれば全部のドアで止まるが、<code>passwd -l</code> は警備員に何も伝えていない。暗証番号の台帳の1行を書き換えただけである。</div>
+
+<h2 id="expire">止めるなら、アカウントの期限を切る</h2>
+<div class="sgoal"><b>この節で分かること</b>: どの入口でも必ず読まれる列。</div>
+<p><code>/etc/shadow</code> の8列目は「アカウント自体の有効期限」である。ここに 1（1970-01-02）を書くと、とうに期限切れになる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo usermod -e 1 alice
+@@ sudo grep '^alice:' /etc/shadow
+</code></pre>
+<pre data-where="外（lab@host）"><code>
+@@ ssh -l alice linuc id
+</code></pre>
+<p>鍵の照合は通ったうえで、そのあとの「このアカウントは使ってよいか」の検査（PAM の account 段）で断られた。この検査は ssh でもコンソールでも <code>su</code> でも必ず通る。root から <code>su</code> しても止まる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo su - alice -c id
+@@ sudo chage -l alice
+</code></pre>
+<p><code>chage -l</code> は <code>/etc/shadow</code> の日数を日付に直して見せる。<code>Account expires : Jan 02, 1970</code> が8列目の 1 である。期限を空に戻すと、また入れる（パスワードはまだロックのままなのに、鍵なら入れることにも注意）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo usermod -e '' alice
+</code></pre>
+<pre data-where="外（lab@host）"><code>
+@@ ssh -l alice linuc id
+</code></pre>
+<p>もう1つの方法は、ログインシェル（<code>/etc/passwd</code> の7列目）を、ログインを断るだけのプログラムにすることである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo usermod -s /usr/sbin/nologin alice
+</code></pre>
+<pre data-where="外（lab@host）"><code>
+@@ ssh -l alice linuc id
+</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo usermod -s /bin/bash alice
+</code></pre>
+<p>ログインは「本人確認（パスワードか鍵）→ アカウントの検査（有効期限など）→ シェルの起動」の順に進む。どの段で止めるかで、止まる入口が変わる。</p>
+<div class="scroll"><table>
+<tr><th>止め方</th><th>書き換える場所</th><th>効く段</th><th>パスワード</th><th>鍵の ssh</th><th>root からの su</th></tr>
+<tr><td><code>passwd -l</code> / <code>usermod -L</code></td><td><code>/etc/shadow</code> 2列目に <code>!</code></td><td>本人確認</td><td>止まる</td><td>止まらない</td><td>止まらない</td></tr>
+<tr><td><code>usermod -e 1</code> / <code>chage -E 0</code></td><td><code>/etc/shadow</code> 8列目</td><td>アカウントの検査</td><td>止まる</td><td>止まる</td><td>止まる</td></tr>
+<tr><td><code>usermod -s /usr/sbin/nologin</code></td><td><code>/etc/passwd</code> 7列目</td><td>シェルの起動</td><td>止まる</td><td>止まる</td><td>止まる</td></tr>
+</table></div>
+<p>試験で「アカウントを一時的に無効にする」と問われたら、<code>passwd -l</code>・<code>usermod -L</code>（ロック）、<code>usermod -e</code>・<code>chage -E</code>（期限）、シェルを <code>/usr/sbin/nologin</code> や <code>/bin/false</code> にする、の3系統が答えになる。実務では、鍵で入る人がいるならロックだけでは足りない。</p>
+<div class="analogy"><b>たとえ</b>: 社員証の有効期限に近い。期限が切れた社員証では、暗証番号のドアでもカードキーのドアでも、受付で止められる。
+<br>ただし<b>崩れる点</b>: 社員証の期限は本人も見て知っているが、<code>/etc/shadow</code> の8列目は本人には読めず、切れたことは入ろうとして初めて分かる。だから「戻ってきたら <code>usermod -e ''</code> で戻す」と記録しておく。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-admin/">演習03</a>は、dave を消さずに一時停止する課題である。
+判定は外から dave の鍵で実際に ssh し、練習機の中で root から <code>su - dave</code> して、入れないことを確かめる。</div>
+
+<h2 id="options">passwd の残りのオプション</h2>
+<div class="sgoal"><b>この節で分かること</b>: ロック解除・期限切れの強制・パスワードの削除が、それぞれ何を書くか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo passwd -u alice
+@@ sudo passwd -S alice
+@@ sudo passwd -e alice
+@@ sudo passwd -S alice
+</code></pre>
+<p><code>-u</code> で <code>!</code> が外れて <code>P</code> に戻った。<code>-e</code> はパスワードを「期限切れ」にする。3列目（最終変更日）が 0、つまり 1970-01-01 になり、次のログインで変更を強制される。こちらはアカウントの検査で効くので、鍵の ssh でも止まる。</p>
+<pre data-where="外（lab@host）"><code>
+@@ ssh -l alice linuc id
+</code></pre>
+<p>端末があれば、その場で新しいパスワードを聞かれる。コマンドを1つ実行するだけの ssh には端末が無いので、変更できずに断られた。最後に <code>-d</code>（パスワードを空にする）を見る。</p>
+<div class="analogy"><b>たとえ</b>: <code>passwd -e</code> は「次に来たら、受付で暗証番号を作り直させる」という指示に近い。カードキー（鍵）で来ても受付は通るので、そこで止められる。
+<br>ただし<b>崩れる点</b>: 受付なら作り直す場所があるが、コマンドを1つ実行するだけの ssh には端末が無く、作り直す手段が無いまま断られる。対話のログインなら、その場で新しいパスワードを決めて入れる。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo passwd -d alice
+@@ sudo passwd -S alice
+@@ sudo passwd -l alice; sudo passwd -u alice
+</code></pre>
+<p><code>NP</code> はパスワードが空の状態で、コンソールでは<b>パスワード無しで入れてしまう</b>危険な状態である。そこからロックして解除しようとすると、<code>passwd -u</code> は「解除するとパスワード無しのアカウントになる」と言って断る。</p>
+<div class="scroll"><table>
+<tr><th><code>passwd</code></th><th>同じことをする別のコマンド</th><th><code>/etc/shadow</code> の変化</th></tr>
+<tr><td><code>-l</code>（ロック）</td><td><code>usermod -L</code></td><td>2列目の頭に <code>!</code></td></tr>
+<tr><td><code>-u</code>（ロック解除）</td><td><code>usermod -U</code></td><td>2列目の <code>!</code> を外す</td></tr>
+<tr><td><code>-d</code>（パスワードを消す）</td><td>—</td><td>2列目を空にする</td></tr>
+<tr><td><code>-e</code>（期限切れにする）</td><td><code>chage -d 0</code></td><td>3列目を 0 にする</td></tr>
+<tr><td><code>-S</code>（状態を見る）</td><td><code>chage -l</code></td><td>（読むだけ）</td></tr>
+<tr><td><code>-n</code> / <code>-x</code> / <code>-w</code> / <code>-i</code></td><td><code>chage -m</code> / <code>-M</code> / <code>-W</code> / <code>-I</code></td><td>4〜7列目（最短・有効・警告・猶予の日数）</td></tr>
+</table></div>
+
+<div class="quiz"><b>確認</b>
+<p>ユーザ taro のパスワードをロックするコマンドを2つ答えよ。また、ロックすると <code>/etc/shadow</code> の taro の行はどう変わるか。</p>
+<details><summary>答え</summary>
+<p><code>passwd -l taro</code> と <code>usermod -L taro</code>。2列目（パスワードのハッシュ）の先頭に <code>!</code> が付き、<code>passwd -S</code> の状態が <code>L</code> になる。
+ただし ssh の公開鍵など、パスワードを使わない入口は止まらない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>passwd -l</code> でロックしたユーザが、ssh の公開鍵認証でログインできてしまった。アカウントを削除せずに、どの方法でもログインできないようにするコマンドとして適切なものはどれか。</p>
+<p>A. <code>passwd -d hanako</code>　B. <code>usermod -e 1 hanako</code>　C. <code>passwd -u hanako</code>　D. <code>usermod -U hanako</code></p>
+<details><summary>答え</summary>
+<p>B。アカウントの有効期限（<code>/etc/shadow</code> の8列目）を過去にすると、PAM のアカウント検査で鍵の ssh も <code>su</code> も止まる。
+A はパスワードを空にしてしまい、かえって危険。C と D はロック解除である。シェルを <code>/usr/sbin/nologin</code> にする方法でも止まる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>次のログイン時にユーザ jiro にパスワードの変更を強制したい。<code>passwd</code> のオプションで答えよ。また <code>/etc/shadow</code> のどの列が何になるか。</p>
+<details><summary>答え</summary>
+<p><code>passwd -e jiro</code>。3列目（最後にパスワードを変えた日）が 0 になる。<code>chage -d 0 jiro</code> でも同じ。
+この章では、これで鍵の ssh も（端末が無いと変更できずに）止まった。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>useradd</code> 直後はパスワードが無く <code>L</code>（2列目が <code>!</code>）。<code>passwd ユーザ名</code> で付けると <code>P</code></li><li><code>passwd -l</code>（= <code>usermod -L</code>）は2列目の頭に <code>!</code> を足すだけ。<b>鍵の ssh は止まらない</b></li><li>一時停止は <code>usermod -e 1</code>（= <code>chage -E 0</code>）でアカウントの期限を切るか、シェルを <code>/usr/sbin/nologin</code> にする。戻すのは <code>usermod -e ''</code> と <code>usermod -s</code></li><li><code>passwd -e</code> は3列目を 0 にして次のログインで変更を強制する。<code>passwd -d</code> はパスワードを空にする（危険）</li><li>どの方法がどの入口を止めるかは、ログインのどの段（本人確認・アカウントの検査・シェル）でその列が読まれるかで決まる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / openssh-server 1:9.6p1-3ubuntu13.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-admin/theory/03-membership">← 3. 所属は、書いたとおりに置き換わる</a><a href="/linuc-admin/theory/05-crontab">次: 5. crontab には「誰が」の列が無い →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-admin/theory/">理論編 目次</a> · <a href="/linuc-admin/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-admin/chapters.js"></script>
+<script src="/linuc-admin/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>確かめて説明する LinuC 主題1.08 — アカウント・ジョブ・ロケールを仮想マシンで確かめる</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="linuc-admin">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <strong>主題1.08</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文の出力はすべて実機（コンテナの中の仮想マシン）の記録で、演習8本は模範解答どおりに通ること・未達のときに判定が鳴ることを
+   両方確認してあります。それでも<b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、読者として通した段階で4回に分けて不備が出ました。
+   詰まったら <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   ページ下のコメントへ。それが直す順番になります。</p>
+</div>
+
+<h1>確かめて説明する LinuC 主題1.08</h1>
+<p class="lead">LinuC レベル1 <strong>102 試験・主題1.08「システム管理」</strong>
+（アカウント管理 / ジョブスケジューリング / ローカライゼーションと国際化）を、
+<strong>コンテナの中で動く練習機（仮想マシン）で実際に打って</strong>確かめます。
+ユーザを作って止め、cron と at に本物の時刻でジョブを走らせ、ロケールを生成します。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します（時刻や日付など、打った日時で変わるものを除く）。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<div class="notfor">
+<h4>この教材が向かない人</h4>
+<ul>
+<li>いま動かしたいだけの人 → 公式ドキュメントのほうが速い</li>
+<li>答えだけ欲しい人 → AI に聞いたほうが速く、あなたの語彙に合う</li>
+</ul>
+<p>向く人: コマンドは打てる。写経すれば動く。
+でも「なぜ動くのか」を人に説明できない人。<br>
+<b>LinuC を受ける人向けには</b>: <code>useradd</code> や <code>crontab</code> のオプションを、読んでも覚えられない人。</p>
+</div>
+
+<h2 id="cage">この教材の檻</h2>
+<div class="cages"><div class="scroll"><table>
+<tr><th>檻</th><th>準備</th><th>ここで触れる</th><th>ここでは触れない（逃がす先）</th></tr>
+<tr><td>仮想マシン型（コンテナの中で QEMU が Ubuntu 24.04 の練習機を1台動かす）</td><td>イメージ（約 2GB）の取得と、練習機の起動（KVM なしで 30 秒〜1分半）</td>
+    <td><code>useradd</code> <code>usermod</code> <code>passwd</code> <code>crontab</code> <code>anacron</code> <code>at</code> <code>locale-gen</code> <code>iconv</code>、外からの <code>ssh</code></td>
+    <td>LDAP などの外部のユーザ管理、メールでの通知（練習機に MTA はありません）、RHEL 系の挙動（本文の表で扱います）</td></tr>
+</table></div></div>
+<p>影響度 <b>B</b>（変更はコンテナの中の練習機だけ。母艦の設定もファイルも書き換えません）。
+演習は練習機の <code>/etc</code> やユーザを書き換えますが、<b>読者がホストに渡す特権はありません</b>（<code>--privileged</code> も <code>--cap-add</code> も使いません）。
+練習機は QEMU の完全エミュレーション（TCG）で動くので、ホストのカーネルの機能を借りません。
+やり直したいときは、外の端末で <code>vm reset --yes</code> と打てば練習機が最初の状態に戻ります。</p>
+
+<h2 id="start">はじめる</h2>
+<p>Docker の場合。起動して、入ります。</p>
+<pre><code>docker run -d --name lab-linuc-admin --hostname host --stop-timeout 30 \
+  -v lab-linuc-admin-vm:/home/lab/vm \
+  -v lab-linuc-admin-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__
+
+docker exec -it lab-linuc-admin bash -l</code></pre>
+<p><code>--stop-timeout 30</code> は特権ではなく、<code>docker stop</code> のときに待つ秒数です。練習機を正常に停止するのに KVM なしで十数秒かかり、
+docker の既定の10秒では電源を抜くのと同じ止まり方になります（次の起動でディスクの検査が走ります）。
+付けずに作った場合は <code>docker stop -t 30 lab-linuc-admin</code> で止めてください。podman でも同じオプションです。</p>
+<p>入ると、練習機の状態と現在地が出ます。起動の直後は練習機がまだ立ち上がっていないことがあります（KVM なしで 30〜90 秒）。</p>
+<pre data-where="外（lab@host）"><code>練習機 linuc: running（エージェント 応答あり / ssh 待ち受け中）
+  vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
+
+
+── lab-linuc-admin 1.0.0 ────────────────────────────────────────
+lab-linuc-admin  進捗 0/8
+  次 → 01 「ユーザを1人、使える状態で作る」 (目安 12分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-admin-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────</code></pre>
+<p>いるのは外側のコンテナ（<code>lab@host</code>）です。練習機（<code>student@linuc</code>）には <code>ssh linuc</code> で入ります。</p>
+<pre data-where="外（lab@host）"><code>$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+student@linuc:~$ exit
+logout</code></pre>
+<p>プロンプトが <code>lab@host</code> なら外、<code>student@linuc</code> なら練習機の中です。本文の端末表示には、どちらで打つかを見出しで付けてあります。
+student は <code>sudo</code> をパスワード無しで使えます。<code>lab check</code> などの <code>lab</code> コマンドは、外でも練習機の中でも打てます。</p>
+<p>速くしたい Linux の読者は、起動コマンドに <code>--device /dev/kvm</code> を足せます（起動が数秒になります）。
+ただし <code>/proc/cpuinfo</code> などの画面が変わります。<b>本文の出力はすべて KVM なしで取ったもの</b>です。</p>
+
+<h2 id="vm">練習機の操作</h2>
+<div class="scroll"><table>
+<tr><th>外（lab@host）で打つ</th><th>すること</th><th>中身</th></tr>
+<tr><td><code>vm status</code></td><td>練習機の状態を見る</td><td><code>virsh domstate linuc</code></td></tr>
+<tr><td><code>vm start</code> / <code>vm stop</code></td><td>起動する / 正常に停止する</td><td><code>virsh start</code> / <code>virsh shutdown</code></td></tr>
+<tr><td><code>ssh linuc</code>（<code>vm ssh</code>）</td><td>練習機に入る（抜けるのは <code>exit</code>）</td><td>127.0.0.1:2222 → 練習機の 22</td></tr>
+<tr><td><code>vm console</code></td><td>シリアルコンソールにつなぐ（ssh が切れたとき。抜けるのは <kbd>Ctrl</kbd>+<kbd>]</kbd>）</td><td><code>virsh console</code></td></tr>
+<tr><td><code>vm reset --yes</code></td><td>練習機を最初の状態に戻す（全部の演習も最初に戻る）</td><td>ディスクの差分を捨てる</td></tr>
+</table></div>
+
+<h2 id="ex">演習</h2>
+<p>8本あります。判定は<b>観測できる結果だけ</b>で行い（実際に ssh で入ってみる、cron が書いたファイルを見る、など）、コマンドの打ち方は見ません。
+詰まったら <code>lab hint NN</code> を何度でも。使い切ったら <code>lab solve NN</code> で模範解答に必ず届きます
+（見ても構いません。進捗には「solve を見た」として残ります）。</p>
+<div class="scroll"><table>
+<tr><th>No</th><th>やること</th><th>副題</th><th>章</th><th>目安</th></tr>
+<tr><td>01</td><td>ユーザを1人、使える状態で作る</td><td>1.08.1</td><td><a href="/linuc-admin/theory/02-useradd">2</a></td><td>12分</td></tr>
+<tr><td>02</td><td>今の所属を残したまま、グループを1つ足す</td><td>1.08.1</td><td><a href="/linuc-admin/theory/03-membership">3</a></td><td>10分</td></tr>
+<tr><td>03</td><td>アカウントを消さずに一時停止する</td><td>1.08.1</td><td><a href="/linuc-admin/theory/04-lock">4</a></td><td>12分</td></tr>
+<tr><td>04</td><td>2種類の表に、毎分のジョブを置く</td><td>1.08.2</td><td><a href="/linuc-admin/theory/05-crontab">5</a></td><td>15分</td></tr>
+<tr><td>05</td><td>置いてあるのに走らないスクリプトを、毎日の実行に入れる</td><td>1.08.2</td><td><a href="/linuc-admin/theory/06-daily">6</a></td><td>12分</td></tr>
+<tr><td>06</td><td>1人だけ、at と crontab を使えなくする</td><td>1.08.2</td><td><a href="/linuc-admin/theory/07-at">7</a></td><td>10分</td></tr>
+<tr><td>07</td><td>呼ぶ人のロケールに左右されないスクリプトにする</td><td>1.08.3</td><td><a href="/linuc-admin/theory/08-locale">8</a></td><td>12分</td></tr>
+<tr><td>08</td><td>文字コードのそろわない3つのファイルを UTF-8 にする</td><td>1.08.3</td><td><a href="/linuc-admin/theory/09-iconv">9</a></td><td>12分</td></tr>
+</table></div>
+<p>演習の相手（ユーザ bob・dave・eve や、演習用のファイル）は、練習機を初めて起動したときに自動で用意されます。
+演習04 は cron が実際に動くのを確かめるので、判定が最大 75 秒待つことがあります（待っている間はそう表示します）。</p>
+<p>先に読む場合は <a href="/linuc-admin/theory/">理論編（9章）</a>へ。章と演習は対応しているので、どちらから始めても構いません。</p>
+
+<h2 id="report">本文と違う出力が出たら</h2>
+<p>教材のバグとして直します。次の4つを貼ってください。</p>
+<ol>
+<li>打ったコマンド（外で打ったか、練習機の中で打ったか）</li>
+<li>本文に書いてある出力</li>
+<li>あなたの画面に出た出力</li>
+<li><code>lab env</code> の全文（外で打ってください）</li>
+</ol>
+<pre data-where="外（lab@host）"><code>$ lab env
+テーマ    : lab-linuc-admin 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:admin-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+練習機    : running（エージェント 応答あり / ssh 待ち受け中）
+KVM       : なし（TCG。本文と同じ条件）
+QEMU      : 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+練習機の中: Ubuntu 24.04.5 LTS / カーネル 6.8.0-142-generic
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb</code></pre>
+<p><a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。
+<code>練習機</code> の行が <code>running</code> 以外のときは、外で <code>vm start</code> を打ってから見直してください。
+<code>KVM</code> の行が「あり」のときは、本文と画面が違うことがあります（本文は KVM なしで取っています）。</p>
+
+<h2 id="end">終わったら</h2>
+<pre><code>docker stop lab-linuc-admin        # 練習機を正常に止めてから止まる（docker start で続きから）
+docker rm -f lab-linuc-admin
+docker volume rm lab-linuc-admin-vm lab-linuc-admin-state     # 練習機のディスクと進捗も消す場合だけ</code></pre>
+<p>イメージは <code>docker rmi</code> で消せます。
+母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。</p>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / cron 3.0pl1-184ubuntu2 / anacron 2.3-39ubuntu2 / at 3.2.5-2.1ubuntu3 / locales 2.39-0ubuntu8.9 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で演習8本を完走 / 検証日 2026-10-13</div>
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-admin/theory/">理論編</a> · <a href="/linuc-admin/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

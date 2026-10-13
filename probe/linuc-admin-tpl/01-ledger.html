@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. ユーザの台帳は3枚に分かれている — 確かめて説明する LinuC 主題1.08</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="1" data-theme="linuc-admin">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-admin/theory/">理論編</a> › 第1章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/">詳しく</a></p>
+</div>
+<h1>1. ユーザの台帳は3枚に分かれている</h1>
+<p class="lead">「ユーザ」という1つのものがあるように見えるが、実体は3枚のテキストファイルに散らばった行である。名前と番号は <code>/etc/passwd</code>、パスワードは <code>/etc/shadow</code>、グループは <code>/etc/group</code>。しかもグループの名簿には、そのグループを主グループにしている人が載らない。</p>
+<div class="badges"><span>前提: 実践編の「はじめる」で練習機に入れた</span><span>所要 15分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.08.1（重要度5）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>/etc/passwd</code>（7列）・<code>/etc/shadow</code>（9列）・<code>/etc/group</code>（4列）の各列を読める</li><li>あるユーザの所属グループが、2つの台帳に分けて書かれていることを説明できる</li><li><code>id</code> と <code>getent</code> が、台帳をどう引いているかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: パスワードのハッシュの計算方法（yescrypt の中身）、<code>/etc/gshadow</code> の各列、LDAP や SSSD の設定は扱わない。<code>/etc/nsswitch.conf</code> の書き方は主題1.07（ネットワークの基礎。1.07.2 と 1.07.4）で問われるので、ここでは「どこを引くかの順番表」と分かれば足りる。この章は読むだけで、何も書き換えない。</div></div>
+
+<h2 id="number">自分が誰かは、番号で決まっている</h2>
+<div class="sgoal"><b>この節で分かること</b>: カーネルが見ているのは名前ではなく番号であること。</div>
+<p>外の端末で <code>ssh linuc</code> と打って練習機に入り、自分が誰かを聞く。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ id
+</code></pre>
+<p>3つの欄がある。<b>uid</b>（ユーザの番号）、<b>gid</b>（主グループの番号）、<b>groups</b>（所属しているグループ全部の番号）。かっこの中の名前は、番号を台帳で引いて付け足した飾りである。番号だけを出すこともできる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ id -u
+1000
+$ id -g
+1000
+$ id -G
+1000 4 27
+$ id -nG
+student adm sudo</code></pre>
+<p>プロセスが持っているのは、この番号の組だけである。ファイルの所有者も番号で記録されている。名前を出しているのは <code>id</code> や <code>ls</code> が<b>表示するときに台帳を引いたから</b>で、台帳の行が消えれば名前も出なくなる（第3章で実際に消す）。</p>
+
+<h2 id="passwd">/etc/passwd は、誰でも読める7列の名簿</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/etc/passwd</code> の7列それぞれの意味。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ grep '^student:' /etc/passwd
+</code></pre>
+<p><code>:</code> で区切られた7列である。試験ではこの順番と意味がそのまま問われる。</p>
+<div class="scroll"><table>
+<tr><th>列</th><th>この行の値</th><th>意味</th></tr>
+<tr><td>1</td><td><code>student</code></td><td>ユーザ名</td></tr>
+<tr><td>2</td><td><code>x</code></td><td>パスワード欄。<code>x</code> は「<code>/etc/shadow</code> を見よ」の印（シャドウパスワード）</td></tr>
+<tr><td>3</td><td><code>1000</code></td><td>UID</td></tr>
+<tr><td>4</td><td><code>1000</code></td><td>主グループの GID</td></tr>
+<tr><td>5</td><td><code>LinuC student</code></td><td>コメント（GECOS。氏名など。空でもよい）</td></tr>
+<tr><td>6</td><td><code>/home/student</code></td><td>ホームディレクトリ</td></tr>
+<tr><td>7</td><td><code>/bin/bash</code></td><td>ログインシェル</td></tr>
+</table></div>
+<p>先頭の数行はシステムのユーザである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ head -3 /etc/passwd
+</code></pre>
+<p><code>root</code> は UID 0。<code>daemon</code> や <code>bin</code> のシェルは <code>/usr/sbin/nologin</code> で、人がログインするためのユーザではない。人のユーザは UID 1000 から振られる（第2章で <code>/etc/login.defs</code> の <code>UID_MIN</code> を見る）。3列目が 1000 以上の行だけを抜き出す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ awk -F: '$3 >= 1000' /etc/passwd
+</code></pre>
+<p><code>bob</code>・<code>dave</code>・<code>eve</code> は、実践編の演習で使うために最初から作ってある。<code>nobody</code>（65534）は「誰でもない」ことを表す特別なユーザで、範囲の外に置かれている。</p>
+<div class="analogy"><b>たとえ</b>: 会社の受付に置いてある社員名簿に近い。名前・社員番号・所属・席の場所が載っていて、誰でも閲覧できる。
+<br>ただし<b>崩れる点</b>: 社員名簿は人が読むためのものだが、<code>/etc/passwd</code> はプログラムが1行ずつ読むためのもので、列の順番が1つずれただけで別人の扱いになる。だから手で編集せず、<code>useradd</code> や <code>usermod</code> に書かせる。</div>
+
+<h2 id="shadow">パスワードは、別の台帳にしまってある</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/etc/shadow</code> が分かれている理由と、9列の読み方。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ ls -l /etc/passwd /etc/shadow /etc/group /etc/gshadow
+</code></pre>
+<p><code>/etc/passwd</code> と <code>/etc/group</code> は誰でも読める（<code>-rw-r--r--</code>）。<code>/etc/shadow</code> と <code>/etc/gshadow</code> は root と <code>shadow</code> グループしか読めない（<code>-rw-r-----</code>）。<code>ls -l</code> も <code>id</code> もユーザ名を出すために <code>/etc/passwd</code> を読むので、こちらは全員に読ませる必要がある。だからハッシュだけを別のファイルに逃がした。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ grep '^student:' /etc/shadow
+@@ sudo grep '^student:' /etc/shadow
+</code></pre>
+<div class="scroll"><table>
+<tr><th>列</th><th>この行の値</th><th>意味</th></tr>
+<tr><td>1</td><td><code>student</code></td><td>ユーザ名</td></tr>
+<tr><td>2</td><td><code>$y$j9T$…</code></td><td>パスワードのハッシュ。<code>$y$</code> は yescrypt、<code>$6$</code> なら SHA-512。<code>!</code> や <code>*</code> で始まるとパスワードでは入れない（第4章）</td></tr>
+<tr><td>3</td><td><code>20739</code></td><td>最後にパスワードを変えた日（1970-01-01 からの<b>日数</b>）。0 なら「次のログインで変更を強制」</td></tr>
+<tr><td>4</td><td><code>0</code></td><td>変更してから次に変えられるまでの最短日数</td></tr>
+<tr><td>5</td><td><code>99999</code></td><td>パスワードの有効日数（99999 は事実上無期限）</td></tr>
+<tr><td>6</td><td><code>7</code></td><td>期限切れの何日前から警告するか</td></tr>
+<tr><td>7</td><td>（空）</td><td>期限切れのあと、ログインできなくなるまでの猶予日数</td></tr>
+<tr><td>8</td><td>（空）</td><td>アカウント自体の有効期限（1970-01-01 からの日数）</td></tr>
+<tr><td>9</td><td>（空）</td><td>予約</td></tr>
+</table></div>
+<p>3列目の <code>20739</code> を日付に直すと、練習機を作った日になる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ date -d '1970-01-01 +20739 days' +%F
+</code></pre>
+<p>日付が「日数」で入っているのが <code>/etc/shadow</code> の読みにくさで、人が読むときは <code>chage -l</code>（第4章）で変換して表示させる。</p>
+<div class="analogy"><b>たとえ</b>: 名簿とは別に、金庫の中にしまってある暗証番号の控えに近い。名簿は誰でも見られるが、控えは管理者しか見られない。名簿の暗証番号の欄には「金庫を見よ」とだけ書いてある（それが <code>x</code>）。
+<br>ただし<b>崩れる点</b>: 金庫の控えには暗証番号そのものが書いてあるが、<code>/etc/shadow</code> にあるのはハッシュ（元に戻せない変換の結果）で、パスワードそのものは誰も持っていない。それでも盗まれると総当たりで割られうるので、読める人を絞っている。</div>
+
+<h2 id="group">グループの名簿には、主グループの人が載らない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 所属グループが2つの台帳に分けて書かれていること。</div>
+<p><code>/etc/group</code> は4列（グループ名・<code>x</code>・GID・メンバー）である。<code>id</code> に出た3つのグループの行を見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ grep -E '^(adm|sudo|student):' /etc/group
+</code></pre>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>グループに誰が入っているかは、<code>/etc/group</code> のそのグループの行の4列目（メンバー）を見れば分かる。
+<code>student</code> は <code>student</code> グループに入っているのだから、<code>student</code> の行のメンバー欄には <code>student</code> と書いてあるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ getent group student
+@@ id student
+</code></pre>
+<div class="then"><b>だめな理由</b>: メンバー欄は空である。それでも <code>id</code> は <code>1000(student)</code> に入っていると言う。
+<code>/etc/group</code> の4列目に書かれるのは<b>副グループとして入っている人だけ</b>で、主グループはそこに書かれない。
+主グループは <code>/etc/passwd</code> の4列目に GID で書かれている。つまり所属は2枚の台帳に分かれていて、
+<code>/etc/group</code> だけを見ると主グループの人を数え落とす。</div></div>
+<p>主グループの側から引くとこうなる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ getent passwd student | cut -d: -f4
+@@ getent group 1000
+</code></pre>
+<p>演習用の <code>bob</code> でも同じ形になっている。<code>proj-a</code> と <code>proj-b</code> の行にはメンバーとして <code>bob</code> が載り、<code>bob</code> グループの行のメンバー欄は空である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ getent group proj-a proj-b bob
+@@ id bob
+</code></pre>
+<pre><code>主グループ   /etc/passwd の4列目（GID）      bob:x:1001:<b>1001</b>:…
+副グループ   /etc/group  の4列目（メンバー）  proj-a:x:1101:<b>bob</b>
+id bob       両方を引いて1行にまとめる       groups=1001(bob),1101(proj-a),1102(proj-b)</code></pre>
+<p>だから「ユーザの所属を全部」知りたいときは <code>grep</code> ではなく <code>id ユーザ名</code>（または <code>groups ユーザ名</code>）を使う。そして第3章で見るとおり、所属を変える <code>usermod</code> も、この2つの台帳を別々のオプションで書き換える。</p>
+<div class="analogy"><b>たとえ</b>: 社員証に印刷された所属部署（本務）と、プロジェクトごとの参加者名簿（兼務）に近い。参加者名簿に載るのは兼務で入った人だけで、その部署が本務の人はわざわざ書かれない。
+<br>ただし<b>崩れる点</b>: 会社なら本務の部署にも名簿があるのがふつうだが、<code>/etc/group</code> では本務（主グループ）の人は名簿に一切載らない。名簿の行数を数えても人数にはならない。</div>
+
+<h2 id="getent">getent は、ログインと同じ道で台帳を引く</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>grep</code> と <code>getent</code> の違い。</div>
+<p>ここまで <code>getent</code> を使ってきた。<code>getent</code> はファイルを直接読むのではなく、ログインや <code>id</code> が使うのと同じ「名前解決の仕組み（NSS）」に問い合わせる。どこを引くかの順番表が <code>/etc/nsswitch.conf</code> にある。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ grep -E '^(passwd|group|shadow|gshadow):' /etc/nsswitch.conf
+</code></pre>
+<p>この練習機ではどれも <code>files</code>（<code>/etc</code> のファイル）だけなので、<code>getent</code> と <code>grep</code> の結果は同じになる。会社のサーバのように LDAP などからユーザを引く設定では、<code>/etc/passwd</code> に1行も無いユーザがログインできる。そのとき <code>grep</code> では見つからず、<code>getent</code> では見つかる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ getent passwd bob
+@@ getent passwd 1002
+@@ getent passwd nosuchuser; echo $?
+@@ sudo getent shadow bob
+</code></pre>
+<p>番号からも引ける（<code>1002</code> は <code>dave</code>）。見つからないときは何も出さず、終了コード <code>2</code> を返す。<code>shadow</code> を引くには root の権限が要る。<code>bob</code> の2列目が <code>!</code> なのは、パスワードを一度も設定していないからである（第4章）。</p>
+<div class="analogy"><b>たとえ</b>: 電話番号を、手元の電話帳をめくって探す（<code>grep</code>）か、番号案内に聞く（<code>getent</code>）かの違いに近い。番号案内は手元の電話帳も、ほかの地域の電話帳も、決まった順に調べてくれる。
+<br>ただし<b>崩れる点</b>: 番号案内は人が判断して答えるが、<code>getent</code> は <code>/etc/nsswitch.conf</code> の順番どおりに機械的に引き、最初に見つかったものを返すだけである。2か所に同じ名前があれば、後ろの方は見えない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-admin/">演習01・02</a>で、ここで読んだ列を自分で書き換える。
+判定は <code>getent</code> と <code>id</code> を引いて、台帳の行と実物（ホームディレクトリ）を確かめる。</div>
+
+<div class="quiz"><b>確認</b>
+<p>次の行は <code>/etc/passwd</code> の1行である。ログインシェルと、主グループの GID を答えよ。</p>
+<pre><code>carol:x:1005:1005:Carol Lab:/home/carol:/bin/bash</code></pre>
+<details><summary>答え</summary>
+<p>ログインシェルは7列目の <code>/bin/bash</code>、主グループの GID は4列目の <code>1005</code>。
+3列目（UID）と4列目（GID）はどちらも 1005 だが、意味が違う。5列目の <code>Carol Lab</code> はコメント（GECOS）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>ユーザ <code>alice</code> が所属するグループを、主グループも含めてすべて表示したい。最も適切なコマンドはどれか。</p>
+<p>A. <code>grep alice /etc/group</code>　B. <code>id alice</code>　C. <code>grep alice /etc/passwd</code>　D. <code>cat /etc/gshadow</code></p>
+<details><summary>答え</summary>
+<p>B。<code>id</code> は <code>/etc/passwd</code> の4列目（主グループ）と <code>/etc/group</code> の4列目（副グループ）の両方を引いて1行にまとめる。
+A は副グループしか拾えず、主グループの行には <code>alice</code> の名前が載らない（この章の <code>student:x:1000:</code> がその実物）。<code>groups alice</code> でも同じ情報が出る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/shadow</code> の3列目が <code>20739</code> だった。これは何を表すか。また、0 だったら何が起きるか。</p>
+<details><summary>答え</summary>
+<p>最後にパスワードを変更した日を、1970-01-01 からの日数で表したもの（20739 日目 = 2026-10-13）。
+0 は「パスワードを最後に変えたのが 1970-01-01」という扱いになり、次のログインでパスワードの変更を強制される（<code>passwd -e</code> がこれを書く。第4章）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>プロセスとファイルが持っているのは番号（UID・GID）で、名前は台帳を引いて付けた表示にすぎない</li><li><code>/etc/passwd</code> は7列（名前:x:UID:GID:コメント:ホーム:シェル）。誰でも読める</li><li><code>/etc/shadow</code> は9列。ハッシュと、日数で書かれた期限の情報。root と shadow グループだけが読める</li><li><code>/etc/group</code> は4列。4列目のメンバーは<b>副グループの人だけ</b>で、主グループは <code>/etc/passwd</code> の4列目に書かれる</li><li>所属を全部知るには <code>id ユーザ名</code>。台帳を引くなら <code>getent</code>（ログインと同じ道を通る）</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / libc-bin 2.39-0ubuntu8.9 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-admin/theory/">← 理論編 目次</a><a href="/linuc-admin/theory/02-useradd">次: 2. useradd は、頼まれたことしかしない →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-admin/theory/">理論編 目次</a> · <a href="/linuc-admin/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-admin/chapters.js"></script>
+<script src="/linuc-admin/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

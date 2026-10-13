@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>7. 拒否リストを消すと、誰も使えなくなる — 確かめて説明する LinuC 主題1.08</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="7" data-theme="linuc-admin">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-admin/theory/">理論編</a> › 第7章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/">詳しく</a></p>
+</div>
+<h1>7. 拒否リストを消すと、誰も使えなくなる</h1>
+<p class="lead"><code>/etc/at.deny</code> は「at を使わせない人」の一覧である。これを消せば制限が無くなる、と考えるのが自然だが、消した瞬間に student も at を使えなくなる。<code>/etc/at.allow</code> も <code>/etc/at.deny</code> も無いとき、at は root にしか使わせない。同じ形のファイルを持つ cron は、無いときに全員に使わせる。</p>
+<div class="badges"><span>前提: 第6章まで読了</span><span>所要 16分（うち at を待つ時間 約1分）</span><span class="impact-b">影響度 B</span><span>出題範囲 1.08.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>at</code> で1回だけのジョブを予約し、<code>atq</code> で確かめ、<code>atrm</code> で取り消せる</li><li>at のジョブが、投入したときの環境（環境変数・カレントディレクトリ）を持っていくことを <code>at -c</code> で示せる</li><li><code>batch</code> がいつ走るかを言える</li><li><code>/etc/at.allow</code> と <code>/etc/at.deny</code> の4つの場合を、cron との違いも含めて説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>atd</code> の起動オプション、キュー（a〜z）の使い分け、結果をメールで受け取る設定は扱わない。</div></div>
+
+<h2 id="at">1回だけの予約は at</h2>
+<div class="sgoal"><b>この節で分かること</b>: at の打ち方と、予約の確かめ方。</div>
+<p>cron が「毎回」なら、at は「1回だけ」である。at の予約を実行するのは <code>atd</code> というデーモンで、練習機では最初から動いている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ systemctl is-active atd
+active</code></pre>
+<p><code>at 時刻</code> と打つと <code>at&gt;</code> という入力待ちになる。実行したいコマンドを書き、最後に <kbd>Ctrl</kbd>+<kbd>D</kbd> で閉じる（画面には <code>&lt;EOT&gt;</code> と出る）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ at now + 1 minute
+warning: commands will be executed using /bin/sh
+at Tue Oct 13 11:55:00 2026
+at&gt; date &gt; /tmp/at.txt
+at&gt; &lt;EOT&gt;
+job 1 at Tue Oct 13 11:55:00 2026
+$ atq
+1	Tue Oct 13 11:55:00 2026 a student</code></pre>
+<p><code>now + 1 minute</code> は「いまから1分後の、分の頭」になる（秒は切り捨てられる）。<code>atq</code> の列は、ジョブ番号・予定時刻・キュー（<code>a</code>）・投入したユーザである。入力待ちにせず、パイプで渡すこともできる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ export LAB_NOTE=hello
+$ echo 'echo late &gt; /tmp/at-late.txt' | at 23:59
+warning: commands will be executed using /bin/sh
+job 2 at Tue Oct 13 23:59:00 2026
+$ atq
+1	Tue Oct 13 11:55:00 2026 a student
+2	Tue Oct 13 23:59:00 2026 a student</code></pre>
+<p>パイプで渡す前に、目印の環境変数を1つ作っておいた（次の節で使う）。<code>atq</code> の並び順は決まっていない（著者の記録でも回によって逆になった）ので、ジョブは番号で見分ける。</p>
+<div class="scroll"><table>
+<tr><th>時刻の書き方</th><th>意味</th></tr>
+<tr><td><code>at now + 5 minutes</code></td><td>5分後（<code>hours</code> <code>days</code> <code>weeks</code> も使える）</td></tr>
+<tr><td><code>at 23:59</code></td><td>今日の 23:59（過ぎていれば翌日）</td></tr>
+<tr><td><code>at 9:00 tomorrow</code></td><td>明日の 9:00</td></tr>
+<tr><td><code>at noon</code> / <code>at midnight</code> / <code>at teatime</code></td><td>12:00 / 0:00 / 16:00</td></tr>
+<tr><td><code>at -f script.sh 10:00</code></td><td>コマンドを標準入力ではなくファイルから読む</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: cron が定期便なら、at は配達日を指定した1回きりの小包に近い。一度届けば伝票は消える。
+<br>ただし<b>崩れる点</b>: 小包は中身を送った時点で固めて運ぶ。at も同じで、コマンドだけでなく、投入した瞬間の環境まで固めて持っていく（次の節）。ここが cron と大きく違う。</div>
+
+<h2 id="env">at のジョブは、投入したときの環境を持っていく</h2>
+<div class="sgoal"><b>この節で分かること</b>: at が実際に保存しているものと、その置き場所。</div>
+<p><code>at -c 番号</code> で、ジョブとして保存された中身を見られる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ at -c 2 | head -4
+#!/bin/sh
+# atrun uid=1000 gid=1000
+# mail student 0
+umask 2
+$ at -c 2 | grep LAB_NOTE
+LAB_NOTE=hello; export LAB_NOTE
+$ at -c 2 | tail -6
+cd /home/student || {
+	 echo 'Execution directory inaccessible' &gt;&amp;2
+	 exit 1
+}
+echo late &gt; /tmp/at-late.txt</code></pre>
+<p>1行のコマンドが、シェルスクリプトとして保存されていた。投入したときの <code>umask</code> のあとに、そのときの環境変数が1つずつ <code>export</code> され（さっき作った <code>LAB_NOTE</code> も入っている）、投入したときのカレントディレクトリへ <code>cd</code> してから、やっとコマンドが来る。第5章で見た cron のジョブ（環境変数は6つだけ）とは逆で、<b>at はいまの自分の環境を丸ごと持っていく</b>。予約したあとで <code>PATH</code> などを変えても、ジョブには届かない。</p>
+<p><code>at -c 2</code> を全部表示すると、環境変数の数と並びは打った端末によって変わる（対話のシェルなら端末の種類 <code>TERM</code> や <code>ls</code> の色の設定 <code>LS_COLORS</code> も入る）。本文では、誰の画面でも同じになる部分だけを抜き出している。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ls -l /var/spool/cron/atjobs
+total 8
+-rwx------ 1 student daemon 878 Oct 13 11:54 a0000101c7b18f
+-rwx------ 1 student daemon 885 Oct 13 11:54 a0000201c7b463
+$ atrm 2
+$ atq
+1	Tue Oct 13 11:55:00 2026 a student</code></pre>
+<p>保存場所は <code>/var/spool/cron/atjobs</code> で、cron の表（<code>/var/spool/cron/crontabs</code>）と同じ <code>/var/spool/cron/</code> の下にある。<code>atrm</code> で取り消すとファイルも消え、<code>atq</code> から1件減る。ここで1分待つと、最初のジョブが動く。</p>
+<pre data-where="練習機の中（student@linuc）"><code>（次の分になるまで待つ）
+$ cat /tmp/at.txt
+Tue Oct 13 11:55:00 JST 2026
+$ atq</code></pre>
+<p>動いたジョブは <code>atq</code> から消える。<code>batch</code> は時刻を指定しない at で、システムの負荷（load average）が下がったときに動く（この版の atd の既定は 1.5 未満）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo 'uptime &gt; /tmp/batch.txt' | batch
+warning: commands will be executed using /bin/sh
+job 3 at Tue Oct 13 11:55:00 2026
+（20秒ほど待つ）
+$ cat /tmp/batch.txt
+ 11:55:12 up 16 min,  0 user,  load average: 0.28, 0.35, 0.32</code></pre>
+<p>練習機は暇なので、すぐに動いた。<code>atq</code> と <code>atrm</code> は <code>at -l</code> と <code>at -r</code>（<code>at -d</code>）でも同じことができる。</p>
+<div class="analogy"><b>たとえ</b>: at は、出発前に必要な荷物を全部トランクに詰めていく旅行者に近い。cron は手ぶらで行かせる代理人である（第5章）。
+<br>ただし<b>崩れる点</b>: 旅行者はトランクを開けて足りない物を現地で買えるが、at のジョブは詰めた環境のまま動くだけで、あとから足すことはできない。変えたいなら取り消して入れ直す。</div>
+
+<h2 id="allow">拒否リストを消すと、誰も使えなくなる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/etc/at.allow</code> と <code>/etc/at.deny</code> の読まれ方。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ ls -l /etc/at.allow /etc/at.deny
+ls: cannot access '/etc/at.allow': No such file or directory
+-rw-r----- 1 root daemon 144 Apr  1  2024 /etc/at.deny
+$ sudo head -5 /etc/at.deny
+alias
+backup
+bin
+daemon
+ftp</code></pre>
+<p>いまは <code>/etc/at.deny</code> だけがあり、<code>daemon</code> や <code>ftp</code> などのシステムのユーザが並んでいる（root と daemon グループしか読めない）。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>/etc/at.deny</code> は「使わせない人」の一覧なのだから、このファイルを無くせば、拒否される人がいなくなる。
+少なくとも、いま使えている student が使えなくなることはないはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mv /etc/at.deny /etc/at.deny.orig
+$ atq
+You do not have permission to use atq.
+$ echo 'date' | at now + 5 minutes
+You do not have permission to use at.
+$ sudo atq</code></pre>
+<div class="then"><b>だめな理由</b>: student が at も atq も断られた。root だけが使える。
+at の決まりは「<code>at.allow</code> があればそれだけを見る。無ければ <code>at.deny</code> を見る。<b>どちらも無ければ root だけ</b>」で、
+<code>at.deny</code> は「拒否リスト」であると同時に「一般ユーザにも使わせる」という意思表示になっていた。
+消したことで、その意思表示ごと消えた。</div></div>
+<p>同じ状態でも cron は使える（第5章で見たとおり、どちらも無いとき Debian 系の cron は全員に使わせる）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ crontab -l
+no crontab for student</code></pre>
+<p>空の <code>at.deny</code> を置くと「拒否する人はいない＝全員使える」になる。<code>at.allow</code> を置くと、そこに書かれた人だけになる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo touch /etc/at.deny
+$ atq; echo $?
+0
+$ echo root | sudo tee /etc/at.allow
+root
+$ atq
+You do not have permission to use atq.</code></pre>
+<p>元に戻す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo rm /etc/at.allow /etc/at.deny
+$ sudo mv /etc/at.deny.orig /etc/at.deny
+$ atq; echo $?
+0</code></pre>
+<div class="scroll"><table>
+<tr><th>ファイルの状態</th><th>at を使える人</th><th>crontab を使える人（Debian 系）</th></tr>
+<tr><td><code>allow</code> がある</td><td><code>at.allow</code> に書いた人だけ（<code>at.deny</code> は読まれない）</td><td><code>cron.allow</code> に書いた人だけ</td></tr>
+<tr><td><code>allow</code> が無く、<code>deny</code> がある</td><td><code>at.deny</code> に書いた人<b>以外</b></td><td><code>cron.deny</code> に書いた人以外</td></tr>
+<tr><td><code>allow</code> が無く、<code>deny</code> が空</td><td>全員</td><td>全員</td></tr>
+<tr><td>どちらも無い</td><td><b>root だけ</b></td><td><b>全員</b></td></tr>
+</table></div>
+<p>root はどの場合でも使える。試験では「どちらも無いとき」と「deny が空のとき」がよく問われる。</p>
+<div class="analogy"><b>たとえ</b>: 2つの会議室の予約受付に近い。「予約できる人の名簿」があれば受付はそれだけを見る。「予約できない人の名簿」だけがあれば、それ以外の人は予約できる。
+<br>ただし<b>崩れる点</b>: 名簿が両方とも無いとき、at の受付は「管理者以外お断り」、cron の受付は「どなたでもどうぞ」と、方針が逆になる。同じ形の名簿なのに、無いときの扱いは受付ごとに決まっている。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-admin/">演習06</a>は、eve だけに at と crontab を使わせないようにする課題である。
+判定は3人それぞれとして実際に <code>atq</code> と <code>crontab -l</code> を打ち、断られるかを見る。</div>
+
+<div class="quiz"><b>確認</b>
+<p>30分後に <code>/usr/local/bin/backup</code> を1回だけ実行したい。正しいものはどれか。</p>
+<p>A. <code>echo /usr/local/bin/backup | at now + 30 minutes</code>　B. <code>at -c 30 /usr/local/bin/backup</code>　C. <code>batch now + 30 minutes /usr/local/bin/backup</code>　D. <code>atq now + 30 minutes</code></p>
+<details><summary>答え</summary>
+<p>A。<code>at</code> はコマンドを標準入力から読む（対話なら <code>at&gt;</code> に書いて <kbd>Ctrl</kbd>+<kbd>D</kbd>）。
+<code>at -c</code> はジョブの中身を表示するオプション、<code>batch</code> は時刻を取らず負荷が下がったときに動かす、<code>atq</code> は一覧の表示。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>予約済みの at のジョブを一覧し、ジョブ番号 5 を取り消すコマンドをそれぞれ答えよ。</p>
+<details><summary>答え</summary>
+<p>一覧は <code>atq</code>（<code>at -l</code>）、取り消しは <code>atrm 5</code>（<code>at -r 5</code> / <code>at -d 5</code>）。
+一般ユーザの <code>atq</code> は自分のジョブだけ、root はすべてのユーザのジョブを表示する。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/at.allow</code> が存在せず、<code>/etc/at.deny</code> が空のファイルとして存在する。at を使えるのは誰か。また、<code>/etc/at.deny</code> も削除したらどうなるか。</p>
+<details><summary>答え</summary>
+<p>空の <code>at.deny</code> なら全員が使える（拒否する人がいない）。両方とも無くなると root だけが使える。
+cron（Debian 系）は両方無いときに全員が使えるので、at と逆になる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>at 時刻</code> で1回だけの予約。<code>atq</code>（一覧）・<code>atrm 番号</code>（取り消し）・<code>at -c 番号</code>（中身）。<code>batch</code> は負荷が下がったら動く</li><li>at のジョブは、投入したときの環境変数・umask・カレントディレクトリを丸ごと持っていく（cron は最小限の環境）</li><li>at の予約は <code>/var/spool/cron/atjobs</code>、cron の表は <code>/var/spool/cron/crontabs</code> に置かれる</li><li><code>at.allow</code> があればそれだけ、無ければ <code>at.deny</code> 以外、どちらも無ければ <b>root だけ</b>。空の <code>at.deny</code> は全員</li><li>cron は同じ形のファイルを持つが、どちらも無いときは<b>全員</b>（Debian 系）。無いときの扱いが逆</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ at 3.2.5-2.1ubuntu3 / cron 3.0pl1-184ubuntu2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-admin/theory/06-daily">← 6. 毎日の仕事は、名前で選ばれる</a><a href="/linuc-admin/theory/08-locale">次: 8. ロケールは、名前で指しているだけ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-admin/theory/">理論編 目次</a> · <a href="/linuc-admin/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-admin/chapters.js"></script>
+<script src="/linuc-admin/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6. 毎日の仕事は、名前で選ばれる — 確かめて説明する LinuC 主題1.08</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="6" data-theme="linuc-admin">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-admin/theory/">理論編</a> › 第6章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/">詳しく</a></p>
+</div>
+<h1>6. 毎日の仕事は、名前で選ばれる</h1>
+<p class="lead">実行権を付けたスクリプトを <code>/etc/cron.daily</code> に置いても、名前が <code>hello.sh</code> なら毎日の実行に選ばれない。中身を選んでいるのは <code>run-parts</code> で、名前に <code>.</code> を含むファイルを黙って飛ばす。そして「いつ走らせるか」を決めているのは、この Ubuntu では cron ではなく anacron である。</p>
+<div class="badges"><span>前提: 第5章まで読了</span><span>前提: 練習機を起動してから15分以上たっている（理由は本文）</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.08.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>/etc/cron.hourly</code>・<code>/etc/cron.daily</code>・<code>/etc/cron.weekly</code>・<code>/etc/cron.monthly</code> を、誰がいつ走らせるかを説明できる</li><li><code>run-parts</code> がディレクトリの中から何を選ぶか（実行権と名前）を、<code>--test</code> で確かめられる</li><li><code>/etc/anacrontab</code> の4列と、anacron の主なオプション（<code>-f</code> <code>-n</code> <code>-s</code> <code>-d</code> <code>-T</code> <code>-u</code>）を読める</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: systemd のタイマーの書き方（<code>anacron.timer</code> の中身は読むだけ）、電源（AC/バッテリー）による抑止は扱わない。</div></div>
+
+<h2 id="who">cron.daily を走らせているのは誰か</h2>
+<div class="sgoal"><b>この節で分かること</b>: 毎時・毎日・毎週・毎月のディレクトリの実行経路。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ ls -l /etc/cron.daily
+@@ grep run-parts /etc/crontab
+</code></pre>
+<p>第5章で見た <code>/etc/crontab</code> の4行である。毎時（<code>17 *</code>）は cron が <code>run-parts</code> を直接呼ぶ。毎日・毎週・毎月の行は <code>test -x /usr/sbin/anacron || …</code> で始まっていて、<b>anacron が入っていれば何もしない</b>。代わりに anacron が自分の表を読む。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ grep -vE '^\s*#|^\s*$' /etc/anacrontab
+</code></pre>
+<div class="scroll"><table>
+<tr><th>列</th><th>例（1行目）</th><th>意味</th></tr>
+<tr><td>1 周期</td><td><code>1</code></td><td>何日ごとか（<code>7</code> なら週1回。<code>@monthly</code> は月1回）</td></tr>
+<tr><td>2 遅延</td><td><code>5</code></td><td>anacron が起きてから、何分待って始めるか</td></tr>
+<tr><td>3 ジョブ名</td><td><code>cron.daily</code></td><td>識別子。前回の実行日を <code>/var/spool/anacron/</code> のこの名前のファイルに書く</td></tr>
+<tr><td>4 コマンド</td><td><code>run-parts --report /etc/cron.daily</code></td><td>実行するもの</td></tr>
+</table></div>
+<p>先頭の3行（<code>SHELL</code>・<code>HOME</code>・<code>LOGNAME</code>）は、ジョブを走らせるときの環境変数である。RHEL 系の <code>/etc/anacrontab</code> には、さらに <code>RANDOM_DELAY=45</code>（2列目の遅延に、0〜45分の乱数を足す）と <code>START_HOURS_RANGE=3-22</code>（3時から22時のあいだだけ実行する）が書かれている。この練習機の Ubuntu には無い。</p>
+<p>anacron は常駐しない。起動したとき（<code>anacron.service</code>）と、7時から23時までの毎時30分（<code>anacron.timer</code>。最大5分のずれを足す）に起こされ、「前回から周期の日数がたっていれば、遅延の分だけ待ってから実行する」。この練習機が起動したときの記録が残っている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ journalctl -u anacron -b --no-pager
+@@ systemctl list-timers anacron.timer --no-pager --full
+@@ sudo ls -l /var/spool/anacron
+@@ sudo cat /var/spool/anacron/cron.daily
+</code></pre>
+<p>起動した時点で3つとも「まだ一度も走っていない」扱いだったので、5分後・10分後・15分後に順に走らせ、そのたびにジョブ名のファイルへ今日の日付を書いた。記録の最後の4行は、毎時30分すぎに <code>anacron.timer</code> が起こした2回目の anacron で、今日の分はもう済んでいるので何もせずに終わっている（いつ出るかは、練習機を起動した時刻で変わる）。<b>15分たつまでは、起動時の anacron が順番待ちのまま残っている</b>。そのあいだに手で anacron を打つと、ロックされたジョブを <code>locked by another anacron - skipping</code> と言って飛ばす。この章の前提を「起動から15分以上」にしたのはそのためである。</p>
+<div class="analogy"><b>たとえ</b>: cron は目覚まし時計で、anacron は日めくりカレンダーに印を付ける当番に近い。目覚ましは鳴る時刻に電源が切れていたら、その日は鳴らない。当番は来たときにカレンダーを見て、今日の印が無ければ仕事をして印を付ける。
+<br>ただし<b>崩れる点</b>: 当番は1日に何度来ても、印があれば何もしない。だから1日より細かい周期は anacron では作れない（毎時の <code>cron.hourly</code> は cron が直接走らせている）。</div>
+
+<h2 id="runparts">実行権を付けても、選ばれない名前がある</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>run-parts</code> がディレクトリの中から何を選ぶか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>/etc/cron.daily</code> にスクリプトを置いて実行権を付ければ、毎日1回走る。
+名前はなんでもよいはずで、シェルスクリプトだと分かるように <code>.sh</code> を付けておく。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ printf '#!/bin/sh\ndate >> /tmp/daily.txt\n' | sudo tee /etc/cron.daily/hello.sh
+@@ sudo chmod 755 /etc/cron.daily/hello.sh
+@@ run-parts --test /etc/cron.daily
+@@ run-parts --list /etc/cron.daily
+</code></pre>
+<div class="then"><b>だめな理由</b>: <code>run-parts --test</code> は「実際には走らせずに、走らせるものの名前だけ出す」オプションである。そこに hello.sh が無い。実行権を見ずに名前の条件だけで選ぶ <code>--list</code> にも無い。
+Debian 系の <code>run-parts</code> は、名前が英大文字・小文字・数字・<code>_</code>・<code>-</code> だけでできているファイルしか選ばない。
+<code>.sh</code> の <code>.</code> で外れた。パッケージの更新で残る <code>foo.dpkg-old</code> や <code>foo.dpkg-dist</code> を誤って実行しないための決まりで、
+飛ばしたことはどこにも記録されない。ディレクトリに置いたことと、毎日の実行に入ったことは別である。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo mv /etc/cron.daily/hello.sh /etc/cron.daily/hello
+@@ run-parts --test /etc/cron.daily
+</code></pre>
+<p>名前から <code>.sh</code> を外すと選ばれた。もう1つの条件は実行権である。外して比べる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo chmod 644 /etc/cron.daily/hello
+@@ run-parts --test /etc/cron.daily
+@@ run-parts --list /etc/cron.daily
+@@ sudo chmod 755 /etc/cron.daily/hello
+</code></pre>
+<div class="scroll"><table>
+<tr><th>オプション</th><th>出すもの</th><th>hello（実行権なし）</th><th>hello.sh（実行権あり）</th></tr>
+<tr><td><code>run-parts --test DIR</code></td><td>実際に走らせるもの（名前の条件と実行権の両方）</td><td>出ない</td><td>出ない</td></tr>
+<tr><td><code>run-parts --list DIR</code></td><td>名前の条件に合うもの（実行権は見ない）</td><td>出る</td><td>出ない</td></tr>
+<tr><td><code>run-parts --report DIR</code></td><td>実際に走らせ、何か出力したものの名前を添える</td><td colspan="2">（<code>/etc/crontab</code> と <code>/etc/anacrontab</code> が使っている形）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 決まった書式の伝票だけを処理する事務の係に近い。書式の違う伝票は、受け付けたとも断ったとも言わずに箱に残しておく。
+<br>ただし<b>崩れる点</b>: 人なら「この伝票は書式が違います」と戻してくれるが、run-parts は何も言わない。自分から <code>--test</code> で聞かない限り、外れたことに気づけない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-admin/">演習05</a>は、置いてあるのに一度も走っていない <code>lab-backup.sh</code> を毎日の実行に入れ、今日の分を走らせる課題である。
+判定は <code>run-parts --test</code> に選ばれるかと、走った跡（ログの行）を見る。</div>
+
+<h2 id="now">今日の分を、いま走らせる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 時刻を待たずに anacron の動きを確かめる方法。</div>
+<p><code>-n</code> は「遅延の分数を待たない」、<code>-d</code> は「バックグラウンドに回らず、経過を端末に出す」。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo anacron -n -d
+</code></pre>
+<p>何も走らなかった。今日の日付がもう書かれているからである。日付を無視させるのが <code>-f</code>、ジョブを1つずつ順に走らせるのが <code>-s</code> である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo anacron -f -n -s -d
+@@ cat /tmp/daily.txt
+@@ sudo cat /var/spool/anacron/cron.daily
+</code></pre>
+<p>3つのジョブが順に走り、hello も <code>run-parts</code> に選ばれて1行書いた。cron.daily の先頭にある <code>0anacron</code> は、cron が直接 cron.daily を走らせた場合（anacron が無い構成など）でも日付を書くための部品である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ tail -1 /etc/cron.daily/0anacron
+@@ sudo anacron -T; echo $?
+@@ sudo rm /etc/cron.daily/hello
+</code></pre>
+<p><code>-T</code> は <code>/etc/anacrontab</code> の書き方だけを検査する（正しければ何も出さずに 0）。</p>
+<div class="scroll"><table>
+<tr><th>オプション</th><th>意味</th></tr>
+<tr><td><code>-f</code></td><td>前回の日付を無視して、全部のジョブを走らせる</td></tr>
+<tr><td><code>-n</code></td><td>遅延（2列目の分数）を待たずにすぐ始める</td></tr>
+<tr><td><code>-s</code></td><td>ジョブを1つずつ順に走らせる（Ubuntu の既定の起動でも付いている）</td></tr>
+<tr><td><code>-d</code></td><td>端末に経過を出し、バックグラウンドに回らない</td></tr>
+<tr><td><code>-u</code></td><td>走らせずに、日付だけを今日に更新する</td></tr>
+<tr><td><code>-T</code></td><td><code>/etc/anacrontab</code>（<code>-t ファイル</code> で別のファイル）の書き方を検査する</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: <code>anacron -f</code> は、日めくりカレンダーの印を見ないで当番に今日の仕事をさせることに近い。終われば今日の印は付く。
+<br>ただし<b>崩れる点</b>: 当番の仕事はカレンダー1枚につき1つだが、anacron のジョブは「ディレクトリの中身を全部」である。<code>-f</code> で走らせると、置いてあるほかのスクリプトも全部走る。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>/etc/anacrontab</code> の次の行の、<code>7</code> と <code>10</code> の意味を答えよ。</p>
+<pre><code>7	10	cron.weekly	run-parts --report /etc/cron.weekly</code></pre>
+<details><summary>答え</summary>
+<p><code>7</code> は周期（前回の実行から7日たっていれば実行する）、<code>10</code> は遅延（anacron が起きてから10分待って始める）。
+3列目の <code>cron.weekly</code> はジョブ名で、前回の実行日は <code>/var/spool/anacron/cron.weekly</code> に書かれる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/cron.daily/backup.sh</code> を置き、<code>chmod 755</code> もした。しかし毎日の実行で走っていない。Debian 系で最も考えられる原因はどれか。</p>
+<p>A. 所有者が root ではない　B. 名前に <code>.</code> が含まれている　C. <code>/etc/crontab</code> に登録していない　D. <code>crontab -e</code> で登録していない</p>
+<details><summary>答え</summary>
+<p>B。<code>run-parts</code> は名前に <code>.</code> を含むファイルを選ばない。<code>run-parts --test /etc/cron.daily</code> で選ばれるかを確かめられる。
+C・D は不要で、ディレクトリに置くこと自体が登録になっている（ただし名前と実行権の条件を満たすとき）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>夜は電源を切るノート PC で、1日1回の処理を取りこぼさずに実行したい。cron と anacron のどちらが向いているか。理由も答えよ。</p>
+<details><summary>答え</summary>
+<p>anacron。cron は決まった時刻に動いていなければ、その回は実行しない。anacron は起動したとき（と定期的に）前回の実行日を見て、
+周期の日数がたっていれば実行する。ただし anacron の周期は日単位で、1日より細かい間隔には使えない。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/etc/cron.hourly</code> は cron が毎時17分に、<code>/etc/cron.daily</code>・<code>weekly</code>・<code>monthly</code> は anacron が走らせる（anacron が入っていれば <code>/etc/crontab</code> の該当行は何もしない）</li><li>中身を選ぶのは <code>run-parts</code>。<b>実行権があり、名前が英数字・<code>_</code>・<code>-</code> だけのもの</b>しか選ばない。<code>.sh</code> は外れる</li><li>選ばれるかは <code>run-parts --test</code>、名前の条件だけなら <code>--list</code> で確かめる</li><li><code>/etc/anacrontab</code> は「周期（日） 遅延（分） ジョブ名 コマンド」の4列。前回の実行日は <code>/var/spool/anacron/ジョブ名</code></li><li>今日の分を走らせるのは <code>anacron -f -n</code>（<code>-s</code> 順に、<code>-d</code> 経過を表示）。書き方の検査は <code>anacron -T</code></li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ cron 3.0pl1-184ubuntu2 / anacron 2.3-39ubuntu2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-admin/theory/05-crontab">← 5. crontab には「誰が」の列が無い</a><a href="/linuc-admin/theory/07-at">次: 7. 拒否リストを消すと、誰も使えなくなる →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-admin/theory/">理論編 目次</a> · <a href="/linuc-admin/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-admin/chapters.js"></script>
+<script src="/linuc-admin/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

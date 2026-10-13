@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>9. 文字コードは、読む側が決める — 確かめて説明する LinuC 主題1.08</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="9" data-theme="linuc-admin">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-admin/theory/">理論編</a> › 第9章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/">詳しく</a></p>
+</div>
+<h1>9. 文字コードは、読む側が決める</h1>
+<p class="lead">文字化けした「縺薙ｓ縺ｫ縺｡縺ｯ」を逆向きにもう一度変換すると、「こんにちは」に戻る。バイト列は1つも壊れていなかった。ファイルは自分の文字コードを名乗らないので、どう読むかは読む側が決めている。<code>iconv</code> の <code>-f</code> は、その「読み方」を渡すオプションである。</p>
+<div class="badges"><span>前提: 第8章まで読了</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.08.3（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>文字・コードポイント（Unicode）・バイト列（UTF-8 など）の関係を説明できる</li><li>ASCII・ISO-8859・UTF-8・ISO-2022-JP・Shift_JIS・EUC-JP の違いを、バイト列で見分けられる</li><li><code>iconv -f -t</code> で変換し、変換できないときに何が起きるかを言える</li><li>文字化けが「バイトの破損」ではなく「読み方の誤り」であることを示せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: UTF-16 の BOM の細部、Unicode の正規化（NFC と NFD）、<code>nkf</code>、Windows 独自の拡張（CP932 と Shift_JIS の差、① や ～ の扱い）は扱わない。</div></div>
+
+<h2 id="bytes">文字は、バイト列として保存されている</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じ1文字が、文字コードごとに違うバイト列になること。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ printf 'A' | od -An -tx1
+@@ printf 'あ' | od -An -tx1
+@@ printf 'é' | od -An -tx1
+@@ printf '\u3042\n'
+</code></pre>
+<p><code>A</code> は1バイト（0x41）、<code>é</code> は2バイト、<code>あ</code> は3バイトだった。この端末は UTF-8 で読み書きしている。<b>Unicode</b> は世界の文字に番号（コードポイント）を振った表で、「あ」は <code>U+3042</code> である（<code>printf '\u3042\n'</code> のように番号から文字を出せる）。<b>UTF-8</b> は、その番号を1〜4バイトに詰める方式の1つで、<b>ASCII</b>（0x00〜0x7F の7ビットの英数字）の範囲はそのまま1バイトになる。同じ「あ」を、ほかの方式で書き出す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ printf 'あ' | iconv -f UTF-8 -t UTF-16BE | od -An -tx1
+@@ printf 'あ' | iconv -f UTF-8 -t SHIFT_JIS | od -An -tx1
+@@ printf 'あ' | iconv -f UTF-8 -t EUC-JP | od -An -tx1
+@@ printf 'あ' | iconv -f UTF-8 -t ISO-2022-JP | od -An -tx1
+</code></pre>
+<div class="scroll"><table>
+<tr><th>文字コード</th><th>「あ」</th><th>特徴</th></tr>
+<tr><td>ASCII</td><td>（表せない）</td><td>7ビット。英数字と記号だけ</td></tr>
+<tr><td>ISO-8859-1（Latin-1）</td><td>（表せない）</td><td>1バイト。ASCII ＋ 西欧の文字（é など）。ISO-8859-2〜16 は東欧・ギリシャ文字などの別の版</td></tr>
+<tr><td>UTF-8</td><td><code>e3 81 82</code></td><td>Unicode を1〜4バイトで。ASCII と互換。Linux の標準</td></tr>
+<tr><td>UTF-16</td><td><code>30 42</code></td><td>Unicode を2または4バイトで（BE はバイトの並びが大きい方から）</td></tr>
+<tr><td>Shift_JIS</td><td><code>82 a0</code></td><td>日本語。Windows で長く使われた</td></tr>
+<tr><td>EUC-JP</td><td><code>a4 a2</code></td><td>日本語。古い Unix で使われた</td></tr>
+<tr><td>ISO-2022-JP</td><td><code>1b 24 42 24 22 1b 28 42</code></td><td>日本語。7ビットだけで書き、<code>ESC $ B</code> と <code>ESC ( B</code> で文字の集合を切り替える。日本語の電子メールの伝統的な形（JIS コード）</td></tr>
+</table></div>
+<p>UTF-16 の <code>30 42</code> は、コードポイント U+3042 の番号そのものである。ほかの方式は、それぞれ独自の規則で番号をバイトに置き換えている。</p>
+<div class="analogy"><b>たとえ</b>: 同じ住所を、郵便番号・緯度経度・地番という別々の書き方で表すのに近い。どの書き方かを知らない人に数字だけ渡しても、場所は分からない。
+<br>ただし<b>崩れる点</b>: 住所の書き方は桁数や形で見分けがつくことが多いが、文字コードは同じバイト列が別の方式でも「それらしい文字」として読めてしまう（次の節）。</div>
+
+<h2 id="mojibake">文字化けは、バイトが壊れたのではない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 文字化けの正体。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>「縺薙ｓ縺ｫ縺｡縺ｯ」のように化けた文字は、変換の途中でデータが壊れた結果である。
+化けてしまったら、元の文には戻せないだろう。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ echo こんにちは | iconv -f SHIFT_JIS -t UTF-8
+@@ echo こんにちは | iconv -f SHIFT_JIS -t UTF-8 | iconv -f UTF-8 -t SHIFT_JIS
+</code></pre>
+<div class="then"><b>だめな理由</b>: 戻った。1回目は、UTF-8 のバイト列を「Shift_JIS だと思って」読んだ。<code>e3 81</code> は Shift_JIS では「縺」という漢字に当たるので、それらしい文字の列ができた。
+2回目は同じ読み違いを逆にたどっただけで、元のバイト列がそのまま出てきた。バイトそのものを比べると同じである。
+文字化けは<b>読み方の間違い</b>で、ファイルの中身が壊れたわけではない。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ echo こんにちは | od -An -tx1
+@@ echo こんにちは | iconv -f SHIFT_JIS -t UTF-8 | iconv -f UTF-8 -t SHIFT_JIS | od -An -tx1
+</code></pre>
+<p>ただし、化けた結果を「表せない文字は捨てる」ような変換にかけたり、手で編集して保存したりすると、そこで初めて情報が失われる。化けたら、まず元のファイルを残したまま、読み方（<code>-f</code>）を変えて試す。</p>
+<div class="analogy"><b>たとえ</b>: 暗号表を取り違えて手紙を読むのに近い。出てきた文はでたらめだが、手紙そのものは1文字も変わっていない。正しい暗号表で読み直せば元の文が出てくる。
+<br>ただし<b>崩れる点</b>: 暗号の手紙には「この表で読め」と書き添えることもあるが、ふつうのテキストファイルには、どの文字コードで書いたかの印がどこにも無い（UTF-16 の BOM など、一部の例外を除く）。</div>
+
+<h2 id="file">ファイルは、自分の文字コードを名乗らない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 文字コードを見分ける道具の限界。</div>
+<p>同じ文を4つの文字コードで保存する。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ mkdir -p ~/enc
+@@ printf '日本語のメモ\n' > ~/enc/utf8.txt
+@@ iconv -f UTF-8 -t SHIFT_JIS ~/enc/utf8.txt > ~/enc/sjis.txt
+@@ iconv -f UTF-8 -t EUC-JP ~/enc/utf8.txt > ~/enc/euc.txt
+@@ iconv -f UTF-8 -t ISO-2022-JP ~/enc/utf8.txt > ~/enc/jis.txt
+@@ cd ~/enc && file *.txt
+@@ cd ~/enc && wc -c *.txt
+</code></pre>
+<p><code>file</code> は EUC-JP のファイルを「<b>OpenPGP Public Key</b>」（暗号の公開鍵のファイル）と言った。先頭のバイトの並びが、たまたまその形式の目印と一致したからである。<code>file</code> はバイトの並びから推測しているだけで、文字コードを知っているわけではない。実践編の演習08の EUC-JP のファイルは「<b>ISO-8859</b> text」と判定される。ISO-8859-1 は 0x80 以上のどのバイトにも文字を割り当てているので、どんな8ビットのバイト列も「ISO-8859 として読める」からである。ISO-2022-JP は全部のバイトが 0x80 未満なので「ASCII text」に見える。</p>
+<p>バイト数は、UTF-8 が19（かな・漢字が3バイト×6＋改行）、Shift_JIS と EUC-JP が13（2バイト×6＋改行）、ISO-2022-JP も19（2バイト×6＋前後の切り替えの印3バイトずつ＋改行）である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ cat -v ~/enc/sjis.txt
+@@ od -c ~/enc/jis.txt
+@@ iconv -f SHIFT_JIS -t UTF-8 ~/enc/sjis.txt
+@@ iconv -f EUC-JP -t UTF-8 ~/enc/sjis.txt > /dev/null; echo $?
+</code></pre>
+<p><code>cat -v</code> は表示できないバイトを <code>M-</code> 付きの記号で見せる。ISO-2022-JP には <code>033 $ B</code>（ESC $ B）と <code>033 ( B</code> という切り替えの印が入っている。正しい <code>-f</code> なら元の文になり、違う <code>-f</code> では途中で止まる。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-admin/">演習08</a>は、文字コードのそろわない3つのファイル（中身は日本語）を UTF-8 に直す課題である。
+判定は、変換後のファイルを元のファイルの正しい読み方と突き合わせる。<code>file</code> の言うことをうのみにすると、1つ外す。</div>
+
+<h2 id="fail">変換できないとき</h2>
+<div class="sgoal"><b>この節で分かること</b>: 変換先に無い文字の扱いと、<code>iconv</code> のオプション。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ printf 'こんにちは\n' | iconv -f UTF-8 -t ISO-8859-1 > /dev/null; echo $?
+@@ printf 'café\n' | iconv -f UTF-8 -t ISO-8859-1 | od -An -tx1
+</code></pre>
+<p>ISO-8859-1 に日本語は無いので失敗した。メッセージは「入力が不正（illegal input sequence）」と言うが、入力の UTF-8 は正しい。<b>変換先に無い文字</b>でも同じ言い方をする。<code>é</code> は ISO-8859-1 にあるので、1バイト（<code>e9</code>）になった。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ printf 'こんにちは\n' | iconv -f UTF-8 -t ASCII//TRANSLIT; echo $?
+@@ printf 'café\n' | iconv -f UTF-8 -t ASCII//TRANSLIT
+@@ iconv -l | grep -E '^(SHIFT_JIS|EUC-JP|ISO-2022-JP|ISO-8859-1|UTF-8|ASCII)//'
+</code></pre>
+<p><code>//TRANSLIT</code> は「近い文字に置き換える」指定で、<code>é</code> は <code>e</code> になった。日本語は近い文字が無いので <code>?</code> になり、<b>終了コードは 0</b>。失敗を報告せずに情報が消える。使うなら結果を目で確かめる。</p>
+<div class="analogy"><b>たとえ</b>: <code>//TRANSLIT</code> は、訳せない単語を「？」で埋めて納品する翻訳者に近い。似た綴りの単語がある言語どうしなら、それなりに読める訳になる（café → cafe）。
+<br>ただし<b>崩れる点</b>: 人の翻訳者なら「ここは訳せませんでした」と添えるが、<code>iconv</code> は終了コード 0 で何も言わない。スクリプトで <code>$?</code> だけを見ていると、成功に見える。</div>
+<div class="scroll"><table>
+<tr><th><code>iconv</code> の書き方</th><th>意味</th></tr>
+<tr><td><code>-f 文字コード</code></td><td>入力をどう読むか（from）</td></tr>
+<tr><td><code>-t 文字コード</code></td><td>何で書き出すか（to）。<code>//TRANSLIT</code> で近い文字に置き換え、<code>//IGNORE</code> で表せない文字を捨てる</td></tr>
+<tr><td><code>-c</code></td><td>変換できない文字を捨てて続ける</td></tr>
+<tr><td><code>-o ファイル</code></td><td>結果をファイルに書く（<code>&gt;</code> でも同じ）</td></tr>
+<tr><td><code>-l</code></td><td>使える文字コードの名前の一覧</td></tr>
+</table></div>
+
+<h2 id="spine">9章を1本にする</h2>
+<div class="sgoal"><b>この節で分かること</b>: 主題1.08 の3つの副題に共通していたこと。</div>
+<p>この章で見たのは「バイト列は文字コードを名乗らず、読む側（<code>iconv -f</code>・端末・<code>file</code>）が読み方を決める」ことだった。これは第1章からずっと同じ形をしている。</p>
+<div class="scroll"><table>
+<tr><th>章</th><th>書き換えたもの（台帳）</th><th>それを読んで決める側</th></tr>
+<tr><td>1</td><td><code>/etc/passwd</code> の4列目と <code>/etc/group</code> の4列目</td><td><code>id</code> とログイン（2つを合わせて所属を決める）</td></tr>
+<tr><td>2</td><td><code>/etc/passwd</code> の6列目（ホーム）</td><td>ログイン（ディレクトリが無ければ入れない）</td></tr>
+<tr><td>3</td><td><code>/etc/group</code> のメンバー欄</td><td>次のログイン（いまのシェルは読み直さない）</td></tr>
+<tr><td>4</td><td><code>/etc/shadow</code> の2列目と8列目</td><td>sshd と PAM（鍵の照合は2列目を読まない。期限は必ず読む）</td></tr>
+<tr><td>5</td><td>crontab の行と置き場所</td><td>cron（ファイル名で実行ユーザを決め、<code>.</code> 付きの名前は読まない）</td></tr>
+<tr><td>6</td><td><code>/etc/cron.daily</code> のファイル名と実行権</td><td><code>run-parts</code> と anacron（名前で選び、日付で決める）</td></tr>
+<tr><td>7</td><td><code>/etc/at.allow</code> と <code>/etc/at.deny</code></td><td>at（どちらも無ければ root だけ）</td></tr>
+<tr><td>8</td><td><code>LANG</code> と <code>LC_*</code></td><td>C ライブラリ（実体が無ければ黙って C）</td></tr>
+<tr><td>9</td><td>バイト列</td><td><code>iconv -f</code>・端末（読み方を間違えると化ける）</td></tr>
+</table></div>
+<div class="goal">
+<p><b>管理コマンドが書き換えるのは、台帳（/etc やスプールにあるテキスト）の1行だけである。
+その1行が効くかどうかは、台帳を読む側が、いつ・どの列を読むかで決まる。</b></p>
+<p>だから「コマンドが成功した」ことと「狙った効果が出た」ことは別で、確かめるには読む側に聞くしかない
+（<code>id</code>、実際の ssh、<code>run-parts --test</code>、<code>locale -a</code>、<code>iconv</code> の結果）。主題1.08 の詳細欄にファイルのパスがたくさん並んでいるのは、それぞれが「誰かに読まれる台帳」だからである。</p>
+</div>
+
+<div class="quiz"><b>確認</b>
+<p>Shift_JIS で書かれた <code>memo.txt</code> を、UTF-8 に変換して <code>memo-utf8.txt</code> に保存したい。正しいコマンドはどれか。</p>
+<p>A. <code>iconv -f UTF-8 -t SHIFT_JIS memo.txt &gt; memo-utf8.txt</code>　B. <code>iconv -f SHIFT_JIS -t UTF-8 memo.txt &gt; memo-utf8.txt</code>　C. <code>iconv -t SHIFT_JIS memo.txt -o memo-utf8.txt</code>　D. <code>iconv -l SHIFT_JIS UTF-8 memo.txt</code></p>
+<details><summary>答え</summary>
+<p>B。<code>-f</code> が元の読み方（from）、<code>-t</code> が書き出す文字コード（to）。A は逆向き。<code>-o memo-utf8.txt</code> を使って <code>iconv -f SHIFT_JIS -t UTF-8 -o memo-utf8.txt memo.txt</code> としてもよい。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>7ビットのバイトだけで日本語を表し、エスケープシーケンスで文字の集合を切り替える文字コードはどれか。</p>
+<p>A. EUC-JP　B. Shift_JIS　C. ISO-2022-JP　D. UTF-8</p>
+<details><summary>答え</summary>
+<p>C。この章の「あ」は <code>1b 24 42 24 22 1b 28 42</code> で、すべて 0x80 未満だった。<code>file</code> は「ASCII text, with escape sequences」と判定する。
+日本語の電子メールで長く使われてきた（JIS コードとも呼ばれる）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>Unicode と UTF-8 の違いを説明せよ。また ASCII との関係も答えよ。</p>
+<details><summary>答え</summary>
+<p>Unicode は文字に番号（コードポイント。「あ」は U+3042）を振った文字の集合で、UTF-8 はその番号をバイト列に置き換える方式（符号化）の1つ。
+UTF-8 は ASCII の範囲（0x00〜0x7F）をそのまま1バイトで表すので、ASCII だけのファイルはそのまま UTF-8 としても正しい。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>Unicode は文字に番号を振った表、UTF-8 はそれを1〜4バイトに詰める方式。ASCII（7ビット）と互換</li><li>同じ文字でも、Shift_JIS・EUC-JP・ISO-2022-JP（7ビット＋エスケープ）・ISO-8859-1（日本語なし）でバイト列が違う</li><li>ファイルは文字コードを名乗らない。<code>file</code> は推測で、EUC-JP を ISO-8859 や OpenPGP Public Key と言うこともある</li><li>文字化けは読み方の誤り。元のバイト列があれば、正しい <code>iconv -f</code> で戻せる</li><li><code>iconv -f 元 -t 先</code>。表せない文字は失敗する（メッセージは「illegal input」）。<code>//TRANSLIT</code> は黙って <code>?</code> に置き換え、終了コード 0</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ libc-bin 2.39-0ubuntu8.9（iconv）/ file 1:5.45-3build1 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-admin/theory/08-locale">← 8. ロケールは、名前で指しているだけ</a><a href="/linuc-admin/">実践編（演習8本）→</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-admin/theory/">理論編 目次</a> · <a href="/linuc-admin/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-admin/chapters.js"></script>
+<script src="/linuc-admin/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

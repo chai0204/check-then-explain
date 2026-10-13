@@ -1,0 +1,10 @@
+#!/bin/bash
+# lab env の追加行（linuc-admin）。仮想マシン型の檻なので、練習機の状態と、
+# KVM を使っているか（使うと /proc/cpuinfo などの画面が本文と変わる）を出す。
+st=$(vm status --short 2>/dev/null | sed 's/^練習機 linuc: //')
+printf '練習機    : %s\n' "${st:-不明}"
+if [ -e /dev/kvm ]; then kvm='あり（本文の出力は KVM なしで取ったもの）'; else kvm='なし（TCG。本文と同じ条件）'; fi
+printf 'KVM       : %s\n' "$kvm"
+printf 'QEMU      : %s\n' "$(qemu-system-x86_64 --version 2>/dev/null | head -1 | sed 's/^QEMU emulator version //')"
+g=$(lab-guest '. /etc/os-release; printf "%s / カーネル %s" "$PRETTY_NAME" "$(uname -r)"' 2>/dev/null) || g='届かない（vm status で状態を見てください）'
+printf '練習機の中: %s\n' "$g"

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. 所属は、書いたとおりに置き換わる — 確かめて説明する LinuC 主題1.08</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="linuc-admin">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-admin/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/">詳しく</a></p>
+</div>
+<h1>3. 所属は、書いたとおりに置き換わる</h1>
+<p class="lead"><code>usermod -G ops alice</code> は「alice を ops にも入れる」ではなく「alice の副グループを ops だけにする」。それまでの所属は黙って消える。そして <code>userdel</code> で消えるのは台帳の名前だけで、ファイルには番号が残り、次に同じ番号をもらった人がそれを受け継ぐ。</p>
+<div class="badges"><span>前提: 第2章まで読了（alice と carol がいる）</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.08.1（重要度5）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>groupadd</code>・<code>groupmod</code>・<code>groupdel</code> でグループを作り・変え・消せる</li><li><code>usermod -G</code> と <code>usermod -aG</code> の違いを、結果の台帳で説明できる</li><li>所属の変更が、ログイン中のシェルにいつ効くかを言える</li><li><code>userdel</code> と <code>userdel -r</code> の違いと、消したあとに残るものを説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>gpasswd</code> のグループ管理者の機能、<code>newgrp</code>、<code>/etc/gshadow</code> のグループパスワード、<code>vipw</code> / <code>vigr</code> による直接編集は扱わない（<code>gpasswd -d</code> だけ、片づけに1回使う）。</div></div>
+
+<h2 id="groupadd">グループを作る</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>groupadd</code> が GID をどう決めるか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo groupadd proj-x
+@@ sudo groupadd -g 1200 proj-y
+@@ getent group proj-x proj-y
+</code></pre>
+<p>番号を指定しないと、いまある最大の GID（演習用の <code>proj-b</code> の 1102）の次が振られる。<code>-g</code> で指定もできる。alice を2つに入れる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo usermod -aG proj-x,proj-y alice
+@@ id alice
+</code></pre>
+
+<h2 id="replace">-G は「足す」ではなく「この一覧にする」</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>usermod -G</code> が何を書き換えるか。</div>
+<p>もう1つグループを作り、alice をそこにも入れたい。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>usermod -G ops alice</code> と打てば、alice が ops に入る。
+proj-x と proj-y にはさっき入れたのだから、そのまま残っているはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo groupadd ops
+@@ sudo usermod -G ops alice
+@@ id alice
+@@ getent group proj-x proj-y ops
+</code></pre>
+<div class="then"><b>だめな理由</b>: proj-x と proj-y から alice が消えた。エラーも警告も出ていない。
+<code>-G</code> に渡した一覧は「副グループをこれにする」という意味で、<code>usermod</code> は <code>/etc/group</code> の全部の行を見て、
+一覧に無いグループのメンバー欄から alice を消し、一覧にあるグループに足す。足すだけのつもりなら <code>-a</code>（append）が要る。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo usermod -aG proj-x,proj-y alice
+@@ id alice
+</code></pre>
+<p>主グループ（<code>gid=1004(alice)</code>）は最初から最後まで変わっていない。第1章で見たとおり主グループは <code>/etc/passwd</code> の4列目にあり、<code>-G</code> が触るのは <code>/etc/group</code> の4列目だけだからである。主グループを変えるのは小文字の <code>-g</code> である。</p>
+<div class="scroll"><table>
+<tr><th><code>usermod</code> のオプション</th><th>書き換える場所</th></tr>
+<tr><td><code>-g グループ</code></td><td>主グループ（<code>/etc/passwd</code> の4列目）</td></tr>
+<tr><td><code>-G a,b</code></td><td>副グループの一覧を<b>置き換える</b>（<code>/etc/group</code> の4列目）</td></tr>
+<tr><td><code>-aG a,b</code></td><td>副グループに<b>足す</b></td></tr>
+<tr><td><code>-l 新しい名前</code></td><td>ユーザ名（1列目）。ホームの場所は変わらない</td></tr>
+<tr><td><code>-d /新しいホーム -m</code></td><td>ホームの場所（6列目）。<code>-m</code> で中身も移す</td></tr>
+<tr><td><code>-s</code> / <code>-u</code> / <code>-c</code></td><td>シェル（7列目）／UID（3列目）／コメント（5列目）</td></tr>
+<tr><td><code>-e</code> / <code>-L</code> / <code>-U</code></td><td>有効期限／ロック／ロック解除（<code>/etc/shadow</code>。第4章）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 部署の兼務を申請する書類が「兼務先を<b>全部</b>書く」様式になっているのに近い。新しい兼務先だけを書いて出すと、書かなかった兼務は解除されたものとして処理される。
+<br>ただし<b>崩れる点</b>: 人事なら「本当に外しますか」と確認してくれるが、<code>usermod -G</code> は確認せずにその場で書き換え、何を外したかも言わない。結果は <code>id</code> で確かめるしかない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-admin/">演習02</a>は、今の所属を残したまま bob をグループに足す課題である。
+判定は <code>id bob</code> で、最初からあった所属が残っているかまで見る。</div>
+
+<h2 id="session">ログイン中のシェルには、すぐには効かない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 所属の変更がいつ読まれるか。</div>
+<p>自分（student）を proj-x に入れ、同じ端末でそのまま確かめる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo usermod -aG proj-x student
+$ id -nG
+student adm sudo
+$ id -nG student
+student adm sudo proj-x</code></pre>
+<p>名前を付けない <code>id</code> には proj-x が出ず、名前を付けた <code>id student</code> には出る。名前を付けないと<b>いま動いているシェルが持っている番号</b>を表示し、名前を付けると<b>台帳</b>を引くからである。シェルの所属グループは、ログインしたときに台帳から読み込まれ、そのあとは変わらない。<code>exit</code> して <code>ssh linuc</code> で入り直すと出る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ id -nG
+</code></pre>
+<p>「グループに入れたのに、まだ権限が無いと言われる」ときは、たいていこれである。入り直すまで、プロセスは古い所属のまま動く。確かめ終えたので外しておく。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo gpasswd -d student proj-x
+</code></pre>
+<div class="analogy"><b>たとえ</b>: 入館証に近い。入館するときに、その時点の権限を書き込んだカードを受け取る。名簿で権限を足しても、いま首から下げているカードは変わらない。出て入り直すと、新しいカードになる。
+<br>ただし<b>崩れる点</b>: 入館証は1人1枚だが、プロセスは子プロセスを作るたびに同じ所属を写していく。古い所属のまま動き続けるプロセスは、ログアウトしても残っていることがある（cron やデーモンが起動したもの）。</div>
+
+<h2 id="groupmod">グループの名前を変える・消す</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>groupmod</code> と <code>groupdel</code> が台帳のどこを変えるか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo groupmod -n operators ops
+@@ getent group operators
+@@ id alice
+</code></pre>
+<p><code>-n</code> で名前だけが変わり、GID 1201 とメンバーはそのままである。ファイルの所有グループも番号で記録されているので、<code>ls -l</code> の表示が新しい名前に変わる（番号を変える <code>groupmod -g</code> は逆で、ファイルの側は古い番号のまま取り残される）。消すのは <code>groupdel</code> である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo groupdel alice
+@@ sudo groupdel operators
+@@ id alice
+</code></pre>
+<p>誰かの主グループになっているグループは消せない。消すと、その人の <code>/etc/passwd</code> の4列目が存在しない番号を指すことになるからである。副グループ（operators）なら、メンバーがいても消せる。</p>
+
+<h2 id="userdel">userdel で消えるのは名前で、番号は残る</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>userdel</code> と <code>userdel -r</code> の違いと、消したあとに起きること。</div>
+<p>carol に、ホームの外にもファイルを1つ作らせてから、<code>-r</code> を付けずに消す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo -u carol touch /tmp/carol-was-here
+@@ ls -l /tmp/carol-was-here
+@@ sudo userdel carol
+@@ ls -ld /home/carol
+@@ ls -l /tmp/carol-was-here
+</code></pre>
+<p>ホームも <code>/tmp</code> のファイルも残り、所有者の欄が名前から番号（1005）に変わった。ファイルに書かれていたのは最初から番号で、<code>ls</code> が台帳を引いて名前に直していただけである。台帳の行が消えたので、番号がそのまま出た。持ち主のいないファイルは <code>find</code> で探せる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo find / -xdev -nouser
+</code></pre>
+<p>ここで新しいユーザを1人作る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo useradd -m erin
+@@ id erin
+@@ ls -l /home
+@@ ls -l /tmp/carol-was-here
+</code></pre>
+<p>erin は carol と同じ UID 1005 をもらい、<b>carol のホームと <code>/tmp</code> のファイルの持ち主になった</b>。<code>useradd</code> は「いまある最大の UID の次」を振るので、いちばん新しいユーザを消すと、次に作った人がその番号を引き継ぐ。会社なら、退職者のファイルを新人が丸ごと読める状態である。</p>
+<p>消すときは <code>-r</code> を付けてホーム（とメールスプール）も消し、ホームの外に残ったものは <code>find / -nouser</code> や <code>find / -uid 番号</code> で探して始末する。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo userdel -r erin
+@@ sudo rm -r /home/carol /tmp/carol-was-here
+@@ ls -1 /home
+</code></pre>
+<p><code>userdel -r</code> が消すのはホームとメールスプールだけで、<code>/tmp</code> など他の場所のファイルは消さない。</p>
+<div class="analogy"><b>たとえ</b>: 番号で管理しているロッカーに近い。退職者の名札を外しても、ロッカーの中身は番号ごと残る。次にその番号を割り当てられた人は、中身ごと受け取る。
+<br>ただし<b>崩れる点</b>: 会社なら新人に渡す前に中を空けるが、<code>useradd</code> は番号が空いているかを台帳でしか確かめない。ディスクにその番号のファイルが残っていても気にしない。</div>
+
+<div class="quiz"><b>確認</b>
+<p>ユーザ <code>hanako</code> は副グループ <code>sales</code> に所属している。sales の所属を保ったまま、<code>developers</code> にも所属させたい。正しいコマンドはどれか。</p>
+<p>A. <code>usermod -G developers hanako</code>　B. <code>usermod -g developers hanako</code>　C. <code>usermod -aG developers hanako</code>　D. <code>groupmod -a developers hanako</code></p>
+<details><summary>答え</summary>
+<p>C。<code>-G</code> だけだと副グループが developers だけに置き換わり、sales から外れる（この章の proj-x と proj-y がその実物）。
+<code>-g</code> は主グループを変える。<code>groupmod</code> はグループ自体の名前や GID を変えるコマンドで、メンバーは変えない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>userdel taro</code> と <code>userdel -r taro</code> の違いを答えよ。また、どちらの場合も残りうるものは何か。</p>
+<details><summary>答え</summary>
+<p><code>-r</code> を付けるとホームディレクトリとメールスプールも消す。付けないと台帳の行だけが消え、ホームは所有者が番号表示のまま残る。
+どちらの場合も、ホームの外（<code>/tmp</code> など）にある taro のファイルは残る。<code>find / -nouser</code> で探せる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>groupdel staff</code> が <code>cannot remove the primary group of user 'ken'</code> で失敗した。何が原因で、どうすれば消せるか。</p>
+<details><summary>答え</summary>
+<p>staff が ken の主グループ（<code>/etc/passwd</code> の4列目）になっている。先に <code>usermod -g 別のグループ ken</code> で ken の主グループを変えるか、ken を消してから <code>groupdel</code> する。副グループとしてのメンバーがいるだけなら消せる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>groupadd</code>（<code>-g</code> で GID 指定）・<code>groupmod</code>（<code>-n</code> で改名）・<code>groupdel</code>（誰かの主グループは消せない）</li><li><code>usermod -G</code> は副グループを<b>置き換え</b>、<code>-aG</code> は<b>足す</b>。主グループは <code>-g</code></li><li>所属の変更はログインのときに読まれる。<code>id</code>（名前なし）はいまのシェル、<code>id ユーザ名</code> は台帳</li><li><code>userdel</code> は台帳の行を消す。<code>-r</code> でホームとメールスプールも消す。ほかの場所のファイルは番号のまま残る</li><li>UID は「最大の次」から振られるので、消した番号は再利用されうる。残ったファイルは新しい持ち主のものになる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-admin/theory/02-useradd">← 2. useradd は、頼まれたことしかしない</a><a href="/linuc-admin/theory/04-lock">次: 4. ロックは、扉を1つ閉めるだけ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-admin/theory/">理論編 目次</a> · <a href="/linuc-admin/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-admin/chapters.js"></script>
+<script src="/linuc-admin/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>
