@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>確かめて説明する LinuC 主題1.11 — オープンソースの文化をライセンスの実物で確かめる</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="linuc-oss">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-oss/">オープンソースの文化</a> › <strong>実践編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文の出力はすべて実機の記録です。このコースには演習がありません（理由は下に書きました）。
+   それでも<b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、読者として通した段階で4回に分けて不備が出ました。
+   詰まったら <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   ページ下のコメントへ。それが直す順番になります。</p>
+</div>
+
+<h1>確かめて説明する LinuC 主題1.11</h1>
+<p class="lead">LinuC レベル1 <strong>102 試験・主題1.11「オープンソースの文化」</strong>
+（オープンソースの概念とライセンス / オープンソースのコミュニティとエコシステム）を、
+<strong>どの Ubuntu にも入っているライセンスの実物</strong>を読んで確かめます。
+教材は <code>/usr/share/common-licenses/</code> の条文と、パッケージごとの <code>/usr/share/doc/*/copyright</code> です。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<div class="notfor">
+<h4>この教材が向かない人</h4>
+<ul>
+<li>いま動かしたいだけの人 → 公式ドキュメントのほうが速い</li>
+<li>答えだけ欲しい人 → AI に聞いたほうが速く、あなたの語彙に合う</li>
+</ul>
+<p>向く人: コマンドは打てる。写経すれば動く。
+でも「なぜ動くのか」を人に説明できない人。<br>
+<b>LinuC を受ける人向けには</b>: 出題範囲を読んで「GPL というライセンスがあるんだな」で止まっている人。</p>
+</div>
+
+<h2 id="cage">この教材の檻</h2>
+<div class="cages"><div class="scroll"><table>
+<tr><th>檻</th><th>準備</th><th>ここで触れる</th><th>ここでは触れない（逃がす先）</th></tr>
+<tr><td>素の Ubuntu（公式・digest 固定）</td><td>1分</td>
+    <td><code>common-licenses/</code> <code>doc/*/copyright</code> <code>--version</code> <code>--help</code> <code>dpkg -s</code> <code>bashbug</code></td>
+    <td>AGPL の全文・掲示板・OSD の原文 → 本文の表と理論</td></tr>
+</table></div></div>
+<p>檻は Docker Hub 公式の素の Ubuntu イメージをダイジェストで固定したもので、このコースのための専用イメージは作っていません。
+AGPL の全文・掲示板・オープンソースの定義の原文は手元に実物が無いので、本文では表と理論で扱います。
+影響度 <b>A</b>（読むだけ。設定も状態も変えません）。本文のコマンドは手元の Ubuntu や Debian でもそのまま打てますが、
+入っているパッケージが違うので、数（copyright 92 個・ライセンスの書き方 155 通りなど）が変わります。
+<b>本文と同じ画面にしたいときは、下のイメージを使ってください</b>。</p>
+
+<h2 id="nolab">このコースに演習が無い理由</h2>
+<p>主題1.11 は<b>知識問題</b>で、出題範囲の「詳細」欄に打つコマンドが1つもありません。
+このシリーズの演習は、<code>lab check</code> がコンテナの中の<b>状態を実際に観測して</b>合否を出す形で作っています。
+ライセンスを理解したかどうかは、状態として観測できません。観測型の判定を持つ演習が作れないので、
+<b>演習と専用の檻は作らず、理論編だけのコース</b>にしました。</p>
+<p>そのかわり、理論編の端末表示はすべて下のイメージで記録してあり、同じイメージで同じ画面が出ます。
+各章の「手を動かす」の欄に、その章で自分の画面に出してほしいコマンドを書いてあります。</p>
+
+<h2 id="start">はじめる</h2>
+<p>Docker の場合。1行です。</p>
+<pre><code>docker run --rm -it --hostname linuc \
+  ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3</code></pre>
+<p>root のシェルが開きます。<code>--rm</code> なので、<code>exit</code> で抜けるとコンテナは消えます。
+このコースは何も保存しないので、進捗用のボリュームも要りません。
+<code>--hostname linuc</code> は、出力に出るホスト名を本文と揃えるためです。
+<code>@sha256:…</code> まで書くのは、<code>ubuntu:24.04</code> という名前の中身が更新で入れ替わっても、本文と同じイメージを取ってくるためです。</p>
+<p>Podman の場合（Docker Hub の名前を省略せずに書きます）。</p>
+<pre><code>podman run --rm -it --hostname linuc \
+  docker.io/library/ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3</code></pre>
+<p>podman 5.8.6（rootless）で本文の全コマンドを流し、docker の記録と1文字も違わないことを確かめてあります。</p>
+<p>入ったら、まず本文と同じイメージかを確かめます。</p>
+<pre><code>$ grep PRETTY_NAME /etc/os-release
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+$ dpkg -l | grep -c '^ii'
+92</code></pre>
+<p>92 と出れば、本文の数字（copyright 92 個など）がそのまま再現します。</p>
+
+<h2 id="map">章と、そこで打つもの</h2>
+<p>演習のかわりに、各章で自分の画面に出してほしいものを並べます。</p>
+<div class="scroll"><table>
+<tr><th>章</th><th>確かめること</th><th>打つもの</th><th>副題</th><th>目安</th></tr>
+<tr><td><a href="/linuc-oss/theory/01-owner">1</a></td><td>オープンソースに持ち主がいて、保証が無いこと</td><td><code>ls --version</code> <code>grep -A2 '^Files: \*$' /usr/share/doc/bash/copyright</code></td><td>1.11.1</td><td>16分</td></tr>
+<tr><td><a href="/linuc-oss/theory/02-copyleft">2</a></td><td>GPL の義務が配るときに生まれること</td><td><code>grep -n "^  [0-9]*\. [A-Z]" /usr/share/common-licenses/GPL-3</code></td><td>1.11.1</td><td>18分</td></tr>
+<tr><td><a href="/linuc-oss/theory/03-permissive">3</a></td><td>許可型にも条件があり、持ち主がいないのはパブリックドメインだけなこと</td><td><code>ldd /bin/ls | awk '{print $1}'</code> から4つのライセンスを辿る</td><td>1.11.1</td><td>16分</td></tr>
+<tr><td><a href="/linuc-oss/theory/04-community">4</a></td><td>報告先が層ごとにあること</td><td><code>bash --help | tail -4</code> <code>grep URL /etc/os-release</code></td><td>1.11.2</td><td>15分</td></tr>
+</table></div>
+<p>先に読む場合は <a href="/linuc-oss/theory/">理論編（4章）</a>へ。地形図に出題範囲との対応表と、試験の直前に見る表があります。</p>
+
+<h2 id="report">本文と違う出力が出たら</h2>
+<p>教材のバグとして直します。次の4つを貼ってください。</p>
+<ol>
+<li>打ったコマンド</li>
+<li>本文に書いてある出力</li>
+<li>あなたの画面に出た出力</li>
+<li>起動に使ったコマンドと、下の2つのコマンドの出力</li>
+</ol>
+<pre><code>$ grep PRETTY_NAME /etc/os-release
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+$ dpkg-query -W base-files bash coreutils dpkg libc6
+base-files	13ubuntu10.5
+bash	5.2.21-2ubuntu4
+coreutils	9.4-3ubuntu6.3
+dpkg	1.22.6ubuntu6.6
+libc6:amd64	2.39-0ubuntu8.9</code></pre>
+<p>このコースは素の Ubuntu を使うので、他のコースにある <code>lab env</code> はありません。
+版が本文と違うときは、起動コマンドの <code>@sha256:</code> 以降が抜けていないかを先に見てください。
+<a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。</p>
+
+<h2 id="end">終わったら</h2>
+<pre><code>exit</code></pre>
+<p><code>--rm</code> で起動しているので、抜ければコンテナは消えます。
+イメージも消すなら <code>docker rmi</code> で（他で使っていなければ）。母艦には何も残りません。</p>
+
+<div class="verified"><b>検証環境</b>: イメージ ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3（Docker Hub 公式の素のイメージ。このコースは専用イメージを作らない）/ Ubuntu 24.04.5 LTS / base-files 13ubuntu10.5 / bash 5.2.21-2ubuntu4 / coreutils 9.4-3ubuntu6.3 / dpkg 1.22.6ubuntu6.6 / libc6 2.39-0ubuntu8.9 / apt は使わない（イメージに入っているファイルを読むだけ）/ docker 29.8.0・amd64 で理論編の全コマンドを記録（podman 5.8.6 rootless でも同じ出力を確認）/ 検証日 2026-10-13</div>
+
+<!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
+<nav class="pager"><a href="/linuc-oss/theory/">← 理論編</a><a href="/">記事の一覧へ →</a></nav>
+<!-- /catalog:pager -->
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-oss/">オープンソースの文化</a> · <a href="/linuc-oss/theory/">理論編 目次</a> · <a href="/linuc-oss/practice/">実践編</a> · <a href="/linuc-oss/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

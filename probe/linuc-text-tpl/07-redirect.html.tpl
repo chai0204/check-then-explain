@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="7" data-theme="linuc-text">
 <div class="wrap">
-<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-text/theory/">理論編</a> › 第7章</nav>
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-text/">コマンドラインとテキスト処理</a> › <a href="/linuc-text/theory/">理論編</a> › 第7章</nav>
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
 </div>
@@ -158,7 +158,7 @@ $ rm out.txt err.txt both.txt only.txt amp.txt note.txt upper.txt greet.txt copy
 <code>sort data.txt &gt; data.txt</code> は、<code>sort</code> が読む前にシェルが <code>data.txt</code> を空にするので、空のファイルになる（実測 0 バイト）。
 同じファイルに書き戻すなら <code>sort data.txt -o data.txt</code>。</p></details></div>
 <div class="note try"><b>手を動かす</b>:
-実践編の<a href="/linuc-text/">演習05</a>は、1つのスクリプトの出力を「標準出力だけ」「標準エラー出力だけ」「両方を順番どおり」の3つのファイルに分ける課題である。
+実践編の<a href="/linuc-text/practice/">演習05</a>は、1つのスクリプトの出力を「標準出力だけ」「標準エラー出力だけ」「両方を順番どおり」の3つのファイルに分ける課題である。
 <code>2&gt;&amp;1</code> を先に書くと、判定は「all.log に NG の行が入っていない」と観測する。</div>
 
 <h2 id="wrap">この章で分かったこと</h2>
@@ -170,7 +170,7 @@ $ rm out.txt err.txt both.txt only.txt amp.txt note.txt upper.txt greet.txt copy
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
 <div id="giscus"></div>
 </section>
-<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
+<footer><a href="/">トップ</a> · <a href="/linuc-text/">コマンドラインとテキスト処理</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/practice/">実践編</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
 </div>
 <script src="/linuc-text/chapters.js"></script>
 <script src="/linuc-text/theory/terms.js"></script>

@@ -1,145 +1,58 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>確かめて説明する LinuC 主題1.02 — 権限・ファイル操作・リンク・検索を実機で確かめる</title>
+<title>ファイルとパーミッション — 確かめて説明する</title>
+<meta name="description" content="（下書き待ち）">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-theme="linuc-files">
 <div class="wrap">
-<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <strong>主題1.02</strong></nav>
+<nav class="top"><a href="/">トップ</a> › <strong>ファイルとパーミッション</strong></nav>
+<div class="draftbar compact"><p><b>ドラフト</b>: この記事は<b>著者が読者として通していません</b>。本文の出力はすべて実機の記録で、演習は模範解答で通ること・未達のときに判定が鳴ることを確かめてあります。それでも導線の不備は残っている可能性があります。詰まったら各ページ下のコメントか <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> へ。</p></div>
+<h1>ファイルとパーミッション</h1>
+<div class="badges"><span>LinuC レベル1 101 主題1.02</span><span>初級</span><span>演習あり（コンテナ）</span><span>約3時間58分</span><span>状態: ドラフト</span></div>
+<p class="lead">（下書き待ち）</p>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
-<p>本文の出力はすべて実機の記録で、演習8本は模範解答どおりに通ること・未達のときに判定が鳴ることを
-   両方確認してあります。それでも<b>導線の不備</b>は残っている可能性があります。
-   先に公開した SQLite 編では、読者として通した段階で4回に分けて不備が出ました。
-   詰まったら <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
-   ページ下のコメントへ。それが直す順番になります。</p>
-</div>
+<div class="card"><h3>想定読者</h3><p>（下書き待ち）</p></div>
 
-<h1>確かめて説明する LinuC 主題1.02</h1>
-<p class="lead">LinuC レベル1 <strong>101 試験・主題1.02「ファイル・ディレクトリの操作と管理」</strong>
-（所有者とパーミッション / 基本的なファイル管理 / ハードリンクとシンボリックリンク / ファイルの配置と検索）を、
-<strong>全部コンテナの中で実際に打って</strong>確かめます。
-あなたは一般ユーザ <code>lab</code> として入り、他人の立場（alice・bob・carol）と root の立場は <code>sudo</code> で借ります。
-パーミッションは「誰として触るか」で結果が変わるので、人を複数用意した檻です。</p>
-
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
-AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
-ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<div class="notfor">
-<h4>この教材が向かない人</h4>
+<h2 id="outcomes">得られるもの</h2>
 <ul>
-<li>いま動かしたいだけの人 → 公式ドキュメントのほうが速い</li>
-<li>答えだけ欲しい人 → AI に聞いたほうが速く、あなたの語彙に合う</li>
+<li>（下書き待ち）</li>
 </ul>
-<p>向く人: コマンドは打てる。写経すれば動く。
-でも「なぜ動くのか」を人に説明できない人。<br>
-<b>LinuC を受ける人向けには</b>: <code>chmod 4755</code> や <code>find -mtime +7</code> を暗記しようとして、
-覚えたそばから抜けていく人。</p>
+
+<h2 id="start">進め方</h2>
+<div class="toc">
+  <a href="/linuc-files/theory/"><b>理論編</b><span>全8章・約2時間32分。1章ごとに「実際に打つと何が出るか」を先に置いてある。</span></a>
+  <a href="/linuc-files/practice/"><b>実践編</b><span>演習8本・約1時間26分。docker か podman で檻（コンテナ）を1つ起動する。特権は渡さない。</span></a>
 </div>
+<p class="detail">完了推定時間（約3時間58分）は、各章の所要時間と演習の目安の合計です。</p>
 
-<h2 id="cage">この教材の檻</h2>
-<div class="cages"><div class="scroll"><table>
-<tr><th>檻</th><th>準備</th><th>ここで触れる</th><th>ここでは触れない（逃がす先）</th></tr>
-<tr><td>一般ユーザのコンテナ</td><td>2分</td>
-    <td><code>chmod</code> <code>umask</code> <code>chown</code> <code>chgrp</code> <code>cp</code> <code>find</code> <code>tar</code> <code>gzip</code> <code>bzip2</code> <code>xz</code> <code>dd</code> <code>ln</code> <code>locate</code> <code>updatedb</code></td>
-    <td>ディスクの装置（<code>/dev/sda</code> などのブロックデバイスと、それを写す <code>dd</code>）→ 実機か VM（本文では理論として説明しています）</td></tr>
-</table></div></div>
-<p>影響度 <b>B</b>（変更はコンテナの中だけ。母艦の設定もファイルも書き換えません）。
-演習はホームや <code>/etc</code>・<code>/srv</code> の権限と中身を書き換えるので、<b>母艦では絶対に実行しないでください</b>。
-やり直したいときはコンテナを抜けて入り直します。</p>
-<div class="scroll"><table>
-<tr><th>ユーザ</th><th>役割</th></tr>
-<tr><td><code>lab</code></td><td>あなた。<code>sudo</code> が使える（パスワード不要）。どのグループの仲間でもない</td></tr>
-<tr><td><code>alice</code> <code>bob</code></td><td>グループ <code>devs</code> の仲間。<code>sudo -u alice コマンド</code> で、alice として1つ打てる</td></tr>
-<tr><td><code>carol</code></td><td>部外者（<code>devs</code> ではない）</td></tr>
-</table></div>
-
-<h2 id="start">はじめる</h2>
-<p>Docker の場合。1行です（著者は docker で確かめました。podman は未確認です）。</p>
-<pre><code>docker run --rm -it --name lab-linuc-files --hostname linuc \
-  -v lab-linuc-files-work:/home/lab/work \
-  -v lab-linuc-files-state:/home/lab/.lab \
-  ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:6b256ca7b7f40bb879761737a315e018979ae26ab8b0ef71dcaaf0d77031fa69</code></pre>
-<p>入ると現在地が出ます。</p>
-<pre><code>── lab-linuc-files 1.0.1 ────────────────────────────────────────
-lab-linuc-files  進捗 0/8
-  次 → 01 「一覧は見せずに、1つのファイルだけ読ませる」 (目安 10分 / 影響度 B)
-  lab start 01 で課題を開く
-  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-files-state）
-  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
-────────────────────────────────────────────────────────────</code></pre>
-<div class="note warn">
-<p><b>この檻の約束（画面を本文と揃えるために）</b></p>
-<ul>
-<li><b><code>--rm</code> で起動しています。</b>抜けると、<code>~/work</code> と進捗（2つのボリューム）以外の変更は消えます。
-   ホームや <code>/etc</code> の権限をいじって分からなくなったら、抜けて入り直せば元に戻ります。</li>
-<li><b>2つ目の端末を開かないでください。</b>別の端末から <code>docker exec</code> で入ったシェルは umask が <code>0000</code> で、
-   作ったファイルが <code>-rw-rw-rw-</code> になります（著者の実測・docker 29.8.0）。この教材は <code>docker run</code> で入ったシェル
-   （umask <code>0022</code>）で記録してあります。開くなら、最初に <code>umask 022</code> を打ってください。</li>
-<li><b>第1〜7章は <code>~/work/ch1</code> 〜 <code>~/work/ch7</code> で、第8章はホームで作業します。</b>第1〜7章を途中からやり直すときは、
-   その章のディレクトリを消してから（<code>rm -rf ~/work/ch4</code> のように）最初の行から打ってください。
-   <code>~/work</code> はボリュームなので、檻を抜けても残っています。第8章は <code>/tmp</code> と索引を触るので、やり直すなら檻を入り直してください。</li>
-</ul>
-</div>
-
-<h2 id="ex">演習</h2>
-<p>8本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。
-他人の立場が要るものは、判定が alice・bob・carol として実際に読んだり消したりして確かめます。
-詰まったら <code>lab hint NN</code> を何度でも。使い切ったら <code>lab solve NN</code> で模範解答に必ず届きます
-（見ても構いません。進捗には「solve を見た」として残ります）。</p>
-<div class="scroll"><table>
-<tr><th>No</th><th>やること</th><th>副題</th><th>目安</th></tr>
-<tr><td>01</td><td>一覧は見せずに、1つのファイルだけ読ませる</td><td>1.02.1</td><td>10分</td></tr>
-<tr><td>02</td><td>次に開くシェルでも 640 と 750 で作られるようにする</td><td>1.02.1</td><td>10分</td></tr>
-<tr><td>03</td><td>devs の共有ディレクトリを作る</td><td>1.02.1</td><td>12分</td></tr>
-<tr><td>04</td><td>設定ファイルを、時刻ごと控えておく</td><td>1.02.2</td><td>10分</td></tr>
-<tr><td>05</td><td>大きな .tmp だけを、深いところまで消す</td><td>1.02.2</td><td>12分</td></tr>
-<tr><td>06</td><td>project を tar.xz にまとめる</td><td>1.02.2</td><td>10分</td></tr>
-<tr><td>07</td><td>current を v2 に切り替える</td><td>1.02.3</td><td>10分</td></tr>
-<tr><td>08</td><td>locate で見つからない2つを、見つかるようにする</td><td>1.02.4</td><td>12分</td></tr>
-</table></div>
-<p>先に読む場合は <a href="/linuc-files/theory/">理論編（8章）</a>へ。
-章と演習は1対1で対応しているので、どちらから始めても構いません。</p>
-<p class="detail"><code>lab reset NN</code> で演習を配られたときの状態に戻すと、<code>~/work/NN</code> はディレクトリごと作り直されます。
-そのディレクトリの中にいたなら、続けて <code>cd ~/work/NN</code> と打ち直してください（打たないと、消えた古いディレクトリに残ったままになり、<code>ls</code> は何も出さず、<code>cat</code> などは <code>No such file or directory</code> になります）。</p>
-
-<h2 id="report">本文と違う出力が出たら</h2>
-<p>教材のバグとして直します。次の4つを貼ってください。</p>
-<ol>
-<li>打ったコマンド</li>
-<li>本文に書いてある出力</li>
-<li>あなたの画面に出た出力</li>
-<li><code>lab env</code> の全文</li>
+<h2 id="chapters">章</h2>
+<ol class="chlist">
+<li><a href="/linuc-files/theory/01-permissions">名前と中身は別の場所にある</a></li>
+<li><a href="/linuc-files/theory/02-umask">umask は引き算ではない</a></li>
+<li><a href="/linuc-files/theory/03-special-bits">特殊なビットは「誰として」と「誰が消せるか」</a></li>
+<li><a href="/linuc-files/theory/04-cp-mv-rm">コピーは作り直し、移動は書き換え</a></li>
+<li><a href="/linuc-files/theory/05-find">find は名前をたどり、属性で選ぶ</a></li>
+<li><a href="/linuc-files/theory/06-tar">tar は束ねるだけ</a></li>
+<li><a href="/linuc-files/theory/07-links">リンクは名前を増やすか、道順を書くか</a></li>
+<li><a href="/linuc-files/theory/08-locate">locate は索引の写真を引く</a></li>
 </ol>
-<pre><code>$ lab env
-テーマ    : lab-linuc-files 1.0.1
-イメージ  : ghcr.io/chai0204/lab-linuc:files-1.0.1
-ベース    : Ubuntu 24.04.5 LTS
-apt 固定  : 20260929T000000Z
-カーネル  : 7.2.6
-アーキ    : x86_64
-ランタイム: docker
-特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb</code></pre>
-<p><a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。</p>
-<p><b>もともと環境ごとに変わるもの</b>は、違っていても正常です:
-時刻、inode 番号、<code>dd</code> の秒数と速度、<code>tar</code> を圧縮した大きさ（中に時刻が入るので、数十バイト変わることがある）。
-また本文は、作業ボリュームが <b>ext4</b> の上にある環境で記録しました。母艦が xfs や btrfs だと、
-ディレクトリの大きさの欄（<code>4096</code>）と、<code>ls -l</code> の <code>total</code>、ディレクトリのリンク数が変わることがあります（第7章）。
-<code>umask</code> が <code>0022</code> 以外なら、入り方（<code>docker exec</code> ではないか）から見てください。</p>
 
-<h2 id="end">終わったら</h2>
-<pre><code>exit
-docker volume rm lab-linuc-files-work lab-linuc-files-state     # 作業と進捗も消す場合だけ</code></pre>
-<p>コンテナは <code>--rm</code> なので、抜けた時点で消えています。イメージは <code>docker rmi</code> で消せます。
-母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。</p>
+<h2 id="syllabus">出題範囲（LinuC レベル1 101 試験）</h2>
+<ul>
+<li>1.02.1 ファイルの所有者とパーミッション（重要度 3）</li>
+<li>1.02.2 基本的なファイル管理の実行（重要度 3）</li>
+<li>1.02.3 ハードリンクとシンボリックリンク（重要度 2）</li>
+<li>1.02.4 ファイルの配置と検索（重要度 2）</li>
+</ul>
+<p class="detail">どの副題を、どの記事で手を動かせるかの一覧: <a href="/linuc/">LinuC レベル1 出題範囲マップ</a></p>
 
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:6b256ca7b7f40bb879761737a315e018979ae26ab8b0ef71dcaaf0d77031fa69 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で演習8本を完走（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<h2 id="neighbors">前後の記事（LinuC レベル1）</h2>
+<nav class="pager plain"><a href="/linuc-boot/">← 主題1.01 Linux の起動・仮想化・プロセス</a><a href="/linuc-text/">主題1.03 コマンドラインとテキスト処理 →</a></nav>
+
+
+<p class="detail">作成 2026-10-13 ／ 最終更新 2026-10-13 ／ 関連領域: サーバー</p>
 
 <section id="comments">
 <h2>コメント</h2>
@@ -148,7 +61,7 @@ docker volume rm lab-linuc-files-work lab-linuc-files-state     # 作業と進�
    添える情報が決まっているので速く直せます。</p>
 <div id="giscus"></div>
 </section>
-<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-files/theory/">理論編</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
+<footer><a href="/">トップ</a> · <a href="/linuc-files/">ファイルとパーミッション</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/practice/">実践編</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
 </div>
 <script src="/shared/comments.js"></script>
 </body></html>

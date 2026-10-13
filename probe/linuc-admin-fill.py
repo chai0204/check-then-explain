@@ -163,7 +163,7 @@ def main():
             continue
         res = process(t.read_text(encoding='utf-8'))
         # 00- で始まるひな形は実践編の入口（public/linuc-admin/index.html）。記録の先頭（環境・ログイン）を使うので最初に処理される
-        dest = (OUT.parent / 'index.html') if t.name.startswith('00-') else (OUT / t.name)
+        dest = (OUT.parent / 'practice' / 'index.html') if t.name.startswith('00-') else (OUT / t.name)
         dest.write_text(res, encoding='utf-8')
         print(f'書いた: {dest}')
     if errors:

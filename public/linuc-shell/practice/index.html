@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>確かめて説明する LinuC 主題1.06 — シェルとスクリプトを実機で確かめる</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="linuc-shell">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-shell/">シェルとスクリプト</a> › <strong>実践編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文の出力はすべて実機の記録で、演習8本は模範解答どおりに通ること・未達のときに判定が鳴ることを
+   両方確認してあります。それでも<b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、読者として通した段階で4回に分けて不備が出ました。
+   詰まったら <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   ページ下のコメントへ。それが直す順番になります。</p>
+</div>
+
+<h1>確かめて説明する LinuC 主題1.06</h1>
+<p class="lead">LinuC レベル1 <strong>102 試験・主題1.06「シェルおよびスクリプト」</strong>
+（シェル環境のカスタマイズ / シェルスクリプト）を、
+<strong>全部コンテナの中で実際に打って</strong>確かめます。
+1.06.2 は重要度 6 で、レベル1 の全39副題の中で<strong>最も重い</strong>副題です。
+<code>~/.bashrc</code> を書き換えても、<code>su - alice</code> と打っても、母艦には何も起きない檻です。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<div class="notfor">
+<h4>この教材が向かない人</h4>
+<ul>
+<li>いま動かしたいだけの人 → 公式ドキュメントのほうが速い</li>
+<li>答えだけ欲しい人 → AI に聞いたほうが速く、あなたの語彙に合う</li>
+</ul>
+<p>向く人: コマンドは打てる。写経すれば動く。
+でも「なぜ動くのか」を人に説明できない人。<br>
+<b>LinuC を受ける人向けには</b>: <code>~/.bash_profile</code> と <code>~/.bashrc</code> の違いや <code>$@</code> と <code>$*</code> の違いを、
+表で覚えようとして覚えきれない人。</p>
+</div>
+
+<h2 id="cage">この教材の檻</h2>
+<div class="cages"><div class="scroll"><table>
+<tr><th>檻</th><th>準備</th><th>ここで触れる</th><th>ここでは触れない（逃がす先）</th></tr>
+<tr><td>Ubuntu 24.04 のコンテナ（読者 <code>lab</code> と、実験相手の <code>alice</code>・<code>bob</code>）</td><td>2分</td>
+    <td><code>bash</code> <code>sh</code>（dash） <code>su</code> <code>sudo -i</code> 起動ファイル7つ <code>source</code> <code>alias</code> <code>chmod</code> <code>chown</code> <code>bash -x</code></td>
+    <td>ssh でのログイン・GUI の端末アプリ・cron（主題1.08）→ 理論として説明</td></tr>
+</table></div></div>
+<p>影響度 <b>B</b>（変更はコンテナの中だけ。母艦の設定もファイルも書き換えません）。
+演習は <code>/etc</code> や他のユーザのホームを書き換えるので、<b>母艦では実行しないでください</b>。
+やり直したいときはコンテナを起動し直します（<code>--rm</code> なので、<code>~/work</code> と進捗以外は元に戻ります）。</p>
+<p>alice のパスワードは <code>alice</code> です（<code>su - alice</code> を試すため。学習用の檻なので固定にしてあります）。</p>
+
+<h2 id="start">はじめる</h2>
+<p>Docker の場合。1行（4行に折り返しています）です。</p>
+<pre><code>docker run --rm -it --name lab-linuc-shell --hostname linuc \
+  -v lab-linuc-shell-work:/home/lab/work \
+  -v lab-linuc-shell-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab-linuc:shell-1.0.2@sha256:edb99156f4bdca3dcce3465064acd8f7a8c7bb9938ff849de56db8d8574b19ce</code></pre>
+<p>権限を追加するオプション（<code>--privileged</code> や <code>--cap-add</code>）は使いません。
+<code>--hostname linuc</code> は、プロンプトや出力に出るホスト名を本文と揃えるためです。</p>
+<p>入ると現在地が出ます。この案内がなぜ出るのか（なぜ <code>bash</code> と打ち直すと出ないのか）が、第1章の入口です。</p>
+<pre><code>── lab-linuc-shell 1.0.2 ────────────────────────────────────────
+lab-linuc-shell  進捗 0/8
+  次 → 01 「ログインしたときだけ挨拶を出す」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-shell-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────</code></pre>
+
+<div class="note warn">
+<p><b>端末を2つ使いたいときの注意</b></p>
+<p>別の端末から <code>docker exec -it lab-linuc-shell bash -l</code> で入ることもできます。
+ただしそちらの端末は <code>umask</code> が <code>0000</code> になり、作ったファイルの権限が本文（<code>docker run</code> で入った端末・<code>0022</code>）と変わります。</p>
+<pre><code>docker run で入った端末で作ったファイル   -rw-r--r--   （umask 0022）
+docker exec で入った端末で作ったファイル   -rw-rw-rw-   （umask 0000）</code></pre>
+<p>第4章の <code>ls -l</code> の結果を本文と揃えたいときは、<code>docker run</code> で入った最初の端末を使うか、
+2つ目の端末で <code>umask 022</code> と打ってから始めてください。<code>lab env</code> の <code>umask</code> の行で確かめられます。</p>
+</div>
+
+<h2 id="ex">演習</h2>
+<p>8本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。
+多くの判定は、あなたのスクリプトや alice・bob のシェルを<b>実際に起動して</b>、出た文字と終了ステータスを見ます。
+詰まったら <code>lab hint NN</code> を何度でも。使い切ったら <code>lab solve NN</code> で模範解答に必ず届きます
+（見ても構いません。進捗には「solve を見た」として残ります）。</p>
+<div class="scroll"><table>
+<tr><th>No</th><th>やること</th><th>副題</th><th>章</th><th>目安</th></tr>
+<tr><td>01</td><td>ログインしたときだけ挨拶を出す</td><td>1.06.1</td><td>1</td><td>10分</td></tr>
+<tr><td>02</td><td>自作のコマンドを、名前だけで呼べるようにする</td><td>1.06.1</td><td>2</td><td>10分</td></tr>
+<tr><td>03</td><td>スクリプトを、全員が名前だけで使えるように置く</td><td>1.06.2</td><td>4</td><td>15分</td></tr>
+<tr><td>04</td><td>引数を数えて、使い方を出すスクリプト</td><td>1.06.2</td><td>5</td><td>12分</td></tr>
+<tr><td>05</td><td>成功と失敗を、終了ステータスで返すスクリプト</td><td>1.06.2</td><td>6</td><td>12分</td></tr>
+<tr><td>06</td><td>決まったコマンドだけを選ばせるメニュー</td><td>1.06.2</td><td>7</td><td>15分</td></tr>
+<tr><td>07</td><td>ファイルごとに数えて、合計を出す</td><td>1.06.2</td><td>7</td><td>12分</td></tr>
+<tr><td>08</td><td>bash -x で原因を見つけて直す</td><td>1.06.2</td><td>8</td><td>12分</td></tr>
+</table></div>
+<p><b>シェルは章をまたいで同じまま使う前提です。</b>檻に入ったときのシェル（PID 1 の <code>bash -l</code>）で、第1章から順に打っていく書き方にしてあります（PID 1 で <code>exit</code> するとコンテナごと消えるので、入り直す必要はありません）。章の中で変えたシェルの状態のうち、後の章の画面を変えるもの（第2章で足した PATH と、上書きした <code>ls</code> の alias）は、その章の中で元に戻す行を本文に出してあります。理論編の第2〜8章はどれも <code>~/try</code> に必要なファイルを自分で作ってから始まるので、<b>前の章から続けても、檻を起動し直した直後からその章を始めても、同じ画面になります</b>。本文の記録は、第1章から第8章までを1つのシェルで通して打った記録とも突き合わせてあります。</p>
+<p>先に読む場合は <a href="/linuc-shell/theory/">理論編（8章）</a>へ。
+章と演習は対応しているので、どちらから始めても構いません。</p>
+<p class="detail"><code>lab reset NN</code> で演習を配られたときの状態に戻すと、<code>~/work/NN</code> はディレクトリごと作り直されます。
+そのディレクトリの中にいたなら、続けて <code>cd ~/work/NN</code> と打ち直してください（打たないと、消えた古いディレクトリに残ったままになり、<code>ls</code> は何も出さず、<code>cat</code> などは <code>No such file or directory</code> になります）。</p>
+
+<h2 id="report">本文と違う出力が出たら</h2>
+<p>教材のバグとして直します。次の4つを貼ってください。</p>
+<ol>
+<li>打ったコマンド</li>
+<li>本文に書いてある出力</li>
+<li>あなたの画面に出た出力</li>
+<li><code>lab env</code> の全文</li>
+</ol>
+<pre><code>$ lab env
+テーマ    : lab-linuc-shell 1.0.2
+イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.2
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+bash      : 5.2.21(1)-release
+/bin/sh   : /usr/bin/dash
+umask     : 0022
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb</code></pre>
+<p><a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。
+<code>umask</code> の行が <code>0022</code> 以外のときは、上の「端末を2つ使いたいときの注意」から見てください。
+<code>カーネル</code> の行はあなたの母艦の値になります（本文と違っていて構いません）。</p>
+
+<h2 id="end">終わったら</h2>
+<p><code>--rm</code> を付けて起動しているので、<code>exit</code> で抜ければコンテナは消えます。</p>
+<pre><code>docker volume rm lab-linuc-shell-work lab-linuc-shell-state     # 作業と進捗も消す場合だけ</code></pre>
+<p>イメージは <code>docker rmi</code> で消せます。
+母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。</p>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:shell-1.0.2@sha256:edb99156f4bdca3dcce3465064acd8f7a8c7bb9938ff849de56db8d8574b19ce / Ubuntu 24.04.5 LTS / bash 5.2.21 / dash 0.5.12 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で演習8本を完走 / 検証日 2026-10-13</div>
+
+<!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
+<nav class="pager"><a href="/linuc-shell/theory/">← 理論編</a><a href="/linuc-network/">次の記事: 主題1.07 ネットワークの基礎 →</a></nav>
+<!-- /catalog:pager -->
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-shell/">シェルとスクリプト</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/practice/">実践編</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

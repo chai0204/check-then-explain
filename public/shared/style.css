@@ -152,3 +152,37 @@ a.term:hover{color:var(--accent);border-bottom-style:solid}
 .notfor{border:1px solid var(--line);border-left:3px solid var(--muted);border-radius:0 9px 9px 0;
   padding:.8rem 1.1rem;margin:1.2rem 0;font-size:.9rem;color:var(--muted)}
 .notfor b{color:var(--fg)}
+
+/* ---- トップの記事一覧（tools/catalog.mjs が焼き出す表と、shared/catalog.js の絞り込み） ---- */
+.catalog-controls{display:flex;flex-wrap:wrap;gap:.45rem;margin:.6rem 0 .4rem}
+.catalog-controls input[type=search]{flex:1 1 16rem;min-width:0;padding:.45rem .6rem;border:1px solid var(--line);border-radius:8px;background:var(--card);color:inherit;font:inherit}
+.catalog-controls select{padding:.4rem .5rem;border:1px solid var(--line);border-radius:8px;background:var(--card);color:inherit;font:inherit;font-size:.85rem;max-width:100%}
+table.catalog{width:100%;border-collapse:collapse;font-size:.86rem}
+table.catalog th,table.catalog td{border-bottom:1px solid var(--line);padding:.5rem .45rem;vertical-align:top;text-align:left}
+table.catalog th{white-space:nowrap;color:var(--muted);font-weight:600;font-size:.78rem}
+table.catalog td:not(.ttl){white-space:nowrap}
+table.catalog td.ttl{min-width:15rem}
+table.catalog td.ttl a{font-weight:600}
+table.catalog .sum{display:block;color:var(--muted);font-size:.8rem;margin-top:.2rem;white-space:normal}
+.tag.rev{color:var(--accent);border-color:var(--accent)}
+ol.chlist{padding-left:1.4rem}
+ol.chlist li{margin:.2rem 0}
+/* 表は本文の幅（900px）より広く取る。9列あるので */
+.catalog-wide{position:relative;left:50%;width:min(1180px,calc(100vw - 2.5rem));transform:translateX(-50%)}
+table.catalog td.wrap2{white-space:normal;min-width:5.5rem}
+table.catalog tr[hidden]{display:none}
+.pager.plain{border-top:0;margin-top:.6rem;padding-top:0}
+/* スマホでは1行を1枚のカードにする（列の見出しは各項目の前に出す） */
+@media (max-width:760px){
+  .catalog-wide{left:auto;width:auto;transform:none}
+  table.catalog thead{display:none}
+  table.catalog,table.catalog tbody,table.catalog tr{display:block;width:auto}
+  table.catalog tr{border:1px solid var(--line);border-radius:10px;padding:.65rem .8rem;margin:.65rem 0;background:var(--card)}
+  table.catalog td{border:0;padding:.1rem 0}
+  table.catalog td.ttl{display:block;min-width:0;margin-bottom:.35rem}
+  table.catalog td:not(.ttl){display:inline-block;white-space:nowrap;margin:0 .9rem .15rem 0;font-size:.8rem}
+  table.catalog td:not(.ttl)::before{content:attr(data-label) "：";color:var(--muted);font-size:.74rem}
+  table.catalog td br{display:none}
+}
+table.catalog .cx{display:block}
+@media (max-width:760px){ table.catalog .cx{display:inline} }

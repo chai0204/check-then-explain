@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="4" data-theme="linuc-security">
 <div class="wrap">
-<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-security/theory/">理論編</a> › 第4章</nav>
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-security/">セキュリティ</a> › <a href="/linuc-security/theory/">理論編</a> › 第4章</nav>
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
 </div>
@@ -65,7 +65,7 @@ $ systemctl is-active ssh.socket ssh.service
 <div class="analogy"><b>たとえ</b>: ソケット起動の 22 番は、<b>受付の呼び鈴を管理会社が設置し、最初の来客で担当者を呼び出す</b>窓口に近い。担当者（sshd）は一度来たら常駐し、呼び鈴（ソケット）は管理会社（systemd）と担当者が両方握っている。
 <br>ただし<b>崩れる点</b>: 窓口なら誰が握っているか見れば分かるが、<code>netstat -p</code> は1人しか表示しないので、管理会社（PID 1）だけが握っているように見える。</div>
 
-<div class="note try"><b>手を動かす</b>: 実践編の<a href="/linuc-security/">演習03</a>は、この <code>2323</code> を出している <code>lab-echo</code> サービスを見つけて止める課題である。判定は、練習機の中で <code>2323</code> が待ち受けていないことを実際に見る。</div>
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/linuc-security/practice/">演習03</a>は、この <code>2323</code> を出している <code>lab-echo</code> サービスを見つけて止める課題である。判定は、練習機の中で <code>2323</code> が待ち受けていないことを実際に見る。</div>
 
 <div class="quiz"><b>確認</b>
 <p><code>nmap</code> で <code>2323/tcp open 3d-nfsd</code> と出た。そのポートで<b>実際に</b>動いているプログラムを特定するには、どれが確実か。</p>
@@ -95,7 +95,7 @@ $ systemctl is-active ssh.socket ssh.service
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
 <div id="giscus"></div>
 </section>
-<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
+<footer><a href="/">トップ</a> · <a href="/linuc-security/">セキュリティ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/practice/">実践編</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
 </div>
 <script src="/linuc-security/chapters.js"></script>
 <script src="/linuc-security/theory/terms.js"></script>

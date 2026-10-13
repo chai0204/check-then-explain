@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="7" data-theme="linuc-services">
 <div class="wrap">
-<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-services/theory/">理論編</a> › 第7章</nav>
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-services/">時刻・ログ・メール</a> › <a href="/linuc-services/theory/">理論編</a> › 第7章</nav>
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/">詳しく</a></p>
 </div>
@@ -156,7 +156,7 @@ root</code></pre>
 <br>ただし<b>崩れる点</b>: 自席のメモは誰が書いても読まれるが、
 <code>.forward</code> は権限が緩いと読まれない。しかも読まなかったことを本人に伝えない。</div>
 <div class="note try"><b>手を動かす</b>:
-実践編の<a href="/linuc-services/">演習06</a>で、この2段の書き換えを自分で作る。
+実践編の<a href="/linuc-services/practice/">演習06</a>で、この2段の書き換えを自分で作る。
 判定は実際に1通送って、どのメールボックスに入ったかだけを見る。</div>
 <h2 id="bounce">届かないメールは、キューではなく root に戻る</h2>
 <div class="sgoal"><b>この節で分かること</b>: 「キューが空だから問題なし」が成り立たない理由。</div>
@@ -287,13 +287,13 @@ rsyslog に開き直させるのは HUP シグナル。<code>~/.forward</code> �
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>To:</code> に書いた名前は希望でしかない。<code>/etc/aliases</code> と <code>~/.forward</code> で2回書き換わった</li><li><code>alias_maps = hash:/etc/aliases</code> なので、テキストを直したら <code>newaliases</code> で <code>.db</code> を作り直す。<code>~/.forward</code> は不要</li><li><code>/etc/aliases</code> の右側はカンマで複数（<code>support: alice, bob</code>）。<code>~/.forward</code> は1行に1宛先で、手元にも残すなら <code>\自分の名前</code> の行を足す</li><li><code>mail -s 件名 [-c Cc] [-b Bcc] [-r 送信元] 宛先…</code>。本文は標準入力から。<code>-S smtp=…</code> は Red Hat 系の mailx の書き方で、Ubuntu の <code>mail</code> には無い</li><li><code>~/.forward</code> が world writable（other が書ける）だと postfix は読まない（group だけなら読む）。警告はログ（journal と <code>/var/log/mail.log</code>）に出るだけで、送り手には返らない</li><li>配送の経路はログの <code>orig_to</code>（送り手の名前）と <code>to</code>（実際の配送先）で追う</li><li><code>mailq</code> が空でも成功とは言えない。差し戻しは送り手（この檻では root）のメールボックスへ行き、元の1通はキューから消える</li><li>MTA は1台に1つ。postfix・exim・sendmail はどれも <code>mail-transport-agent</code> を提供し、それと衝突する。どれも <code>sendmail</code>・<code>mailq</code>・<code>newaliases</code> の名前のコマンドを持つ</li><li>7章すべてが「送り手はラベルだけを渡し、宛先は受け手の表が決める」という1つの形だった。だから出題範囲にファイルパスが並ぶ</li><li>書いたら読み直させ、当人に聞き、ログを読む。この3手を飛ばすと必ず止まる</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で、読者と同じ入り方（docker exec -it・端末 80 桁）で第1章から通して検証（podman 5.8.6 rootless は起動と、umask の違いで .forward の拒否が起きないことを確認）/ 検証日 2026-10-13</div>
-<nav class="pager"><a href="/linuc-services/theory/06-logrotate">← 6. 捨てる判断も、受け手側にある</a><a href="/linuc-services/">実践編へ →</a></nav>
+<nav class="pager"><a href="/linuc-services/theory/06-logrotate">← 6. 捨てる判断も、受け手側にある</a><a href="/linuc-services/practice/">実践編へ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
 <div id="giscus"></div>
 </section>
-<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
+<footer><a href="/">トップ</a> · <a href="/linuc-services/">時刻・ログ・メール</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/practice/">実践編</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
 </div>
 <script src="/linuc-services/chapters.js"></script>
 <script src="/linuc-services/theory/terms.js"></script>

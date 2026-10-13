@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="7" data-theme="linuc-packages">
 <div class="wrap">
-<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-packages/theory/">理論編</a> › 第7章</nav>
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第7章</nav>
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
 </div>
@@ -245,8 +245,8 @@ labhello: RSA/SHA256, Tue Oct 13 10:08:48 2026, Key ID 0ba6fe4393f77b82</code></
 </table></div>
 <p>ファイルそのもの（.deb / .rpm）に聞くのが3つ目の向きで、<code>dpkg -I</code> <code>-c</code> と <code>rpm -qp…</code> がそれにあたる。迷ったら、そのコマンドが「台帳・目録・ファイルのどれを開いているか」を先に考える。それが分かれば、入っていないパッケージに答えられるかどうか、root が要るかどうかまで決まる。root が要るのは、台帳・目録の写し・設定ファイルを<b>書き換える</b>とき（入れる・消す・上げるのほか、目録の写しを書き換える <code>apt update</code>・<code>apt-get update</code>・<code>apt-file update</code> も。一般ユーザで打つと lock の <code>Permission denied</code> で止まる。第3章）。読むだけ（<code>apt-cache</code>・<code>dpkg -l</code>・<code>rpm -q</code>・<code>yum info</code>）と、手元に取るだけ（<code>apt-get download</code>・<code>yumdownloader</code>）は要らない。</p>
 <div class="note try"><b>手を動かす</b>:
-実践編の<a href="/linuc-packages/">演習06</a>は、yumdownloader で取ってきた .rpm を rpm だけで入れる課題で、この章の「rpm は依存を取りに行かない」をそのまま踏む。
-<a href="/linuc-packages/">演習04</a>は、署名の確認（<code>gpgcheck=1</code>）を切らずに、別の鍵で署名されたリポジトリから入れる。判定は鍵が台帳に入ったかまで見る。</div>
+実践編の<a href="/linuc-packages/practice/">演習06</a>は、yumdownloader で取ってきた .rpm を rpm だけで入れる課題で、この章の「rpm は依存を取りに行かない」をそのまま踏む。
+<a href="/linuc-packages/practice/">演習04</a>は、署名の確認（<code>gpgcheck=1</code>）を切らずに、別の鍵で署名されたリポジトリから入れる。判定は鍵が台帳に入ったかまで見る。</div>
 <div class="quiz"><b>確認</b>
 <p>インストールされているパッケージだけを新しい版に更新し、インストールされていなければ何もしない rpm のオプションはどれか。<br>
 (a) <code>-i</code>　(b) <code>-U</code>　(c) <code>-F</code>　(d) <code>-e</code></p>
@@ -277,13 +277,13 @@ labhello: RSA/SHA256, Tue Oct 13 10:08:48 2026, Key ID 0ba6fe4393f77b82</code></
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>rpm -ivh</code> は依存関係が足りないと1つも入れずに止まる。必要なファイルを並べて渡せば順番は rpm が決める</li><li><code>rpm -e</code> は依存されているものを消さない。<code>--nodeps</code> は台帳の整合を崩し、<code>rpm -V</code> が <code>Unsatisfied dependencies</code> を報告する</li><li><code>-i</code> は新しく入れる（古い版があれば衝突）、<code>-U</code> は上げるか入れる、<code>-F</code> は入っているものだけ上げる</li><li><code>rpm -K</code> の <code>digests OK</code> は「署名が無い」。署名の語（RHEL 8 以降は <code>signatures</code>、RHEL 7 は <code>rsa</code>・<code>pgp</code>）が小文字で OK のときだけ、署名が確かめられている。大文字は失敗</li><li>確かめる鍵は台帳（<code>gpg-pubkey</code>）に入っている。<code>rpm --import</code> で取り込む</li><li>署名の確認を強制するのは yum の <code>gpgcheck=1</code>。rpm は署名が無くても入れる</li><li>主題1.04 のコマンドは「台帳・目録・ファイルのどれを、どちら向きに引くか」で整理できる</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.1@sha256:4eb5ddf9488295b831dbf8316e8a19fc3b7292f14b6b6441e4776745f3e99429 / AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / リポジトリ vault.almalinux.org 9.7（2026-05-20 で凍結）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
-<nav class="pager"><a href="/linuc-packages/theory/06-rpm-query">← 6. rpm -V が黙っているのは、台帳どおりだから</a><a href="/linuc-packages/">次: 実践編（演習6本）→</a></nav>
+<nav class="pager"><a href="/linuc-packages/theory/06-rpm-query">← 6. rpm -V が黙っているのは、台帳どおりだから</a><a href="/linuc-packages/practice/">実践編へ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
 <div id="giscus"></div>
 </section>
-<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+<footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
 </div>
 <script src="/linuc-packages/chapters.js"></script>
 <script src="/linuc-packages/theory/terms.js"></script>

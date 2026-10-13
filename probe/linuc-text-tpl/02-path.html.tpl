@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="2" data-theme="linuc-text">
 <div class="wrap">
-<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-text/theory/">理論編</a> › 第2章</nav>
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-text/">コマンドラインとテキスト処理</a> › <a href="/linuc-text/theory/">理論編</a> › 第2章</nav>
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
 </div>
@@ -178,7 +178,7 @@ $ ls -l ~/.bash_history; echo "exit=$?"
 <p><code>~/.bash_history</code>（変数 <code>HISTFILE</code> で変えられる）。既定ではシェルの<b>終了時</b>にまとめて書き込まれる。
 実測では、子の bash の中から見たときは存在せず、<code>exit</code> した後には子で打った行が入っていた（末尾の5行を表示した）。</p></details></div>
 <div class="note try"><b>手を動かす</b>:
-実践編の<a href="/linuc-text/">演習02</a>は、自分で用意したコマンドをどこからでも名前だけで動かす課題である。
+実践編の<a href="/linuc-text/practice/">演習02</a>は、自分で用意したコマンドをどこからでも名前だけで動かす課題である。
 判定は <code>/tmp</code> に移ってから探すので、<code>PATH</code> に相対パスを足すと必ず鳴る。</div>
 
 <div class="quiz"><b>確認</b>
@@ -197,7 +197,7 @@ C は履歴を空にしてから書くので、ファイルが空になる（実
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
 <div id="giscus"></div>
 </section>
-<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
+<footer><a href="/">トップ</a> · <a href="/linuc-text/">コマンドラインとテキスト処理</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/practice/">実践編</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
 </div>
 <script src="/linuc-text/chapters.js"></script>
 <script src="/linuc-text/theory/terms.js"></script>

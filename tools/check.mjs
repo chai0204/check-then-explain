@@ -224,19 +224,20 @@ for (const theme of themeDirs) {
   }
 }
 
-// ポータルの印が、実際のドラフト状態と一致しているか
+// トップの記事一覧（tools/catalog.mjs が台帳から焼く表）の状態が、実際のドラフト状態と一致しているか。
+// 行 <tr data-slug="X" data-status="…"> の状態と、その記事のページの data-draft を突き合わせる（2026-10-13 に表へ移した）。
 const topPage = join(ROOT, "index.html");
 if (existsSync(topPage)) {
   const h = readFileSync(topPage, "utf8");
+  const rowsTop = [...h.matchAll(/<tr data-slug="([^"]+)" data-status="([^"]+)"[\s\S]*?<\/tr>/g)];
   for (const theme of themeDirs) {
-    if (!htmls.some((f) => relative(ROOT, f).startsWith(theme + "/"))) continue;
+    if (!htmls.some((f) => relative(ROOT, f).startsWith(theme + "/theory/"))) continue;
+    const row = rowsTop.find((m) => m[1] === theme);
+    if (!row) { err(topPage, `記事 ${theme} がトップの一覧に無い（catalog/articles.sql に行を足して node tools/catalog.mjs）`); continue; }
     const isDraft = draftThemes.has(theme);
-    const links = [...h.matchAll(/<a\s[^>]*href="\/([^/"]+)\/[^"]*"[\s\S]*?<\/a>/g)].filter((m) => m[1] === theme);
-    for (const m of links) {
-      const tagged = /class="tag draft"/.test(m[0]);
-      if (isDraft && !tagged) err(topPage, `ドラフトのテーマ ${theme} へのリンクに「ドラフト」の印が無い`);
-      if (!isDraft && tagged) err(topPage, `ドラフトでないテーマ ${theme} に「ドラフト」の印が付いている`);
-    }
+    if (isDraft && row[2] !== "ドラフト") err(topPage, `ドラフトの記事 ${theme} の状態が「${row[2]}」になっている`);
+    if (!isDraft && row[2] === "ドラフト") err(topPage, `ドラフトでない記事 ${theme} の状態が「ドラフト」になっている`);
+    if (row[2] === "ドラフト" && !/class="tag draft"/.test(row[0])) err(topPage, `ドラフトの記事 ${theme} の行に「ドラフト」の印が無い`);
   }
 }
 if (draftThemes.size) console.log(`  ドラフト扱いのテーマ: ${[...draftThemes].join(", ")}`);

@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>確かめて説明する LinuC 主題1.09 — 時刻・ログ・メールを実機で確かめる</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="linuc-services">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-services/">時刻・ログ・メール</a> › <strong>実践編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文の出力はすべて実機の記録で、演習6本は模範解答どおりに通ること・未達のときに判定が鳴ることを
+   両方確認してあります。それでも<b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、読者として通した段階で4回に分けて不備が出ました。
+   詰まったら <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   ページ下のコメントへ。それが直す順番になります。</p>
+</div>
+
+<h1>確かめて説明する LinuC 主題1.09</h1>
+<p class="lead">LinuC レベル1 <strong>102 試験・主題1.09「重要なシステムサービス」</strong>
+（システム時刻の管理 / システムのログ / MTA の基本）を、
+<strong>全部コンテナの中で実際に打って</strong>確かめます。
+<code>timedatectl</code> も <code>journalctl</code> も <code>systemctl</code> も動く檻です。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<div class="notfor">
+<h4>この教材が向かない人</h4>
+<ul>
+<li>いま動かしたいだけの人 → 公式ドキュメントのほうが速い</li>
+<li>答えだけ欲しい人 → AI に聞いたほうが速く、あなたの語彙に合う</li>
+</ul>
+<p>向く人: コマンドは打てる。写経すれば動く。
+でも「なぜ動くのか」を人に説明できない人。<br>
+<b>LinuC を受ける人向けには</b>: 出題範囲を読んで「そういうことができるんだな」で止まっている人。</p>
+</div>
+
+<h2 id="cage">この教材の檻</h2>
+<div class="cages"><div class="scroll"><table>
+<tr><th>檻</th><th>準備</th><th>ここで触れる</th><th>ここでは触れない（逃がす先）</th></tr>
+<tr><td>systemd コンテナ</td><td>3分</td>
+    <td><code>systemctl</code> <code>journalctl</code> <code>timedatectl</code> <code>rsyslogd</code> <code>chronyd</code> <code>postfix</code> <code>logrotate</code></td>
+    <td>RTC への書き戻し・ディスクとパーティション → 実機か VM（本文に出る出力だけ載せてあります）</td></tr>
+</table></div></div>
+<p>影響度 <b>B</b>（変更はコンテナの中だけ。母艦の設定もファイルも書き換えません）。
+演習は <code>/etc</code> を書き換えるので、<b>母艦では絶対に実行しないでください</b>。
+やり直したいときはコンテナを作り直します。</p>
+
+<h2 id="start">はじめる</h2>
+<p>Docker の場合。2行です。</p>
+<pre><code>docker run -d -t --name lab-linuc --hostname linuc \
+  --cap-add SYS_ADMIN \
+  -v lab-linuc-services-state:/root/.lab \
+  ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2
+
+docker exec -it lab-linuc bash -l</code></pre>
+
+<div class="note warn">
+<p><b><code>--cap-add SYS_ADMIN</code> を打たせている理由</b>（この教材で唯一、読者に権限を渡してもらう箇所です）</p>
+<p>この主題は <code>timedatectl</code> と <code>journalctl</code> と <code>systemctl</code> を扱います。
+どれも <b>systemd が PID 1 で動いていないと1つも試せません</b>。
+ところが docker は <code>/sys/fs/cgroup</code> を読み取り専用でマウントするため、
+systemd は起動の最初に <code>/init.scope</code> を作れずに即死します（実測 2026-10-12・docker 29.8.0）。</p>
+<pre><code>Failed to create /init.scope control group: Read-only file system
+Failed to allocate manager object.
+[!!!!!!] Failed to allocate manager object.
+→ 終了コード 255</code></pre>
+<p><code>--cgroupns=host</code> でも <code>--security-opt systempaths=unconfined</code> でも読み取り専用のままでした。
+書き込みに戻すには <code>CAP_SYS_ADMIN</code> が必要で、無いまま remount を試すと
+<code>mount: /sys/fs/cgroup: permission denied</code> になります。</p>
+<p><b>増える権限は1ビットだけです。</b>渡す前と後を自分で比べられます。</p>
+<pre><code>$ docker run --rm ubuntu:24.04 grep CapEff /proc/1/status
+CapEff:	00000000a80425fb
+$ docker exec lab-linuc grep CapEff /proc/1/status
+CapEff:	00000000a82425fb
+                ^
+          差は 0x00200000 = bit 21 = CAP_SYS_ADMIN だけ</code></pre>
+<p><b>Podman なら権限を1つも渡さずに済みます。</b>rootless の podman は systemd 用に
+cgroup を書き込み可でマウントするので、専用のオプション1つで足ります。</p>
+<pre><code>podman run -d -t --name lab-linuc --hostname linuc \
+  --systemd=always \
+  -v lab-linuc-services-state:/root/.lab \
+  ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2
+
+podman exec -it lab-linuc bash -l</code></pre>
+<p>podman 5.8.6（rootless・uid 1100）で、起動と演習6本の完走を確認しました。
+<code>--cap-add</code> は要りません。この違いそのものが、出題範囲 1.01.2「仮想マシン・コンテナの概念」の実物です。</p>
+<p>もう1つ違いがあります。<code>podman exec</code> で入ったシェルは <code>umask</code> が <code>0022</code> で、<code>docker exec</code> の <code>0000</code> と違います（2026-10-13 実測）。そのため第6章の1つ目の拒否（設定ファイルの権限）と、第7章の <code>.forward</code> の拒否が、podman では起きません。該当する箇所に、podman で何が出るかを書いてあります。演習のヒントと模範解答も、どちらの入り方でも通るように書いてあります（どちらでも模範解答どおりに全問 ✔ になることを確認済み）。</p>
+</div>
+
+<p>入ると現在地が出ます。</p>
+<pre><code>── lab-linuc-services 1.0.2 ────────────────────────────────────────
+lab-linuc-services  進捗 0/6
+  次 → 01 「時刻の表示を3箇所で揃える」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /root/.lab/progress.json（消すには docker volume rm lab-linuc-services-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────</code></pre>
+
+<h2 id="ex">演習</h2>
+<p>6本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。
+詰まったら <code>lab hint NN</code> を何度でも。使い切ったら <code>lab solve NN</code> で模範解答に必ず届きます
+（見ても構いません。進捗には「solve を見た」として残ります）。</p>
+<div class="scroll"><table>
+<tr><th>No</th><th>やること</th><th>副題</th><th>目安</th></tr>
+<tr><td>01</td><td>時刻の表示を3箇所で揃える</td><td>1.09.1</td><td>10分</td></tr>
+<tr><td>02</td><td>chrony に基準を与えて同期させる</td><td>1.09.1</td><td>12分</td></tr>
+<tr><td>03</td><td>local3 のログを専用ファイルへ落とす</td><td>1.09.2</td><td>12分</td></tr>
+<tr><td>04</td><td>journal の上限を自分で決める</td><td>1.09.2</td><td>10分</td></tr>
+<tr><td>05</td><td>ログを切って3世代だけ残す</td><td>1.09.2</td><td>12分</td></tr>
+<tr><td>06</td><td>メールを2回曲げて、ログで追う</td><td>1.09.3</td><td>15分</td></tr>
+</table></div>
+<p>先に読む場合は <a href="/linuc-services/theory/">理論編（7章）</a>へ。
+章と演習は対応しているので、どちらから始めても構いません。</p>
+
+<h2 id="report">本文と違う出力が出たら</h2>
+<p>教材のバグとして直します。次の4つを貼ってください。</p>
+<ol>
+<li>打ったコマンド</li>
+<li>本文に書いてある出力</li>
+<li>あなたの画面に出た出力</li>
+<li><code>lab env</code> の全文</li>
+</ol>
+<pre><code>$ lab env
+テーマ    : lab-linuc-services 1.0.2
+イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.2
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+PID1      : /sbin/init
+systemd   : running
+cgroup    : rw,nosuid,nodev,noexec,relatime
+journal   : 8.0M in the file system.
+特権      : CapEff=00000000a82425fb CapBnd=00000000a82425fb</code></pre>
+<p><a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。
+<code>systemd</code> の行が <code>running</code> 以外のときは、起動コマンドの
+<code>--cap-add SYS_ADMIN</code>（podman なら <code>--systemd=always</code>）から見てください。</p>
+
+<h2 id="end">終わったら</h2>
+<pre><code>docker rm -f lab-linuc
+docker volume rm lab-linuc-services-state     # 進捗も消す場合だけ</code></pre>
+<p>イメージは <code>docker rmi</code> で消せます。
+母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。</p>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 と podman 5.8.6 rootless の両方で演習6本を完走 / 検証日 2026-10-13</div>
+
+<!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
+<nav class="pager"><a href="/linuc-services/theory/">← 理論編</a><a href="/linuc-security/">次の記事: 主題1.10 セキュリティ →</a></nav>
+<!-- /catalog:pager -->
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-services/">時刻・ログ・メール</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/practice/">実践編</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

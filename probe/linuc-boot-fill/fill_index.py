@@ -4,7 +4,7 @@ REPO = _HERE.parent.parent
 _sys.path.insert(0, str(_HERE))
 import sys
 from bootlog import chunk
-P = str(REPO / 'public/linuc-boot/index.html')
+P = str(REPO / 'public/linuc-boot/practice/index.html')
 env = f'''<pre data-where="外（lab@host）"><code>{chunk('00', 'lab env（練習機が動いているとき）')}</code></pre>'''
 BLOCKS = {'LAB_ENV': env}
 if __name__ == '__main__':

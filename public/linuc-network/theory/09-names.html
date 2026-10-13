@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="9" data-theme="linuc-network">
 <div class="wrap">
-<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-network/theory/">理論編</a> › 第9章</nav>
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-network/">ネットワークの基礎</a> › <a href="/linuc-network/theory/">理論編</a> › 第9章</nav>
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/">詳しく</a></p>
 </div>
@@ -266,7 +266,7 @@ linuc</code></pre>
 <p>B。<code>hostname</code> コマンドはカーネルが持つ今の値だけを変える。起動時には <code>/etc/hostname</code> が読まれる。
 再起動後も残したいなら <code>hostnamectl set-hostname</code> を使うか /etc/hostname を書き換え、/etc/hosts の 127.0.1.1 の行も合わせる。</p></details></div>
 <div class="note try"><b>手を動かす</b>:
-実践編の<a href="/linuc-network/">演習07</a>が、www.lab.example を正しいサーバに向ける課題である。
+実践編の<a href="/linuc-network/practice/">演習07</a>が、www.lab.example を正しいサーバに向ける課題である。
 判定は <code>getent ahostsv4 www.lab.example</code> の答えと、判定の中で実際に <code>http://www.lab.example/</code> を取りに行った結果を見る（DNS が引けない状態では「この環境では判定できません」と出る）。</div>
 
 <h2 id="spine">9章を通して見たもの</h2>
@@ -293,13 +293,13 @@ ifconfig と ip、ifup と nmcli、dig と ping は、同じものを別々の�
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/etc/nsswitch.conf</code> の <code>hosts: files dns</code> は「先に /etc/hosts、無ければ DNS」。順番を変えると全部の名前の引き方が変わる</li><li><code>dig</code> / <code>host</code> は DNS サーバだけに聞く。<code>ping</code> / <code>curl</code> / <code>ssh</code> は NSS を通す。ping が使うアドレスは <code>getent ahosts</code>（IPv4 だけなら <code>getent ahostsv4</code>）で確かめる。先頭の行が ping の使うアドレス</li><li><code>getent hosts</code> は IPv6 を先に聞き、見つかれば IPv6 のアドレスだけを出す。/etc/hosts に IPv4 だけ・DNS に IPv6 がある名前では、ping と違う答えになる</li><li><code>hostname 名前</code> は今だけ。再起動で <code>/etc/hostname</code> に戻る。<code>hostnamectl set-hostname</code> は /etc/hostname まで変えるが、/etc/hosts の 127.0.1.1 は変えない</li><li>直したものを再起動で残すには、それぞれの持ち主の設定ファイルに書く</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:network-1.0.1@sha256:f35f4e774ff26c799660fd6a108900565c9913e56d33ef7ca2f8fd081fbf035b / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ systemd 255.4（hostnamectl）/ bind9-dnsutils 9.18.39 / iputils 20240117 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
-<nav class="pager"><a href="/linuc-network/theory/08-dns">← 8. resolv.conf に書いた1行は、消される</a><a href="/linuc-network/theory/">理論編 目次へ →</a></nav>
+<nav class="pager"><a href="/linuc-network/theory/08-dns">← 8. resolv.conf に書いた1行は、消される</a><a href="/linuc-network/practice/">実践編へ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
 <div id="giscus"></div>
 </section>
-<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
+<footer><a href="/">トップ</a> · <a href="/linuc-network/">ネットワークの基礎</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/practice/">実践編</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
 </div>
 <script src="/linuc-network/chapters.js"></script>
 <script src="/linuc-network/theory/terms.js"></script>

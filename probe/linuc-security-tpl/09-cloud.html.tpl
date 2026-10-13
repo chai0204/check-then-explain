@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="9" data-theme="linuc-security">
 <div class="wrap">
-<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-security/theory/">理論編</a> › 第9章</nav>
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-security/">セキュリティ</a> › <a href="/linuc-security/theory/">理論編</a> › 第9章</nav>
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。この章は<b>理論のみ</b>（クラウドの管理コンソールは檻に入らないため端末記録がありません）。<a href="/linuc-security/theory/">詳しく</a></p>
 </div>
@@ -94,13 +94,13 @@ OS を全開にしてもセキュリティグループが閉じていれば届�
 <li>管理コンソールはインターネット経由の最大の攻撃対象。種類の違う要素を組み合わせる多要素認証（ワンタイムパスワードなど）で守る。多段階認証とは別物</li>
 </ul></div>
 <div class="verified"><b>検証環境</b>: この章は理論のみ（端末記録なし）。クラウドの管理コンソールはこの教材の檻（練習機）では再現できない（アカウント作成と課金が発生するため）。かわりに練習機と外側ホストの関係（外から届くのは外側で転送した 22 だけ）を、OS の外側の層のたとえに用いている。イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:31b5b127298fad0e2ee33f368852d2be236b65338727d7f34d8e0d1d8485fde0 / 検証日 2026-10-13</div>
-<nav class="pager"><a href="/linuc-security/theory/08-crypto">← 8. 鍵は、持ち主で非対称になっている</a><a href="/linuc-security/">実践編（演習7本）→</a></nav>
+<nav class="pager"><a href="/linuc-security/theory/08-crypto">← 8. 鍵は、持ち主で非対称になっている</a><a href="/linuc-security/practice/">実践編へ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
 <div id="giscus"></div>
 </section>
-<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
+<footer><a href="/">トップ</a> · <a href="/linuc-security/">セキュリティ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/practice/">実践編</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
 </div>
 <script src="/linuc-security/chapters.js"></script>
 <script src="/linuc-security/theory/terms.js"></script>

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // LinuC 出題範囲マップ（public/linuc/index.html）を、各コースの実物から作り直す。
 //
-//   node tools/linuc-hub.mjs           作り直して書き込む
+//   node tools/linuc-hub.mjs           作り直して書き込む（トップの記事一覧は tools/catalog.mjs）
 //   node tools/linuc-hub.mjs --check   書き込まず、いまのファイルと違えば exit 1
 //
 // 表を手で書くと、章を足したり番号を変えたりしたときに表と実物がずれる。そこで次の3つから毎回組み立てる:
@@ -232,60 +232,13 @@ ${courseRows.map(({ c, ids, themes }) => `<tr><td><a href="/${c.slug}/">主題${
 </body></html>
 `;
 
-// ---- トップページ（public/index.html）の LinuC コース一覧 ----
-// 目印 <!-- linuc-courses:start …--> と <!-- linuc-courses:end --> の間だけを置き換える。
-const portal = join(repo, "public", "index.html");
-function cageKind(slug) {
-  const dir = join(repo, "containers", CAGE_DIR[slug] || slug);
-  const dfs = walk(dir).filter((p) => /Dockerfile$/.test(p)).map((p) => readFileSync(p, "utf8"));
-  if (!dfs.length) return "理論のみ（演習なし）";
-  if (dfs.some((d) => /^FROM lab-linuc-machine:/m.test(d))) return "特権なし（仮想マシンの練習機）";
-  if (dfs.some((d) => /cap-add|SYS_ADMIN|systemd/.test(d)) && slug === "linuc-services") return "<code>CAP_SYS_ADMIN</code> 1ビットのみ";
-  return dfs.length > 1 ? `特権なし（コンテナ ${dfs.length} 種）` : "特権なし（コンテナ）";
-}
-function minutes(slug) {
-  const c = courses[slug];
-  let m = 0;
-  for (const ch of c.chapters) {
-    const h = readFileSync(join(repo, "public", slug, "theory", ch.file + ".html"), "utf8");
-    m += +(h.match(/所要\s*(\d+)\s*分/)?.[1] ?? 0);
-  }
-  for (const p of walk(join(repo, "containers", CAGE_DIR[slug] || slug)).filter((p) => /\/verify\/\d\d\.meta$/.test(p)))
-    m += +(readFileSync(p, "utf8").match(/^est_min=(\d+)/m)?.[1] ?? 0);
-  return m;
-}
-const hm = (m) => (m >= 60 ? `約${Math.floor(m / 60)}時間${m % 60 ? `${m % 60}分` : ""}` : `約${m}分`);
-function lead(slug) {
-  const f = join(repo, "public", slug, "theory", "index.html");
-  if (!existsSync(f)) return "";
-  const t = (readFileSync(f, "utf8").match(/<p class="lead">([\s\S]*?)<\/p>/)?.[1] ?? "").replace(/\s+/g, " ").trim();
-  const first = t.split("。")[0];
-  return first ? first + "。" : "";
-}
-const portalBlock = `<!-- linuc-courses:start（ここから下は tools/linuc-hub.mjs が各コースの実物から生成する。手で編集しない） -->
-<div class="toc">
-${courseRows.map(({ c, ids, themes }) => {
-  const ex = c.exercises.length;
-  return `  <a href="/${c.slug}/theory/"><b><span class="tag draft">ドラフト</span>LinuC 主題${themes.join("・")} ${esc(COURSE_TITLE[c.slug] || c.slug)}</b>
-    <span>${lead(c.slug)}<br>
-      ${ids.join(" / ")} ／ 理論${c.chapters.length}章${ex ? ` ＋ 演習${ex}本` : ""} ／ ${hm(minutes(c.slug))} ／ ${cageKind(c.slug)}</span></a>`;
-}).join("\n")}
-</div>
-<!-- linuc-courses:end -->`;
-let portalHtml = existsSync(portal) ? readFileSync(portal, "utf8") : "";
-const pm = portalHtml.match(/<!-- linuc-courses:start[\s\S]*?<!-- linuc-courses:end -->/);
-if (!pm) { console.error("✗ public/index.html に linuc-courses の目印が無い"); process.exit(1); }
-const newPortal = portalHtml.replace(pm[0], portalBlock);
+// トップ（public/index.html）の記事一覧は tools/catalog.mjs が台帳から作る（2026-10-13 に移した。ここでは書かない）。
 
-if (CHECK) {
-  if (newPortal !== portalHtml) { console.log("✗ public/index.html の LinuC 一覧が実物と合っていない（node tools/linuc-hub.mjs で作り直す）"); process.exit(1); }
-}
 if (CHECK) {
   const cur = existsSync(out) ? readFileSync(out, "utf8") : "";
   if (cur !== html) { console.log("✗ public/linuc/index.html が実物と合っていない（node tools/linuc-hub.mjs で作り直す）"); process.exit(1); }
   console.log("✔ 出題範囲マップは実物と一致"); process.exit(0);
 }
 writeFileSync(out, html);
-writeFileSync(portal, newPortal);
-console.log(`書き込み: public/linuc/index.html と public/index.html（LinuC コース一覧）`);
+console.log(`書き込み: public/linuc/index.html`);
 console.log(`  手を動かせる ${nHands} 副題（重要度 ${wHands}）/ 理論のみ ${nTheory}（${wTheory}）/ まだ無い ${nNone}（${wNone}）`);

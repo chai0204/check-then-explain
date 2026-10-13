@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>確かめて説明する LinuC 主題1.10 — セキュリティを仮想マシンで確かめる</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="linuc-security">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-security/">セキュリティ</a> › <strong>実践編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文の出力はすべて実機（仮想マシンの練習機）の記録で、演習7本は模範解答どおりに通ること・未達のときに判定が鳴ることを
+   両方確認してあります。1.0.1 では事実確認で見つかった誤りを直し、記録を全部取り直しました。それでも<b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、読者として通した段階で4回に分けて不備が出ました。
+   詰まったら <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   ページ下のコメントへ。それが直す順番になります。</p>
+</div>
+
+<h1>確かめて説明する LinuC 主題1.10</h1>
+<p class="lead">LinuC レベル1 <strong>102 試験・主題1.10「セキュリティ」</strong>
+（セキュリティ管理業務 / ホストの設定 / 暗号化 / クラウドの基礎）を、
+<strong>コンテナの中で動く仮想マシンの練習機</strong>で実際に手を動かして確かめます。
+<code>iptables</code> も <code>/etc/nologin</code> も <code>ssh-keygen</code> も、本物のカーネルの上で動く練習機で試せます。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<div class="notfor">
+<h4>この教材が向かない人</h4>
+<ul>
+<li>いま動かしたいだけの人 → 公式ドキュメントのほうが速い</li>
+<li>答えだけ欲しい人 → AI に聞いたほうが速く、あなたの語彙に合う</li>
+</ul>
+<p>向く人: コマンドは打てる。写経すれば動く。
+でも「なぜ動くのか」を人に説明できない人。<br>
+<b>LinuC を受ける人向けには</b>: 出題範囲を読んで「そういうことができるんだな」で止まっている人。</p>
+</div>
+
+<h2 id="cage">この教材の檻</h2>
+<div class="cages"><div class="scroll"><table>
+<tr><th>檻</th><th>準備</th><th>ここで触れる</th><th>ここでは触れない（逃がす先）</th></tr>
+<tr><td>仮想マシン型（コンテナの中で QEMU が練習機を1台動かす）</td><td>起動 40〜90秒</td>
+    <td><code>find</code> SUID監査・<code>chage</code>・<code>ss</code>/<code>nmap</code>・<code>sudo</code>/<code>visudo</code>・<code>/etc/nologin</code>・<code>xinetd</code>・<code>iptables</code>/<code>firewalld</code>・<code>ssh-keygen</code>・<code>gpg</code></td>
+    <td>クラウドの管理コンソール → 理論（第9章。アカウント作成と課金が発生するため檻に入りません）</td></tr>
+</table></div></div>
+<p>影響度 <b>B</b>（変更は練習機の中だけ。母艦にも外側コンテナにも波及しません）。
+演習は練習機の <code>/etc</code> やアカウント・ファイアウォールを書き換えます。
+<b>締め出されても練習機は消えません</b>。<code>vm reset --yes</code> で工場出荷時に戻せます。
+演習を始めるとき <code>lab</code> は「元に戻すには起動し直してください」と出しますが、この檻では起動し直しても練習機は戻りません（ディスクはボリュームに残ります）。戻すのは <code>vm reset --yes</code> です。
+<b>なぜ仮想マシンか</b>: ファイアウォールやログイン制御・シャドウパスワードは、コンテナ（ホストのカーネルを借りる）では読者ごとに違う画面になります。
+QEMU の完全エミュレーションなら、本物のカーネルの上で全員に同じ画面が出て、<code>--cap-add</code> も <code>--privileged</code> も要りません。</p>
+
+<h2 id="start">はじめる</h2>
+<p>Docker の場合。2行です（練習機は起動時に自動で立ち上がります）。</p>
+<pre><code>docker run -d --name lab-linuc-security --hostname host --stop-timeout 30 \
+  -v lab-linuc-security-vm:/home/lab/vm \
+  -v lab-linuc-security-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:31b5b127298fad0e2ee33f368852d2be236b65338727d7f34d8e0d1d8485fde0
+
+docker exec -it lab-linuc-security bash -l</code></pre>
+<p><code>--stop-timeout 30</code> を付けてください。練習機の正常停止に十数秒かかるので、既定の猶予（10秒）だと電源断になり、次の起動でディスクの回復が走ります。</p>
+<p><b>Podman の場合</b>も同じオプションで動きます（podman 5.8.6・rootless で、同じ土台を使う主題1.08 の檻により、練習機の起動・<code>lab-guest</code>・停止まで確認。権限の追加は要りません）。</p>
+<pre><code>podman run -d --name lab-linuc-security --hostname host --stop-timeout 30 \
+  -v lab-linuc-security-vm:/home/lab/vm \
+  -v lab-linuc-security-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:31b5b127298fad0e2ee33f368852d2be236b65338727d7f34d8e0d1d8485fde0
+
+podman exec -it lab-linuc-security bash -l</code></pre>
+
+<div class="note warn">
+<p><b>外側（<code>lab@host</code>）と練習機（<code>student@linuc</code>）の2層があります。</b></p>
+<p>プロンプトが <code>lab@host</code> なら外側のコンテナ、<code>student@linuc</code> なら練習機の中です。いまどちらにいるかは、この名前で分かります。</p>
+<pre><code>vm status        練習機の状態を見る
+vm ssh           練習機に入る（ssh linuc。抜けるのは exit）
+vm console        シリアルコンソールにつなぐ（ssh を壊したとき。抜けるのは Ctrl+]）
+vm reset --yes   練習機を工場出荷時に戻す（ディスクの変更が全部消える）</code></pre>
+<p>入ると、現在地と演習の進捗が出ます。練習機の中でも <code>lab check NN</code> で答え合わせができます
+（判定は外側のコンテナがゲストエージェント経由で行うので、ネットワークや <code>ssh</code> を壊しても採点できます）。</p>
+</div>
+
+<h2 id="recover">締め出されたら</h2>
+<p>この主題は、自分を締め出す操作（<code>/etc/nologin</code>・<code>sshd</code> やファイアウォールの設定）を扱います。<code>ssh</code> で入れなくなっても、外側のコンテナから戻せます。</p>
+<div class="scroll"><table>
+<tr><th>まず</th><th>次に</th><th>最後の手段</th></tr>
+<tr><td><code>vm ssh</code> でまだ入れるか試す</td><td><code>vm console</code> でシリアルから入る／<code>lab-guest 'コマンド'</code> で root として直す</td><td><code>vm reset --yes</code> で工場出荷時に戻す</td></tr>
+</table></div>
+<p>演習は、管理用の <code>ssh</code>（<code>enp0s16</code> の 22 番）を塞がない手順になっています。もし塞いでも、上のどれかで必ず戻せます。</p>
+
+<h2 id="ex">演習</h2>
+<p>7本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。
+詰まったら <code>lab hint NN</code> を何度でも。使い切ったら <code>lab solve NN</code> で模範解答に必ず届きます
+（見ても構いません。進捗には「solve を見た」として残ります）。</p>
+<div class="scroll"><table>
+<tr><th>No</th><th>やること</th><th>副題</th><th>目安</th></tr>
+<tr><td>01</td><td>SUID の棚卸しをする（仕込まれた1つを無効化）</td><td>1.10.1</td><td>12分</td></tr>
+<tr><td>02</td><td>退職者のアカウントを本当に無効化する</td><td>1.10.1</td><td>12分</td></tr>
+<tr><td>03</td><td>使っていない待ち受け（2323）を止める</td><td>1.10.1 / 1.10.2</td><td>10分</td></tr>
+<tr><td>04</td><td>sudo を1コマンド（journalctl）だけに絞る</td><td>1.10.1</td><td>12分</td></tr>
+<tr><td>05</td><td>ファイアウォールで塞ぐ（管理の ssh は残す）</td><td>1.10.2</td><td>12分</td></tr>
+<tr><td>06</td><td>SSH 鍵でパスワードなしログインを用意する</td><td>1.10.3</td><td>12分</td></tr>
+<tr><td>07</td><td>GnuPG でファイルを暗号化する</td><td>1.10.3</td><td>12分</td></tr>
+</table></div>
+<p>先に読む場合は <a href="/linuc-security/theory/">理論編（9章）</a>へ。
+章と演習は対応しているので、どちらから始めても構いません。</p>
+
+<h2 id="report">本文と違う出力が出たら</h2>
+<p>教材のバグとして直します。次の4つを貼ってください。</p>
+<ol>
+<li>打ったコマンド（練習機の中か外側かも）</li>
+<li>本文に書いてある出力</li>
+<li>あなたの画面に出た出力</li>
+<li>外側で <code>lab env</code> の全文</li>
+</ol>
+<pre><code>$ lab env
+テーマ    : lab-linuc-security 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:security-1.0.1
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb</code></pre>
+<p>練習機（<code>student@linuc</code>）の中は Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic です。
+外側の <code>カーネル</code> 行は母艦のもの（コンテナはカーネルを借りるため）で、練習機のカーネルとは別です
+——この違いそのものが、主題1.01 の「仮想マシンとコンテナ」の実物です。</p>
+<p><a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。</p>
+
+<h2 id="end">終わったら</h2>
+<pre><code>docker stop lab-linuc-security      # 練習機を正常に停止してから止まる
+docker rm -f lab-linuc-security
+docker volume rm lab-linuc-security-vm lab-linuc-security-state   # 練習機のディスクと進捗も消す場合</code></pre>
+<p>イメージは <code>docker rmi</code> で消せます。
+母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。
+<code>docker start lab-linuc-security</code> で、途中から再開できます（練習機の状態はボリュームに残っています）。</p>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:31b5b127298fad0e2ee33f368852d2be236b65338727d7f34d8e0d1d8485fde0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / OpenSSH 9.6p1 / GnuPG 2.4.4 / sudo 1.9.15p5 / iptables 1.8.10 (nf_tables) / systemd 255.4 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）で演習7本を完走 / 練習機の中の操作は対話のログインシェルで記録 / 検証日 2026-10-13</div>
+
+<!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
+<nav class="pager"><a href="/linuc-security/theory/">← 理論編</a><a href="/linuc-oss/">次の記事: 主題1.11 オープンソースの文化 →</a></nav>
+<!-- /catalog:pager -->
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-security/">セキュリティ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/practice/">実践編</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="8" data-theme="linuc-files">
 <div class="wrap">
-<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-files/theory/">理論編</a> › 第8章</nav>
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-files/">ファイルとパーミッション</a> › <a href="/linuc-files/theory/">理論編</a> › 第8章</nav>
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/">詳しく</a></p>
 </div>
@@ -156,7 +156,7 @@ Persistent=true
 WantedBy=timers.target</code></pre>
 <p>実機では、systemd のタイマー（<code>OnCalendar=daily</code>）が1日1回 <code>updatedb</code> を呼ぶ。systemd が動いていない環境のために <code>/etc/cron.daily/plocate</code> も置かれていて、こちらは中で「タイマーが使えるなら何もしない」と確かめてから動く。タイマーは毎回、呼ぶ時刻を 0〜12時間の範囲で選び直してずらす（<code>RandomizedDelaySec=12h</code>）。そのため索引の古さは 0 から最大でおよそ1日半（36時間）で、平均すると半日ほどになる。この檻の中では systemd も cron のデーモンも動いていないので、どちらも起動しない。索引は、自分で <code>sudo updatedb</code> を打つまで変わらない。</p>
 <div class="note try"><b>手を動かす</b>:
-実践編の<a href="/linuc-files/">演習08</a>は、<code>locate</code> で見つからない2つのファイルを見つかるようにする課題である。
+実践編の<a href="/linuc-files/practice/">演習08</a>は、<code>locate</code> で見つからない2つのファイルを見つかるようにする課題である。
 2つは見つからない理由が違い、片方は <code>/etc/updatedb.conf</code> を直さないと出てこない。
 判定は <code>locate needle.txt</code> を実際に引いて確かめる。</div>
 
@@ -318,13 +318,13 @@ Ubuntu の <code>which</code> は PATH 上のファイルしか探さない（Re
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>locate</code> は <code>updatedb</code> が作った索引を引くだけ。作った直後は出ず、消した後も出る（<code>-e</code> で実在を確かめる）</li><li><code>updatedb</code> は root で打つ。実機ではタイマーか <code>/etc/cron.daily</code> が1日1回呼ぶ</li><li><code>/etc/updatedb.conf</code> の <code>PRUNEPATHS</code>・<code>PRUNEFS</code>・<code>PRUNENAMES</code> が索引から外す。<code>/tmp</code> は最初から外れている</li><li>一般ユーザの <code>locate</code> には、親ディレクトリに r と x を持たない場所のものは出ない</li><li><code>which</code> は PATH 上のファイル（Ubuntu。Red Hat 系はエイリアスも出す）、<code>type</code> はシェルが実際に動かすもの、<code>whereis</code> は実行ファイルとマニュアルの場所。組み込みかどうかを確かめるのは <code>type</code></li><li>FHS は置き場所の約束。<code>/etc</code> 設定、<code>/var/log</code> ログ、<code>/tmp</code> と <code>/var/tmp</code> 一時、<code>/usr/local</code> 自分で入れたもの。いまの Ubuntu では <code>/bin</code> は <code>usr/bin</code> へのリンク</li><li>この主題の全部が「名前はディレクトリに、それ以外は inode に」の上にある</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:6b256ca7b7f40bb879761737a315e018979ae26ab8b0ef71dcaaf0d77031fa69 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / bash 5.2.21 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
-<nav class="pager"><a href="/linuc-files/theory/07-links">← 7. ハードリンクは名前を増やし、シンボリックリンクは道順を書く</a><a href="/linuc-files/">実践編へ →</a></nav>
+<nav class="pager"><a href="/linuc-files/theory/07-links">← 7. ハードリンクは名前を増やし、シンボリックリンクは道順を書く</a><a href="/linuc-files/practice/">実践編へ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
 <div id="giscus"></div>
 </section>
-<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
+<footer><a href="/">トップ</a> · <a href="/linuc-files/">ファイルとパーミッション</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/practice/">実践編</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
 </div>
 <script src="/linuc-files/chapters.js"></script>
 <script src="/linuc-files/theory/terms.js"></script>

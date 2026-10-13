@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="2" data-theme="linuc-security">
 <div class="wrap">
-<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-security/theory/">理論編</a> › 第2章</nav>
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-security/">セキュリティ</a> › <a href="/linuc-security/theory/">理論編</a> › 第2章</nav>
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
 </div>
@@ -111,7 +111,7 @@ $ sudo passwd -S root
 <div class="analogy"><b>たとえ</b>: <code>/etc/shadow</code> の各列は、免許証の裏面にある<b>有効期限・更新日・条件欄</b>に近い。表（<code>/etc/passwd</code>）には名前と番号しか無く、期限などの機微な情報は裏（shadow）に分けてある。
 <br>ただし<b>崩れる点</b>: 免許証は1枚だが、Linux は表（<code>/etc/passwd</code>・誰でも読める）と裏（<code>/etc/shadow</code>・一般ユーザは読めない。Ubuntu では <code>640</code>・<code>root:shadow</code>）を別ファイルに分けている。だから裏を読むには権限が要る。</div>
 
-<div class="note try"><b>手を動かす</b>: 実践編の<a href="/linuc-security/">演習02</a>は、この <code>olduser</code> を本当にログインできなくする課題である。判定は「パスワードをロックしただけ」では通らない。有効期限が切れているかを、アカウントデータベースから実際に読んで確かめる。</div>
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/linuc-security/practice/">演習02</a>は、この <code>olduser</code> を本当にログインできなくする課題である。判定は「パスワードをロックしただけ」では通らない。有効期限が切れているかを、アカウントデータベースから実際に読んで確かめる。</div>
 
 <div class="quiz"><b>確認</b>
 <p>退職した <code>olduser</code> を、SSH 鍵を持っていても<b>ログインできない</b>ようにしたい。確実なのはどれか。</p>
@@ -147,7 +147,7 @@ $ sudo passwd -S root
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
 <div id="giscus"></div>
 </section>
-<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
+<footer><a href="/">トップ</a> · <a href="/linuc-security/">セキュリティ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/practice/">実践編</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
 </div>
 <script src="/linuc-security/chapters.js"></script>
 <script src="/linuc-security/theory/terms.js"></script>

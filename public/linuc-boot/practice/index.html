@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>確かめて説明する LinuC 主題1.01 — 起動・仮想マシン・プロセスを実機で確かめる</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-theme="linuc-boot">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> › <strong>実践編</strong></nav>
+
+<div class="draftbar">
+<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<p>本文の出力はすべて実機の記録で、演習7本は模範解答どおりに通ること・未達のときに判定が鳴ることを
+   両方確認してあります。それでも<b>導線の不備</b>は残っている可能性があります。
+   先に公開した SQLite 編では、読者として通した段階で4回に分けて不備が出ました。
+   詰まったら <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
+   ページ下のコメントへ。それが直す順番になります。</p>
+</div>
+
+<h1>確かめて説明する LinuC 主題1.01</h1>
+<p class="lead">LinuC レベル1 <strong>101 試験・主題1.01「Linux のインストールと仮想マシン・コンテナの利用」</strong>
+（起動と停止・ssh での接続 / 仮想マシンとコンテナ / ブートプロセスと systemd / プロセス / デスクトップ）を、
+<strong>コンテナの中で動く本物の仮想マシン</strong>で確かめます。
+電源を入れる、GRUB でカーネルに引数を渡す、シングルユーザモードで入る、halt で止める——全部あなたの手で打てます。</p>
+
+<div class="promise">
+<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
+出なければ教材のバグとして直します。
+AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
+ここにあるのは、誰かが実際に一度通した記録です。</p>
+</div>
+
+<div class="notfor">
+<h4>この教材が向かない人</h4>
+<ul>
+<li>いま動かしたいだけの人 → 公式ドキュメントのほうが速い</li>
+<li>答えだけ欲しい人 → AI に聞いたほうが速く、あなたの語彙に合う</li>
+</ul>
+<p>向く人: コマンドは打てる。写経すれば動く。
+でも「なぜ動くのか」を人に説明できない人。<br>
+<b>LinuC を受ける人向けには</b>: 出題範囲を読んで「そういうことができるんだな」で止まっている人。</p>
+</div>
+
+<h2 id="cage">この教材の檻</h2>
+<div class="cages"><div class="scroll"><table>
+<tr><th>檻</th><th>準備</th><th>ここで触れる</th><th>ここでは触れない（逃がす先）</th></tr>
+<tr><td>仮想マシン型（コンテナの中で QEMU が練習機を1台動かす）</td><td>5分</td>
+    <td><code>virsh</code>・UEFI の設定画面と <code>efibootmgr</code>・GRUB・カーネル引数・systemd のターゲット・<code>shutdown</code> <code>halt</code>・<code>ssh</code> の鍵・シグナル</td>
+    <td>GUI（X）・DVD からのインストーラ・レガシー BIOS → 理論編で説明（<a href="/linuc-boot/theory/#cage">理由</a>）</td></tr>
+</table></div></div>
+<p>端末には2つの場所があります。プロンプトで、いまどちらにいるかが分かります。</p>
+<pre><code>あなたの PC（ホスト OS）
+└─ コンテナ          lab@host       … 外。virsh・ssh・lab check を打つ場所
+   └─ 練習機（QEMU）  student@linuc  … 仮想マシン。Ubuntu 24.04 が自分のカーネルで動く</code></pre>
+<p>影響度 <b>B</b>（変更は練習機とコンテナの中だけ。あなたの PC の設定もファイルも書き換えません）。
+練習機はシステム全体を触る演習をします。壊したら外で <code>vm reset --yes</code> を打てば、工場出荷時に戻ります。
+演習を始めるとき <code>lab</code> は「元に戻すには起動し直してください」と出しますが、この檻では起動し直しても練習機は戻りません（ディスクはボリュームに残ります）。戻すのは <code>vm reset --yes</code> です。
+<b>あなたの PC で同じことはしないでください</b>（GRUB や root の入り方を変える章があります）。</p>
+<p>練習機は KVM を使わない完全エミュレーションで動きます。あなたの PC に特権を1つも求めない代わりに、
+起動に 30〜90 秒かかります。本文の出力は、すべてこの条件で取ったものです。</p>
+
+<h2 id="start">はじめる</h2>
+<p>Docker の場合。2行です。</p>
+<pre><code>docker run -d --name lab-linuc-boot --hostname host --stop-timeout 30 \
+  -v lab-linuc-boot-vm:/home/lab/vm \
+  -v lab-linuc-boot-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab-linuc:boot-1.0.1@sha256:a442381b8ff6ee27bb22dfa933605fb8b0d42426cfb547cd2e975c2fbe2cf3c1
+
+docker exec -it lab-linuc-boot bash -l</code></pre>
+<ul>
+<li><code>--stop-timeout 30</code> は外さないでください。<code>docker stop</code> のとき、練習機を正常に止めるのに十数秒かかります（著者の環境で 12.4 秒）。
+docker の既定の猶予（10 秒）では途中で打ち切られ、練習機は電源を抜かれたのと同じになります（第3章・第7章）。</li>
+<li><code>--privileged</code> も <code>--cap-add</code> も要りません。練習機は QEMU がソフトだけで動かすので、あなたの PC の特権を借りません。</li>
+<li>端末は2つ以上あると楽です（練習機の画面を見る端末と、操作する端末）。<code>docker exec -it lab-linuc-boot bash -l</code> を別の窓でもう一度打てば増えます。</li>
+</ul>
+
+<p>入ると現在地が出ます。練習機の電源は、まだ入っていません（第1章で、あなたが入れます）。</p>
+<pre><code>練習機 linuc: shut off（エージェント — / ssh —）
+  vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
+
+── lab-linuc-boot 1.0.0 ────────────────────────────────────────
+lab-linuc-boot  進捗 0/7
+  次 → 01 「練習機に電源を入れ、自動で起動するようにする」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-boot-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────</code></pre>
+<p>1行目は練習機の状態で、<code>vm</code> は <code>virsh</code> と <code>ssh</code> を包んだ短縮のコマンドです（打つと中で何を実行したかを表示します）。
+この教材では、仮想マシンを操作するコマンドそのもの（<code>virsh</code>）を覚えるために、本文では <code>virsh</code> を直接打ちます。</p>
+
+<h2 id="ex">演習</h2>
+<p>7本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。
+判定は外の端末でも、練習機の中でも <code>lab check NN</code> で打てます。
+詰まったら <code>lab hint NN</code> を何度でも。使い切ったら <code>lab solve NN</code> で模範解答に必ず届きます
+（見ても構いません。進捗には「solve を見た」として残ります）。</p>
+<div class="scroll"><table>
+<tr><th>No</th><th>やること</th><th>副題</th><th>目安</th></tr>
+<tr><td>01</td><td>練習機に電源を入れ、自動で起動するようにする</td><td>1.01.2</td><td>10分</td></tr>
+<tr><td>02</td><td>RSA の鍵で、パスワードなしで入れるようにする</td><td>1.01.1</td><td>12分</td></tr>
+<tr><td>03</td><td>次の1回だけ、CUI のターゲットで起動する（GRUB でカーネル引数を足す）</td><td>1.01.3</td><td>15分</td></tr>
+<tr><td>04</td><td>既定のターゲットを変えて、再起動後も CUI にする</td><td>1.01.3</td><td>12分</td></tr>
+<tr><td>05</td><td>停止を予約し、ログイン中の人に知らせる</td><td>1.01.1 / 1.01.3</td><td>10分</td></tr>
+<tr><td>06</td><td>TERM を無視するプロセスを止める</td><td>1.01.4</td><td>12分</td></tr>
+<tr><td>07</td><td>切断しても止まらない処理を残す</td><td>1.01.4</td><td>15分</td></tr>
+</table></div>
+<p>先に読む場合は <a href="/linuc-boot/theory/">理論編（10章）</a>へ。
+章と演習は対応しているので、どちらから始めても構いません。</p>
+
+<h2 id="report">本文と違う出力が出たら</h2>
+<p>教材のバグとして直します。次の4つを貼ってください。</p>
+<ol>
+<li>打ったコマンド（外か、練習機の中か）</li>
+<li>本文に書いてある出力</li>
+<li>あなたの画面に出た出力</li>
+<li><code>lab env</code> の全文（外で打つ）</li>
+</ol>
+<!-- gen:LAB_ENV -->
+<pre data-where="外（lab@host）"><code>$ lab env
+テーマ    : lab-linuc-boot 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:boot-1.0.1
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+練習機    : running
+仮想化    : TCG（完全エミュレーション。domain type=qemu） / /dev/kvm なし
+練習機の中: Ubuntu 24.04.5 LTS / カーネル 6.8.0-142-generic / systemd 255
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb</code></pre>
+<!-- /gen:LAB_ENV -->
+<p><a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。
+<code>カーネル</code> の行は、あなたの PC のカーネルなので本文と違って正常です（第3章で、なぜそうなるかを確かめます）。
+<code>仮想化</code> の行が TCG 以外なら、本文と違う画面（特に CPU まわり）になります。</p>
+
+<h2 id="end">終わったら</h2>
+<pre><code>docker stop lab-linuc-boot                # 練習機を正常に止めてから止まる
+docker rm lab-linuc-boot
+docker volume rm lab-linuc-boot-vm lab-linuc-boot-state   # 練習機のディスクと進捗も消す場合だけ</code></pre>
+<p>イメージは <code>docker rmi</code> で消せます。
+あなたの PC には何も残りません（名前付きボリューム以外のファイルを作っていないため）。
+続きをやる日は <code>docker start lab-linuc-boot</code> で再開できます（練習機のディスクも、進捗も、そのまま残っています）。</p>
+
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:boot-1.0.1@sha256:a442381b8ff6ee27bb22dfa933605fb8b0d42426cfb547cd2e975c2fbe2cf3c1 / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4・OpenSSH 9.6p1）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+
+<!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
+<nav class="pager"><a href="/linuc-boot/theory/">← 理論編</a><a href="/linuc-files/">次の記事: 主題1.02 ファイルとパーミッション →</a></nav>
+<!-- /catalog:pager -->
+
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>
+   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、
+   添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/practice/">実践編</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/shared/comments.js"></script>
+</body></html>

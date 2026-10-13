@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="1" data-theme="linuc-security">
 <div class="wrap">
-<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-security/theory/">理論編</a> › 第1章</nav>
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-security/">セキュリティ</a> › <a href="/linuc-security/theory/">理論編</a> › 第1章</nav>
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
 </div>
@@ -105,7 +105,7 @@ $ sudo chmod u-s /usr/local/bin/catfile; ls -l /usr/local/bin/catfile
 $ /usr/local/bin/catfile /etc/shadow
 @@</code></pre>
 <p><code>s</code> が <code>x</code> に戻り、一般ユーザでは <code>/etc/shadow</code> が読めなくなった。これが監査の目的である。<b>「いま実際にどのファイルが特別な権限を持っているか」を数え、身に覚えのないものを無効化する。</b></p>
-<div class="note try"><b>手を動かす</b>: 実践編の<a href="/linuc-security/">演習01</a>が、この棚卸しと無効化をそのまま行う課題である。判定は、練習機の中で <code>catfile</code> の SUID が落ちているかを実際に見る。この章のとおりに打った後なら、演習01 はそのまま達成になる（自力で解きたいなら、この章を打つ前に演習から始める。やり直しは外の端末で <code>vm reset --yes</code>）。</div>
+<div class="note try"><b>手を動かす</b>: 実践編の<a href="/linuc-security/practice/">演習01</a>が、この棚卸しと無効化をそのまま行う課題である。判定は、練習機の中で <code>catfile</code> の SUID が落ちているかを実際に見る。この章のとおりに打った後なら、演習01 はそのまま達成になる（自力で解きたいなら、この章を打つ前に演習から始める。やり直しは外の端末で <code>vm reset --yes</code>）。</div>
 
 <div class="quiz"><b>確認</b>
 <p>システムの SUID ファイルを<b>漏れなく</b>一覧したい。正しいのはどれか。</p>
@@ -139,7 +139,7 @@ $ /usr/local/bin/catfile /etc/shadow
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
 <div id="giscus"></div>
 </section>
-<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
+<footer><a href="/">トップ</a> · <a href="/linuc-security/">セキュリティ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/practice/">実践編</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
 </div>
 <script src="/linuc-security/chapters.js"></script>
 <script src="/linuc-security/theory/terms.js"></script>
