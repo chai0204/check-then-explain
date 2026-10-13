@@ -6,7 +6,7 @@
 #
 # 走らせ方（probe と同じ。新しいボリューム名で、練習機を最初の状態から始める）:
 #   docker run -d --name linuc-admin-s1 --hostname host --stop-timeout 30 \
-#     -v linuc-admin-s1-vm:/home/lab/vm -v linuc-admin-s1-state:/home/lab/.lab lab-linuc-admin:1.0.0
+#     -v linuc-admin-s1-vm:/home/lab/vm -v linuc-admin-s1-state:/home/lab/.lab lab-linuc-admin:1.0.1
 #   docker exec linuc-admin-s1 vm wait
 #   docker cp probe/linuc-admin-solve-all.sh linuc-admin-s1:/tmp/solve.sh
 #   docker exec -u lab -w /home/lab linuc-admin-s1 bash /tmp/solve.sh > logs/linuc-admin-solve-all.log 2>&1

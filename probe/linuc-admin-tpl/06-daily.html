@@ -11,7 +11,7 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/">詳しく</a></p>
 </div>
 <h1>6. 毎日の仕事は、名前で選ばれる</h1>
-<p class="lead">実行権を付けたスクリプトを <code>/etc/cron.daily</code> に置いても、名前が <code>hello.sh</code> なら毎日の実行に選ばれない。中身を選んでいるのは <code>run-parts</code> で、名前に <code>.</code> を含むファイルを黙って飛ばす。そして「いつ走らせるか」を決めているのは、この Ubuntu では cron ではなく anacron である。</p>
+<p class="lead">実行権を付けたスクリプトを <code>/etc/cron.daily</code> に置いても、名前が <code>hello.sh</code> なら毎日の実行に選ばれない。中身を選んでいるのは <code>run-parts</code> で、Debian 系の <code>run-parts</code> は名前に <code>.</code> を含むファイルを黙って飛ばす。そして「いつ走らせるか」を決めているのは、この Ubuntu では cron ではなく anacron である。</p>
 <div class="badges"><span>前提: 第5章まで読了</span><span>前提: 練習機を起動してから15分以上たっている（理由は本文）</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.08.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>/etc/cron.hourly</code>・<code>/etc/cron.daily</code>・<code>/etc/cron.weekly</code>・<code>/etc/cron.monthly</code> を、誰がいつ走らせるかを説明できる</li><li><code>run-parts</code> がディレクトリの中から何を選ぶか（実行権と名前）を、<code>--test</code> で確かめられる</li><li><code>/etc/anacrontab</code> の4列と、anacron の主なオプション（<code>-f</code> <code>-n</code> <code>-s</code> <code>-d</code> <code>-T</code> <code>-u</code>）を読める</li></ul>
@@ -34,7 +34,7 @@
 <tr><td>3 ジョブ名</td><td><code>cron.daily</code></td><td>識別子。前回の実行日を <code>/var/spool/anacron/</code> のこの名前のファイルに書く</td></tr>
 <tr><td>4 コマンド</td><td><code>run-parts --report /etc/cron.daily</code></td><td>実行するもの</td></tr>
 </table></div>
-<p>先頭の3行（<code>SHELL</code>・<code>HOME</code>・<code>LOGNAME</code>）は、ジョブを走らせるときの環境変数である。RHEL 系の <code>/etc/anacrontab</code> には、さらに <code>RANDOM_DELAY=45</code>（2列目の遅延に、0〜45分の乱数を足す）と <code>START_HOURS_RANGE=3-22</code>（3時から22時のあいだだけ実行する）が書かれている。この練習機の Ubuntu には無い。</p>
+<p>先頭の3行（<code>SHELL</code>・<code>HOME</code>・<code>LOGNAME</code>）は、ジョブを走らせるときの環境変数である。RHEL 系の <code>/etc/anacrontab</code> には、さらに <code>RANDOM_DELAY=45</code>（2列目の遅延に、0〜45分の乱数を足す）と <code>START_HOURS_RANGE=3-22</code>（3時台から21時台のあいだだけ実行する。終わりの22は含まない）が書かれている。この練習機の Ubuntu には無い。</p>
 <p>anacron は常駐しない。起動したとき（<code>anacron.service</code>）と、7時から23時までの毎時30分（<code>anacron.timer</code>。最大5分のずれを足す）に起こされ、「前回から周期の日数がたっていれば、遅延の分だけ待ってから実行する」。この練習機が起動したときの記録が残っている。</p>
 <pre data-where="練習機の中（student@linuc）"><code>
 @@ journalctl -u anacron -b --no-pager
@@ -42,7 +42,13 @@
 @@ sudo ls -l /var/spool/anacron
 @@ sudo cat /var/spool/anacron/cron.daily
 </code></pre>
-<p>起動した時点で3つとも「まだ一度も走っていない」扱いだったので、5分後・10分後・15分後に順に走らせ、そのたびにジョブ名のファイルへ今日の日付を書いた。記録の最後の4行は、毎時30分すぎに <code>anacron.timer</code> が起こした2回目の anacron で、今日の分はもう済んでいるので何もせずに終わっている（いつ出るかは、練習機を起動した時刻で変わる）。<b>15分たつまでは、起動時の anacron が順番待ちのまま残っている</b>。そのあいだに手で anacron を打つと、ロックされたジョブを <code>locked by another anacron - skipping</code> と言って飛ばす。この章の前提を「起動から15分以上」にしたのはそのためである。</p>
+<p>起動した時点で3つとも「まだ一度も走っていない」扱いだったので、5分後・10分後・15分後に順に走らせ、そのたびにジョブ名のファイルへ今日の日付を書いた。起動時の anacron は3つのジョブを終えて <code>Normal exit (3 jobs run)</code> と書き、systemd がサービスを止めた。この記録ではその直後に、<code>anacron.timer</code> が起こした2回目の anacron（PID が違う）が <code>Normal exit (0 jobs run)</code> と書いている。今日の分は済んでいるので何もしない。2回目が出るかどうか、いつ出るかは、練習機を起動した時刻で変わる（出ない記録も取れた）。<b>15分たつまでは、起動時の anacron が順番待ちのまま残っている</b>。そのあいだに手で anacron を打つと、ロックされたジョブを <code>locked by another anacron - skipping</code> と言って飛ばす。この章の前提を「起動から15分以上」にしたのはそのためである。</p>
+<p>ここまでは Ubuntu のしくみである。RHEL 系では anacron を起こすのも cron で、<code>/etc/cron.d/0hourly</code> が毎時01分に <code>/etc/cron.hourly</code> を走らせ、その中の <code>0anacron</code> が「今日まだなら」anacron を起動する（LinuC の例題も「cron によって anacron を定期実行する」と書く）。比較のために AlmaLinux 9.7 のコンテナで見た記録を添える（この教材の練習機では打てない）。</p>
+<pre data-where="比較: AlmaLinux 9.7（RHEL 系）のコンテナ"><code>
+@@rhel cat /etc/cron.d/0hourly
+@@rhel grep -vE '^#|^$' /etc/cron.hourly/0anacron | tail -3
+@@rhel grep -vE '^#|^$' /etc/anacrontab
+</code></pre>
 <div class="analogy"><b>たとえ</b>: cron は目覚まし時計で、anacron は日めくりカレンダーに印を付ける当番に近い。目覚ましは鳴る時刻に電源が切れていたら、その日は鳴らない。当番は来たときにカレンダーを見て、今日の印が無ければ仕事をして印を付ける。
 <br>ただし<b>崩れる点</b>: 当番は1日に何度来ても、印があれば何もしない。だから1日より細かい周期は anacron では作れない（毎時の <code>cron.hourly</code> は cron が直接走らせている）。</div>
 
@@ -61,6 +67,11 @@
 Debian 系の <code>run-parts</code> は、名前が英大文字・小文字・数字・<code>_</code>・<code>-</code> だけでできているファイルしか選ばない。
 <code>.sh</code> の <code>.</code> で外れた。パッケージの更新で残る <code>foo.dpkg-old</code> や <code>foo.dpkg-dist</code> を誤って実行しないための決まりで、
 飛ばしたことはどこにも記録されない。ディレクトリに置いたことと、毎日の実行に入ったことは別である。</div></div>
+<p>この名前の決まりは Debian 系の <code>run-parts</code> のものである。RHEL 系の <code>run-parts</code> は別の実装（crontabs パッケージのシェルスクリプト）で、<code>hello.sh</code> も走らせる。比較の記録を添える。</p>
+<pre data-where="比較: AlmaLinux 9.7（RHEL 系）のコンテナ"><code>
+@@rhel run-parts /tmp/rp
+</code></pre>
+<p>（<code>/tmp/rp</code> には、実行権を付けた <code>hello.sh</code> を1つだけ置いてある。）</p>
 <pre data-where="練習機の中（student@linuc）"><code>
 @@ sudo mv /etc/cron.daily/hello.sh /etc/cron.daily/hello
 @@ run-parts --test /etc/cron.daily
@@ -96,9 +107,9 @@ Debian 系の <code>run-parts</code> は、名前が英大文字・小文字・�
 @@ cat /tmp/daily.txt
 @@ sudo cat /var/spool/anacron/cron.daily
 </code></pre>
-<p>3つのジョブが順に走り、hello も <code>run-parts</code> に選ばれて1行書いた。cron.daily の先頭にある <code>0anacron</code> は、cron が直接 cron.daily を走らせた場合（anacron が無い構成など）でも日付を書くための部品である。</p>
+<p>3つのジョブが順に走り、hello も <code>run-parts</code> に選ばれて1行書いた。cron.daily の先頭にある <code>0anacron</code> は、<code>run-parts</code> が cron.daily を走らせたとき（anacron からでも cron からでも、手で打っても）に、anacron の日付を今日にそろえる部品である。anacron が入っていなければ何もしない。</p>
 <pre data-where="練習機の中（student@linuc）"><code>
-@@ tail -1 /etc/cron.daily/0anacron
+@@ grep -vE '^#|^$' /etc/cron.daily/0anacron
 @@ sudo anacron -T; echo $?
 @@ sudo rm /etc/cron.daily/hello
 </code></pre>
@@ -134,8 +145,8 @@ C・D は不要で、ディレクトリに置くこと自体が登録になっ�
 周期の日数がたっていれば実行する。ただし anacron の周期は日単位で、1日より細かい間隔には使えない。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/etc/cron.hourly</code> は cron が毎時17分に、<code>/etc/cron.daily</code>・<code>weekly</code>・<code>monthly</code> は anacron が走らせる（anacron が入っていれば <code>/etc/crontab</code> の該当行は何もしない）</li><li>中身を選ぶのは <code>run-parts</code>。<b>実行権があり、名前が英数字・<code>_</code>・<code>-</code> だけのもの</b>しか選ばない。<code>.sh</code> は外れる</li><li>選ばれるかは <code>run-parts --test</code>、名前の条件だけなら <code>--list</code> で確かめる</li><li><code>/etc/anacrontab</code> は「周期（日） 遅延（分） ジョブ名 コマンド」の4列。前回の実行日は <code>/var/spool/anacron/ジョブ名</code></li><li>今日の分を走らせるのは <code>anacron -f -n</code>（<code>-s</code> 順に、<code>-d</code> 経過を表示）。書き方の検査は <code>anacron -T</code></li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ cron 3.0pl1-184ubuntu2 / anacron 2.3-39ubuntu2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>この Ubuntu では、<code>/etc/cron.hourly</code> は cron が毎時17分に、<code>/etc/cron.daily</code>・<code>weekly</code>・<code>monthly</code> は anacron が走らせる（anacron が入っていれば <code>/etc/crontab</code> の該当行は何もしない）。RHEL 系は cron が毎時01分に <code>/etc/cron.hourly</code> を走らせ、その中の <code>0anacron</code> が anacron を起こす</li><li>中身を選ぶのは <code>run-parts</code>。Debian 系の <code>run-parts</code> は<b>実行権があり、名前が英数字・<code>_</code>・<code>-</code> だけのもの</b>しか選ばない。<code>.sh</code> は外れる（RHEL 系の <code>run-parts</code> は選ぶ）</li><li>選ばれるかは <code>run-parts --test</code>、名前の条件だけなら <code>--list</code> で確かめる</li><li><code>/etc/anacrontab</code> は「周期（日） 遅延（分） ジョブ名 コマンド」の4列。前回の実行日は <code>/var/spool/anacron/ジョブ名</code></li><li>今日の分を走らせるのは <code>anacron -f -n</code>（<code>-s</code> 順に、<code>-d</code> 経過を表示）。書き方の検査は <code>anacron -T</code></li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ cron 3.0pl1-184ubuntu2 / anacron 2.3-39ubuntu2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-admin/theory/05-crontab">← 5. crontab には「誰が」の列が無い</a><a href="/linuc-admin/theory/07-at">次: 7. 拒否リストを消すと、誰も使えなくなる →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

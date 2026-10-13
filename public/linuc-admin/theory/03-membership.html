@@ -92,23 +92,32 @@ $ id alice
 uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y),1201(operators)</code></pre>
 <p><code>-n</code> で名前だけが変わり、GID 1201 とメンバーはそのままである。ファイルの所有グループも番号で記録されているので、<code>ls -l</code> の表示が新しい名前に変わる（番号を変える <code>groupmod -g</code> は逆で、ファイルの側は古い番号のまま取り残される）。消すのは <code>groupdel</code> である。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo groupdel alice
-groupdel: cannot remove the primary group of user 'alice'
-$ sudo groupdel operators
+groupdel: cannot remove the primary group of user 'alice'</code></pre>
+<p>誰かの主グループになっているグループは、そのままでは消せない。消すと、その人の <code>/etc/passwd</code> の4列目が名前の無い番号を指すことになるからである。それでも消すのが <code>-f</code>（<code>--force</code>）である。alice で試すと後の章の画面が変わるので、使い捨てのユーザで確かめる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo useradd -m temp1
+$ sudo groupdel -f temp1
+$ id temp1
+uid=1006(temp1) gid=1006 groups=1006
+$ ls -ld /home/temp1
+drwxr-x--- 2 temp1 1006 4096 Oct 13 19:19 /home/temp1
+$ sudo userdel -r temp1
+userdel: temp1 mail spool (/var/mail/temp1) not found</code></pre>
+<p>消えた。temp1 の <code>/etc/passwd</code> の4列目（1006）はそのままなので、主グループは名前を引けない番号だけになり、<code>id</code> も <code>ls -l</code> も番号で表示した。副グループ（operators）なら、<code>-f</code> が無くてもメンバーごと消せる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo groupdel operators
 $ id alice
 uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y)</code></pre>
-<p>誰かの主グループになっているグループは消せない。消すと、その人の <code>/etc/passwd</code> の4列目が存在しない番号を指すことになるからである。副グループ（operators）なら、メンバーがいても消せる。</p>
 
 <h2 id="userdel">userdel で消えるのは名前で、番号は残る</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>userdel</code> と <code>userdel -r</code> の違いと、消したあとに起きること。</div>
 <p>carol に、ホームの外にもファイルを1つ作らせてから、<code>-r</code> を付けずに消す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo -u carol touch /tmp/carol-was-here
 $ ls -l /tmp/carol-was-here
--rw-rw-r-- 1 carol carol 0 Oct 13 11:40 /tmp/carol-was-here
+-rw-rw-r-- 1 carol carol 0 Oct 13 19:19 /tmp/carol-was-here
 $ sudo userdel carol
 $ ls -ld /home/carol
-drwxr-x--- 2 1005 1005 4096 Oct 13 11:39 /home/carol
+drwxr-x--- 2 1005 1005 4096 Oct 13 19:18 /home/carol
 $ ls -l /tmp/carol-was-here
--rw-rw-r-- 1 1005 1005 0 Oct 13 11:40 /tmp/carol-was-here</code></pre>
+-rw-rw-r-- 1 1005 1005 0 Oct 13 19:19 /tmp/carol-was-here</code></pre>
 <p>ホームも <code>/tmp</code> のファイルも残り、所有者の欄が名前から番号（1005）に変わった。ファイルに書かれていたのは最初から番号で、<code>ls</code> が台帳を引いて名前に直していただけである。台帳の行が消えたので、番号がそのまま出た。持ち主のいないファイルは <code>find</code> で探せる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo find / -xdev -nouser
 /home/carol
@@ -123,15 +132,15 @@ $ id erin
 uid=1005(erin) gid=1005(erin) groups=1005(erin)
 $ ls -l /home
 total 28
-drwxr-x--- 2 alice   alice   4096 Oct 13 11:39 alice
-drwxr-x--- 2 bob     bob     4096 Oct 13 11:38 bob
-drwxr-x--- 2 erin    erin    4096 Oct 13 11:39 carol
-drwxr-x--- 3 dave    dave    4096 Oct 13 11:38 dave
-drwxr-x--- 2 erin    erin    4096 Oct 13 11:40 erin
-drwxr-x--- 2 eve     eve     4096 Oct 13 11:38 eve
-drwxr-x--- 5 student student 4096 Oct 13 11:38 student
+drwxr-x--- 2 alice   alice   4096 Oct 13 19:18 alice
+drwxr-x--- 2 bob     bob     4096 Oct 13 19:18 bob
+drwxr-x--- 2 erin    erin    4096 Oct 13 19:18 carol
+drwxr-x--- 3 dave    dave    4096 Oct 13 19:18 dave
+drwxr-x--- 2 erin    erin    4096 Oct 13 19:19 erin
+drwxr-x--- 2 eve     eve     4096 Oct 13 19:18 eve
+drwxr-x--- 5 student student 4096 Oct 13 19:18 student
 $ ls -l /tmp/carol-was-here
--rw-rw-r-- 1 erin erin 0 Oct 13 11:40 /tmp/carol-was-here</code></pre>
+-rw-rw-r-- 1 erin erin 0 Oct 13 19:19 /tmp/carol-was-here</code></pre>
 <p>erin は carol と同じ UID 1005 をもらい、<b>carol のホームと <code>/tmp</code> のファイルの持ち主になった</b>。<code>useradd</code> は「いまある最大の UID の次」を振るので、いちばん新しいユーザを消すと、次に作った人がその番号を引き継ぐ。会社なら、退職者のファイルを新人が丸ごと読める状態である。</p>
 <p>消すときは <code>-r</code> を付けてホーム（とメールスプール）も消し、ホームの外に残ったものは <code>find / -nouser</code> や <code>find / -uid 番号</code> で探して始末する。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo userdel -r erin
@@ -152,7 +161,7 @@ student</code></pre>
 <p>A. <code>usermod -G developers hanako</code>　B. <code>usermod -g developers hanako</code>　C. <code>usermod -aG developers hanako</code>　D. <code>groupmod -a developers hanako</code></p>
 <details><summary>答え</summary>
 <p>C。<code>-G</code> だけだと副グループが developers だけに置き換わり、sales から外れる（この章の proj-x と proj-y がその実物）。
-<code>-g</code> は主グループを変える。<code>groupmod</code> はグループ自体の名前や GID を変えるコマンドで、メンバーは変えない。</p></details></div>
+<code>-g</code> は主グループを変える。D は書式が誤りで、<code>groupmod</code> でメンバーを足すなら <code>groupmod -a -U hanako developers</code> という別の形になる（<code>-U</code> でメンバーの一覧を渡し、<code>-a</code> で足す。<code>-a</code> が無いと一覧が置き換わる）。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>userdel taro</code> と <code>userdel -r taro</code> の違いを答えよ。また、どちらの場合も残りうるものは何か。</p>
 <details><summary>答え</summary>
@@ -161,11 +170,11 @@ student</code></pre>
 <div class="quiz"><b>確認</b>
 <p><code>groupdel staff</code> が <code>cannot remove the primary group of user 'ken'</code> で失敗した。何が原因で、どうすれば消せるか。</p>
 <details><summary>答え</summary>
-<p>staff が ken の主グループ（<code>/etc/passwd</code> の4列目）になっている。先に <code>usermod -g 別のグループ ken</code> で ken の主グループを変えるか、ken を消してから <code>groupdel</code> する。副グループとしてのメンバーがいるだけなら消せる。</p></details></div>
+<p>staff が ken の主グループ（<code>/etc/passwd</code> の4列目）になっている。先に <code>usermod -g 別のグループ ken</code> で ken の主グループを変えるか、ken を消してから <code>groupdel</code> する。<code>groupdel -f staff</code> でも消せるが、ken の主グループは名前の無い GID を指したまま残る（この章の temp1）。副グループとしてのメンバーがいるだけなら、<code>-f</code> が無くても消せる。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>groupadd</code>（<code>-g</code> で GID 指定）・<code>groupmod</code>（<code>-n</code> で改名）・<code>groupdel</code>（誰かの主グループは消せない）</li><li><code>usermod -G</code> は副グループを<b>置き換え</b>、<code>-aG</code> は<b>足す</b>。主グループは <code>-g</code></li><li>所属の変更はログインのときに読まれる。<code>id</code>（名前なし）はいまのシェル、<code>id ユーザ名</code> は台帳</li><li><code>userdel</code> は台帳の行を消す。<code>-r</code> でホームとメールスプールも消す。ほかの場所のファイルは番号のまま残る</li><li>UID は「最大の次」から振られるので、消した番号は再利用されうる。残ったファイルは新しい持ち主のものになる</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:56338d96ec710f96d06a8b36d18b5030e8210fec72dd9c3a6e712c9ea02f4c5d / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>groupadd</code>（<code>-g</code> で GID 指定）・<code>groupmod</code>（<code>-n</code> で改名）・<code>groupdel</code>（誰かの主グループは <code>-f</code> を付けないと消せない。付けると名前の無い GID が残る）</li><li><code>usermod -G</code> は副グループを<b>置き換え</b>、<code>-aG</code> は<b>足す</b>。主グループは <code>-g</code></li><li>所属の変更はログインのときに読まれる。<code>id</code>（名前なし）はいまのシェル、<code>id ユーザ名</code> は台帳</li><li><code>userdel</code> は台帳の行を消す。<code>-r</code> でホームとメールスプールも消す。ほかの場所のファイルは番号のまま残る</li><li>UID は「最大の次」から振られるので、消した番号は再利用されうる。残ったファイルは新しい持ち主のものになる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-admin/theory/02-useradd">← 2. useradd は、頼まれたことしかしない</a><a href="/linuc-admin/theory/04-lock">次: 4. ロックは、扉を1つ閉めるだけ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

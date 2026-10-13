@@ -3,8 +3,8 @@
 ========== 0. 環境（検証環境ブロックの版の出どころ） ==========
 
 $ lab env
-テーマ    : lab-linuc-admin 1.0.0
-イメージ  : ghcr.io/chai0204/lab-linuc:admin-1.0.0
+テーマ    : lab-linuc-admin 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:admin-1.0.1
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -28,7 +28,7 @@ $ bash -lic exit 2>/dev/null
   vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
 
 
-── lab-linuc-admin 1.0.0 ────────────────────────────────────────
+── lab-linuc-admin 1.0.1 ────────────────────────────────────────
 lab-linuc-admin  進捗 0/8
   次 → 01 「ユーザを1人、使える状態で作る」 (目安 12分 / 影響度 B)
   lab start 01 で課題を開く
@@ -91,10 +91,10 @@ dave:x:1002:1002:Dave (lab 03):/home/dave:/bin/bash
 eve:x:1003:1003:Eve (lab 06):/home/eve:/bin/bash
 
 $ ls -l /etc/passwd /etc/shadow /etc/group /etc/gshadow
--rw-r--r-- 1 root root    804 Oct 13 11:38 /etc/group
--rw-r----- 1 root shadow  669 Oct 13 11:38 /etc/gshadow
--rw-r--r-- 1 root root   1642 Oct 13 11:38 /etc/passwd
--rw-r----- 1 root shadow  901 Oct 13 11:38 /etc/shadow
+-rw-r--r-- 1 root root    804 Oct 13 19:18 /etc/group
+-rw-r----- 1 root shadow  669 Oct 13 19:18 /etc/gshadow
+-rw-r--r-- 1 root root   1642 Oct 13 19:18 /etc/passwd
+-rw-r----- 1 root shadow  901 Oct 13 19:18 /etc/shadow
 
 $ grep '^student:' /etc/shadow
 grep: /etc/shadow: Permission denied
@@ -163,6 +163,10 @@ $ sudo -iu alice pwd
 sudo: unable to change directory to /home/alice: No such file or directory
 /home/student
 
+$ sudo su - alice -c pwd
+su: warning: cannot change directory to /home/alice: No such file or directory
+/home/student
+
 $ id alice
 uid=1004(alice) gid=1004(alice) groups=1004(alice)
 
@@ -185,11 +189,12 @@ $ ls -l /etc/default/useradd
 $ grep -vE '^\s*#|^\s*$' /etc/default/useradd
 SHELL=/bin/sh
 
-$ grep -E '^(UID_MIN|UID_MAX|GID_MIN|USERGROUPS_ENAB|HOME_MODE)' /etc/login.defs
+$ grep -E '^(UID_MIN|UID_MAX|GID_MIN|USERGROUPS_ENAB|HOME_MODE|DEFAULT_HOME|CREATE_HOME)' /etc/login.defs
 HOME_MODE	0750
 UID_MIN			 1000
 UID_MAX			60000
 GID_MIN			 1000
+DEFAULT_HOME	yes
 USERGROUPS_ENAB yes
 
 $ sudo userdel alice
@@ -200,12 +205,12 @@ $ getent passwd alice
 alice:x:1004:1004::/home/alice:/bin/bash
 
 $ ls -ld /home/alice
-drwxr-x--- 2 alice alice 4096 Oct 13 11:39 /home/alice
+drwxr-x--- 2 alice alice 4096 Oct 13 19:18 /home/alice
 
 $ sudo ls -la /home/alice
 total 20
-drwxr-x--- 2 alice alice 4096 Oct 13 11:39 .
-drwxr-xr-x 7 root  root  4096 Oct 13 11:39 ..
+drwxr-x--- 2 alice alice 4096 Oct 13 19:18 .
+drwxr-xr-x 7 root  root  4096 Oct 13 19:18 ..
 -rw-r--r-- 1 alice alice  220 Mar 31  2024 .bash_logout
 -rw-r--r-- 1 alice alice 3771 Mar 31  2024 .bashrc
 -rw-r--r-- 1 alice alice  807 Mar 31  2024 .profile
@@ -213,7 +218,7 @@ drwxr-xr-x 7 root  root  4096 Oct 13 11:39 ..
 $ ls -la /etc/skel
 total 20
 drwxr-xr-x  2 root root 4096 Oct 13 09:56 .
-drwxr-xr-x 85 root root 4096 Oct 13 11:39 ..
+drwxr-xr-x 85 root root 4096 Oct 13 19:18 ..
 -rw-r--r--  1 root root  220 Mar 31  2024 .bash_logout
 -rw-r--r--  1 root root 3771 Mar 31  2024 .bashrc
 -rw-r--r--  1 root root  807 Mar 31  2024 .profile
@@ -244,7 +249,7 @@ $ sudo useradd -D | grep SHELL
 SHELL=/bin/bash
 
 $ ls -l /etc/default/useradd
--rw------- 1 root root 1209 Oct 13 11:39 /etc/default/useradd
+-rw------- 1 root root 1209 Oct 13 19:19 /etc/default/useradd
 
 $ sudo useradd -D -s /bin/sh
 
@@ -332,6 +337,19 @@ uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y),120
 $ sudo groupdel alice
 groupdel: cannot remove the primary group of user 'alice'
 
+$ sudo useradd -m temp1
+
+$ sudo groupdel -f temp1
+
+$ id temp1
+uid=1006(temp1) gid=1006 groups=1006
+
+$ ls -ld /home/temp1
+drwxr-x--- 2 temp1 1006 4096 Oct 13 19:19 /home/temp1
+
+$ sudo userdel -r temp1
+userdel: temp1 mail spool (/var/mail/temp1) not found
+
 $ sudo groupdel operators
 
 $ id alice
@@ -340,15 +358,15 @@ uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y)
 $ sudo -u carol touch /tmp/carol-was-here
 
 $ ls -l /tmp/carol-was-here
--rw-rw-r-- 1 carol carol 0 Oct 13 11:40 /tmp/carol-was-here
+-rw-rw-r-- 1 carol carol 0 Oct 13 19:19 /tmp/carol-was-here
 
 $ sudo userdel carol
 
 $ ls -ld /home/carol
-drwxr-x--- 2 1005 1005 4096 Oct 13 11:39 /home/carol
+drwxr-x--- 2 1005 1005 4096 Oct 13 19:18 /home/carol
 
 $ ls -l /tmp/carol-was-here
--rw-rw-r-- 1 1005 1005 0 Oct 13 11:40 /tmp/carol-was-here
+-rw-rw-r-- 1 1005 1005 0 Oct 13 19:19 /tmp/carol-was-here
 
 $ sudo find / -xdev -nouser
 /home/carol
@@ -365,16 +383,16 @@ uid=1005(erin) gid=1005(erin) groups=1005(erin)
 
 $ ls -l /home
 total 28
-drwxr-x--- 2 alice   alice   4096 Oct 13 11:39 alice
-drwxr-x--- 2 bob     bob     4096 Oct 13 11:38 bob
-drwxr-x--- 2 erin    erin    4096 Oct 13 11:39 carol
-drwxr-x--- 3 dave    dave    4096 Oct 13 11:38 dave
-drwxr-x--- 2 erin    erin    4096 Oct 13 11:40 erin
-drwxr-x--- 2 eve     eve     4096 Oct 13 11:38 eve
-drwxr-x--- 5 student student 4096 Oct 13 11:38 student
+drwxr-x--- 2 alice   alice   4096 Oct 13 19:18 alice
+drwxr-x--- 2 bob     bob     4096 Oct 13 19:18 bob
+drwxr-x--- 2 erin    erin    4096 Oct 13 19:18 carol
+drwxr-x--- 3 dave    dave    4096 Oct 13 19:18 dave
+drwxr-x--- 2 erin    erin    4096 Oct 13 19:19 erin
+drwxr-x--- 2 eve     eve     4096 Oct 13 19:18 eve
+drwxr-x--- 5 student student 4096 Oct 13 19:18 student
 
 $ ls -l /tmp/carol-was-here
--rw-rw-r-- 1 erin erin 0 Oct 13 11:40 /tmp/carol-was-here
+-rw-rw-r-- 1 erin erin 0 Oct 13 19:19 /tmp/carol-was-here
 
 $ sudo userdel -r erin
 userdel: erin mail spool (/var/mail/erin) not found
@@ -406,7 +424,7 @@ $ sudo passwd -S alice
 alice P 2026-10-13 0 99999 7 -1
 
 $ sudo grep '^alice:' /etc/shadow
-alice:$y$j9T$AbkbtBGaz4UeaY92K5zmH.$QdW8eKwklmc/fAiak7grze1WtGIeY0yW3hyg4Cyw50B:20739:0:99999:7:::
+alice:$y$j9T$34SYfbe.MEahLvgGVNueX1$JXtTXYDzvTICIdn/pdfdbHlECZfIXTP6yjeSSFDxXi1:20739:0:99999:7:::
 
 $ sudo install -d -m 700 -o alice -g alice /home/alice/.ssh
 
@@ -422,7 +440,7 @@ $ sudo passwd -S alice
 alice L 2026-10-13 0 99999 7 -1
 
 $ sudo grep '^alice:' /etc/shadow
-alice:!$y$j9T$AbkbtBGaz4UeaY92K5zmH.$QdW8eKwklmc/fAiak7grze1WtGIeY0yW3hyg4Cyw50B:20739:0:99999:7:::
+alice:!$y$j9T$34SYfbe.MEahLvgGVNueX1$JXtTXYDzvTICIdn/pdfdbHlECZfIXTP6yjeSSFDxXi1:20739:0:99999:7:::
 
 $ ssh -l alice linuc id
 uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y)
@@ -430,7 +448,7 @@ uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y)
 $ sudo usermod -e 1 alice
 
 $ sudo grep '^alice:' /etc/shadow
-alice:!$y$j9T$AbkbtBGaz4UeaY92K5zmH.$QdW8eKwklmc/fAiak7grze1WtGIeY0yW3hyg4Cyw50B:20739:0:99999:7::1:
+alice:!$y$j9T$34SYfbe.MEahLvgGVNueX1$JXtTXYDzvTICIdn/pdfdbHlECZfIXTP6yjeSSFDxXi1:20739:0:99999:7::1:
 
 $ ssh -l alice linuc id
 Your account has expired; please contact your system administrator.
@@ -458,6 +476,9 @@ $ sudo usermod -s /usr/sbin/nologin alice
 
 $ ssh -l alice linuc id
 This account is currently not available.
+
+$ sudo su -s /bin/bash alice -c id
+uid=1004(alice) gid=1004(alice) groups=1004(alice),1103(proj-x),1200(proj-y)
 
 $ sudo usermod -s /bin/bash alice
 
@@ -508,21 +529,21 @@ $ crontab -l
 
 $ sudo ls -l /var/spool/cron/crontabs
 total 4
--rw------- 1 student crontab 207 Oct 13 11:41 student
+-rw------- 1 student crontab 207 Oct 13 19:20 student
 
 $ sudo cat /var/spool/cron/crontabs/student
 # DO NOT EDIT THIS FILE - edit the master and reinstall.
-# (- installed on Tue Oct 13 11:41:20 2026)
+# (- installed on Tue Oct 13 19:20:47 2026)
 # (Cron version -- $Id: crontab.c,v 2.13 1994/01/17 03:20:37 vixie Exp $)
 * * * * * date >> /tmp/tick.txt
 
 $ cat /tmp/tick.txt
-Tue Oct 13 11:42:01 JST 2026
+Tue Oct 13 19:21:01 JST 2026
 
 $ journalctl -u cron -n 3 --no-pager
-Oct 13 11:42:01 linuc CRON[1743]: pam_unix(cron:session): session opened for user student(uid=1000) by student(uid=0)
-Oct 13 11:42:01 linuc CRON[1744]: (student) CMD (date >> /tmp/tick.txt)
-Oct 13 11:42:01 linuc CRON[1743]: pam_unix(cron:session): session closed for user student
+Oct 13 19:21:01 linuc CRON[1807]: pam_unix(cron:session): session opened for user student(uid=1000) by student(uid=0)
+Oct 13 19:21:01 linuc CRON[1808]: (student) CMD (date >> /tmp/tick.txt)
+Oct 13 19:21:01 linuc CRON[1807]: pam_unix(cron:session): session closed for user student
 
 $ grep -vE '^\s*#|^\s*$' /etc/crontab
 SHELL=/bin/sh
@@ -540,7 +561,7 @@ $ cat /tmp/tick2.txt
 /bin/sh: 1: student: not found
 
 $ cat /tmp/tick.txt
-Tue Oct 13 11:42:01 JST 2026
+Tue Oct 13 19:21:01 JST 2026
 
 $ ls -l /etc/cron.d
 total 8
@@ -570,8 +591,8 @@ ls: cannot access '/tmp/cron-dot.txt': No such file or directory
 ls: cannot access '/tmp/cron-nouser.txt': No such file or directory
 
 $ journalctl -u cron -n 30 --no-pager | grep -E 'lab|ERROR'
-Oct 13 11:44:01 linuc cron[426]: Error: bad username; while reading /etc/cron.d/lab-nouser
-Oct 13 11:44:01 linuc cron[426]: (*system*lab-nouser) ERROR (Syntax error, this crontab file will be ignored)
+Oct 13 19:23:01 linuc cron[429]: Error: bad username; while reading /etc/cron.d/lab-nouser
+Oct 13 19:23:01 linuc cron[429]: (*system*lab-nouser) ERROR (Syntax error, this crontab file will be ignored)
 
 $ cat /tmp/cron-env.txt
 HOME=/home/student
@@ -616,7 +637,7 @@ total 24
 -rwxr-xr-x 1 root root  376 Jul 29 23:09 apport
 -rwxr-xr-x 1 root root 1478 Mar 22  2024 apt-compat
 -rwxr-xr-x 1 root root  123 Feb  5  2024 dpkg
--rw-r--r-- 1 root root  165 Oct 13 11:38 lab-backup.sh
+-rw-r--r-- 1 root root  165 Oct 13 19:18 lab-backup.sh
 -rwxr-xr-x 1 root root 1395 Mar 30  2024 man-db
 
 $ grep run-parts /etc/crontab
@@ -634,36 +655,39 @@ LOGNAME=root
 @monthly	15	cron.monthly	run-parts --report /etc/cron.monthly
 
 $ journalctl -u anacron -b --no-pager
-Oct 13 11:38:34 linuc systemd[1]: Started anacron.service - Run anacron jobs.
-Oct 13 11:38:35 linuc anacron[419]: Anacron 2.3 started on 2026-10-13
-Oct 13 11:38:35 linuc anacron[419]: Will run job `cron.daily' in 5 min.
-Oct 13 11:38:35 linuc anacron[419]: Will run job `cron.weekly' in 10 min.
-Oct 13 11:38:35 linuc anacron[419]: Will run job `cron.monthly' in 15 min.
-Oct 13 11:38:35 linuc anacron[419]: Jobs will be executed sequentially
-Oct 13 11:43:34 linuc anacron[419]: Job `cron.daily' started
-Oct 13 11:43:34 linuc anacron[1904]: Updated timestamp for job `cron.daily' to 2026-10-13
-Oct 13 11:43:34 linuc anacron[419]: Job `cron.daily' terminated
-Oct 13 11:48:34 linuc anacron[419]: Job `cron.weekly' started
-Oct 13 11:48:34 linuc anacron[419]: Job `cron.weekly' terminated
-Oct 13 11:53:34 linuc anacron[419]: Job `cron.monthly' started
-Oct 13 11:53:34 linuc anacron[419]: Job `cron.monthly' terminated
-Oct 13 11:53:34 linuc anacron[419]: Normal exit (3 jobs run)
-Oct 13 11:53:34 linuc systemd[1]: anacron.service: Killing process 3116 (anacron) with signal SIGKILL.
-Oct 13 11:53:34 linuc systemd[1]: anacron.service: Deactivated successfully.
-Oct 13 11:53:34 linuc systemd[1]: anacron.service: Consumed 1.023s CPU time.
+Oct 13 19:17:56 linuc systemd[1]: Started anacron.service - Run anacron jobs.
+Oct 13 19:17:56 linuc anacron[423]: Anacron 2.3 started on 2026-10-13
+Oct 13 19:17:56 linuc anacron[423]: Will run job `cron.daily' in 5 min.
+Oct 13 19:17:56 linuc anacron[423]: Will run job `cron.weekly' in 10 min.
+Oct 13 19:17:56 linuc anacron[423]: Will run job `cron.monthly' in 15 min.
+Oct 13 19:17:56 linuc anacron[423]: Jobs will be executed sequentially
+Oct 13 19:22:56 linuc anacron[423]: Job `cron.daily' started
+Oct 13 19:22:57 linuc anacron[423]: Job `cron.daily' terminated
+Oct 13 19:27:56 linuc anacron[423]: Job `cron.weekly' started
+Oct 13 19:27:57 linuc anacron[423]: Job `cron.weekly' terminated
+Oct 13 19:32:56 linuc anacron[423]: Job `cron.monthly' started
+Oct 13 19:32:57 linuc anacron[423]: Job `cron.monthly' terminated
+Oct 13 19:32:57 linuc anacron[423]: Normal exit (3 jobs run)
+Oct 13 19:32:57 linuc systemd[1]: anacron.service: Killing process 3211 (anacron) with signal SIGKILL.
+Oct 13 19:32:57 linuc systemd[1]: anacron.service: Deactivated successfully.
+Oct 13 19:32:57 linuc systemd[1]: anacron.service: Consumed 1.022s CPU time.
+Oct 13 19:32:57 linuc systemd[1]: Started anacron.service - Run anacron jobs.
+Oct 13 19:32:57 linuc anacron[3215]: Anacron 2.3 started on 2026-10-13
+Oct 13 19:32:57 linuc anacron[3215]: Normal exit (0 jobs run)
+Oct 13 19:32:57 linuc systemd[1]: anacron.service: Deactivated successfully.
 
 $ systemctl list-timers anacron.timer --no-pager --full
-NEXT                         LEFT LAST                           PASSED UNIT          ACTIVATES
-Tue 2026-10-13 12:34:09 JST 40min Tue 2026-10-13 11:40:12 JST 13min ago anacron.timer anacron.service
+NEXT                           LEFT LAST                         PASSED UNIT          ACTIVATES
+Tue 2026-10-13 20:34:26 JST 1h 1min Tue 2026-10-13 19:32:57 JST 11s ago anacron.timer anacron.service
 
 1 timers listed.
 Pass --all to see loaded but inactive timers, too.
 
 $ sudo ls -l /var/spool/anacron
 total 12
--rw------- 1 root root 9 Oct 13 11:43 cron.daily
--rw------- 1 root root 9 Oct 13 11:53 cron.monthly
--rw------- 1 root root 9 Oct 13 11:48 cron.weekly
+-rw------- 1 root root 9 Oct 13 19:22 cron.daily
+-rw------- 1 root root 9 Oct 13 19:32 cron.monthly
+-rw------- 1 root root 9 Oct 13 19:27 cron.weekly
 
 $ sudo cat /var/spool/anacron/cron.daily
 20261013
@@ -736,12 +760,13 @@ Job `cron.monthly' terminated
 Normal exit (3 jobs run)
 
 $ cat /tmp/daily.txt
-Tue Oct 13 11:53:59 JST 2026
+Tue Oct 13 19:33:20 JST 2026
 
 $ sudo cat /var/spool/anacron/cron.daily
 20261013
 
-$ tail -1 /etc/cron.daily/0anacron
+$ grep -vE '^#|^$' /etc/cron.daily/0anacron
+test -x /usr/sbin/anacron || exit 0
 anacron -u cron.daily
 
 $ sudo anacron -T; echo $?
@@ -757,21 +782,21 @@ active
 
 $ at now + 1 minute
 warning: commands will be executed using /bin/sh
-at Tue Oct 13 11:55:00 2026
+at Tue Oct 13 19:34:00 2026
 at> date > /tmp/at.txt
 at> <EOT>
-job 1 at Tue Oct 13 11:55:00 2026
+job 1 at Tue Oct 13 19:34:00 2026
 
 $ atq
-1	Tue Oct 13 11:55:00 2026 a student
+1	Tue Oct 13 19:34:00 2026 a student
 
 $ export LAB_NOTE=hello; echo 'echo late > /tmp/at-late.txt' | at 23:59
 warning: commands will be executed using /bin/sh
 job 2 at Tue Oct 13 23:59:00 2026
 
 $ atq
-1	Tue Oct 13 11:55:00 2026 a student
 2	Tue Oct 13 23:59:00 2026 a student
+1	Tue Oct 13 19:34:00 2026 a student
 
 $ at -c 2 | head -4
 #!/bin/sh
@@ -792,25 +817,71 @@ echo late > /tmp/at-late.txt
 
 $ sudo ls -l /var/spool/cron/atjobs
 total 8
--rwx------ 1 student daemon 878 Oct 13 11:54 a0000101c7b18f
--rwx------ 1 student daemon 885 Oct 13 11:54 a0000201c7b463
+-rwx------ 1 student daemon 878 Oct 13 19:33 a0000101c7b35a
+-rwx------ 1 student daemon 885 Oct 13 19:33 a0000201c7b463
 
 $ atrm 2
 
 $ atq
-1	Tue Oct 13 11:55:00 2026 a student
+1	Tue Oct 13 19:34:00 2026 a student
 
 $ cat /tmp/at.txt
-Tue Oct 13 11:55:00 JST 2026
+Tue Oct 13 19:34:00 JST 2026
 
 $ atq
 
 $ echo 'uptime > /tmp/batch.txt' | batch
 warning: commands will be executed using /bin/sh
-job 3 at Tue Oct 13 11:55:00 2026
+job 3 at Tue Oct 13 19:34:00 2026
 
 $ cat /tmp/batch.txt
- 11:55:12 up 16 min,  0 user,  load average: 0.28, 0.35, 0.32
+ 19:34:12 up 16 min,  0 user,  load average: 0.43, 0.42, 0.35
+
+$ echo 'date' | at now +10min
+warning: commands will be executed using /bin/sh
+job 4 at Tue Oct 13 19:44:00 2026
+
+$ echo 'date' | at 00:00
+warning: commands will be executed using /bin/sh
+job 5 at Wed Oct 14 00:00:00 2026
+
+$ echo 'date' | at 10:00 2030-12-24
+warning: commands will be executed using /bin/sh
+job 6 at Tue Dec 24 10:00:00 2030
+
+$ echo 'date' | at 10:00 12/24/2030
+warning: commands will be executed using /bin/sh
+job 7 at Tue Dec 24 10:00:00 2030
+
+$ echo 'date' | at 10:00 24.12.2030
+warning: commands will be executed using /bin/sh
+job 8 at Tue Dec 24 10:00:00 2030
+
+$ echo 'date' | at 10:00 122430
+warning: commands will be executed using /bin/sh
+job 9 at Tue Dec 24 10:00:00 2030
+
+$ echo 'date' | at 2030-12-24 10:00
+syntax error. Last token seen: 10:00
+Garbled time
+
+$ echo 'date' | at 10:00 20301224
+Error in month number. Last token seen: 20301224
+Garbled time
+
+$ echo 'date' | at 10:00 yesterday
+syntax error. Last token seen: y
+Garbled time
+
+$ atq | sort -n
+4	Tue Oct 13 19:44:00 2026 a student
+5	Wed Oct 14 00:00:00 2026 a student
+6	Tue Dec 24 10:00:00 2030 a student
+7	Tue Dec 24 10:00:00 2030 a student
+8	Tue Dec 24 10:00:00 2030 a student
+9	Tue Dec 24 10:00:00 2030 a student
+
+$ atrm 4 5 6 7 8 9
 
 $ ls -l /etc/at.allow /etc/at.deny
 ls: cannot access '/etc/at.allow': No such file or directory
@@ -882,8 +953,31 @@ C
 C.utf8
 POSIX
 
+$ locale LC_TIME | head -4
+Sun;Mon;Tue;Wed;Thu;Fri;Sat
+Sunday;Monday;Tuesday;Wednesday;Thursday;Friday;Saturday
+Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec
+January;February;March;April;May;June;July;August;September;October;November;December
+
+$ locale -k LC_TIME | head -4
+abday="Sun;Mon;Tue;Wed;Thu;Fri;Sat"
+day="Sunday;Monday;Tuesday;Wednesday;Thursday;Friday;Saturday"
+abmon="Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec"
+mon="January;February;March;April;May;June;July;August;September;October;November;December"
+
+$ locale -ck LC_TIME | head -5
+LC_TIME
+abday="Sun;Mon;Tue;Wed;Thu;Fri;Sat"
+day="Sunday;Monday;Tuesday;Wednesday;Thursday;Friday;Saturday"
+abmon="Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec"
+mon="January;February;March;April;May;June;July;August;September;October;November;December"
+
+$ locale -t
+locale: invalid option -- 't'
+Try `locale --help' or `locale --usage' for more information.
+
 $ LANG=ja_JP.UTF-8 date; echo $?
-Tue Oct 13 11:55:49 JST 2026
+Tue Oct 13 19:35:01 JST 2026
 0
 
 $ LANG=ja_JP.UTF-8 locale
@@ -926,7 +1020,7 @@ POSIX
 ja_JP.utf8
 
 $ LANG=ja_JP.UTF-8 date
-2026年 10月 13日 火曜日 11:55:58 JST
+2026年 10月 13日 火曜日 19:35:11 JST
 
 $ LANG=ja_JP.UTF-8 ls -l /etc/hostname
 -rw-r--r-- 1 root root 6 10月 13 09:46 /etc/hostname
@@ -936,6 +1030,21 @@ $ LANG=ja_JP.UTF-8 printf "%'d\n" 1234567
 
 $ LANG=C printf "%'d\n" 1234567
 1234567
+
+$ locale -k thousands_sep
+thousands_sep=""
+
+$ LANG=ja_JP.UTF-8 locale -k LC_NUMERIC
+decimal_point="."
+thousands_sep=","
+grouping=3
+numeric-decimal-point-wc=46
+numeric-thousands-sep-wc=44
+numeric-codeset="UTF-8"
+
+$ LANG=ja_JP.UTF-8 locale -ck date_fmt
+LC_TIME
+date_fmt="%Y年 %b %e日 %A %H:%M:%S %Z"
 
 $ LANG=ja_JP.UTF-8 ls /nonexistent
 ls: cannot access '/nonexistent': No such file or directory
@@ -951,10 +1060,10 @@ firewalld.mo
 libapt-pkg6.0.mo
 
 $ LANG=ja_JP.UTF-8 LC_TIME=C date
-Tue Oct 13 11:56:03 JST 2026
+Tue Oct 13 19:35:18 JST 2026
 
 $ LANG=C LC_ALL=ja_JP.UTF-8 date
-2026年 10月 13日 火曜日 11:56:04 JST
+2026年 10月 13日 火曜日 19:35:19 JST
 
 $ LANG=ja_JP.UTF-8 LC_TIME=C locale
 LANG=ja_JP.UTF-8
@@ -972,6 +1081,23 @@ LC_TELEPHONE="ja_JP.UTF-8"
 LC_MEASUREMENT="ja_JP.UTF-8"
 LC_IDENTIFICATION="ja_JP.UTF-8"
 LC_ALL=
+
+$ LANG=ja_JP.UTF-8 LC_ALL=C locale
+LANG=ja_JP.UTF-8
+LANGUAGE=
+LC_CTYPE="C"
+LC_NUMERIC="C"
+LC_TIME="C"
+LC_COLLATE="C"
+LC_MONETARY="C"
+LC_MESSAGES="C"
+LC_PAPER="C"
+LC_NAME="C"
+LC_ADDRESS="C"
+LC_TELEPHONE="C"
+LC_MEASUREMENT="C"
+LC_IDENTIFICATION="C"
+LC_ALL=C
 
 $ LANG=ja_JP.UTF-8 date | awk '{print $2}'
 10月
@@ -1010,13 +1136,13 @@ LANG=ja_JP.UTF-8
 
 $ echo $LANG; date
 ja_JP.UTF-8
-2026年 10月 13日 火曜日 11:56:22 JST
+2026年 10月 13日 火曜日 19:35:37 JST
 
 $ sudo localectl set-locale LANG=C.UTF-8
 
 $ echo $LANG; date
 C.UTF-8
-Tue Oct 13 11:56:25 JST 2026
+Tue Oct 13 19:35:41 JST 2026
 
 
 ========== 第9章 文字コードは、読む側が決める（1.08.3） ==========

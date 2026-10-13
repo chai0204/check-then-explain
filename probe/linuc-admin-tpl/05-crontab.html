@@ -14,8 +14,8 @@
 <p class="lead"><code>/etc/crontab</code> には、時刻の5列のあとに実行ユーザの列がある。同じつもりで自分の crontab に <code>student</code> と書くと、cron はそれを<b>コマンド</b>として実行する。ユーザの crontab では、表が置かれた場所（ファイル名）が「誰が」を表しているからである。</p>
 <div class="badges"><span>前提: 第4章まで読了</span><span>所要 20分（うち cron を待つ時間 約3分）</span><span class="impact-b">影響度 B</span><span>出題範囲 1.08.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>crontab の時刻の5列（分・時・日・月・曜日）を読み書きできる</li><li><code>crontab -e</code> <code>-l</code> <code>-r</code> と、ファイルを渡す形の違いを言える</li><li>ユーザの crontab（<code>/var/spool/cron/crontabs</code>）・<code>/etc/crontab</code>・<code>/etc/cron.d</code> の書式の違いを、動いた結果で説明できる</li><li><code>/etc/cron.allow</code> と <code>/etc/cron.deny</code> の役割を言える</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: systemd のタイマーへの置き換え、<code>MAILTO</code> とメールの配送、cron の実装ごとの違い（cronie など）は扱わない。<code>/etc/cron.daily</code> などの「毎日・毎週」の仕組みは第6章で扱う。</div></div>
+<ul><li>crontab の時刻の5列（分・時・日・月・曜日）を読み書きできる</li><li><code>crontab -e</code> <code>-l</code> <code>-r</code> と、ファイルを渡す形の違いを言える</li><li>ユーザの crontab（Debian 系は <code>/var/spool/cron/crontabs</code>、RHEL 系は <code>/var/spool/cron</code>）・<code>/etc/crontab</code>・<code>/etc/cron.d</code> の書式の違いを、動いた結果で説明できる</li><li><code>/etc/cron.allow</code> と <code>/etc/cron.deny</code> の役割を言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: systemd のタイマーへの置き換え、<code>MAILTO</code> とメールの配送は扱わない。<code>/etc/cron.daily</code> などの「毎日・毎週」の仕組みは第6章で扱う。RHEL 系の cron（cronie）とこの Ubuntu の cron で答えが変わるところは、本文でそのつど並べる（試験は両方の書き方で出る）。</div></div>
 
 <h2 id="table">自分の表は、crontab コマンドで渡す</h2>
 <div class="sgoal"><b>この節で分かること</b>: ユーザの crontab がどこに、どう保存されるか。</div>
@@ -53,7 +53,7 @@
 @@ cat /tmp/tick.txt
 @@ journalctl -u cron -n 3 --no-pager
 </code></pre>
-<p>ログに <code>(student) CMD (…)</code> と、誰として何を実行したかが残る。<code>student</code> という名前は表の中のどこにも書いていない。表のファイル名から来ている。</p>
+<p>ログに <code>(student) CMD (…)</code> と、誰として何を実行したかが残る（サービスの名前は Ubuntu では <code>cron</code>、RHEL 系では <code>crond</code> で、LinuC の例題は <code>crond</code> と書く）。<code>student</code> という名前は表の中のどこにも書いていない。表のファイル名から来ている。</p>
 <div class="analogy"><b>たとえ</b>: cron は、毎分0秒に起きて全員の予定表を見回る当番に近い。予定の時刻と一致した行があれば、その人の代わりに実行する。
 <br>ただし<b>崩れる点</b>: 当番は寝過ごした回を後で取り返さない。練習機が止まっていた時刻の予定は、動き出しても実行されない。それを補う仕組みが第6章の anacron である。</div>
 <div class="analogy"><b>たとえ</b>: 名前入りの個人ロッカーに入れた予定表に近い。誰の予定かはロッカーの名札で分かるので、予定表に「誰が」の欄は要らない。
@@ -108,7 +108,7 @@ sh は <code>student</code> というコマンドを探して失敗した。<cod
 @@ ls -l /tmp/cron-dot.txt /tmp/cron-nouser.txt
 @@ journalctl -u cron -n 30 --no-pager | grep -E 'lab|ERROR'
 </code></pre>
-<p>動いたのは <code>lab-demo</code> だけで、6列目どおり <code>root</code> として動いた。実行ユーザを書かなかった <code>lab-nouser</code> は、<code>id</code> をユーザ名として読まれてファイルごと捨てられ、ログにそう出た。名前に <code>.</code> を入れた <code>lab.demo</code> は<b>ログにも何も出ずに</b>無視された。Debian 系の cron は、<code>/etc/cron.d</code> のファイル名が英数字・<code>_</code>・<code>-</code> だけでできていないと読まない（パッケージの退避ファイル <code>foo.dpkg-old</code> などを動かさないため）。同じ決まりが第6章の <code>run-parts</code> にもある。</p>
+<p>動いたのは <code>lab-demo</code> だけで、6列目どおり <code>root</code> として動いた。実行ユーザを書かなかった <code>lab-nouser</code> は、<code>id</code> をユーザ名として読まれてファイルごと捨てられ、ログにそう出た。名前に <code>.</code> を入れた <code>lab.demo</code> は<b>ログにも何も出ずに</b>無視された。Debian 系の cron は、<code>/etc/cron.d</code> のファイル名が英数字・<code>_</code>・<code>-</code> だけでできていないと読まない（パッケージの退避ファイル <code>foo.dpkg-old</code> などを動かさないため）。同じ決まりが第6章の <code>run-parts</code> にもある。RHEL 系の cron（cronie）にはこの決まりが無く、<code>lab.demo</code> のような名前も読む。</p>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-admin/">演習04</a>は、自分の crontab と <code>/etc/cron.d</code> の両方に毎分のジョブを置く課題である。
 判定は cron が実際に書いたファイルを見て、誰として動いたかまで確かめる（動くまで最大 75 秒待つ）。</div>
@@ -139,7 +139,7 @@ sh は <code>student</code> というコマンドを探して失敗した。<cod
 @@ sudo rm /etc/cron.deny
 @@ crontab -l
 </code></pre>
-<p><code>/etc/cron.allow</code> があれば、そこに書かれた人だけが <code>crontab</code> を使える。無ければ <code>/etc/cron.deny</code> に書かれた人が断られる。どちらも無いとき、Debian 系では全員が使える。<code>at</code> にも同じ形の <code>/etc/at.allow</code> と <code>/etc/at.deny</code> があるが、<b>どちらも無いときの扱いが逆</b>になっている。第7章で確かめる。</p>
+<p><code>/etc/cron.allow</code> があれば、そこに書かれた人だけが <code>crontab</code> を使える。無ければ <code>/etc/cron.deny</code> に書かれた人が断られる。どちらも無いとき、この Ubuntu（Debian 系）の cron では全員が使え、RHEL 系の cron（cronie）では root だけが使える（ただし RHEL は空の <code>/etc/cron.deny</code> を最初から置いているので、既定の状態では全員が使える）。<code>at</code> にも同じ形の <code>/etc/at.allow</code> と <code>/etc/at.deny</code> があるが、<b>どちらも無いときの扱いが逆</b>になっている。第7章で確かめる。</p>
 
 <div class="quiz"><b>確認</b>
 <p>毎週月曜日から金曜日の 9時30分に <code>/usr/local/bin/report</code> を実行したい。ユーザの crontab に書く行として正しいものはどれか。</p>
@@ -160,8 +160,8 @@ D は <code>/etc/crontab</code> や <code>/etc/cron.d</code> の書式で、ユ�
 <code>/etc/crontab</code>（と <code>/etc/cron.d</code>）は時刻の5列のあとに実行ユーザの列があり、ユーザの crontab には無い。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>時刻は「分 時 日 月 曜日」の5列。<code>*</code> <code>a-b</code> <code>a,b</code> <code>*/n</code> と <code>@reboot</code> などで書く</li><li>ユーザの表は <code>crontab -e</code> で編集し、<code>/var/spool/cron/crontabs/ユーザ名</code> に置かれる。<code>-l</code> 表示、<code>-r</code> 削除（確認なし）、<code>crontab ファイル</code> は置き換え</li><li><code>/etc/crontab</code> と <code>/etc/cron.d/*</code> は6列目に<b>実行ユーザ</b>を書く。ユーザの表に書くとコマンドとして実行される</li><li><code>/etc/cron.d</code> のファイル名に <code>.</code> を入れると、ログも出さずに無視される</li><li>ジョブは <code>SHELL=/bin/sh</code> と最小限の環境で動く。出力はメールで送られ、MTA が無ければ捨てられる</li><li><code>/etc/cron.allow</code> があればそこに書いた人だけ、無ければ <code>/etc/cron.deny</code> に書いた人以外が使える</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ cron 3.0pl1-184ubuntu2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>時刻は「分 時 日 月 曜日」の5列。<code>*</code> <code>a-b</code> <code>a,b</code> <code>*/n</code> と <code>@reboot</code> などで書く</li><li>ユーザの表は <code>crontab -e</code> で編集し、<code>/var/spool/cron/crontabs/ユーザ名</code>（RHEL 系は <code>/var/spool/cron/ユーザ名</code>）に置かれる。<code>-l</code> 表示、<code>-r</code> 削除（確認なし）、<code>crontab ファイル</code> は置き換え</li><li><code>/etc/crontab</code> と <code>/etc/cron.d/*</code> は6列目に<b>実行ユーザ</b>を書く。ユーザの表に書くとコマンドとして実行される</li><li>Debian 系の cron は、<code>/etc/cron.d</code> のファイル名に <code>.</code> を入れるとログも出さずに無視する（RHEL 系の cronie は読む）</li><li>ジョブは <code>SHELL=/bin/sh</code> と最小限の環境で動く。出力はメールで送られ、MTA が無ければ捨てられる</li><li><code>/etc/cron.allow</code> があればそこに書いた人だけ、無ければ <code>/etc/cron.deny</code> に書いた人以外が使える。どちらも無いと Debian 系は全員、RHEL 系の cronie は root だけ</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ cron 3.0pl1-184ubuntu2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-admin/theory/04-lock">← 4. ロックは、扉を1つ閉めるだけ</a><a href="/linuc-admin/theory/06-daily">次: 6. 毎日の仕事は、名前で選ばれる →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

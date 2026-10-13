@@ -41,7 +41,7 @@ $ locale -a
 C
 C.utf8
 POSIX</code></pre>
-<p><code>locale</code> は、いまのシェルのロケールを分野ごとに表示する。引用符 <code>"…"</code> 付きの値は「自分では設定されていないので <code>LANG</code> から引き継いだ」という意味である。<code>LANG</code> の値は、ログインのときに <code>/etc/default/locale</code>（システムの既定）から読み込まれた。<code>locale -a</code> は、この練習機に<b>生成済み</b>のロケールの一覧で、いまは C 系の3つしか無い。</p>
+<p><code>locale</code> は、いまのシェルのロケールを分野ごとに表示する。引用符 <code>"…"</code> 付きの値は「その変数そのものの値ではなく、<code>LC_ALL</code>（設定されていればそちら）か <code>LANG</code> から来た値」という意味である（<code>LC_ALL</code> の例は後の節で見る）。<code>LANG</code> の値は、ログインのときに <code>/etc/default/locale</code>（システムの既定）から読み込まれた。<code>locale -a</code> は、この練習機に<b>生成済み</b>のロケールの一覧で、いまは C 系の3つしか無い。</p>
 <div class="scroll"><table>
 <tr><th>変数</th><th>決めるもの</th><th>影響を受ける例</th></tr>
 <tr><td><code>LC_CTYPE</code></td><td>文字の種類（どのバイト列が1文字か）</td><td><code>wc -m</code>、正規表現の <code>[[:alpha:]]</code></td></tr>
@@ -53,6 +53,26 @@ POSIX</code></pre>
 <tr><td><code>LANG</code></td><td>上のどれも設定されていないときの既定</td><td>—</td></tr>
 <tr><td><code>LC_ALL</code></td><td>設定すると、全分野をこの値で上書き</td><td>—</td></tr>
 </table></div>
+<p><code>locale</code> に分野の名前を渡すと、その分野が持っている値が並ぶ。<code>-k</code> を付けるとキーワード名（<code>abday=</code> など）も出し、<code>-c</code> を付けると分野の名前も出す。<code>-t</code> というオプションは無い。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ locale LC_TIME | head -4
+Sun;Mon;Tue;Wed;Thu;Fri;Sat
+Sunday;Monday;Tuesday;Wednesday;Thursday;Friday;Saturday
+Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec
+January;February;March;April;May;June;July;August;September;October;November;December
+$ locale -k LC_TIME | head -4
+abday="Sun;Mon;Tue;Wed;Thu;Fri;Sat"
+day="Sunday;Monday;Tuesday;Wednesday;Thursday;Friday;Saturday"
+abmon="Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec"
+mon="January;February;March;April;May;June;July;August;September;October;November;December"
+$ locale -ck LC_TIME | head -5
+LC_TIME
+abday="Sun;Mon;Tue;Wed;Thu;Fri;Sat"
+day="Sunday;Monday;Tuesday;Wednesday;Thursday;Friday;Saturday"
+abmon="Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec"
+mon="January;February;March;April;May;June;July;August;September;October;November;December"
+$ locale -t
+locale: invalid option -- 't'
+Try `locale --help' or `locale --usage' for more information.</code></pre>
 
 <h2 id="name">生成していないロケールを指すと、黙って C になる</h2>
 <div class="sgoal"><b>この節で分かること</b>: ロケールの「名前」と「実体」が別であること。</div>
@@ -60,7 +80,7 @@ POSIX</code></pre>
 <p>日本語の表示にしたければ、<code>LANG=ja_JP.UTF-8</code> を付けて実行すればよい。
 使えない名前を指定したなら、エラーになって教えてくれるはずだ。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ LANG=ja_JP.UTF-8 date; echo $?
-Tue Oct 13 11:55:49 JST 2026
+Tue Oct 13 19:35:01 JST 2026
 0
 $ LANG=ja_JP.UTF-8 locale
 locale: Cannot set LC_CTYPE to default locale: No such file or directory
@@ -108,14 +128,28 @@ POSIX
 ja_JP.utf8</code></pre>
 <p><code>locale-gen</code> は <code>/etc/locale.gen</code> の該当行のコメントを外し、データを生成した。一覧での名前は <code>ja_JP.utf8</code>（小文字・ハイフン無し）に正規化されている。もう一度同じことをする。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ LANG=ja_JP.UTF-8 date
-2026年 10月 13日 火曜日 11:55:58 JST
+2026年 10月 13日 火曜日 19:35:11 JST
 $ LANG=ja_JP.UTF-8 ls -l /etc/hostname
 -rw-r--r-- 1 root root 6 10月 13 09:46 /etc/hostname
 $ LANG=ja_JP.UTF-8 printf "%'d\n" 1234567
 1,234,567
 $ LANG=C printf "%'d\n" 1234567
 1234567</code></pre>
-<p>日時（<code>LC_TIME</code>）と桁区切り（<code>LC_NUMERIC</code>）が日本の書き方になった。ところがメッセージ（<code>LC_MESSAGES</code>）は、プログラムによって変わったり変わらなかったりする。</p>
+<p>日時（<code>LC_TIME</code>）と桁区切り（<code>LC_NUMERIC</code>）が日本の書き方になった。何が変わったのかは、最初の節で使った <code>locale -k</code>・<code>-c</code> で、ロケールのデータの中身として見られる。キーワード1つを渡すこともできる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ locale -k thousands_sep
+thousands_sep=""
+$ LANG=ja_JP.UTF-8 locale -k LC_NUMERIC
+decimal_point="."
+thousands_sep=","
+grouping=3
+numeric-decimal-point-wc=46
+numeric-thousands-sep-wc=44
+numeric-codeset="UTF-8"
+$ LANG=ja_JP.UTF-8 locale -ck date_fmt
+LC_TIME
+date_fmt="%Y年 %b %e日 %A %H:%M:%S %Z"</code></pre>
+<p>C.UTF-8 の桁区切り（<code>thousands_sep</code>）は空で、ja_JP.UTF-8 は <code>,</code> を3桁ごと（<code>grouping=3</code>）に入れる。<code>printf "%'d"</code> の違いはここから来ていた。<code>date</code> の既定の形も <code>LC_TIME</code> の <code>date_fmt</code> に書いてある。</p>
+<p>ところがメッセージ（<code>LC_MESSAGES</code>）は、プログラムによって変わったり変わらなかったりする。ところがメッセージ（<code>LC_MESSAGES</code>）は、プログラムによって変わったり変わらなかったりする。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ LANG=ja_JP.UTF-8 ls /nonexistent
 ls: cannot access '/nonexistent': No such file or directory
 $ LANG=ja_JP.UTF-8 dpkg -s nonexistent-pkg
@@ -146,9 +180,9 @@ ja_JP.utf8</code></pre>
 <h2 id="order">LC_ALL は、LANG と LC_* より強い</h2>
 <div class="sgoal"><b>この節で分かること</b>: 変数が複数あるとき、どれが効くか。</div>
 <pre data-where="練習機の中（student@linuc）"><code>$ LANG=ja_JP.UTF-8 LC_TIME=C date
-Tue Oct 13 11:56:03 JST 2026
+Tue Oct 13 19:35:18 JST 2026
 $ LANG=C LC_ALL=ja_JP.UTF-8 date
-2026年 10月 13日 火曜日 11:56:04 JST
+2026年 10月 13日 火曜日 19:35:19 JST
 $ LANG=ja_JP.UTF-8 LC_TIME=C locale
 LANG=ja_JP.UTF-8
 LANGUAGE=
@@ -164,8 +198,24 @@ LC_ADDRESS="ja_JP.UTF-8"
 LC_TELEPHONE="ja_JP.UTF-8"
 LC_MEASUREMENT="ja_JP.UTF-8"
 LC_IDENTIFICATION="ja_JP.UTF-8"
-LC_ALL=</code></pre>
-<p>分野ごとの <code>LC_TIME</code> は <code>LANG</code> より強く、<code>LC_ALL</code> はその両方より強い。<code>locale</code> の表示では、自分で設定した <code>LC_TIME=C</code> だけが引用符なしになっている。</p>
+LC_ALL=
+$ LANG=ja_JP.UTF-8 LC_ALL=C locale
+LANG=ja_JP.UTF-8
+LANGUAGE=
+LC_CTYPE="C"
+LC_NUMERIC="C"
+LC_TIME="C"
+LC_COLLATE="C"
+LC_MONETARY="C"
+LC_MESSAGES="C"
+LC_PAPER="C"
+LC_NAME="C"
+LC_ADDRESS="C"
+LC_TELEPHONE="C"
+LC_MEASUREMENT="C"
+LC_IDENTIFICATION="C"
+LC_ALL=C</code></pre>
+<p>分野ごとの <code>LC_TIME</code> は <code>LANG</code> より強く、<code>LC_ALL</code> はその両方より強い。<code>locale</code> の表示では、自分で設定した <code>LC_TIME=C</code> だけが引用符なしになっている。<code>LC_ALL</code> を設定すると、全分野が引用符付きの <code>"C"</code> になった。<code>LC_ALL</code> から来た値だからで、このとき自分で設定した <code>LC_*</code> があっても、表示は <code>LC_ALL</code> の値になる。</p>
 <div class="analogy"><b>たとえ</b>: <code>LANG</code> は会社の標準ルール、<code>LC_TIME</code> などは部署ごとの例外ルール、<code>LC_ALL</code> は社長の一斉指示に近い。一斉指示が出ていれば、部署の例外も標準ルールも見ない。
 <br>ただし<b>崩れる点</b>: 社長の指示は全社に届くが、<code>LC_ALL</code> が届くのはそれを設定したプロセスと、そこから起動した子プロセスだけである。スクリプトの中で設定すれば、そのスクリプトの中だけで効く（第7章の at は、投入したときの値を持っていく）。</div>
 <pre><code>LC_ALL   ＞   LC_TIME など個別の LC_*   ＞   LANG
@@ -203,12 +253,12 @@ LANG=ja_JP.UTF-8</code></pre>
 <p><code>localectl set-locale</code> は <code>/etc/default/locale</code> を書き換える（RHEL 系では <code>/etc/locale.conf</code>）。このファイルはログインのときに読まれるので、いまのシェルには効かない。<code>exit</code> して入り直す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ echo $LANG; date
 ja_JP.UTF-8
-2026年 10月 13日 火曜日 11:56:22 JST</code></pre>
+2026年 10月 13日 火曜日 19:35:37 JST</code></pre>
 <p>新しいログインでは日本語になった。この教材の出力は C.UTF-8 で取っているので、元に戻して入り直す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo localectl set-locale LANG=C.UTF-8
 $ echo $LANG; date
 C.UTF-8
-Tue Oct 13 11:56:25 JST 2026</code></pre>
+Tue Oct 13 19:35:41 JST 2026</code></pre>
 
 <div class="quiz"><b>確認</b>
 <p><code>LANG=ja_JP.UTF-8</code>、<code>LC_TIME=C</code> が設定され、<code>LC_ALL</code> は設定されていない。<code>date</code> の表示と、エラーメッセージの言語はそれぞれ何で決まるか。</p>
@@ -234,8 +284,8 @@ Tue Oct 13 11:56:25 JST 2026</code></pre>
 数字は先頭と末尾の文字の間の文字数（internationalization の 18、localization の 10）。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>ロケールは分野ごとの変数（<code>LC_CTYPE</code> <code>LC_TIME</code> <code>LC_COLLATE</code> <code>LC_MESSAGES</code> など）でできていて、強さは <code>LC_ALL</code> ＞ <code>LC_*</code> ＞ <code>LANG</code></li><li><code>LANG</code> は名前を指すだけ。生成していないロケールを指すと、<b>多くのプログラムは黙って C で動く</b>。生成済みかは <code>locale -a</code> で見る</li><li>生成は <code>locale-gen</code>（Debian 系。<code>/etc/locale.gen</code>）か <code>localedef -i 定義 -f 文字コード 名前</code></li><li>メッセージの翻訳はロケールとは別の翻訳ファイルで、プログラムごとにある（i18n は仕組み、l10n は中身）</li><li>スクリプトは <code>LANG=C</code>（確実には <code>LC_ALL=C</code>）で出力の形を固定する</li><li>システムの既定は <code>localectl set-locale</code> で <code>/etc/default/locale</code> に書き、次のログインから効く</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:56338d96ec710f96d06a8b36d18b5030e8210fec72dd9c3a6e712c9ea02f4c5d / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ locales 2.39-0ubuntu8.9 / libc-bin 2.39-0ubuntu8.9 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>ロケールは分野ごとの変数（<code>LC_CTYPE</code> <code>LC_TIME</code> <code>LC_COLLATE</code> <code>LC_MESSAGES</code> など）でできていて、強さは <code>LC_ALL</code> ＞ <code>LC_*</code> ＞ <code>LANG</code></li><li><code>LANG</code> は名前を指すだけ。生成していないロケールを指すと、<b>多くのプログラムは黙って C で動く</b>。生成済みかは <code>locale -a</code> で見る</li><li>生成は <code>locale-gen</code>（Debian 系。<code>/etc/locale.gen</code>）か <code>localedef -i 定義 -f 文字コード 名前</code></li><li>中身は <code>locale LC_TIME</code>（その分野の値）・<code>locale -k</code>（キーワード名付き）・<code>locale -c</code>（分野の名前も）で見る。<code>-t</code> は無い。引用符付きの値は <code>LC_ALL</code> か <code>LANG</code> から来た値</li><li>メッセージの翻訳はロケールとは別の翻訳ファイルで、プログラムごとにある（i18n は仕組み、l10n は中身）</li><li>スクリプトは <code>LANG=C</code>（確実には <code>LC_ALL=C</code>）で出力の形を固定する</li><li>システムの既定は <code>localectl set-locale</code> で <code>/etc/default/locale</code> に書き、次のログインから効く</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ locales 2.39-0ubuntu8.9 / libc-bin 2.39-0ubuntu8.9 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-admin/theory/07-at">← 7. 拒否リストを消すと、誰も使えなくなる</a><a href="/linuc-admin/theory/09-iconv">次: 9. 文字コードは、読む側が決める →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

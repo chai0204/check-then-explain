@@ -1,0 +1,119 @@
+
+
+========== 0. 版 ==========
+
+$ cat /etc/almalinux-release
+AlmaLinux release 9.7 (Moss Jungle Cat)
+
+$ rpm -q shadow-utils passwd cronie crontabs at
+shadow-utils-4.9-15.el9.x86_64
+passwd-0.80-12.el9.x86_64
+cronie-1.5.7-15.el9.x86_64
+crontabs-1.11-27.20190603git.el9_0.noarch
+at-3.1.23-13.el9_7.x86_64
+
+
+========== 第1章 /etc/shadow の権限 ==========
+
+$ ls -l /etc/shadow /etc/gshadow
+---------- 1 root root 315 May 24 12:07 /etc/gshadow
+---------- 1 root root 417 May 24 12:07 /etc/shadow
+
+
+========== 第2章 useradd（CREATE_HOME） ==========
+
+$ grep -E '^(CREATE_HOME|DEFAULT_HOME|USERGROUPS_ENAB)' /etc/login.defs
+USERGROUPS_ENAB yes
+CREATE_HOME	yes
+
+$ useradd alice
+
+$ ls -ld /home/alice
+drwx------ 2 alice alice 4096 Oct 13 10:42 /home/alice
+
+$ grep '^alice:' /etc/shadow
+alice:!!:20739:0:99999:7:::
+
+
+========== 第4章 passwd -S / passwd -l / usermod -L ==========
+
+$ passwd -S alice
+alice LK 2026-10-13 0 99999 7 -1 (Password locked.)
+
+$ echo 'alice:Alice-pass-2026' | chpasswd
+
+$ passwd -S alice
+alice PS 2026-10-13 0 99999 7 -1 (Password set, SHA512 crypt.)
+
+$ passwd -l alice
+Locking password for user alice.
+passwd: Success
+
+$ grep '^alice:' /etc/shadow | cut -c1-12
+alice:!!$6$X
+
+$ passwd -S alice
+alice LK 2026-10-13 0 99999 7 -1 (Password locked.)
+
+$ passwd -u alice
+Unlocking password for user alice.
+passwd: Success
+
+$ usermod -L alice
+
+$ grep '^alice:' /etc/shadow | cut -c1-12
+alice:!$6$Xo
+
+
+========== 第5章・第7章 cron と at の置き場所と許可ファイル（cronie） ==========
+
+$ ls -l /etc/cron.allow /etc/cron.deny /etc/at.allow /etc/at.deny
+ls: cannot access '/etc/cron.allow': No such file or directory
+ls: cannot access '/etc/at.allow': No such file or directory
+-rw-r--r-- 1 root root 1 Nov 12  2025 /etc/at.deny
+-rw-r--r-- 1 root root 0 Sep 25  2025 /etc/cron.deny
+
+$ ls -ld /var/spool/cron /var/spool/at
+drwx------ 3 root root 4096 Oct 13 10:42 /var/spool/at
+drwx------ 2 root root 4096 Sep 25  2025 /var/spool/cron
+
+$ su -s /bin/bash alice -c 'crontab -l'
+no crontab for alice
+
+$ rm /etc/cron.deny
+
+$ su -s /bin/bash alice -c 'crontab -l'
+You (alice) are not allowed to use this program (crontab)
+See crontab(1) for more information
+
+
+========== 第6章 cron.hourly と anacron の起こし方、run-parts の名前の規則 ==========
+
+$ cat /etc/cron.d/0hourly
+# Run the hourly jobs
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+01 * * * * root run-parts /etc/cron.hourly
+
+$ grep -vE '^#|^$' /etc/cron.hourly/0anacron | tail -3
+    exit 0
+fi
+/usr/sbin/anacron -s
+
+$ grep -vE '^#|^$' /etc/anacrontab
+SHELL=/bin/sh
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+RANDOM_DELAY=45
+START_HOURS_RANGE=3-22
+1	5	cron.daily		nice run-parts /etc/cron.daily
+7	25	cron.weekly		nice run-parts /etc/cron.weekly
+@monthly 45	cron.monthly		nice run-parts /etc/cron.monthly
+
+$ mkdir -p /tmp/rp && printf '#!/bin/sh\necho hello.sh ran\n' > /tmp/rp/hello.sh && chmod 755 /tmp/rp/hello.sh
+
+$ run-parts /tmp/rp
+/tmp/rp/hello.sh:
+
+hello.sh ran

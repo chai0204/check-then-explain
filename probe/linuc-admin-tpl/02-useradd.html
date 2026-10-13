@@ -11,7 +11,7 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/">詳しく</a></p>
 </div>
 <h1>2. useradd は、頼まれたことしかしない</h1>
-<p class="lead"><code>sudo useradd alice</code> は何も言わずに成功する。台帳の6列目には <code>/home/alice</code> と書かれる。ところが、そのディレクトリはどこにも無い。<code>useradd</code> が書いたのは台帳の行だけで、ホームを作れとは頼まれていないからである。</p>
+<p class="lead"><code>sudo useradd alice</code> は何も言わずに成功する。台帳の6列目には <code>/home/alice</code> と書かれる。ところが、そのディレクトリはどこにも無い。この Ubuntu の <code>useradd</code> が書いたのは台帳の行だけで、ホームを作れとは頼まれていないからである。</p>
 <div class="badges"><span>前提: 第1章まで読了</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.08.1（重要度5）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>useradd</code> の主なオプション（<code>-m</code> <code>-s</code> <code>-d</code> <code>-g</code> <code>-G</code> <code>-u</code> <code>-c</code> <code>-k</code> <code>-D</code>）を使い分けられる</li><li>既定値が <code>/etc/default/useradd</code>・<code>/etc/login.defs</code>・<code>/etc/skel</code> のどこから来るかを言える</li><li><code>useradd</code> と <code>adduser</code> の違いを説明できる</li></ul>
@@ -27,18 +27,28 @@
 @@ getent passwd alice
 @@ ls -ld /home/alice
 @@ sudo -iu alice pwd
+@@ sudo su - alice -c pwd
 </code></pre>
 <div class="then"><b>だめな理由</b>: 台帳の6列目に <code>/home/alice</code> と<b>書かれただけ</b>で、ディレクトリは作られていない。
-alice として入ろうとすると <code>cd</code> に失敗し、元の場所（<code>/home/student</code>）に取り残される。
+alice として動かすと、<code>sudo</code> も <code>su</code> もホームへ移れないと警告し、元の場所（<code>/home/student</code>）のまま動いた。
+入れないわけではないが、使える状態でもない（コンソールの <code>login</code> なら <code>/</code> から始まる。次の節の <code>DEFAULT_HOME yes</code>）。
 7列目のシェルも <code>/bin/bash</code> ではなく <code>/bin/sh</code> になっている。
-<code>useradd</code> は台帳に行を書くコマンドで、ホームを作るのは <code>-m</code> を付けたときだけである
-（Ubuntu の場合。RHEL 系は <code>/etc/login.defs</code> の <code>CREATE_HOME yes</code> により <code>-m</code> なしでも作る）。</div></div>
+<code>useradd</code> は台帳に行を書くコマンドで、<code>-m</code> なしでホームを作るかどうかは <code>/etc/login.defs</code> の <code>CREATE_HOME</code> で決まる。
+この Ubuntu には行が無いので、<code>-m</code> を付けたときだけ作る（RHEL 系は <code>CREATE_HOME yes</code> なので <code>-m</code> なしでも作る）。</div></div>
 <p>書かれたのは <code>/etc/passwd</code> の1行だけではない。主グループと、パスワードの欄も作られている。</p>
 <pre data-where="練習機の中（student@linuc）"><code>
 @@ id alice
 @@ sudo grep '^alice:' /etc/shadow
 </code></pre>
 <p>UID と同じ番号 1004 の私的グループ <code>alice</code> ができ、<code>/etc/shadow</code> の2列目は <code>!</code>（パスワードが無い・ロック）である。パスワードも頼まれていないので付けていない。</p>
+<p>RHEL 系で同じことをすると、結果が2点違う。比較のために AlmaLinux 9.7 のコンテナで打った記録を添える（この教材の練習機では打てない）。</p>
+<pre data-where="比較: AlmaLinux 9.7（RHEL 系）のコンテナ"><code>
+@@rhel grep -E '^(CREATE_HOME|DEFAULT_HOME|USERGROUPS_ENAB)' /etc/login.defs
+@@rhel useradd alice
+@@rhel ls -ld /home/alice
+@@rhel grep '^alice:' /etc/shadow
+</code></pre>
+<p><code>CREATE_HOME yes</code> なので <code>-m</code> なしでもホームができ、パスワードの欄は <code>!!</code> になる。試験で「<code>useradd</code> でホームが作られるか」を問われたら、<code>-m</code>（作る）・<code>-M</code>（作らない）と、既定は <code>/etc/login.defs</code> の <code>CREATE_HOME</code> で決まることを答える。</p>
 <div class="analogy"><b>たとえ</b>: 住民票に住所を登録するのに近い。登録すれば住所は書類に載るが、その部屋が建つわけではない。
 <br>ただし<b>崩れる点</b>: 役所は実在しない住所を受け付けないが、<code>useradd</code> は存在しないディレクトリをそのまま台帳に書き、警告も出さない。確かめる役は自分にある。</div>
 
@@ -53,7 +63,7 @@ alice として入ろうとすると <code>cd</code> に失敗し、元の場所
 <p><code>/etc/default/useradd</code> で有効な行は <code>SHELL=/bin/sh</code> の1行だけで、残りは <code>useradd</code> に組み込まれた値である。
 ところが <code>GROUP=100</code>（<code>users</code>）と出ているのに、alice の主グループは 1004 だった。これを決めているのはもう1つのファイルである。</p>
 <pre data-where="練習機の中（student@linuc）"><code>
-@@ grep -E '^(UID_MIN|UID_MAX|GID_MIN|USERGROUPS_ENAB|HOME_MODE)' /etc/login.defs
+@@ grep -E '^(UID_MIN|UID_MAX|GID_MIN|USERGROUPS_ENAB|HOME_MODE|DEFAULT_HOME|CREATE_HOME)' /etc/login.defs
 </code></pre>
 <p><code>USERGROUPS_ENAB yes</code> のとき、<code>useradd</code> はユーザと同じ名前のグループを作って主グループにする（ユーザプライベートグループ）。<code>GROUP=100</code> は、これを切ったとき（<code>-N</code>）にだけ使われる。</p>
 <div class="scroll"><table>
@@ -64,6 +74,8 @@ alice として入ろうとすると <code>cd</code> に失敗し、元の場所
 <tr><td>UID・GID の範囲</td><td><code>/etc/login.defs</code> の <code>UID_MIN</code> / <code>UID_MAX</code> / <code>GID_MIN</code></td><td>1000〜60000</td></tr>
 <tr><td>同名の私的グループを作るか</td><td><code>/etc/login.defs</code> の <code>USERGROUPS_ENAB</code></td><td><code>yes</code></td></tr>
 <tr><td>ホームの権限</td><td><code>/etc/login.defs</code> の <code>HOME_MODE</code></td><td><code>0750</code></td></tr>
+<tr><td><code>-m</code> なしでホームを作るか</td><td><code>/etc/login.defs</code> の <code>CREATE_HOME</code></td><td>行が無い（作らない）。RHEL 系は <code>yes</code></td></tr>
+<tr><td>ホームに移れないときログインさせるか</td><td><code>/etc/login.defs</code> の <code>DEFAULT_HOME</code></td><td><code>yes</code>（<code>/</code> で始める）</td></tr>
 </table></div>
 
 <h2 id="skel">-m を付けると、ひな形が写される</h2>
@@ -140,9 +152,9 @@ alice として入ろうとすると <code>cd</code> に失敗し、元の場所
 <div class="scroll"><table>
 <tr><th></th><th><code>useradd</code></th><th><code>adduser</code>（Debian 系）</th></tr>
 <tr><td>位置づけ</td><td>台帳を書く本体（全ディストリビューション共通）</td><td>方針どおりに本体を呼ぶ窓口</td></tr>
-<tr><td>ホーム</td><td><code>-m</code> を付けたときだけ</td><td>作る</td></tr>
+<tr><td>ホーム</td><td><code>-m</code> を付けたとき（RHEL 系は <code>CREATE_HOME yes</code> で付けなくても作る）</td><td>作る</td></tr>
 <tr><td>シェル</td><td><code>/etc/default/useradd</code>（ここでは <code>/bin/sh</code>）</td><td><code>/etc/adduser.conf</code>（既定 <code>/bin/bash</code>）</td></tr>
-<tr><td>パスワード</td><td>付けない（<code>!</code>）</td><td>対話で聞く</td></tr>
+<tr><td>パスワード</td><td>付けない（Ubuntu は <code>!</code>、RHEL 系は <code>!!</code>）</td><td>対話で聞く</td></tr>
 <tr><td>設定ファイル</td><td><code>/etc/default/useradd</code>・<code>/etc/login.defs</code></td><td><code>/etc/adduser.conf</code></td></tr>
 </table></div>
 <p>RHEL 系の <code>adduser</code> は <code>useradd</code> への別名（シンボリックリンク）で、動きは <code>useradd</code> と同じになる。試験で問われるのは <code>useradd</code> のオプションである。最後に kai を消しておく。</p>
@@ -157,7 +169,7 @@ alice として入ろうとすると <code>cd</code> に失敗し、元の場所
 <p>ユーザ <code>taro</code> を、ホームディレクトリを作成し、ログインシェルを <code>/bin/bash</code>、副グループを <code>wheel</code> と <code>dev</code> にして作成したい。正しいコマンドはどれか。</p>
 <p>A. <code>useradd -d -s /bin/bash -g wheel,dev taro</code>　B. <code>useradd -m -s /bin/bash -G wheel,dev taro</code>　C. <code>useradd -k -b /bin/bash -G wheel,dev taro</code>　D. <code>useradd -m -s /bin/bash -g wheel -g dev taro</code></p>
 <details><summary>答え</summary>
-<p>B。ホームを作るのは <code>-m</code>、シェルは <code>-s</code>、副グループは <code>-G</code>（カンマ区切り）。
+<p>B。ホームを作るのは <code>-m</code>、シェルは <code>-s</code>、副グループは <code>-G</code>（カンマ区切り）。RHEL 系は <code>CREATE_HOME yes</code> なので <code>-m</code> が無くても作られるが、付けておけばどちらでも確実に作る。
 <code>-g</code> は主グループで、1つしか指定できない。<code>-d</code> はホームの場所を指定するだけで、作るかどうかは <code>-m</code> で決まる。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>/etc/skel</code> に <code>.vimrc</code> を追加した。すでにいるユーザ alice のホームにも <code>.vimrc</code> が配られるか。</p>
@@ -171,8 +183,8 @@ alice として入ろうとすると <code>cd</code> に失敗し、元の場所
 この練習機では <code>useradd -D -s</code> がファイルを root だけが読める権限で書き直したので、確認は <code>sudo useradd -D</code> で行う。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>useradd</code> は台帳（<code>/etc/passwd</code>・<code>/etc/shadow</code>・<code>/etc/group</code>）に行を書く。ホームは <code>-m</code> を付けたときだけ作る</li><li>既定値は <code>/etc/default/useradd</code>（シェル・ひな形）と <code>/etc/login.defs</code>（UID の範囲・私的グループ・ホームの権限）から来る。確かめるのは <code>useradd -D</code></li><li><code>/etc/skel</code> はホームを作る瞬間にだけ写される。所有者は新しいユーザになる</li><li>作ったばかりのユーザはパスワードが無い（<code>/etc/shadow</code> の2列目が <code>!</code>）</li><li><code>adduser</code> は Debian 系の窓口で、ホーム・シェル・パスワードまでまとめて面倒を見る。本体は <code>useradd</code></li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / adduser 3.137ubuntu1 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>useradd</code> は台帳（<code>/etc/passwd</code>・<code>/etc/shadow</code>・<code>/etc/group</code>）に行を書く。<code>-m</code> なしでホームを作るかは <code>/etc/login.defs</code> の <code>CREATE_HOME</code> で決まり、Ubuntu は作らない（RHEL 系は作る）。<code>-m</code> を付ければどちらでも作る</li><li>既定値は <code>/etc/default/useradd</code>（シェル・ひな形）と <code>/etc/login.defs</code>（UID の範囲・私的グループ・ホームの権限・ホームを作るか）から来る。確かめるのは <code>useradd -D</code></li><li><code>/etc/skel</code> はホームを作る瞬間にだけ写される。所有者は新しいユーザになる</li><li>作ったばかりのユーザはパスワードが無い（<code>/etc/shadow</code> の2列目が Ubuntu は <code>!</code>、RHEL 系は <code>!!</code>）</li><li><code>adduser</code> は Debian 系の窓口で、ホーム・シェル・パスワードまでまとめて面倒を見る。本体は <code>useradd</code></li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / adduser 3.137ubuntu1 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-admin/theory/01-ledger">← 1. ユーザの台帳は3枚に分かれている</a><a href="/linuc-admin/theory/03-membership">次: 3. 所属は、書いたとおりに置き換わる →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

@@ -24,7 +24,7 @@
 @@ cat /etc/default/locale
 @@ locale -a
 </code></pre>
-<p><code>locale</code> は、いまのシェルのロケールを分野ごとに表示する。引用符 <code>"…"</code> 付きの値は「自分では設定されていないので <code>LANG</code> から引き継いだ」という意味である。<code>LANG</code> の値は、ログインのときに <code>/etc/default/locale</code>（システムの既定）から読み込まれた。<code>locale -a</code> は、この練習機に<b>生成済み</b>のロケールの一覧で、いまは C 系の3つしか無い。</p>
+<p><code>locale</code> は、いまのシェルのロケールを分野ごとに表示する。引用符 <code>"…"</code> 付きの値は「その変数そのものの値ではなく、<code>LC_ALL</code>（設定されていればそちら）か <code>LANG</code> から来た値」という意味である（<code>LC_ALL</code> の例は後の節で見る）。<code>LANG</code> の値は、ログインのときに <code>/etc/default/locale</code>（システムの既定）から読み込まれた。<code>locale -a</code> は、この練習機に<b>生成済み</b>のロケールの一覧で、いまは C 系の3つしか無い。</p>
 <div class="scroll"><table>
 <tr><th>変数</th><th>決めるもの</th><th>影響を受ける例</th></tr>
 <tr><td><code>LC_CTYPE</code></td><td>文字の種類（どのバイト列が1文字か）</td><td><code>wc -m</code>、正規表現の <code>[[:alpha:]]</code></td></tr>
@@ -36,6 +36,13 @@
 <tr><td><code>LANG</code></td><td>上のどれも設定されていないときの既定</td><td>—</td></tr>
 <tr><td><code>LC_ALL</code></td><td>設定すると、全分野をこの値で上書き</td><td>—</td></tr>
 </table></div>
+<p><code>locale</code> に分野の名前を渡すと、その分野が持っている値が並ぶ。<code>-k</code> を付けるとキーワード名（<code>abday=</code> など）も出し、<code>-c</code> を付けると分野の名前も出す。<code>-t</code> というオプションは無い。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ locale LC_TIME | head -4
+@@ locale -k LC_TIME | head -4
+@@ locale -ck LC_TIME | head -5
+@@ locale -t
+</code></pre>
 
 <h2 id="name">生成していないロケールを指すと、黙って C になる</h2>
 <div class="sgoal"><b>この節で分かること</b>: ロケールの「名前」と「実体」が別であること。</div>
@@ -69,7 +76,14 @@
 @@ LANG=ja_JP.UTF-8 printf "%'d\n" 1234567
 @@ LANG=C printf "%'d\n" 1234567
 </code></pre>
-<p>日時（<code>LC_TIME</code>）と桁区切り（<code>LC_NUMERIC</code>）が日本の書き方になった。ところがメッセージ（<code>LC_MESSAGES</code>）は、プログラムによって変わったり変わらなかったりする。</p>
+<p>日時（<code>LC_TIME</code>）と桁区切り（<code>LC_NUMERIC</code>）が日本の書き方になった。何が変わったのかは、最初の節で使った <code>locale -k</code>・<code>-c</code> で、ロケールのデータの中身として見られる。キーワード1つを渡すこともできる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>
+@@ locale -k thousands_sep
+@@ LANG=ja_JP.UTF-8 locale -k LC_NUMERIC
+@@ LANG=ja_JP.UTF-8 locale -ck date_fmt
+</code></pre>
+<p>C.UTF-8 の桁区切り（<code>thousands_sep</code>）は空で、ja_JP.UTF-8 は <code>,</code> を3桁ごと（<code>grouping=3</code>）に入れる。<code>printf "%'d"</code> の違いはここから来ていた。<code>date</code> の既定の形も <code>LC_TIME</code> の <code>date_fmt</code> に書いてある。</p>
+<p>ところがメッセージ（<code>LC_MESSAGES</code>）は、プログラムによって変わったり変わらなかったりする。ところがメッセージ（<code>LC_MESSAGES</code>）は、プログラムによって変わったり変わらなかったりする。</p>
 <pre data-where="練習機の中（student@linuc）"><code>
 @@ LANG=ja_JP.UTF-8 ls /nonexistent
 @@ LANG=ja_JP.UTF-8 dpkg -s nonexistent-pkg
@@ -95,8 +109,9 @@
 @@ LANG=ja_JP.UTF-8 LC_TIME=C date
 @@ LANG=C LC_ALL=ja_JP.UTF-8 date
 @@ LANG=ja_JP.UTF-8 LC_TIME=C locale
+@@ LANG=ja_JP.UTF-8 LC_ALL=C locale
 </code></pre>
-<p>分野ごとの <code>LC_TIME</code> は <code>LANG</code> より強く、<code>LC_ALL</code> はその両方より強い。<code>locale</code> の表示では、自分で設定した <code>LC_TIME=C</code> だけが引用符なしになっている。</p>
+<p>分野ごとの <code>LC_TIME</code> は <code>LANG</code> より強く、<code>LC_ALL</code> はその両方より強い。<code>locale</code> の表示では、自分で設定した <code>LC_TIME=C</code> だけが引用符なしになっている。<code>LC_ALL</code> を設定すると、全分野が引用符付きの <code>"C"</code> になった。<code>LC_ALL</code> から来た値だからで、このとき自分で設定した <code>LC_*</code> があっても、表示は <code>LC_ALL</code> の値になる。</p>
 <div class="analogy"><b>たとえ</b>: <code>LANG</code> は会社の標準ルール、<code>LC_TIME</code> などは部署ごとの例外ルール、<code>LC_ALL</code> は社長の一斉指示に近い。一斉指示が出ていれば、部署の例外も標準ルールも見ない。
 <br>ただし<b>崩れる点</b>: 社長の指示は全社に届くが、<code>LC_ALL</code> が届くのはそれを設定したプロセスと、そこから起動した子プロセスだけである。スクリプトの中で設定すれば、そのスクリプトの中だけで効く（第7章の at は、投入したときの値を持っていく）。</div>
 <pre><code>LC_ALL   ＞   LC_TIME など個別の LC_*   ＞   LANG
@@ -161,8 +176,8 @@
 数字は先頭と末尾の文字の間の文字数（internationalization の 18、localization の 10）。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>ロケールは分野ごとの変数（<code>LC_CTYPE</code> <code>LC_TIME</code> <code>LC_COLLATE</code> <code>LC_MESSAGES</code> など）でできていて、強さは <code>LC_ALL</code> ＞ <code>LC_*</code> ＞ <code>LANG</code></li><li><code>LANG</code> は名前を指すだけ。生成していないロケールを指すと、<b>多くのプログラムは黙って C で動く</b>。生成済みかは <code>locale -a</code> で見る</li><li>生成は <code>locale-gen</code>（Debian 系。<code>/etc/locale.gen</code>）か <code>localedef -i 定義 -f 文字コード 名前</code></li><li>メッセージの翻訳はロケールとは別の翻訳ファイルで、プログラムごとにある（i18n は仕組み、l10n は中身）</li><li>スクリプトは <code>LANG=C</code>（確実には <code>LC_ALL=C</code>）で出力の形を固定する</li><li>システムの既定は <code>localectl set-locale</code> で <code>/etc/default/locale</code> に書き、次のログインから効く</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ locales 2.39-0ubuntu8.9 / libc-bin 2.39-0ubuntu8.9 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>ロケールは分野ごとの変数（<code>LC_CTYPE</code> <code>LC_TIME</code> <code>LC_COLLATE</code> <code>LC_MESSAGES</code> など）でできていて、強さは <code>LC_ALL</code> ＞ <code>LC_*</code> ＞ <code>LANG</code></li><li><code>LANG</code> は名前を指すだけ。生成していないロケールを指すと、<b>多くのプログラムは黙って C で動く</b>。生成済みかは <code>locale -a</code> で見る</li><li>生成は <code>locale-gen</code>（Debian 系。<code>/etc/locale.gen</code>）か <code>localedef -i 定義 -f 文字コード 名前</code></li><li>中身は <code>locale LC_TIME</code>（その分野の値）・<code>locale -k</code>（キーワード名付き）・<code>locale -c</code>（分野の名前も）で見る。<code>-t</code> は無い。引用符付きの値は <code>LC_ALL</code> か <code>LANG</code> から来た値</li><li>メッセージの翻訳はロケールとは別の翻訳ファイルで、プログラムごとにある（i18n は仕組み、l10n は中身）</li><li>スクリプトは <code>LANG=C</code>（確実には <code>LC_ALL=C</code>）で出力の形を固定する</li><li>システムの既定は <code>localectl set-locale</code> で <code>/etc/default/locale</code> に書き、次のログインから効く</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ locales 2.39-0ubuntu8.9 / libc-bin 2.39-0ubuntu8.9 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-admin/theory/07-at">← 7. 拒否リストを消すと、誰も使えなくなる</a><a href="/linuc-admin/theory/09-iconv">次: 9. 文字コードは、読む側が決める →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

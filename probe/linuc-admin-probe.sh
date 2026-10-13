@@ -6,8 +6,10 @@
 # 章をまたいで持ち越される。ここでもそれをそのまま再現する。ここに出ない出力は本文に書かない。
 #
 # 走らせ方（読者の起動コマンドと同じオプション。名前とボリューム名だけ probe 用。KVM は使わない）:
+#   （1.0.1: 事実確認の指摘を受けて、groupdel -f・su -s・0anacron・日付つきの at（通る書式と通らない書式）・
+#    locale LC_TIME / -k / -c（-t は無い）・LC_ALL の引用符を足した）
 #   docker run -d --name linuc-admin-p1 --hostname host --stop-timeout 30 \
-#     -v linuc-admin-p1-vm:/home/lab/vm -v linuc-admin-p1-state:/home/lab/.lab lab-linuc-admin:1.0.0
+#     -v linuc-admin-p1-vm:/home/lab/vm -v linuc-admin-p1-state:/home/lab/.lab lab-linuc-admin:1.0.1
 #   docker exec linuc-admin-p1 vm wait
 #   docker cp probe/linuc-admin-probe.sh linuc-admin-p1:/tmp/probe.sh
 #   docker exec -u lab -w /home/lab linuc-admin-p1 bash /tmp/probe.sh > logs/linuc-admin-probe.log 2>&1
@@ -97,12 +99,13 @@ G 'sudo useradd alice'
 G 'getent passwd alice'
 G 'ls -ld /home/alice'
 G 'sudo -iu alice pwd'
+G 'sudo su - alice -c pwd'
 G 'id alice'
 G "sudo grep '^alice:' /etc/shadow"
 G 'useradd -D'
 G 'ls -l /etc/default/useradd'
 G "grep -vE '^\s*#|^\s*\$' /etc/default/useradd"
-G "grep -E '^(UID_MIN|UID_MAX|GID_MIN|USERGROUPS_ENAB|HOME_MODE)' /etc/login.defs"
+G "grep -E '^(UID_MIN|UID_MAX|GID_MIN|USERGROUPS_ENAB|HOME_MODE|DEFAULT_HOME|CREATE_HOME)' /etc/login.defs"
 G 'sudo userdel alice'
 G 'sudo useradd -m -s /bin/bash alice'
 G 'getent passwd alice'
@@ -145,6 +148,11 @@ G 'sudo groupmod -n operators ops'
 G 'getent group operators'
 G 'id alice'
 G 'sudo groupdel alice'
+G 'sudo useradd -m temp1'
+G 'sudo groupdel -f temp1'
+G 'id temp1'
+G 'ls -ld /home/temp1'
+G 'sudo userdel -r temp1'
 G 'sudo groupdel operators'
 G 'id alice'
 G 'sudo -u carol touch /tmp/carol-was-here'
@@ -183,6 +191,7 @@ G "sudo usermod -e '' alice"
 H 'ssh -l alice linuc id'
 G 'sudo usermod -s /usr/sbin/nologin alice'
 H 'ssh -l alice linuc id'
+G 'sudo su -s /bin/bash alice -c id'
 G 'sudo usermod -s /bin/bash alice'
 G 'sudo passwd -u alice'
 G 'sudo passwd -S alice'
@@ -254,7 +263,7 @@ G 'sudo anacron -n -d'
 G 'sudo anacron -f -n -s -d'
 G 'cat /tmp/daily.txt'
 G 'sudo cat /var/spool/anacron/cron.daily'
-G 'tail -1 /etc/cron.daily/0anacron'
+G "grep -vE '^#|^\$' /etc/cron.daily/0anacron"
 G 'sudo anacron -T; echo $?'
 G 'sudo rm /etc/cron.daily/hello'
 
@@ -277,6 +286,17 @@ G 'atq'
 G "echo 'uptime > /tmp/batch.txt' | batch"
 W_sec 20
 G 'cat /tmp/batch.txt'
+G "echo 'date' | at now +10min"
+G "echo 'date' | at 00:00"
+G "echo 'date' | at 10:00 2030-12-24"
+G "echo 'date' | at 10:00 12/24/2030"
+G "echo 'date' | at 10:00 24.12.2030"
+G "echo 'date' | at 10:00 122430"
+G "echo 'date' | at 2030-12-24 10:00"
+G "echo 'date' | at 10:00 20301224"
+G "echo 'date' | at 10:00 yesterday"
+G 'atq | sort -n'
+G 'atrm 4 5 6 7 8 9'
 G 'ls -l /etc/at.allow /etc/at.deny'
 G 'sudo head -5 /etc/at.deny'
 G 'sudo mv /etc/at.deny /etc/at.deny.orig'
@@ -296,6 +316,10 @@ S "第8章 ロケールは、名前で指しているだけ（1.08.3）"
 G 'locale'
 G 'cat /etc/default/locale'
 G 'locale -a'
+G 'locale LC_TIME | head -4'
+G 'locale -k LC_TIME | head -4'
+G 'locale -ck LC_TIME | head -5'
+G 'locale -t'
 G 'LANG=ja_JP.UTF-8 date; echo $?'
 G 'LANG=ja_JP.UTF-8 locale'
 G 'grep ja_JP /etc/locale.gen'
@@ -306,12 +330,16 @@ G 'LANG=ja_JP.UTF-8 date'
 G 'LANG=ja_JP.UTF-8 ls -l /etc/hostname'
 G "LANG=ja_JP.UTF-8 printf \"%'d\\n\" 1234567"
 G "LANG=C printf \"%'d\\n\" 1234567"
+G 'locale -k thousands_sep'
+G 'LANG=ja_JP.UTF-8 locale -k LC_NUMERIC'
+G 'LANG=ja_JP.UTF-8 locale -ck date_fmt'
 G 'LANG=ja_JP.UTF-8 ls /nonexistent'
 G 'LANG=ja_JP.UTF-8 dpkg -s nonexistent-pkg'
 G 'ls -1 /usr/share/locale/ja/LC_MESSAGES/'
 G 'LANG=ja_JP.UTF-8 LC_TIME=C date'
 G 'LANG=C LC_ALL=ja_JP.UTF-8 date'
 G 'LANG=ja_JP.UTF-8 LC_TIME=C locale'
+G 'LANG=ja_JP.UTF-8 LC_ALL=C locale'
 G "LANG=ja_JP.UTF-8 date | awk '{print \$2}'"
 G "LANG=C date | awk '{print \$2}'"
 G 'sudo localedef -i en_US -f UTF-8 en_US.UTF-8'

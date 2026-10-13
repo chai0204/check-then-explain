@@ -23,7 +23,7 @@
 @@ sudo passwd -S alice
 @@ sudo grep '^alice:' /etc/shadow
 </code></pre>
-<p><code>passwd -S</code> は <code>/etc/shadow</code> の行を読みやすく直して表示する。2つ目の欄が状態で、<code>L</code> はロック（2列目が <code>!</code> で始まる）、<code>P</code> は使えるパスワードがある、<code>NP</code> はパスワードが空。3つ目以降は最終変更日・最短日数・有効日数・警告日数・猶予日数で、<code>/etc/shadow</code> の3〜7列目に対応する。</p>
+<p><code>passwd -S</code> は <code>/etc/shadow</code> の行を読みやすく直して表示する。2つ目の欄が状態で、<code>L</code> はロック（2列目が <code>!</code> で始まる）、<code>P</code> は使えるパスワードがある、<code>NP</code> はパスワードが空。3つ目以降は最終変更日・最短日数・有効日数・警告日数・猶予日数で、<code>/etc/shadow</code> の3〜7列目に対応する。これは Ubuntu（Debian 系）の <code>passwd</code> の表示で、RHEL 系は <code>LK</code>・<code>PS</code>・<code>NP</code> の2文字と説明文を出す（章の最後で比べる）。</p>
 <p>パスワードを付ける。<code>passwd</code> は2回聞いてくる。打った文字は画面に出ない。</p>
 <pre data-where="練習機の中（student@linuc）"><code>
 @@ sudo passwd alice
@@ -93,15 +93,17 @@
 <pre data-where="外（lab@host）"><code>
 @@ ssh -l alice linuc id
 </code></pre>
+<p>ただし root だけは、<code>su -s</code> で別のシェルを指定すれば入れる。root はもともと何でもできるので、ここで止める相手ではない。</p>
 <pre data-where="練習機の中（student@linuc）"><code>
+@@ sudo su -s /bin/bash alice -c id
 @@ sudo usermod -s /bin/bash alice
 </code></pre>
 <p>ログインは「本人確認（パスワードか鍵）→ アカウントの検査（有効期限など）→ シェルの起動」の順に進む。どの段で止めるかで、止まる入口が変わる。</p>
 <div class="scroll"><table>
 <tr><th>止め方</th><th>書き換える場所</th><th>効く段</th><th>パスワード</th><th>鍵の ssh</th><th>root からの su</th></tr>
-<tr><td><code>passwd -l</code> / <code>usermod -L</code></td><td><code>/etc/shadow</code> 2列目に <code>!</code></td><td>本人確認</td><td>止まる</td><td>止まらない</td><td>止まらない</td></tr>
-<tr><td><code>usermod -e 1</code> / <code>chage -E 0</code></td><td><code>/etc/shadow</code> 8列目</td><td>アカウントの検査</td><td>止まる</td><td>止まる</td><td>止まる</td></tr>
-<tr><td><code>usermod -s /usr/sbin/nologin</code></td><td><code>/etc/passwd</code> 7列目</td><td>シェルの起動</td><td>止まる</td><td>止まる</td><td>止まる</td></tr>
+<tr><td><code>passwd -l</code> / <code>usermod -L</code></td><td><code>/etc/shadow</code> 2列目に <code>!</code>（RHEL 系の <code>passwd -l</code> は <code>!!</code>）</td><td>本人確認</td><td>止まる</td><td>止まらない</td><td>止まらない</td></tr>
+<tr><td><code>usermod -e 1</code> / <code>chage -E 1</code></td><td><code>/etc/shadow</code> 8列目</td><td>アカウントの検査</td><td>止まる</td><td>止まる</td><td>止まる</td></tr>
+<tr><td><code>usermod -s /usr/sbin/nologin</code></td><td><code>/etc/passwd</code> 7列目</td><td>シェルの起動</td><td>止まる</td><td>止まる</td><td>止まる（root が <code>su -s /bin/bash</code> でシェルを指定すると入れる）</td></tr>
 </table></div>
 <p>試験で「アカウントを一時的に無効にする」と問われたら、<code>passwd -l</code>・<code>usermod -L</code>（ロック）、<code>usermod -e</code>・<code>chage -E</code>（期限）、シェルを <code>/usr/sbin/nologin</code> や <code>/bin/false</code> にする、の3系統が答えになる。実務では、鍵で入る人がいるならロックだけでは足りない。</p>
 <div class="analogy"><b>たとえ</b>: 社員証の有効期限に近い。期限が切れた社員証では、暗証番号のドアでもカードキーのドアでも、受付で止められる。
@@ -133,18 +135,38 @@
 <p><code>NP</code> はパスワードが空の状態で、コンソールでは<b>パスワード無しで入れてしまう</b>危険な状態である。そこからロックして解除しようとすると、<code>passwd -u</code> は「解除するとパスワード無しのアカウントになる」と言って断る。</p>
 <div class="scroll"><table>
 <tr><th><code>passwd</code></th><th>同じことをする別のコマンド</th><th><code>/etc/shadow</code> の変化</th></tr>
-<tr><td><code>-l</code>（ロック）</td><td><code>usermod -L</code></td><td>2列目の頭に <code>!</code></td></tr>
+<tr><td><code>-l</code>（ロック）</td><td><code>usermod -L</code></td><td>2列目の頭に <code>!</code>（RHEL 系の <code>passwd -l</code> は <code>!!</code>）</td></tr>
 <tr><td><code>-u</code>（ロック解除）</td><td><code>usermod -U</code></td><td>2列目の <code>!</code> を外す</td></tr>
 <tr><td><code>-d</code>（パスワードを消す）</td><td>—</td><td>2列目を空にする</td></tr>
 <tr><td><code>-e</code>（期限切れにする）</td><td><code>chage -d 0</code></td><td>3列目を 0 にする</td></tr>
 <tr><td><code>-S</code>（状態を見る）</td><td><code>chage -l</code></td><td>（読むだけ）</td></tr>
 <tr><td><code>-n</code> / <code>-x</code> / <code>-w</code> / <code>-i</code></td><td><code>chage -m</code> / <code>-M</code> / <code>-W</code> / <code>-I</code></td><td>4〜7列目（最短・有効・警告・猶予の日数）</td></tr>
 </table></div>
+<p><code>chage -E</code> の値は日数で、<code>usermod -e 1</code> と同じことは <code>chage -E 1</code> である。<code>0</code> は「1970-01-01」とも「期限なし」とも読まれうるので使わない（<code>man 5 shadow</code>）。</p>
+<p>ここまでの表示とロックの印は Ubuntu（Debian 系）のものである。RHEL 系は <code>passwd</code> が別の実装で、表示も印も違う。比較のために AlmaLinux 9.7 のコンテナで打った記録を添える（この教材の練習機では打てない。root で打っているので <code>sudo</code> が無く、パスワードは <code>chpasswd</code> で入れている）。</p>
+<pre data-where="比較: AlmaLinux 9.7（RHEL 系）のコンテナ"><code>
+@@rhel passwd -S alice
+@@rhel echo 'alice:Alice-pass-2026' | chpasswd
+@@rhel passwd -S alice  ## n=2
+@@rhel passwd -l alice
+@@rhel grep '^alice:' /etc/shadow | cut -c1-12
+@@rhel passwd -u alice
+@@rhel usermod -L alice
+@@rhel grep '^alice:' /etc/shadow | cut -c1-12  ## n=2
+</code></pre>
+<div class="scroll"><table>
+<tr><th></th><th>Ubuntu（この練習機）</th><th>RHEL 系（AlmaLinux 9.7）</th></tr>
+<tr><td><code>useradd</code> 直後の2列目</td><td><code>!</code></td><td><code>!!</code></td></tr>
+<tr><td><code>passwd -l</code> が足す印</td><td><code>!</code></td><td><code>!!</code></td></tr>
+<tr><td><code>usermod -L</code> が足す印</td><td><code>!</code></td><td><code>!</code></td></tr>
+<tr><td><code>passwd -S</code> の状態</td><td><code>L</code> / <code>P</code> / <code>NP</code></td><td><code>LK</code> / <code>PS</code> / <code>NP</code> と説明文（<code>(Password locked.)</code> など）</td></tr>
+</table></div>
+<p>どちらも「2列目の先頭が <code>!</code> ならロック」で、意味は同じである。試験の選択肢に <code>!!</code> や <code>LK</code> が出てきても、ロックのことだと読めればよい。</p>
 
 <div class="quiz"><b>確認</b>
 <p>ユーザ taro のパスワードをロックするコマンドを2つ答えよ。また、ロックすると <code>/etc/shadow</code> の taro の行はどう変わるか。</p>
 <details><summary>答え</summary>
-<p><code>passwd -l taro</code> と <code>usermod -L taro</code>。2列目（パスワードのハッシュ）の先頭に <code>!</code> が付き、<code>passwd -S</code> の状態が <code>L</code> になる。
+<p><code>passwd -l taro</code> と <code>usermod -L taro</code>。2列目（パスワードのハッシュ）の先頭に <code>!</code> が付き、<code>passwd -S</code> の状態が <code>L</code> になる（Ubuntu の場合。RHEL 系の <code>passwd -l</code> は <code>!!</code> を付け、表示は <code>LK</code>）。
 ただし ssh の公開鍵など、パスワードを使わない入口は止まらない。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>passwd -l</code> でロックしたユーザが、ssh の公開鍵認証でログインできてしまった。アカウントを削除せずに、どの方法でもログインできないようにするコマンドとして適切なものはどれか。</p>
@@ -159,8 +181,8 @@ A はパスワードを空にしてしまい、かえって危険。C と D は�
 この章では、これで鍵の ssh も（端末が無いと変更できずに）止まった。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>useradd</code> 直後はパスワードが無く <code>L</code>（2列目が <code>!</code>）。<code>passwd ユーザ名</code> で付けると <code>P</code></li><li><code>passwd -l</code>（= <code>usermod -L</code>）は2列目の頭に <code>!</code> を足すだけ。<b>鍵の ssh は止まらない</b></li><li>一時停止は <code>usermod -e 1</code>（= <code>chage -E 0</code>）でアカウントの期限を切るか、シェルを <code>/usr/sbin/nologin</code> にする。戻すのは <code>usermod -e ''</code> と <code>usermod -s</code></li><li><code>passwd -e</code> は3列目を 0 にして次のログインで変更を強制する。<code>passwd -d</code> はパスワードを空にする（危険）</li><li>どの方法がどの入口を止めるかは、ログインのどの段（本人確認・アカウントの検査・シェル）でその列が読まれるかで決まる</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / openssh-server 1:9.6p1-3ubuntu13.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>useradd</code> 直後はパスワードが無く <code>L</code>（2列目が <code>!</code>。RHEL 系は <code>!!</code> で <code>LK</code>）。<code>passwd ユーザ名</code> で付けると <code>P</code></li><li><code>passwd -l</code> は2列目の頭にロックの印（Ubuntu は <code>!</code>、RHEL 系は <code>!!</code>）を足すだけ。<b>鍵の ssh は止まらない</b></li><li>一時停止は <code>usermod -e 1</code>（= <code>chage -E 1</code>）でアカウントの期限を切るか、シェルを <code>/usr/sbin/nologin</code> にする（root だけは <code>su -s</code> で入れる）。戻すのは <code>usermod -e ''</code> と <code>usermod -s</code></li><li><code>passwd -e</code> は3列目を 0 にして次のログインで変更を強制する。<code>passwd -d</code> はパスワードを空にする（危険）</li><li>どの方法がどの入口を止めるかは、ログインのどの段（本人確認・アカウントの検査・シェル）でその列が読まれるかで決まる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ passwd 1:4.13+dfsg1-4ubuntu3.2 / openssh-server 1:9.6p1-3ubuntu13.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-admin/theory/03-membership">← 3. 所属は、書いたとおりに置き換わる</a><a href="/linuc-admin/theory/05-crontab">次: 5. crontab には「誰が」の列が無い →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

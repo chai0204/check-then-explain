@@ -41,7 +41,7 @@ window.TERM_GROUPS = [
 
     { t:"シャドウパスワード", alt:["シャドーパスワード"], id:"shadow-password",
       hint:"パスワードのハッシュを、root しか読めない /etc/shadow に分けて置く方式",
-      body:"パスワードのハッシュを、誰でも読める <code>/etc/passwd</code> から、root と shadow グループしか読めない <code>/etc/shadow</code> に移す方式。<code>/etc/passwd</code> の2列目の <code>x</code> は「shadow を見よ」の印。<code>/etc/shadow</code> は9列で、ハッシュのほかに最終変更日・有効日数・アカウントの有効期限などを「1970-01-01 からの日数」で持つ。<b>たとえ</b>: 受付の名簿とは別に金庫にしまった暗証番号の控え。<b>崩れる点</b>: 控えに入っているのは暗証番号そのものではなく、元に戻せない変換（ハッシュ）の結果である。",
+      body:"パスワードのハッシュを、誰でも読める <code>/etc/passwd</code> から、root しか読めない <code>/etc/shadow</code> に移す方式（Ubuntu は shadow グループも読める <code>-rw-r-----</code>、RHEL 系は権限 000）。<code>/etc/passwd</code> の2列目の <code>x</code> は「shadow を見よ」の印。<code>/etc/shadow</code> は9列で、ハッシュのほかに最終変更日・有効日数・アカウントの有効期限などを「1970-01-01 からの日数」で持つ。<b>たとえ</b>: 受付の名簿とは別に金庫にしまった暗証番号の控え。<b>崩れる点</b>: 控えに入っているのは暗証番号そのものではなく、元に戻せない変換（ハッシュ）の結果である。",
       misread:"「/etc/shadow にパスワードが書いてある」と思われがちだが、あるのはハッシュで、パスワードそのものは誰も持っていない。", ch:1 },
 
     { t:"NSS", alt:["Name Service Switch","名前解決の仕組み"], id:"nss",
@@ -63,7 +63,7 @@ window.TERM_GROUPS = [
 
     { t:"ログインシェル", alt:[], id:"login-shell",
       hint:"ログインしたときに起動されるプログラム。/etc/passwd の7列目",
-      body:"ログインしたときに起動されるプログラム。<code>/etc/passwd</code> の7列目で、<code>useradd -s</code> / <code>usermod -s</code> で変える。<code>/usr/sbin/nologin</code> や <code>/bin/false</code> にすると、ログインのたびにすぐ終了するので、事実上そのユーザでは入れなくなる。<b>たとえ</b>: 入館したときに案内される部屋。<b>崩れる点</b>: 部屋が無ければ入館そのものは済んでしまいそうだが、ログインシェルが断ればセッションは始まらず、ssh も <code>su</code> もそこで終わる。",
+      body:"ログインしたときに起動されるプログラム。<code>/etc/passwd</code> の7列目で、<code>useradd -s</code> / <code>usermod -s</code> で変える。<code>/usr/sbin/nologin</code> や <code>/bin/false</code> にすると、ログインのたびにすぐ終了するので、事実上そのユーザでは入れなくなる。<b>たとえ</b>: 入館したときに案内される部屋。<b>崩れる点</b>: 部屋が無ければ入館そのものは済んでしまいそうだが、ログインシェルが断ればセッションは始まらず、ssh も <code>su</code> もそこで終わる。ただし root だけは <code>su -s /bin/bash</code> のように別のシェルを指定して入れる。",
       misread:"「シェルを nologin にしても鍵の ssh なら入れる」と思われがちだが、ログインのたびに起動されるので止まる（第4章）。", ch:4 },
 
     { t:"PAM", alt:["Pluggable Authentication Modules"], id:"pam",
@@ -80,22 +80,22 @@ window.TERM_GROUPS = [
   { g: "ジョブスケジューリング", terms: [
     { t:"crontab", alt:[], id:"crontab",
       hint:"cron の予定表と、それを出し入れするコマンドの両方の名前",
-      body:"cron が読む予定表、およびそれを編集するコマンド。ユーザの表は <code>crontab -e</code> で編集し、Debian 系では <code>/var/spool/cron/crontabs/ユーザ名</code> に置かれる（時刻5列＋コマンド）。システムの表 <code>/etc/crontab</code> と <code>/etc/cron.d/*</code> は6列目に実行ユーザを書く。<b>たとえ</b>: 名前入りのロッカーに入れた予定表。<b>崩れる点</b>: 誰の予定かはロッカーの名札（ファイル名）で決まるので、表の中に名前を書くと、cron はそれをコマンドとして実行しようとする（第5章）。",
+      body:"cron が読む予定表、およびそれを編集するコマンド。ユーザの表は <code>crontab -e</code> で編集し、Debian 系では <code>/var/spool/cron/crontabs/ユーザ名</code>、RHEL 系では <code>/var/spool/cron/ユーザ名</code> に置かれる（時刻5列＋コマンド）。システムの表 <code>/etc/crontab</code> と <code>/etc/cron.d/*</code> は6列目に実行ユーザを書く。<b>たとえ</b>: 名前入りのロッカーに入れた予定表。<b>崩れる点</b>: 誰の予定かはロッカーの名札（ファイル名）で決まるので、表の中に名前を書くと、cron はそれをコマンドとして実行しようとする（第5章）。",
       misread:"「/etc/crontab と同じ6列で書ける」と思われがちだが、ユーザの表には実行ユーザの列が無い。", ch:5 },
 
     { t:"anacron", alt:[], id:"anacron",
       hint:"前回の実行日を見て、日単位の仕事を取りこぼさずに走らせる仕組み",
-      body:"「前回からの日数」で仕事を走らせるかを決める仕組み。<code>/etc/anacrontab</code> に「周期（日） 遅延（分） ジョブ名 コマンド」を書き、前回の実行日を <code>/var/spool/anacron/ジョブ名</code> に残す。常駐せず、起動時と毎時30分に起こされる。Ubuntu では <code>/etc/cron.daily</code>・<code>weekly</code>・<code>monthly</code> を走らせているのは anacron である。<b>たとえ</b>: 日めくりカレンダーに印を付ける当番。<b>崩れる点</b>: 当番は1日に何度来ても印があれば何もしないので、1日より細かい周期には使えない。",
+      body:"「前回からの日数」で仕事を走らせるかを決める仕組み。<code>/etc/anacrontab</code> に「周期（日） 遅延（分） ジョブ名 コマンド」を書き、前回の実行日を <code>/var/spool/anacron/ジョブ名</code> に残す。常駐せず、Ubuntu では起動時と毎時30分に systemd のタイマーが、RHEL 系では cron（<code>/etc/cron.hourly/0anacron</code>）が起こす。どちらも <code>/etc/cron.daily</code>・<code>weekly</code>・<code>monthly</code> を走らせているのは anacron である。<b>たとえ</b>: 日めくりカレンダーに印を付ける当番。<b>崩れる点</b>: 当番は1日に何度来ても印があれば何もしないので、1日より細かい周期には使えない。",
       misread:"「cron の代わりになる」と思われがちだが、日単位より細かい予定は作れず、cron.hourly は cron が直接走らせている。", ch:6 },
 
     { t:"run-parts", alt:[], id:"run-parts",
       hint:"ディレクトリの中の実行ファイルを順に走らせる道具。名前で選ぶ",
-      body:"ディレクトリの中のファイルを名前の順に実行する道具。<code>/etc/cron.daily</code> などはこれで走る。実行権があり、名前が英数字・<code>_</code>・<code>-</code> だけのファイルしか選ばない（Debian 系の既定）。<code>--test</code> で走らせずに選ぶものを表示し、<code>--list</code> は実行権を見ずに名前の条件だけで表示する。<b>たとえ</b>: 決まった書式の伝票だけを処理する係。<b>崩れる点</b>: 人なら書式違いを戻してくれるが、run-parts は黙って飛ばし、どこにも記録しない。",
-      misread:"「実行権さえ付ければ走る」と思われがちだが、backup.sh のように名前に . があると選ばれない。", ch:6 },
+      body:"ディレクトリの中のファイルを名前の順に実行する道具。<code>/etc/cron.daily</code> などはこれで走る。実行権があり、名前が英数字・<code>_</code>・<code>-</code> だけのファイルしか選ばない（Debian 系の既定。RHEL 系の run-parts は別の実装で、<code>.</code> を含む名前も走らせる）。<code>--test</code> で走らせずに選ぶものを表示し、<code>--list</code> は実行権を見ずに名前の条件だけで表示する。<b>たとえ</b>: 決まった書式の伝票だけを処理する係。<b>崩れる点</b>: 人なら書式違いを戻してくれるが、run-parts は黙って飛ばし、どこにも記録しない。",
+      misread:"「実行権さえ付ければ走る」と思われがちだが、Debian 系では backup.sh のように名前に . があると選ばれない。", ch:6 },
 
     { t:"スプール", alt:[], id:"spool",
       hint:"処理待ちのものを置いておく場所。/var/spool の下",
-      body:"あとで処理するものを一時的に置いておく場所。cron の表は <code>/var/spool/cron/crontabs</code>、at の予約は <code>/var/spool/cron/atjobs</code>、メールは <code>/var/mail</code>（メールスプール）に置かれる。<b>たとえ</b>: 事務所の「未処理」の箱。<b>崩れる点</b>: 箱なら誰でも中を覗けるが、cron と at のスプールは一般ユーザには読めない権限になっていて、出し入れは必ず <code>crontab</code> や <code>at</code> のコマンドを通す。",
+      body:"あとで処理するものを一時的に置いておく場所。ユーザの cron の表は Debian 系が <code>/var/spool/cron/crontabs/ユーザ名</code>、RHEL 系が <code>/var/spool/cron/ユーザ名</code>、at の予約は Debian 系が <code>/var/spool/cron/atjobs</code>、RHEL 系が <code>/var/spool/at</code>、メールは <code>/var/mail</code>（メールスプール）に置かれる。<b>たとえ</b>: 事務所の「未処理」の箱。<b>崩れる点</b>: 箱なら誰でも中を覗けるが、cron と at のスプールは一般ユーザには読めない権限になっていて、出し入れは必ず <code>crontab</code> や <code>at</code> のコマンドを通す。",
       misread:"「設定ファイルなので直接編集してよい」と思われがちだが、スプールの表は crontab -e などのコマンドを通して扱う。", ch:7 },
 
   ]},
@@ -132,8 +132,8 @@ window.TERM_GROUPS = [
       misread:"「Unicode と UTF-8 は同じもの」と思われがちだが、Unicode は番号の表で、UTF-8 はそれをバイトにする方式の1つである。", ch:9 },
 
     { t:"UTF-8", alt:[], id:"utf-8",
-      hint:"Unicode を1〜4バイトで表す方式。ASCII と互換で、Linux の標準",
-      body:"Unicode のコードポイントを1〜4バイトで表す方式。ASCII の範囲（0x00〜0x7F）はそのまま1バイトなので、ASCII だけのファイルはそのまま UTF-8 として正しい。日本語のかな・漢字の多くは3バイトになる（「あ」は <code>e3 81 82</code>）。<b>たとえ</b>: 短い住所は短く、長い住所は長く書ける可変長の宛名書き。<b>崩れる点</b>: 可変長なので、バイト数から文字数は分からない。<code>wc -c</code>（バイト）と <code>wc -m</code>（文字）は別の数になる。",
+      hint:"Unicode を1〜4バイト（古い定義では最大6バイト）で表す方式。ASCII と互換",
+      body:"Unicode のコードポイントを1〜4バイトで表す方式（いまの規格。古い定義では最大6バイトで、LinuC の例題の解説はこの書き方）。ASCII の範囲（0x00〜0x7F）はそのまま1バイトなので、ASCII だけのファイルはそのまま UTF-8 として正しい。日本語のかな・漢字の多くは3バイトになる（「あ」は <code>e3 81 82</code>）。<b>たとえ</b>: 短い住所は短く、長い住所は長く書ける可変長の宛名書き。<b>崩れる点</b>: 可変長なので、バイト数から文字数は分からない。<code>wc -c</code>（バイト）と <code>wc -m</code>（文字）は別の数になる。",
       misread:"「1文字は2バイト」と思われがちだが、ASCII は1バイト、かな・漢字は多くが3バイトである。", ch:9 },
 
     { t:"ASCII", alt:["アスキー"], id:"ascii",
@@ -143,17 +143,17 @@ window.TERM_GROUPS = [
 
     { t:"ISO-8859", alt:["ISO-8859-1","Latin-1"], id:"iso-8859",
       hint:"ASCII に西欧などの文字を足した1バイトの文字コードの系列",
-      body:"ASCII に、ヨーロッパの言語などの文字を 0x80〜0xFF に足した1バイトの文字コードの系列。ISO-8859-1（Latin-1）は西欧向けで <code>é</code> は <code>e9</code> の1バイト。日本語は入っていない。0x80 以上のどのバイトにも文字が割り当ててあるので、どんな8ビットのバイト列も「ISO-8859 として読める」。<b>たとえ</b>: どんな数字を渡しても、何かの単語を返す辞書。<b>崩れる点</b>: 何でも読めるということは、間違っていても気づかないということで、<code>file</code> が EUC-JP を ISO-8859 と判定し、<code>iconv -f ISO-8859-1</code> が失敗せずに文字化けを作る原因になる。",
+      body:"ASCII に、ヨーロッパの言語などの文字を足した1バイトの文字コードの系列。文字は 0xA0〜0xFF に置かれ（0x80〜0x9F は制御文字）、ISO-8859-1（Latin-1）は西欧向けで <code>é</code> は <code>e9</code> の1バイト。日本語は入っていない。<code>iconv</code> の ISO-8859-1 は 0x00〜0xFF のすべてのバイトを文字（か制御文字）に対応させるので、どんなバイト列も失敗せずに変換する。<b>たとえ</b>: どんな数字を渡しても、何かの単語を返す辞書。<b>崩れる点</b>: 何でも読めるということは、間違っていても気づかないということで、<code>iconv -f ISO-8859-1</code> は日本語のファイルを失敗せずに文字化けにする。<code>file</code> が EUC-JP（0xA1〜0xFE だけを使う）を ISO-8859 と判定するのも、バイトがこの範囲に収まって見えるからである。",
       misread:"「日本語も扱える」と思われがちだが、1バイトの文字コードで日本語は入っていない。", ch:9 },
 
     { t:"Shift_JIS", alt:["シフトJIS","SJIS"], id:"shift-jis",
       hint:"Windows で長く使われた日本語の文字コード。2バイトで漢字を表す",
-      body:"日本語の文字コード。ASCII の範囲は1バイト、かな・漢字は2バイト（「あ」は <code>82 a0</code>）で表す。Windows で長く使われ、古いファイルや業務システムのデータで今も出会う。Windows の拡張版は CP932 と呼ばれ、一部の記号が違う。<b>たとえ</b>: 地域の古い住所表記。<b>崩れる点</b>: 2バイト目に <code>\\</code> と同じ値（0x5C）が来る文字があり、日本語を正しく扱えないプログラムでは、文字の途中を区切り文字と誤解することがある。",
+      body:"日本語の文字コード。ASCII の範囲と半角カタカナは1バイト、かな・漢字は2バイト（「あ」は <code>82 a0</code>）で表す。2バイトの1バイト目には 0x81〜0x9F も使うので、<code>file</code> は ISO-8859 ではなく「Non-ISO extended-ASCII」と判定する。Windows で長く使われ、古いファイルや業務システムのデータで今も出会う。Windows の拡張版は CP932 と呼ばれ、一部の記号が違う。<b>たとえ</b>: 地域の古い住所表記。<b>崩れる点</b>: 2バイト目に <code>\\</code> と同じ値（0x5C）が来る文字があり、日本語を正しく扱えないプログラムでは、文字の途中を区切り文字と誤解することがある。",
       misread:"「UTF-8 と同じく ASCII と互換だから安全」と思われがちだが、2バイト目に ASCII の記号と同じ値が出ることがある。", ch:9 },
 
     { t:"EUC-JP", alt:[], id:"euc-jp",
       hint:"古い Unix で使われた日本語の文字コード。漢字は2バイト",
-      body:"日本語の文字コード。かな・漢字を 0x80 以上の2バイト（「あ」は <code>a4 a2</code>）で表し、ASCII と重ならない。古い Unix で標準的に使われた。<code>file</code> は「ISO-8859 text」と判定したり、中身によっては「OpenPGP Public Key」と言ったりする（第9章）。<b>たとえ</b>: 同じ地域の、もう1つの古い住所表記。<b>崩れる点</b>: Shift_JIS と同じ2バイトでも並びが違うので、取り違えると iconv が途中で止まるか、別の文字に化ける。",
+      body:"日本語の文字コード。かな・漢字を 0xA1〜0xFE の2バイト（「あ」は <code>a4 a2</code>）で表し、ASCII と重ならない。古い Unix で標準的に使われた。<code>file</code> は「ISO-8859 text」と判定したり、中身によっては「OpenPGP Public Key」と言ったりする（第9章）。<b>たとえ</b>: 同じ地域の、もう1つの古い住所表記。<b>崩れる点</b>: Shift_JIS と同じ2バイトでも並びが違うので、取り違えると iconv が途中で止まるか、別の文字に化ける。",
       misread:"「file コマンドで EUC-JP と分かる」と思われがちだが、file は EUC-JP という答えを出さず、ISO-8859 や別の形式の名前を言う。", ch:9 },
 
     { t:"ISO-2022-JP", alt:["JIS コード","JISコード"], id:"iso-2022-jp",

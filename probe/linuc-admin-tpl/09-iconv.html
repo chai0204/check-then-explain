@@ -25,7 +25,7 @@
 @@ printf 'é' | od -An -tx1
 @@ printf '\u3042\n'
 </code></pre>
-<p><code>A</code> は1バイト（0x41）、<code>é</code> は2バイト、<code>あ</code> は3バイトだった。この端末は UTF-8 で読み書きしている。<b>Unicode</b> は世界の文字に番号（コードポイント）を振った表で、「あ」は <code>U+3042</code> である（<code>printf '\u3042\n'</code> のように番号から文字を出せる）。<b>UTF-8</b> は、その番号を1〜4バイトに詰める方式の1つで、<b>ASCII</b>（0x00〜0x7F の7ビットの英数字）の範囲はそのまま1バイトになる。同じ「あ」を、ほかの方式で書き出す。</p>
+<p><code>A</code> は1バイト（0x41）、<code>é</code> は2バイト、<code>あ</code> は3バイトだった。この端末は UTF-8 で読み書きしている。<b>Unicode</b> は世界の文字に番号（コードポイント）を振った表で、「あ」は <code>U+3042</code> である（<code>printf '\u3042\n'</code> のように番号から文字を出せる）。<b>UTF-8</b> は、その番号を1〜4バイトに詰める方式の1つで（いまの規格の上限は4バイト。古い定義では最大6バイトで、LinuC の例題の解説はこの書き方をしている）、<b>ASCII</b>（0x00〜0x7F の7ビットの英数字）の範囲はそのまま1バイトになる。同じ「あ」を、ほかの方式で書き出す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>
 @@ printf 'あ' | iconv -f UTF-8 -t UTF-16BE | od -An -tx1
 @@ printf 'あ' | iconv -f UTF-8 -t SHIFT_JIS | od -An -tx1
@@ -36,9 +36,9 @@
 <tr><th>文字コード</th><th>「あ」</th><th>特徴</th></tr>
 <tr><td>ASCII</td><td>（表せない）</td><td>7ビット。英数字と記号だけ</td></tr>
 <tr><td>ISO-8859-1（Latin-1）</td><td>（表せない）</td><td>1バイト。ASCII ＋ 西欧の文字（é など）。ISO-8859-2〜16 は東欧・ギリシャ文字などの別の版</td></tr>
-<tr><td>UTF-8</td><td><code>e3 81 82</code></td><td>Unicode を1〜4バイトで。ASCII と互換。Linux の標準</td></tr>
+<tr><td>UTF-8</td><td><code>e3 81 82</code></td><td>Unicode を1〜4バイトで（古い定義では最大6バイト）。ASCII と互換。Linux の標準</td></tr>
 <tr><td>UTF-16</td><td><code>30 42</code></td><td>Unicode を2または4バイトで（BE はバイトの並びが大きい方から）</td></tr>
-<tr><td>Shift_JIS</td><td><code>82 a0</code></td><td>日本語。Windows で長く使われた</td></tr>
+<tr><td>Shift_JIS</td><td><code>82 a0</code></td><td>日本語。Windows で長く使われた。かな・漢字は2バイト、半角カタカナは1バイト</td></tr>
 <tr><td>EUC-JP</td><td><code>a4 a2</code></td><td>日本語。古い Unix で使われた</td></tr>
 <tr><td>ISO-2022-JP</td><td><code>1b 24 42 24 22 1b 28 42</code></td><td>日本語。7ビットだけで書き、<code>ESC $ B</code> と <code>ESC ( B</code> で文字の集合を切り替える。日本語の電子メールの伝統的な形（JIS コード）</td></tr>
 </table></div>
@@ -78,7 +78,7 @@
 @@ cd ~/enc && file *.txt
 @@ cd ~/enc && wc -c *.txt
 </code></pre>
-<p><code>file</code> は EUC-JP のファイルを「<b>OpenPGP Public Key</b>」（暗号の公開鍵のファイル）と言った。先頭のバイトの並びが、たまたまその形式の目印と一致したからである。<code>file</code> はバイトの並びから推測しているだけで、文字コードを知っているわけではない。実践編の演習08の EUC-JP のファイルは「<b>ISO-8859</b> text」と判定される。ISO-8859-1 は 0x80 以上のどのバイトにも文字を割り当てているので、どんな8ビットのバイト列も「ISO-8859 として読める」からである。ISO-2022-JP は全部のバイトが 0x80 未満なので「ASCII text」に見える。</p>
+<p><code>file</code> は EUC-JP のファイルを「<b>OpenPGP Public Key</b>」（暗号の公開鍵のファイル）と言った。先頭のバイトの並びが、たまたまその形式の目印と一致したからである。<code>file</code> はバイトの並びから推測しているだけで、文字コードを知っているわけではない。実践編の演習08の EUC-JP のファイルは「<b>ISO-8859</b> text」と判定される。ISO-8859 の系列が文字を置いているのは 0xA0〜0xFF で（0x80〜0x9F は制御文字）、EUC-JP の日本語のバイトは 0xA1〜0xFE だけを使うので、その範囲に収まって「ISO-8859 として読める」からである。Shift_JIS は 0x81〜0x9F も使うので、上の記録のとおり「Non-ISO extended-ASCII text」になる。ISO-2022-JP は全部のバイトが 0x80 未満なので「ASCII text」に見える。</p>
 <p>バイト数は、UTF-8 が19（かな・漢字が3バイト×6＋改行）、Shift_JIS と EUC-JP が13（2バイト×6＋改行）、ISO-2022-JP も19（2バイト×6＋前後の切り替えの印3バイトずつ＋改行）である。</p>
 <pre data-where="練習機の中（student@linuc）"><code>
 @@ cat -v ~/enc/sjis.txt
@@ -121,11 +121,11 @@
 <div class="scroll"><table>
 <tr><th>章</th><th>書き換えたもの（台帳）</th><th>それを読んで決める側</th></tr>
 <tr><td>1</td><td><code>/etc/passwd</code> の4列目と <code>/etc/group</code> の4列目</td><td><code>id</code> とログイン（2つを合わせて所属を決める）</td></tr>
-<tr><td>2</td><td><code>/etc/passwd</code> の6列目（ホーム）</td><td>ログイン（ディレクトリが無ければ入れない）</td></tr>
+<tr><td>2</td><td><code>/etc/passwd</code> の6列目（ホーム）</td><td><code>sudo</code>・<code>su</code>・ログイン（ディレクトリが無くても止めはせず、警告して元の場所や <code>/</code> で始める）</td></tr>
 <tr><td>3</td><td><code>/etc/group</code> のメンバー欄</td><td>次のログイン（いまのシェルは読み直さない）</td></tr>
 <tr><td>4</td><td><code>/etc/shadow</code> の2列目と8列目</td><td>sshd と PAM（鍵の照合は2列目を読まない。期限は必ず読む）</td></tr>
-<tr><td>5</td><td>crontab の行と置き場所</td><td>cron（ファイル名で実行ユーザを決め、<code>.</code> 付きの名前は読まない）</td></tr>
-<tr><td>6</td><td><code>/etc/cron.daily</code> のファイル名と実行権</td><td><code>run-parts</code> と anacron（名前で選び、日付で決める）</td></tr>
+<tr><td>5</td><td>crontab の行と置き場所</td><td>cron（ファイル名で実行ユーザを決める。Debian 系は <code>.</code> 付きの名前を読まない）</td></tr>
+<tr><td>6</td><td><code>/etc/cron.daily</code> のファイル名と実行権</td><td><code>run-parts</code> と anacron（Debian 系の run-parts は名前で選び、anacron は日付で決める）</td></tr>
 <tr><td>7</td><td><code>/etc/at.allow</code> と <code>/etc/at.deny</code></td><td>at（どちらも無ければ root だけ）</td></tr>
 <tr><td>8</td><td><code>LANG</code> と <code>LC_*</code></td><td>C ライブラリ（実体が無ければ黙って C）</td></tr>
 <tr><td>9</td><td>バイト列</td><td><code>iconv -f</code>・端末（読み方を間違えると化ける）</td></tr>
@@ -155,8 +155,8 @@
 UTF-8 は ASCII の範囲（0x00〜0x7F）をそのまま1バイトで表すので、ASCII だけのファイルはそのまま UTF-8 としても正しい。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>Unicode は文字に番号を振った表、UTF-8 はそれを1〜4バイトに詰める方式。ASCII（7ビット）と互換</li><li>同じ文字でも、Shift_JIS・EUC-JP・ISO-2022-JP（7ビット＋エスケープ）・ISO-8859-1（日本語なし）でバイト列が違う</li><li>ファイルは文字コードを名乗らない。<code>file</code> は推測で、EUC-JP を ISO-8859 や OpenPGP Public Key と言うこともある</li><li>文字化けは読み方の誤り。元のバイト列があれば、正しい <code>iconv -f</code> で戻せる</li><li><code>iconv -f 元 -t 先</code>。表せない文字は失敗する（メッセージは「illegal input」）。<code>//TRANSLIT</code> は黙って <code>?</code> に置き換え、終了コード 0</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ libc-bin 2.39-0ubuntu8.9（iconv）/ file 1:5.45-3build1 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>Unicode は文字に番号を振った表、UTF-8 はそれを1〜4バイト（古い定義では最大6バイト）に詰める方式。ASCII（7ビット）と互換</li><li>同じ文字でも、Shift_JIS・EUC-JP・ISO-2022-JP（7ビット＋エスケープ）・ISO-8859-1（日本語なし）でバイト列が違う</li><li>ファイルは文字コードを名乗らない。<code>file</code> は推測で、EUC-JP を ISO-8859 や OpenPGP Public Key と言うこともある</li><li>文字化けは読み方の誤り。元のバイト列があれば、正しい <code>iconv -f</code> で戻せる</li><li><code>iconv -f 元 -t 先</code>。表せない文字は失敗する（メッセージは「illegal input」）。<code>//TRANSLIT</code> は黙って <code>?</code> に置き換え、終了コード 0</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:admin-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic）/ libc-bin 2.39-0ubuntu8.9（iconv）/ file 1:5.45-3build1 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-admin/theory/08-locale">← 8. ロケールは、名前で指しているだけ</a><a href="/linuc-admin/">実践編（演習8本）→</a></nav>
 <section id="comments">
 <h2>コメント</h2>

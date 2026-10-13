@@ -11,6 +11,7 @@ public/linuc-admin/theory/ に書き出す。端末表示を手で写さない�
   @@ <コマンド>  ## n=2             → 記録の中で2回目に出てくるものを使う
   @@ <コマンド>  ## sub             → 記録の "$ " 行に部分文字列として含まれるものを使う（`a; b` を本文で分けて見せるとき）
   @@note <部分文字列> => <注記>      → 直前に出した行のうち、部分文字列を含む最後の行の末尾に "   ← 注記"
+  @@rhel <コマンド>                  → 比較の記録（logs/linuc-admin-rhel-compare.log。AlmaLinux 9.7）から同じように埋める
 コマンドは記録の "$ " 行と完全一致で探す。前回見つけた位置より後ろから探し、無ければ先頭から探す。
 """
 import html
@@ -51,12 +52,20 @@ def parse_log(text):
 
 
 RECS = parse_log(LOG.read_text(encoding='utf-8'))
+RHEL_LOG = REPO / 'logs' / 'linuc-admin-rhel-compare.log'
+RECS_RHEL = parse_log(RHEL_LOG.read_text(encoding='utf-8')) if RHEL_LOG.exists() else []
 cursor = 0
 errors = []
 
 
-def find(cmd, nth=None, sub=False):
+def find(cmd, nth=None, sub=False, recs=None):
     global cursor
+    if recs is not None:   # 比較の記録は、カーソルを持たずに完全一致の n 番目（既定は最初）を使う
+        hits = [(c, o) for c, o in recs if c == cmd]
+        if len(hits) < (nth or 1):
+            errors.append(f'比較の記録に無いコマンド: {cmd}')
+            return None
+        return hits[(nth or 1) - 1]
     # sub: 記録では `a; b` と1回で打ったものを、本文で b だけ見せるとき（照合ツールと同じく部分一致で探す）
     idx = [i for i, (c, _) in enumerate(RECS) if (cmd in c if sub else c == cmd)]
     if not idx:
@@ -114,8 +123,9 @@ def process(text):
             else:
                 errors.append(f'注記の相手が見つからない: {sub}')
             continue
-        if line.startswith('@@ '):
-            body = line[3:]
+        rhel = line.startswith('@@rhel ')
+        if line.startswith('@@ ') or rhel:
+            body = line[7:] if rhel else line[3:]
             opts = {}
             if '  ## ' in body:
                 body, o = body.split('  ## ', 1)
@@ -126,7 +136,8 @@ def process(text):
                     else:
                         opts[tok] = True
             cmd = body.rstrip()
-            rec = find(cmd, int(opts['n']) if 'n' in opts else None, sub=('sub' in opts))
+            rec = find(cmd, int(opts['n']) if 'n' in opts else None, sub=('sub' in opts),
+                       recs=(RECS_RHEL if rhel else None))
             if rec is None:
                 lines_out.append('$ ' + esc(cmd) + '   ← ★記録に無い')
                 continue

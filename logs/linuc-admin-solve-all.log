@@ -234,7 +234,7 @@ $ lab check 04; echo "exit=$?"
 ✗ 04 未達
   判定 : 観測型（cron が実際にジョブを動かし、2つのファイルが増えるかを見た）
   待機 : cron は毎分0秒に起きます。次の実行を待っています（最大 75 秒）…
-  観測 : /home/student/tick.log → 0 行（所有者 student・最後に書かれたのは 46 秒前）
+  観測 : /home/student/tick.log → 0 行（所有者 student・最後に書かれたのは 57 秒前）
          /var/log/lab-whoami.log → 無い
          /var/log/lab-whoami.log の最後の行 → （無い）
          /etc/cron.d/lab-whoami → -rw-r--r-- root root /etc/cron.d/lab-whoami
@@ -244,11 +244,11 @@ $ lab check 04; echo "exit=$?"
 exit=1
 
 $ cat /home/student/tick.log; ls -l /home/student/tick.log
--rw-rw-r-- 1 student student 0 Oct 13 11:03 /home/student/tick.log
+-rw-rw-r-- 1 student student 0 Oct 13 19:01 /home/student/tick.log
 
 $ journalctl -u cron -n 20 --no-pager | grep -E 'lab-whoami|ERROR'
-Oct 13 11:03:01 linuc cron[432]: Error: bad username; while reading /etc/cron.d/lab-whoami
-Oct 13 11:03:01 linuc cron[432]: (*system*lab-whoami) ERROR (Syntax error, this crontab file will be ignored)
+Oct 13 19:01:01 linuc cron[433]: Error: bad username; while reading /etc/cron.d/lab-whoami
+Oct 13 19:01:01 linuc cron[433]: (*system*lab-whoami) ERROR (Syntax error, this crontab file will be ignored)
 
 $ echo '* * * * * date >> /home/student/tick.log' | crontab -
 
@@ -271,7 +271,7 @@ exit=0
 ########## F. 演習05 — 置いてあるのに走らないスクリプトを、毎日の実行に入れる ##########
 
 $ ls -l /etc/cron.daily/lab-backup.sh; run-parts --test /etc/cron.daily
--rw-r--r-- 1 root root 165 Oct 13 10:59 /etc/cron.daily/lab-backup.sh
+-rw-r--r-- 1 root root 165 Oct 13 18:57 /etc/cron.daily/lab-backup.sh
 /etc/cron.daily/0anacron
 /etc/cron.daily/apport
 /etc/cron.daily/apt-compat
@@ -340,7 +340,7 @@ Job `cron.monthly' terminated
 Normal exit (3 jobs run)
 
 $ cat /var/backups/lab-backup.log
-2026-10-13 11:14:51 lab-backup ran
+2026-10-13 19:13:09 lab-backup ran
 
 $ lab check 05; echo "exit=$?"
 ✔ 05 達成
@@ -353,7 +353,7 @@ $ lab check 05; echo "exit=$?"
            /etc/cron.daily/lab-backup
            /etc/cron.daily/man-db
          /etc/cron.daily の lab-backup → -rwxr-xr-x lab-backup
-         /var/backups/lab-backup.log → 1 行（最後: 2026-10-13 11:14:51 lab-backup ran）
+         /var/backups/lab-backup.log → 1 行（最後: 2026-10-13 19:13:09 lab-backup ran）
          run-parts が lab-backup を選び、実際に走った跡もある
          → 毎日の実行に入るかどうかを決めたのは、置き場所ではなく run-parts の選び方（名前と実行権）
 exit=0
@@ -518,11 +518,11 @@ $ lab check 08; echo "exit=$?"
 
   自分の手で確かめたこと
 
-   ✔ 01  useradd は -m を付けないとホームを作らず、/etc/skel は作った瞬間にだけ写されること
+   ✔ 01  Ubuntu の useradd は -m を付けないとホームを作らず、/etc/skel は作った瞬間にだけ写されること
    ✔ 02  usermod -G は「この一覧にする」で、足すときは -aG と書くこと
    ✔ 03  passwd -l は鍵の ssh を止めず、usermod -e 1 なら ssh でも su でも入れなくなること
    ✔ 04  誰として動くかは、crontab の置き場所と /etc/cron.d の6列目で決まること
-   ✔ 05  run-parts は名前に . を含むファイルを選ばず、今日の分は anacron -f で走らせられること
+   ✔ 05  Debian 系の run-parts は名前に . を含むファイルを選ばず、今日の分は anacron -f で走らせられること
    ✔ 06  allow があれば allow だけが読まれ、deny しか無ければ deny に書いた人だけが断られること
    ✔ 07  LANG=C だけでは呼ぶ側の LC_ALL に負け、スクリプトの中で LC_ALL=C を決めれば出力がそろうこと
    ✔ 08  file は文字コードを当て推量でしか言えず、正しい -f を渡したときだけ元の文に戻ること
@@ -567,8 +567,8 @@ $ lab check; echo "exit=$?"
          → 止めたのはパスワードの欄ではなく、アカウントそのもの（期限かシェル）
 ✔ 04 達成
   判定 : 観測型（cron が実際にジョブを動かし、2つのファイルが増えるかを見た）
-  観測 : /home/student/tick.log → 12 行（所有者 student・最後に書かれたのは 40 秒前）
-         /var/log/lab-whoami.log → 12 行（所有者 root・最後に書かれたのは 40 秒前）
+  観測 : /home/student/tick.log → 12 行（所有者 student・最後に書かれたのは 14 秒前）
+         /var/log/lab-whoami.log → 12 行（所有者 root・最後に書かれたのは 14 秒前）
          /var/log/lab-whoami.log の最後の行 → root
          /etc/cron.d/lab-whoami → -rw-r--r-- root root /etc/cron.d/lab-whoami
          student の表のジョブは student として、/etc/cron.d のジョブは root として、毎分動いている
@@ -583,7 +583,7 @@ $ lab check; echo "exit=$?"
            /etc/cron.daily/lab-backup
            /etc/cron.daily/man-db
          /etc/cron.daily の lab-backup → -rwxr-xr-x lab-backup
-         /var/backups/lab-backup.log → 1 行（最後: 2026-10-13 11:14:51 lab-backup ran）
+         /var/backups/lab-backup.log → 1 行（最後: 2026-10-13 19:13:09 lab-backup ran）
          run-parts が lab-backup を選び、実際に走った跡もある
          → 毎日の実行に入るかどうかを決めたのは、置き場所ではなく run-parts の選び方（名前と実行権）
 ✔ 06 達成
