@@ -7,7 +7,7 @@ e5d039e9-44a9-40f7-9a88-cd842c8332fd
 
 $ journalctl --list-boots
 IDX BOOT ID                          FIRST ENTRY                 LAST ENTRY
-  0 e5d039e944a940f79a88cd842c8332fd Tue 2026-10-13 10:31:59 JST Tue 2026-10-13 10:32:00 JST
+  0 e5d039e944a940f79a88cd842c8332fd Tue 2026-10-13 11:43:05 JST Tue 2026-10-13 11:43:05 JST
 
 
 ========== 第6章の裏取り: su をブロックの中に書いて、設定ファイルを直接渡す ==========
@@ -32,11 +32,11 @@ Handling 1 logs
 
 rotating pattern: /var/log/lab-app.log  1024 bytes (3 rotations)
 empty log files are rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 332)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 331)
 considering log /var/log/lab-app.log
 Creating new state
-  Now: 2026-10-13 10:32
-  Last rotated at 2026-10-13 10:00
+  Now: 2026-10-13 11:43
+  Last rotated at 2026-10-13 11:00
   log needs rotating
 rotating log /var/log/lab-app.log, log->rotateCount is 3
 dateext suffix '-20261013'
@@ -50,30 +50,30 @@ old log /var/log/lab-app.log.1.gz does not exist
 log /var/log/lab-app.log.4.gz doesn't exist -- won't try to dispose of it
 renaming /var/log/lab-app.log to /var/log/lab-app.log.1
 compressing log with: /bin/gzip
-switching uid to 0 and gid to 4 permanently (pid 333)
-switching euid from 0 to 0 and egid from 4 to 0 (pid 332)
+switching uid to 0 and gid to 4 permanently (pid 332)
+switching euid from 0 to 0 and egid from 4 to 0 (pid 331)
 
 $ echo $?
 0
 
 $ ls -l /var/log/lab-app.log*
--rw-r----- 1 syslog adm 466 Oct 13 10:32 /var/log/lab-app.log.1.gz
+-rw-r----- 1 syslog adm 477 Oct 13 11:43 /var/log/lab-app.log.1.gz
 
 $ logger -p local3.info "切ったあとの1行"
 
 $ ls -l /var/log/lab-app.log*
--rw-r----- 1 syslog adm 466 Oct 13 10:32 /var/log/lab-app.log.1.gz
+-rw-r----- 1 syslog adm 477 Oct 13 11:43 /var/log/lab-app.log.1.gz
 
 $ systemctl kill -s HUP rsyslog.service
 
 $ logger -p local3.info "HUP のあとの1行"
 
 $ ls -l /var/log/lab-app.log*
--rw-r----- 1 syslog adm  66 Oct 13 10:32 /var/log/lab-app.log
--rw-r----- 1 syslog adm 466 Oct 13 10:32 /var/log/lab-app.log.1.gz
+-rw-r----- 1 syslog adm  66 Oct 13 11:43 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 477 Oct 13 11:43 /var/log/lab-app.log.1.gz
 
 $ cat /var/log/lab-app.log
-2026-10-13T01:32:05.407337+00:00 linuc root: HUP のあとの1行
+2026-10-13T02:43:10.984238+00:00 linuc root: HUP のあとの1行
 
 
 ========== 演習05 の模範解答の注記の裏取り: create と postrotate を書いた設定に su を足して、単体で渡す ==========
@@ -94,10 +94,10 @@ Handling 1 logs
 
 rotating pattern: /var/log/lab-app.log  1024 bytes (3 rotations)
 empty log files are not rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 419)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 418)
 considering log /var/log/lab-app.log
-  Now: 2026-10-13 10:32
-  Last rotated at 2026-10-13 10:32
+  Now: 2026-10-13 11:43
+  Last rotated at 2026-10-13 11:43
   log needs rotating
 rotating log /var/log/lab-app.log, log->rotateCount is 3
 dateext suffix '-20261013'
@@ -111,10 +111,10 @@ log /var/log/lab-app.log.4.gz doesn't exist -- won't try to dispose of it
 renaming /var/log/lab-app.log to /var/log/lab-app.log.1
 creating new /var/log/lab-app.log mode = 0640 uid = 101 gid = 4
 running postrotate script
-switching euid from 0 to 0 and egid from 4 to 0 (pid 420)
-compressing log with: /bin/gzip
-switching uid to 0 and gid to 4 permanently (pid 422)
 switching euid from 0 to 0 and egid from 4 to 0 (pid 419)
+compressing log with: /bin/gzip
+switching uid to 0 and gid to 4 permanently (pid 421)
+switching euid from 0 to 0 and egid from 4 to 0 (pid 418)
 
 $ echo $?
 0
@@ -122,9 +122,9 @@ $ echo $?
 $ logger -p local3.info "切ったあとの1行（create と postrotate あり）"
 
 $ ls -l /var/log/lab-app.log*
--rw-r----- 1 syslog adm 102 Oct 13 10:32 /var/log/lab-app.log
--rw-r----- 1 syslog adm 513 Oct 13 10:32 /var/log/lab-app.log.1.gz
--rw-r----- 1 syslog adm 466 Oct 13 10:32 /var/log/lab-app.log.2.gz
+-rw-r----- 1 syslog adm 102 Oct 13 11:43 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 534 Oct 13 11:43 /var/log/lab-app.log.1.gz
+-rw-r----- 1 syslog adm 477 Oct 13 11:43 /var/log/lab-app.log.2.gz
 
 $ cat /var/log/lab-app.log
-2026-10-13T01:32:09.491724+00:00 linuc root: 切ったあとの1行（create と postrotate あり）
+2026-10-13T02:43:15.087914+00:00 linuc root: 切ったあとの1行（create と postrotate あり）

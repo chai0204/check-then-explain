@@ -38,8 +38,8 @@ window.TERM_GROUPS = [
   { g: "時刻合わせ — 測ることと直すこと", terms: [
     { t:"NTP", alt:["Network Time Protocol"], id:"ntp",
       hint:"ネットワーク越しに時刻を合わせる仕組み。123/udp を使う",
-      body:"ネットワーク上の基準と時刻を比べ、ずれを求めるためのプロトコル。<code>123/udp</code> で話す。実装は複数あり、現行の Ubuntu では <code>chronyd</code>、従来からあるものが <code>ntpd</code> である。公開された基準サーバ群の名前が <code>pool.ntp.org</code>。<b>たとえ</b>: <b>時報への電話</b>。かけて差をメモする作業の自動化である。<b>崩れる点</b>: 電話は1回で済むが、NTP は往復の遅延を見積もるために何度も測る。",
-      misread:"「時刻を配る仕組み」と読まれがちだが、配られた値を自分の時計に反映するかどうかはローカル側の設定と権限が決める。", ch:3 },
+      body:"ネットワーク上の基準と時刻を比べ、ずれを求めて自分の時計を合わせるためのプロトコル。<code>123/udp</code> で話す。実装は複数あり、現行の Ubuntu では <code>chronyd</code>、従来からあるものが <code>ntpd</code> である。公開された基準サーバ群の名前が <code>pool.ntp.org</code>。<b>たとえ</b>: <b>時報への電話</b>。かけて差をメモする作業の自動化である。<b>崩れる点</b>: 電話は1回で済むが、NTP は往復の遅延を見積もるために何度も測る。",
+      misread:"「時刻を配る仕組み」と読まれがちだが、配られた値を自分の時計に反映するかどうかはローカル側の設定と権限が決める。この教材の檻の chronyd は -x（時計を制御しない）で起動していて、測るだけで時計は動かさない。", ch:3 },
 
     { t:"stratum", alt:["ストラタム"], id:"stratum",
       hint:"基準から何段離れているかの数。基準にした相手より必ず1大きい",
@@ -48,7 +48,7 @@ window.TERM_GROUPS = [
 
     { t:"CAP_SYS_TIME", alt:[], id:"cap-sys-time",
       hint:"システムクロックを変更する権限。コンテナには既定で渡されない",
-      body:"Linux のケーパビリティの1つで、システムクロックを変更できる権限。これが無いと <code>date -s</code> は <code>Operation not permitted</code> になり、<code>chronyc makestep</code> は <code>500 Failure</code> を返す。ずれを<b>測る</b>のには要らないので、権限が無くても同期状態の報告はできる。<b>たとえ</b>: 時計の<b>裏蓋の鍵</b>。針の位置を読むのは誰でもできるが、回すには鍵が要る。<b>崩れる点</b>: 鍵は後から借りられるが、ケーパビリティは起動時に決まり、動いているプロセスには足せない。",
+      body:"Linux のケーパビリティの1つで、システムクロックを変更できる権限。これが無いと <code>date -s</code> は <code>Operation not permitted</code> になる。chronyd も時計を動かせないので、Ubuntu はコンテナの中では chronyd を <code>-x</code>（時計を制御しない）で起動する。この教材の檻もそうしていて、<code>chronyc makestep</code> が <code>500 Failure</code> を返す直接の理由は <code>-x</code> である。ずれを<b>測る</b>のには要らないので、権限が無くても同期状態の報告はできる。<b>たとえ</b>: 時計の<b>裏蓋の鍵</b>。針の位置を読むのは誰でもできるが、回すには鍵が要る。<b>崩れる点</b>: 鍵は後から借りられるが、ケーパビリティは起動時に決まり、動いているプロセスには足せない。",
       misread:"root なら必ず持っていると思われがちだが、コンテナの root は渡されたケーパビリティしか持たない。", ch:3 },
   ]},
 
@@ -70,7 +70,7 @@ window.TERM_GROUPS = [
 
     { t:"journald", alt:["systemd-journald","journal"], id:"journald",
       hint:"systemd が持つログの箱。項目ごとにバイナリで保存し、journalctl で読む",
-      body:"systemd のログ収集デーモン。テキスト1行ではなく、PID・ホスト名・起動 ID・ユニット名などを項目に分けたバイナリ形式で保存する。だから <code>journalctl -u</code> や <code>-p</code> で絞り込める。保存先は <code>/var/log/journal/</code>（残る）か <code>/run/log/journal/</code>（消える）。rsyslog とは独立しており、同じ1行が両方に入る。<b>たとえ</b>: 自由記述の日誌に対する<b>項目が決まった記録簿</b>。欄ごとに読めるので後から絞れる。<b>崩れる点</b>: 記録簿は欄外を書けないが、journald は本文も丸ごと持っている。情報は減っていない。",
+      body:"systemd のログ収集デーモン。テキスト1行ではなく、PID・ホスト名・起動 ID・ユニット名などを項目に分けたバイナリ形式で保存する。だから <code>journalctl -u</code> や <code>-p</code> で絞り込める。保存先は <code>/var/log/journal/</code>（残る）か <code>/run/log/journal/</code>（消える）。保存は rsyslog と別々だが、入口は1本で、<code>logger</code> の1行はまず journald が受け取り、<code>ForwardToSyslog=yes</code> で rsyslog に回す。だから同じ1行が両方に入る。<b>たとえ</b>: 自由記述の日誌に対する<b>項目が決まった記録簿</b>。欄ごとに読めるので後から絞れる。<b>崩れる点</b>: 記録簿は欄外を書けないが、journald は本文も丸ごと持っている。情報は減っていない。",
       misread:"<code>/var/log/syslog</code> を整形して見せていると読まれがちだが、まったく別の保存領域を持っている。片方を消しても他方は残る。", ch:5 },
 
     { t:"machine-id", alt:["/etc/machine-id"], id:"machine-id",
@@ -85,7 +85,7 @@ window.TERM_GROUPS = [
 
     { t:"su ディレクティブ", alt:["su root adm"], id:"su-directive",
       hint:"logrotate がどのユーザ・グループとして作業するかの指定",
-      body:"logrotate の設定に書く「誰として作業するか」の指定。ログの親ディレクトリが root 以外のグループに書き込み可のとき、これが無いと logrotate はそのログを飛ばす。Debian 系では <code>/etc/logrotate.conf</code> に <code>su root adm</code> が書かれていて、<code>include</code> された設定はそれを受け継ぐ。<b>たとえ</b>: 現場に入るための<b>権限を明示した書類</b>。事務所には用意されているが、現場へ直行すると持っていない。<b>崩れる点</b>: 書類は現場で借りられるが、こちらは実行時に渡したファイルで決まる。",
+      body:"logrotate の設定に書く「誰として作業するか」の指定。ログの親ディレクトリが root 以外のグループに書き込み可のとき、これが無いと logrotate はそのログを飛ばす。Ubuntu では <code>/etc/logrotate.conf</code> に <code>su root adm</code> が書かれていて、<code>include</code> された設定はそれを受け継ぐ。<b>たとえ</b>: 現場に入るための<b>権限を明示した書類</b>。事務所には用意されているが、現場へ直行すると持っていない。<b>崩れる点</b>: 書類は現場で借りられるが、こちらは実行時に渡したファイルで決まる。",
       misread:"セキュリティ上の飾りと読まれがちだが、これが無いと /var/log 配下のログが実際に飛ばされる。", ch:6 },
   ]},
 
@@ -102,7 +102,7 @@ window.TERM_GROUPS = [
 
     { t:".forward", alt:["~/.forward","forward ファイル"], id:"forward",
       hint:"ユーザ本人が自分宛のメールを転送する設定。作り直しは要らない",
-      body:"ユーザのホームディレクトリに置く、自分宛メールの転送先を書いたテキストファイル。エイリアスの展開より後に見られる。テキストとして直接読まれるので <code>newaliases</code> のような作り直しは要らない。ただし group や other に書き込み権があると postfix は読まず、警告をログにだけ出す。<b>たとえ</b>: 自席に貼る<b>「不在時はこの人へ」のメモ</b>。<b>崩れる点</b>: メモは誰が書いても読まれるが、.forward は権限が緩いと読まれない。しかも読まなかったことを本人に伝えない。",
+      body:"ユーザのホームディレクトリに置く、自分宛メールの転送先を書いたテキストファイル。エイリアスの展開より後に見られる。テキストとして直接読まれるので <code>newaliases</code> のような作り直しは要らない。ただし other（world）に書き込み権があると postfix は読まず、警告をログにだけ出す（group だけが書けるなら読む）。<b>たとえ</b>: 自席に貼る<b>「不在時はこの人へ」のメモ</b>。<b>崩れる点</b>: メモは誰が書いても読まれるが、.forward は権限が緩いと読まれない。しかも読まなかったことを本人に伝えない。",
       misread:"設定したのに転送されないとき設定内容を疑いがちだが、まず権限（world writable でないか）を見る。", ch:7 },
 
     { t:"postmaster", alt:[], id:"postmaster",

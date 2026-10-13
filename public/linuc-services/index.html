@@ -57,7 +57,7 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <pre><code>docker run -d -t --name lab-linuc --hostname linuc \
   --cap-add SYS_ADMIN \
   -v lab-linuc-services-state:/root/.lab \
-  ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:da71ddd5786ef105ed8dfa8836c5fdfb3c94a9d9fedbfc0b52b2d56f19ab6ded
+  ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:__DIGEST__
 
 docker exec -it lab-linuc bash -l</code></pre>
 
@@ -86,7 +86,7 @@ cgroup を書き込み可でマウントするので、専用のオプション1
 <pre><code>podman run -d -t --name lab-linuc --hostname linuc \
   --systemd=always \
   -v lab-linuc-services-state:/root/.lab \
-  ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:da71ddd5786ef105ed8dfa8836c5fdfb3c94a9d9fedbfc0b52b2d56f19ab6ded
+  ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:__DIGEST__
 
 podman exec -it lab-linuc bash -l</code></pre>
 <p>podman 5.8.6（rootless・uid 1100）で、起動と演習6本の完走を確認しました。
@@ -95,7 +95,7 @@ podman exec -it lab-linuc bash -l</code></pre>
 </div>
 
 <p>入ると現在地が出ます。</p>
-<pre><code>── lab-linuc-services 1.0.1 ────────────────────────────────────────
+<pre><code>── lab-linuc-services 1.0.2 ────────────────────────────────────────
 lab-linuc-services  進捗 0/6
   次 → 01 「時刻の表示を3箇所で揃える」 (目安 10分 / 影響度 B)
   lab start 01 で課題を開く
@@ -128,8 +128,8 @@ lab-linuc-services  進捗 0/6
 <li><code>lab env</code> の全文</li>
 </ol>
 <pre><code>$ lab env
-テーマ    : lab-linuc-services 1.0.1
-イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.1
+テーマ    : lab-linuc-services 1.0.2
+イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.2
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -150,7 +150,7 @@ docker volume rm lab-linuc-services-state     # 進捗も消す場合だけ</cod
 <p>イメージは <code>docker rmi</code> で消せます。
 母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。</p>
 
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:da71ddd5786ef105ed8dfa8836c5fdfb3c94a9d9fedbfc0b52b2d56f19ab6ded / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 と podman 5.8.6 rootless の両方で演習6本を完走 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 と podman 5.8.6 rootless の両方で演習6本を完走 / 検証日 2026-10-13</div>
 
 <section id="comments">
 <h2>コメント</h2>

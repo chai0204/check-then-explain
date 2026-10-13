@@ -11,20 +11,20 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/">詳しく</a></p>
 </div>
 <h1>5. journald は隣にある別の箱</h1>
-<p class="lead"><code>logger</code> で1行投げると、<code>/var/log/lab-app.log</code> と <code>journalctl</code> の両方に出る。どちらも1件ずつで、合計2件保存されている。rsyslog と journald は同じ入力を別々に受け取り、別々の規則で捨てる。</p>
-<div class="badges"><span>前提: 第4章まで読了</span><span>前提: 檻が起動している</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.2（重要度5）</span><span>最終検証 2026-10-13</span></div>
+<p class="lead"><code>logger</code> で1行投げると、<code>/var/log/lab-app.log</code> と <code>journalctl</code> の両方に出る。どちらも1件ずつで、合計2件保存されている。保存は別々で、別々の規則で捨てる。ただし入口は1本で、<code>logger</code> の1行はまず journald が受け取り、journald がそれを rsyslog に回している。</p>
+<div class="badges"><span>前提: 第4章まで読了</span><span>前提: 檻が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.2（重要度5）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>journald と rsyslog が同じ1行を二重に持つことを、数えて確かめられる</li><li><code>Storage=</code> の既定（<code>auto</code>）がディレクトリの有無で決まることを説明できる</li><li><code>journalctl</code> の絞り込みを、ユニット・優先度・時刻・タグで書ける</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: journal のバイナリ形式、<code>--merge</code> やリモートの journal（journal-remote）、<code>systemd-journal-gatewayd</code> は扱わない。<code>Seal=</code>（改ざん検知）や <code>ForwardToSyslog=</code> の細かい挙動も外す。覚えるのは保存先が2つあることと、絞り込みの書き方だけでよい。</div></div>
+<ul><li>journald と rsyslog が同じ1行を二重に持つことを、数えて確かめられる</li><li><code>logger</code> の1行が journald を通ってから rsyslog に届くことを、転送を止めて確かめられる</li><li><code>Storage=</code> の既定（<code>auto</code>）がディレクトリの有無で決まることを説明できる</li><li><code>journalctl</code> の絞り込みを、ユニット・優先度・時刻・タグで書ける</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: journal のバイナリ形式、<code>--merge</code> やリモートの journal（journal-remote）、<code>systemd-journal-gatewayd</code> は扱わない。<code>Seal=</code>（改ざん検知）も外す。<code>ForwardToSyslog=</code> は、rsyslog への入口になっていることを確かめるところだけ扱う。覚えるのは保存先が2つあることと、絞り込みの書き方だけでよい。</div></div>
 <h2 id="double">同じ1行が、2つの箱に入っている</h2>
-<div class="sgoal"><b>この節で分かること</b>: rsyslog と journald が独立していること。</div>
+<div class="sgoal"><b>この節で分かること</b>: rsyslog と journald が、同じ1行を別々に保存していること。</div>
 <p>第4章の受け皿がある状態で、1行投げて両方で数える。</p>
 <pre><code>$ logger -p local3.info "二重に入るか"
 $ grep -c "二重に入るか" /var/log/lab-app.log
 1
 $ journalctl | grep -c "二重に入るか"
 1</code></pre>
-<p>どちらも1件である。<b>同じ1行が2つの箱に保存されている。</b>片方を消しても、もう片方は残る。片方の設定を変えても、もう片方は変わらない。</p>
+<p>どちらも1件である。<b>同じ1行が2つの箱に保存されている。</b>保存先は別々なので、片方を消してももう片方は残る。ただし2つの箱は、入口でつながっている（次の節で確かめる）。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p><code>journalctl</code> はログを見るための便利なコマンドなのだから、
 <code>/var/log/syslog</code> を読んで整形して出しているのだろう。
@@ -32,7 +32,7 @@ $ journalctl | grep -c "二重に入るか"
 <pre><code>$ journalctl --disk-usage
 Archived and active journals take up 8.0M in the file system.
 $ journalctl --no-pager -t myapp -o verbose
-Tue 2026-10-13 10:31:24.319268 JST [s=bfb6643ec800468d802685d65d9269d5;i=a8;b=e5d039e944a940f79a88cd842c8332fd;m=1e28f301ab;t=65daec5ca3234;x=cecd92a05e24157d]
+Tue 2026-10-13 11:42:26.621586 JST [s=7862faf881244922895fff133ab494fc;i=b6;b=e5d039e944a940f79a88cd842c8332fd;m=1f2700944f;t=65dafc3d7c4d9;x=70a9b30e12212940]
     _UID=0
     _GID=0
     _BOOT_ID=e5d039e944a940f79a88cd842c8332fd
@@ -42,12 +42,11 @@ Tue 2026-10-13 10:31:24.319268 JST [s=bfb6643ec800468d802685d65d9269d5;i=a8;b=e5
     _TRANSPORT=syslog
     PRIORITY=3
     SYSLOG_FACILITY=19
-    _COMM=logger
     SYSLOG_IDENTIFIER=myapp
-    SYSLOG_TIMESTAMP=Oct 13 10:31:24
+    SYSLOG_TIMESTAMP=Oct 13 11:42:26
     MESSAGE=タグも付けられる
-    _PID=616
-    _SOURCE_REALTIME_TIMESTAMP=1791855084319268</code></pre>
+    _PID=664
+    _SOURCE_REALTIME_TIMESTAMP=1791859346621586</code></pre>
 <div class="then"><b>だめな理由</b>: <code>journalctl --disk-usage</code> が自分の占有量を 8.0M と答えている。
 テキストファイルを読んでいるだけなら、自分の占有量という概念が無い。
 第4章で <code>logger</code> が投げた1行を <code>-o verbose</code> で出すと、<code>_PID</code>・<code>_UID</code>・<code>_HOSTNAME</code>・<code>_BOOT_ID</code>
@@ -59,6 +58,7 @@ journald は<b>独自のバイナリ形式で、項目ごとに分けて保存�
 <p>2つの箱の違いを整理する。</p>
 <div class="scroll"><table>
 <tr><th></th><th>rsyslog</th><th>journald</th></tr>
+<tr><td>入口</td><td>journald から回してもらう（<code>ForwardToSyslog</code>）。ネットワーク（<code>imudp</code>・<code>imtcp</code>）からは直接</td><td><code>/dev/log</code>（<code>logger</code>）・<code>systemd-cat</code></td></tr>
 <tr><td>保存の形</td><td>テキスト1行</td><td>バイナリ・項目ごと</td></tr>
 <tr><td>置き場所</td><td><code>/var/log/*.log</code></td><td><code>/var/log/journal/</code> か <code>/run/log/journal/</code></td></tr>
 <tr><td>設定</td><td><code>/etc/rsyslog.conf</code>・<code>/etc/rsyslog.d/</code></td><td><code>/etc/systemd/journald.conf</code>・<code>journald.conf.d/</code></td></tr>
@@ -73,14 +73,48 @@ journald は<b>独自のバイナリ形式で、項目ごとに分けて保存�
 <br>ただし<b>崩れる点</b>: 人が2人書けば労力は2倍だが、
 ログの二重化で増えるのはディスクだけで、投げる側の手間は変わらない。
 送り手は1回投げただけである。</div>
+<h2 id="entry">保存は別々、入口は1本</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>logger</code> の1行が、journald を通ってから rsyslog に届いていること。</div>
+<p><code>logger</code> が書き込む <code>/dev/log</code> が、どこにつながっているかを見る。</p>
+<pre><code>$ ls -l /dev/log
+lrwxrwxrwx 1 root root 28 Oct 13 11:41 /dev/log -&gt; /run/systemd/journal/dev-log
+$ cat /usr/lib/systemd/journald.conf.d/syslog.conf
+# Undo upstream commit 46b131574fdd7d77 for now. For details see
+#  http://lists.freedesktop.org/archives/systemd-devel/2014-November/025550.html
+
+[Journal]
+ForwardToSyslog=yes</code></pre>
+<p><code>/dev/log</code> は journald のソケット（<code>/run/systemd/journal/dev-log</code>）へのリンクである。<code>logger</code> の1行を最初に受け取るのは journald で、rsyslog に届くのは、journald が <code>ForwardToSyslog=yes</code> で回した分である。この設定は Ubuntu（Debian）が <code>/usr/lib/systemd/journald.conf.d/syslog.conf</code> に置いている。</p>
+<p>確かめるには、回すのを止めればよい。<code>/usr/lib</code> の下の設定ファイルは、<code>/etc</code> の同じ場所に<b>同じ名前</b>のファイルを置くと差し替えられる。</p>
+<pre><code>$ mkdir -p /etc/systemd/journald.conf.d
+$ printf '[Journal]\nForwardToSyslog=no\n' &gt; /etc/systemd/journald.conf.d/syslog.conf
+$ systemctl restart systemd-journald
+$ logger -p local3.info "転送を止めた後"
+$ grep -c "転送を止めた後" /var/log/syslog
+0
+$ journalctl | grep -c "転送を止めた後"
+1</code></pre>
+<p><code>/var/log/syslog</code> に 0 件、journal に 1 件。rsyslog の設定には何も触っていないのに、rsyslog に届かなくなった。置いたファイルを消して、もとに戻す。</p>
+<pre><code>$ rm /etc/systemd/journald.conf.d/syslog.conf
+$ systemctl restart systemd-journald
+$ logger -p local3.info "戻した後"
+$ grep -c "戻した後" /var/log/syslog
+1</code></pre>
+<p>戻すとまた届く。2つの箱は横に並んでいるのではなく、入口で直列につながっている。</p>
+<pre><code>logger → /dev/log（journald が受け取る）→ /var/log/journal に保存
+                          └→ ForwardToSyslog=yes → rsyslog → /var/log/syslog などに保存</code></pre>
+<p><b>保存先と捨て方は別々だが、入口は1本である。</b>だから journald の設定を変えると、rsyslog に届くものが変わる。逆に、第4章でネットワークから受け取った行は rsyslog に直接入り、journald には入らなかった。</p>
+<p class='detail'>（差し替えるファイルを <code>99-noforward.conf</code> のような名前にすると効かない。設定は名前の順に読まれ、後に読まれる <code>syslog.conf</code> の <code>ForwardToSyslog=yes</code> が勝つからである。別の檻で実測した。）</p>
+<div class="analogy"><b>たとえ</b>: 会社に届いた郵便を受付がまず全部受け取って自分の台帳に記録し、写しを文書係へ回している状態に近い。文書係（rsyslog）は、受付から回ってきたものしか見ていない。受付が回すのをやめれば、文書係の棚には何も増えない。
+<br>ただし<b>崩れる点</b>: 文書係には裏口（ネットワークの 514 番）もあり、そこから来たものは受付を通らないので、受付の台帳（journal）には載らない。</div>
 <h2 id="storage">保存先は2つあり、ディレクトリの有無で決まる</h2>
 <div class="sgoal"><b>この節で分かること</b>: 設定値を書いていないのに保存先が決まっている仕組み。</div>
 <p>設定ファイルはほぼ空である。</p>
 <pre><code>$ grep -vE '^\s*#|^\s*$' /etc/systemd/journald.conf
 [Journal]</code></pre>
 <p>セクション名だけで、キーが1つも無い。それでも保存先は決まっている。</p>
-<pre><code>$ ls -d /var/log/journal
-/var/log/journal
+<pre><code>$ ls -d /var/log/journal/*
+/var/log/journal/f5295b64ae1a49b9a1af1c892764514b
 $ ls -d /run/log/journal/* 2&gt;&amp;1
 ls: cannot access '/run/log/journal/*': No such file or directory
 $ journalctl --disk-usage
@@ -93,16 +127,18 @@ Archived and active journals take up 8.0M in the file system.</code></pre>
 <tr><td><code>auto</code>（既定）</td><td><b><code>/var/log/journal/</code> が在れば</b>そこ、無ければ <code>/run/log/journal/</code></td><td>場合による</td></tr>
 <tr><td><code>none</code></td><td>保存しない（転送のみ）</td><td>—</td></tr>
 </table></div>
-<p><b>ディレクトリが在るかどうかが設定値の役割をしている。</b>だから「永続化したい」ときの操作が <code>mkdir</code> になる。</p>
-<pre><code>$ mkdir -p /var/log/journal
-$ systemd-tmpfiles --create --prefix /var/log/journal
-$ systemctl restart systemd-journald
-$ ls -d /var/log/journal/*
-/var/log/journal/f5295b64ae1a49b9a1af1c892764514b</code></pre>
-<p>中にできたディレクトリ名は machine-id である。</p>
+<p><b>ディレクトリが在るかどうかが設定値の役割をしている。</b>この檻は起動した時点で <code>/var/log/journal/</code> の下に machine-id の名前のディレクトリが在り（上の <code>ls</code>）、もう永続化されている。
+<code>/var/log/journal</code> が無い環境で永続化するときの手順はこうなる。</p>
+<pre><code># /var/log/journal が無い環境での手順（この檻では済んでいる）
+mkdir -p /var/log/journal
+systemd-tmpfiles --create --prefix /var/log/journal
+systemctl restart systemd-journald        # マシンの再起動でもよい</code></pre>
+<p class='detail'>（別の新しい檻で <code>/var/log/journal</code> を消してから試すと、<code>mkdir</code> のあと <code>journalctl --flush</code> だけでは <code>/run/log/journal</code> に書き続け、
+journald を再起動して初めて <code>/var/log/journal/&lt;machine-id&gt;</code> に移った。<code>journalctl -t systemd-journald</code> の行も <code>Runtime Journal</code> から <code>System Journal</code> に変わった。）</p>
+<p>ディレクトリの名前は machine-id である。</p>
 <pre><code>$ cat /etc/machine-id
 f5295b64ae1a49b9a1af1c892764514b</code></pre>
-<p class='detail'>（machine-id は本来1台ごとに違う値である。この檻ではイメージを作ったときの値が焼き込まれているので、誰が起動しても <code>f5295b64ae1a49b9a1af1c892764514b</code> になる。見るのは「machine-id と同じ名前のディレクトリができる」ことである。）</p>
+<p class='detail'>（machine-id は本来1台ごとに違う値である。この檻ではイメージを作ったときの値が焼き込まれているので、誰が起動しても <code>f5295b64ae1a49b9a1af1c892764514b</code> になる。見るのは、ディレクトリの名前が machine-id と同じであることである。）</p>
 <div class="analogy"><b>たとえ</b>: 郵便受けを設置したかどうかで、配達員が
 投函するか持ち帰るかを決める運用に近い。「投函してください」と書面で頼むのではなく、
 受け箱を置くことが依頼になっている。
@@ -116,7 +152,7 @@ f5295b64ae1a49b9a1af1c892764514b</code></pre>
 $ printf '[Journal]\nSystemMaxUse=8M\n' &gt; /etc/systemd/journald.conf.d/10-lab.conf
 $ systemctl restart systemd-journald
 $ journalctl -t systemd-journald --no-pager | tail -1
-Oct 13 10:31:27 linuc systemd-journald[659]: System Journal (/var/log/journal/f5295b64ae1a49b9a1af1c892764514b) is 8.0M, max 8.0M, 0B free.</code></pre>
+Oct 13 11:42:32 linuc systemd-journald[728]: System Journal (/var/log/journal/f5295b64ae1a49b9a1af1c892764514b) is 8.0M, max 8.0M, 0B free.</code></pre>
 <p><b>journald は起動のたびに、自分がどの上限で動くかをログに書く。</b>だから設定が効いたかどうかを推測しなくてよい。第3章の <code>chronyc tracking</code> と同じで、<b>当人に聞けば答える</b>。</p>
 <p>名前は <code>System</code> と <code>Runtime</code> の2系統あり、保存先に対応している。</p>
 <pre><code>SystemMaxUse=    /var/log/journal  の上限
@@ -130,8 +166,8 @@ Vacuuming done, freed 0B of archived journals from /run/log/journal.
 Vacuuming done, freed 0B of archived journals from /var/log/journal/f5295b64ae1a49b9a1af1c892764514b.
 $ journalctl --vacuum-time=2d
 Vacuuming done, freed 0B of archived journals from /var/log/journal.
-Vacuuming done, freed 0B of archived journals from /run/log/journal.
-Vacuuming done, freed 0B of archived journals from /var/log/journal/f5295b64ae1a49b9a1af1c892764514b.</code></pre>
+Vacuuming done, freed 0B of archived journals from /var/log/journal/f5295b64ae1a49b9a1af1c892764514b.
+Vacuuming done, freed 0B of archived journals from /run/log/journal.</code></pre>
 <p><code>freed 0B</code> なのは、捨てられるのが<b>アーカイブ済み</b>のファイルだけで、いま書いている分（<code>system.journal</code>）は対象外だからである。この檻にはまだアーカイブ済みのファイルが1つも無いので、何も減らない。これは失敗ではない。</p>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-services/">演習04</a>は、上限を 8M にして
@@ -141,13 +177,13 @@ journald 自身に <code>max 8.0M</code> と言わせる課題である。
 <div class="sgoal"><b>この節で分かること</b>: テキストの grep では書けない絞り方。</div>
 <p>journald は項目ごとに保存しているので、項目で絞れる。</p>
 <pre><code>$ journalctl --no-pager -u rsyslog -n 3
-Oct 13 10:31:22 linuc rsyslogd[604]: rsyslogd's groupid changed to 102
-Oct 13 10:31:22 linuc rsyslogd[604]: rsyslogd's userid changed to 101
-Oct 13 10:31:22 linuc rsyslogd[604]: [origin software="rsyslogd" swVersion="8.2312.0" x-pid="604" x-info="https://www.rsyslog.com"] start
+Oct 13 11:42:24 linuc rsyslogd[636]: rsyslogd's groupid changed to 102
+Oct 13 11:42:24 linuc rsyslogd[636]: rsyslogd's userid changed to 101
+Oct 13 11:42:24 linuc rsyslogd[636]: [origin software="rsyslogd" swVersion="8.2312.0" x-pid="636" x-info="https://www.rsyslog.com"] start
 $ journalctl --no-pager -p err -n 3
-Oct 13 10:31:22 linuc rsyslogd[604]: imklog: cannot open kernel log (/proc/kmsg): Operation not permitted.
-Oct 13 10:31:22 linuc rsyslogd[604]: activation of module imklog failed [v8.2312.0 try https://www.rsyslog.com/e/2145 ]
-Oct 13 10:31:24 linuc myapp[616]: タグも付けられる</code></pre>
+Oct 13 11:42:24 linuc rsyslogd[636]: imklog: cannot open kernel log (/proc/kmsg): Operation not permitted.
+Oct 13 11:42:24 linuc rsyslogd[636]: activation of module imklog failed [v8.2312.0 try https://www.rsyslog.com/e/2145 ]
+Oct 13 11:42:26 linuc myapp[664]: タグも付けられる</code></pre>
 <p><code>-p err</code> が効いている。第4章で <code>local3.err</code> として投げた<code>myapp</code> の行が入り、<code>info</code> で投げた行は入っていない。<b>rsyslog では行に残らなかった priority が、journald では絞り込みに使える。</b></p>
 <div class="scroll"><table>
 <tr><th>書き方</th><th>意味</th></tr>
@@ -165,15 +201,30 @@ Oct 13 10:31:24 linuc myapp[616]: タグも付けられる</code></pre>
 <p>起動ごとの区切りも持っている。</p>
 <pre><code>$ journalctl --list-boots
 IDX BOOT ID                          FIRST ENTRY                 LAST ENTRY
-  0 e5d039e944a940f79a88cd842c8332fd Tue 2026-10-13 10:30:58 JST Tue 2026-10-13 10:31:27 JST
+  0 e5d039e944a940f79a88cd842c8332fd Tue 2026-10-13 11:41:58 JST Tue 2026-10-13 11:42:32 JST
 $ cat /proc/sys/kernel/random/boot_id
 e5d039e9-44a9-40f7-9a88-cd842c8332fd</code></pre>
 <p>1件しか出ない。BOOT ID はカーネルが起動のたびに作る値で（<code>/proc/sys/kernel/random/boot_id</code> と同じもの）、コンテナはホストのカーネルをそのまま使っている。だからこの檻の BOOT ID はホストの起動 ID で、コンテナを作り直しても再起動しても、ホストを再起動しない限り増えない。実機では起動のたびに新しい ID が付いて過去の起動が並び、<code>journalctl -b -1</code> で前回分を読める。<b>これは永続化していないとできない。</b>保存先の話がここに繋がる。</p>
 <p>自分でも journal に書ける。</p>
 <pre><code>$ systemd-cat -t lab-cat echo "systemd-cat から1行"
 $ journalctl --no-pager -t lab-cat
-Oct 13 10:31:28 linuc lab-cat[677]: systemd-cat から1行</code></pre>
-<p><code>logger</code> と <code>systemd-cat</code> の違いは入口である。<code>logger</code> は syslog のソケットへ、<code>systemd-cat</code> は journald へ直接渡す。どちらも <b>facility と priority というラベルを付けて渡すだけ</b>で、宛先は渡さない。</p>
+Oct 13 11:42:33 linuc lab-cat[746]: systemd-cat から1行</code></pre>
+<p><code>logger</code> は <code>/dev/log</code>（journald のソケット）へ syslog の形で、<code>systemd-cat</code> はコマンドの標準出力を journald へつないで渡す。どちらも受け取るのは journald である。違いはラベルで、facility と priority のうち <code>systemd-cat</code> が付けられるのは priority（<code>-p</code>）だけである。</p>
+<pre><code>$ journalctl --no-pager -t lab-cat -o verbose
+Tue 2026-10-13 11:42:33.839485 JST [s=7862faf881244922895fff133ab494fc;i=c3;b=e5d039e944a940f79a88cd842c8332fd;m=1f276eb6f3;t=65dafc445e77d;x=1df38eae81e1ecbd]
+    PRIORITY=6
+    _UID=0
+    _GID=0
+    _BOOT_ID=e5d039e944a940f79a88cd842c8332fd
+    _MACHINE_ID=f5295b64ae1a49b9a1af1c892764514b
+    _HOSTNAME=linuc
+    _RUNTIME_SCOPE=system
+    _TRANSPORT=stdout
+    _STREAM_ID=93a8b21478fc4b57841463e8ffa82c56
+    SYSLOG_IDENTIFIER=lab-cat
+    MESSAGE=systemd-cat から1行
+    _PID=746</code></pre>
+<p><code>PRIORITY=6</code>（info）はあるが、<code>SYSLOG_FACILITY</code> の項目が無い（<code>logger</code> の1行には <code>SYSLOG_FACILITY=19</code> があった）。<code>_TRANSPORT=stdout</code> が「標準出力から来た」という印である。どちらも<b>宛先は1文字も渡していない</b>。</p>
 <div class="analogy"><b>たとえ</b>: 自由記述の日誌と、項目が決まった記録簿の違いに近い。
 日誌からは「先週の月曜の天気」を探すのに読み返すしかないが、記録簿は天気の欄だけ見れば済む。
 <br>ただし<b>崩れる点</b>: 記録簿は欄が決まっているので欄外のことは書けないが、
@@ -181,7 +232,7 @@ journald は本文も丸ごと持っている。項目が増えただけで、�
 <div class="quiz"><b>確認</b>
 <p><code>/var/log/syslog</code> を削除した。<code>journalctl</code> で過去のログは見られるか。</p>
 <details><summary>答え</summary>
-<p>見られる。2つは独立した箱で、journald は <code>/var/log/journal/</code> か
+<p>見られる。2つは保存先が別の箱で、journald は <code>/var/log/journal/</code> か
 <code>/run/log/journal/</code> に自分の形式で持っている。
 逆に <code>journalctl --vacuum-size</code> で journal を削っても <code>/var/log/syslog</code> は減らない。</p></details></div>
 <div class="quiz"><b>確認</b>
@@ -190,11 +241,12 @@ journal はどこに保存されているか。</p>
 <details><summary>答え</summary>
 <p>既定は <code>auto</code> なので、<code>/var/log/journal/</code> というディレクトリが
 存在すればそこ、存在しなければ <code>/run/log/journal/</code>。
-確かめるには <code>ls -d /var/log/journal</code> か <code>journalctl --disk-usage</code> を見る。
-設定ファイルを読んでも分からない、という点が要点である。</p></details></div>
+確かめるには <code>ls -d /var/log/journal/* /run/log/journal/*</code> で machine-id のディレクトリがどちらに在るかを見るか、
+<code>journalctl -t systemd-journald</code> に出る行が <code>System Journal</code>（<code>/var</code>）か <code>Runtime Journal</code>（<code>/run</code>）かを見る。
+<code>journalctl --disk-usage</code> は合計しか出さないので、どちらかは分からない。設定ファイルを読んでも分からない、という点が要点である。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>同じ1行が rsyslog と journald の両方に入る。実測でどちらも1件だった</li><li>journald はテキストではなくバイナリで、項目ごとに保存する（<code>-o verbose</code> で <code>_PID</code>・<code>_BOOT_ID</code>・<code>PRIORITY</code> などが見える）</li><li><code>Storage=auto</code>（既定）は <code>/var/log/journal</code> の<b>有無</b>で保存先が決まる。設定ファイルを読んでも分からない</li><li>journald は起動のたびに自分の上限をログに書く。<code>max 8.0M</code> を見れば設定が効いたか確かめられる</li><li>journal は logrotate の対象ではない。自分で <code>SystemMaxUse=</code> を持ち、<code>--vacuum-size</code> で捨てる</li><li>rsyslog では行に残らない priority が、journald では <code>-p</code> で絞り込みに使える</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:da71ddd5786ef105ed8dfa8836c5fdfb3c94a9d9fedbfc0b52b2d56f19ab6ded / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>同じ1行が rsyslog と journald の両方に入る（どちらも1件）。保存は別々だが入口は1本で、<code>logger</code> → journald →（<code>ForwardToSyslog</code>）→ rsyslog の順に通る。転送を止めると <code>/var/log/syslog</code> には0件になった</li><li>journald はテキストではなくバイナリで、項目ごとに保存する（<code>-o verbose</code> で <code>_PID</code>・<code>_BOOT_ID</code>・<code>PRIORITY</code> などが見える）</li><li><code>Storage=auto</code>（既定）は <code>/var/log/journal</code> の<b>有無</b>で保存先が決まる。設定ファイルを読んでも分からない</li><li>journald は起動のたびに自分の上限をログに書く。<code>max 8.0M</code> を見れば設定が効いたか確かめられる</li><li>journal は logrotate の対象ではない。自分で <code>SystemMaxUse=</code> を持ち、<code>--vacuum-size</code> で捨てる</li><li>rsyslog では行に残らない priority が、journald では <code>-p</code> で絞り込みに使える</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/04-rsyslog">← 4. ログの宛先は、受け手の表が決める</a><a href="/linuc-services/theory/06-logrotate">次: 6. 捨てる判断も、受け手側にある →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

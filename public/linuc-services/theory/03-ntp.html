@@ -69,7 +69,13 @@ rtcsync
 makestep 1 3
 leapsectz right/UTC</code></pre>
 <p>置き場所（<code>driftfile</code>、<code>logdir</code>）と振る舞い（<code>makestep</code>）は書いてあるが、<code>server</code> も <code>pool</code> も無い。</p>
-<p class='detail'>（この教材では既定の <code>pool ntp.ubuntu.com</code> を外してある。インターネットに出られる読者と出られない読者で出力が完全に変わり、「本文と同じ画面が出る」が壊れるため。著者の環境ではこの行を残したまま測ると、外部のサーバに <code>stratum 3</code> で同期してしまい、誰にも再現できない出力になった。）</p>
+<p>この教材では、Ubuntu の既定にある <code>pool</code> の行を4本ともコメントにしてある。</p>
+<pre><code>$ grep '^#pool' /etc/chrony/chrony.conf
+#pool ntp.ubuntu.com        iburst maxsources 4
+#pool 0.ubuntu.pool.ntp.org iburst maxsources 1
+#pool 1.ubuntu.pool.ntp.org iburst maxsources 1
+#pool 2.ubuntu.pool.ntp.org iburst maxsources 2</code></pre>
+<p>Ubuntu の既定は <code>ntp.ubuntu.com</code> と、公開サーバ群 <code>pool.ntp.org</code> の中の Ubuntu 用の名前（<code>0〜2.ubuntu.pool.ntp.org</code>）を基準にする。外したのは、インターネットに出られる読者と出られない読者で出力が完全に変わり、「本文と同じ画面が出る」が壊れるためである。著者の環境ではこれらの行を残したまま測ると、外部のサーバに <code>stratum 3</code> で同期してしまい、誰にも再現できない出力になった。</p>
 <div class="analogy"><b>たとえ</b>: 検針員を雇ったが、どの家を回るかのリストを渡していない状態に近い。
 出勤はしているし、呼べば返事もする。回る先が0軒なので報告できる数字が無い。
 <br>ただし<b>崩れる点</b>: 検針員はリストが空なら「仕事がない」と言うが、
@@ -91,7 +97,7 @@ $ ss -lun | grep -E ':(123|323)'
 UNCONN 0      0          127.0.0.1:123       0.0.0.0:*
 UNCONN 0      0          127.0.0.1:323       0.0.0.0:*
 UNCONN 0      0              [::1]:323          [::]:*</code></pre>
-<p><code>123/udp</code> が NTP の待ち受けである（試験範囲のポート番号表にある）。<code>323/udp</code> は <code>chronyc</code> が使う管理用で、NTP ではない。</p>
+<p><code>123/udp</code> が NTP の待ち受けで（試験範囲のポート番号表にある）、ここで待ち受けているのは基準サーバの <code>lab-ntp-server</code> である。<code>323/udp</code> は <code>chronyc</code> が使う管理用で、NTP ではない。</p>
 <p>クライアント側に1行足して読み直させる。</p>
 <pre><code>$ echo 'server 127.0.0.1 iburst' &gt;&gt; /etc/chrony/chrony.conf
 $ systemctl restart chrony
@@ -108,7 +114,7 @@ $ chronyc sources -v
 ||                                 |    |           \
 MS Name/IP address         Stratum Poll Reach LastRx Last sample
 ===============================================================================
-^* localhost                     8   6    17     2    +96ns[ +451ns] +/- 4477ns</code></pre>
+^* localhost                     8   6    17     2    +18us[  +18us] +/-   22us</code></pre>
 <p><code>-v</code> を付けると記号の意味が先頭に出る。覚えなくてよい。読み方は毎回ここから引ける。</p>
 <pre><code>^   … 相手はサーバ（peer なら =、ローカル時計なら #）
 *   … いま選ばれている基準
@@ -116,15 +122,15 @@ MS Name/IP address         Stratum Poll Reach LastRx Last sample
 <pre><code>$ chronyc tracking
 Reference ID    : 7F000001 (localhost)
 Stratum         : 9
-Ref time (UTC)  : Tue Oct 13 01:31:05 2026
-System time     : 0.000003099 seconds fast of NTP time
-Last offset     : +0.000000355 seconds
-RMS offset      : 0.000000355 seconds
-Frequency       : 0.146 ppm slow
-Residual freq   : +0.000 ppm
-Skew            : 2.209 ppm
-Root delay      : 0.000008886 seconds
-Root dispersion : 0.000007549 seconds
+Ref time (UTC)  : Tue Oct 13 02:42:05 2026
+System time     : 0.000003198 seconds fast of NTP time
+Last offset     : +0.000000066 seconds
+RMS offset      : 0.000000066 seconds
+Frequency       : 0.092 ppm slow
+Residual freq   : -0.000 ppm
+Skew            : 18.112 ppm
+Root delay      : 0.000044635 seconds
+Root dispersion : 0.000046090 seconds
 Update interval : 2.0 seconds
 Leap status     : Normal</code></pre>
 <p><code>Reference ID</code> が <code>7F000001</code> になった。これは <code>127.0.0.1</code> を16進で書いたもの（7F=127, 00=0, 00=0, 01=1）である。<code>Stratum</code> が <code>9</code> なのは、基準側が <code>local stratum 8</code> だから1段深くなった結果である。</p>
@@ -143,8 +149,8 @@ System clock synchronized: yes
 <tr><td><code>ntpdate -q &lt;host&gt;</code></td><td>1回問い合わせるだけ（時計は動かさない）</td><td>同じ</td></tr>
 </table></div>
 <pre><code>$ ntpdate -q 127.0.0.1
-2026-10-13 10:31:07.488144 (+0900) +0.000017 +/- 0.000048 127.0.0.1 s8 no-leap</code></pre>
-<p><code>s8</code> が相手の stratum、<code>+0.000017</code> がずれである。<code>-q</code> は問い合わせだけなので、権限が無くても通る。次の節でそれが効く。</p>
+2026-10-13 11:42:08.208499 (+0900) -0.000004 +/- 0.000067 127.0.0.1 s8 no-leap</code></pre>
+<p><code>s8</code> が相手の stratum、<code>-0.000004</code> がずれである。<code>-q</code> は問い合わせだけなので、権限が無くても通る。次の節でそれが効く。</p>
 <div class="analogy"><b>たとえ</b>: 時報に電話をかけて、自分の時計との差をメモする作業に近い。
 <code>sources</code> は「どの番号に何回繋がったか」の記録で、<code>tracking</code> は
 「いまどの番号を信じていて、何秒ずれているか」のまとめである。
@@ -159,19 +165,24 @@ $ date -s "2020-01-01 00:00:00"
 date: cannot set date: Operation not permitted
 Wed Jan  1 00:00:00 JST 2020</code></pre>
 <p><code>date -s</code> の出力に注意する。<b>エラーを出したあとに、設定しようとした時刻を表示している</b>。表示だけ見ると成功したように見えるが、直前の行が <code>Operation not permitted</code> である。<code>date</code> を打ち直せば元の時刻が返る。</p>
-<p>権限が無いのは、この檻に CAP_SYS_TIME というケーパビリティが無いからである。第1章で RTC のデバイスが無かったのと同じ理由で、コンテナに時計を動かす力は既定で渡されない。</p>
-<p>だからこの檻の <code>chronyd</code> は、最初から「時計を触らない」指定で起動している。</p>
+<p><code>date -s</code> が失敗したのは、この檻に CAP_SYS_TIME（システムクロックを変える権限）が無いからである。第1章で RTC のデバイスが無かったのと同じ理由で、コンテナに時計を動かす力は既定で渡されない。</p>
+<p><code>chronyc makestep</code> の <code>500 Failure</code> は、その一歩手前で決まっている。この檻の <code>chronyd</code> は、最初から「時計を制御しない」指定で起動している。</p>
 <pre><code>$ cat /etc/default/chrony
 DAEMON_OPTS="-F -1 -x"</code></pre>
-<p><code>-x</code> が「システムクロックを制御しない」である。それでも <code>Leap status : Normal</code> になった。つまり <code>chronyd</code> の仕事は2つに分かれている。</p>
+<p><code>-x</code> が「システムクロックを制御しない」である（<code>man chronyd</code> の言葉では <code>disables the control of the system clock</code>）。Ubuntu の既定の <code>/etc/default/chrony</code> は <code>-F 1</code> だけで <code>-x</code> は付いていないが、Ubuntu の起動スクリプトはコンテナの中では <code>-x</code> を自動で足す。CAP_SYS_TIME の無い場所で時計を合わせようとしても、chronyd が落ちるだけだからである（<code>/usr/share/doc/chrony/README.container</code>）。この檻は、それを設定ファイルにも書いてある。</p>
+<p><b>実機の <code>chronyd</code> や <code>ntpd</code> の本来の仕事は、測ったずれでシステムクロックを合わせることである。</b>この檻の <code>chronyd</code> は時計を動かさないが、それでも <code>Leap status : Normal</code> になった。つまり <code>chronyd</code> の仕事は2つに分かれている。</p>
 <pre><code>測る   … 基準と話して、ずれと揺らぎを求める     ← 権限は要らない
-直す   … 求めたずれをシステムクロックに反映する ← CAP_SYS_TIME が要る</code></pre>
+直す   … 求めたずれをシステムクロックに反映する ← CAP_SYS_TIME が要る（この檻は -x で止めてある）</code></pre>
 <p>そしてこの失敗は、ログに残っている。第4章でこの行をもう一度見る。</p>
 <pre><code>$ tail -3 /var/log/syslog
-2026-10-13T01:30:59.445157+00:00 linuc systemd[1]: Started chrony.service - chrony, an NTP client/server.
-2026-10-13T01:31:03.719446+00:00 linuc chronyd[405]: Selected source 127.0.0.1
-2026-10-13T01:31:07.495866+00:00 linuc chronyd[405]: Could not step system clock</code></pre>
-<p><code>Could not step system clock</code> が、いま打った <code>makestep</code> の結果である。<b>コマンドの手元には <code>500 Failure</code> の1行しか返らなかったが、理由はログに書かれていた</b>。これがこの教材を通して繰り返す形になる。</p>
+2026-10-13T02:42:00.165109+00:00 linuc systemd[1]: Started chrony.service - chrony, an NTP client/server.
+2026-10-13T02:42:04.442509+00:00 linuc chronyd[413]: Selected source 127.0.0.1
+2026-10-13T02:42:08.216251+00:00 linuc chronyd[413]: Could not step system clock</code></pre>
+<p><code>Could not step system clock</code> が、いま打った <code>makestep</code> の結果である。コマンドの手元には <code>500 Failure</code> の1行しか返らなかったが、何が起きたかはログに書かれていた。そして理由のほうは、<code>chronyd</code> が起動したときにもう書いている。</p>
+<pre><code>$ journalctl --no-pager -u chrony | grep "control of system clock"
+Oct 13 11:41:58 linuc chronyd[98]: Disabled control of system clock
+Oct 13 11:42:00 linuc chronyd[413]: Disabled control of system clock</code></pre>
+<p>1行目は檻が起動したとき、2行目はこの章で <code>server</code> を足して再起動したときの記録である。どちらも <code>Disabled control of system clock</code>、つまり「時計は制御しない（<code>-x</code>）」と最初に宣言している。<b>手元に返るのは短い1行でも、結果も理由もログに書かれている</b>。これがこの教材を通して繰り返す形になる。</p>
 <div class="analogy"><b>たとえ</b>: 時刻のずれを測る計測員と、時計の針を回す鍵を持つ管理人が
 別人になっている状態に近い。計測員は「3分遅れています」と正しく報告できるが、針には触れない。
 <br>ただし<b>崩れる点</b>: 人なら管理人を呼べるが、コンテナには呼ぶ相手がいない。
@@ -194,22 +205,22 @@ Get:2 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InReleas
 Get:3 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease [126 kB]
 Get:4 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble/universe amd64 Packages [19.3 MB]
 Get:5 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble/main amd64 Packages [1808 kB]
-Get:6 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates/main amd64 Packages [1633 kB]
-Get:7 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates/universe amd64 Packages [2159 kB]
+Get:6 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates/universe amd64 Packages [2159 kB]
+Get:7 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates/main amd64 Packages [1633 kB]
 Get:8 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security/main amd64 Packages [1310 kB]
 Get:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security/universe amd64 Packages [1542 kB]
-Fetched 28.3 MB in 7s (4002 kB/s)
+Fetched 28.3 MB in 7s (4347 kB/s)
 Reading package lists...
 $ apt-cache show ntpsec | grep -E '^(Provides|Conflicts):'
 Provides: time-daemon
 Conflicts: time-daemon</code></pre>
 <p class='detail'>（<code>Get</code> の行の並び順と、<code>Fetched</code> の行の秒数と速度は、回線で変わる。この檻の apt は 2026-09-29 時点のスナップショットに固定してあるので、取ってくる一覧の中身そのものは誰がいつ打っても同じになる。）</p>
 <p>どちらも <code>time-daemon</code> を<b>提供し</b>、同時に <code>time-daemon</code> と<b>衝突する</b>と書いてある。自分と同じ役を名乗る相手を排除する書き方である。結果として、1台のマシンには時刻デーモンが1つしか入らない。</p>
-<p>理由は <code>123/udp</code> を2つのプロセスが取り合うからで、片方が先に bind すると他方は起動に失敗する。パッケージの段階で防いでいる。</p>
+<p>理由は、1つしかないシステムクロックを2つのデーモンが同時に合わせようとすると、互いの調整がぶつかるからである。待ち受けるポート（<code>123/udp</code>）の取り合いではない。クライアントとして動く <code>chronyd</code> は 123 番で待ち受けていない（この檻で 123 番にいるのは基準サーバのほうで、それを止めると 123 番の行は消える。別の檻で実測）。クライアント専用の <code>systemd-timesyncd</code> も同じ <code>time-daemon</code> を名乗っていて、chrony とは同時に入らない。パッケージの段階で防いでいる。</p>
 <p>だから覚え方はこうなる。<b>コマンド名を別々に覚えるのではなく、対応表で覚える。</b></p>
 <div class="scroll"><table>
 <tr><th>やること</th><th>chrony（現行の既定）</th><th>ntpd / ntpsec</th></tr>
-<tr><td>設定ファイル</td><td><code>/etc/chrony/chrony.conf</code></td><td><code>/etc/ntp.conf</code></td></tr>
+<tr><td>設定ファイル</td><td><code>/etc/chrony/chrony.conf</code>（Debian・Ubuntu）<br><code>/etc/chrony.conf</code>（RHEL 系・上流の既定）</td><td><code>/etc/ntp.conf</code>（Ubuntu の ntpsec は <code>/etc/ntpsec/ntp.conf</code>）</td></tr>
 <tr><td>デーモン</td><td><code>chronyd</code></td><td><code>ntpd</code></td></tr>
 <tr><td>候補の一覧</td><td><code>chronyc sources</code></td><td><code>ntpq -p</code></td></tr>
 <tr><td>基準の指定</td><td><code>server</code> / <code>pool</code></td><td><code>server</code> / <code>pool</code></td></tr>
@@ -234,8 +245,8 @@ Conflicts: time-daemon</code></pre>
 基準にした相手より必ず1大きくなる。実測でも、基準側の設定は
 <code>local stratum 8</code> で、こちらは <code>9</code> になった。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>デーモンが <code>active</code> でも、基準を渡されていなければ時刻は合わない（<code>Reference ID : 00000000</code> / <code>Not synchronised</code>）</li><li>この檻の <code>timedatectl</code> は、基準を足す前から <code>synchronized: yes</code> だった（ホストのカーネルの状態）。檻の中の <code>chronyd</code> のことは <code>chronyc tracking</code> に聞く</li><li>基準は設定の <code>server</code> か <code>pool</code> で渡す。1行足して読み直させるだけで <code>Reference ID : 7F000001</code> / <code>Stratum : 9</code> になった</li><li><code>sources</code> は候補の一覧、<code>tracking</code> はいまの基準とずれ。読み分ける</li><li>ずれを測るのに権限は要らないが、時計を動かすには <code>CAP_SYS_TIME</code> が要る。<code>makestep</code> は <code>500 Failure</code>、<code>date -s</code> は <code>Operation not permitted</code></li><li>手元に返るのは <code>500 Failure</code> の1行だけでも、理由（<code>Could not step system clock</code>）はログに書かれている</li><li><code>chrony</code> と <code>ntpsec</code> はどちらも <code>Provides: time-daemon</code> かつ <code>Conflicts: time-daemon</code>。だから実機には片方しか無い</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:da71ddd5786ef105ed8dfa8836c5fdfb3c94a9d9fedbfc0b52b2d56f19ab6ded / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>デーモンが <code>active</code> でも、基準を渡されていなければ時刻は合わない（<code>Reference ID : 00000000</code> / <code>Not synchronised</code>）</li><li>この檻の <code>timedatectl</code> は、基準を足す前から <code>synchronized: yes</code> だった（ホストのカーネルの状態）。檻の中の <code>chronyd</code> のことは <code>chronyc tracking</code> に聞く</li><li>基準は設定の <code>server</code> か <code>pool</code> で渡す。1行足して読み直させるだけで <code>Reference ID : 7F000001</code> / <code>Stratum : 9</code> になった</li><li><code>sources</code> は候補の一覧、<code>tracking</code> はいまの基準とずれ。読み分ける</li><li><code>chronyd</code>・<code>ntpd</code> の本来の仕事は時計を合わせること。この檻の <code>chronyd</code> は <code>-x</code>（時計を制御しない）で起動していて、<code>makestep</code> は <code>500 Failure</code> になる。<code>date -s</code> が <code>Operation not permitted</code> になるのは <code>CAP_SYS_TIME</code> が無いから</li><li>手元に返るのは <code>500 Failure</code> の1行だけでも、結果（<code>Could not step system clock</code>）も理由（起動時の <code>Disabled control of system clock</code>）もログに書かれている</li><li><code>chrony</code> と <code>ntpsec</code> はどちらも <code>Provides: time-daemon</code> かつ <code>Conflicts: time-daemon</code>。1つの時計を2つで合わせないためで、だから実機には片方しか無い</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/02-timezone">← 2. タイムゾーンは表示の都合だけ</a><a href="/linuc-services/theory/04-rsyslog">次: 4. ログの宛先は、受け手の表が決める →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

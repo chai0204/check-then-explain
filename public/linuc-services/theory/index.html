@@ -36,12 +36,13 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <h2 id="spine">この7章を貫いている1つの事実</h2>
 <div class="goal">
 <p><b>送り手は、中身とラベルだけを渡す。宛先を決めているのは、受け手側にある設定ファイルである。</b></p>
-<p><code>logger</code> は facility と priority しか渡さない。<code>chronyd</code> はずれを測るだけで時計は動かさない。
+<p><code>logger</code> は facility と priority しか渡さない。<code>chronyd</code> は設定に書かれた基準としか話さず、時計を動かすかどうかも起動の指定が決める（この檻の <code>chronyd</code> は時計を動かさない <code>-x</code> で起動してある）。
 メールの <code>To:</code> は希望でしかない。だから主題1.09 の「詳細」欄には、コマンドよりファイルパスが多く並んでいます。
 <b>判断がそこに置かれているから</b>です。</p>
 <div class="skip"><b>ここで覚えなくていいこと</b>:
-SMTP のやりとり、NTP のパケット形式、rsyslog の RainerScript、journal のバイナリ形式、
-リモート転送と TLS。どれもレベル1の範囲外で、この7章には1行も出てきません。</div>
+SMTP のやりとり、NTP のパケット形式、rsyslog の RainerScript の書き方（受信を有効にする <code>module</code>・<code>input</code> の行のコメントを外すところだけ第4章で扱う）、
+journal のバイナリ形式、TLS による暗号化。どれもレベル1の範囲外です。
+ログを別のマシン（ログサーバー）へ送る・受け取るのは範囲内なので、第4章で扱います。</div>
 </div>
 
 <h2 id="range">LinuC 出題範囲との対応</h2>
@@ -58,7 +59,7 @@ SMTP のやりとり、NTP のパケット形式、rsyslog の RainerScript、jo
     <td><code>chronyd</code> <code>chronyc</code> <code>chrony.conf</code> <code>ntpdate</code> <code>pool.ntp.org</code>（<code>ntpd</code> <code>ntpq</code> <code>ntp.conf</code> は対応表で）</td></tr>
 <tr><td rowspan="3">1.09.2 システムのログ</td><td rowspan="3">5</td>
     <td><a href="/linuc-services/theory/04-rsyslog">4</a></td>
-    <td><code>rsyslogd</code> <code>rsyslog.conf</code> <code>/etc/rsyslog.d/</code> <code>logger</code> <code>/var/log/</code></td></tr>
+    <td><code>rsyslogd</code> <code>rsyslog.conf</code> <code>/etc/rsyslog.d/</code> <code>logger</code> <code>/var/log/</code>、ログサーバーへの送受信（<code>@</code> / <code>@@</code>・514 番・<code>imudp</code> / <code>imtcp</code>・<code>logger -n</code>）</td></tr>
 <tr><td><a href="/linuc-services/theory/05-journald">5</a></td>
     <td><code>journalctl</code> <code>/etc/systemd/journald.conf</code> <code>/var/log/journal/</code> <code>systemd-cat</code></td></tr>
 <tr><td><a href="/linuc-services/theory/06-logrotate">6</a></td>
@@ -84,13 +85,13 @@ SMTP のやりとり、NTP のパケット形式、rsyslog の RainerScript、jo
 <li><a href="/linuc-services/theory/03-ntp">基準を渡されるまで始まらない</a> —
     <span class="detail">デーモンは <code>active</code>。それでも <code>Not synchronised</code>。設定1行で <code>Stratum : 9</code> になる（15分）</span></li>
 <li><a href="/linuc-services/theory/04-rsyslog">宛先は受け手の表が決める</a> —
-    <span class="detail"><code>local3</code> に投げた行が <code>/var/log/syslog</code> に入る理由。1行が2箇所に入る（18分）</span></li>
+    <span class="detail"><code>local3</code> に投げた行が <code>/var/log/syslog</code> に入る理由。1行が2箇所に入る。別のマシン（ログサーバー）へも送れる（22分）</span></li>
 <li><a href="/linuc-services/theory/05-journald">journald は隣にある別の箱</a> —
-    <span class="detail">同じ1行が両方に1件ずつ。保存先はディレクトリの有無で決まる（16分）</span></li>
+    <span class="detail">同じ1行が両方に1件ずつ。保存は別々だが、入口は journald の1本。保存先はディレクトリの有無で決まる（20分）</span></li>
 <li><a href="/linuc-services/theory/06-logrotate">捨てる判断も受け手側にある</a> —
     <span class="detail">1つ目の拒否はエラーを出しながら終了コード 0 で終わる。止まる原因は2つあり、どちらも権限（16分）</span></li>
 <li><a href="/linuc-services/theory/07-mail">宛先に書いた名前は希望にすぎない</a> —
-    <span class="detail">2回書き換わる。書き換わったことはログにしか残らない。ここで7章が1本になる（18分）</span></li>
+    <span class="detail">2回書き換わる。途中の経路は、届いたメールを見ても分からない。ここで7章が1本になる（18分）</span></li>
 </ol>
 </div>
 <p><a href="/linuc-services/theory/glossary">用語辞書</a> —
@@ -110,8 +111,8 @@ SMTP のやりとり、NTP のパケット形式、rsyslog の RainerScript、jo
     <td>ログは放っておくと増える一方で、捨てる仕組みは2つに分かれている</td>
     <td>journal は logrotate の対象外。<code>SystemMaxUse=</code> を別に見る</td><td>5・6</td></tr>
 <tr><td>システムからの通知を受け取る</td>
-    <td>cron・smartd・logrotate などは失敗を root 宛のメールで知らせる</td>
-    <td><code>mailq</code> が空でも成功ではない。差し戻しは <code>/var/mail/root</code> に溜まる</td><td>7</td></tr>
+    <td>cron や smartd などは、失敗を root 宛のメールで知らせる</td>
+    <td><code>mailq</code> が空でも成功ではない。差し戻しは送り手に戻る（root が出したものは <code>/var/mail/root</code> に溜まる）</td><td>7</td></tr>
 </table></div>
 <p><b>この主題を使わない方がよい場面</b>も1つあります。
 コンテナで動くアプリのログを rsyslog や logrotate で扱おうとすることです。

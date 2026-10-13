@@ -11,7 +11,7 @@
 # 走らせ方（読者の起動コマンドと同じオプション。名前とボリューム名だけ probe 用）:
 #   docker run -d -t --name linuc-services-probe --hostname linuc --cap-add SYS_ADMIN \
 #     -v <新しい名前のボリューム>:/root/.lab \
-#     lab-linuc-services:1.0.1   # 公開名 ghcr.io/chai0204/lab-linuc-services:1.0.1。記録は push 前のローカルの同じイメージで取った
+#     lab-linuc-services:1.0.2   # 公開名 ghcr.io/chai0204/lab-linuc-services:1.0.2。記録は push 前のローカルの同じイメージで取った
 #   docker exec linuc-services-probe systemctl is-system-running --wait   # running が返るまで繰り返す（起動直後は D-Bus が無い）
 #   docker cp probe/linuc-services-probe.sh linuc-services-probe:/tmp/probe.sh
 #   docker exec linuc-services-probe bash -l /tmp/probe.sh > logs/linuc-services-probe.log 2>&1
@@ -26,9 +26,10 @@
 #        人の手で打てば必ず数秒空くので、その間だけを置いている。コマンドは足していない。
 #   S  … 章の区切り。記録の見出しで、本文には出ない。
 #
-# 同じ檻の記録はほかに3本ある（logs/ の同名ファイルに出る）:
+# 同じ檻の記録はほかにもある（logs/ の同名ファイルに出る）:
 #   probe/linuc-services-solve-all.sh … 演習6本を ✗ → ✔ の両方向で通す
 #   probe/linuc-services-extra.sh     … 地の文の裏取りのうち、この流れに混ぜると状態が変わるもの
+#   probe/linuc-services-extra2.sh    … 事実確認（2026-10-13）で直した地の文の裏取り
 #   probe/linuc-services-podman.sh    … podman（rootless）の読者で出力が変わる箇所（umask が 0022）
 set -u
 LAST=0
@@ -89,6 +90,7 @@ R 'chronyc tracking'
 R 'systemctl is-active chrony'
 R 'chronyc activity'
 R "grep -vE '^\s*#|^\s*\$' /etc/chrony/chrony.conf"
+R "grep '^#pool' /etc/chrony/chrony.conf"
 R 'systemctl is-active lab-ntp-server'
 R "grep -vE '^\s*#|^\s*\$' /etc/chrony/lab-ntp-server.conf"
 R "ss -lun | grep -E ':(123|323)'"
@@ -104,6 +106,7 @@ W 1
 R 'date -s "2020-01-01 00:00:00"'
 R 'cat /etc/default/chrony'
 R 'tail -3 /var/log/syslog'
+R 'journalctl --no-pager -u chrony | grep "control of system clock"'
 R "apt-cache show chrony | grep -E '^(Provides|Conflicts):'"
 R "apt-cache show ntpsec | grep -E '^(Provides|Conflicts):'"
 R 'apt-get update'
@@ -142,6 +145,18 @@ R 'logger -p local3.info "受け皿ができた後"'
 W 1
 R 'cat /var/log/lab-app.log'
 R 'grep "受け皿ができた後" /var/log/syslog'
+R "grep -n -E 'imudp|imtcp' /etc/rsyslog.conf"
+R "sed -i -e '17s/^#//' -e '18s/^#//' -e '21s/^#//' -e '22s/^#//' /etc/rsyslog.conf"
+R "grep -n -E 'imudp|imtcp' /etc/rsyslog.conf"
+R 'systemctl restart rsyslog'
+W 1
+R "ss -lnu | grep ':514'"
+R "ss -lnt | grep ':514'"
+R 'logger -n 127.0.0.1 -P 514 -d "UDP で届いた"'
+R 'logger -n 127.0.0.1 -P 514 -T "TCP で届いた"'
+W 1
+R 'grep "で届いた" /var/log/syslog'
+R 'journalctl | grep -c "で届いた"'
 R 'logger -p local3.err -t myapp "タグも付けられる"'
 W 1
 R 'tail -1 /var/log/lab-app.log'
@@ -153,15 +168,26 @@ R 'grep -c "二重に入るか" /var/log/lab-app.log'
 R 'journalctl | grep -c "二重に入るか"'
 R 'journalctl --disk-usage'
 R 'journalctl --no-pager -t myapp -o verbose'
-R "grep -vE '^\s*#|^\s*\$' /etc/systemd/journald.conf"
-R 'ls -d /var/log/journal'
-R 'ls -d /run/log/journal/* 2>&1'
-R 'journalctl --disk-usage'
-R 'mkdir -p /var/log/journal'
-R 'systemd-tmpfiles --create --prefix /var/log/journal'
+R 'ls -l /dev/log'
+R 'cat /usr/lib/systemd/journald.conf.d/syslog.conf'
+R 'mkdir -p /etc/systemd/journald.conf.d'
+R "printf '[Journal]\nForwardToSyslog=no\n' > /etc/systemd/journald.conf.d/syslog.conf"
 R 'systemctl restart systemd-journald'
 W 1
+R 'logger -p local3.info "転送を止めた後"'
+W 1
+R 'grep -c "転送を止めた後" /var/log/syslog'
+R 'journalctl | grep -c "転送を止めた後"'
+R 'rm /etc/systemd/journald.conf.d/syslog.conf'
+R 'systemctl restart systemd-journald'
+W 1
+R 'logger -p local3.info "戻した後"'
+W 1
+R 'grep -c "戻した後" /var/log/syslog'
+R "grep -vE '^\s*#|^\s*\$' /etc/systemd/journald.conf"
 R 'ls -d /var/log/journal/*'
+R 'ls -d /run/log/journal/* 2>&1'
+R 'journalctl --disk-usage'
 R 'cat /etc/machine-id'
 R 'mkdir -p /etc/systemd/journald.conf.d'
 R "printf '[Journal]\nSystemMaxUse=8M\n' > /etc/systemd/journald.conf.d/10-lab.conf"
@@ -177,6 +203,7 @@ R 'cat /proc/sys/kernel/random/boot_id'
 R 'systemd-cat -t lab-cat echo "systemd-cat から1行"'
 W 1
 R 'journalctl --no-pager -t lab-cat'
+R 'journalctl --no-pager -t lab-cat -o verbose'
 
 S "第6章 捨てる判断も、受け手側にある（1.09.2）"
 R "grep -vE '^\s*#|^\s*\$' /etc/logrotate.conf"
@@ -230,11 +257,13 @@ W 3
 R 'grep -c "2回曲がる" /var/mail/root'
 R 'grep -c "2回曲がる" /var/mail/bob'
 R 'journalctl -t postfix/local --no-pager | tail -3'
+R 'grep "world writable" /var/log/mail.log'
 R 'chmod 644 /home/bob/.forward'
 R 'echo "2回曲がる" | mail -s "forward 経由" alice'
 W 3
 R 'grep -c "2回曲がる" /var/mail/root'
 R 'journalctl -t postfix/local --no-pager -n 2'
+R "grep -E '^(X-Original-To|Delivered-To):' /var/mail/root"
 R 'echo x | mail -s "届かない宛先" nosuchuser@invalid.example'
 W 5
 R 'mailq'

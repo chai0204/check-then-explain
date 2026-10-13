@@ -12,7 +12,7 @@
 # 走らせ方は probe/linuc-services-probe.sh と同じ（名前とボリューム名だけ extra 用）:
 #   docker run -d -t --name linuc-services-extra --hostname linuc --cap-add SYS_ADMIN \
 #     -v <新しい名前のボリューム>:/root/.lab \
-#     lab-linuc-services:1.0.1   # 公開名 ghcr.io/chai0204/lab-linuc-services:1.0.1。記録は push 前のローカルの同じイメージで取った
+#     lab-linuc-services:1.0.2   # 公開名 ghcr.io/chai0204/lab-linuc-services:1.0.2。記録は push 前のローカルの同じイメージで取った
 #   docker exec linuc-services-extra systemctl is-system-running --wait   # running が返るまで繰り返す
 #   docker cp probe/linuc-services-extra.sh linuc-services-extra:/tmp/extra.sh
 #   docker exec linuc-services-extra bash -l /tmp/extra.sh > logs/linuc-services-extra.log 2>&1

@@ -95,8 +95,11 @@ LABEL org.opencontainers.image.licenses=MIT
 # 1.0.1（2026-10-13）: 全問クリア時の案内のパスを実在するもの（/linuc-services/…）に直し、
 #   演習05・06 のヒントと模範解答を docker exec（umask 0000）と podman exec（umask 0022）の
 #   どちらで入った読者にも正しい書き方にした。設定とパッケージは 1.0.0 と同じ。
-ENV LAB_THEME=linuc-services LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc-services:1.0.1
+# 1.0.2（2026-10-13）: 事実確認に合わせて演習の文面（lab/）だけを直した。
+#   chronyd が時計を動かさないのは -x のため / rsyslog は journald から回された分を受け取る /
+#   .forward が拒否されるのは world writable のときだけ / journald の上限の行の実物、など。
+ENV LAB_THEME=linuc-services LAB_VERSION=1.0.2 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc-services:1.0.2
 WORKDIR /root
 # systemd の停止は SIGRTMIN+3。SIGTERM だと 10 秒待たされて強制 kill になる。
 STOPSIGNAL SIGRTMIN+3

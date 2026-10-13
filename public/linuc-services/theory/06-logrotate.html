@@ -102,8 +102,8 @@ logrotate は設定に書かれたコマンドを root で実行するので、
 <pre><code>$ chmod 644 /etc/logrotate.d/lab-app
 $ for i in $(seq 1 60); do logger -p local3.info "かさ増し $i"; done
 $ ls -l /var/log/lab-app.log
--rw-r----- 1 syslog adm 3856 Oct 13 10:31 /var/log/lab-app.log</code></pre>
-<p>3856 バイトで、<code>size 1k</code> の条件は満たしている。もう一度打つ。</p>
+-rw-r----- 1 syslog adm 3914 Oct 13 11:42 /var/log/lab-app.log</code></pre>
+<p>3914 バイトで、<code>size 1k</code> の条件は満たしている。もう一度打つ。</p>
 <pre><code>$ logrotate -v /etc/logrotate.d/lab-app
 reading config file /etc/logrotate.d/lab-app
 acquired lock on state file /var/lib/logrotate/statusReading state from file: /var/lib/logrotate/status
@@ -120,7 +120,7 @@ $ echo $?
 1</code></pre>
 <p>まだ切れない。ただし今度は終了コードが <code>1</code> になった。1つ目の拒否（設定ファイルの権限）は 0、2つ目は 1 である。<b>2段目の条件は、ログの親ディレクトリの権限である。</b></p>
 <pre><code>$ ls -ld /var/log
-drwxrwxr-x 1 root syslog 4096 Oct 13 10:31 /var/log</code></pre>
+drwxrwxr-x 1 root syslog 4096 Oct 13 11:42 /var/log</code></pre>
 <p><code>/var/log</code> は <code>syslog</code> グループが書ける。rsyslog が自分でログファイルを作れるようにそうなっている。logrotate はこれを危険と見て飛ばす。メッセージが解決策を名指ししている — <code>Set &quot;su&quot; directive</code>。この su ディレクティブは、<b>すでにどこかに書かれている</b>。</p>
 <pre><code>$ grep -n su /etc/logrotate.conf
 10:su root adm
@@ -134,10 +134,10 @@ Handling 9 logs
 ...
 rotating pattern: /var/log/lab-app.log  1024 bytes (3 rotations)
 empty log files are rotated, old logs are removed
-switching euid from 0 to 0 and egid from 0 to 4 (pid 767)
+switching euid from 0 to 0 and egid from 0 to 4 (pid 838)
 considering log /var/log/lab-app.log
-  Now: 2026-10-13 10:31
-  Last rotated at 2026-10-13 10:00
+  Now: 2026-10-13 11:42
+  Last rotated at 2026-10-13 11:00
   log needs rotating
 rotating log /var/log/lab-app.log, log-&gt;rotateCount is 3
 ...
@@ -146,8 +146,8 @@ creating new /var/log/lab-app.log mode = 0640 uid = 101 gid = 4
 compressing log with: /bin/gzip
 ...
 $ ls -l /var/log/lab-app.log*
--rw-r----- 1 syslog adm   0 Oct 13 10:31 /var/log/lab-app.log
--rw-r----- 1 syslog adm 596 Oct 13 10:31 /var/log/lab-app.log.1.gz</code></pre>
+-rw-r----- 1 syslog adm   0 Oct 13 11:42 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 621 Oct 13 11:42 /var/log/lab-app.log.1.gz</code></pre>
 <p>切れた。<code>.log</code> が 0 バイトで作り直され、前の内容は <code>.log.1.gz</code> になっている。途中の <code>switching euid from 0 to 0 and egid from 0 to 4</code> が、<code>su root adm</code> が効いた跡である（グループ ID 4 は <code>adm</code>）。</p>
 <p class='detail'>（この設定には <code>postrotate</code> が無いので、rsyslog はこの時点ではまだ、名前を変えられて（圧縮のあとに）消えた古いファイルを開いたままである。次の節の <code>logrotate -f</code> で、rsyslog 側の設定（<code>/etc/logrotate.d/rsyslog</code>）の <code>postrotate</code> が HUP を送るまで、新しい <code>lab-app.log</code> には書かれない。）</p>
 <p><b>Ubuntu 標準の <code>/etc/logrotate.d/rsyslog</code> に <code>su</code> が書かれていないのに動くのは、単体で実行される前提になっていないから</b>である。<code>logrotate.conf</code> から <code>include</code> され、そこにある <code>su root adm</code> を受け継いで動いている。設定の階層は「どのファイルを渡して実行したか」で変わる。</p>
@@ -172,21 +172,21 @@ $ ls -l /var/log/lab-app.log*
 <div class="sgoal"><b>この節で分かること</b>: logrotate が状態を持っていること、そして誰が呼ぶのか。</div>
 <pre><code>$ cat /var/lib/logrotate/status
 logrotate state -- version 2
-"/var/log/syslog" 2026-10-13-10:0:0
-"/var/log/dpkg.log" 2026-10-13-10:0:0
-"/var/log/auth.log" 2026-10-13-10:0:0
-"/var/log/apt/term.log" 2026-10-13-10:0:0
-"/var/log/lab-app.log" 2026-10-13-10:31:31
-"/var/log/apt/history.log" 2026-10-13-10:0:0
-"/var/log/alternatives.log" 2026-10-13-10:0:0
-"/var/log/mail.log" 2026-10-13-10:0:0
-"/var/log/kern.log" 2026-10-13-10:0:0
-"/var/log/wtmp" 2026-10-13-10:0:0
-"/var/log/chrony/*.log" 2026-10-13-10:0:0
-"/var/log/btmp" 2026-10-13-10:0:0
-"/var/log/user.log" 2026-10-13-10:0:0
-"/var/log/cron.log" 2026-10-13-10:0:0</code></pre>
-<p>対象ごとに「前回切った時刻」を持っている。<code>lab-app.log</code> だけ分と秒まで入っているのは、実際に切った時刻だからである（ほかは初めて見たときに記録された時刻で、<code>-v</code> の出力の <code>Last rotated at 2026-10-13 10:00</code> と同じく時の単位に丸められている）。だから <code>weekly</code> の設定で1日に何度打っても1回しか切らない。条件を無視させたいときだけ <code>-f</code> を使う。</p>
+"/var/log/syslog" 2026-10-13-11:0:0
+"/var/log/dpkg.log" 2026-10-13-11:0:0
+"/var/log/auth.log" 2026-10-13-11:0:0
+"/var/log/apt/term.log" 2026-10-13-11:0:0
+"/var/log/lab-app.log" 2026-10-13-11:42:36
+"/var/log/apt/history.log" 2026-10-13-11:0:0
+"/var/log/alternatives.log" 2026-10-13-11:0:0
+"/var/log/mail.log" 2026-10-13-11:0:0
+"/var/log/kern.log" 2026-10-13-11:0:0
+"/var/log/wtmp" 2026-10-13-11:0:0
+"/var/log/chrony/*.log" 2026-10-13-11:0:0
+"/var/log/btmp" 2026-10-13-11:0:0
+"/var/log/user.log" 2026-10-13-11:0:0
+"/var/log/cron.log" 2026-10-13-11:0:0</code></pre>
+<p>対象ごとに「前回切った時刻」を持っている。<code>lab-app.log</code> だけ分と秒まで入っているのは、実際に切った時刻だからである（ほかは初めて見たときに記録された時刻で、<code>-v</code> の出力の <code>Last rotated at 2026-10-13 11:00</code> と同じく時の単位に丸められている）。だから <code>weekly</code> の設定で1日に何度打っても1回しか切らない。条件を無視させたいときだけ <code>-f</code> を使う。</p>
 <pre><code>$ logrotate -f /etc/logrotate.conf</code></pre>
 <p>世代の上限が効いていることも確かめられる。4回切ると最古が消える。</p>
 <pre><code>$ for r in 1 2 3 4; do
@@ -194,15 +194,15 @@ logrotate state -- version 2
 &gt;   logrotate -f /etc/logrotate.conf
 &gt; done
 $ ls -l /var/log/lab-app.log*
--rw-r----- 1 syslog adm   0 Oct 13 10:31 /var/log/lab-app.log
--rw-r----- 1 syslog adm 479 Oct 13 10:31 /var/log/lab-app.log.1.gz
--rw-r----- 1 syslog adm 479 Oct 13 10:31 /var/log/lab-app.log.2.gz
--rw-r----- 1 syslog adm 466 Oct 13 10:31 /var/log/lab-app.log.3.gz</code></pre>
+-rw-r----- 1 syslog adm   0 Oct 13 11:42 /var/log/lab-app.log
+-rw-r----- 1 syslog adm 473 Oct 13 11:42 /var/log/lab-app.log.1.gz
+-rw-r----- 1 syslog adm 486 Oct 13 11:42 /var/log/lab-app.log.2.gz
+-rw-r----- 1 syslog adm 481 Oct 13 11:42 /var/log/lab-app.log.3.gz</code></pre>
 <p><code>rotate 3</code> なので <code>.4.gz</code> は作られず、捨てられている。</p>
 <p>では誰が <code>logrotate</code> を呼ぶのか。常駐していない。</p>
 <pre><code>$ systemctl list-timers logrotate.timer --no-pager
 NEXT                        LEFT LAST PASSED UNIT            ACTIVATES
-Wed 2026-10-14 00:00:00 JST  13h -         - logrotate.timer logrotate.service
+Wed 2026-10-14 00:00:00 JST  12h -         - logrotate.timer logrotate.service
 
 1 timers listed.
 Pass --all to see loaded but inactive timers, too.
@@ -238,16 +238,17 @@ logrotate は条件を満たさなければ何もせずに帰る。来たこと�
 <code>Handling 1 logs</code> のあとに <code>error: skipping</code> が出て、終了コードは 1 になる。
 どちらも <code>-v</code>（または何もしない <code>-d</code>）で判断の過程を読む。</p></details></div>
 <div class="quiz"><b>確認</b>
-<p><code>rotate 3</code> と <code>compress</code> を設定して4回切った。
-残っているファイルを列挙せよ。</p>
+<p><code>rotate 3</code> と <code>compress</code> を設定し、<code>/etc/logrotate.conf</code> 経由で
+（全体設定の <code>create</code> が効く形で）4回切った。残っているファイルを列挙せよ。</p>
 <details><summary>答え</summary>
-<p><code>lab-app.log</code>（新しい空ファイル）、<code>.1.gz</code>、<code>.2.gz</code>、<code>.3.gz</code> の4つ。
-<code>.4.gz</code> は作られずに捨てられる。
+<p><code>lab-app.log</code>（<code>create</code> で作り直された空のファイル）、<code>.1.gz</code>、<code>.2.gz</code>、<code>.3.gz</code> の4つ。
+<code>.4.gz</code> は作られずに捨てられる。<code>create</code> が効いていなければ、新しい <code>lab-app.log</code> は作られない
+（この章の su の節で、設定ファイルを単体で渡したときに見たとおり）。
 <code>delaycompress</code> を付けていれば <code>.1</code> が非圧縮のまま残り、
 <code>.2.gz</code> 以降が圧縮される。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>書く側（rsyslog）と捨てる側（logrotate）は別のプログラムで、設定ファイルも別</li><li><code>logrotate</code> は設定ファイルが group/other に書けると<b>丸ごと無視</b>する。しかも終了コードは 0</li><li>ログの親ディレクトリが group 書き込み可だと、<code>su</code> ディレクティブが無い限り飛ばす（こちらは終了コード 1）</li><li><code>/etc/logrotate.d/&lt;名前&gt;</code> を直接渡すと <code>/etc/logrotate.conf</code> の既定（<code>su root adm</code> など）が効かない。渡すのは <code>logrotate.conf</code></li><li>前回切った時刻は <code>/var/lib/logrotate/status</code> にある。無視させるのは <code>-f</code></li><li>logrotate は常駐しない。<code>logrotate.timer</code>（<code>OnCalendar=daily</code> / <code>Persistent=true</code>）が呼ぶ</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.1@sha256:da71ddd5786ef105ed8dfa8836c5fdfb3c94a9d9fedbfc0b52b2d56f19ab6ded / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動と、umask の違いで1つ目の拒否が起きないことを確認）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動と、umask の違いで1つ目の拒否が起きないことを確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/05-journald">← 5. journald は隣にある別の箱</a><a href="/linuc-services/theory/07-mail">次: 7. 宛先に書いた名前は、希望にすぎない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

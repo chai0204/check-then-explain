@@ -9,7 +9,7 @@
 # 走らせ方（入口ページの podman の起動コマンドと同じオプション。名前とボリューム名だけ probe 用）:
 #   podman run -d -t --name linuc-services-podman --hostname linuc --systemd=always \
 #     -v <新しい名前のボリューム>:/root/.lab \
-#     lab-linuc-services:1.0.1   # 公開名 ghcr.io/chai0204/lab-linuc-services:1.0.1。記録は push 前のローカルの同じイメージで取った
+#     lab-linuc-services:1.0.2   # 公開名 ghcr.io/chai0204/lab-linuc-services:1.0.2。記録は push 前のローカルの同じイメージで取った
 #   podman exec linuc-services-podman systemctl is-system-running --wait   # running が返るまで繰り返す
 #   podman cp probe/linuc-services-podman.sh linuc-services-podman:/tmp/podman.sh
 #   podman exec linuc-services-podman bash -l /tmp/podman.sh > logs/linuc-services-podman.log 2>&1
