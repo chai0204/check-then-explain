@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# 外側コンテナの PID 1（tini の子）。lab ユーザで動く。
+#
+#   1. 練習機のディスク（土台の上の差分）と定義を用意する
+#   2. 練習機の中から外の lab を呼べる中継を 127.0.0.1:7777 に立てる
+#      （練習機から見ると 10.0.2.2:7777。QEMU の slirp が外のループバックへ届ける）
+#   3. LAB_VM_AUTOSTART=1 のコースでは練習機を起動しておく
+#   4. docker stop を受けたら、練習機を正常に停止してから終わる（電源を抜くと次回 fsck になる）
+set -u
+export LIBVIRT_DEFAULT_URI=qemu:///session
+DOM=${LAB_VM_NAME:-linuc}
+
+mkdir -p "$HOME/vm" "$HOME/.lab" "$HOME/work" 2>/dev/null
+
+socat TCP-LISTEN:7777,bind=127.0.0.1,fork,reuseaddr EXEC:/usr/local/libexec/lab-remote 2>/dev/null &
+
+if [ "${LAB_VM_AUTOSTART:-0}" = "1" ]; then
+  /usr/local/bin/vm start --quiet > "$HOME/vm/autostart.log" 2>&1 &
+else
+  # 定義だけはしておく（読者が最初に virsh list --all を打ったとき、練習機が見えるように）
+  /usr/local/bin/vm define > "$HOME/vm/define.log" 2>&1
+fi
+
+# 初回の準備（コースの provision.sh）の見張り。起動経路に依らず、練習機が応答したら1回だけ走る。
+if [ -f /etc/lab-vm/provision.sh ]; then
+  # 終わらせない: vm reset --yes で印が消えたら、次に起動したときにもう一度準備する
+  ( while sleep 5; do
+      [ -f "$HOME/vm/.provisioned" ] || /usr/local/bin/vm provision >> "$HOME/vm/provision-watch.log" 2>&1
+    done ) &
+fi
+
+stop_vm() {
+  if [ "$(virsh domstate "$DOM" 2>/dev/null | head -1)" = "running" ]; then
+    virsh shutdown "$DOM" >/dev/null 2>&1
+    for _ in $(seq 1 40); do
+      [ "$(virsh domstate "$DOM" 2>/dev/null | head -1)" = "shut off" ] && break
+      sleep 0.5
+    done
+    virsh destroy "$DOM" >/dev/null 2>&1
+  fi
+  exit 0
+}
+trap stop_vm TERM INT
+
+sleep infinity &
+wait $!

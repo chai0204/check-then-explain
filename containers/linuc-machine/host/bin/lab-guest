@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# lab-guest [-u USER] 'コマンド' — 練習機の中でコマンドを実行し、標準出力・標準エラー・終了コードを返す。
+#
+# 判定（verify）用。ssh ではなく qemu-guest-agent（virtio-serial）を通るので、
+# 読者がネットワークや sshd を壊していても判定できる。実行は root。-u で別ユーザにできる。
+# 終了コード: 練習機の中のコマンドの終了コード。エージェントに届かないときは 125。
+set -uo pipefail
+export LIBVIRT_DEFAULT_URI=${LIBVIRT_DEFAULT_URI:-qemu:///session}
+DOM=${LAB_VM_NAME:-linuc}
+
+user=""
+if [ "${1:-}" = "-u" ]; then user=$2; shift 2; fi
+cmd="$*"
+[ -n "$cmd" ] || { echo "使い方: lab-guest [-u USER] 'コマンド'" >&2; exit 2; }
+if [ -n "$user" ]; then
+  q=$(printf '%q' "$cmd")
+  cmd="runuser -l $user -c $q"
+fi
+
+req=$(jq -nc --arg c "$cmd" \
+  '{execute:"guest-exec",arguments:{path:"/bin/bash",arg:["-c",$c],"capture-output":true}}')
+if ! out=$(virsh qemu-agent-command "$DOM" "$req" --timeout 10 2>&1); then
+  echo "lab-guest: 練習機のエージェントに届きません（練習機が止まっていませんか: vm status）" >&2
+  exit 125
+fi
+pid=$(jq -r '.return.pid' <<<"$out")
+
+st=""
+for _ in $(seq 1 1500); do
+  st=$(virsh qemu-agent-command "$DOM" \
+        "{\"execute\":\"guest-exec-status\",\"arguments\":{\"pid\":$pid}}" --timeout 10 2>&1) || exit 125
+  [ "$(jq -r '.return.exited' <<<"$st")" = "true" ] && break
+  sleep 0.2
+done
+[ "$(jq -r '.return.exited' <<<"$st")" = "true" ] || { echo "lab-guest: 5分待っても終わりません" >&2; exit 124; }
+
+jq -r '.return["out-data"] // ""' <<<"$st" | base64 -d
+jq -r '.return["err-data"] // ""' <<<"$st" | base64 -d >&2
+exit "$(jq -r '.return.exitcode // 1' <<<"$st")"

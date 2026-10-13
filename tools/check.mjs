@@ -164,6 +164,9 @@ const PLACEHOLDERS = [
   "GISCUS_CATEGORY_ID",
   "GISCUS_REPO_ID",
   "GISCUS_REPO",
+  // イメージのダイジェスト。push するまで決まらないので、制作中は __DIGEST__ と書いておき push 後に置き換える
+  // （LinuC の全範囲を並列で作ったときに導入。2026-10-13）
+  "__DIGEST__",
 ].sort((a, b) => b.length - a.length);
 
 let phTotal = 0;
@@ -299,7 +302,7 @@ for (const f of htmls.filter((f) => /glossary\.html$/.test(f))) {
 // README（著者向け）は対象外。
 for (const f of htmls) {
   const h = readFileSync(f, "utf8");
-  for (const m of h.matchAll(/<pre><code>([\s\S]*?)<\/code><\/pre>/g)) {
+  for (const m of h.matchAll(/<pre\b[^>]*><code>([\s\S]*?)<\/code><\/pre>/g)) {
     const cmd = m[1];
     if (!/\b(docker|podman)\s+run\b/.test(cmd)) continue;
 
@@ -360,6 +363,11 @@ if (existsSync(containersDir)) {
       const fromExternal = froms.some((i) => !/^lab-/.test(i));
       if (fromExternal && /apt-get/.test(d) && !/snapshot\.ubuntu\.com/.test(d))
         errors.push(`${name}: 外部イメージから apt を使っているが snapshot.ubuntu.com を指していない`);
+      // dnf / yum も同じ。既定のミラーは日々更新されるので、固定されたポイントリリース（vault）を指させる
+      // （主題1.04 の RHEL 系の檻を足したときに導入。2026-10-13）
+      if (fromExternal && /\b(dnf|yum)\b/.test(d.replace(/^#.*$/gm, "")) &&
+          !/vault\.almalinux\.org|dl\.rockylinux\.org\/vault|vault\.centos\.org/.test(d))
+        errors.push(`${name}: 外部イメージから dnf/yum を使っているが、固定されたリポジトリ（vault）を指していない`);
     }
   }
 }

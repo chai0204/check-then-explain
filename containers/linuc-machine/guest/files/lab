@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# 練習機の中の lab。採点と進捗は外（コンテナ）が持っているので、外の lab に頼んで結果を表示する。
+# 経路: 10.0.2.2:7777（QEMU の slirp が外のコンテナの 127.0.0.1:7777 に届ける）
+if ! exec 3<>/dev/tcp/10.0.2.2/7777 2>/dev/null; then
+  echo "外の lab に届きません。"
+  echo "管理用の NIC（enp0s16）や経路を触った後なら、外の端末で打ってください:"
+  echo "    docker exec -it <コンテナ名> lab ${*:-}"
+  exit 2
+fi
+printf '%s\n' "$*" >&3
+cat <&3

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# 練習機の中の `lab …` から呼ばれる中継（socat が1接続ごとに起動する）。
+# 1行だけ読み、許可したサブコマンドだけを外の lab に渡す。採点と進捗は外が持つ。
+IFS= read -r line || exit 0
+read -r -a args <<<"$line"
+sub=${args[0]:-status}
+case "$sub" in
+  status|ls|start|check|hint|solve|reset|env|help|-h|--help) ;;
+  *) echo "練習機の中からは使えないサブコマンドです: $sub"; exit 0 ;;
+esac
+for a in "${args[@]}"; do
+  case "$a" in *[!0-9A-Za-z_-]*) echo "使えない文字が入っています: $a"; exit 0 ;; esac
+done
+cd "$HOME" || exit 0
+exec /usr/local/bin/lab "${args[@]}" 2>&1

@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# vm — 練習機（仮想マシン linuc）を動かす薄いラッパ。
+#
+# 中身は virsh と ssh だけで、打つたびに実際のコマンドを ▶ で表示する。
+# 読者がこのラッパに慣れたら、表示されたコマンドを自分で打てばよい（1.01.2 は virsh を名指ししている）。
+set -uo pipefail
+export LIBVIRT_DEFAULT_URI=${LIBVIRT_DEFAULT_URI:-qemu:///session}
+DOM=${LAB_VM_NAME:-linuc}
+VMDIR=${LAB_VM_DIR:-$HOME/vm}
+BASE=/var/lib/lab-vm/linuc-guest.qcow2
+
+c_d=$'\033[2m'; c_b=$'\033[1m'; c_ok=$'\033[32m'; c_ng=$'\033[31m'; c_0=$'\033[0m'
+[ -t 1 ] || { c_d=; c_b=; c_ok=; c_ng=; c_0=; }
+show() { printf '%s\n' "${c_d}▶ $*${c_0}"; }
+say()  { [ "${QUIET:-0}" = 1 ] || printf '%s\n' "$*"; }
+
+state()    { virsh domstate "$DOM" 2>/dev/null | head -1; }
+agent_ok() { virsh qemu-agent-command "$DOM" '{"execute":"guest-ping"}' --timeout 3 >/dev/null 2>&1; }
+# ssh の待ち受けは「鍵が通るか」ではなく「SSH のバナーが返るか」で見る。
+# ブートのコースでは鍵を読者が作るので、鍵で確かめると準備ができていても失敗に見える。
+ssh_up()   { timeout 4 bash -c 'exec 3<>/dev/tcp/127.0.0.1/2222 && head -c 4 <&3' 2>/dev/null | grep -q '^SSH-'; }
+
+define_if_needed() {
+  mkdir -p "$VMDIR"
+  if [ ! -f "$VMDIR/linuc.qcow2" ]; then
+    qemu-img create -q -f qcow2 -F qcow2 -b "$BASE" "$VMDIR/linuc.qcow2" 20G
+    rm -f "$VMDIR/.provisioned"
+  fi
+  # コースの層が足す起動前の準備（追加ディスクの作成など）。外側で lab として走る。
+  # 追加のファイルは $VMDIR/extra/ に置く約束にする（vm reset --yes で一緒に消える）。
+  if [ -f /etc/lab-vm/pre-start.sh ]; then
+    mkdir -p "$VMDIR/extra"
+    VMDIR="$VMDIR" bash /etc/lab-vm/pre-start.sh || { echo "起動前の準備（pre-start.sh）に失敗しました" >&2; return 1; }
+  fi
+  if ! virsh dominfo "$DOM" >/dev/null 2>&1; then
+    sed "s|@VMDIR@|$VMDIR|g" /etc/lab-vm/domain.xml.in > "$VMDIR/linuc.xml"
+    virsh define "$VMDIR/linuc.xml" >/dev/null || return 1
+  fi
+}
+
+provision_if_needed() {
+  local p=/etc/lab-vm/provision.sh
+  [ -f "$p" ] || return 0
+  [ -f "$VMDIR/.provisioned" ] && return 0
+  # vm start と lab-vm-init の見張りが同時に来ても1回だけ走らせる
+  exec 9>"$VMDIR/.provision.lock"
+  flock 9
+  [ -f "$VMDIR/.provisioned" ] && { flock -u 9; return 0; }
+  say "  初回の準備: このコースの設定を練習機に入れています"
+  local b64; b64=$(base64 -w0 < "$p")
+  if lab-guest "echo $b64 | base64 -d > /root/.lab-provision.sh && bash /root/.lab-provision.sh" > "$VMDIR/provision.log" 2>&1; then
+    : > "$VMDIR/.provisioned"
+    flock -u 9
+  else
+    flock -u 9
+    printf '%s\n' "${c_ng}初回の準備に失敗しました（$VMDIR/provision.log）${c_0}" >&2
+    return 1
+  fi
+}
+
+wait_ready() {  # 起動を待つ（エージェント → ssh の順）
+  local t0=$SECONDS i
+  for i in $(seq 1 360); do agent_ok && break; sleep 1
+    [ $((i % 10)) = 0 ] && say "  起動中… ${i}秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）"
+  done
+  agent_ok || { printf '%s\n' "${c_ng}練習機が応答しません（vm console で画面を見てください）${c_0}" >&2; return 1; }
+  for i in $(seq 1 120); do ssh_up && break; sleep 1; done
+  provision_if_needed || return 1
+  say "${c_ok}練習機が起動しました${c_0}（$((SECONDS - t0))秒）"
+}
+
+cmd_start() {
+  [ "${1:-}" = "--quiet" ] && QUIET=1
+  define_if_needed || exit 1
+  if [ "$(state)" = "running" ]; then
+    say "練習機はもう動いています"
+  else
+    say "$(show "virsh start $DOM")"
+    virsh start "$DOM" >/dev/null || exit 1
+  fi
+  wait_ready || exit 1
+  say "  入るには:  ${c_b}ssh linuc${c_0}   （抜けるときは exit）"
+}
+
+cmd_stop() {
+  if [ "$(state)" != "running" ]; then say "練習機は止まっています"; return 0; fi
+  show "virsh shutdown $DOM"
+  virsh shutdown "$DOM" >/dev/null || exit 1
+  local i
+  for i in $(seq 1 120); do [ "$(state)" = "shut off" ] && { say "止まりました（${i}秒）"; return 0; }; sleep 1; done
+  say "120 秒待っても止まりません。電源を抜くなら: virsh destroy $DOM"
+  return 1
+}
+
+cmd_status() {
+  local st; st=$(state); [ -n "$st" ] || st="未定義"
+  local a="—" s="—"
+  if [ "$st" = "running" ]; then
+    agent_ok && a="応答あり" || a="応答なし"
+    ssh_up && s="待ち受け中" || s="まだ"
+  fi
+  if [ "${1:-}" = "--short" ]; then
+    printf '練習機 linuc: %s（エージェント %s / ssh %s）\n' "$st" "$a" "$s"
+  else
+    printf '練習機     : %s\n' "$DOM"
+    printf '状態       : %s\n' "$st"
+    printf 'エージェント: %s\n' "$a"
+    printf 'ssh        : %s（127.0.0.1:2222 → 練習機の 22）\n' "$s"
+    printf 'ディスク   : %s（土台 %s）\n' "$VMDIR/linuc.qcow2" "$BASE"
+  fi
+}
+
+cmd_reset() {
+  if [ "${1:-}" != "--yes" ]; then
+    echo "練習機を工場出荷時に戻します（ディスクの変更はすべて消えます）。"
+    echo "よければ: vm reset --yes"
+    return 1
+  fi
+  [ "$(state)" = "running" ] && { show "virsh destroy $DOM"; virsh destroy "$DOM" >/dev/null; }
+  rm -f "$VMDIR/linuc.qcow2" "$VMDIR/linuc_VARS.fd" "$VMDIR/.provisioned" "$VMDIR/provision.log"
+  rm -rf "$VMDIR/extra"
+  virsh undefine --nvram "$DOM" >/dev/null 2>&1 || virsh undefine "$DOM" >/dev/null 2>&1
+  define_if_needed && echo "戻しました。vm start で起動します"
+}
+
+usage() {
+  cat <<EOF
+vm — 練習機（仮想マシン ${DOM}）の操作。中で打つコマンドを ▶ で表示します。
+
+  vm start        起動して、ssh で入れるまで待つ   （virsh start ${DOM}）
+  vm ssh          練習機に入る                     （ssh linuc）
+  vm console      シリアルコンソールにつなぐ       （virsh console ${DOM}。抜けるのは Ctrl+]）
+  vm stop         正常に停止する                   （virsh shutdown ${DOM}）
+  vm status       状態を見る                       （virsh domstate ${DOM}）
+  vm reset --yes  ディスクを最初の状態に戻す
+EOF
+}
+
+case "${1:-status}" in
+  start)   shift; cmd_start "$@" ;;
+  stop)    cmd_stop ;;
+  ssh)     shift; show "ssh linuc $*"; exec ssh linuc "$@" ;;
+  console) show "virsh console $DOM"; echo "（抜けるときは Ctrl+] ）"; exec virsh console "$DOM" ;;
+  status)  shift; cmd_status "$@" ;;
+  reset)   shift; cmd_reset "$@" ;;
+  wait)    wait_ready ;;
+  define)  define_if_needed ;;
+  # 起動のしかた（vm start / virsh start / virsh reboot）に関係なく、練習機が応答したら初回の準備を1回だけ行う。
+  # lab-vm-init が数秒おきに呼ぶ。読者が virsh start を直接打っても準備が漏れないようにするため。
+  provision)
+    [ "$(state)" = "running" ] && agent_ok && QUIET=1 provision_if_needed ;;
+  -h|--help|help) usage ;;
+  *) usage; exit 1 ;;
+esac
