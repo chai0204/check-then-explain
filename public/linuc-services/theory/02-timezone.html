@@ -30,13 +30,13 @@ Etc/UTC</code></pre>
 <p>タイムゾーンを設定するコマンドが用意されているのだから、それを打てば3つとも揃うはずだ。</p>
 <pre><code>$ timedatectl set-timezone Asia/Tokyo
 $ ls -l /etc/localtime
-lrwxrwxrwx 1 root root 30 Oct 13 19:32 /etc/localtime -&gt; /usr/share/zoneinfo/Asia/Tokyo
+lrwxrwxrwx 1 root root 30 Oct 13 21:05 /etc/localtime -&gt; /usr/share/zoneinfo/Asia/Tokyo
 $ cat /etc/timezone
 Etc/UTC
 $ date
-Tue Oct 13 19:32:37 JST 2026
+Tue Oct 13 21:05:58 JST 2026
 $ date -u
-Tue Oct 13 10:32:37 UTC 2026</code></pre>
+Tue Oct 13 12:05:59 UTC 2026</code></pre>
 <div class="then"><b>だめな理由</b>: 揃ったのは <code>/etc/localtime</code> だけである。
 <code>/etc/timezone</code> は <code>Etc/UTC</code> のまま残り、<code>date</code> が出すゾーンは
 打つ前と同じ <code>JST</code> のままである。<code>timedatectl</code> は systemd に設定を変えさせるコマンドで、
@@ -63,12 +63,12 @@ TZ=Asia/Tokyo</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: ゾーンを変えても、中で持っている数は動かないこと。</div>
 <p>エポック秒（1970-01-01 00:00:00 UTC からの秒数）を前後で挟んで、間に3つのゾーンで表示させる。</p>
 <pre><code>$ date +%s; TZ=UTC date; TZ=Asia/Tokyo date; TZ=America/New_York date; date +%s
-1791887557
-Tue Oct 13 10:32:37 UTC 2026
-Tue Oct 13 19:32:37 JST 2026
-Tue Oct 13 06:32:37 EDT 2026
-1791887557</code></pre>
-<p>表示は3通りに変わったが、前後の <code>1791887557</code> は同じである。<b>ゾーンは保存ではなく表示の設定</b>だと確かめられる。</p>
+1791893160
+Tue Oct 13 12:06:00 UTC 2026
+Tue Oct 13 21:06:00 JST 2026
+Tue Oct 13 08:06:00 EDT 2026
+1791893160</code></pre>
+<p>表示は3通りに変わったが、前後の <code>1791893160</code> は同じである。<b>ゾーンは保存ではなく表示の設定</b>だと確かめられる。</p>
 <p>逆向きにも確かめられる。エポック 0 を表示させると、ゾーンの分だけずれて出る。</p>
 <pre><code>$ date -d @0
 Thu Jan  1 09:00:00 JST 1970
@@ -76,7 +76,7 @@ $ TZ=UTC date -d @0
 Thu Jan  1 00:00:00 UTC 1970</code></pre>
 <p>同じ <code>0</code> が 09:00 と 00:00 の両方になる。9時間の差は <code>Asia/Tokyo</code> のオフセット <code>+0900</code> である。</p>
 <pre><code>$ date '+%Y-%m-%d %H:%M:%S %Z %z'
-2026-10-13 19:32:37 JST +0900</code></pre>
+2026-10-13 21:06:02 JST +0900</code></pre>
 <p>ここが実務で効く。<b>ログの時刻を比べるときは、オフセットが付いているかを先に見る</b>。第4章と第5章で、rsyslog と journald が同じ1行をどう書くかを並べるが、書式が違うのはこのオフセットの扱いである。</p>
 <div class="analogy"><b>たとえ</b>: 温度を摂氏で見るか華氏で見るかの切り替えに近い。
 表示を変えても部屋の暖かさは変わらない。<code>25℃</code> と <code>77℉</code> は同じ状態の2つの書き方である。
@@ -87,7 +87,7 @@ Thu Jan  1 00:00:00 UTC 1970</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: ゾーン名が何を指しているか、実体はどこにあるか。</div>
 <p><code>/etc/localtime</code> はリンクで、指し先はゾーン定義のファイルである（この章の最初に <code>timedatectl set-timezone</code> を打ったので、指し先は <code>Asia/Tokyo</code> に変わっている）。</p>
 <pre><code>$ ls -l /etc/localtime
-lrwxrwxrwx 1 root root 30 Oct 13 19:32 /etc/localtime -&gt; /usr/share/zoneinfo/Asia/Tokyo
+lrwxrwxrwx 1 root root 30 Oct 13 21:05 /etc/localtime -&gt; /usr/share/zoneinfo/Asia/Tokyo
 $ ls /usr/share/zoneinfo | head -20
 Africa
 America
@@ -146,10 +146,10 @@ $ readlink /etc/localtime
 <details><summary>答え</summary>
 <p>変わらない（経過した分だけ増えるだけ）。エポック秒は UTC 基準の通し番号で、
 ゾーンは表示のときにだけ使われる。実測でも、3つのゾーンで表示を挟んだ前後の
-<code>date +%s</code> はどちらも <code>1791887557</code> だった。</p></details></div>
+<code>date +%s</code> はどちらも <code>1791893160</code> だった。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>タイムゾーンの設定は3箇所にある。<code>TZ</code>（プロセスごと・最優先）、<code>/etc/localtime</code>（systemd が管理）、<code>/etc/timezone</code>（Debian 系のテキスト）</li><li><code>timedatectl set-timezone</code> が書き換えるのは <code>/etc/localtime</code> だけ。<code>/etc/timezone</code> は残り、<code>TZ</code> があれば <code>date</code> の表示も変わらない</li><li>保存されている時刻はエポック秒1つだけ。ゾーンを変えても値は動かない（実測で前後とも <code>1791887557</code>）</li><li>ゾーンはオフセット1つではなく「いつからどのオフセットか」の表。だから <code>+0900</code> ではなく <code>Asia/Tokyo</code> で指定する</li><li>ゾーン名は覚えずに <code>timedatectl list-timezones</code> で引く（実測598件）。<code>tzselect</code> は質問に答えるとゾーン名を出すだけで、設定は変えない</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>タイムゾーンの設定は3箇所にある。<code>TZ</code>（プロセスごと・最優先）、<code>/etc/localtime</code>（systemd が管理）、<code>/etc/timezone</code>（Debian 系のテキスト）</li><li><code>timedatectl set-timezone</code> が書き換えるのは <code>/etc/localtime</code> だけ。<code>/etc/timezone</code> は残り、<code>TZ</code> があれば <code>date</code> の表示も変わらない</li><li>保存されている時刻はエポック秒1つだけ。ゾーンを変えても値は動かない（実測で前後とも <code>1791893160</code>）</li><li>ゾーンはオフセット1つではなく「いつからどのオフセットか」の表。だから <code>+0900</code> ではなく <code>Asia/Tokyo</code> で指定する</li><li>ゾーン名は覚えずに <code>timedatectl list-timezones</code> で引く（実測598件）。<code>tzselect</code> は質問に答えるとゾーン名を出すだけで、設定は変えない</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で、読者と同じ入り方（docker exec -it・端末 80 桁）で第1章から通して検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/01-clock">← 1. 時計は2つある</a><a href="/linuc-services/theory/03-ntp">次: 3. 時刻合わせは、基準を渡されるまで始まらない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

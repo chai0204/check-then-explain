@@ -20,12 +20,12 @@
 <div class="sgoal"><b>この節で分かること</b>: 同じマシンの中に、別々に進む時計が2つあること。</div>
 <p>まず2つ並べて打つ。どちらも時刻を出すコマンドだが、出てくる内容が違う。</p>
 <pre><code>$ date
-Tue Oct 13 19:32:37 JST 2026
+Tue Oct 13 21:05:43 JST 2026
 $ date -u
-Tue Oct 13 10:32:37 UTC 2026
+Tue Oct 13 12:05:44 UTC 2026
 $ timedatectl
-               Local time: Tue 2026-10-13 10:32:37 UTC
-           Universal time: Tue 2026-10-13 10:32:37 UTC
+               Local time: Tue 2026-10-13 12:05:44 UTC
+           Universal time: Tue 2026-10-13 12:05:44 UTC
                  RTC time: n/a
                 Time zone: Etc/UTC (UTC, +0000)
 System clock synchronized: yes
@@ -48,7 +48,7 @@ hwclock: Use the --verbose option to see the details of our search for an access
 そして「読む先が無い」ことは「RTC が存在しない」ことと同じではない。次でそれを確かめる。</div></div>
 <p>RTC が本当に存在しないのかを、別の経路から見る。カーネルは <code>/proc</code> の下に、自分が把握しているデバイスの状態をテキストで出している。</p>
 <pre><code>$ cat /proc/driver/rtc
-rtc_time	: 10:32:04
+rtc_time	: 12:05:13
 rtc_date	: 2026-10-13
 alrm_time	: 13:32:01
 alrm_date	: 2026-10-11
@@ -59,9 +59,13 @@ periodic IRQ enabled	: no
 periodic IRQ frequency	: 1
 max user IRQ frequency	: 64
 24hr		: yes</code></pre>
-<p>RTC は在る。時刻も入っている。ここで2つの数字を並べる。</p>
-<pre><code>date -u            → 10:32:37   ← システムクロック
-/proc/driver/rtc   → 10:32:04   ← RTC
+<p>RTC は在る。時刻も入っている。2つの時計を比べるには、<b>同じ瞬間に</b>読む必要がある。上の <code>date -u</code> と <code>cat</code> は打った時刻がずれている（手で打てば数秒から数十秒）ので、その間の分が差に混ざる。1行で続けて読み直す。</p>
+<pre><code>$ date -u +%T; grep rtc_time /proc/driver/rtc
+12:05:47
+rtc_time	: 12:05:14</code></pre>
+<p>ここで2つの数字を並べる。</p>
+<pre><code>date -u +%T        → 12:05:47   ← システムクロック
+rtc_time           → 12:05:14   ← RTC
                      差 33秒</code></pre>
 <p>同じマシンの、同じ瞬間に読んだ2つの時計が33秒ずれている。どちらかが壊れているのではない。<b>2つは別々に進んでいて、合わせる仕組みが別にある</b>。その仕組みが第3章の NTP である。</p>
 <p class='detail'>（秒数と日付はあなたの環境で変わる。見るのは「2つの値が一致しない」ことだけ。一致していたら、直前に合わせた直後だったということになる。）</p>
@@ -110,7 +114,7 @@ LocalRTC=no
 CanNTP=yes
 NTP=yes
 NTPSynchronized=yes
-TimeUSec=Tue 2026-10-13 19:32:37 JST</code></pre>
+TimeUSec=Tue 2026-10-13 21:05:49 JST</code></pre>
 <p><code>NTPSynchronized=yes</code> と出ている。RTC は読めないままである。つまり「同期している」という判断は RTC とは無関係に下されている。判断の材料は、カーネルが持っている時計の状態である（<code>timedatectl</code> は systemd を通してカーネルに問い合わせている）。そしてコンテナはホストのカーネルをそのまま使うので、ここに出ているのは<b>ホスト側の時刻合わせの結果</b>である。第3章で見るとおり、檻の中の時刻合わせのデーモンは、この時点ではまだ何とも同期していない。</p>
 <p>整理すると、時刻に関わる登場人物はこうなる。</p>
 <div class="scroll"><table>
@@ -204,7 +208,7 @@ RTC にシステムクロックを書き戻すのは別の操作（<code>hwclock
 <code>touch -t</code> は年が先頭の <code>[[CC]YY]MMDDhhmm</code> なので、<code>touch -t 202610130930 ファイル</code> になる。</p></details></div>
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>1台のマシンに時計は2つある。RTC は電池で動き続け、システムクロックはカーネルが持ち、電源で消える</li><li>システムクロックは起動時に RTC から値を受け取り、そのあとは別々に進む。書き戻す仕組みが働かなければずれる（この檻では33秒ずれていた）</li><li><code>hwclock</code> の失敗は「コマンドが無い」ではなく「<code>/dev/rtc*</code> が無い」。同じ RTC は <code>/proc/driver/rtc</code> から読めた</li><li>コンテナにデバイスを渡さないのは設計どおり。だからこの章の失敗は読者の操作ミスではない</li><li><code>hwclock</code> の短い形は <code>-r</code>（<code>--show</code>）・<code>-w</code>（<code>--systohc</code>、システム → RTC）・<code>-s</code>（<code>--hctosys</code>、RTC → システム）。<code>-a</code>（<code>--adjust</code>）は進み・遅れの癖を補正する</li><li>時刻の設定は <code>date MMDDhhmm[[CC]YY][.ss]</code>（年は最後。例 <code>date 021409002022</code>）か <code>date -s "文字列"</code>。<code>touch -t</code> は <code>[[CC]YY]MMDDhhmm[.ss]</code> で年が先頭。この檻では CAP_SYS_TIME が無いので設定は失敗するが、<code>date</code> は解釈した日時を表示する</li><li><code>timedatectl</code> のサブコマンドは <code>status</code>（省略時）・<code>show</code>・<code>set-time</code>・<code>set-timezone</code>・<code>list-timezones</code>・<code>set-local-rtc</code>・<code>set-ntp</code> の7つ。<code>set-clock</code> は無い。<code>set-time</code> は NTP が有効な間は拒否される</li><li><code>System clock synchronized</code> はシステムクロックの話であって、RTC が合っているとは言っていない。しかもこの檻では、その判断もホストのカーネルの状態から来ている</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.2@sha256:6e6b6ba1ad9622da75bbe4f4a68a705955bdf49b0d569dd24a49a71fd623bce2 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で、読者と同じ入り方（docker exec -it・端末 80 桁）で第1章から通して検証（podman 5.8.6 rootless は起動のみ確認）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-services/theory/">← 理論編 目次</a><a href="/linuc-services/theory/02-timezone">次: 2. タイムゾーンは表示の都合だけ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

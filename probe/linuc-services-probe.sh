@@ -1,5 +1,10 @@
 #!/bin/bash
-# LinuC 主題1.09（重要なシステムサービス）理論編 第1〜7章の端末表示の出どころ。
+# LinuC 主題1.09（重要なシステムサービス）理論編 第1〜7章の流れの記録（端末なし）。
+#
+# 2026-10-13 から、本文の端末表示は端末つきの通しの記録（probe/linuc-services-seq.py →
+# logs/linuc-services-tty.log）から引いている。読者は docker exec -it の端末で打つので、端末の有無で
+# 表示が変わるコマンド（ls の段組み、apt の進み具合、systemctl の幅、pager）が本文と違って見えたため。
+# この記録は、同じ流れを端末なしで打ったもの（打ち方の確かめと、入口の案内・lab env の出どころ）。
 #
 # 章本文の `$ ` 行を、本文と同じ順序で、本文と同じ文字のまま1行ずつ打つ。
 # 読者は第1章から順に同じ檻の中で打っていくので、状態（設定ファイル・ログ・メールボックス）は
@@ -33,6 +38,7 @@
 #   probe/linuc-services-podman.sh    … podman（rootless）の読者で出力が変わる箇所（umask が 0022）
 #   probe/linuc-services-exam.sh      … 試験対策で足した地の文（mail のオプション・aliases・.forward・ntpq など）の裏取り
 #   probe/linuc-services-rhel.sh      … 「Red Hat 系では」と書いたところの裏取り（AlmaLinux 8.10 / 9.8、lab の podman）
+#   probe/linuc-services-seq.py       … 本文から作った入力を、読者と同じ入り方（端末つき）で通して打つ（本文の端末表示の出どころ）
 set -u
 LAST=0
 R() {
@@ -62,6 +68,7 @@ R 'timedatectl'
 R 'hwclock'
 R 'hwclock --show'
 R 'cat /proc/driver/rtc'
+R 'date -u +%T; grep rtc_time /proc/driver/rtc'
 R 'ls -l /dev/rtc*'
 R "hwclock --help | grep -E -- '--(show|hctosys|systohc|adjust) '"
 R 'timedatectl show'
@@ -217,9 +224,9 @@ W 1
 R 'journalctl -t systemd-journald --no-pager | tail -1'
 R 'journalctl --vacuum-size=1M'
 R 'journalctl --vacuum-time=2d'
-R 'journalctl --no-pager -u rsyslog -n 3'
+R 'journalctl --no-pager -u chrony -n 2'
 R 'journalctl --no-pager -p err -n 3'
-R 'journalctl --list-boots'
+R 'journalctl --no-pager --list-boots'
 R 'cat /proc/sys/kernel/random/boot_id'
 R 'systemd-cat -t lab-cat echo "systemd-cat から1行"'
 W 1
