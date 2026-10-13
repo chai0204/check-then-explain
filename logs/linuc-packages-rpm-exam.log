@@ -1,0 +1,141 @@
+
+
+========== e-installed. 入っている全部を出すのは list installed と info installed。info も installed / available / updates を付けられる（例題 3678） ==========
+
+$ yum list installed | head -4
+Installed Packages
+acl.x86_64                            2.3.1-4.el9                     @baseos   
+almalinux-gpg-keys.x86_64             9.7-1.el9                       @baseos   
+almalinux-release.x86_64              9.7-1.el9                       @baseos   
+
+$ yum info installed | head -14
+Installed Packages
+Name         : acl
+Version      : 2.3.1
+Release      : 4.el9
+Architecture : x86_64
+Size         : 207 k
+Source       : acl-2.3.1-4.el9.src.rpm
+Repository   : @System
+From repo    : baseos
+Summary      : Access control list utilities
+URL          : https://savannah.nongnu.org/projects/acl
+License      : GPLv2+
+Description  : This package contains the getfacl and setfacl utilities needed for
+             : manipulating access control lists.
+
+$ yum list updates
+Last metadata expiration check: 9:17:16 ago on Tue Oct 13 10:08:56 2026.
+Available Upgrades
+labhello.noarch                            1.1-1                             lab
+
+$ yum info updates
+Last metadata expiration check: 9:17:16 ago on Tue Oct 13 10:08:56 2026.
+Available Upgrades
+Name         : labhello
+Version      : 1.1
+Release      : 1
+Architecture : noarch
+Size         : 6.6 k
+Source       : labhello-1.1-1.src.rpm
+Repository   : lab
+Summary      : prints its own version
+URL          : https://github.com/chai0204/check-then-explain
+License      : MIT
+Description  : A tiny package used to practice upgrades.
+
+
+$ yum installed; echo "exit=$?"
+No such command: installed. Please use /usr/bin/yum --help
+It could be a YUM plugin command, try: "yum install 'dnf-command(installed)'"
+exit=1
+
+$ yum search installed | head -4
+Last metadata expiration check: 9:17:17 ago on Tue Oct 13 10:08:56 2026.
+========================== Summary Matched: installed ==========================
+gcc-plugin-annobin.x86_64 : The annobin plugin for gcc, built by the installed version of gcc
+gcc-toolset-12-gcc-plugin-annobin.x86_64 : The annobin plugin for gcc, built by the installed version of gcc
+gcc-toolset-13-gcc-plugin-annobin.x86_64 : The annobin plugin for gcc, built by the installed version of gcc
+
+
+========== e-autoremove. dnf の autoremove は、名前を付けるとそれを依存ごと消す（例題 5580） ==========
+
+$ sudo yum install -y labapp
+Last metadata expiration check: 9:17:18 ago on Tue Oct 13 10:08:56 2026.
+Dependencies resolved.
+================================================================================
+ Package            Architecture       Version            Repository       Size
+================================================================================
+Installing:
+ labapp             noarch             1.0-1              lab             7.3 k
+Installing dependencies:
+ liblab             noarch             1.0-1              lab             6.7 k
+
+Transaction Summary
+================================================================================
+Install  2 Packages
+
+Total size: 14 k
+Installed size: 515  
+Downloading Packages:
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : liblab-1.0-1.noarch                                    1/2 
+  Installing       : labapp-1.0-1.noarch                                    2/2 
+  Running scriptlet: labapp-1.0-1.noarch                                    2/2 
+  Verifying        : labapp-1.0-1.noarch                                    1/2 
+  Verifying        : liblab-1.0-1.noarch                                    2/2 
+
+Installed:
+  labapp-1.0-1.noarch                    liblab-1.0-1.noarch                   
+
+Complete!
+
+$ sudo yum autoremove -y labapp
+Dependencies resolved.
+================================================================================
+ Package            Architecture       Version           Repository        Size
+================================================================================
+Removing:
+ labapp             noarch             1.0-1             @lab             409  
+Removing unused dependencies:
+ liblab             noarch             1.0-1             @lab             106  
+
+Transaction Summary
+================================================================================
+Remove  2 Packages
+
+Freed space: 515  
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Erasing          : labapp-1.0-1.noarch                                    1/2 
+  Erasing          : liblab-1.0-1.noarch                                    2/2 
+  Verifying        : labapp-1.0-1.noarch                                    1/2 
+  Verifying        : liblab-1.0-1.noarch                                    2/2 
+
+Removed:
+  labapp-1.0-1.noarch                    liblab-1.0-1.noarch                   
+
+Complete!
+
+$ rpm -q labapp liblab; echo "exit=$?"
+package labapp is not installed
+package liblab is not installed
+exit=2
+
+
+========== e-update. dnf の update は upgrade の別名（例題 5580） ==========
+
+$ yum update --help | head -1
+usage: yum upgrade [-c CONFIG_FILE] [-q] [-v] [--version] [--installroot PATH]
+
+$ yum upgrade --help | head -1
+usage: yum upgrade [-c CONFIG_FILE] [-q] [-v] [--version] [--installroot PATH]

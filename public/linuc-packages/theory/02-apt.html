@@ -14,7 +14,7 @@
 <p class="lead"><code>apt install</code> は名前を1つ渡すだけで、必要なものまで全部入れる。ところが <code>apt remove</code> で消したはずのパッケージは、台帳に <code>rc</code> という印を付けて残り、設定ファイルも、一緒に入ってきたものも消えない。apt の「消す」には段階がある。</p>
 <div class="badges"><span>前提: 第1章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>apt-cache</code> の <code>search</code> / <code>show</code> / <code>depends</code> / <code>rdepends</code> / <code>policy</code> を、目録を読むコマンドとして使い分けられる</li><li><code>apt install</code> が依存関係をたどって何を入れたかを、出力と <code>apt-mark</code> で説明できる</li><li><code>remove</code> / <code>purge</code> / <code>autoremove</code> の違いを、台帳の状態（<code>ii</code> / <code>rc</code>）と設定ファイルの有無で言える</li><li><code>apt</code> と <code>apt-get</code> と <code>apt-cache</code> の関係を言える</li></ul>
+<ul><li><code>apt-cache</code> の <code>search</code> / <code>show</code> / <code>depends</code> / <code>rdepends</code> / <code>showpkg</code> / <code>policy</code> を、目録を読むコマンドとして使い分けられる</li><li><code>apt install</code> が依存関係をたどって何を入れたかを、出力と <code>apt-mark</code> で説明できる</li><li><code>remove</code> / <code>purge</code> / <code>autoremove</code> の違いを、台帳の状態（<code>ii</code> / <code>rc</code>）と設定ファイルの有無で言える</li><li><code>apt</code> と <code>apt-get</code> と <code>apt-cache</code> の関係を言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: 優先度の書き換え（<code>/etc/apt/preferences.d/</code> の pinning）、<code>apt-mark hold</code>、<code>aptitude</code>、<code>full-upgrade</code> が何を消すかの細かい判断。<code>apt-cache policy</code> に出る 500 や 100 という数字は、この章では「どの帳簿から来た版か」の印として読めれば足りる。</div></div>
 
 <h2 id="read">目録を読む — apt-cache</h2>
@@ -74,6 +74,27 @@ apt
 <tr><td><code>Conflicts:</code> / <code>Breaks:</code></td><td>一緒には入れられない（入れるなら片方を消す）</td></tr>
 <tr><td><code>Replaces:</code></td><td>相手のファイルを上書きしてよい（置き換える）</td></tr>
 </table></div>
+<p>依存を出すサブコマンドはもう1つある。<code>showpkg</code> は、目録にある版・逆向きの依存・版ごとの依存を、1つの出力にまとめて出す（別の檻で記録した）。</p>
+<pre><code>$ apt-cache showpkg labapp
+Package: labapp
+Versions:
+1.0 (/var/lib/apt/lists/_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4)
+...
+Reverse Depends:
+Dependencies:
+1.0 - liblab (2 1.0)
+Provides:
+1.0 -
+Reverse Provides:
+$ apt-cache showpkg liblab
+Package: liblab
+...
+Reverse Depends:
+  labapp,liblab 1.0
+Dependencies:
+1.0 -
+...</code></pre>
+<p><code>Dependencies:</code> は <code>depends</code> と同じ向き（labapp は liblab を必要とする）、<code>Reverse Depends:</code> は <code>rdepends</code> と同じ向き（liblab は labapp に必要とされている）である。<code>liblab (2 1.0)</code> の括弧の中は版の条件を番号で書いたもので、上の <code>show</code> の <code>Depends: liblab (&gt;= 1.0)</code> にあたる（<code>2</code> が <code>&gt;=</code>）。man にも「並べたパッケージの版と逆向きの依存を出し、版ごとの依存も出す」とある。<b>依存しているパッケージを出せるのは <code>depends</code> と <code>showpkg</code></b> で、<code>rdepends</code> は逆向き（これに依存しているもの）を出す。</p>
 <p>いちばん情報が多いのは <code>policy</code> である。檻には labhello の 1.0 が最初から入っている。</p>
 <pre><code>$ apt-cache policy labhello
 labhello:
@@ -98,6 +119,16 @@ tree:
      2.1.1-2ubuntu3 500
         500 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble/universe amd64 Packages</code></pre>
 <p>tree は Ubuntu 24.04 の発売時の版（<code>noble</code>）と、その後の修正版（<code>noble-updates</code>）の2つが目録にあり、新しいほうが入っている。</p>
+<p>この節で使った <code>apt-cache</code> のサブコマンドをまとめる。どれも帳簿を読むだけで、何も入れない。</p>
+<div class="scroll"><table>
+<tr><th>サブコマンド</th><th>答えること</th></tr>
+<tr><td><code>search 語</code></td><td>名前と説明文に語を含むパッケージ</td></tr>
+<tr><td><code>show 名前</code></td><td>目録の記載そのまま（<code>Depends:</code> もここに出る）</td></tr>
+<tr><td><code>depends 名前</code></td><td>これが必要とするもの（依存）</td></tr>
+<tr><td><code>rdepends 名前</code></td><td>これを必要としているもの（逆向きの依存）</td></tr>
+<tr><td><code>showpkg 名前</code></td><td>目録にある版・逆向きの依存・版ごとの依存をまとめて</td></tr>
+<tr><td><code>policy 名前</code></td><td>目録の版と台帳の版、入れるならどの版か（<code>Candidate</code>）</td></tr>
+</table></div>
 <div class="analogy"><b>たとえ</b>: 通販のカタログで商品を調べる作業に近い。
 品番・値段・「別売りの部品が要る」は、注文する前にカタログで分かる。<code>apt-cache</code> はカタログを引くだけで、何も注文しない。
 <br>ただし<b>崩れる点</b>: 通販カタログは「自分が何を持っているか」を知らないが、
@@ -320,6 +351,7 @@ $ MANWIDTH=80 man apt | sed -n "/^ *full-upgrade (apt-get(8))/,/^ *install, rein
 ...</code></pre>
 <p>apt の <code>upgrade</code> は「新しいパッケージは依存のためなら入れる（New packages will be installed if required）、入っているものは決して消さない」、apt-get の <code>upgrade</code> は「入っているものを消すことも、入っていないものを入れることも、どんな場合もしない（under no circumstances）」、<code>full-upgrade</code> は「全体を上げるのに必要なら消す（will remove）」と書いてある。</p>
 <p>「パッケージ一覧を新しくする」が <code>update</code>、「入っているパッケージを新しくする」が <code>upgrade</code> である。名前が似ていて試験でよく入れ替えられる。</p>
+<p>試験の例題には、<code>dist-upgrade</code> を「ディストリビューションの更新（Debian 8 から 9 へ）」、<code>upgrade</code> を「インストールされているパッケージを全部更新する」と言い切ったものがあり、この形で出うる。man に書いてある違いは上のとおりで、<code>upgrade</code> も全部を上げようとはするが、消さないと上げられないものは上げずに残す。特定のパッケージだけを上げるのは <code>install 名前</code> である。</p>
 <div class="analogy"><b>たとえ</b>: 新しいカタログと、自宅の持ち物の記録を並べて「型が古いもの」に印を付ける作業に近い。
 印を付けるだけなら何も買わなくてよい（<code>-s</code>）。
 <br>ただし<b>崩れる点</b>: 人ならカタログが古いと気づけるが、apt は手元のカタログを疑わない。
@@ -405,7 +437,8 @@ partial</code></pre>
 <p>パッケージ foo が依存しているパッケージの一覧と、foo に依存しているパッケージの一覧を表示するコマンドをそれぞれ答えよ。</p>
 <details><summary>答え</summary>
 <p><code>apt-cache depends foo</code> と <code>apt-cache rdepends foo</code>。
-どちらも目録を読むだけなので、foo が入っていなくても答えられる。</p></details></div>
+どちらも目録を読むだけなので、foo が入っていなくても答えられる。
+依存の一覧は <code>apt-cache showpkg foo</code> の <code>Dependencies:</code> にも出る（逆向きは <code>Reverse Depends:</code>）。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>apt-get update</code> と <code>apt-get upgrade</code> の違いを説明せよ。</p>
 <details><summary>答え</summary>
@@ -415,7 +448,7 @@ partial</code></pre>
 <code>apt upgrade</code> は依存のために新しく入れることはあるが、消さない。消すことまでするのは <code>apt-get dist-upgrade</code>（<code>apt full-upgrade</code>）である。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>apt-cache</code>（<code>search</code> / <code>show</code> / <code>depends</code> / <code>rdepends</code> / <code>policy</code>）は目録を読むだけ。入っていないパッケージにも答えられる</li><li><code>apt-cache policy</code> には目録の版（500）と台帳の版（100 <code>/var/lib/dpkg/status</code>）が並ぶ</li><li><code>apt install</code> は目録の <code>Depends:</code> をたどって足りないものも入れ、それに auto の印を付ける（<code>apt-mark showauto</code>）</li><li><code>remove</code> は設定ファイル（conffile）を残して <code>rc</code>（conffile の無いパッケージは台帳から消える）、<code>purge</code> は設定ファイルも台帳の行も消す、<code>autoremove</code> は auto の印で不要になったものを消す（名前を渡すとそのパッケージも remove）</li><li><code>upgrade</code> は目録の版と台帳の版の比較。<code>update</code>（目録を取り直す）とは別物。<code>apt-get upgrade</code> は入れも消しもせず、<code>apt upgrade</code> は依存のためなら入れ、<code>full-upgrade</code>（<code>dist-upgrade</code>）は消すこともある</li><li><code>apt</code> は人向けの入口。スクリプトには <code>apt-get</code> と <code>apt-cache</code></li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>apt-cache</code>（<code>search</code> / <code>show</code> / <code>depends</code> / <code>rdepends</code> / <code>showpkg</code> / <code>policy</code>）は目録を読むだけ。入っていないパッケージにも答えられる。依存を出すのは <code>depends</code> と <code>showpkg</code>（<code>rdepends</code> は逆向き）</li><li><code>apt-cache policy</code> には目録の版（500）と台帳の版（100 <code>/var/lib/dpkg/status</code>）が並ぶ</li><li><code>apt install</code> は目録の <code>Depends:</code> をたどって足りないものも入れ、それに auto の印を付ける（<code>apt-mark showauto</code>）</li><li><code>remove</code> は設定ファイル（conffile）を残して <code>rc</code>（conffile の無いパッケージは台帳から消える）、<code>purge</code> は設定ファイルも台帳の行も消す、<code>autoremove</code> は auto の印で不要になったものを消す（名前を渡すとそのパッケージも remove）</li><li><code>upgrade</code> は目録の版と台帳の版の比較。<code>update</code>（目録を取り直す）とは別物。<code>apt-get upgrade</code> は入れも消しもせず、<code>apt upgrade</code> は依存のためなら入れ、<code>full-upgrade</code>（<code>dist-upgrade</code>）は消すこともある</li><li><code>apt</code> は人向けの入口。スクリプトには <code>apt-get</code> と <code>apt-cache</code></li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.0.1@sha256:f3a834b80eeb0b5f27ec8b541b8b4bc1cae3ce352546345c1426099a910a70a5 / Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt-file 3.3 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/01-package">← 1. 入っているかどうかは、台帳が決める</a><a href="/linuc-packages/theory/03-sources">次: 3. 目録は、取りに行くまで古いまま →</a></nav>
 <section id="comments">

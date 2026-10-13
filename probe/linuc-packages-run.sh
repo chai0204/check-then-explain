@@ -5,6 +5,7 @@
 #   bash probe/linuc-packages-run.sh probe          → logs/linuc-packages-deb-probe.log と -rpm-probe.log
 #   bash probe/linuc-packages-run.sh solve          → logs/linuc-packages-deb-solve-all.log と -rpm-solve-all.log
 #   bash probe/linuc-packages-run.sh extra          → logs/linuc-packages-deb-extra.log と -rpm-extra.log（事実確認の後で足した記録）
+#   bash probe/linuc-packages-run.sh exam           → logs/linuc-packages-deb-exam.log と -rpm-exam.log（公式例題の監査の後で足した記録）
 #   bash probe/linuc-packages-run.sh one deb ch2    → 1節だけ標準出力へ（作業中の確認用）
 #
 # 読者の起動コマンド（本文に書いたもの）との違いは2つだけ:
@@ -49,6 +50,19 @@ case "${1:-}" in
     { for s in x-qp x-repoquery x-rpmsave; do
         one "$RPM" probe/linuc-packages-rpm-extra.sh "$s"; done; } > logs/linuc-packages-rpm-extra.log 2>&1
     ;;
+  exam)
+    # 公式例題（linuc.org/study/samples）の監査（2026-10-13）を受けて足した記録。
+    #   bash probe/linuc-packages-run.sh exam          両方の檻
+    #   bash probe/linuc-packages-run.sh exam deb      片方だけ（もう片方のログの時刻を動かさない）
+    if [ "${2:-deb}" = deb ]; then
+      { for s in e-showpkg; do
+          one "$DEB" probe/linuc-packages-deb-exam.sh "$s"; done; } > logs/linuc-packages-deb-exam.log 2>&1
+    fi
+    if [ "${2:-rpm}" = rpm ]; then
+      { for s in e-installed e-autoremove e-update; do
+          one "$RPM" probe/linuc-packages-rpm-exam.sh "$s"; done; } > logs/linuc-packages-rpm-exam.log 2>&1
+    fi
+    ;;
   solve)
     one "$DEB" probe/linuc-packages-deb-solve-all.sh all > logs/linuc-packages-deb-solve-all.log 2>&1
     one "$RPM" probe/linuc-packages-rpm-solve-all.sh all > logs/linuc-packages-rpm-solve-all.log 2>&1
@@ -57,8 +71,8 @@ case "${1:-}" in
     case "${2:-}" in
       deb) one "$DEB" "probe/linuc-packages-deb-${4:-probe}.sh" "$3" ;;
       rpm) one "$RPM" "probe/linuc-packages-rpm-${4:-probe}.sh" "$3" ;;
-      *) echo "使い方: bash probe/linuc-packages-run.sh one deb|rpm <節> [probe|solve-all]" >&2; exit 2 ;;
+      *) echo "使い方: bash probe/linuc-packages-run.sh one deb|rpm <節> [probe|solve-all|extra|exam]" >&2; exit 2 ;;
     esac
     ;;
-  *) echo "使い方: bash probe/linuc-packages-run.sh probe|solve|one" >&2; exit 2 ;;
+  *) echo "使い方: bash probe/linuc-packages-run.sh probe|solve|extra|exam|one" >&2; exit 2 ;;
 esac
