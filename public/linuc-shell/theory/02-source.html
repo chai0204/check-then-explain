@@ -168,7 +168,8 @@ $ /usr/bin/ls -d /etc
 $ unalias ls
 $ alias ls
 bash: alias: ls: not found</code></pre>
-<p><code>alias ls='ls -l'</code> は、Ubuntu の <code>~/.bashrc</code> が作っていた <code>ls --color=auto</code> の定義を上書きし、<code>unalias ls</code> はその定義を消した。どちらも新しく開いた対話シェルでは <code>~/.bashrc</code> から元に戻る。</p>
+<p><code>alias ls='ls -l'</code> は、Ubuntu の <code>~/.bashrc</code> が作っていた <code>ls --color=auto</code> の定義を上書きし、<code>unalias ls</code> はその定義を消した。どちらも新しく開いた対話シェルでは <code>~/.bashrc</code> から元に戻る。このシェルでも Ubuntu の定義に戻しておく（この後の節の <code>type ls</code> で使う）。</p>
+<pre><code>$ alias ls='ls --color=auto'</code></pre>
 <p>alias も変数の代入も、<code>=</code> の前後に<b>空白を入れない</b>。反対に <code>[ ]</code> の中で比べる <code>=</code> には空白が要る（第6章）。</p>
 <pre><code>$ alias ll = 'ls -l'; echo "終了ステータス $?"
 alias ll='ls -alF'
@@ -281,8 +282,9 @@ $ echo $PATH
 $ here
 ここにいる</code></pre>
 <p><code>~/bin</code> を作っただけでは見つからない。<code>~/.profile</code> の判定は<b>ログインしたその瞬間</b>に1回行われただけで、そのとき <code>~/bin</code> はまだ無かった。<code>. ~/.profile</code> で読み直させると、先頭に <code>/home/lab/bin</code> が付いた。</p>
-<p>手で足すなら、こう書く。</p>
-<pre><code>$ PATH="$PATH:$HOME/try"; echo $PATH
+<p>手で足すなら、こう書く。あとで元に戻せるように、足す前の値を変数 <code>OLDPATH</code> に取っておく。</p>
+<pre><code>$ OLDPATH=$PATH
+$ PATH="$PATH:$HOME/try"; echo $PATH
 /home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/lab/try</code></pre>
 <div class="scroll"><table>
 <tr><th>書き方</th><th>意味</th></tr>
@@ -291,6 +293,9 @@ $ here
 <tr><td><code>export PATH=…</code></td><td>同じ意味（PATH は最初から環境変数なので、<code>export</code> は付けても付けなくてもよい）</td></tr>
 </table></div>
 <p>こうして手で足した PATH は、<b>このシェルと、ここから起動する子</b>にしか効かない。次のログインでは消える。ずっと効かせるには、ログインのときに読まれるファイル（Ubuntu なら <code>~/.profile</code>）に書く。第1章のとおり、<code>~/.bash_profile</code> を新しく作ると <code>~/.profile</code> が読まれなくなる点に注意する。</p>
+<p>足した <code>~/try</code> は、ここで外しておく。この檻ではこのシェルを章をまたいで使い続けるので、残したままだと第4章の「カレントディレクトリは PATH に入っていないので、名前だけでは動かない」を確かめるところで、<code>~/try</code> のスクリプトが名前だけで動いてしまう。</p>
+<pre><code>$ PATH=$OLDPATH; echo $PATH
+/home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin</code></pre>
 <div class="analogy"><b>たとえ</b>: 倉庫の<b>棚を端から順に見ていく</b>係に近い。棚の並び順（PATH）が係に渡された唯一の地図で、同じ名前の箱が2つの棚にあれば、先に見た棚のものを持ってくる。
 <br>ただし<b>崩れる点</b>: 人の係は「この棚、さっき増えたよね」と気づくことがあるが、シェルは地図を書き換えてもらわない限り、新しく作った棚（<code>~/bin</code>）を見に行かない。</div>
 <div class="note try"><b>手を動かす</b>:
@@ -326,7 +331,7 @@ $ here
 /usr/bin;/opt/tools/bin
 bash: ls: command not found
 $ $PATH=$PATH:/opt/tools/bin
-bash: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/tools/bin: No such file or directory</code></pre></details></div>
+bash: /home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin=/home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/tools/bin: No such file or directory</code></pre></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>#!/bin/sh</code> で始まるスクリプトの中で、別のファイル <code>conf.sh</code> の変数定義を読み込みたい。Ubuntu で確実に動く書き方はどれか。<br>
 (A) <code>source conf.sh</code>　(B) <code>. ./conf.sh</code>　(C) <code>bash conf.sh</code></p>

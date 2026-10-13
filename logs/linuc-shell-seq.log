@@ -1,0 +1,1193 @@
+
+
+========== 第1章から第8章まで、1つのログインシェルで通して打つ ==========
+$ # ==== 01-startup.html ====
+$ echo $0
+/bin/bash
+$ shopt login_shell
+login_shell    	on
+$ echo $-
+himBHs
+$ bash -l
+
+── lab-linuc-shell 1.0.2 ────────────────────────────────────────
+lab-linuc-shell  進捗 0/8
+  次 → 01 「ログインしたときだけ挨拶を出す」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-shell-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+lab@linuc:~$ shopt login_shell
+login_shell    	on
+lab@linuc:~$ exit
+logout
+$ bash
+lab@linuc:~$ shopt login_shell
+login_shell    	off
+lab@linuc:~$ exit
+exit
+$ grep -n -A6 'profile.d' /etc/profile
+20:if [ -d /etc/profile.d ]; then
+21:  for i in /etc/profile.d/*.sh; do
+22-    if [ -r $i ]; then
+23-      . $i
+24-    fi
+25-  done
+26-  unset i
+27-fi
+$ ls -1 /etc/profile.d/
+01-locale-fix.sh
+99-lab.sh
+bash_completion.sh
+gawk.csh
+gawk.sh
+$ head -3 /etc/profile.d/99-lab.sh
+# ログイン時に現在地を必ず出す。読者が「いま何をすればいいか」を探さずに済むようにする。
+# 非対話シェル（docker run … lab check 03 のような素通し）では出さない。
+case $- in *i*) ;; *) return ;; esac
+$ grep -E '^(lab|alice|bob):' /etc/passwd
+lab:x:1000:1000::/home/lab:/bin/bash
+alice:x:1001:1001::/home/alice:/bin/bash
+bob:x:1002:1002::/home/bob:/bin/bash
+$ grep SHELL /etc/default/useradd
+# The SHELL variable specifies the default login shell on your
+# Similar to DSHELL in adduser. However, we use "sh" here because
+SHELL=/bin/sh
+$ sudo sed -i '1i echo "[/etc/profile]"' /etc/profile
+$ sudo sed -i '1i echo "[/etc/bash.bashrc]"' /etc/bash.bashrc
+$ sudo sed -i '1i echo "[~/.profile]"' /home/alice/.profile
+$ sudo sed -i '1i echo "[~/.bashrc]"' /home/alice/.bashrc
+$ sudo sed -i '1i echo "[~/.bash_logout]"' /home/alice/.bash_logout
+$ sudo head -1 /etc/profile /etc/bash.bashrc /home/alice/.profile /home/alice/.bashrc /home/alice/.bash_logout
+==> /etc/profile <==
+echo "[/etc/profile]"
+
+==> /etc/bash.bashrc <==
+echo "[/etc/bash.bashrc]"
+
+==> /home/alice/.profile <==
+echo "[~/.profile]"
+
+==> /home/alice/.bashrc <==
+echo "[~/.bashrc]"
+
+==> /home/alice/.bash_logout <==
+echo "[~/.bash_logout]"
+$ sudo -iu alice
+[/etc/profile]
+[/etc/bash.bashrc]
+
+── lab-base  ────────────────────────────────────────
+lab-base  進捗 0/8
+  次 → 01 「ログインしたときだけ挨拶を出す」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/alice/.lab/progress.json（消すには docker volume rm lab-base-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+[~/.profile]
+[~/.bashrc]
+alice@linuc:~$ exit
+logout
+[~/.bash_logout]
+$ su - alice
+Password: 
+[/etc/profile]
+[/etc/bash.bashrc]
+
+── lab-base  ────────────────────────────────────────
+lab-base  進捗 0/8
+  次 → 01 「ログインしたときだけ挨拶を出す」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/alice/.lab/progress.json（消すには docker volume rm lab-base-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+[~/.profile]
+[~/.bashrc]
+alice@linuc:~$ exit
+logout
+[~/.bash_logout]
+$ su alice
+Password: 
+[/etc/bash.bashrc]
+[~/.bashrc]
+alice@linuc:/home/lab$ pwd
+/home/lab
+alice@linuc:/home/lab$ exit
+exit
+$ sudo -iu alice
+[/etc/profile]
+[/etc/bash.bashrc]
+
+── lab-base  ────────────────────────────────────────
+lab-base  進捗 0/8
+  次 → 01 「ログインしたときだけ挨拶を出す」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/alice/.lab/progress.json（消すには docker volume rm lab-base-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+[~/.profile]
+[~/.bashrc]
+alice@linuc:~$ bash
+[/etc/bash.bashrc]
+[~/.bashrc]
+alice@linuc:~$ exit
+exit
+alice@linuc:~$ exit
+logout
+[~/.bash_logout]
+$ sudo -iu alice true
+[/etc/profile]
+[~/.profile]
+[~/.bashrc]
+$ sudo -u alice bash -c 'echo こんにちは'
+こんにちは
+$ MANWIDTH=80 man bash | grep -A6 'invoked as an interactive login shell'
+       When bash is invoked as an interactive login shell, or as a  non-inter‐
+       active  shell with the --login option, it first reads and executes com‐
+       mands from the file /etc/profile, if that file exists.   After  reading
+       that file, it looks for ~/.bash_profile, ~/.bash_login, and ~/.profile,
+       in  that order, and reads and executes commands from the first one that
+       exists and is readable.  The --noprofile option may be  used  when  the
+       shell is started to inhibit this behavior.
+$ sed -n '1,12p' /etc/profile
+echo "[/etc/profile]"
+# /etc/profile: system-wide .profile file for the Bourne shell (sh(1))
+# and Bourne compatible shells (bash(1), ksh(1), ash(1), ...).
+
+if [ "${PS1-}" ]; then
+  if [ "${BASH-}" ] && [ "$BASH" != "/bin/sh" ]; then
+    # The file bash.bashrc already sets the default PS1.
+    # PS1='\h:\w\$ '
+    if [ -f /etc/bash.bashrc ]; then
+      . /etc/bash.bashrc
+    fi
+  else
+$ sudo grep -n -A5 'if running bash' /home/alice/.profile
+12:# if running bash
+13-if [ -n "$BASH_VERSION" ]; then
+14-    # include .bashrc if it exists
+15-    if [ -f "$HOME/.bashrc" ]; then
+16-	. "$HOME/.bashrc"
+17-    fi
+$ sudo grep -n -B1 -A3 'not running interactively' /home/alice/.bashrc
+5-
+6:# If not running interactively, don't do anything
+7-case $- in
+8-    *i*) ;;
+9-      *) return;;
+$ sudo -iu alice
+[/etc/profile]
+[/etc/bash.bashrc]
+
+── lab-base  ────────────────────────────────────────
+lab-base  進捗 0/8
+  次 → 01 「ログインしたときだけ挨拶を出す」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/alice/.lab/progress.json（消すには docker volume rm lab-base-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+[~/.profile]
+[~/.bashrc]
+alice@linuc:~$ ll -d ~
+drwxr-x--- 1 alice alice 4096 Oct 13 19:53 /home/alice/
+alice@linuc:~$ printf 'echo "[~/.bash_profile]"\nPATH="$HOME/bin:$PATH"\n' > ~/.bash_profile
+alice@linuc:~$ cat ~/.bash_profile
+echo "[~/.bash_profile]"
+PATH="$HOME/bin:$PATH"
+alice@linuc:~$ exit
+logout
+[~/.bash_logout]
+$ sudo -iu alice
+[/etc/profile]
+[/etc/bash.bashrc]
+
+── lab-base  ────────────────────────────────────────
+lab-base  進捗 0/8
+  次 → 01 「ログインしたときだけ挨拶を出す」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/alice/.lab/progress.json（消すには docker volume rm lab-base-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+[~/.bash_profile]
+alice@linuc:~$ ll -d ~
+-bash: ll: command not found
+alice@linuc:~$ type ll
+-bash: type: ll: not found
+alice@linuc:~$ exit
+logout
+[~/.bash_logout]
+$ echo 'echo "[~/.bash_login]"' | sudo tee /home/alice/.bash_login
+echo "[~/.bash_login]"
+$ sudo -iu alice true
+[/etc/profile]
+[~/.bash_profile]
+$ sudo rm /home/alice/.bash_profile
+$ sudo -iu alice true
+[/etc/profile]
+[~/.bash_login]
+$ sudo rm /home/alice/.bash_login
+$ sudo -iu alice true
+[/etc/profile]
+[~/.profile]
+[~/.bashrc]
+$ printf 'echo "[~/.bash_profile]"\nPATH="$HOME/bin:$PATH"\n. ~/.profile\n' | sudo -u alice tee /home/alice/.bash_profile
+echo "[~/.bash_profile]"
+PATH="$HOME/bin:$PATH"
+. ~/.profile
+$ sudo -iu alice
+[/etc/profile]
+[/etc/bash.bashrc]
+
+── lab-base  ────────────────────────────────────────
+lab-base  進捗 0/8
+  次 → 01 「ログインしたときだけ挨拶を出す」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/alice/.lab/progress.json（消すには docker volume rm lab-base-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+[~/.bash_profile]
+[~/.profile]
+[~/.bashrc]
+alice@linuc:~$ ll -d ~
+drwxr-x--- 1 alice alice 4096 Oct 13 19:53 /home/alice/
+alice@linuc:~$ exit
+logout
+[~/.bash_logout]
+$ MANWIDTH=80 man bash | grep -A2 'When an interactive login shell exits'
+       When an interactive login shell exits, or a non-interactive login shell
+       executes  the  exit  builtin  command, bash reads and executes commands
+       from the file ~/.bash_logout, if it exists.
+$ sudo cat /home/alice/.bash_logout
+echo "[~/.bash_logout]"
+# ~/.bash_logout: executed by bash(1) when login shell exits.
+
+# when leaving the console clear the screen to increase privacy
+
+if [ "$SHLVL" = 1 ]; then
+    [ -x /usr/bin/clear_console ] && /usr/bin/clear_console -q
+fi
+$ sudo sed -i '/^echo "\[.*\]"$/d' /etc/profile /etc/bash.bashrc /home/alice/.profile /home/alice/.bashrc /home/alice/.bash_logout
+$ sudo rm /home/alice/.bash_profile
+$ sudo -iu alice true
+$ head -1 /etc/profile
+# /etc/profile: system-wide .profile file for the Bourne shell (sh(1))
+$ # ==== 02-source.html ====
+$ mkdir -p ~/try && cd ~/try
+$ echo "alias hi='echo やあ'" >> ~/.bashrc
+$ tail -1 ~/.bashrc
+alias hi='echo やあ'
+$ hi
+bash: hi: command not found
+$ bash ~/.bashrc
+/home/lab/.bashrc: line 8: return: can only `return' from a function or sourced script
+$ hi
+bash: hi: command not found
+$ cp ~/.bashrc /tmp/bashrc.copy; echo 'alias hi' >> /tmp/bashrc.copy
+$ bash /tmp/bashrc.copy; echo "終了ステータス $?"
+/tmp/bashrc.copy: line 8: return: can only `return' from a function or sourced script
+alias hi='echo やあ'
+終了ステータス 0
+$ hi
+bash: hi: command not found
+$ source ~/.bashrc
+$ hi
+やあ
+$ type hi
+hi is aliased to `echo やあ'
+$ x=1
+$ bash -c 'echo "子から見た x=[$x]"'
+子から見た x=[]
+$ export x
+$ bash -c 'echo "子から見た x=[$x]"'
+子から見た x=[1]
+$ bash -c 'x=2; echo "子の中で x=$x"'; echo "親の x=$x"
+子の中で x=2
+親の x=1
+$ declare -p x PATH
+declare -x x="1"
+declare -x PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+$ y=2; declare -p y
+declare -- y="2"
+$ env | grep -E '^(x|y)='
+x=1
+$ export z=3; bash -c 'echo "z=[$z]"'
+z=[3]
+$ cat > go.sh <<'END'
+> cd /tmp
+> export GREETING=やあ
+> END
+$ bash go.sh; pwd; echo "GREETING=[$GREETING]"
+/home/lab/try
+GREETING=[]
+$ . ./go.sh; pwd; echo "GREETING=[$GREETING]"
+/tmp
+GREETING=[やあ]
+$ cd ~/try
+$ type source .
+source is a shell builtin
+. is a shell builtin
+$ sh -c '. ./go.sh; pwd'
+/tmp
+$ sh -c 'source ./go.sh'
+sh: 1: source: not found
+$ alias yo='echo よう'
+$ yo
+よう
+$ bash -ic yo
+bash: yo: command not found
+$ bash -ic hi
+やあ
+$ printf '#!/bin/bash\nhi\n' > usehi.sh
+$ bash usehi.sh; echo "終了ステータス $?"
+usehi.sh: line 2: hi: command not found
+終了ステータス 127
+$ alias ll
+alias ll='ls -alF'
+$ type ll
+ll is aliased to `ls -alF'
+$ unalias yo
+$ yo
+bash: yo: command not found
+$ bash -c 'shopt expand_aliases'
+expand_aliases 	off
+$ bash -ic 'shopt expand_aliases'
+expand_aliases 	on
+$ printf 'alias hi3="echo alias が展開された"\nhi3\n' > a.sh
+$ bash a.sh; echo "終了ステータス $?"
+a.sh: line 2: hi3: command not found
+終了ステータス 127
+$ printf 'shopt -s expand_aliases\nalias hi3="echo alias が展開された"\nhi3\n' > a2.sh
+$ bash a2.sh
+alias が展開された
+$ sh a.sh
+alias が展開された
+$ bash --posix a.sh
+alias が展開された
+$ alias ls='ls -l'
+$ ls -d /etc
+drwxr-xr-x 1 root root 4096 Oct 13 19:54 /etc
+$ \ls -d /etc
+/etc
+$ command ls -d /etc
+/etc
+$ /usr/bin/ls -d /etc
+/etc
+$ unalias ls
+$ alias ls
+bash: alias: ls: not found
+$ alias ls='ls --color=auto'
+$ alias ll = 'ls -l'; echo "終了ステータス $?"
+alias ll='ls -alF'
+bash: alias: =: not found
+bash: alias: ls -l: not found
+終了ステータス 1
+$ x = 1
+bash: x: command not found
+$ x=no; [ "$x"="yes" ] && echo "空白が無いと、いつも真"
+空白が無いと、いつも真
+$ [ "$x" = "yes" ] || echo "空白があれば、正しく偽"
+空白があれば、正しく偽
+$ echo "alias zz='echo /etc/profile で定義した alias'" | sudo tee -a /etc/profile
+alias zz='echo /etc/profile で定義した alias'
+$ bash -l -c 'alias zz'
+alias zz='echo /etc/profile で定義した alias'
+$ bash -c 'alias zz'
+bash: line 1: alias: zz: not found
+$ sudo sed -i '/^alias zz=/d' /etc/profile; tail -1 /etc/profile
+fi
+$ grep -n -E '^ *(PS1|HISTSIZE)=' ~/.bashrc
+19:HISTSIZE=1000
+60:    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+62:    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
+69:    PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
+$ echo 'HISTSIZE=0' >> ~/.bashrc
+$ HISTFILE=/tmp/hist-demo bash
+lab@linuc:~/try$ echo 履歴に残すか
+履歴に残すか
+lab@linuc:~/try$ history
+lab@linuc:~/try$ exit
+exit
+$ ls -l /tmp/hist-demo
+ls: cannot access '/tmp/hist-demo': No such file or directory
+$ sed -i '/^HISTSIZE=0$/d' ~/.bashrc
+$ HISTFILE=/tmp/hist-demo2 bash
+lab@linuc:~/try$ echo 履歴に残すか
+履歴に残すか
+lab@linuc:~/try$ exit
+exit
+$ cat /tmp/hist-demo2
+echo 履歴に残すか
+exit
+$ echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+$ type ls cd
+ls is aliased to `ls --color=auto'
+cd is a shell builtin
+$ MANWIDTH=80 man bash | grep -A10 'If the command name contains no slashes'
+       If the command name contains no slashes, the shell attempts  to  locate
+       it.   If  there  exists a shell function by that name, that function is
+       invoked as described above in FUNCTIONS.  If the name does not match  a
+       function,  the shell searches for it in the list of shell builtins.  If
+       a match is found, that builtin is invoked.
+
+       If the name is neither a shell function nor a builtin, and contains  no
+       slashes,  bash  searches  each element of the PATH for a directory con‐
+       taining an executable file by that name.  Bash uses a hash table to re‐
+       member the full pathnames of executable files  (see  hash  under  SHELL
+       BUILTIN  COMMANDS  below).  A full search of the directories in PATH is
+$ type -a echo
+echo is a shell builtin
+echo is /usr/bin/echo
+echo is /bin/echo
+$ cat > here.sh <<'END'
+> #!/bin/bash
+> echo "ここにいる"
+> END
+$ chmod +x here.sh
+$ here.sh
+bash: here.sh: command not found
+$ ./here.sh
+ここにいる
+$ mkdir -p ~/bin && cp here.sh ~/bin/here
+$ here
+bash: here: command not found
+$ grep -n -A2 'HOME/bin' ~/.profile
+20:if [ -d "$HOME/bin" ] ; then
+21:    PATH="$HOME/bin:$PATH"
+22-fi
+23-
+$ . ~/.profile
+$ echo $PATH
+/home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+$ here
+ここにいる
+$ OLDPATH=$PATH
+$ PATH="$PATH:$HOME/try"; echo $PATH
+/home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/lab/try
+$ PATH=$OLDPATH; echo $PATH
+/home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+$ (PATH="/usr/bin;/opt/tools/bin"; echo "$PATH"; ls /)
+/usr/bin;/opt/tools/bin
+bash: ls: command not found
+$ $PATH=$PATH:/opt/tools/bin
+bash: /home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin=/home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/tools/bin: No such file or directory
+$ # ==== 03-lists.html ====
+$ mkdir -p ~/try && cd ~/try
+$ true; echo $?
+0
+$ false; echo $?
+1
+$ cd /nonexistent; pwd
+bash: cd: /nonexistent: No such file or directory
+/home/lab/try
+$ cd /nonexistent && pwd
+bash: cd: /nonexistent: No such file or directory
+$ mkdir /forbidden || echo "作れなかった"
+mkdir: cannot create directory ‘/forbidden’: Permission denied
+作れなかった
+$ grep -q '^alice:' /etc/passwd && echo いる || echo いない
+いる
+$ mkdir newdir && cp /nonexistent newdir/ || echo "mkdir に失敗した"
+cp: cannot stat '/nonexistent': No such file or directory
+mkdir に失敗した
+$ ls -d newdir
+newdir
+$ mkdir newdir2 && { cp /nonexistent newdir2/ || echo "cp に失敗した"; }
+cp: cannot stat '/nonexistent': No such file or directory
+cp に失敗した
+$ echo "今日は $(date +%F)"
+今日は 2026-10-13
+$ echo "わたしは `id -un`"
+わたしは lab
+$ echo "外 $(echo "内 $(id -un)")"
+外 内 lab
+$ n=$(wc -l < /etc/passwd); echo "passwd は $n 行"
+passwd は 21 行
+$ echo "外 `echo \`id -un\``"
+外 lab
+$ ls -A1 /etc/skel
+.bash_logout
+.bashrc
+.profile
+$ files=$(ls -A1 /etc/skel); echo $files
+.bash_logout .bashrc .profile
+$ echo "$files"
+.bash_logout
+.bashrc
+.profile
+$ x=1; y=$(x=2; echo $x); echo "x=$x y=$y"
+x=1 y=2
+$ v=$(false); echo "終了ステータス $?"
+終了ステータス 1
+$ echo "[$(printf 'a\n\n\n')]"
+[a]
+$ (cd /tmp; pwd); pwd
+/tmp
+/home/lab/try
+$ { cd /tmp; pwd; }; pwd
+/tmp
+/tmp
+$ cd ~/try
+$ # ==== 04-script.html ====
+$ mkdir -p ~/try && cd ~/try
+$ cat > hello.sh <<'END'
+> #!/bin/sh
+> function say {
+>     echo "こんにちは、$1"
+> }
+> say "$(id -un)"
+> echo "\$0 は $0"
+> END
+$ ls -l hello.sh
+-rw-r--r-- 1 lab lab 93 Oct 13 19:55 hello.sh
+$ ./hello.sh; echo "終了ステータス $?"
+bash: ./hello.sh: Permission denied
+終了ステータス 126
+$ bash hello.sh; echo "終了ステータス $?"
+こんにちは、lab
+$0 は hello.sh
+終了ステータス 0
+$ chmod +x hello.sh; ls -l hello.sh
+-rwxr-xr-x 1 lab lab 93 Oct 13 19:55 hello.sh
+$ ./hello.sh; echo "終了ステータス $?"
+./hello.sh: 2: function: not found
+こんにちは、
+./hello.sh: 4: Syntax error: "}" unexpected
+終了ステータス 2
+$ head -1 hello.sh; ls -l /bin/sh
+#!/bin/sh
+lrwxrwxrwx 1 root root 4 Mar 31  2024 /bin/sh -> dash
+$ sh hello.sh; echo "終了ステータス $?"
+hello.sh: 2: function: not found
+こんにちは、
+hello.sh: 4: Syntax error: "}" unexpected
+終了ステータス 2
+$ mkdir -p fbin
+$ printf '#!/bin/sh\necho "function が受け取った引数: $# 個: $*"\n' > fbin/function; chmod +x fbin/function
+$ PATH="$HOME/try/fbin:$PATH" sh hello.sh
+function が受け取った引数: 2 個: say {
+こんにちは、
+hello.sh: 4: Syntax error: "}" unexpected
+$ sed -i '1s|.*|#!/bin/bash|' hello.sh; head -1 hello.sh
+#!/bin/bash
+$ ./hello.sh
+こんにちは、lab
+$0 は ./hello.sh
+$ sh hello.sh; echo "終了ステータス $?"
+hello.sh: 2: function: not found
+こんにちは、
+hello.sh: 4: Syntax error: "}" unexpected
+終了ステータス 2
+$ . ./hello.sh
+こんにちは、lab
+$0 は /bin/bash
+$ type say
+say is a function
+say () 
+{ 
+    echo "こんにちは、$1"
+}
+$ printf 'echo "BASH_VERSION=[$BASH_VERSION]"\n' > noshebang.sh; chmod +x noshebang.sh
+$ ./noshebang.sh
+BASH_VERSION=[5.2.21(1)-release]
+$ sh noshebang.sh
+BASH_VERSION=[]
+$ sh -c ./noshebang.sh
+BASH_VERSION=[]
+$ chmod 700 hello.sh; ls -l hello.sh
+-rwx------ 1 lab lab 95 Oct 13 19:55 hello.sh
+$ chmod u=rwx,go=rx hello.sh; ls -l hello.sh
+-rwxr-xr-x 1 lab lab 95 Oct 13 19:55 hello.sh
+$ chmod go-x hello.sh; ls -l hello.sh
+-rwxr--r-- 1 lab lab 95 Oct 13 19:55 hello.sh
+$ chmod 755 hello.sh
+$ (umask 077; chmod 644 hello.sh; chmod +x hello.sh; ls -l hello.sh)
+-rwxr--r-- 1 lab lab 95 Oct 13 19:55 hello.sh
+$ (umask 077; chmod 644 hello.sh; chmod a+x hello.sh; ls -l hello.sh)
+-rwxr-xr-x 1 lab lab 95 Oct 13 19:55 hello.sh
+$ hello.sh
+bash: hello.sh: command not found
+$ sudo cp hello.sh /usr/local/bin/hello
+$ ls -l /usr/local/bin/hello
+-rwxr-xr-x 1 root root 95 Oct 13 19:55 /usr/local/bin/hello
+$ hello
+こんにちは、lab
+$0 は /usr/local/bin/hello
+$ sudo -u alice hello
+こんにちは、alice
+$0 は /usr/local/bin/hello
+$ sudo chmod 711 /usr/local/bin/hello; ls -l /usr/local/bin/hello
+-rwx--x--x 1 root root 95 Oct 13 19:55 /usr/local/bin/hello
+$ sudo -u alice hello; echo "終了ステータス $?"
+/bin/bash: /usr/local/bin/hello: Permission denied
+終了ステータス 126
+$ sudo cp /usr/bin/id /usr/local/bin/myid; sudo chmod 711 /usr/local/bin/myid; ls -l /usr/local/bin/myid
+-rwx--x--x 1 root root 39432 Oct 13 19:56 /usr/local/bin/myid
+$ sudo -u alice myid -un
+alice
+$ sudo chmod 755 /usr/local/bin/hello
+$ chown lab /usr/local/bin/hello
+chown: changing ownership of '/usr/local/bin/hello': Operation not permitted
+$ sudo chown alice:alice /usr/local/bin/hello; ls -l /usr/local/bin/hello
+-rwxr-xr-x 1 alice alice 95 Oct 13 19:55 /usr/local/bin/hello
+$ sudo chown root:root /usr/local/bin/hello; ls -l /usr/local/bin/hello
+-rwxr-xr-x 1 root root 95 Oct 13 19:55 /usr/local/bin/hello
+$ sudo usermod -aG staff alice; id alice
+uid=1001(alice) gid=1001(alice) groups=1001(alice),50(staff)
+$ sudo -u alice bash -c umask
+0002
+$ sudo -u alice bash -c 'cd /tmp && touch g.txt && chgrp staff g.txt && ls -l g.txt'
+-rw-rw-r-- 1 alice staff 0 Oct 13 19:56 g.txt
+$ sudo -u alice bash -c 'cd /tmp && chown :alice g.txt && ls -l g.txt'
+-rw-rw-r-- 1 alice alice 0 Oct 13 19:56 g.txt
+$ sudo -u alice bash -c 'cd /tmp && chgrp lab g.txt'
+chgrp: changing group of 'g.txt': Operation not permitted
+$ sudo -u alice bash -c 'cd /tmp && chown lab g.txt'
+chown: changing ownership of 'g.txt': Operation not permitted
+$ cat > report.sh <<'END'
+> #!/bin/bash
+> echo "作成日: $(date +%F)"
+> END
+$ sudo cp report.sh /usr/local/bin/report; sudo chmod 755 /usr/local/bin/report
+$ sudo -u alice mkdir /home/alice/bin
+$ printf '#!/bin/sh\necho "1999-12-31"\n' | sudo -u alice tee /home/alice/bin/date
+#!/bin/sh
+echo "1999-12-31"
+$ sudo chmod 755 /home/alice/bin/date
+$ report
+作成日: 2026-10-13
+$ sudo -u alice report
+作成日: 2026-10-13
+$ sudo -iu alice report
+作成日: 1999-12-31
+$ sudo -iu alice bash -c 'echo $PATH'
+/home/alice/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+$ su - alice
+Password: 
+
+── lab-base  ────────────────────────────────────────
+lab-base  進捗 0/8
+  次 → 01 「ログインしたときだけ挨拶を出す」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/alice/.lab/progress.json（消すには docker volume rm lab-base-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+alice@linuc:~$ echo $PATH
+/home/alice/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+alice@linuc:~$ type date
+date is /home/alice/bin/date
+alice@linuc:~$ report
+作成日: 1999-12-31
+alice@linuc:~$ exit
+logout
+$ sed -i '1a PATH=/usr/bin:/bin' report.sh; head -2 report.sh
+#!/bin/bash
+PATH=/usr/bin:/bin
+$ sudo cp report.sh /usr/local/bin/report
+$ sudo -iu alice report
+作成日: 2026-10-13
+$ # ==== 05-args.html ====
+$ mkdir -p ~/try && cd ~/try
+$ touch "my file.txt"
+$ cat > cpall.sh <<'END'
+> #!/bin/bash
+> cp $* /tmp/
+> END
+$ bash cpall.sh "my file.txt"; echo "終了ステータス $?"
+cp: cannot stat 'my': No such file or directory
+cp: cannot stat 'file.txt': No such file or directory
+終了ステータス 1
+$ sed -i 's/\$\*/"$@"/' cpall.sh; cat cpall.sh
+#!/bin/bash
+cp "$@" /tmp/
+$ bash cpall.sh "my file.txt"; ls -l "/tmp/my file.txt"
+-rw-r--r-- 1 lab lab 0 Oct 13 19:56 '/tmp/my file.txt'
+$ cat > args.sh <<'END'
+> #!/bin/bash
+> echo "\$0 = $0"
+> echo "\$# = $#"
+> echo "\$1 = $1"
+> echo "\$2 = $2"
+> echo '--- for a in "$@"'
+> for a in "$@"; do echo "[$a]"; done
+> echo '--- for a in "$*"'
+> for a in "$*"; do echo "[$a]"; done
+> echo '--- for a in $*'
+> for a in $*; do echo "[$a]"; done
+> END
+$ chmod +x args.sh
+$ ./args.sh "my file.txt" b
+$0 = ./args.sh
+$# = 2
+$1 = my file.txt
+$2 = b
+--- for a in "$@"
+[my file.txt]
+[b]
+--- for a in "$*"
+[my file.txt b]
+--- for a in $*
+[my]
+[file.txt]
+[b]
+$ ./args.sh my file.txt b
+$0 = ./args.sh
+$# = 3
+$1 = my
+$2 = file.txt
+--- for a in "$@"
+[my]
+[file.txt]
+[b]
+--- for a in "$*"
+[my file.txt b]
+--- for a in $*
+[my]
+[file.txt]
+[b]
+$ set -- "my file.txt" b; for a in $@; do echo "[$a]"; done
+[my]
+[file.txt]
+[b]
+$ cat > ten.sh <<'END'
+> #!/bin/bash
+> echo "\$# = $#"
+> echo "\$10 = $10"
+> echo "\${10} = ${10}"
+> END
+$ bash ten.sh a b c d e f g h i j
+$# = 10
+$10 = a0
+${10} = j
+$ a=(x y z)
+$ echo ${a[1]}
+y
+$ echo $a[1]
+x[1]
+$ echo $a
+x
+$ echo ${a[@]}; echo ${#a[@]}
+x y z
+3
+$ sh -c 'a=(x y z)'
+sh: 1: Syntax error: "(" unexpected
+$ cat > sh.sh <<'END'
+> #!/bin/bash
+> echo "はじめ:     \$# = $#  \$1 = $1  \$@ = $@"
+> shift
+> echo "shift 後:   \$# = $#  \$1 = $1  \$@ = $@"
+> shift 2
+> echo "shift 2 後: \$# = $#  \$1 = $1"
+> shift 5
+> echo "shift 5 の終了ステータス = $?  \$# = $#"
+> END
+$ bash sh.sh a b c d
+はじめ:     $# = 4  $1 = a  $@ = a b c d
+shift 後:   $# = 3  $1 = b  $@ = b c d
+shift 2 後: $# = 1  $1 = d
+shift 5 の終了ステータス = 1  $# = 1
+$ sh sh.sh a b c d; echo "終了ステータス $?"
+はじめ:     $# = 4  $1 = a  $@ = a b c d
+shift 後:   $# = 3  $1 = b  $@ = b c d
+shift 2 後: $# = 1  $1 = d
+sh.sh: 7: shift: can't shift that many
+終了ステータス 2
+$ cat > each.sh <<'END'
+> #!/bin/bash
+> while [ $# -gt 0 ]; do
+>     echo "残り $# 個: [$1]"
+>     shift
+> done
+> END
+$ bash each.sh one "two three" four
+残り 3 個: [one]
+残り 2 個: [two three]
+残り 1 個: [four]
+$ set -- x "y z"; echo $#; echo "$2"
+2
+y z
+$ cat > need.sh <<'END'
+> #!/bin/bash
+> if [ $# -ne 1 ]; then
+>     echo "使い方: $(basename "$0") 名前" >&2
+>     exit 1
+> fi
+> echo "こんにちは、$1"
+> END
+$ bash need.sh; echo "終了ステータス $?"
+使い方: need.sh 名前
+終了ステータス 1
+$ bash need.sh alice
+こんにちは、alice
+$ bash need.sh alice bob 2> /dev/null; echo "終了ステータス $?"
+終了ステータス 1
+$ # ==== 06-status.html ====
+$ mkdir -p ~/try && cd ~/try
+$ ls /nonexistent; echo $?
+ls: cannot access '/nonexistent': No such file or directory
+2
+$ echo $?
+0
+$ grep -q lab /etc/passwd; echo $?
+0
+$ grep -q nosuchuser /etc/passwd; echo $?
+1
+$ grep -q lab /nonexistent; echo $?
+grep: /nonexistent: No such file or directory
+2
+$ nosuchcommand; echo $?
+bash: nosuchcommand: command not found
+127
+$ expr 2 + 3; echo "終了ステータス $?"
+5
+終了ステータス 0
+$ expr 2 - 2; echo "終了ステータス $?"
+0
+終了ステータス 1
+$ expr 3 \* 4
+12
+$ i=0; i=$(expr $i + 1); echo $i
+1
+$ expr --help | grep -A1 'Exit status'
+Exit status is 0 if EXPRESSION is neither null nor 0, 1 if EXPRESSION is null
+or 0, 2 if EXPRESSION is syntactically invalid, and 3 if an error occurred.
+$ printf '#!/bin/bash\nexit 3\n' > ret.sh; bash ret.sh; echo $?
+3
+$ sed -i 's/exit 3/exit 255/' ret.sh; bash ret.sh; echo $?
+255
+$ sed -i 's/exit 255/exit 256/' ret.sh; cat ret.sh; bash ret.sh; echo $?
+#!/bin/bash
+exit 256
+0
+$ sed -i 's/exit 256/exit 257/' ret.sh; bash ret.sh; echo $?
+1
+$ bash -c 'exit -1'; echo $?
+255
+$ printf '#!/bin/bash\nls /nonexistent\necho おわり\n' > last.sh; bash last.sh; echo "終了ステータス $?"
+ls: cannot access '/nonexistent': No such file or directory
+おわり
+終了ステータス 0
+$ test -f /etc/passwd; echo $?
+0
+$ [ -f /etc/passwd ]; echo $?
+0
+$ [ -d /etc/passwd ]; echo $?
+1
+$ [ -e /nonexistent ]; echo $?
+1
+$ [ ! -e /nonexistent ]; echo $?
+0
+$ [ -r /etc/shadow ]; echo $?
+1
+$ [ -x /usr/bin/ls ]; echo $?
+0
+$ [ -s /etc/passwd ]; echo $?
+0
+$ [ -z "" ]; echo $?; [ -n "" ]; echo $?
+0
+1
+$ [ 1 -eq 01 ]; echo $?; [ 1 = 01 ]; echo $?
+0
+1
+$ [ 10 -gt 9 ]; echo $?; [ 10 \> 9 ]; echo $?
+0
+1
+$ [ "abc" != "abd" ]; echo $?
+0
+$ x=; [ $x = yes ]; echo $?
+bash: [: =: unary operator expected
+2
+$ [ "$x" = yes ]; echo $?
+1
+$ [1 -eq 1]; echo $?
+bash: [1: command not found
+127
+$ type [ test [[
+[ is a shell builtin
+test is a shell builtin
+[[ is a shell keyword
+$ ls -l /usr/bin/[ /usr/bin/test
+-rwxr-xr-x 1 root root 55744 Aug 26 00:09 '/usr/bin/['
+-rwxr-xr-x 1 root root 47552 Aug 26 00:09  /usr/bin/test
+$ cat > kind.sh <<'END'
+> #!/bin/bash
+> if [ -d "$1" ]; then
+>     echo "$1 はディレクトリ"
+> elif [ -f "$1" ]; then
+>     echo "$1 はふつうのファイル"
+> else
+>     echo "$1 は見つからない"
+>     exit 1
+> fi
+> END
+$ bash kind.sh /etc; bash kind.sh /etc/passwd; bash kind.sh /nonexistent; echo "終了ステータス $?"
+/etc はディレクトリ
+/etc/passwd はふつうのファイル
+/nonexistent は見つからない
+終了ステータス 1
+$ if grep -q '^alice:' /etc/passwd; then echo "alice は居る"; fi
+alice は居る
+$ [ -f /etc/passwd ] && [ -r /etc/passwd ] && echo "読める"
+読める
+$ [ -f /etc/passwd -a -r /etc/shadow ]; echo $?
+1
+$ bash -c 'exit 300'; echo $?
+44
+$ # ==== 07-loops.html ====
+$ mkdir -p ~/try && cd ~/try
+$ for i in 1 2 3; do echo "i=$i"; done
+i=1
+i=2
+i=3
+$ for f in /etc/host*; do echo "$f"; done
+/etc/host.conf
+/etc/hostname
+/etc/hosts
+$ seq 3
+1
+2
+3
+$ seq 2 5
+2
+3
+4
+5
+$ seq 1 2 9
+1
+3
+5
+7
+9
+$ seq -w 8 10
+08
+09
+10
+$ seq -s , 5
+1,2,3,4,5
+$ for i in $(seq 1 3); do echo "$i 回目"; done
+1 回目
+2 回目
+3 回目
+$ printf '1\n2\n' > list.txt; for x in $(cat list.txt); do echo "$x"; echo 9 >> list.txt; done; cat list.txt
+1
+2
+1
+2
+9
+9
+$ for ((i = 0; i < 3; i++)); do echo "i=$i"; done
+i=0
+i=1
+i=2
+$ n=0; while [ $n -lt 3 ]; do echo "n=$n"; n=$((n + 1)); done
+n=0
+n=1
+n=2
+$ until [ $n -eq 0 ]; do n=$((n - 1)); echo "n=$n"; done
+n=2
+n=1
+n=0
+$ printf 'alice\nbob\ncarol\n' > names.txt
+$ while read -r name; do echo "名前: $name"; done < names.txt
+名前: alice
+名前: bob
+名前: carol
+$ cat > count.sh <<'END'
+> #!/bin/bash
+> n=0
+> cat names.txt | while read -r name; do
+>     n=$((n + 1))
+>     echo "読んだ: $name (n=$n)"
+> done
+> echo "合計: $n"
+> END
+$ bash count.sh
+読んだ: alice (n=1)
+読んだ: bob (n=2)
+読んだ: carol (n=3)
+合計: 0
+$ cat > count2.sh <<'END'
+> #!/bin/bash
+> n=0
+> while read -r name; do
+>     n=$((n + 1))
+> done < names.txt
+> echo "合計: $n"
+> END
+$ bash count2.sh
+合計: 3
+$ read a b c <<< "1 2 3 4 5"; echo "a=$a b=$b c=$c"
+a=1 b=2 c=3 4 5
+$ IFS=: read -r user pw uid rest < /etc/passwd; echo "$user の UID は $uid"
+root の UID は 0
+$ printf '%s\n' 'C:\temp' | { read p; echo "$p"; }
+C:temp
+$ printf '%s\n' 'C:\temp' | { read -r p; echo "$p"; }
+C:\temp
+$ cat > yn.sh <<'END'
+> #!/bin/bash
+> read -p "続けますか? [y/n] " ans
+> case "$ans" in
+>     [yY]|[yY][eE][sS]) echo "続けます" ;;
+>     [nN]*)             echo "やめます" ;;
+>     *)                 echo "y か n で答えてください"; exit 1 ;;
+> esac
+> END
+$ bash yn.sh
+続けますか? [y/n] yes
+続けます
+$ echo No | bash yn.sh
+やめます
+$ echo maybe | bash yn.sh; echo "終了ステータス $?"
+y か n で答えてください
+終了ステータス 1
+$ for i in 1 2 3 4 5; do [ $i -eq 2 ] && continue; [ $i -eq 4 ] && break; echo $i; done
+1
+3
+$ seq 1 2 10
+1
+3
+5
+7
+9
+$ case restart in start) echo "start に当たった" ;; *) echo "その他に入った" ;; esac
+その他に入った
+$ # ==== 08-function.html ====
+$ mkdir -p ~/try && cd ~/try
+$ wave() { echo "やあ、$1"; }
+$ wave alice
+やあ、alice
+$ type wave
+wave is a function
+wave () 
+{ 
+    echo "やあ、$1"
+}
+$ function bye { echo "またね、$1"; }
+$ bye bob
+またね、bob
+$ bash -c 'wave alice'; echo "終了ステータス $?"
+bash: line 1: wave: command not found
+終了ステータス 127
+$ function hi2() { echo "function と () を両方付けても書ける"; }
+$ hi2
+function と () を両方付けても書ける
+$ sh -c 'function f() { echo x; }; f'
+sh: 1: Syntax error: "(" unexpected
+$ date() { echo "関数の date が先に動いた"; }
+$ date
+関数の date が先に動いた
+$ type date
+date is a function
+date () 
+{ 
+    echo "関数の date が先に動いた"
+}
+$ unset -f date
+$ type date
+date is /usr/bin/date
+$ cat > fn.sh <<'END'
+> #!/bin/bash
+> greet() {
+>     local who=$1
+>     echo "こんにちは、$who（関数の中で \$0 = $0、\$# = $#）"
+>     return 3
+> }
+> greet alice bob
+> echo "greet の終了ステータス = $?"
+> echo "関数の外で who = [$who]"
+> END
+$ bash fn.sh
+こんにちは、alice（関数の中で $0 = fn.sh、$# = 2）
+greet の終了ステータス = 3
+関数の外で who = []
+$ cat > ex.sh <<'END'
+> #!/bin/bash
+> stop() { echo "関数の中で exit します"; exit 5; }
+> stop
+> echo "ここは表示されない"
+> END
+$ bash ex.sh; echo "終了ステータス $?"
+関数の中で exit します
+終了ステータス 5
+$ cat > number.sh <<'END'
+> #!/bin/bash
+> line() {
+>     for ((i = 0; i < 20; i++)); do printf '-'; done
+>     printf '\n'
+> }
+> i=1
+> for name in "$@"; do
+>     echo "$i: $name"
+>     line
+>     i=$((i + 1))
+> done
+> END
+$ bash number.sh alice bob carol
+1: alice
+--------------------
+21: bob
+--------------------
+21: carol
+--------------------
+$ bash -x number.sh alice bob 2>&1 | head -12
++ i=1
++ for name in "$@"
++ echo '1: alice'
+1: alice
++ line
++ (( i = 0 ))
++ (( i < 20 ))
++ printf -
+-+ (( i++ ))
++ (( i < 20 ))
++ printf -
+-+ (( i++ ))
+$ bash -x number.sh alice bob 2>&1 | grep -E '^\+ (i=|echo)'
++ i=1
++ echo '1: alice'
++ i=21
++ echo '21: bob'
++ i=21
+$ bash -v number.sh alice 2>&1 | head -14
+#!/bin/bash
+line() {
+    for ((i = 0; i < 20; i++)); do printf '-'; done
+    printf '\n'
+}
+i=1
+for name in "$@"; do
+    echo "$i: $name"
+    line
+    i=$((i + 1))
+done
+1: alice
+--------------------
+$ sed -i '/^line() {/a\    local i' number.sh; sed -n '2,6p' number.sh
+line() {
+    local i
+    for ((i = 0; i < 20; i++)); do printf '-'; done
+    printf '\n'
+}
+$ bash number.sh alice bob carol
+1: alice
+--------------------
+2: bob
+--------------------
+3: carol
+--------------------
+$ set -x; echo "$HOME"; set +x
++ echo /home/lab
+/home/lab
++ set +x
+$ 
+$ exit
+logout
