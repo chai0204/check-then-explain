@@ -37,6 +37,10 @@ PAIRS=(
   "linuc-network   lab-linuc-network:1.0.0       $REPO:network-1.0.0"
   "linuc-admin     lab-linuc-admin:1.0.0         $REPO:admin-1.0.0"
   "linuc-security  lab-linuc-security:1.0.0      $REPO:security-1.0.0"
+  "linuc-disks     lab-linuc-disks:1.0.1         $REPO:disks-1.0.1"
+  "linuc-network   lab-linuc-network:1.0.1       $REPO:network-1.0.1"
+  "linuc-admin     lab-linuc-admin:1.0.1         $REPO:admin-1.0.1"
+  "linuc-security  lab-linuc-security:1.0.1      $REPO:security-1.0.1"
 )
 
 for line in "${PAIRS[@]}"; do
