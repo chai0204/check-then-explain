@@ -132,7 +132,7 @@ $ /usr/local/bin/catfile /etc/shadow
 <li>カーネルはシェルスクリプトの SUID を無視する。効くのはコンパイル済みの実行ファイルだけ</li>
 <li>ディレクトリの <code>t</code> はスティッキービット（自分のファイルしか消せない）、ディレクトリの <code>s</code> はグループの継承</li>
 </ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / findutils 4.9.0 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:31b5b127298fad0e2ee33f368852d2be236b65338727d7f34d8e0d1d8485fde0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / findutils 4.9.0 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-security/theory/">← 理論編 目次</a><a href="/linuc-security/theory/02-accounts">次: 2. 「ロックした」は「無効化した」ではない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

@@ -146,7 +146,7 @@ $ sudo lastb | head -3
 <li><code>TMOUT</code> は無操作での自動ログアウト。<code>/etc/profile</code> に <code>readonly TMOUT</code> と書けば利用者は変更も <code>unset</code> もできない</li>
 <li><code>who</code> は utmp（端末ログインだけ）、<code>last</code> は wtmp（一般ユーザも打てる）、<code>lastb</code> は btmp（root が要る）。この練習機の <code>w</code> は logind から端末なしのセッションも出し、<code>WHAT</code> に実行中のコマンドを出す</li>
 </ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / bash 5.2.21 / procps（w）4.0.4 / util-linux（last）2.39.3 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で、1つのシェルに続けて打って記録 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:31b5b127298fad0e2ee33f368852d2be236b65338727d7f34d8e0d1d8485fde0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / bash 5.2.21 / procps（w）4.0.4 / util-linux（last）2.39.3 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で、1つのシェルに続けて打って記録 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-security/theory/02-accounts">← 2. 「ロックした」は「無効化した」ではない</a><a href="/linuc-security/theory/04-ports">次: 4. 開いているポートは、数えないと見えない →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

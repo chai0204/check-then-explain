@@ -140,7 +140,7 @@ $ sudo passwd -S root
 <li><code>/etc/shadow</code> の8列目がアカウント有効期限、7列目がパスワード期限切れ後の猶予。<code>*</code> や <code>!</code> のパスワード欄はパスワードでのログイン不可の印</li>
 <li>シェルを <code>nologin</code> にしても <code>ssh -N</code> の転送は止まらない</li>
 </ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / passwd（shadow）4.13 / OpenSSH 9.6p1 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:31b5b127298fad0e2ee33f368852d2be236b65338727d7f34d8e0d1d8485fde0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / passwd（shadow）4.13 / OpenSSH 9.6p1 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-security/theory/01-suid">← 1. SUID は、実行する人ではなく持ち主で動く</a><a href="/linuc-security/theory/03-sessions">次: 3. 入っている人と、入れる上限 →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

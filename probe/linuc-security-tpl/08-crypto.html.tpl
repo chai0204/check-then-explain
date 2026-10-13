@@ -187,7 +187,7 @@ A と <code>relay</code> の間は ssh で暗号化されるが、<code>relay</c
 <li><code>ssh -L 手元:宛先 相手</code> は、相手から見た宛先を手元のポートに出す（逆向きは <code>-R</code>）</li>
 <li><code>gpg</code> の鍵束・秘密鍵・信頼データベースは <code>~/.gnupg</code>。<code>gpg-agent</code> が秘密鍵とパスフレーズを預かる</li>
 </ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / OpenSSH 9.6p1 / GnuPG 2.4.4 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション。RSA の鍵生成の時間差はこの遅いエミュレーションで顕著）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:31b5b127298fad0e2ee33f368852d2be236b65338727d7f34d8e0d1d8485fde0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / OpenSSH 9.6p1 / GnuPG 2.4.4 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション。RSA の鍵生成の時間差はこの遅いエミュレーションで顕著）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-security/theory/07-firewall">← 7. ファイアウォールは、自分を締め出せる</a><a href="/linuc-security/theory/09-cloud">次: 9. クラウドでは、守る範囲が分かれている →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

@@ -124,7 +124,7 @@ $ sudo iptables -L INPUT -n ⟪k=3⟫
 <li><code>iptables -A INPUT ... -j DROP</code> で落とす。管理用の 22 を巻き込まない（通すルールより先に方針を DROP にしない）</li>
 <li><code>iptables</code> のルールは再起動で消える。恒久化には保存と復元の仕掛けが要る</li>
 </ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / iptables 1.8.10 (nf_tables) / firewalld 2.1.1（FirewallBackend=nftables）/ apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.1@sha256:31b5b127298fad0e2ee33f368852d2be236b65338727d7f34d8e0d1d8485fde0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / iptables 1.8.10 (nf_tables) / firewalld 2.1.1（FirewallBackend=nftables）/ apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）/ 練習機の中の操作は対話のログインシェル（端末 80 桁）で記録 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-security/theory/06-services">← 6. シャドウと、使っていないサービスを止める</a><a href="/linuc-security/theory/08-crypto">次: 8. 鍵は、持ち主で非対称になっている →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
