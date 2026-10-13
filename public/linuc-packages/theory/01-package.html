@@ -175,7 +175,19 @@ rpmlib(CompressedFileNames) &lt;= 3.0.4-1
 rpmlib(FileDigests) &lt;= 4.6.0-1
 rpmlib(PayloadFilesHavePrefix) &lt;= 4.0-1
 rpmlib(PayloadIsZstd) &lt;= 5.4.18-1</code></pre>
-<p><code>-q</code> は問い合わせ（query）、<code>p</code> は「台帳ではなく、このパッケージファイルに聞け」、<code>i</code> が情報・<code>l</code> がファイル一覧・<code>R</code> が依存関係（requires）である。<code>liblab &gt;= 1.0</code> が Debian の <code>Depends:</code> にあたる。<code>Install Date: (not installed)</code> は、まだ台帳に無いことを表している。</p>
+<p><code>-q</code> は問い合わせ（query）、<code>p</code> は「台帳ではなく、このパッケージファイルに聞け」、<code>i</code> が情報・<code>l</code> がファイル一覧・<code>R</code> が依存関係（requires）である。<code>liblab &gt;= 1.0</code> が Debian の <code>Depends:</code> にあたる。</p>
+<p><code>Install Date: (not installed)</code> は「入っていない」という台帳の答えではない。<code>-qp</code> はファイルの中を読むだけで、ファイルの中には入れた日時が書かれていないので、いつもこう出る。檻に最初から入っている labhello で比べると分かる（別の檻で記録した）。</p>
+<pre><code>$ rpm -q labhello
+labhello-1.0-1.noarch
+$ rpm -qpi /srv/lab-rpm/labhello-1.0-1.noarch.rpm | grep -E '^(Name|Version|Install Date)'
+Name        : labhello
+Version     : 1.0
+Install Date: (not installed)
+$ rpm -qi labhello | grep -E '^(Name|Version|Install Date)'
+Name        : labhello
+Version     : 1.0
+Install Date: Tue Oct 13 10:08:56 2026</code></pre>
+<p>入っているのに、ファイルに聞くと <code>(not installed)</code>、台帳に聞くと入れた日時が出た。入っているかどうかは、名前で台帳に聞く（<code>rpm -q 名前</code>）。</p>
 <p>中身だけを広げる道具は <code>rpm2cpio</code> である（.rpm の中身を cpio 形式で取り出し、<code>cpio</code> が展開する）。</p>
 <pre><code>$ cd / &amp;&amp; rpm2cpio /srv/lab-rpm/liblab-1.0-1.noarch.rpm | sudo cpio -idmv
 ./usr/lib/liblab/liblab.sh
@@ -201,7 +213,7 @@ $ ls /var/lib/rpm/
 rpmdb.sqlite
 rpmdb.sqlite-shm
 rpmdb.sqlite-wal</code></pre>
-<p>答え方まで同じである。RPM 系の台帳は <code>/var/lib/rpm/</code> の SQLite のデータベースで、dpkg と違ってテキストではない。だから中を見るときは必ず <code>rpm -q</code> を通す。</p>
+<p>答え方まで同じである。RPM 系の台帳は <code>/var/lib/rpm/</code> のデータベースで、dpkg と違ってテキストではない。この檻（AlmaLinux 9・rpm 4.16）は SQLite（<code>rpmdb.sqlite</code>）で、RHEL 9 からこの形になった。RHEL 7・8 は Berkeley DB で、<code>Packages</code> などのファイルが並ぶ。どちらでも中を見るときは <code>rpm -q</code> を通す。</p>
 <div class="scroll"><table>
 <tr><th>聞きたいこと</th><th>Debian 系</th><th>RPM 系</th></tr>
 <tr><td>台帳の場所</td><td><code>/var/lib/dpkg/</code>（テキスト）</td><td><code>/var/lib/rpm/</code>（データベース）</td></tr>
@@ -310,7 +322,9 @@ CPU を問わないものは .deb が <code>all</code>、.rpm が <code>noarch</
 (a) <code>rpm -ql pkg.rpm</code>　(b) <code>rpm -qpl pkg.rpm</code>　(c) <code>rpm -qf pkg.rpm</code>　(d) <code>rpm -V pkg.rpm</code></p>
 <details><summary>答え</summary>
 <p>(b)。<code>p</code> が「台帳ではなくパッケージファイルに聞け」の印である。
-(a) は台帳に聞くので、入っていなければ <code>package … is not installed</code> になる。
+(a) は本来は台帳に聞く書き方で、RHEL 7（rpm 4.11）では <code>package … is not installed</code> になる。
+RHEL 8 以降（rpm 4.14 以降）は末尾が <code>.rpm</code> の引数をファイルとして読むので一覧が出る（この檻の rpm 4.16 で実測。第6章）。
+どの版でも確実で、試験で正しいとされるのは、ファイルに聞くと明示する (b) である。
 Debian 系なら <code>dpkg -c pkg.deb</code>（= <code>dpkg-deb -c</code>）が同じ役をする。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>

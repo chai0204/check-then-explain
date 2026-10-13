@@ -50,10 +50,17 @@ $ labapp; echo "exit=$?"
 exit=2</code></pre>
 <div class="then"><b>だめな理由</b>: どちらの予想も外れた。dpkg は liblab を取りに行かず、
 かといって何もせずに終わってもいない。<b>展開（Unpacking）までは進めて</b>、設定の手前で止まっている。
-台帳には <code>iU</code>（入れたい／展開済み）、liblab には <code>un</code>（知らない／入っていない）と書かれた。
+台帳には labapp が <code>iU</code>（入れたい／展開済み）と書かれた（liblab の <code>un</code> は、すぐ下で確かめるとおり台帳の行ではない）。
 <code>/usr/bin/labapp</code> は置かれているので、打つと動きかけて、liblab のファイルが無いところで失敗する。
 dpkg は control の <code>Depends:</code> を読めるので「足りない」とは分かる。
 しかし<b>どこへ取りに行けばいいかを知らない</b>。リポジトリの目録を持っているのは apt のほうである。</div></div>
+<p>liblab の <code>un</code>（知らない／入っていない）は、台帳に liblab の行ができたという意味ではない。同じ状態を作って台帳を直接見ると、liblab の行は1つも無い（別の檻で記録した）。</p>
+<pre><code>$ grep -c '^Package: liblab$' /var/lib/dpkg/status
+0
+$ dpkg -s labapp | grep -E '^(Status|Depends):'
+Status: install ok unpacked
+Depends: liblab (&gt;= 1.0)</code></pre>
+<p>台帳にあるのは labapp の行だけで、その <code>Depends:</code> に liblab の名前が出てくる。<code>dpkg -l</code> は名前を指定されたので、台帳に行の無い liblab を <code>un</code> として表示しただけである。</p>
 <p>しかもこの状態は、関係ないパッケージの操作も止める。labhello を上げようとする。</p>
 <pre><code>$ sudo apt install -y labhello; echo "exit=$?"
 ...
@@ -62,7 +69,7 @@ The following packages have unmet dependencies:
  labapp : Depends: liblab (&gt;= 1.0) but it is not going to be installed
 E: Unmet dependencies. Try 'apt --fix-broken install' with no packages (or specify a solution).
 exit=100</code></pre>
-<p>apt は「台帳の全体で依存関係が満たされた状態」しか作らない。どこかに <code>iU</code> が残っていると、それを直す以外の操作を受け付けない。直し方は出力の中に書いてある。</p>
+<p>apt は「台帳の全体で依存関係が満たされた状態」しか作らない。<b>依存関係が満たされないもの</b>（ここでは liblab の無い labapp）が残っていると、それを直す以外の操作を受け付けない。直し方は出力の中に書いてある。</p>
 <pre><code>$ sudo apt --fix-broken install -y
 ...
 Correcting dependencies... Done
@@ -85,6 +92,20 @@ ii  liblab         1.0          all          small shell library for lab program
 $ labapp
 liblab: hello from labapp 1.0</code></pre>
 <p><code>1 not fully installed or removed.</code> が labapp の <code>iU</code> のことで、apt が目録から liblab を取ってきて入れ、続けて labapp の設定（Setting up）を済ませた。<code>apt --fix-broken install</code> は <code>apt-get -f install</code> とも書く（<code>-f</code> = fix-broken）。</p>
+<p>断られた原因は <code>iU</code> そのものではなく、満たされない依存関係のほうである。依存関係が満たされている <code>iU</code> なら、apt は断らずに、次の操作のついでに設定を済ませる。<code>dpkg --unpack</code>（展開だけして設定しない）で依存の無い labhello を <code>iU</code> にしてから、別のパッケージを入れた記録である（別の檻）。</p>
+<pre><code>$ sudo dpkg --unpack /srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
+...
+Unpacking labhello (1.1) over (1.0) ...
+$ dpkg -l labhello | tail -1
+iU  labhello       1.1          all          prints its own version
+$ sudo apt install -y liblab
+...
+1 not fully installed or removed.
+...
+Setting up labhello (1.1) ...
+Setting up liblab (1.0) ...
+$ dpkg -l labhello | tail -1
+ii  labhello       1.1          all          prints its own version</code></pre>
 <div class="scroll"><table>
 <tr><th>やり方</th><th>依存関係</th><th>結果</th></tr>
 <tr><td><code>dpkg -i ファイル.deb</code></td><td>読んで確かめるだけ。足りなければ止まる</td><td>展開済み・設定前（<code>iU</code>）で残る</td></tr>
@@ -121,7 +142,7 @@ ii  labsvc-common  1.0          all          data files for labsvc</code></pre>
 <tr><td><code>ii</code></td><td>Install（入れたい）</td><td>Installed（入っていて設定済み）</td><td>ふつうの状態</td></tr>
 <tr><td><code>rc</code></td><td>Remove（消したい）</td><td>Conf-files（設定ファイルだけ残っている）</td><td>第2章の <code>apt remove</code> の後</td></tr>
 <tr><td><code>iU</code></td><td>Install（入れたい）</td><td>Unpacked（展開済み・設定前）</td><td>この章の <code>dpkg -i</code> の後</td></tr>
-<tr><td><code>un</code></td><td>Unknown（知らない）</td><td>Not（入っていない）</td><td>依存として名前だけ台帳に載った liblab</td></tr>
+<tr><td><code>un</code></td><td>Unknown（知らない）</td><td>Not（入っていない）</td><td>台帳に行は無いが、labapp の <code>Depends:</code> に名前が出てくる liblab（<code>dpkg -l</code> が表示だけする）</td></tr>
 </table></div>
 <p>1つのパッケージについて詳しく聞く。</p>
 <pre><code>$ dpkg -L labapp
@@ -170,7 +191,7 @@ $ dpkg -I /srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
 <div class="scroll"><table>
 <tr><th>オプション</th><th>長い名前</th><th>相手</th><th>すること</th></tr>
 <tr><td><code>-i</code></td><td><code>--install</code></td><td>.deb ファイル</td><td>展開して設定し、<b>台帳に書く</b></td></tr>
-<tr><td><code>-r</code></td><td><code>--remove</code></td><td>パッケージ名</td><td>中身を消す。設定ファイルは残す（<code>rc</code>）</td></tr>
+<tr><td><code>-r</code></td><td><code>--remove</code></td><td>パッケージ名</td><td>中身を消す。conffile は残す（<code>rc</code>）。conffile の無いパッケージは台帳の行も消える</td></tr>
 <tr><td><code>-P</code></td><td><code>--purge</code></td><td>パッケージ名</td><td>設定ファイルも消し、台帳の行も消す</td></tr>
 <tr><td><code>-l</code></td><td><code>--list</code></td><td>台帳</td><td>一覧と状態</td></tr>
 <tr><td><code>-s</code></td><td><code>--status</code></td><td>台帳</td><td>1つのパッケージの詳しい状態</td></tr>
@@ -286,7 +307,13 @@ $ sudo debconf-show tzdata
 ...
 * tzdata/Areas: Asia
 ...</code></pre>
-<p><code>dpkg-reconfigure</code> は、パッケージを入れたときの「質問して設定する」手順を、入れ直さずにもう一度走らせる。答えは debconf の記録に残り（<code>*</code> が今回答えた印）、tzdata の設定の手順がその答えで <code>/etc/timezone</code> と <code>/etc/localtime</code> を書き直した。設定ファイルを手で直す代わりに、パッケージ自身に直させる方法である。</p>
+<p><code>dpkg-reconfigure</code> は、パッケージを入れたときの「質問して設定する」手順を、入れ直さずにもう一度走らせる。答えは debconf の記録に残り（<code>*</code> は「その質問がもう出された」印。下の man の記述を参照）、tzdata の設定の手順がその答えで <code>/etc/timezone</code> と <code>/etc/localtime</code> を書き直した。設定ファイルを手で直す代わりに、パッケージ自身に直させる方法である。</p>
+<pre><code>$ MANWIDTH=80 man debconf-show | sed -n "/The most common use/,/with an/p"
+       The most common use is "debconf-show packagename", which displays all
+       items in the debconf database owned by a given package, and their
+       current values.  Questions that have been asked already are prefixed
+       with an '*'.</code></pre>
+<p><code>*</code> は「今回答えたもの」ではなく「すでに尋ねられた質問」の印である（別の檻で記録した）。tzdata は Areas と Zones/Asia の2問を尋ねたので、その2行に付いた。</p>
 <div class="analogy"><b>たとえ</b>: 家電の「初期設定をやり直す」メニューに近い。
 買ったときに答えた質問（地域・言語）にもう一度答えると、本体の設定が書き換わる。
 <br>ただし<b>崩れる点</b>: 家電は設定画面を出し直すだけだが、dpkg-reconfigure はパッケージの設定の手順を丸ごと走らせ直す。
@@ -320,7 +347,7 @@ $ sudo debconf-show tzdata
 最初から <code>apt install ./foo.deb</code> と打てば、依存も解決して1回で入る。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>dpkg -i</code> は依存関係を読めるが取りに行かない。足りなければ展開済み・設定前（<code>iU</code>）で止まり、ファイルは置かれたまま残る</li><li><code>iU</code> が残っていると apt は別の操作も断る。<code>apt --fix-broken install</code>（<code>apt-get -f install</code>）が目録から足りないものを取って続きをする</li><li>台帳を読む: <code>-l</code> 一覧・<code>-s</code> 状態・<code>-L</code> パッケージ→ファイル・<code>-S</code> ファイル→パッケージ。ファイルを読む: <code>-c</code> 中身・<code>-I</code> 情報</li><li><code>-r</code> は設定ファイルを残して <code>rc</code>、<code>-P</code> は全部消す。依存されているものは <code>-r</code> を拒まれる</li><li><code>dpkg -V</code> は違うファイルだけを出し、違いがあっても終了コードは 0。入れ直しても書き換えた設定ファイルは戻らない</li><li><code>dpkg-reconfigure</code> は入れたときの質問をやり直し、その答えで設定を書き直す</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>dpkg -i</code> は依存関係を読めるが取りに行かない。足りなければ展開済み・設定前（<code>iU</code>）で止まり、ファイルは置かれたまま残る</li><li>依存関係が満たされないまま <code>iU</code> が残っていると、apt は別の操作も断る。<code>apt --fix-broken install</code>（<code>apt-get -f install</code>）が目録から足りないものを取って続きをする（依存が満たされた <code>iU</code> なら、apt は次の操作のついでに設定する）</li><li>台帳を読む: <code>-l</code> 一覧・<code>-s</code> 状態・<code>-L</code> パッケージ→ファイル・<code>-S</code> ファイル→パッケージ。ファイルを読む: <code>-c</code> 中身・<code>-I</code> 情報</li><li><code>-r</code> は conffile を残して <code>rc</code>（conffile の無いパッケージは台帳から消える）、<code>-P</code> は全部消す。依存されているものは <code>-r</code> を拒まれる</li><li><code>dpkg -V</code> は違うファイルだけを出し、違いがあっても終了コードは 0。入れ直しても書き換えた設定ファイルは戻らない</li><li><code>dpkg-reconfigure</code> は入れたときの質問をやり直し、その答えで設定を書き直す</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0@sha256:556b75a379fdee91de07d7b828b45545cfd71f206c7c9761d9c375825c604457 / Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / debconf 1.5.86ubuntu1 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/03-sources">← 3. 目録は、取りに行くまで古いまま</a><a href="/linuc-packages/theory/05-yum">次: 5. yum は、目録を自分で取りに行く →</a></nav>
 <section id="comments">

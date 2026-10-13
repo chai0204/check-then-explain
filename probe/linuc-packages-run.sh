@@ -4,6 +4,7 @@
 #
 #   bash probe/linuc-packages-run.sh probe          → logs/linuc-packages-deb-probe.log と -rpm-probe.log
 #   bash probe/linuc-packages-run.sh solve          → logs/linuc-packages-deb-solve-all.log と -rpm-solve-all.log
+#   bash probe/linuc-packages-run.sh extra          → logs/linuc-packages-deb-extra.log と -rpm-extra.log（事実確認の後で足した記録）
 #   bash probe/linuc-packages-run.sh one deb ch2    → 1節だけ標準出力へ（作業中の確認用）
 #
 # 読者の起動コマンド（本文に書いたもの）との違いは2つだけ:
@@ -40,6 +41,13 @@ case "${1:-}" in
       { for s in env ch1 ch5 ch6 ch7; do one "$RPM" probe/linuc-packages-rpm-probe.sh "$s"; done; } \
         > logs/linuc-packages-rpm-probe.log 2>&1
     fi
+    ;;
+  extra)
+    # 事実確認（2026-10-13）を受けて足した記録。イメージは作り直していない（push 済みと同じ）。
+    { for s in x-upgrade x-autoremove x-root x-aptcmds x-un x-pending x-depends x-docs; do
+        one "$DEB" probe/linuc-packages-deb-extra.sh "$s"; done; } > logs/linuc-packages-deb-extra.log 2>&1
+    { for s in x-qp x-repoquery x-rpmsave; do
+        one "$RPM" probe/linuc-packages-rpm-extra.sh "$s"; done; } > logs/linuc-packages-rpm-extra.log 2>&1
     ;;
   solve)
     one "$DEB" probe/linuc-packages-deb-solve-all.sh all > logs/linuc-packages-deb-solve-all.log 2>&1

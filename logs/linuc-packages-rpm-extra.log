@@ -1,0 +1,107 @@
+
+
+========== x-qp. -qp はファイルの中を読むだけ。.rpm で終わる引数は rpm 4.16 ではファイルとして読まれる ==========
+
+$ rpm -q labhello
+labhello-1.0-1.noarch
+
+$ rpm -qpi /srv/lab-rpm/labhello-1.0-1.noarch.rpm | grep -E '^(Name|Version|Install Date)'
+Name        : labhello
+Version     : 1.0
+Install Date: (not installed)
+
+$ rpm -qi labhello | grep -E '^(Name|Version|Install Date)'
+Name        : labhello
+Version     : 1.0
+Install Date: Tue Oct 13 10:08:56 2026
+
+$ rpm -q labtool; echo "exit=$?"
+package labtool is not installed
+exit=1
+
+$ rpm -ql labtool; echo "exit=$?"
+package labtool is not installed
+exit=1
+
+$ rpm -qpl /srv/lab-rpm/labtool-1.0-1.noarch.rpm
+/usr/bin/labtool
+
+$ rpm -ql /srv/lab-rpm/labtool-1.0-1.noarch.rpm; echo "exit=$?"
+/usr/bin/labtool
+exit=0
+
+$ rpm --version
+RPM version 4.16.1.3
+
+
+========== x-repoquery. 入っていないパッケージの中身を目録から引く ==========
+
+$ rpm -q labtool; echo "exit=$?"
+package labtool is not installed
+exit=1
+
+$ yum repoquery -l labtool
+Last metadata expiration check: 1:18:13 ago on Tue Oct 13 10:08:56 2026.
+/usr/bin/labtool
+
+$ ls -l /usr/bin/repoquery
+lrwxrwxrwx 1 root root 22 Nov 12  2025 /usr/bin/repoquery -> /usr/libexec/dnf-utils
+
+$ repoquery -l labtool
+Last metadata expiration check: 1:18:13 ago on Tue Oct 13 10:08:56 2026.
+/usr/bin/labtool
+
+$ yum repoquery -l labapp liblab
+Last metadata expiration check: 1:18:13 ago on Tue Oct 13 10:08:56 2026.
+/etc/labapp.conf
+/usr/bin/labapp
+/usr/share/doc/labapp/README
+/usr/lib/liblab/liblab.sh
+
+
+========== x-rpmsave. 書き換えていない設定ファイルは、消すと一緒に消える ==========
+
+$ sudo yum install -y labapp
+Last metadata expiration check: 1:18:14 ago on Tue Oct 13 10:08:56 2026.
+Dependencies resolved.
+================================================================================
+ Package            Architecture       Version            Repository       Size
+================================================================================
+Installing:
+ labapp             noarch             1.0-1              lab             7.3 k
+Installing dependencies:
+ liblab             noarch             1.0-1              lab             6.7 k
+
+Transaction Summary
+================================================================================
+Install  2 Packages
+
+Total size: 14 k
+Installed size: 515  
+Downloading Packages:
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : liblab-1.0-1.noarch                                    1/2 
+  Installing       : labapp-1.0-1.noarch                                    2/2 
+  Running scriptlet: labapp-1.0-1.noarch                                    2/2 
+  Verifying        : labapp-1.0-1.noarch                                    1/2 
+  Verifying        : liblab-1.0-1.noarch                                    2/2 
+
+Installed:
+  labapp-1.0-1.noarch                    liblab-1.0-1.noarch                   
+
+Complete!
+
+$ rpm -V labapp; echo "exit=$?"
+exit=0
+
+$ sudo rpm -e labapp; echo "exit=$?"
+exit=0
+
+$ ls -l /etc/labapp.conf*; echo "exit=$?"
+ls: cannot access '/etc/labapp.conf*': No such file or directory
+exit=2

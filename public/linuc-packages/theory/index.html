@@ -65,7 +65,7 @@ pinning（優先度の書き換え）、モジュールとグループ（<code>d
     <td><code>dpkg -i -r -P -l -L -S -s -c -I -V</code>、<code>--configure</code>、<code>apt --fix-broken install</code>、<code>dpkg-reconfigure</code> <code>debconf-show</code></td></tr>
 <tr><td>1.04.3 yumコマンドによるパッケージ管理</td><td>3</td>
     <td><a href="/linuc-packages/theory/05-yum">5</a></td>
-    <td><code>yum</code>（= <code>dnf</code>）の <code>list</code> <code>info</code> <code>search</code> <code>provides</code> <code>deplist</code> <code>install</code> <code>remove</code> <code>update</code> <code>check-update</code> <code>repolist</code>、<code>/etc/yum.repos.d/</code> <code>/etc/yum.conf</code>、<code>yumdownloader</code></td></tr>
+    <td><code>yum</code>（= <code>dnf</code>）の <code>list</code> <code>info</code> <code>search</code> <code>provides</code> <code>repoquery -l</code> <code>deplist</code> <code>install</code> <code>remove</code> <code>update</code> <code>check-update</code> <code>repolist</code>、<code>/etc/yum.repos.d/</code> <code>/etc/yum.conf</code>、<code>yumdownloader</code></td></tr>
 <tr><td rowspan="2">1.04.4 RPMパッケージ管理</td><td rowspan="2">1</td>
     <td><a href="/linuc-packages/theory/06-rpm-query">6</a></td>
     <td><code>rpm -qa -qi -ql -qf -qc -qd -qR -qp</code> <code>--provides</code> <code>--whatrequires</code>、<code>rpm -V</code> <code>-Va</code>、<code>rpm2cpio</code></td></tr>
@@ -85,30 +85,31 @@ pinning（優先度の書き換え）、モジュールとグループ（<code>d
 <div class="scroll"><table>
 <tr><th>出題範囲の語</th><th>一行の意味</th><th>章</th></tr>
 <tr><td><code>apt</code></td><td>人が画面で打つための入口。<code>install</code> <code>remove</code> <code>purge</code> <code>update</code> <code>upgrade</code> <code>search</code> <code>show</code> <code>list</code> をまとめて持つ（スクリプトには向かない）</td><td><a href="/linuc-packages/theory/02-apt#family">2</a></td></tr>
-<tr><td><code>apt-get</code></td><td>目録を読んで入れる・消す・上げる道具。<code>update</code> は目録を取り直すだけ、<code>upgrade</code> は入っているものを上げる、<code>dist-upgrade</code> は入れ替えも伴う、<code>clean</code> は取ってきた .deb を消す</td><td><a href="/linuc-packages/theory/02-apt#upgrade">2</a></td></tr>
+<tr><td><code>apt-get</code></td><td>目録を読んで入れる・消す・上げる道具。<code>update</code> は目録を取り直すだけ（root が要る）、<code>upgrade</code> は入っているものを上げる（新しく入れも消しもしない。<code>apt upgrade</code> は依存のためなら新しく入れる）、<code>dist-upgrade</code> は消すこともある、<code>clean</code> は取ってきた .deb を消す</td><td><a href="/linuc-packages/theory/02-apt#upgrade">2</a></td></tr>
 <tr><td><code>apt-cache</code></td><td>目録を読むだけ。<code>search</code> 名前と説明、<code>show</code> 詳細、<code>depends</code> / <code>rdepends</code> 依存、<code>policy</code> 台帳と目録の版の比較</td><td><a href="/linuc-packages/theory/02-apt#read">2</a></td></tr>
 <tr><td><code>apt-file</code></td><td>Contents 目録を引き、入っていないパッケージも含めて「このファイルはどのパッケージか」（<code>search</code>）・「中身は何か」（<code>list</code>）に答える。索引は <code>apt-file update</code></td><td><a href="/linuc-packages/theory/03-sources#aptfile">3</a></td></tr>
 <tr><td><code>/etc/apt/sources.list</code></td><td>どこから取るかの表。<code>deb URI ディストリビューション コンポーネント</code> の1行形式。<code>/etc/apt/sources.list.d/</code> の <code>*.list</code> と <code>*.sources</code>（deb822）も同じ扱い。書いたら <code>apt update</code></td><td><a href="/linuc-packages/theory/03-sources#table">3</a></td></tr>
 <tr><td>依存関係</td><td>先に入っていなければならない別のパッケージ（.deb の <code>Depends:</code>、.rpm の <code>Requires</code>）。dpkg と rpm は読むが取りに行かない。取りに行くのは apt と yum</td><td><a href="/linuc-packages/theory/04-dpkg#install">4</a>・<a href="/linuc-packages/theory/07-rpm-install#deps">7</a></td></tr>
-<tr><td><code>dpkg</code></td><td>Debian 系の台帳を読み書きする道具。<code>-i</code> 入れる・<code>-r</code> 消す（設定は残す）・<code>-P</code> 全部消す・<code>-l</code> 一覧・<code>-L</code> ファイル一覧・<code>-S</code> ファイル→パッケージ・<code>-s</code> 状態・<code>-c</code> / <code>-I</code> .deb の中身と情報</td><td><a href="/linuc-packages/theory/04-dpkg#query">4</a></td></tr>
+<tr><td><code>dpkg</code></td><td>Debian 系の台帳を読み書きする道具。<code>-i</code> 入れる・<code>-r</code> 消す（conffile は残す）・<code>-P</code> 全部消す・<code>-l</code> 一覧・<code>-L</code> ファイル一覧・<code>-S</code> ファイル→パッケージ・<code>-s</code> 状態・<code>-c</code> / <code>-I</code> .deb の中身と情報</td><td><a href="/linuc-packages/theory/04-dpkg#query">4</a></td></tr>
 <tr><td><code>dpkg-reconfigure</code></td><td>入れたときの質問（debconf）をもう一度出し、その答えで設定し直す。例: <code>dpkg-reconfigure tzdata</code></td><td><a href="/linuc-packages/theory/04-dpkg#reconfigure">4</a></td></tr>
 <tr><td>リポジトリ</td><td>中身（.deb / .rpm）の置き場と、目録（<code>dists/…/Packages</code> / <code>repodata/</code>）をまとめた配布元</td><td><a href="/linuc-packages/theory/01-package#repo">1</a></td></tr>
-<tr><td><code>yum</code></td><td>RPM 系の、目録を読んで入れる道具。RHEL 8 以降は <code>dnf</code> へのリンク。<code>provides</code> で入っていないパッケージのファイルも探せる。目録は期限切れなら自分で取り直す</td><td><a href="/linuc-packages/theory/05-yum#whois">5</a></td></tr>
+<tr><td><code>yum</code></td><td>RPM 系の、目録を読んで入れる道具。RHEL 8 以降は <code>dnf</code> へのリンク（形はそのまま使えるが、既定値と出力は RHEL 7 と違うところがある）。<code>provides</code> でファイルからパッケージを、<code>repoquery -l</code> でパッケージの中身を、入っていなくても引ける。目録は期限切れなら自分で取り直す</td><td><a href="/linuc-packages/theory/05-yum#whois">5</a></td></tr>
 <tr><td><code>/etc/yum.repos.d/</code></td><td>リポジトリを1つずつ書く <code>.repo</code> ファイルの置き場。<code>[repo id]</code> <code>name=</code> <code>baseurl=</code> <code>enabled=</code> <code>gpgcheck=</code> <code>gpgkey=</code></td><td><a href="/linuc-packages/theory/05-yum#repos">5</a></td></tr>
 <tr><td><code>/etc/yum.conf</code></td><td>yum 全体の設定（<code>[main]</code>）。RHEL 8 以降は <code>/etc/dnf/dnf.conf</code> へのリンク。<code>gpgcheck=1</code> <code>installonly_limit</code> <code>clean_requirements_on_remove</code></td><td><a href="/linuc-packages/theory/05-yum#whois">5</a></td></tr>
-<tr><td><code>yumdownloader</code></td><td>入れずに .rpm を取ってくる（<code>--resolve</code> で依存も、<code>--destdir</code> で置き場所を指定）。yum-utils に入っていて、実体は <code>dnf download</code></td><td><a href="/linuc-packages/theory/05-yum#download">5</a></td></tr>
+<tr><td><code>yumdownloader</code></td><td>入れずに .rpm を取ってくる（<code>--resolve</code> で依存も、<code>--destdir</code> で置き場所を指定）。yum-utils に入っていて、RHEL 8 以降の実体は <code>dnf download</code>（RHEL 7 は独立した Python のプログラム）</td><td><a href="/linuc-packages/theory/05-yum#download">5</a></td></tr>
 <tr><td><code>rpm</code></td><td>RPM 系の台帳を読み書きする道具。<code>-q</code> 系で引き、<code>-V</code> で照らし合わせ、<code>-i</code> / <code>-U</code> / <code>-F</code> / <code>-e</code> で入れて消す。<code>-p</code> を付けると .rpm ファイルに聞く</td><td><a href="/linuc-packages/theory/06-rpm-query#query">6</a>・<a href="/linuc-packages/theory/07-rpm-install#iuf">7</a></td></tr>
-<tr><td>署名</td><td>作った人が鍵で付ける印。<code>rpm -K</code> で確かめ、<code>digests signatures OK</code> のときだけ確かめられている（署名が無いと <code>digests OK</code>）。鍵は <code>rpm --import</code> で台帳へ</td><td><a href="/linuc-packages/theory/07-rpm-install#sign">7</a></td></tr>
+<tr><td>署名</td><td>作った人が鍵で付ける印。<code>rpm -K</code> で確かめ、署名の語（RHEL 8 以降は <code>signatures</code>、RHEL 7 は <code>rsa</code>・<code>pgp</code>）が小文字で OK のときだけ確かめられている（RHEL 8 以降で署名が無いと <code>digests OK</code>、RHEL 7 なら <code>sha1 md5 OK</code>）。大文字は失敗。鍵は <code>rpm --import</code> で台帳へ</td><td><a href="/linuc-packages/theory/07-rpm-install#sign">7</a></td></tr>
 </table></div>
 <p>取り違えやすい組み合わせも並べておきます。どれも本文で両方を実際に打っています。</p>
 <div class="scroll"><table>
 <tr><th>組み合わせ</th><th>違い</th><th>章</th></tr>
-<tr><td><code>apt remove</code> と <code>apt purge</code></td><td>remove は設定ファイルを残して台帳に <code>rc</code>、purge は全部消す</td><td><a href="/linuc-packages/theory/02-apt#remove">2</a></td></tr>
+<tr><td><code>apt remove</code> と <code>apt purge</code></td><td>remove は conffile を残して台帳に <code>rc</code>（conffile の無いパッケージは行ごと消える）、purge は全部消す</td><td><a href="/linuc-packages/theory/02-apt#remove">2</a></td></tr>
 <tr><td><code>apt update</code> と <code>apt upgrade</code></td><td>update は目録を取り直すだけ、upgrade は入っているものを上げる</td><td><a href="/linuc-packages/theory/02-apt#upgrade">2</a></td></tr>
 <tr><td><code>dpkg -S</code> と <code>apt-file search</code></td><td>どちらもファイル→パッケージ。<code>-S</code> は入っているものだけ、apt-file は入っていなくてよい</td><td><a href="/linuc-packages/theory/03-sources#aptfile">3</a></td></tr>
 <tr><td><code>dpkg -l</code> と <code>dpkg -L</code></td><td>小文字は台帳の一覧、大文字は1つのパッケージのファイル一覧</td><td><a href="/linuc-packages/theory/04-dpkg#query">4</a></td></tr>
 <tr><td><code>rpm -qf</code> と <code>rpm -ql</code></td><td>-qf はファイル→パッケージ、-ql はパッケージ→ファイル</td><td><a href="/linuc-packages/theory/06-rpm-query#query">6</a></td></tr>
 <tr><td><code>rpm -qf</code> と <code>yum provides</code></td><td>rpm は入っているものだけ、yum は入っていなくてよい</td><td><a href="/linuc-packages/theory/05-yum#query">5</a></td></tr>
+<tr><td><code>rpm -ql</code> と <code>yum repoquery -l</code></td><td>どちらもパッケージ → 中身。rpm は入っているものだけ（ファイルに聞くなら <code>-qpl</code>）、repoquery は入っていなくてよい</td><td><a href="/linuc-packages/theory/05-yum#query">5</a></td></tr>
 <tr><td><code>rpm -i</code> と <code>-U</code> と <code>-F</code></td><td>-i は新しく入れる（古い版があると衝突）、-U は上げるか入れる、-F は入っているものだけ上げる</td><td><a href="/linuc-packages/theory/07-rpm-install#iuf">7</a></td></tr>
 <tr><td><code>dpkg -V</code> と <code>rpm -V</code></td><td>どちらも違うファイルだけを出す。dpkg は中身の要約しか持たず、違っても終了コード 0。rpm は欄が埋まり、終了コードも 0 以外</td><td><a href="/linuc-packages/theory/04-dpkg#verify">4</a>・<a href="/linuc-packages/theory/06-rpm-query#verify">6</a></td></tr>
 </table></div>

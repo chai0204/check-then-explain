@@ -14,7 +14,7 @@
 <p class="lead">いまの RHEL 系で <code>yum</code> と打つと、動いているのは <code>dnf</code> である。<code>/etc/yum.conf</code> も dnf の設定ファイルを指すリンクにすぎない。そして apt と違い、リポジトリを足したら<b>更新のコマンドを打たずに</b>そのまま入れられる。目録が無い・古いと気づくと、自分で取りに行くからだ。</p>
 <div class="badges"><span>前提: 第4章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.3（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>yum</code> と <code>dnf</code>、<code>/etc/yum.conf</code> と <code>/etc/dnf/dnf.conf</code> の関係を <code>ls -l</code> で示せる</li><li><code>/etc/yum.repos.d/</code> の .repo ファイルの主な項目（<code>[repo id]</code> <code>name</code> <code>baseurl</code> <code>enabled</code> <code>gpgcheck</code> <code>gpgkey</code>）を読み書きできる</li><li>yum の <code>list</code> / <code>info</code> / <code>search</code> / <code>provides</code> / <code>deplist</code> / <code>install</code> / <code>remove</code> / <code>update</code> / <code>check-update</code> を使い分けられる</li><li><code>yumdownloader</code> でパッケージを入れずに取ってこられる</li></ul>
+<ul><li><code>yum</code> と <code>dnf</code>、<code>/etc/yum.conf</code> と <code>/etc/dnf/dnf.conf</code> の関係を <code>ls -l</code> で示せる</li><li><code>/etc/yum.repos.d/</code> の .repo ファイルの主な項目（<code>[repo id]</code> <code>name</code> <code>baseurl</code> <code>enabled</code> <code>gpgcheck</code> <code>gpgkey</code>）を読み書きできる</li><li>yum の <code>list</code> / <code>info</code> / <code>search</code> / <code>provides</code> / <code>repoquery -l</code> / <code>deplist</code> / <code>install</code> / <code>remove</code> / <code>update</code> / <code>check-update</code> を使い分けられる</li><li><code>yumdownloader</code> でパッケージを入れずに取ってこられる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: モジュール（<code>dnf module</code>）、グループ（<code>yum groupinstall</code>）の中身、<code>yum history undo</code>、次の世代の dnf5、RHEL のサブスクリプション登録。<code>Last metadata expiration check</code> の行は「目録を最後に確かめた時刻」とだけ読めれば足りる（時刻は読者ごとに違う）。</div></div>
 <p>この章からは RPM 系の檻を使う。出力は、<b>RPM 系の檻を起動し直した直後</b>から打ったものである（起動のしかたは<a href="/linuc-packages/">実践編</a>）。</p>
 
@@ -38,13 +38,13 @@ dnf-data-4.14.0-31.el9.alma.1.noarch
 yum-4.14.0-31.el9.alma.1.noarch
 $ yum --version | head -1
 4.14.0</code></pre>
-<p><code>yum</code> も <code>dnf</code> も、同じ <code>dnf-3</code> を指すシンボリックリンクである。<code>yum --version</code> が返す 4.14.0 は dnf の版だ。RHEL 8 から、yum の中身は dnf に置き換わった。<code>yum</code> という名前は、古い手順や試験問題がそのまま使えるように、yum というパッケージがリンクとして残している（<code>rpm -qf</code> で持ち主が分かる）。</p>
+<p><code>yum</code> も <code>dnf</code> も、同じ <code>dnf-3</code> を指すシンボリックリンクである。<code>yum --version</code> が返す 4.14.0 は dnf の版だ。RHEL 8 から、yum の中身は dnf に置き換わった。<code>yum</code> という名前は、古い手順や試験問題がそのまま使えるように、yum というパッケージがリンクとして残している（<code>rpm -qf</code> で持ち主が分かる）。<b>コマンドの形（サブコマンドとオプション）はそのまま試せるが、既定値と出力は RHEL 7 の yum と違うところがある</b>。この章では、違うところにそのつど印を付ける。</p>
 <p><code>/etc/yum.conf</code> も <code>dnf/dnf.conf</code> へのリンクで、どちらを編集しても同じファイルが変わる。<code>[main]</code> の5行の意味を押さえる。</p>
 <div class="scroll"><table>
 <tr><th>項目</th><th>意味</th></tr>
 <tr><td><code>gpgcheck=1</code></td><td>入れるパッケージの署名を確かめる（第7章）</td></tr>
 <tr><td><code>installonly_limit=3</code></td><td>カーネルのように「上書きせず並べて入れる」ものを、3世代まで残す</td></tr>
-<tr><td><code>clean_requirements_on_remove=True</code></td><td>消すとき、依存のために入ったもので不要になったものも消す（この章で実測）</td></tr>
+<tr><td><code>clean_requirements_on_remove=True</code></td><td>消すとき、依存のために入ったもので不要になったものも消す（この章で実測）。dnf（RHEL 8 以降）は既定でこうなる。RHEL 7 の yum は既定が <code>False</code> で、依存を残す</td></tr>
 <tr><td><code>best=True</code></td><td>いちばん新しい版を入れられないなら、失敗にする</td></tr>
 <tr><td><code>skip_if_unavailable=False</code></td><td>目録を取れないリポジトリがあれば、止まる</td></tr>
 </table></div>
@@ -183,12 +183,26 @@ Filename    : /usr/bin/dig
 bind9.18-utils-32:9.18.29-5.el9_7.4.x86_64 : Utilities for querying DNS name servers
 ...</code></pre>
 <p>台帳しか読まない <code>rpm -qf</code> は、入っていないファイルに答えられない。<code>yum provides</code> は入っていないパッケージのファイルまで答える。<b>Debian 系の apt-file にあたることを、yum は追加の道具なしでできる</b>。dnf の目録には最初からファイルの一覧（filelists）が入っているからである。パスの一部しか分からなければ <code>'*/liblab.sh'</code> のようにワイルドカードを使う（シェルに展開されないよう引用符で囲む）。</p>
+<p>逆向き（パッケージの中身の一覧）も、入れる前に目録から引ける。<code>yum repoquery -l</code> である（別の檻で記録した）。</p>
+<pre><code>$ rpm -q labtool; echo "exit=$?"
+package labtool is not installed
+exit=1
+$ yum repoquery -l labtool
+...
+/usr/bin/labtool
+$ ls -l /usr/bin/repoquery
+lrwxrwxrwx 1 root root 22 Nov 12  2025 /usr/bin/repoquery -&gt; /usr/libexec/dnf-utils
+$ repoquery -l labtool
+...
+/usr/bin/labtool</code></pre>
+<p>台帳しか読まない <code>rpm -ql labtool</code> は「入っていない」で終わるが、<code>repoquery -l</code> は目録のファイル一覧を引くので、入れる前の labtool の中身を答えた。Debian 系の <code>apt-file list</code> にあたる。<code>repoquery</code> は yum-utils に入っている道具で、RHEL 8 以降は <code>yum repoquery</code>（dnf のサブコマンド）と同じものへのリンク、RHEL 7 では yum-utils の独立したコマンドである。どちらでも <code>repoquery -l 名前</code> と書ける。</p>
 <div class="scroll"><table>
 <tr><th>聞きたいこと</th><th>yum（目録も読む）</th><th>Debian 系</th></tr>
 <tr><td>入れられるもの・入っているもの</td><td><code>yum list</code>（<code>installed</code> / <code>available</code> / <code>updates</code>）</td><td><code>apt list</code></td></tr>
 <tr><td>詳しい情報</td><td><code>yum info 名前</code></td><td><code>apt-cache show</code></td></tr>
 <tr><td>名前と説明で探す</td><td><code>yum search 語</code></td><td><code>apt-cache search</code></td></tr>
 <tr><td>ファイル名からパッケージ（入っていなくてよい）</td><td><code>yum provides パス</code></td><td><code>apt-file search</code></td></tr>
+<tr><td>パッケージの中身の一覧（入っていなくてよい）</td><td><code>yum repoquery -l 名前</code>（yum-utils の <code>repoquery -l</code>）</td><td><code>apt-file list</code></td></tr>
 <tr><td>依存関係</td><td><code>yum deplist 名前</code></td><td><code>apt-cache depends</code></td></tr>
 <tr><td>リポジトリの一覧</td><td><code>yum repolist</code></td><td><code>apt-cache policy</code>（引数なし）</td></tr>
 </table></div>
@@ -228,7 +242,7 @@ package liblab is not installed
 exit=2
 $ grep clean_requirements_on_remove /etc/yum.conf
 clean_requirements_on_remove=True</code></pre>
-<p>入れるときに依存（<code>Installing dependencies</code>）を足すのは apt と同じだが、<b>消すときに依存も一緒に消した</b>（<code>Removing unused dependencies</code>）。<code>/etc/yum.conf</code> の <code>clean_requirements_on_remove=True</code> がそれを指示している。apt では <code>remove</code> のあとに <code>autoremove</code> を別に打った（第2章）。dnf も「どれを依存のために入れたか」を自分の記録に持っていて、それを見て判断している。</p>
+<p>入れるときに依存（<code>Installing dependencies</code>）を足すのは apt と同じだが、<b>消すときに依存も一緒に消した</b>（<code>Removing unused dependencies</code>）。<code>/etc/yum.conf</code> の <code>clean_requirements_on_remove=True</code> がそれを指示している。apt では <code>remove</code> のあとに <code>autoremove</code> を別に打った（第2章）。dnf も「どれを依存のために入れたか」を自分の記録に持っていて、それを見て判断している。<b>これは dnf（RHEL 8 以降）の既定</b>で、RHEL 7 の yum は <code>clean_requirements_on_remove</code> の既定が <code>False</code> なので、<code>yum remove</code> は依存を残す。</p>
 <p>yum の <code>remove</code> は <code>erase</code> とも書ける。RPM 系には Debian 系の <code>rc</code>（設定ファイルだけ残る）にあたる状態は無く、消せば台帳から消える。書き換えた設定ファイルは <code>.rpmsave</code> という名前で残される。</p>
 
 <h2 id="addrepo">リポジトリを足したら、そのまま入れられる</h2>
@@ -282,7 +296,7 @@ lab-extra                       lab extra (LinuC 1.04)</code></pre>
 <tr><td><code>yum clean all</code></td><td>手元の目録の写しと、取ってきた .rpm を捨てる</td><td><code>apt-get clean</code> と、lists を消すことを合わせたもの</td></tr>
 <tr><td><code>yum --refresh コマンド</code></td><td>期限に関係なく、取り直してから実行する</td><td>—</td></tr>
 </table></div>
-<p>写しの置き場は <code>/var/cache/dnf/</code> である（この檻では、一般ユーザと root が同じ写しを読むように、そこから <code>/var/tmp/dnf-lab-cache</code> へリンクしてある。dnf は root 以外で動くと利用者ごとの別の置き場を使い、写しを一から取り直すため）。</p>
+<p>写しの置き場は <code>/var/cache/dnf/</code> である（RHEL 8 以降。RHEL 7 の yum は <code>/var/cache/yum/</code>）。この檻では、一般ユーザと root が同じ写しを読むように、そこから <code>/var/tmp/dnf-lab-cache</code> へリンクしてある。dnf は root 以外で動くと利用者ごとの別の置き場を使い、写しを一から取り直すためである。</p>
 <pre><code>$ ls -ld /var/cache/dnf
 lrwxrwxrwx 1 root root 22 Oct 13 10:08 /var/cache/dnf -&gt; /var/tmp/dnf-lab-cache
 $ ls /var/cache/dnf/
@@ -344,7 +358,7 @@ $ ls -l dl/
 total 16
 -rw-r--r-- 1 lab lab 6859 Oct 13 10:47 labtool-1.0-1.noarch.rpm
 -rw-r--r-- 1 lab lab 6729 Oct 13 10:47 labtool-data-1.0-1.noarch.rpm</code></pre>
-<p><code>yumdownloader</code> は目録を読んで .rpm を取ってくるだけで、台帳には書かない（<code>rpm -q</code> は「入っていない」）。だから root でなくても打てる。取ったファイルは、第1章の <code>rpm -qpl</code> / <code>-qpR</code> で中身と依存を確かめられる。<code>--resolve</code> は依存するものも一緒に取り、<code>--destdir</code> は置き場所を指定する。実体は yum-utils パッケージの <code>/usr/libexec/dnf-utils</code> で、<code>dnf download</code> を呼んでいる。Debian 系なら <code>apt-get download</code>（第2章）がこれにあたる。</p>
+<p><code>yumdownloader</code> は目録を読んで .rpm を取ってくるだけで、台帳には書かない（<code>rpm -q</code> は「入っていない」）。だから root でなくても打てる。取ったファイルは、第1章の <code>rpm -qpl</code> / <code>-qpR</code> で中身と依存を確かめられる。<code>--resolve</code> は依存するものも一緒に取り、<code>--destdir</code> は置き場所を指定する。RHEL 8 以降の実体は yum-utils パッケージの <code>/usr/libexec/dnf-utils</code> で、<code>dnf download</code> を呼んでいる（RHEL 7 の <code>yumdownloader</code> は、yum-utils に入った独立した Python のプログラムである。使い方は同じ）。Debian 系なら <code>apt-get download</code>（第2章）がこれにあたる。</p>
 <div class="scroll"><table>
 <tr><th>オプション</th><th>意味</th></tr>
 <tr><td>（なし）</td><td>カレントディレクトリに取る</td></tr>
@@ -384,7 +398,7 @@ total 16
 <p>更新できるパッケージがある（目録に、台帳の版より新しい版がある）。0 なら無い、1 ならエラー。実測でも、labhello 1.1 があるときは 100、上げた後は 0 だった。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>RHEL 8 以降の <code>yum</code> は <code>dnf</code> へのリンク。<code>/etc/yum.conf</code> も <code>/etc/dnf/dnf.conf</code> へのリンク</li><li>リポジトリは <code>/etc/yum.repos.d/*.repo</code> に、<code>[repo id]</code>・<code>baseurl=</code>・<code>enabled=</code>・<code>gpgcheck=</code>・<code>gpgkey=</code> で書く</li><li><code>yum list</code> の右端の <code>@lab</code> は台帳（そこから入った）、<code>lab</code> は目録（そこから入れられる）</li><li><code>yum provides</code> は入っていないパッケージのファイルまで答える（apt-file が要らない）</li><li>dnf は目録が無い・期限切れだと、コマンドを打った時点で自分で取りに行く。apt は <code>apt update</code> まで取りに行かない</li><li><code>yum remove</code> は依存のために入った不要なものも消す（<code>clean_requirements_on_remove=True</code>）</li><li><code>yumdownloader</code>（実体は <code>dnf download</code>）は入れずに .rpm を取る。<code>--resolve</code> で依存も</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>RHEL 8 以降の <code>yum</code> は <code>dnf</code> へのリンク。<code>/etc/yum.conf</code> も <code>/etc/dnf/dnf.conf</code> へのリンク</li><li>リポジトリは <code>/etc/yum.repos.d/*.repo</code> に、<code>[repo id]</code>・<code>baseurl=</code>・<code>enabled=</code>・<code>gpgcheck=</code>・<code>gpgkey=</code> で書く</li><li><code>yum list</code> の右端の <code>@lab</code> は台帳（そこから入った）、<code>lab</code> は目録（そこから入れられる）</li><li><code>yum provides</code>（ファイル → パッケージ）と <code>yum repoquery -l</code>（パッケージ → 中身）は、入っていないパッケージにも答える（apt-file が要らない）</li><li>dnf は目録が無い・期限切れだと、コマンドを打った時点で自分で取りに行く。apt は <code>apt update</code> まで取りに行かない</li><li><code>yum remove</code> は依存のために入った不要なものも消す（dnf の既定 <code>clean_requirements_on_remove=True</code>。RHEL 7 の yum は既定 <code>False</code> で残す）</li><li><code>yumdownloader</code>（RHEL 8 以降の実体は <code>dnf download</code>）は入れずに .rpm を取る。<code>--resolve</code> で依存も</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.0@sha256:0a42363b7f56353a30c1a56b89986ee9c030bd867dbf89236060f7d4c3661a84 / AlmaLinux 9.7 / dnf 4.14.0 / rpm 4.16.1.3 / yum-utils 4.3.0 / リポジトリ vault.almalinux.org 9.7（2026-05-20 で凍結）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/04-dpkg">← 4. dpkg は依存を読めるが、取りに行かない</a><a href="/linuc-packages/theory/06-rpm-query">次: 6. rpm -V が黙っているのは、台帳どおりだから →</a></nav>
 <section id="comments">

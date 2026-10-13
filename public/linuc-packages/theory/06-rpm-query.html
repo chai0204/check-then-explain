@@ -47,7 +47,7 @@ $ rpm -ql labhello
 /usr/bin/labhello
 $ rpm -qf /usr/bin/labhello
 labhello-1.0-1.noarch</code></pre>
-<p><code>-q</code>（query）がつくものは全部「台帳に聞く」である。<code>-qa</code> は全部（all）、<code>-qi</code> は情報（info）、<code>-ql</code> はファイルの一覧（list）、<code>-qf</code> はファイルからパッケージ（file）。入っていなければ <code>is not installed</code> と終了コード 1 が返る。<code>-qi</code> の <code>Install Date</code> は台帳に書かれた日時で、第1章で見た「まだ入っていないファイル」では <code>(not installed)</code> だった。</p>
+<p><code>-q</code>（query）がつくものは全部「台帳に聞く」である。<code>-qa</code> は全部（all）、<code>-qi</code> は情報（info）、<code>-ql</code> はファイルの一覧（list）、<code>-qf</code> はファイルからパッケージ（file）。入っていなければ <code>is not installed</code> と終了コード 1 が返る。<code>-qi</code> の <code>Install Date</code> は台帳に書かれた日時である。ファイルに聞く <code>-qpi</code> では、同じパッケージが入っていても <code>(not installed)</code> と出る（第1章）。入っているかどうかは、名前で台帳に聞く。</p>
 <p>依存関係を持つ labapp を入れて、もう少し聞く。</p>
 <pre><code>$ sudo yum install -y labapp
 ...
@@ -78,7 +78,7 @@ liblab = 1.0-1
 $ rpm -q --whatrequires liblab
 labapp-1.0-1.noarch</code></pre>
 <p><code>-qc</code> は設定ファイル（config）、<code>-qd</code> は文書（doc）だけを出す。どちらも、パッケージを作るときに付けられた印で分けている。<code>-qR</code>（requires）には <code>liblab &gt;= 1.0</code> のほかに、<code>/usr/bin/sh</code>（中のスクリプトを動かすシェル）や <code>rpmlib(…)</code>（rpm 自身が対応していなければならない機能）も並ぶ。<code>--provides</code> は「これが満たすもの」、<code>--whatrequires</code> は「これを必要としている、入っているもの」で、Debian の <code>apt-cache rdepends</code> にあたる。</p>
-<p>入っていないパッケージに <code>-ql</code> を使っても答えは無い。ファイルに聞くときは <code>p</code> を足す（第1章）。</p>
+<p>入っていないパッケージの名前で <code>-ql</code> を使っても答えは無い。ファイルに聞くときは <code>p</code> を足す（第1章）。</p>
 <pre><code>$ rpm -ql labtool; echo "exit=$?"
 package labtool is not installed
 exit=1
@@ -89,6 +89,13 @@ Name        : labtool
 Version     : 1.0
 Release     : 1
 Architecture: noarch</code></pre>
+<p>なお、この檻の rpm は、<code>p</code> を付けなくても末尾が <code>.rpm</code> の引数をファイルとして読む（別の檻で記録した）。</p>
+<pre><code>$ rpm -ql /srv/lab-rpm/labtool-1.0-1.noarch.rpm; echo "exit=$?"
+/usr/bin/labtool
+exit=0
+$ rpm --version
+RPM version 4.16.1.3</code></pre>
+<p>これは RHEL 8 以降（rpm 4.14 以降）の振る舞いで、RHEL 7 の rpm 4.11 では <code>package … is not installed</code> になる。どの版でも通じ、試験で正しいとされるのは <code>p</code> を付ける書き方である。</p>
 <div class="scroll"><table>
 <tr><th>オプション</th><th>聞く相手</th><th>答え</th><th>Debian 系</th></tr>
 <tr><td><code>rpm -qa</code></td><td>台帳</td><td>入っている全パッケージ</td><td><code>dpkg -l</code></td></tr>
@@ -180,11 +187,27 @@ $ sudo rpm -e labapp
 warning: /etc/labapp.conf saved as /etc/labapp.conf.rpmsave
 $ ls -l /etc/labapp.conf*
 -rw-r--r-- 1 root root 118 Oct 13 10:47 /etc/labapp.conf.rpmsave</code></pre>
-<p>labapp の設定ファイルは、作るときに「利用者が書き換えたら上書きしない」という印（<code>%config(noreplace)</code>）が付いている。だから入れ直しても、書き足した 118 バイトのまま残った。そして消したとき（<code>rpm -e</code>）には捨てずに <code>.rpmsave</code> という名前で取っておいた。<b>書き換えた設定を勝手に捨てない</b>という考え方は、Debian の <code>rc</code>（第2章）と同じで、残し方が違う。</p>
+<p>同じ版を入れ直すとき、書き換えた設定ファイル（<code>%config</code> の印が付いたもの）は上書きされずに残る。だから書き足した 118 バイトのままだった。そして消したとき（<code>rpm -e</code>）は、捨てずに <code>.rpmsave</code> という名前で取っておいた。<b>書き換えた設定を勝手に捨てない</b>という考え方は、Debian の <code>rc</code>（第2章）と同じで、残し方が違う。</p>
+<p>書き換えていなければ、消すときに一緒に消える。檻を起動し直して、labapp を入れてすぐ消した記録である（別の檻）。</p>
+<pre><code>$ rpm -V labapp; echo "exit=$?"
+exit=0
+$ sudo rpm -e labapp; echo "exit=$?"
+exit=0
+$ ls -l /etc/labapp.conf*; echo "exit=$?"
+ls: cannot access '/etc/labapp.conf*': No such file or directory
+exit=2</code></pre>
+<p>Debian の conffile は、書き換えていなくても <code>remove</code> で必ず残る（第2章）。RPM 系は「書き換えたかどうか」で分ける。</p>
+<p>labapp の設定ファイルには <code>%config(noreplace)</code> という印が付いている。ただ、同じ版の入れ直しで残ったのはこの印のせいではない（印が <code>%config</code> だけでも残る）。<code>noreplace</code> の違いが出るのは、設定ファイルの中身が変わった新しい版に<b>上げるとき</b>である。この檻の練習用パッケージには上げる版が無いので、表で示す。</p>
+<div class="scroll"><table>
+<tr><th>書き換えた設定ファイルがある状態で版を上げると</th><th>残るもの</th></tr>
+<tr><td><code>%config</code></td><td>新しい版の設定ファイルが置かれ、書き換えたほうは <code>.rpmsave</code> に退避される</td></tr>
+<tr><td><code>%config(noreplace)</code></td><td>書き換えたほうがそのまま使われ、新しい版の設定ファイルは <code>.rpmnew</code> として横に置かれる</td></tr>
+</table></div>
 <div class="scroll"><table>
 <tr><th>書き換えた設定ファイル</th><th>Debian 系</th><th>RPM 系</th></tr>
 <tr><td>入れ直したとき</td><td>そのまま残る（<code>dpkg -V</code> に出続ける）</td><td>そのまま残る（<code>rpm -V</code> に出続ける）</td></tr>
 <tr><td>消したとき</td><td>そのまま残り、台帳に <code>rc</code></td><td><code>.rpmsave</code> に名前を変えて残り、台帳からは消える</td></tr>
+<tr><td>（書き換えていない設定ファイルを消したとき）</td><td>それでも残り、台帳に <code>rc</code></td><td>一緒に消える</td></tr>
 <tr><td>完全に消すには</td><td><code>dpkg -P</code> / <code>apt purge</code></td><td>残った <code>.rpmsave</code> を自分で消す</td></tr>
 </table></div>
 <p>全部のパッケージをまとめて照らし合わせるのが <code>rpm -Va</code> である。</p>
@@ -259,7 +282,7 @@ exit=1</code></pre>
 一覧だけなら <code>rpm2cpio foo.rpm | cpio -t</code>、または <code>rpm -qpl foo.rpm</code>。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>rpm -q</code> は台帳に聞く: <code>-qa</code> 全部・<code>-qi</code> 情報・<code>-ql</code> ファイル・<code>-qf</code> ファイル→パッケージ・<code>-qc</code> 設定ファイル・<code>-qd</code> 文書・<code>-qR</code> 依存・<code>--whatrequires</code> 逆依存。ファイルに聞くなら <code>-qp</code></li><li><code>rpm -V</code> は台帳と違うファイルだけを出す。何も出ず終了コード 0 なら、全部台帳どおり</li><li>9文字の欄は SM5DLUGTP（大きさ・権限・中身の要約・…・時刻）。違った欄だけ文字が入り、<code>c</code> は設定ファイル</li><li>入れ直す（<code>yum reinstall</code>）と台帳どおりに戻るが、書き換えた設定ファイル（<code>%config(noreplace)</code>）は戻らず、消すと <code>.rpmsave</code> で残る</li><li><code>rpm -Va</code> は実機でも多くの行を出す。設定ファイルでないのに 5 や M が付いた行から疑う</li><li><code>rpm2cpio | cpio -idmv</code> は入れずに中身を取り出す。台帳には載らない</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>rpm -q</code> は台帳に聞く: <code>-qa</code> 全部・<code>-qi</code> 情報・<code>-ql</code> ファイル・<code>-qf</code> ファイル→パッケージ・<code>-qc</code> 設定ファイル・<code>-qd</code> 文書・<code>-qR</code> 依存・<code>--whatrequires</code> 逆依存。ファイルに聞くなら <code>-qp</code></li><li><code>rpm -V</code> は台帳と違うファイルだけを出す。何も出ず終了コード 0 なら、全部台帳どおり</li><li>9文字の欄は SM5DLUGTP（大きさ・権限・中身の要約・…・時刻）。違った欄だけ文字が入り、<code>c</code> は設定ファイル</li><li>入れ直す（<code>yum reinstall</code>）と台帳どおりに戻るが、書き換えた設定ファイル（<code>%config</code>）は戻らない。消すと、書き換えてあれば <code>.rpmsave</code> で残り、書き換えていなければ一緒に消える。<code>noreplace</code> の差は版を上げるときに出る（<code>.rpmnew</code>）</li><li><code>rpm -Va</code> は実機でも多くの行を出す。設定ファイルでないのに 5 や M が付いた行から疑う</li><li><code>rpm2cpio | cpio -idmv</code> は入れずに中身を取り出す。台帳には載らない</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.0@sha256:0a42363b7f56353a30c1a56b89986ee9c030bd867dbf89236060f7d4c3661a84 / AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / cpio 2.13 / リポジトリ vault.almalinux.org 9.7（2026-05-20 で凍結）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/05-yum">← 5. yum は、目録を自分で取りに行く</a><a href="/linuc-packages/theory/07-rpm-install">次: 7. OK は、確かめられた範囲の OK →</a></nav>
 <section id="comments">

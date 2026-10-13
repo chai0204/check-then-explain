@@ -1,0 +1,332 @@
+
+
+========== x-upgrade. apt upgrade と apt-get upgrade と full-upgrade の違い（man の記述） ==========
+
+$ MANWIDTH=80 man apt | sed -n "/^ *upgrade (apt-get(8))/,/^ *full-upgrade/p"
+       upgrade (apt-get(8))
+           upgrade is used to install available upgrades of all packages
+           currently installed on the system from the sources configured via
+           sources.list(5). New packages will be installed if required to
+           satisfy dependencies, but existing packages will never be removed.
+           If an upgrade for a package requires the removal of an installed
+           package the upgrade for this package isn't performed.
+
+           When a package is supplied as an argument, the package will be
+           installed prior to the upgrade action.
+
+       full-upgrade (apt-get(8))
+
+$ MANWIDTH=80 man apt-get | sed -n "/^ *upgrade$/,/^ *dist-upgrade/p"
+       upgrade
+           upgrade is used to install the newest versions of all packages
+           currently installed on the system from the sources enumerated in
+           /etc/apt/sources.list. Packages currently installed with new
+           versions available are retrieved and upgraded; under no
+           circumstances are currently installed packages removed, or packages
+           not already installed retrieved and installed. New versions of
+           currently installed packages that cannot be upgraded without
+           changing the install status of another package will be left at
+           their current version. An update must be performed first so that
+           apt-get knows that new versions of packages are available.
+
+           When a package is supplied as an argument, the package will be
+           installed prior to the upgrade action.
+
+       dist-upgrade
+
+$ MANWIDTH=80 man apt | sed -n "/^ *full-upgrade (apt-get(8))/,/^ *install, reinstall/p"
+       full-upgrade (apt-get(8))
+           full-upgrade performs the function of upgrade but will remove
+           currently installed packages if this is needed to upgrade the
+           system as a whole.
+
+           When a package is supplied as an argument, the package will be
+           installed prior to the upgrade action.
+
+       install, reinstall, remove, purge (apt-get(8))
+
+
+========== x-autoremove. autoremove に名前を渡すと ==========
+
+$ sudo apt install -y labapp
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following additional packages will be installed:
+  liblab
+The following NEW packages will be installed:
+  labapp liblab
+0 upgraded, 2 newly installed, 0 to remove and 3 not upgraded.
+Need to get 0 B/1822 B of archives.
+After this operation, 106 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+Get:2 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+dpkg-preconfigure: unable to re-open stdin: 
+Selecting previously unselected package liblab.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12824 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Selecting previously unselected package labapp.
+Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
+Unpacking labapp (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labapp (1.0) ...
+
+$ apt-mark showauto | grep lab
+labsvc-common
+liblab
+
+$ sudo apt autoremove -y labapp
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following packages will be REMOVED:
+  labapp liblab
+0 upgraded, 0 newly installed, 2 to remove and 3 not upgraded.
+After this operation, 106 kB disk space will be freed.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12830 files and directories currently installed.)
+Removing labapp (1.0) ...
+Removing liblab (1.0) ...
+
+$ dpkg -l labapp
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-====================================
+rc  labapp         1.0          all          sample application that needs liblab
+
+$ ls -l /etc/labapp.conf
+-rw-r--r-- 1 root root 93 Oct  1 09:00 /etc/labapp.conf
+
+$ dpkg -l liblab | tail -1
+un  liblab         <none>       <none>       (no description available)
+
+$ grep -c '^Package: liblab$' /var/lib/dpkg/status
+0
+
+
+========== x-root. 一般ユーザのまま打つと（root が要るもの・要らないもの） ==========
+
+$ apt update; echo "exit=$?"
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
+E: Unable to lock directory /var/lib/apt/lists/
+exit=100
+
+$ apt-get update; echo "exit=$?"
+Reading package lists...
+E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
+E: Unable to lock directory /var/lib/apt/lists/
+exit=100
+
+$ apt-file update; echo "exit=$?"
+Reading package lists...
+E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
+E: Unable to lock directory /var/lib/apt/lists/
+exit=100
+
+$ apt-cache policy labhello | head -3
+labhello:
+  Installed: 1.0
+  Candidate: 1.1
+
+$ dpkg -l labhello | tail -1
+ii  labhello       1.0          all          prints its own version
+
+$ cd ~/work && apt-get download labhello && ls *.deb
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.1 [620 B]
+labhello_1.1_all.deb
+
+
+========== x-aptcmds. apt にも depends・rdepends・policy・download・clean がある ==========
+
+$ apt depends labapp
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+labapp
+  Depends: liblab (>= 1.0)
+
+$ apt rdepends liblab
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+liblab
+Reverse Depends:
+  Depends: labapp (>= 1.0)
+
+$ apt policy labhello
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+labhello:
+  Installed: 1.0
+  Candidate: 1.1
+  Version table:
+     1.1 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+ *** 1.0 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+        100 /var/lib/dpkg/status
+
+$ cd ~/work && apt download liblab && ls *.deb
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+liblab_1.0_all.deb
+
+$ sudo apt clean; echo "exit=$?"
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+exit=0
+
+$ MANWIDTH=80 man apt | sed -n "/^ *showsrc, depends, rdepends, policy/,/(summarised in apt-get(8))/p"
+       showsrc, depends, rdepends, policy (summarised in apt-cache(8))
+
+       source, build-dep, download, changelog, clean, distclean, autoclean
+       (summarised in apt-get(8))
+
+
+========== x-un. dpkg -l の un は、台帳に行があるという意味ではない ==========
+
+$ sudo dpkg -i /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb; echo "exit=$?"
+Selecting previously unselected package labapp.
+(Reading database ... 12824 files and directories currently installed.)
+Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
+Unpacking labapp (1.0) ...
+dpkg: dependency problems prevent configuration of labapp:
+ labapp depends on liblab (>= 1.0); however:
+  Package liblab is not installed.
+
+dpkg: error processing package labapp (--install):
+ dependency problems - leaving unconfigured
+Errors were encountered while processing:
+ labapp
+exit=1
+
+$ dpkg -l labapp liblab
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-====================================
+iU  labapp         1.0          all          sample application that needs liblab
+un  liblab         <none>       <none>       (no description available)
+
+$ grep -c '^Package: liblab$' /var/lib/dpkg/status
+0
+
+$ dpkg -s labapp | grep -E '^(Status|Depends):'
+Status: install ok unpacked
+Depends: liblab (>= 1.0)
+
+
+========== x-pending. 依存が満たされた iU は、apt が次の操作のついでに設定する ==========
+
+$ sudo dpkg --unpack /srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
+(Reading database ... 12824 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.1_all.deb ...
+Unpacking labhello (1.1) over (1.0) ...
+
+$ dpkg -l labhello | tail -1
+iU  labhello       1.1          all          prints its own version
+
+$ sudo apt install -y liblab
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following NEW packages will be installed:
+  liblab
+0 upgraded, 1 newly installed, 0 to remove and 2 not upgraded.
+1 not fully installed or removed.
+Need to get 0 B/746 B of archives.
+After this operation, 36.9 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+dpkg-preconfigure: unable to re-open stdin: 
+Selecting previously unselected package liblab.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12824 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Setting up labhello (1.1) ...
+Setting up liblab (1.0) ...
+
+$ dpkg -l labhello | tail -1
+ii  labhello       1.1          all          prints its own version
+
+$ labhello
+labhello 1.1
+
+
+========== x-depends. apt-cache depends が出すのは Depends: だけではない ==========
+
+$ apt-cache depends apt
+apt
+ |Depends: base-passwd
+  Depends: adduser
+  Depends: gpgv
+  Depends: libapt-pkg6.0t64
+  Depends: ubuntu-keyring
+  Depends: libc6
+  Depends: libgcc-s1
+  Depends: libgnutls30t64
+  Depends: libseccomp2
+  Depends: libstdc++6
+  Depends: libsystemd0
+  Conflicts: <apt-verify>
+  Conflicts: <libnettle8>
+  Breaks: apt-transport-https
+  Breaks: apt-utils
+  Breaks: aptitude
+  Recommends: ca-certificates
+  Suggests: apt-doc
+ |Suggests: aptitude
+ |Suggests: synaptic
+  Suggests: wajig
+  Suggests: dpkg-dev
+ |Suggests: gnupg
+ |Suggests: gnupg2
+  Suggests: gnupg1
+  Suggests: powermgmt-base
+  Replaces: apt-transport-https
+  Replaces: apt-utils
+
+
+========== x-docs. apt-file update と debconf-show の * の意味（man の記述） ==========
+
+$ MANWIDTH=80 man apt-file | sed -n "/^ *update$/,/on whether a tty is available/p"
+       update
+           This action that just calls apt update or apt-get update (depending
+           on whether a tty is available).
+
+$ MANWIDTH=80 man debconf-show | sed -n "/The most common use/,/with an/p"
+       The most common use is "debconf-show packagename", which displays all
+       items in the debconf database owned by a given package, and their
+       current values.  Questions that have been asked already are prefixed
+       with an '*'.

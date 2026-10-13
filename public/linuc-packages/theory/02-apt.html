@@ -51,7 +51,29 @@ $ apt-cache rdepends liblab
 liblab
 Reverse Depends:
   labapp</code></pre>
-<p><code>depends</code> は「これが必要とするもの」、<code>rdepends</code>（reverse depends）は「これを必要としているもの」である。どちらも目録の <code>Depends:</code> 行を前から読むか、後ろから読むかの違いにすぎない。</p>
+<p><code>depends</code> は「これが必要とするもの」、<code>rdepends</code>（reverse depends）は「これを必要としているもの」である。どちらも目録に書かれたパッケージどうしの関係を、前から読むか後ろから読むかの違いである。練習用のパッケージには <code>Depends:</code> しか書いていないので1行だけだが、本物のパッケージでは関係の種類がもっと出る。</p>
+<pre><code>$ apt-cache depends apt
+apt
+ |Depends: base-passwd
+  Depends: adduser
+...
+  Conflicts: &lt;apt-verify&gt;
+...
+  Breaks: apt-transport-https
+...
+  Recommends: ca-certificates
+  Suggests: apt-doc
+...
+  Replaces: apt-transport-https
+  Replaces: apt-utils</code></pre>
+<div class="scroll"><table>
+<tr><th>関係</th><th>意味</th></tr>
+<tr><td><code>Depends:</code></td><td>無いと動かない（apt が必ず一緒に入れる）。行頭の <code>|</code> は「次の行とどちらか一方でよい」</td></tr>
+<tr><td><code>Recommends:</code></td><td>ふつうは一緒に入れる（apt は既定で入れる。<code>--no-install-recommends</code> で外せる）</td></tr>
+<tr><td><code>Suggests:</code></td><td>あると便利（apt は既定では入れない）</td></tr>
+<tr><td><code>Conflicts:</code> / <code>Breaks:</code></td><td>一緒には入れられない（入れるなら片方を消す）</td></tr>
+<tr><td><code>Replaces:</code></td><td>相手のファイルを上書きしてよい（置き換える）</td></tr>
+</table></div>
 <p>いちばん情報が多いのは <code>policy</code> である。檻には labhello の 1.0 が最初から入っている。</p>
 <pre><code>$ apt-cache policy labhello
 labhello:
@@ -178,12 +200,28 @@ Removing liblab (1.0) ...
 $ dpkg -l liblab; echo "exit=$?"
 dpkg-query: no packages found matching liblab
 exit=1</code></pre>
-<p><code>autoremove</code> は名前を受け取らない。「auto の印があり、もう誰も依存していないもの」を apt が自分で探して消す。前の節の <code>apt-mark showauto</code> の印がここで使われた。</p>
+<p>名前を渡さない <code>autoremove</code> は、「auto の印があり、もう誰も依存していないもの」を apt が自分で探して消す。前の節の <code>apt-mark showauto</code> の印がここで使われた。liblab には設定ファイル（conffile）が無いので、<code>rc</code> も残さず台帳から行ごと消えている（<code>no packages found</code>）。<b>remove が <code>rc</code> を残すのは、conffile を持つパッケージだけ</b>である。</p>
+<p><code>autoremove</code> には名前を渡すこともできる。渡したパッケージを <code>remove</code> し、それで要らなくなった自動の依存も一緒に消す。檻を起動し直して labapp をもう一度 <code>sudo apt install -y labapp</code> で入れてから打った記録である。</p>
+<pre><code>$ sudo apt autoremove -y labapp
+...
+The following packages will be REMOVED:
+  labapp liblab
+0 upgraded, 0 newly installed, 2 to remove and 3 not upgraded.
+After this operation, 106 kB disk space will be freed.
+Removing labapp (1.0) ...
+Removing liblab (1.0) ...
+$ dpkg -l labapp
+...
+rc  labapp         1.0          all          sample application that needs liblab
+$ ls -l /etc/labapp.conf
+-rw-r--r-- 1 root root 93 Oct  1 09:00 /etc/labapp.conf</code></pre>
+<p>labapp も liblab も消えたが、labapp は <code>remove</code> と同じ消し方なので、設定ファイルが残って <code>rc</code> になった。設定ファイルまで消したいなら <code>purge</code> を使う。</p>
 <div class="scroll"><table>
 <tr><th>コマンド</th><th>中身</th><th>設定ファイル（conffile）</th><th>台帳の行</th><th>自動で入った依存</th></tr>
-<tr><td><code>apt remove 名前</code></td><td>消える</td><td><b>残る</b></td><td><code>rc</code> で残る</td><td>残る</td></tr>
+<tr><td><code>apt remove 名前</code></td><td>消える</td><td><b>残る</b></td><td><code>rc</code> で残る（conffile が無ければ行ごと消える）</td><td>残る</td></tr>
 <tr><td><code>apt purge 名前</code>（= <code>apt remove --purge</code>）</td><td>消える</td><td>消える</td><td>消える</td><td>残る</td></tr>
-<tr><td><code>apt autoremove</code></td><td colspan="4">auto の印があって、誰も依存していないものを消す（名前は渡さない）</td></tr>
+<tr><td><code>apt autoremove</code></td><td colspan="4">auto の印があって、誰も依存していないものを消す</td></tr>
+<tr><td><code>apt autoremove 名前</code></td><td colspan="4">その名前を remove し（設定ファイルは残って <code>rc</code>）、それで要らなくなった自動の依存も消す</td></tr>
 <tr><td><code>apt purge --autoremove 名前</code></td><td colspan="4">purge と autoremove を1回で</td></tr>
 </table></div>
 <p>すでに <code>rc</code> になったものにも <code>purge</code> は効く。<code>apt-get</code> でも同じ名前のサブコマンドがある（<code>apt-get remove</code> / <code>purge</code> / <code>autoremove</code>）。</p>
@@ -249,10 +287,38 @@ labhello:
 <div class="scroll"><table>
 <tr><th>コマンド</th><th>すること</th></tr>
 <tr><td><code>apt update</code>（= <code>apt-get update</code>）</td><td>目録を取り直す（第3章）。パッケージは1つも入れない</td></tr>
-<tr><td><code>apt upgrade</code>（= <code>apt-get upgrade</code>）</td><td>入っているものを、目録の新しい版に上げる。<b>新しく入れたり消したりはしない</b></td></tr>
-<tr><td><code>apt full-upgrade</code>（= <code>apt-get dist-upgrade</code>）</td><td>上げるために必要なら、新しく入れたり消したりもする</td></tr>
+<tr><td><code>apt upgrade</code></td><td>入っているものを、目録の新しい版に上げる。上げるのに新しい依存が要れば<b>新しく入れる</b>が、<b>消しはしない</b>（消さないと上げられないものは上げずに残す）</td></tr>
+<tr><td><code>apt-get upgrade</code></td><td>入っているものを上げる。<b>新しく入れも消しもしない</b>（それが要るものは上げずに残す。出力では <code>kept back</code> と出る）</td></tr>
+<tr><td><code>apt full-upgrade</code>（= <code>apt-get dist-upgrade</code>）</td><td>上げるために必要なら、新しく入れることも<b>消すこと</b>もする</td></tr>
 <tr><td><code>apt install 名前</code></td><td>入っていなければ入れ、入っていて新しい版があれば上げる</td></tr>
 </table></div>
+<p><b><code>apt upgrade</code> と <code>apt-get upgrade</code> は同じではない</b>。この檻の練習用リポジトリには「上げるのに新しい依存が要る版」が無いので、違いは man の記述で確かめる（別の檻で記録した。<code>MANWIDTH=80</code> は折り返しの幅を本文と揃えるため）。</p>
+<pre><code>$ MANWIDTH=80 man apt | sed -n "/^ *upgrade (apt-get(8))/,/^ *full-upgrade/p"
+       upgrade (apt-get(8))
+           upgrade is used to install available upgrades of all packages
+           currently installed on the system from the sources configured via
+           sources.list(5). New packages will be installed if required to
+           satisfy dependencies, but existing packages will never be removed.
+           If an upgrade for a package requires the removal of an installed
+           package the upgrade for this package isn't performed.
+...
+$ MANWIDTH=80 man apt-get | sed -n "/^ *upgrade$/,/^ *dist-upgrade/p"
+       upgrade
+...
+           versions available are retrieved and upgraded; under no
+           circumstances are currently installed packages removed, or packages
+           not already installed retrieved and installed. New versions of
+           currently installed packages that cannot be upgraded without
+           changing the install status of another package will be left at
+           their current version. An update must be performed first so that
+...
+$ MANWIDTH=80 man apt | sed -n "/^ *full-upgrade (apt-get(8))/,/^ *install, reinstall/p"
+       full-upgrade (apt-get(8))
+           full-upgrade performs the function of upgrade but will remove
+           currently installed packages if this is needed to upgrade the
+           system as a whole.
+...</code></pre>
+<p>apt の <code>upgrade</code> は「新しいパッケージは依存のためなら入れる（New packages will be installed if required）、入っているものは決して消さない」、apt-get の <code>upgrade</code> は「入っているものを消すことも、入っていないものを入れることも、どんな場合もしない（under no circumstances）」、<code>full-upgrade</code> は「全体を上げるのに必要なら消す（will remove）」と書いてある。</p>
 <p>「パッケージ一覧を新しくする」が <code>update</code>、「入っているパッケージを新しくする」が <code>upgrade</code> である。名前が似ていて試験でよく入れ替えられる。</p>
 <div class="analogy"><b>たとえ</b>: 新しいカタログと、自宅の持ち物の記録を並べて「型が古いもの」に印を付ける作業に近い。
 印を付けるだけなら何も買わなくてよい（<code>-s</code>）。
@@ -286,11 +352,28 @@ Version: 1.0
 <tr><td><code>apt upgrade</code> / <code>full-upgrade</code></td><td><code>apt-get upgrade</code> / <code>dist-upgrade</code></td><td>同上</td></tr>
 <tr><td><code>apt search</code> / <code>apt show</code></td><td><code>apt-cache search</code> / <code>apt-cache show</code></td><td>目録を読むだけ</td></tr>
 <tr><td><code>apt list --installed</code> / <code>--upgradable</code></td><td>（<code>dpkg -l</code> が近い）</td><td>台帳と目録を読む</td></tr>
-<tr><td>—</td><td><code>apt-cache depends</code> / <code>rdepends</code> / <code>policy</code></td><td>目録を読むだけ</td></tr>
-<tr><td>—</td><td><code>apt-get download 名前</code></td><td>目録を読んで .deb を取ってくるだけ（入れない）</td></tr>
-<tr><td>—</td><td><code>apt-get clean</code></td><td><code>/var/cache/apt/archives/</code> の取ってきた .deb を消す</td></tr>
+<tr><td><code>apt depends</code> / <code>rdepends</code> / <code>policy</code></td><td><code>apt-cache depends</code> / <code>rdepends</code> / <code>policy</code></td><td>目録を読むだけ</td></tr>
+<tr><td><code>apt download 名前</code></td><td><code>apt-get download 名前</code></td><td>目録を読んで .deb を取ってくるだけ（入れない）</td></tr>
+<tr><td><code>apt clean</code></td><td><code>apt-get clean</code></td><td><code>/var/cache/apt/archives/</code> の取ってきた .deb を消す</td></tr>
 </table></div>
-<p>最後の2つを確かめる。<code>apt-get download</code> は root でなくてよい。台帳を書かないからである。</p>
+<p>下の3行は、apt の man では「apt-cache と apt-get の説明に任せる」とまとめて1行ずつ書かれているだけだが、apt でもそのまま打てる（別の檻で記録した）。</p>
+<pre><code>$ apt depends labapp
+...
+labapp
+  Depends: liblab (&gt;= 1.0)
+$ apt policy labhello
+...
+labhello:
+  Installed: 1.0
+  Candidate: 1.1
+...
+$ MANWIDTH=80 man apt | sed -n "/^ *showsrc, depends, rdepends, policy/,/(summarised in apt-get(8))/p"
+       showsrc, depends, rdepends, policy (summarised in apt-cache(8))
+
+       source, build-dep, download, changelog, clean, distclean, autoclean
+       (summarised in apt-get(8))</code></pre>
+<p><code>apt depends</code> は版の条件（<code>(&gt;= 1.0)</code>）まで出し、<code>apt-cache depends labapp</code> は名前だけだった。同じ目録を読んでいて、見せ方だけが違う。</p>
+<p>最後の2つの行を確かめる。<code>apt-get download</code> は root でなくてよい。台帳も目録の写しも書き換えず、カレントディレクトリにファイルを置くだけだからである。</p>
 <pre><code>$ apt-get download liblab
 Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
 $ ls -l *.deb
@@ -310,7 +393,7 @@ partial</code></pre>
 (a) <code>apt-get remove pkg</code>　(b) <code>apt-get purge pkg</code>　(c) <code>apt-get autoremove pkg</code>　(d) <code>apt-get remove --purge pkg</code>　(e) <code>apt-get clean pkg</code></p>
 <details><summary>答え</summary>
 <p>(b) と (d)。(a) は設定ファイルを残し、台帳に <code>rc</code> が残る（実測）。
-(c) の autoremove は「自動で入って不要になったもの」を消すサブコマンドで、名前を渡す使い方はしない。
+(c) の <code>autoremove pkg</code> は pkg を remove し、それで不要になった自動の依存も消すが、pkg の設定ファイルは残す（<code>rc</code>。実測）。
 (e) の clean は <code>/var/cache/apt/archives/</code> の .deb を消すもので、入っているパッケージには触らない。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>apt-cache policy foo</code> の出力に <code>100 /var/lib/dpkg/status</code> という行があった。何を表すか。</p>
@@ -328,10 +411,11 @@ partial</code></pre>
 <details><summary>答え</summary>
 <p><code>update</code> は目録（パッケージの一覧）を取り直すだけで、パッケージは1つも入れ替えない。
 <code>upgrade</code> は、手元の目録の新しい版と台帳の版を比べて、入っているパッケージを上げる。
-新しく入れたり消したりが必要な更新は <code>upgrade</code> ではせず、<code>dist-upgrade</code>（<code>apt full-upgrade</code>）が行う。</p></details></div>
+<code>apt-get upgrade</code> は新しく入れることも消すこともしない（それが要るものは上げずに残す）。
+<code>apt upgrade</code> は依存のために新しく入れることはあるが、消さない。消すことまでするのは <code>apt-get dist-upgrade</code>（<code>apt full-upgrade</code>）である。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>apt-cache</code>（<code>search</code> / <code>show</code> / <code>depends</code> / <code>rdepends</code> / <code>policy</code>）は目録を読むだけ。入っていないパッケージにも答えられる</li><li><code>apt-cache policy</code> には目録の版（500）と台帳の版（100 <code>/var/lib/dpkg/status</code>）が並ぶ</li><li><code>apt install</code> は目録の <code>Depends:</code> をたどって足りないものも入れ、それに auto の印を付ける（<code>apt-mark showauto</code>）</li><li><code>remove</code> は設定ファイルを残して <code>rc</code>、<code>purge</code> は設定ファイルも台帳の行も消す、<code>autoremove</code> は auto の印で不要になったものを消す</li><li><code>upgrade</code> は目録の版と台帳の版の比較。<code>update</code>（目録を取り直す）とは別物</li><li><code>apt</code> は人向けの入口。スクリプトには <code>apt-get</code> と <code>apt-cache</code></li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>apt-cache</code>（<code>search</code> / <code>show</code> / <code>depends</code> / <code>rdepends</code> / <code>policy</code>）は目録を読むだけ。入っていないパッケージにも答えられる</li><li><code>apt-cache policy</code> には目録の版（500）と台帳の版（100 <code>/var/lib/dpkg/status</code>）が並ぶ</li><li><code>apt install</code> は目録の <code>Depends:</code> をたどって足りないものも入れ、それに auto の印を付ける（<code>apt-mark showauto</code>）</li><li><code>remove</code> は設定ファイル（conffile）を残して <code>rc</code>（conffile の無いパッケージは台帳から消える）、<code>purge</code> は設定ファイルも台帳の行も消す、<code>autoremove</code> は auto の印で不要になったものを消す（名前を渡すとそのパッケージも remove）</li><li><code>upgrade</code> は目録の版と台帳の版の比較。<code>update</code>（目録を取り直す）とは別物。<code>apt-get upgrade</code> は入れも消しもせず、<code>apt upgrade</code> は依存のためなら入れ、<code>full-upgrade</code>（<code>dist-upgrade</code>）は消すこともある</li><li><code>apt</code> は人向けの入口。スクリプトには <code>apt-get</code> と <code>apt-cache</code></li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0@sha256:556b75a379fdee91de07d7b828b45545cfd71f206c7c9761d9c375825c604457 / Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt-file 3.3 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/01-package">← 1. 入っているかどうかは、台帳が決める</a><a href="/linuc-packages/theory/03-sources">次: 3. 目録は、取りに行くまで古いまま →</a></nav>
 <section id="comments">

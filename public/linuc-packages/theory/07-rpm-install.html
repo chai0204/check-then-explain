@@ -192,12 +192,13 @@ $ rpm -Kv ~/work/tree-copy.rpm
     MD5 digest: BAD (Expected 02e31b29f7f0057ef4433a66aa68821b != 35e582b31f509ef95879bf04663e60c6)</code></pre>
 <p>今度は <code>DIGESTS</code> まで大文字になった。中身（Payload）の要約が合わず <code>BAD</code>、中身にかかる署名も <code>BAD</code> である。鍵が無いときの <code>NOKEY</code> とは別の答えで、こちらが「壊れている・書き換えられている」の印になる。</p>
 <div class="scroll"><table>
-<tr><th><code>rpm -K</code> の出力</th><th>意味</th><th>入れてよいか</th></tr>
-<tr><td><code>digests signatures OK</code></td><td>壊れておらず、持っている鍵で署名を確かめられた</td><td>鍵を信じるなら、よい</td></tr>
-<tr><td><code>digests OK</code></td><td>壊れていない。<b>署名は無い</b>（誰が作ったかは分からない）</td><td>出どころを別の手段で確かめてから</td></tr>
-<tr><td><code>digests SIGNATURES NOT OK</code></td><td>署名はあるが確かめられなかった（<code>-Kv</code> で NOKEY なら鍵が無い）</td><td>正しい鍵を <code>--import</code> してから確かめ直す</td></tr>
-<tr><td><code>DIGESTS SIGNATURES NOT OK</code></td><td>中身が壊れているか、書き換えられている（<code>-Kv</code> に BAD）</td><td>入れない</td></tr>
+<tr><th><code>rpm -K</code> の出力（この檻・RHEL 8 以降）</th><th>RHEL 7（rpm 4.11）での出方</th><th>意味</th><th>入れてよいか</th></tr>
+<tr><td><code>digests signatures OK</code></td><td><code>rsa sha1 md5 OK</code></td><td>壊れておらず、持っている鍵で署名を確かめられた</td><td>鍵を信じるなら、よい</td></tr>
+<tr><td><code>digests OK</code></td><td><code>sha1 md5 OK</code></td><td>壊れていない。<b>署名は無い</b>（誰が作ったかは分からない）</td><td>出どころを別の手段で確かめてから</td></tr>
+<tr><td><code>digests SIGNATURES NOT OK</code></td><td><code>RSA sha1 ((MD5) PGP) md5 NOT OK (MISSING KEYS: …)</code></td><td>署名はあるが確かめられなかった（<code>-Kv</code> で NOKEY なら鍵が無い）</td><td>正しい鍵を <code>--import</code> してから確かめ直す</td></tr>
+<tr><td><code>DIGESTS SIGNATURES NOT OK</code></td><td>—</td><td>中身が壊れているか、書き換えられている（<code>-Kv</code> に BAD）</td><td>入れない</td></tr>
 </table></div>
+<p>表記は rpm の版で違う。この教材の記録は RHEL 8 以降（rpm 4.14 以降）の表記で、RHEL 7 の rpm 4.11 は <code>digests</code> / <code>signatures</code> という語を出さない（RHEL 7 の列は、別の環境で確かめられた出方である）。<b>読み方は共通している。署名の語（RHEL 8 以降は <code>signatures</code>、RHEL 7 は <code>rsa</code>・<code>pgp</code>）が小文字で、最後が OK のときだけ、署名が確かめられている。大文字の語は、その確かめが失敗したことを表す</b>。署名の無いものは、署名の語がそもそも出ずに OK になる。</p>
 <p>そして rpm は、署名が無くても入れる。</p>
 <pre><code>$ sudo rpm -ivh /srv/lab-files/labnosig-1.0-1.noarch.rpm
 Verifying...                          ########################################
@@ -237,12 +238,12 @@ labhello: RSA/SHA256, Tue Oct 13 10:08:48 2026, Key ID 0ba6fe4393f77b82</code></
 <tr><td>あるか・どの版か</td><td><code>dpkg -l</code> ／ <code>rpm -q</code> <code>rpm -qa</code></td><td><code>apt-cache policy</code> ／ <code>yum list</code></td></tr>
 <tr><td>詳しい情報</td><td><code>dpkg -s</code> ／ <code>rpm -qi</code></td><td><code>apt-cache show</code> ／ <code>yum info</code></td></tr>
 <tr><td>ファイル → パッケージ</td><td><code>dpkg -S</code> ／ <code>rpm -qf</code></td><td><code>apt-file search</code> ／ <code>yum provides</code></td></tr>
-<tr><td>パッケージ → ファイル</td><td><code>dpkg -L</code> ／ <code>rpm -ql</code></td><td><code>apt-file list</code> ／ （<code>yumdownloader</code> で取って <code>rpm -qpl</code>）</td></tr>
+<tr><td>パッケージ → ファイル</td><td><code>dpkg -L</code> ／ <code>rpm -ql</code></td><td><code>apt-file list</code> ／ <code>yum repoquery -l 名前</code>（yum-utils の <code>repoquery -l</code>）</td></tr>
 <tr><td>依存関係</td><td><code>rpm -qR</code> ／ <code>rpm -q --whatrequires</code></td><td><code>apt-cache depends</code> <code>rdepends</code> ／ <code>yum deplist</code></td></tr>
 <tr><td>台帳とディスクを比べる</td><td><code>dpkg -V</code> ／ <code>rpm -V</code></td><td>—</td></tr>
 <tr><td>目録を取り直す</td><td>—</td><td><code>apt update</code> ／ <code>yum makecache</code>（yum は自動でも取る）</td></tr>
 </table></div>
-<p>ファイルそのもの（.deb / .rpm）に聞くのが3つ目の向きで、<code>dpkg -I</code> <code>-c</code> と <code>rpm -qp…</code> がそれにあたる。迷ったら、そのコマンドが「台帳・目録・ファイルのどれを開いているか」を先に考える。それが分かれば、入っていないパッケージに答えられるかどうか、root が要るかどうか（台帳を書き換えるときだけ要る）まで決まる。</p>
+<p>ファイルそのもの（.deb / .rpm）に聞くのが3つ目の向きで、<code>dpkg -I</code> <code>-c</code> と <code>rpm -qp…</code> がそれにあたる。迷ったら、そのコマンドが「台帳・目録・ファイルのどれを開いているか」を先に考える。それが分かれば、入っていないパッケージに答えられるかどうか、root が要るかどうかまで決まる。root が要るのは、台帳・目録の写し・設定ファイルを<b>書き換える</b>とき（入れる・消す・上げるのほか、目録の写しを書き換える <code>apt update</code>・<code>apt-get update</code>・<code>apt-file update</code> も。一般ユーザで打つと lock の <code>Permission denied</code> で止まる。第3章）。読むだけ（<code>apt-cache</code>・<code>dpkg -l</code>・<code>rpm -q</code>・<code>yum info</code>）と、手元に取るだけ（<code>apt-get download</code>・<code>yumdownloader</code>）は要らない。</p>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-packages/">演習06</a>は、yumdownloader で取ってきた .rpm を rpm だけで入れる課題で、この章の「rpm は依存を取りに行かない」をそのまま踏む。
 <a href="/linuc-packages/">演習04</a>は、署名の確認（<code>gpgcheck=1</code>）を切らずに、別の鍵で署名されたリポジトリから入れる。判定は鍵が台帳に入ったかまで見る。</div>
@@ -258,6 +259,7 @@ labhello: RSA/SHA256, Tue Oct 13 10:08:48 2026, Key ID 0ba6fe4393f77b82</code></
 <p>署名はあるが、確かめられなかった（<code>digests</code> は小文字なので、中身の要約は合っている）。
 <code>rpm -Kv foo.rpm</code> で <code>NOKEY</code> と出れば、その鍵が rpm の台帳に無いだけで、
 正しい公開鍵を <code>rpm --import</code> で取り込めば確かめられる。取り込んである鍵の一覧は <code>rpm -q gpg-pubkey</code> で見られる。
+（この表記は RHEL 8 以降のもので、RHEL 7 では同じ状態が <code>RSA sha1 ((MD5) PGP) md5 NOT OK (MISSING KEYS: …)</code> と出る。署名の語が大文字なのは同じ。）
 中身が書き換えられていれば、実測のように <code>DIGESTS</code> まで大文字になり、<code>-Kv</code> に <code>BAD</code> が出る。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>依存関係を無視してパッケージを削除する rpm のコマンドを答えよ。また、そのあと何が起きうるか。</p>
@@ -273,7 +275,7 @@ labhello: RSA/SHA256, Tue Oct 13 10:08:48 2026, Key ID 0ba6fe4393f77b82</code></
 鍵の場所を示す <code>gpgkey=</code> で設定する。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>rpm -ivh</code> は依存関係が足りないと1つも入れずに止まる。必要なファイルを並べて渡せば順番は rpm が決める</li><li><code>rpm -e</code> は依存されているものを消さない。<code>--nodeps</code> は台帳の整合を崩し、<code>rpm -V</code> が <code>Unsatisfied dependencies</code> を報告する</li><li><code>-i</code> は新しく入れる（古い版があれば衝突）、<code>-U</code> は上げるか入れる、<code>-F</code> は入っているものだけ上げる</li><li><code>rpm -K</code> の <code>digests OK</code> は「署名が無い」。<code>signatures</code> の語が出て OK のときだけ、署名が確かめられている</li><li>確かめる鍵は台帳（<code>gpg-pubkey</code>）に入っている。<code>rpm --import</code> で取り込む</li><li>署名の確認を強制するのは yum の <code>gpgcheck=1</code>。rpm は署名が無くても入れる</li><li>主題1.04 のコマンドは「台帳・目録・ファイルのどれを、どちら向きに引くか」で整理できる</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>rpm -ivh</code> は依存関係が足りないと1つも入れずに止まる。必要なファイルを並べて渡せば順番は rpm が決める</li><li><code>rpm -e</code> は依存されているものを消さない。<code>--nodeps</code> は台帳の整合を崩し、<code>rpm -V</code> が <code>Unsatisfied dependencies</code> を報告する</li><li><code>-i</code> は新しく入れる（古い版があれば衝突）、<code>-U</code> は上げるか入れる、<code>-F</code> は入っているものだけ上げる</li><li><code>rpm -K</code> の <code>digests OK</code> は「署名が無い」。署名の語（RHEL 8 以降は <code>signatures</code>、RHEL 7 は <code>rsa</code>・<code>pgp</code>）が小文字で OK のときだけ、署名が確かめられている。大文字は失敗</li><li>確かめる鍵は台帳（<code>gpg-pubkey</code>）に入っている。<code>rpm --import</code> で取り込む</li><li>署名の確認を強制するのは yum の <code>gpgcheck=1</code>。rpm は署名が無くても入れる</li><li>主題1.04 のコマンドは「台帳・目録・ファイルのどれを、どちら向きに引くか」で整理できる</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.0@sha256:0a42363b7f56353a30c1a56b89986ee9c030bd867dbf89236060f7d4c3661a84 / AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / リポジトリ vault.almalinux.org 9.7（2026-05-20 で凍結）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/06-rpm-query">← 6. rpm -V が黙っているのは、台帳どおりだから</a><a href="/linuc-packages/">次: 実践編（演習6本）→</a></nav>
 <section id="comments">

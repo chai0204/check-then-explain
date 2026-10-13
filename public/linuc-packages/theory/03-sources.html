@@ -177,12 +177,18 @@ labextra 1.0 (/srv/lab-extra から入った)</code></pre>
 <div class="scroll"><table>
 <tr><th>印</th><th>意味</th></tr>
 <tr><td><code>Hit</code></td><td>前回取ったものから変わっていなかった（取り直さなかった）</td></tr>
-<tr><td><code>Get</code></td><td>取った</td></tr>
-<tr><td><code>Ign</code></td><td>無かったが、無くてもよいものなので無視した（ここでは署名ファイル）</td></tr>
+<tr><td><code>Get</code></td><td>取りに行った。同じ番号の <code>Ign</code> が続けば、そのファイルは無かった（<code>Get:1 … InRelease</code> の次の <code>Ign:1</code>）。続かなければ取れた（<code>Get:7 … Packages</code>）</td></tr>
+<tr><td><code>Ign</code></td><td>無かったが、無くてもよいものなので無視した（ここでは署名つきの <code>InRelease</code> と、署名の <code>Release.gpg</code>）</td></tr>
 <tr><td><code>Err</code></td><td>取れなかった（ネットにつながらない等）</td></tr>
 </table></div>
 <p>Ubuntu 本体の3行が <code>Hit</code> なのは、この檻が最初から目録の写しを持っていて、snapshot（2026-09-29 で止めた Ubuntu の写し）がそれから変わっていないからである。<b>ネットにつながっていない環境では、この3行が <code>Err</code> や <code>Ign</code> になり、警告が出る</b>。それでも手元の古い写しが残るので、檻の中の練習用リポジトリは同じように使える。</p>
 <p>リポジトリの1行を書き換えたら、<code>apt update</code> までが1組の作業である。<code>apt edit-sources</code> と打つと <code>sources.list</code> をエディタで開けるが、これも書き換えるだけで、取りには行かない。</p>
+<p><code>apt update</code> は目録の写し（<code>/var/lib/apt/lists/</code>）を書き換えるので、root が要る。<code>sudo</code> を付け忘れると、写しの置き場に鍵を掛けられずに止まる（別の檻で記録した）。</p>
+<pre><code>$ apt update; echo "exit=$?"
+...
+E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
+E: Unable to lock directory /var/lib/apt/lists/
+exit=100</code></pre>
 <div class="analogy"><b>たとえ</b>: 差出人の印が押された封書だけを受け取る受付に近い。
 印の無い封書は、中身を読む前に送り返す。<code>Signed-By:</code> は「この印鑑なら本物」という見本の登録で、
 <code>[trusted=yes]</code> は「この差出人からは印が無くても受け取る」という例外の指示である。
@@ -213,7 +219,7 @@ _srv_lab-repo_dists_lab_main_Contents-amd64.lz4</code></pre>
 <tr><th>聞きたいこと</th><th>入っているものだけ（台帳）</th><th>入っていなくてよい（目録の Contents）</th></tr>
 <tr><td>このファイルはどのパッケージにあるか</td><td><code>dpkg -S パス</code></td><td><code>apt-file search パス</code></td></tr>
 <tr><td>このパッケージにはどのファイルがあるか</td><td><code>dpkg -L 名前</code></td><td><code>apt-file list 名前</code></td></tr>
-<tr><td>索引を新しくする</td><td>（要らない。入れたときに書かれる）</td><td><code>apt-file update</code>（= Contents だけの <code>apt update</code>）</td></tr>
+<tr><td>索引を新しくする</td><td>（要らない。入れたときに書かれる）</td><td><code>apt-file update</code>（中で <code>apt update</code> をそのまま呼ぶ。Packages も取り直す）</td></tr>
 </table></div>
 <p>この檻では、apt-file の目録を練習用リポジトリの分だけに絞ってある。だから本物のコマンドを探しても見つからない。</p>
 <pre><code>$ apt-file search bin/dig; echo "exit=$?"
@@ -227,7 +233,17 @@ Ign:1 file:/srv/lab-repo lab InRelease
 ...
 Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
 Reading package lists...</code></pre>
-<p><code>apt-file update</code> の中身は <code>apt update</code> と同じ処理である（今の apt-file は、目録を取ることを apt に任せている）。</p>
+<p>出力が <code>apt update</code> とそっくりなのは、<code>apt-file update</code> が <code>apt update</code>（端末につながっていなければ <code>apt-get update</code>）をそのまま呼んでいるだけだからである。Contents だけを取り直すのではなく、Packages も含めて全部の目録を取り直す。man にそう書いてある（別の檻で記録した）。</p>
+<pre><code>$ MANWIDTH=80 man apt-file | sed -n "/^ *update$/,/on whether a tty is available/p"
+       update
+           This action that just calls apt update or apt-get update (depending
+           on whether a tty is available).</code></pre>
+<p>だから一般ユーザで打つと、<code>apt update</code> と同じく root が無くて止まる。</p>
+<pre><code>$ apt-file update; echo "exit=$?"
+Reading package lists...
+E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
+E: Unable to lock directory /var/lib/apt/lists/
+exit=100</code></pre>
 <div class="analogy"><b>たとえ</b>: 本の目次と巻末の索引に近い。目次（Packages）では章の題名（パッケージ名と説明）しか分からないが、
 巻末の索引（Contents）を引けば、ある言葉（ファイル名）がどの章にあるかが分かる。
 <br>ただし<b>崩れる点</b>: 本の索引は本と一緒に手元に来るが、Contents は別に取りに行く目録で、
@@ -260,11 +276,12 @@ apt はこれを <code>…/ubuntu/dists/noble/main/binary-amd64/Packages</code> 
 <div class="quiz"><b>確認</b>
 <p><code>apt update</code> の出力に <code>Hit:</code> と <code>Get:</code> の行がある。それぞれ何を表すか。</p>
 <details><summary>答え</summary>
-<p><code>Hit</code> は前回取った目録から変わっていなかったので取り直さなかったこと、<code>Get</code> は取ってきたことを表す。
+<p><code>Hit</code> は前回取った目録から変わっていなかったので取り直さなかったこと、<code>Get</code> は取りに行ったことを表す
+（同じ番号の <code>Ign</code> が続けばそのファイルは無く、続かなければ取れた）。
 <code>Ign</code> は無くてもよいもの（署名ファイルなど）が無かったので無視したこと、<code>Err</code> は取れなかったこと。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/etc/apt/sources.list</code> の1行は「種類（<code>deb</code> / <code>deb-src</code>）・URI・ディストリビューション・コンポーネント」。Ubuntu 24.04 は <code>/etc/apt/sources.list.d/*.sources</code> の deb822 形式が既定</li><li>apt が引くのは <code>/var/lib/apt/lists/</code> の目録の写し。ソースを書いただけでは写しは変わらず、<code>apt update</code> で初めて取りに行く</li><li>署名の無い目録は <code>is not signed</code> で受け取らない。<code>Signed-By</code> で鍵を指定するのが本来の形で、<code>[trusted=yes]</code> は確かめるのをやめる指示</li><li>ファイル名からパッケージを引くとき、入っているものなら <code>dpkg -S</code>（台帳）、入っていなくてよいなら <code>apt-file search</code>（目録の Contents）</li><li>Contents は Packages とは別の、大きな目録。<code>apt-file update</code> か <code>apt update</code> で取る</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>/etc/apt/sources.list</code> の1行は「種類（<code>deb</code> / <code>deb-src</code>）・URI・ディストリビューション・コンポーネント」。Ubuntu 24.04 は <code>/etc/apt/sources.list.d/*.sources</code> の deb822 形式が既定</li><li>apt が引くのは <code>/var/lib/apt/lists/</code> の目録の写し。ソースを書いただけでは写しは変わらず、<code>apt update</code> で初めて取りに行く</li><li>署名の無い目録は <code>is not signed</code> で受け取らない。<code>Signed-By</code> で鍵を指定するのが本来の形で、<code>[trusted=yes]</code> は確かめるのをやめる指示</li><li>ファイル名からパッケージを引くとき、入っているものなら <code>dpkg -S</code>（台帳）、入っていなくてよいなら <code>apt-file search</code>（目録の Contents）</li><li>Contents は Packages とは別の、大きな目録。<code>apt-file update</code>（中で <code>apt update</code> を呼ぶだけ）か <code>apt update</code> で取る。どちらも目録の写しを書き換えるので root が要る</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0@sha256:556b75a379fdee91de07d7b828b45545cfd71f206c7c9761d9c375825c604457 / Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt-file 3.3 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（ネットにつながった状態） / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/02-apt">← 2. apt は目録を読んで、台帳に書く</a><a href="/linuc-packages/theory/04-dpkg">次: 4. dpkg は依存を読めるが、取りに行かない →</a></nav>
 <section id="comments">
