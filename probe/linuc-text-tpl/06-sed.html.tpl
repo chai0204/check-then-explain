@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6. sed は書き換えた結果を見せるだけ — 確かめて説明する LinuC 主題1.03</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="6" data-theme="linuc-text">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-text/theory/">理論編</a> › 第6章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+</div>
+<h1>6. sed は書き換えた結果を見せるだけ</h1>
+<p class="lead"><code>sed 's/8080/9090/' app.conf</code> と打つと、画面には <code>port=9090</code> が出る。そのあと <code>app.conf</code> を見ると <code>8080</code> のままだ。<code>sed</code> は読んだものを加工して標準出力に流すフィルタで、ファイルを書き換えるのは <code>-i</code> を付けたときだけ。しかも <code>-i</code> でさえ、同じファイルを書き換えてはいなかった。</p>
+<div class="badges"><span>前提: 第5章</span><span>前提: 檻が起動している</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.03.2（重要度3）</span><span>出題範囲 1.03.4（重要度2）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>sed</code> の <code>s</code>（置換）・<code>d</code>（削除）・<code>-n</code> と <code>p</code>（表示）を、行番号やパターンで行を選んで使える</li><li><code>s///g</code> の <code>g</code> と、<code>^</code> で行頭に限る意味を言える</li><li><code>-i</code> と <code>-i.bak</code> の違いと、<code>-i</code> がファイルを作り直していることを説明できる</li><li><code>expand</code> <code>unexpand</code> <code>fmt</code> <code>pr</code> <code>split</code> の役割と主なオプションを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: ホールドスペース（<code>h</code> <code>g</code> <code>x</code>）、複数行をまたぐ処理（<code>N</code>）、<code>a</code> <code>i</code> <code>c</code> コマンドの細かい書き方、<code>pr</code> のヘッダの書式指定、<code>split</code> の接尾辞の長さ。正規表現そのものは第9章で扱う。</div></div>
+
+<h2 id="stdout">sed はファイルを書き換えない</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>sed</code> が何を読んで、どこへ出しているか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>sed</code> は「ストリームエディタ」で、エディタなのだから、置換すればファイルが書き換わるはずだ。
+画面に新しい中身が出たのは、書き換えた結果を見せてくれているのだろう。</p>
+<pre><code>@@
+$ cd ~/text
+$ cat app.conf
+$ sed "s/8080/9090/" app.conf
+$ grep -c 9090 app.conf
+@@</code></pre>
+<div class="then"><b>だめな理由</b>: 画面には <code>9090</code> が2行出たのに、ファイルの中の <code>9090</code> は 0 行だった。
+<code>sed</code> はファイルを<b>読むだけ</b>で、1行ずつコマンドを当てた結果を<b>標準出力に流す</b>。
+<code>cat</code> や <code>tr</code> と同じフィルタである。書き換えたファイルが欲しいなら、
+<code>-i</code> を付けるか、出力を別のファイルにリダイレクトする（同じファイルへのリダイレクトは空になる。第7章）。</div></div>
+<div class="analogy"><b>たとえ</b>: 原稿を読みながら赤を入れた<b>清書を別の紙に書いていく校正者</b>に近い。元の原稿には一切書き込まない。
+<br>ただし<b>崩れる点</b>: 校正者は清書を机に残してくれるが、<code>sed</code> の清書は画面に流れて消える。
+残したければ、受け取る先（ファイル）を自分で用意する必要がある。</div>
+
+<h2 id="subst">置換 s の細部</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>g</code> の有無と、パターンがどこに当たるか。</div>
+<pre><code>@@
+$ sed "s/=/ = /" app.conf
+$ sed "s/=/ = /g" app.conf
+@@</code></pre>
+<p><code>s/探す/置き換える/</code> は、<b>各行で最初に見つかった1か所だけ</b>を置き換える。<code>url=...?lang=ja</code> の2つ目の <code>=</code> は、<code>g</code>（global）を付けたときだけ変わった。コメント行の <code># debug=true</code> も、<code>=</code> を含むので変わっている。</p>
+<pre><code>@@
+$ sed "s/port/PORT/" app.conf
+$ sed "s/^port=/PORT=/" app.conf
+@@</code></pre>
+<p><code>port</code> とだけ書くと <code>port_admin</code> にも当たる。<code>^</code>（行頭）を付けて <code>^port=</code> と書けば、<code>port=</code> で始まる行だけに当たる。<code>/</code> を含む文字列を置き換えるときは、区切りを別の文字にしてよい。<code>(...)</code> で囲んだ部分は <code>\1</code> <code>\2</code> で置き換え側に持ち込める（<code>-E</code> は拡張正規表現。第9章）。</p>
+<pre><code>@@
+$ sed "s|http://localhost|https://example.com|" app.conf | tail -1
+$ sed -E "s/^([a-z_]+)=(.*)$/\1: \2/" app.conf
+$ sed "y/abc/ABC/" fruits.txt
+@@</code></pre>
+<p><code>y/abc/ABC/</code> は1文字ずつの置き換えで、<code>tr abc ABC</code> と同じことをする。</p>
+
+<h2 id="address">行を選ぶ — 行番号とパターン</h2>
+<div class="sgoal"><b>この節で分かること</b>: どの行にコマンドを当てるかの指定と、<code>-n</code> の意味。</div>
+<pre><code>@@
+$ sed -n "2,4p" app.conf
+$ sed -n "/port/p" app.conf
+$ sed "/^#/d" app.conf
+$ sed "1d" app.conf
+$ sed "\$d" app.conf
+$ sed -n "\$p" app.conf
+$ sed "3q" app.conf
+$ sed -e "/^#/d" -e "s/8080/9090/g" app.conf
+$ sed "2i\\# ここに挿入" app.conf | head -4
+@@</code></pre>
+<p><code>sed</code> は何も指定しなければ<b>全行を出す</b>。<code>-n</code> はその自動の出力を止め、<code>p</code> を当てた行だけを出させる。<code>d</code> は当てた行を出さない。コマンドの前に書く行の指定（アドレス）は次のとおり。</p>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>意味</th></tr>
+<tr><td><code>3</code> / <code>2,4</code> / <code>$</code></td><td>3行目 / 2〜4行目 / 最後の行（二重引用符の中では <code>\$</code> と書く）</td></tr>
+<tr><td><code>/^#/</code></td><td>パターンに当たる行（ここでは <code>#</code> で始まる行）</td></tr>
+<tr><td><code>s/A/B/</code> / <code>s/A/B/g</code></td><td>最初の1か所を置換 / 全部置換</td></tr>
+<tr><td><code>d</code></td><td>その行を出さない（削除）</td></tr>
+<tr><td><code>-n</code> と <code>p</code></td><td>自動の出力を止め、<code>p</code> した行だけ出す</td></tr>
+<tr><td><code>q</code></td><td>その行を出したら終わる（<code>3q</code> は <code>head -3</code> と同じ）</td></tr>
+<tr><td><code>-e</code> を複数</td><td>コマンドを順に全部当てる</td></tr>
+<tr><td><code>-i</code> / <code>-i.bak</code></td><td>結果でファイルを置き換える / 元を <code>.bak</code> 付きで残す（次の節）</td></tr>
+</table></div>
+
+<h2 id="inplace">-i は、同じファイルを書き換えていない</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>-i</code> の裏で何が起きているか。</div>
+<pre><code>@@
+$ cp app.conf my.conf
+$ ls -i my.conf
+$ sed -i "s/^port=8080/port=9090/" my.conf
+$ ls -i my.conf
+$ grep ^port= my.conf
+@@</code></pre>
+<p>書き換わった。ところが <code>ls -i</code> が出す番号（i ノード番号。ファイルの実体の番号）が変わっている。<code>-i</code> は結果を<b>新しいファイルに書いてから、元の名前に付け替えている</b>。番号そのものは環境ごとに違うので、見るのは「変わったかどうか」だけでよい。</p>
+<pre><code>@@
+$ sed -i.bak "/^#/d" my.conf
+$ ls -1 my.conf*
+$ cat my.conf
+$ diff my.conf.bak my.conf
+@@</code></pre>
+<p><code>-i.bak</code> は、作り直す前の中身を <code>my.conf.bak</code> として残す（<code>-i</code> と <code>.bak</code> の間に空白は入れない）。付け替える前の実体に、別の名前を残しておく仕組みだ。</p>
+<p>「作り直している」ことは、同じ実体に2つ目の名前（ハードリンク。主題1.02）を付けておくと、はっきり見える。</p>
+<pre><code>@@
+$ ln my.conf hard.conf
+$ ls -i my.conf hard.conf
+$ sed -i "s/^port=9090/port=7070/" my.conf
+$ ls -i my.conf hard.conf
+$ grep ^port= my.conf hard.conf
+@@</code></pre>
+<p><code>sed -i</code> の後、<code>my.conf</code> だけが新しい実体に付け替えられ、<code>hard.conf</code> は古い実体（<code>port=9090</code>）を指したまま残った。</p>
+<div class="analogy"><b>たとえ</b>: 掲示板の紙に<b>直接書き込むのではなく、清書した新しい紙に貼り替える</b>のに近い。
+<code>-i.bak</code> は、はがした古い紙を「.bak」と書いた封筒に入れて残しておくことだ。
+<br>ただし<b>崩れる点</b>: 掲示板なら古い紙を見ていた人も、貼り替えに気づいて新しい紙を見に来る。
+ハードリンクで同じ実体を指していた名前は気づかない。古い紙を持ったまま、黙って取り残される。</div>
+
+<h2 id="format">TAB を広げる・行を折り返す</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>expand</code> <code>unexpand</code> <code>fmt</code> が、空白と改行をどう作り直すか。</div>
+<pre><code>@@
+$ cat -A tabs.txt
+$ expand tabs.txt | cat -A
+$ expand -t 4 tabs.txt | cat -A
+@@</code></pre>
+<p>TAB は「次の<b>タブ位置</b>まで進める」という1文字で、タブ位置は既定で8桁ごとにある。<code>expand</code> は TAB を、そこまでの空白に置き換える。<code>-t 4</code> は4桁ごとにする。<code>unexpand</code> は逆に、空白を TAB に戻す。</p>
+<pre><code>@@
+$ cat -A indent.txt
+$ expand indent.txt | cat -A
+$ expand indent.txt | unexpand | cat -A
+$ expand indent.txt | unexpand -a | cat -A
+@@</code></pre>
+<p><code>unexpand</code> が TAB に戻したのは<b>行頭の空白だけ</b>だった。<code>apple</code> と <code>red</code> の間の空白は、<code>-a</code>（all）を付けたときだけ TAB になった。</p>
+<pre><code>@@
+$ cat poem.txt
+$ fmt -w 40 poem.txt
+$ fmt -w 40 poem.txt | wc -L
+$ fmt -w 20 jp.txt
+@@</code></pre>
+<p><code>fmt</code> は段落の行を詰め直し、指定した幅（<code>-w</code>。既定は75桁）に収まるよう<b>空白の位置で</b>折り返す。<code>wc -L</code>（いちばん長い行の桁数）は 38 で、40 に収まっている。日本語の文は空白が無いので折り返せず、空白のあった <code>fmt</code> の前後でだけ切れた。</p>
+<div class="analogy"><b>たとえ</b>: TAB はタイプライターの<b>タブストップ</b>（あらかじめ決めた目盛りまで一気に送るキー）に近い。
+何文字分進むかは、押した位置によって変わる。
+<br>ただし<b>崩れる点</b>: タイプライターの目盛りは機械ごとに自分で決めるが、ファイルの中の TAB は「どこまで進むか」を持っていない。
+表示する道具の設定（既定は8桁）で見た目が変わるので、TAB でそろえた表は別の環境で崩れることがある。</div>
+
+<h2 id="split">ページを付ける・分割する — pr と split</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>pr</code> が付けるヘッダと、<code>split</code> の分け方と名前。</div>
+<pre><code>@@
+$ pr fruits.txt | head -5
+$ pr -3 -t fruits.txt
+$ pr -l 12 fruits.txt | grep -c "Page"
+@@</code></pre>
+<p><code>pr</code> は印刷向けにページを組む。各ページの先頭に、ファイルの<b>更新日時・名前・ページ番号</b>のヘッダを付ける（日時は檻の中の <code>fruits.txt</code> が作られた時刻）。<code>-3</code> は3段組み、<code>-t</code> はヘッダを付けない、<code>-l 12</code> は1ページを12行にする（ヘッダと余白で10行使うので、本文は2行ずつになり4ページになった）。</p>
+<pre><code>@@
+$ seq 2500 > big.txt
+$ split big.txt
+$ wc -l xa*
+$ split -l 1000 -d big.txt part_
+$ wc -l part_*
+$ cat xa* | cmp - big.txt; echo "exit=$?"
+@@</code></pre>
+<p><code>split</code> は既定で<b>1000行ずつ</b>に分け、<code>xaa</code> <code>xab</code> … という名前を付ける。<code>-l</code> で行数、<code>-d</code> で接尾辞を数字に、最後の引数で名前の頭を変えられる。<code>cat</code> でつなげば元と1バイトも違わない（<code>cmp</code> の終了コード 0）。</p>
+<pre><code>@@
+$ split -n 2 fruits.txt half_; wc -c half_*
+$ cat half_aa; echo "<-- ここまでが half_aa"
+$ split -n l/2 fruits.txt line_; wc -l line_*
+@@</code></pre>
+<p><code>-n 2</code> は<b>バイト数で</b>2等分するので、<code>apple</code> の途中で切れた。行の途中で切りたくなければ <code>-n l/2</code>（line）を使う。<code>-b 100k</code> のようにバイト数で分ける指定もある。</p>
+<div class="quiz"><b>確認</b>
+<p><code>sed</code> でファイル <code>a.txt</code> のすべての <code>foo</code> を <code>bar</code> に置き換えて表示したい（1行に複数ある場合も全部）。正しいものはどれか。</p>
+<p>A. <code>sed 's/foo/bar/' a.txt</code>　B. <code>sed 's/foo/bar/g' a.txt</code>　C. <code>sed -n 's/foo/bar/' a.txt</code>　D. <code>sed 'y/foo/bar/' a.txt</code></p>
+<details><summary>答え</summary>
+<p>B。A は各行の最初の1か所だけ（実測の <code>s/=/ = /</code> と同じ）。C は <code>-n</code> で自動の出力が止まり何も出ない。
+D は1文字ずつの置き換え（<code>tr</code> と同じ）で、<code>foo</code> という並びを探すものではない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>config.txt</code> を直接書き換え、書き換える前の内容を <code>config.txt.orig</code> として残したい。<code>sed</code> のオプションはどれか。</p>
+<details><summary>答え</summary>
+<p><code>sed -i.orig 's/.../.../' config.txt</code>。<code>-i</code> の直後に、空白を入れずに拡張子を書く。
+<code>sed 's/.../.../' config.txt &gt; config.txt</code> はシェルが先にファイルを空にするので、空のファイルが残る（第7章）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>ファイルの3行目から5行目だけを表示する <code>sed</code> の書き方を答えよ。</p>
+<details><summary>答え</summary>
+<p><code>sed -n '3,5p' ファイル</code>。<code>-n</code> を付けないと、全行の自動の出力に加えて3〜5行目がもう一度出る。
+<code>head -5 ファイル | tail -3</code> でも同じ結果になる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>2500行のファイル <code>log.txt</code> に、オプションを付けずに <code>split log.txt</code> を実行した。できるファイルの名前と行数を答えよ。</p>
+<details><summary>答え</summary>
+<p><code>xaa</code>（1000行）、<code>xab</code>（1000行）、<code>xac</code>（500行）。実測の <code>big.txt</code> と同じ。</p></details></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-text/">演習04</a>は、設定ファイルの1つの値だけを <code>sed</code> で書き換え、元を <code>.bak</code> で残す課題である。
+<code>^</code> で行頭を決めないと、変えてはいけない行も変わったと観測される。</div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>sed</code> はファイルを読んで、結果を標準出力に流すだけ。ファイルを変えるのは <code>-i</code></li><li><code>s/A/B/</code> は各行の最初の1か所、<code>g</code> で全部。<code>^</code> で行頭に限る。<code>-n</code> と <code>p</code> で選んだ行だけ出す。<code>d</code> で消す</li><li>行の指定は <code>3</code> <code>2,4</code> <code>$</code> <code>/パターン/</code></li><li><code>-i</code> は新しいファイルに書いて付け替える（i ノード番号が変わる）。<code>-i.bak</code> で元を残す</li><li><code>expand</code> は TAB を空白に、<code>unexpand</code> は行頭の空白を TAB に（<code>-a</code> で全部）。<code>fmt -w</code> は空白の位置で折り返す</li><li><code>pr</code> はヘッダ付きのページを組む。<code>split</code> は既定で1000行ずつ <code>xaa</code> <code>xab</code> …</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-text/theory/05-columns">← 5. uniq は隣どうししか比べない</a><a href="/linuc-text/theory/07-redirect">次: 7. リダイレクトは、左から順に配線する →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-text/chapters.js"></script>
+<script src="/linuc-text/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

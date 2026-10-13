@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. コマンドを探すのはシェルで、カレントは探さない — 確かめて説明する LinuC 主題1.03</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="2" data-theme="linuc-text">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-text/theory/">理論編</a> › 第2章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+</div>
+<h1>2. コマンドを探すのはシェルで、カレントは探さない</h1>
+<p class="lead"><code>ls</code> と打つと動くのに、目の前にある <code>hello.sh</code> と打つと <code>command not found</code> になる。打った名前のファイルを探しているのはシェルで、探す場所は <code>PATH</code> に書かれたディレクトリだけだからだ。この章では、その探し方と、打ったコマンドの記録（履歴）がいつファイルに残るかを確かめる。</p>
+<div class="badges"><span>前提: 第1章</span><span>前提: 檻が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.03.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>hello.sh</code> / <code>./hello.sh</code> / <code>bash hello.sh</code> / <code>. hello.sh</code> の違いを、PATH と実行権とプロセスで説明できる</li><li>絶対パスと相対パスを、<code>pwd</code> と <code>.</code> <code>..</code> から読み解ける</li><li><code>history</code> と <code>!!</code> <code>!番号</code> <code>!文字列</code> を使えて、<code>.bash_history</code> に書かれるタイミングを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>hash</code> の詳しい動き、<code>alias</code> の作り方、<code>fc</code> の細かい使い方、<code>whereis</code> と <code>locate</code>（主題1.02 の側）。履歴の検索キー（<kbd>Ctrl</kbd>+<kbd>R</kbd>）は便利だが試験では名前だけ知っていればよい。</div></div>
+
+<h2 id="notfound">目の前にあるのに、見つからない</h2>
+<div class="sgoal"><b>この節で分かること</b>: 名前だけで打ったコマンドを、シェルがどこで探しているか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>今いるディレクトリにあるファイルなのだから、名前を打てば動くはずだ。
+<code>ls</code> も <code>cat</code> も名前だけで動いている。</p>
+<pre><code>@@
+$ cd ~/text
+$ pwd
+$ ls -l hello.sh cdtest.sh
+$ cat hello.sh
+$ hello.sh; echo "exit=$?"
+@@</code></pre>
+<div class="then"><b>だめな理由</b>: シェルは名前だけのコマンドを、<b>環境変数 PATH に並んだディレクトリの中だけ</b>で探す。
+今いるディレクトリ（カレントディレクトリ）は、<code>PATH</code> に書かれていなければ探さない。
+終了コード <code>127</code> は「見つからなかった」という意味である。</div></div>
+<pre><code>@@
+$ echo "$PATH"
+@@</code></pre>
+<p><code>PATH</code> はコロン区切りのディレクトリの並びで、シェルは<b>前から順に</b>探し、最初に見つかったものを実行する。<code>ls</code> は <code>/usr/bin</code> にあるので見つかる。<code>/home/lab/text</code> はこの並びに無い。</p>
+<p>では場所を書いて打つ。名前に <code>/</code> が入っていると、シェルは <code>PATH</code> を使わず、その場所を直接開く。</p>
+<pre><code>@@
+$ ./hello.sh; echo "exit=$?"
+$ bash hello.sh
+$ chmod +x hello.sh
+$ ./hello.sh
+@@</code></pre>
+<p>今度は見つかったが、終了コード <code>126</code>（見つかったが実行できない）になった。<code>ls -l</code> で見たとおり、<code>hello.sh</code> には実行権（<code>x</code>）が無い。<code>bash hello.sh</code> が動くのは、実行しているのが <code>bash</code> で、<code>hello.sh</code> は <code>bash</code> が<b>読むだけのファイル</b>だからである。<code>chmod +x</code> で実行権を付けると、<code>./hello.sh</code> でも動く。</p>
+<p>スクリプトが出した <code>$0</code>（自分がどう呼ばれたか）が、打ち方ごとに違うことにも注目する。シェルが組み立てて渡した名前が、そのまま届いている。</p>
+<div class="scroll"><table>
+<tr><th>打ち方</th><th>PATH を探すか</th><th>実行権</th><th>どこで動くか</th></tr>
+<tr><td><code>hello.sh</code></td><td>探す（カレントは探さない）</td><td>要る</td><td>子プロセス</td></tr>
+<tr><td><code>./hello.sh</code></td><td>探さない（<code>/</code> を含むので、その場所を開く）</td><td>要る</td><td>子プロセス</td></tr>
+<tr><td><code>bash hello.sh</code></td><td><code>bash</code> を探す</td><td>要らない（読むだけ）</td><td>子プロセス（新しい bash）</td></tr>
+<tr><td><code>. hello.sh</code> / <code>source hello.sh</code></td><td>—</td><td>要らない</td><td><b>今のシェル</b>（次の節）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 電話の<b>短縮ダイヤル</b>に近い。名前だけで掛けられるのは、登録簿（<code>PATH</code>）に載っている相手だけで、
+目の前の机に名刺が置いてあっても、登録していなければ掛からない。番号を全部押せば（<code>./hello.sh</code> や絶対パス）、登録簿は使われない。
+<br>ただし<b>崩れる点</b>: 短縮ダイヤルは同じ名前が2つあれば迷うが、<code>PATH</code> は前から順に探して<b>最初の1つで止まる</b>。
+後ろのディレクトリに同じ名前があっても、黙って隠れる。</div>
+
+<h2 id="paths">絶対パスと相対パス</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じファイルを3通りの書き方で指せる理由。</div>
+<pre><code>@@
+$ ~/text/hello.sh
+$ /home/lab/text/hello.sh
+$ cd /tmp
+$ ../home/lab/text/hello.sh
+$ cd ~/text
+@@</code></pre>
+<p><code>/</code> から始まるのが<b>絶対パス</b>で、どこにいても同じ場所を指す。<code>~</code> はシェルがホームディレクトリ（<code>/home/lab</code>）に置き換える。<code>..</code> から始まるのは<b>相対パス</b>で、<code>pwd</code> が示す今いる場所から数える。<code>/tmp</code> にいたので、<code>..</code>（ひとつ上）が <code>/</code> になり、そこから <code>home/lab/text/hello.sh</code> をたどった。</p>
+<p><code>.</code> と <code>..</code> は記号ではなく、どのディレクトリにも実際に入っている名前である。</p>
+<pre><code>@@
+$ ls -ld . ..
+$ cd ..; pwd
+$ cd text; pwd
+$ cd /usr/share; pwd
+$ cd -
+@@</code></pre>
+<p><code>cd -</code> は直前にいたディレクトリへ戻り、戻った先を表示する。</p>
+<div class="analogy"><b>たとえ</b>: 絶対パスは<b>住所</b>、相対パスは<b>道案内</b>（「ここから1つ上の階に上がって、右の部屋」）に近い。
+住所はどこから読んでも同じ建物を指すが、道案内は出発点が変わると別の場所に着く。
+<br>ただし<b>崩れる点</b>: 道案内は出発点を口で確認できるが、相対パスの出発点は<b>そのプロセスのカレントディレクトリ</b>で、画面には出ていない。
+迷ったら <code>pwd</code> で確かめるしかない。</div>
+
+<h2 id="type">シェルが先に答えるものと、. で読み込むもの</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>PATH</code> を探す前にシェルが自分で処理するものと、<code>.</code>（ドット）コマンドの意味。</div>
+<pre><code>@@
+$ type ls
+$ type cd
+$ type pwd
+$ type -a pwd
+$ type hello.sh
+$ which ls
+@@</code></pre>
+<p><code>type</code> は「この名前を打ったら、シェルが何を実行するか」を答える。<code>ls</code> は <code>~/.bashrc</code> が定義した<b>エイリアス</b>（色付きで出す <code>ls --color=auto</code> に置き換える）、<code>cd</code> と <code>pwd</code> はシェル自身が持つ<b>組み込みコマンド</b>である。<code>pwd</code> は <code>/usr/bin/pwd</code> という外部コマンドもあるが、組み込みが先に使われる。シェルの順番は「エイリアス → 関数 → 組み込みコマンド → <code>PATH</code> の順に探す」だ。</p>
+<p><code>cd</code> が組み込みなのには理由がある。カレントディレクトリはプロセスごとに持つもので、子プロセスが移動しても親は動かない。</p>
+<pre><code>@@
+$ cat cdtest.sh
+$ bash cdtest.sh
+$ pwd
+$ . cdtest.sh
+$ pwd
+@@</code></pre>
+<p><code>bash cdtest.sh</code> は子の bash の中で <code>/tmp</code> に移ったが、終わって戻ってくると親は <code>~/text</code> のままだった。<code>.</code>（ドット。<code>source</code> と同じ）は、ファイルを<b>今のシェルで</b>読み込んで実行する。だから <code>cd</code> が今のシェルに効いた。<code>~/.bashrc</code> を書き換えた後に <code>. ~/.bashrc</code> と打つのは、この性質を使っている。</p>
+<p>最後に、<code>PATH</code> にディレクトリを足すと、名前だけで動くようになることを確かめる。</p>
+<pre><code>@@
+$ cd ~/text
+$ PATH="$PATH:$HOME/text"
+$ hello.sh
+$ type hello.sh
+$ cd /; hello.sh; cd ~/text
+@@</code></pre>
+<p><code>PATH</code> はもともと環境変数なので、書き換えた値は子プロセスにも渡る（第1章）。<code>hashed</code> は「一度見つけた場所を覚えておいた」という意味で、次からは探し直さない。引用符の中で <code>~</code> は展開されないので、<code>$HOME</code> と書いている。</p>
+<div class="quiz"><b>確認</b>
+<p>カレントディレクトリにある実行権付きのスクリプト <code>run.sh</code> を実行する打ち方として正しいものを、すべて選べ（カレントディレクトリは <code>PATH</code> に含まれていない）。</p>
+<p>A. <code>run.sh</code>　B. <code>./run.sh</code>　C. <code>bash run.sh</code>　D. <code>$PWD/run.sh</code></p>
+<details><summary>答え</summary>
+<p>B・C・D。A は <code>PATH</code> の中だけを探すので <code>command not found</code>（終了コード 127）になる。
+D の <code>$PWD</code> はシェルがカレントディレクトリの絶対パスに置き換える。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/home/lab/text</code> にいるとき、<code>cd ../../../tmp</code> を実行すると、どこへ移るか。</p>
+<details><summary>答え</summary>
+<p><code>/tmp</code>。<code>..</code> を3回たどると <code>/home/lab</code> → <code>/home</code> → <code>/</code> になり、そこから <code>tmp</code> へ入る。
+相対パスは、いる場所（<code>pwd</code>）から数える。</p></details></div>
+
+<h2 id="history">履歴は、打ったものを全部は残さない</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>history</code> の使い方と、<code>.bash_history</code> にいつ何が書かれるか。</div>
+<p>打ったコマンドは、シェルが番号を付けて覚えている。設定は <code>~/.bashrc</code> にある。</p>
+<pre><code>@@
+$ grep -n HIST ~/.bashrc
+$ echo "HISTFILE=$HISTFILE HISTSIZE=$HISTSIZE HISTFILESIZE=$HISTFILESIZE HISTCONTROL=$HISTCONTROL"
+$ ls -l ~/.bash_history; echo "exit=$?"
+@@</code></pre>
+<p>覚えておく件数が <code>HISTSIZE</code>（メモリの中）、保存するファイルが <code>HISTFILE</code>、ファイルに残す行数が <code>HISTFILESIZE</code> である。そして起動したばかりの檻には、<code>.bash_history</code> がまだ無い。</p>
+<p>ここからは、端末の上で対話的に打った記録である（プロンプトは <code>$ </code> にそろえてある）。子の bash を1つ起動して、その中で打ち、抜けた後でファイルを見る。</p>
+<pre><code>{{SESSION 2-20}}</code></pre>
+<p><code>history -c</code> で一度空にしてから打ったので、番号が 1 から振られている。<code>!1</code>（1番を再実行）、<code>!ec</code>（<code>ec</code> で始まる最新のものを再実行）、<code>!!</code>（直前を再実行）は、どれも<b>展開した結果を1行表示してから</b>実行した。これを<b>ヒストリ展開</b>という。<code>!</code> を書き換えたのはシェルで、<code>echo</code> に届いたのは展開後の <code>echo 一行目</code> である。</p>
+<pre><code>{{SESSION 21-36}}</code></pre>
+<p>打ったのは11回なのに、履歴は7件しかない。</p>
+<ul>
+<li>先頭に空白を置いた <code> echo 先頭に空白を置いた</code> が無い</li>
+<li><code>!1</code> <code>!ec</code> <code>!!</code> で同じ <code>echo 一行目</code> を続けて打った分は、1件にまとまっている</li>
+<li>続けて2回打った <code>echo 二行目</code> も1件</li>
+</ul>
+<p>Ubuntu の <code>~/.bashrc</code> にある <code>HISTCONTROL=ignoreboth</code> が、「空白で始まる行（<code>ignorespace</code>）」と「直前と同じ行（<code>ignoredups</code>）」の両方を記録しない設定だからである。</p>
+<pre><code>{{SESSION 37-46}}</code></pre>
+<p>子の bash の中から見たとき、<code>.bash_history</code> はまだ存在しなかった。<code>exit</code> で抜けた後に初めて、子の履歴がファイルに書かれている。<b>履歴は打った瞬間ではなく、シェルが終わるときにまとめてファイルへ書かれる</b>。</p>
+<div class="scroll"><table>
+<tr><th>操作</th><th>意味</th></tr>
+<tr><td><code>history</code> / <code>history 5</code></td><td>履歴を番号付きで表示する / 最後の5件だけ</td></tr>
+<tr><td><code>!!</code></td><td>直前のコマンドを再実行</td></tr>
+<tr><td><code>!番号</code></td><td>その番号のコマンドを再実行</td></tr>
+<tr><td><code>!文字列</code></td><td>その文字列で始まる最新のコマンドを再実行</td></tr>
+<tr><td><code>history -c</code></td><td>メモリ上の履歴を消す（ファイルはそのまま）</td></tr>
+<tr><td><code>history -w</code> / <code>history -a</code></td><td>今すぐファイルに書く（全部 / 増えた分だけ）</td></tr>
+<tr><td><kbd>↑</kbd> <kbd>↓</kbd> / <kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>履歴をたどる / 文字列で後ろ向きに検索する</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 会議の<b>議事録係</b>に近い。発言はその場でメモされる（<code>history</code> で見える）が、
+清書して共有フォルダ（<code>.bash_history</code>）に置くのは会議が終わってから。
+しかもこの係は「前置きの雑談（空白で始まる行）」と「同じことの繰り返し」をメモしない方針になっている。
+<br>ただし<b>崩れる点</b>: 議事録係は1人だが、bash は端末ごとに別の係がいる。
+2つの端末を開いていると、それぞれが自分のメモを閉じるときに書き足すので、ファイルの中で順番が入り混じる。</div>
+<div class="quiz"><b>確認</b>
+<p>bash で、直前に実行したコマンドをもう一度実行する入力はどれか。</p>
+<p>A. <code>!!</code>　B. <code>!-0</code>　C. <code>history -r</code>　D. <code>$$</code></p>
+<details><summary>答え</summary>
+<p>A。<code>!!</code> は直前のコマンドに展開され、展開結果を表示してから実行される。
+<code>$$</code> はシェル自身のプロセス ID である。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>bash のコマンド履歴が既定で保存されるファイルはどれか。また、それはいつ書き込まれるか。</p>
+<details><summary>答え</summary>
+<p><code>~/.bash_history</code>（変数 <code>HISTFILE</code> で変えられる）。既定ではシェルの<b>終了時</b>にまとめて書き込まれる。
+実測では、子の bash の中から見たときは存在せず、<code>exit</code> した後には子で打った行が入っていた（末尾の5行を表示した）。</p></details></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-text/">演習02</a>は、自分で用意したコマンドをどこからでも名前だけで動かす課題である。
+判定は <code>/tmp</code> に移ってから探すので、<code>PATH</code> に相対パスを足すと必ず鳴る。</div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>名前だけのコマンドは、シェルが <code>PATH</code> の並びの中だけを前から探す。カレントディレクトリは探さない</li><li><code>/</code> を含む名前は <code>PATH</code> を使わない。だから <code>./hello.sh</code>。127 は見つからない、126 は実行できない</li><li><code>bash file</code> は実行権が要らず子で動く。<code>. file</code>（<code>source</code>）は今のシェルで動くので <code>cd</code> や変数が残る</li><li>絶対パスは <code>/</code> から、相対パスは <code>pwd</code> から数える。<code>.</code> と <code>..</code> は実在する名前</li><li><code>!!</code> <code>!番号</code> <code>!文字列</code> はシェルが展開してから実行する。<code>HISTCONTROL=ignoreboth</code> で空白始まりと連続した重複は残らない</li><li><code>.bash_history</code> に書かれるのはシェルの終了時</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-text/theory/01-quote">← 1. 引用符と変数は、コマンドに届く前に片づく</a><a href="/linuc-text/theory/03-man">次: 3. man が説明しているのは、打ったものと別物のことがある →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-text/chapters.js"></script>
+<script src="/linuc-text/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

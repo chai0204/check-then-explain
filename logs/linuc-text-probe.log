@@ -1,0 +1,2233 @@
+
+── lab-linuc-text 1.0.0 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 0. 環境 ==========
+
+$ lab env
+テーマ    : lab-linuc-text 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:text-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+道具の版  : bash 5.2.21-2ubuntu4 / coreutils 9.4-3ubuntu6.3 / grep 3.11-4build1 / sed 4.9-2ubuntu0.24.04.1 / findutils 4.9.0-5build1
+エディタ  : vim 2:9.1.0016-1ubuntu7.20 / nano 7.2-2ubuntu0.2 / less 590-2ubuntu2.1 / man-db 2.12.0-4build2
+ロケール  : LANG=C.UTF-8 LC_ALL=
+EDITOR    : （未設定）
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb
+
+$ id; pwd
+uid=1000(lab) gid=1000(lab) groups=1000(lab)
+/home/lab
+
+$ ls -l ~/text
+total 88
+-rw-r--r-- 1 lab lab  787 Oct 13 09:00 access.log
+-rw-r--r-- 1 lab lab  148 Oct 13 09:00 app.conf
+-rw-r--r-- 1 lab lab   13 Oct 13 09:00 blank.txt
+-rw-r--r-- 1 lab lab   48 Oct 13 09:00 cdtest.sh
+-rw-r--r-- 1 lab lab   71 Oct 13 09:00 child.sh
+drwxr-xr-x 3 lab lab 4096 Oct 13 09:00 files
+-rw-r--r-- 1 lab lab   46 Oct 13 09:00 fruits.txt
+-rw-r--r-- 1 lab lab   33 Oct 13 09:00 hello.sh
+-rw-r--r-- 1 lab lab   35 Oct 13 09:00 indent.txt
+-rw-r--r-- 1 lab lab   41 Oct 13 09:00 ips.txt
+-rw-r--r-- 1 lab lab  120 Oct 13 09:00 jp.txt
+-rw-r--r-- 1 lab lab   61 Oct 13 09:00 mails.txt
+-rw-r--r-- 1 lab lab   25 Oct 13 09:00 memo.txt
+-rw-r--r-- 1 lab lab   28 Oct 13 09:00 names.txt
+-rw-r--r-- 1 lab lab   22 Oct 13 09:00 notail.txt
+-rw-r--r-- 1 lab lab  142 Oct 13 09:00 poem.txt
+-rw-r--r-- 1 lab lab  100 Oct 13 09:00 scores.csv
+-rw-r--r-- 1 lab lab  466 Oct 13 09:00 server.log
+-rw-r--r-- 1 lab lab   55 Oct 13 09:00 spaces.txt
+-rw-r--r-- 1 lab lab   41 Oct 13 09:00 tabs.txt
+-rw-r--r-- 1 lab lab   12 Oct 13 09:00 unix.txt
+-rw-r--r-- 1 lab lab   14 Oct 13 09:00 win.txt
+
+$ ls -l ~/text/files ~/text/files/sub
+/home/lab/text/files:
+total 4
+-rw-r--r-- 1 lab lab    0 Oct 13 09:00 cache.tmp
+-rw-r--r-- 1 lab lab    0 Oct 13 09:00 memo.txt
+-rw-r--r-- 1 lab lab    0 Oct 13 09:00 old data.tmp
+-rw-r--r-- 1 lab lab    0 Oct 13 09:00 report 2026.txt
+drwxr-xr-x 2 lab lab 4096 Oct 13 09:00 sub
+
+/home/lab/text/files/sub:
+total 0
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 a b c.tmp
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 keep.txt
+
+── lab-linuc-text 1.0.0 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 1. 引用符と変数（1.03.1） ==========
+
+$ cd ~/text
+
+$ echo $HOME
+/home/lab
+
+$ echo '$HOME'
+$HOME
+
+$ echo "$HOME"
+/home/lab
+
+$ echo \$HOME
+$HOME
+
+$ echo "私は $(whoami) です"
+私は lab です
+
+$ echo '私は $(whoami) です'
+私は $(whoami) です
+
+$ echo "私は `whoami` です"
+私は lab です
+
+$ echo a     b
+a b
+
+$ echo "a     b"
+a     b
+
+$ msg="a     b"
+
+$ echo $msg
+a b
+
+$ echo "$msg"
+a     b
+
+$ echo *.csv
+scores.csv
+
+$ echo "*.csv"
+*.csv
+
+$ echo -e 'a\tb'
+a	b
+
+$ echo 'a\tb'
+a\tb
+
+$ echo -n "改行なし"; echo "←ここまでが1行"
+改行なし←ここまでが1行
+
+$ cat child.sh
+#!/bin/bash
+echo "子のプロセスから見た GREETING=[$GREETING]"
+
+$ GREETING=hello
+
+$ echo "$GREETING"
+hello
+
+$ bash child.sh
+子のプロセスから見た GREETING=[]
+
+$ export GREETING
+
+$ bash child.sh
+子のプロセスから見た GREETING=[hello]
+
+$ env | grep GREETING
+GREETING=hello
+
+$ set | grep "^GREETING="
+GREETING=hello
+
+$ LOCAL_ONLY=here
+
+$ set | grep "^LOCAL_ONLY="
+LOCAL_ONLY=here
+
+$ env | grep "^LOCAL_ONLY="; echo "exit=$?"
+exit=1
+
+$ export -p | grep GREETING
+declare -x GREETING="hello"
+
+$ GREETING=bye bash child.sh
+子のプロセスから見た GREETING=[bye]
+
+$ echo "$GREETING"
+hello
+
+$ env GREETING=env-bye bash child.sh
+子のプロセスから見た GREETING=[env-bye]
+
+$ env -i bash child.sh
+子のプロセスから見た GREETING=[]
+
+$ unset GREETING
+
+$ echo "[$GREETING]"
+[]
+
+$ bash child.sh
+子のプロセスから見た GREETING=[]
+
+$ X=1 echo "[$X]"
+[]
+
+$ X=1; echo "[$X]"
+[1]
+
+$ unset X
+
+$ set -o | grep -E "^(noclobber|xtrace|history) "
+history        	on
+noclobber      	off
+xtrace         	off
+
+$ bash -x child.sh
++ echo '子のプロセスから見た GREETING=[]'
+子のプロセスから見た GREETING=[]
+
+$ env | grep -E "^(HOME|LANG)="
+HOME=/home/lab
+LANG=C.UTF-8
+
+$ env | grep -c "^PATH="
+1
+
+$ set | grep -c "^PATH="
+1
+
+$ set | grep -c "^HISTSIZE="
+1
+
+$ env | grep -c "^HISTSIZE="
+0
+
+$ echo $SHLVL; bash -c "echo \$SHLVL"
+1
+2
+
+── lab-linuc-text 1.0.0 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 2. コマンドの在り処と履歴（1.03.1） ==========
+
+$ cd ~/text
+
+$ pwd
+/home/lab/text
+
+$ ls -l hello.sh cdtest.sh
+-rw-r--r-- 1 lab lab 48 Oct 13 09:00 cdtest.sh
+-rw-r--r-- 1 lab lab 33 Oct 13 09:00 hello.sh
+
+$ cat hello.sh
+#!/bin/bash
+echo "hello from $0"
+
+$ hello.sh; echo "exit=$?"
+bash: hello.sh: command not found
+exit=127
+
+$ ./hello.sh; echo "exit=$?"
+bash: ./hello.sh: Permission denied
+exit=126
+
+$ bash hello.sh
+hello from hello.sh
+
+$ chmod +x hello.sh
+
+$ ./hello.sh
+hello from ./hello.sh
+
+$ ~/text/hello.sh
+hello from /home/lab/text/hello.sh
+
+$ /home/lab/text/hello.sh
+hello from /home/lab/text/hello.sh
+
+$ cd /tmp
+
+$ ../home/lab/text/hello.sh
+hello from ../home/lab/text/hello.sh
+
+$ cd ~/text
+
+$ echo "$PATH"
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+$ type ls
+ls is aliased to `ls --color=auto'
+
+$ type cd
+cd is a shell builtin
+
+$ type pwd
+pwd is a shell builtin
+
+$ type -a pwd
+pwd is a shell builtin
+pwd is /usr/bin/pwd
+pwd is /bin/pwd
+
+$ type hello.sh
+bash: type: hello.sh: not found
+
+$ type ./hello.sh
+./hello.sh is ./hello.sh
+
+$ which ls
+/usr/bin/ls
+
+$ ls -ld . ..
+drwxr-xr-x 1 lab lab 4096 Oct 13 09:00 .
+drwxr-x--- 1 lab lab 4096 Oct 13 09:00 ..
+
+$ cd ..; pwd
+/home/lab
+
+$ cd text; pwd
+/home/lab/text
+
+$ cd /usr/share; pwd
+/usr/share
+
+$ cd -
+/home/lab/text
+
+$ cat cdtest.sh
+cd /tmp
+echo "スクリプトの中では $PWD"
+
+$ bash cdtest.sh
+スクリプトの中では /tmp
+
+$ pwd
+/home/lab/text
+
+$ . cdtest.sh
+スクリプトの中では /tmp
+
+$ pwd
+/tmp
+
+$ cd ~/text
+
+$ PATH="$PATH:$HOME/text"
+
+$ hello.sh
+hello from /home/lab/text/hello.sh
+
+$ type hello.sh
+hello.sh is hashed (/home/lab/text/hello.sh)
+
+$ cd /; hello.sh; cd ~/text
+hello from /home/lab/text/hello.sh
+
+$ grep -n HIST ~/.bashrc
+13:HISTCONTROL=ignoreboth
+18:# for setting history length see HISTSIZE and HISTFILESIZE in bash(1)
+19:HISTSIZE=1000
+20:HISTFILESIZE=2000
+
+$ echo "HISTFILE=$HISTFILE HISTSIZE=$HISTSIZE HISTFILESIZE=$HISTFILESIZE HISTCONTROL=$HISTCONTROL"
+HISTFILE=/home/lab/.bash_history HISTSIZE=1000 HISTFILESIZE=2000 HISTCONTROL=ignoreboth
+
+$ ls -l ~/.bash_history; echo "exit=$?"
+ls: cannot access '/home/lab/.bash_history': No such file or directory
+exit=2
+
+--- ここから下は、端末（pty）の上で対話シェルを動かし、1行ずつ打鍵した記録 ---
+lab@linuc:~/text$  export PROMPT_COMMAND='PS1="\$ "'
+$ bash
+$ history -c
+$ echo 一行目
+一行目
+$ echo 二行目
+二行目
+$ history
+    1  echo 一行目
+    2  echo 二行目
+    3  history
+$ !1
+echo 一行目
+一行目
+$ !ec
+echo 一行目
+一行目
+$ !!
+echo 一行目
+一行目
+$  echo 先頭に空白を置いた
+先頭に空白を置いた
+$ echo 二行目
+二行目
+$ echo 二行目
+二行目
+$ history
+    1  echo 一行目
+    2  echo 二行目
+    3  history
+    4  echo 一行目
+    5  echo 二行目
+    6  history
+$ history 2
+    6  history
+    7  history 2
+$ tail -3 ~/.bash_history
+tail: cannot open '/home/lab/.bash_history' for reading: No such file or directory
+$ exit
+exit
+$ tail -5 ~/.bash_history
+echo 二行目
+history
+history 2
+tail -3 ~/.bash_history
+exit
+$ exit
+exit
+--- 対話の記録ここまで ---
+
+── lab-linuc-text 1.0.0 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 3. man の読み方（1.03.1） ==========
+
+$ cd ~/text
+
+$ man -f passwd
+passwd (1)           - change user password
+passwd (5)           - the password file
+
+$ whatis passwd
+passwd (1)           - change user password
+passwd (5)           - the password file
+
+$ man -w passwd
+/usr/share/man/man1/passwd.1.gz
+
+$ man -w 5 passwd
+/usr/share/man/man5/passwd.5.gz
+
+$ man passwd | grep -A1 "^NAME"
+NAME
+       passwd - change user password
+
+$ man 5 passwd | grep -A1 "^NAME"
+NAME
+       passwd - the password file
+
+$ man -k "^regex"
+regex (7)            - POSIX.2 regular expressions
+
+$ apropos "^regex"
+regex (7)            - POSIX.2 regular expressions
+
+$ man -f regex
+regex (7)            - POSIX.2 regular expressions
+
+$ man 7 regex | grep -A1 "^NAME"
+NAME
+       regex - POSIX.2 regular expressions
+
+$ man -k "regular expression" | sort
+re_format (7)        - POSIX.2 regular expressions
+regex (7)            - POSIX.2 regular expressions
+zegrep (1)           - search possibly compressed files for a regular expression
+zfgrep (1)           - search possibly compressed files for a regular expression
+zgrep (1)            - search possibly compressed files for a regular expression
+
+$ ls -d /usr/share/man/man[0-9]
+/usr/share/man/man1
+/usr/share/man/man2
+/usr/share/man/man3
+/usr/share/man/man4
+/usr/share/man/man5
+/usr/share/man/man6
+/usr/share/man/man7
+/usr/share/man/man8
+
+$ man ls | grep -E "^ +-l +"
+       -l     use a long listing format
+
+$ man ls | grep -A1 -E "^ +-a, --all"
+       -a, --all
+              do not ignore entries starting with .
+
+$ man -f echo
+echo (1)             - display a line of text
+
+$ man echo | grep -A1 "^NAME"
+NAME
+       echo - display a line of text
+
+$ man echo | grep -E "^ +--version"
+       --version
+
+$ echo --version
+--version
+
+$ type echo
+echo is a shell builtin
+
+$ type -a echo
+echo is a shell builtin
+echo is /usr/bin/echo
+echo is /bin/echo
+
+$ /usr/bin/echo --version | head -1
+echo (GNU coreutils) 9.4
+
+$ help echo | head -3
+echo: echo [-neE] [arg ...]
+    Write arguments to the standard output.
+    
+
+$ man cd; echo "exit=$?"
+No manual entry for cd
+exit=16
+
+$ man -f cd; echo "exit=$?"
+cd: nothing appropriate.
+exit=16
+
+$ help cd | head -3
+cd: cd [-L|[-P [-e]] [-@]] [dir]
+    Change the shell working directory.
+    
+
+$ type cd
+cd is a shell builtin
+
+$ man -f printf
+printf (1)           - format and print data
+
+$ man 1 printf | grep -A1 "^NAME"
+NAME
+       printf - format and print data
+
+$ man -w 3 printf; echo "exit=$?"
+No manual entry for printf in section 3
+exit=16
+
+$ man -k "^printf"
+printf (1)           - format and print data
+
+$ man bash | grep -E "^ +history \[n\]"
+       history [n]
+
+── lab-linuc-text 1.0.0 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 4. 行を数える・覗く（1.03.2） ==========
+
+$ cd ~/text
+
+$ cat fruits.txt
+banana
+apple
+cherry
+apple
+apple
+banana
+Durian
+
+$ cat -n fruits.txt
+     1	banana
+     2	apple
+     3	cherry
+     4	apple
+     5	apple
+     6	banana
+     7	Durian
+
+$ head -3 fruits.txt
+banana
+apple
+cherry
+
+$ head -n 3 fruits.txt
+banana
+apple
+cherry
+
+$ tail -2 fruits.txt
+banana
+Durian
+
+$ tail -n +6 fruits.txt
+banana
+Durian
+
+$ head -n -5 fruits.txt
+banana
+apple
+
+$ head -c 12 fruits.txt
+banana
+apple
+$ wc fruits.txt
+ 7  7 46 fruits.txt
+
+$ wc -l fruits.txt
+7 fruits.txt
+
+$ wc -w -c fruits.txt
+ 7 46 fruits.txt
+
+$ wc -l < fruits.txt
+7
+
+$ cat fruits.txt | wc -l
+7
+
+$ cat notail.txt
+first line
+second line
+$ wc -l notail.txt
+1 notail.txt
+
+$ od -c notail.txt
+0000000   f   i   r   s   t       l   i   n   e  \n   s   e   c   o   n
+0000020   d       l   i   n   e
+0000026
+
+$ cat -A notail.txt
+first line$
+second line
+$ echo >> notail.txt; wc -l notail.txt
+2 notail.txt
+
+$ cat unix.txt
+line1
+line2
+
+$ cat win.txt
+line1
+line2
+
+$ wc -c unix.txt win.txt
+12 unix.txt
+14 win.txt
+26 total
+
+$ od -c unix.txt
+0000000   l   i   n   e   1  \n   l   i   n   e   2  \n
+0000014
+
+$ od -c win.txt
+0000000   l   i   n   e   1  \r  \n   l   i   n   e   2  \r  \n
+0000016
+
+$ cat -A win.txt
+line1^M$
+line2^M$
+
+$ od -An -tx1 unix.txt
+ 6c 69 6e 65 31 0a 6c 69 6e 65 32 0a
+
+$ od -t x1 -A d unix.txt
+0000000 6c 69 6e 65 31 0a 6c 69 6e 65 32 0a
+0000012
+
+$ cat blank.txt
+first
+
+third
+
+$ nl blank.txt
+     1	first
+       
+     2	third
+
+$ cat -n blank.txt
+     1	first
+     2	
+     3	third
+
+$ nl -b a blank.txt
+     1	first
+     2	
+     3	third
+
+$ nl fruits.txt
+     1	banana
+     2	apple
+     3	cherry
+     4	apple
+     5	apple
+     6	banana
+     7	Durian
+
+$ nl -w 2 -s ": " fruits.txt
+ 1: banana
+ 2: apple
+ 3: cherry
+ 4: apple
+ 5: apple
+ 6: banana
+ 7: Durian
+
+$ less fruits.txt | head -3
+banana
+apple
+cherry
+
+$ seq 1 100 | less | tail -2
+99
+100
+
+$ printf "line %s\n" 1 2 3 > /tmp/watch.log
+
+$ timeout 2 tail -f /tmp/watch.log; echo "exit=$?"
+line 1
+line 2
+line 3
+exit=124
+
+$ (sleep 1; echo "あとから追記した行" >> /tmp/watch.log) | timeout 3 tail -n 1 -f /tmp/watch.log; echo "exit=$?"
+line 3
+あとから追記した行
+exit=124
+
+$ cat -s blank.txt | cat -A
+first$
+$
+third$
+
+── lab-linuc-text 1.0.0 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 5. 列と並び（1.03.2） ==========
+
+$ cd ~/text
+
+$ cat scores.csv
+id,name,dept,score
+1,Sato,dev,72
+2,Suzuki,sales,9
+3,Takahashi,dev,100
+4,Tanaka,hr,85
+5,Ito,sales,85
+
+$ cut -d, -f2 scores.csv
+name
+Sato
+Suzuki
+Takahashi
+Tanaka
+Ito
+
+$ cut -d, -f2,4 scores.csv
+name,score
+Sato,72
+Suzuki,9
+Takahashi,100
+Tanaka,85
+Ito,85
+
+$ cut -d, -f2- scores.csv
+name,dept,score
+Sato,dev,72
+Suzuki,sales,9
+Takahashi,dev,100
+Tanaka,hr,85
+Ito,sales,85
+
+$ cut -c1-3 fruits.txt
+ban
+app
+che
+app
+app
+ban
+Dur
+
+$ cat -A tabs.txt
+name^Iage^Icity$
+alice^I23^Itokyo$
+bob^I7^Iosaka$
+
+$ cut -f2 tabs.txt
+age
+23
+7
+
+$ cut -d, -f2 tabs.txt
+name	age	city
+alice	23	tokyo
+bob	7	osaka
+
+$ cat spaces.txt
+alice   23  tokyo
+bob     7   osaka
+carol   41  nagoya
+
+$ cut -d" " -f2 spaces.txt
+
+
+
+
+$ cut -d" " -f2 spaces.txt | cat -A
+$
+$
+$
+
+$ cut -d" " -f4 spaces.txt
+23
+
+41
+
+$ tr -s " " < spaces.txt
+alice 23 tokyo
+bob 7 osaka
+carol 41 nagoya
+
+$ tr -s " " < spaces.txt | cut -d" " -f2
+23
+7
+41
+
+$ tr a-z A-Z < fruits.txt
+BANANA
+APPLE
+CHERRY
+APPLE
+APPLE
+BANANA
+DURIAN
+
+$ tr -d "a" < fruits.txt
+bnn
+pple
+cherry
+pple
+pple
+bnn
+Durin
+
+$ tr "," "\t" < scores.csv | cat -A | head -2
+id^Iname^Idept^Iscore$
+1^ISato^Idev^I72$
+
+$ tr a-z A-Z fruits.txt; echo "exit=$?"
+tr: extra operand ‘fruits.txt’
+Try 'tr --help' for more information.
+exit=1
+
+$ cat fruits.txt | tr a-z A-Z
+BANANA
+APPLE
+CHERRY
+APPLE
+APPLE
+BANANA
+DURIAN
+
+$ sort fruits.txt
+Durian
+apple
+apple
+apple
+banana
+banana
+cherry
+
+$ sort -r fruits.txt
+cherry
+banana
+banana
+apple
+apple
+apple
+Durian
+
+$ sort -f fruits.txt
+apple
+apple
+apple
+banana
+banana
+cherry
+Durian
+
+$ uniq fruits.txt
+banana
+apple
+cherry
+apple
+banana
+Durian
+
+$ sort fruits.txt | uniq
+Durian
+apple
+banana
+cherry
+
+$ sort fruits.txt | uniq -c
+      1 Durian
+      3 apple
+      2 banana
+      1 cherry
+
+$ sort fruits.txt | uniq -c | sort -rn
+      3 apple
+      2 banana
+      1 cherry
+      1 Durian
+
+$ sort fruits.txt | uniq -d
+apple
+banana
+
+$ sort fruits.txt | uniq -u
+Durian
+cherry
+
+$ sort -u fruits.txt
+Durian
+apple
+banana
+cherry
+
+$ tail -n +2 scores.csv | sort -t, -k4
+3,Takahashi,dev,100
+1,Sato,dev,72
+4,Tanaka,hr,85
+5,Ito,sales,85
+2,Suzuki,sales,9
+
+$ tail -n +2 scores.csv | sort -t, -k4 -n
+2,Suzuki,sales,9
+1,Sato,dev,72
+4,Tanaka,hr,85
+5,Ito,sales,85
+3,Takahashi,dev,100
+
+$ tail -n +2 scores.csv | sort -t, -k4 -nr
+3,Takahashi,dev,100
+5,Ito,sales,85
+4,Tanaka,hr,85
+1,Sato,dev,72
+2,Suzuki,sales,9
+
+$ tail -n +2 scores.csv | sort -t, -k3,3 -k4,4nr
+3,Takahashi,dev,100
+1,Sato,dev,72
+4,Tanaka,hr,85
+5,Ito,sales,85
+2,Suzuki,sales,9
+
+$ cat names.txt
+1 Sato
+2 Suzuki
+3 Takahashi
+
+$ cat mails.txt
+1 sato@example.com
+3 takahashi@example.com
+4 ito@example.com
+
+$ paste names.txt mails.txt
+1 Sato	1 sato@example.com
+2 Suzuki	3 takahashi@example.com
+3 Takahashi	4 ito@example.com
+
+$ paste -d, names.txt mails.txt
+1 Sato,1 sato@example.com
+2 Suzuki,3 takahashi@example.com
+3 Takahashi,4 ito@example.com
+
+$ paste -s -d, fruits.txt
+banana,apple,cherry,apple,apple,banana,Durian
+
+$ join names.txt mails.txt
+1 Sato sato@example.com
+3 Takahashi takahashi@example.com
+
+$ join -a1 names.txt mails.txt
+1 Sato sato@example.com
+2 Suzuki
+3 Takahashi takahashi@example.com
+
+$ join -v1 names.txt mails.txt
+2 Suzuki
+
+$ sort -r names.txt > /tmp/names-r.txt; cat /tmp/names-r.txt
+3 Takahashi
+2 Suzuki
+1 Sato
+
+$ join /tmp/names-r.txt mails.txt; echo "exit=$?"
+join: /tmp/names-r.txt:2: is not sorted: 2 Suzuki
+3 Takahashi takahashi@example.com
+join: input is not in sorted order
+exit=1
+
+$ echo "B a A b" | tr " " "\n" | sort
+A
+B
+a
+b
+
+$ locale | head -3
+LANG=C.UTF-8
+LANGUAGE=
+LC_CTYPE="C.UTF-8"
+
+── lab-linuc-text 1.0.0 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 6. sed と整形（1.03.2 / 1.03.4） ==========
+
+$ cd ~/text
+
+$ cat app.conf
+# app.conf - 練習用の設定ファイル
+host=localhost
+port=8080
+port_admin=8081
+# debug=true
+log_level=info
+url=http://localhost:8080/?lang=ja
+
+$ sed "s/8080/9090/" app.conf
+# app.conf - 練習用の設定ファイル
+host=localhost
+port=9090
+port_admin=8081
+# debug=true
+log_level=info
+url=http://localhost:9090/?lang=ja
+
+$ grep -c 9090 app.conf
+0
+
+$ sed "s/=/ = /" app.conf
+# app.conf - 練習用の設定ファイル
+host = localhost
+port = 8080
+port_admin = 8081
+# debug = true
+log_level = info
+url = http://localhost:8080/?lang=ja
+
+$ sed "s/=/ = /g" app.conf
+# app.conf - 練習用の設定ファイル
+host = localhost
+port = 8080
+port_admin = 8081
+# debug = true
+log_level = info
+url = http://localhost:8080/?lang = ja
+
+$ sed "s/port/PORT/" app.conf
+# app.conf - 練習用の設定ファイル
+host=localhost
+PORT=8080
+PORT_admin=8081
+# debug=true
+log_level=info
+url=http://localhost:8080/?lang=ja
+
+$ sed "s/^port=/PORT=/" app.conf
+# app.conf - 練習用の設定ファイル
+host=localhost
+PORT=8080
+port_admin=8081
+# debug=true
+log_level=info
+url=http://localhost:8080/?lang=ja
+
+$ sed -n "2,4p" app.conf
+host=localhost
+port=8080
+port_admin=8081
+
+$ sed -n "/port/p" app.conf
+port=8080
+port_admin=8081
+
+$ sed "/^#/d" app.conf
+host=localhost
+port=8080
+port_admin=8081
+log_level=info
+url=http://localhost:8080/?lang=ja
+
+$ sed "1d" app.conf
+host=localhost
+port=8080
+port_admin=8081
+# debug=true
+log_level=info
+url=http://localhost:8080/?lang=ja
+
+$ sed "\$d" app.conf
+# app.conf - 練習用の設定ファイル
+host=localhost
+port=8080
+port_admin=8081
+# debug=true
+log_level=info
+
+$ sed -n "\$p" app.conf
+url=http://localhost:8080/?lang=ja
+
+$ sed -e "/^#/d" -e "s/8080/9090/g" app.conf
+host=localhost
+port=9090
+port_admin=8081
+log_level=info
+url=http://localhost:9090/?lang=ja
+
+$ sed "s|http://localhost|https://example.com|" app.conf | tail -1
+url=https://example.com:8080/?lang=ja
+
+$ sed -E "s/^([a-z_]+)=(.*)$/\1: \2/" app.conf
+# app.conf - 練習用の設定ファイル
+host: localhost
+port: 8080
+port_admin: 8081
+# debug=true
+log_level: info
+url: http://localhost:8080/?lang=ja
+
+$ sed "3q" app.conf
+# app.conf - 練習用の設定ファイル
+host=localhost
+port=8080
+
+$ sed "2i\\# ここに挿入" app.conf | head -4
+# app.conf - 練習用の設定ファイル
+# ここに挿入
+host=localhost
+port=8080
+
+$ sed "y/abc/ABC/" fruits.txt
+BAnAnA
+Apple
+Cherry
+Apple
+Apple
+BAnAnA
+DuriAn
+
+$ cp app.conf my.conf
+
+$ ls -i my.conf
+18369488 my.conf
+
+$ sed -i "s/^port=8080/port=9090/" my.conf
+
+$ ls -i my.conf
+18369489 my.conf
+
+$ grep ^port= my.conf
+port=9090
+
+$ sed -i.bak "/^#/d" my.conf
+
+$ ls -1 my.conf*
+my.conf
+my.conf.bak
+
+$ cat my.conf
+host=localhost
+port=9090
+port_admin=8081
+log_level=info
+url=http://localhost:8080/?lang=ja
+
+$ diff my.conf.bak my.conf
+1d0
+< # app.conf - 練習用の設定ファイル
+5d3
+< # debug=true
+
+$ ln my.conf hard.conf
+
+$ ls -i my.conf hard.conf
+18369488 hard.conf
+18369488 my.conf
+
+$ sed -i "s/^port=9090/port=7070/" my.conf
+
+$ ls -i my.conf hard.conf
+18369488 hard.conf
+18369490 my.conf
+
+$ grep ^port= my.conf hard.conf
+my.conf:port=7070
+hard.conf:port=9090
+
+$ cat -A tabs.txt
+name^Iage^Icity$
+alice^I23^Itokyo$
+bob^I7^Iosaka$
+
+$ expand tabs.txt
+name    age     city
+alice   23      tokyo
+bob     7       osaka
+
+$ expand tabs.txt | cat -A
+name    age     city$
+alice   23      tokyo$
+bob     7       osaka$
+
+$ expand -t 4 tabs.txt | cat -A
+name    age city$
+alice   23  tokyo$
+bob 7   osaka$
+
+$ cat -A indent.txt
+list:$
+^Iapple   red$
+^Ibanana  yellow$
+
+$ expand indent.txt | cat -A
+list:$
+        apple   red$
+        banana  yellow$
+
+$ expand indent.txt | unexpand | cat -A
+list:$
+^Iapple   red$
+^Ibanana  yellow$
+
+$ expand indent.txt | unexpand -a | cat -A
+list:$
+^Iapple^Ired$
+^Ibanana^Iyellow$
+
+$ cat poem.txt
+Text streams flow from one command to the next. Each filter reads its input, changes it a little, and writes the result for the next command.
+
+$ fmt -w 40 poem.txt
+Text streams flow from one command to
+the next. Each filter reads its input,
+changes it a little, and writes the
+result for the next command.
+
+$ fmt -w 40 poem.txt | wc -L
+38
+
+$ fmt -w 20 jp.txt
+日本語の文には単語の間に空白が無いので、どこで折り返せばよいかを
+fmt
+は知らない。
+
+$ pr fruits.txt | head -5
+
+
+2026-10-13 09:00                    fruits.txt                    Page 1
+
+
+
+$ pr -3 -t fruits.txt
+banana			apple			banana
+apple			apple			Durian
+cherry
+
+$ pr -l 12 fruits.txt | grep -c "Page"
+4
+
+$ seq 2500 > big.txt
+
+$ split big.txt
+
+$ wc -l xa*
+ 1000 xaa
+ 1000 xab
+  500 xac
+ 2500 total
+
+$ split -l 1000 -d big.txt part_
+
+$ wc -l part_*
+ 1000 part_00
+ 1000 part_01
+  500 part_02
+ 2500 total
+
+$ split -n 2 fruits.txt half_; wc -c half_*
+23 half_aa
+23 half_ab
+46 total
+
+$ cat half_aa; echo "<-- ここまでが half_aa"
+banana
+apple
+cherry
+app<-- ここまでが half_aa
+
+$ split -n l/2 fruits.txt line_; wc -l line_*
+ 4 line_aa
+ 3 line_ab
+ 7 total
+
+$ cat xa* | wc -l
+2500
+
+$ cat xa* | cmp - big.txt; echo "exit=$?"
+exit=0
+
+── lab-linuc-text 1.0.0 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 7. リダイレクト（1.03.3） ==========
+
+$ cd ~/text
+
+$ ls fruits.txt nosuch.txt
+ls: cannot access 'nosuch.txt': No such file or directory
+fruits.txt
+
+$ ls fruits.txt nosuch.txt > out.txt
+ls: cannot access 'nosuch.txt': No such file or directory
+
+$ cat out.txt
+fruits.txt
+
+$ ls fruits.txt nosuch.txt 2> err.txt
+fruits.txt
+
+$ cat err.txt
+ls: cannot access 'nosuch.txt': No such file or directory
+
+$ ls fruits.txt nosuch.txt > both.txt 2>&1
+
+$ cat both.txt
+ls: cannot access 'nosuch.txt': No such file or directory
+fruits.txt
+
+$ ls fruits.txt nosuch.txt 2>&1 > only.txt
+ls: cannot access 'nosuch.txt': No such file or directory
+
+$ cat only.txt
+fruits.txt
+
+$ ls fruits.txt nosuch.txt &> amp.txt
+
+$ cat amp.txt
+ls: cannot access 'nosuch.txt': No such file or directory
+fruits.txt
+
+$ ls fruits.txt nosuch.txt 2> /dev/null
+fruits.txt
+
+$ ls fruits.txt nosuch.txt > /dev/null
+ls: cannot access 'nosuch.txt': No such file or directory
+
+$ stat -c "%A %F" /dev/null
+crw-rw-rw- character special file
+
+$ echo first > note.txt
+
+$ echo second > note.txt
+
+$ cat note.txt
+second
+
+$ echo third >> note.txt
+
+$ cat note.txt
+second
+third
+
+$ ls nosuch.txt 2>> note.txt
+
+$ cat note.txt
+second
+third
+ls: cannot access 'nosuch.txt': No such file or directory
+
+$ wc -l < fruits.txt
+7
+
+$ tr a-z A-Z < fruits.txt > upper.txt
+
+$ cat upper.txt
+BANANA
+APPLE
+CHERRY
+APPLE
+APPLE
+BANANA
+DURIAN
+
+$ cp fruits.txt copy.txt
+
+$ sort copy.txt > copy.txt
+
+$ wc -c copy.txt
+0 copy.txt
+
+$ cp fruits.txt copy.txt
+
+$ sort copy.txt -o copy.txt
+
+$ head -2 copy.txt
+Durian
+apple
+
+$ set -o noclobber
+
+$ echo again > note.txt
+bash: note.txt: cannot overwrite existing file
+
+$ echo again >| note.txt
+
+$ cat note.txt
+again
+
+$ set +o noclobber
+
+$ cat << EOF > greet.txt
+hello, $HOME
+EOF
+
+$ cat greet.txt
+hello, /home/lab
+
+$ cat << 'EOF'
+hello, $HOME
+EOF
+hello, $HOME
+
+$ tr a-z A-Z <<< "here string"
+HERE STRING
+
+$ ls nosuch.txt; echo "exit=$?"
+ls: cannot access 'nosuch.txt': No such file or directory
+exit=2
+
+$ ls fruits.txt; echo "exit=$?"
+fruits.txt
+exit=0
+
+── lab-linuc-text 1.0.0 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 8. パイプと xargs と tee（1.03.3） ==========
+
+$ cd ~/text
+
+$ cut -d" " -f9 access.log | sort | uniq -c | sort -rn
+      4 200
+      3 404
+      1 500
+      1 403
+      1 302
+
+$ ls nosuch.txt | wc -l
+ls: cannot access 'nosuch.txt': No such file or directory
+0
+
+$ ls nosuch.txt 2>&1 | wc -l
+1
+
+$ ls nosuch.txt |& wc -l
+1
+
+$ find files -type f | sort
+files/cache.tmp
+files/memo.txt
+files/old data.tmp
+files/report 2026.txt
+files/sub/a b c.tmp
+files/sub/keep.txt
+
+$ find files -name "*.tmp" | sort
+files/cache.tmp
+files/old data.tmp
+files/sub/a b c.tmp
+
+$ find files -name "*.tmp" | sort | xargs ls -l
+ls: cannot access 'files/old': No such file or directory
+ls: cannot access 'data.tmp': No such file or directory
+ls: cannot access 'files/sub/a': No such file or directory
+ls: cannot access 'b': No such file or directory
+ls: cannot access 'c.tmp': No such file or directory
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/cache.tmp
+
+$ find files -name "*.tmp" -print0 | sort -z | xargs -0 ls -l
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/cache.tmp
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/old data.tmp
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/sub/a b c.tmp
+
+$ find files -name "*.tmp" -exec ls -l {} +
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/cache.tmp
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/old data.tmp
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/sub/a b c.tmp
+
+$ echo a b c | xargs echo
+a b c
+
+$ echo a b c | xargs -n 1 echo
+a
+b
+c
+
+$ echo a b c | xargs -n 2 echo
+a b
+c
+
+$ printf "%s\n" apple banana | xargs -I{} echo "果物: {}"
+果物: apple
+果物: banana
+
+$ echo "report 2026.txt" | xargs ls -l
+ls: cannot access 'report': No such file or directory
+ls: cannot access '2026.txt': No such file or directory
+
+$ find files -name "*.tmp" | sort | xargs -n 1 echo
+files/cache.tmp
+files/old
+data.tmp
+files/sub/a
+b
+c.tmp
+
+$ find files -name "*.tmp" -print0 | sort -z | xargs -0 -n 1 echo
+files/cache.tmp
+files/old data.tmp
+files/sub/a b c.tmp
+
+$ printf "%s\n" "files/old data.tmp" | xargs -d "\n" ls -l
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/old data.tmp
+
+$ cut -d" " -f1 access.log | sort | uniq -c | sort -rn | tee ip-count.txt | head -2
+      4 192.168.1.10
+      2 192.168.1.12
+
+$ cat ip-count.txt
+      4 192.168.1.10
+      2 192.168.1.12
+      2 192.168.1.11
+      1 192.168.1.14
+      1 192.168.1.13
+
+$ echo "追記" | tee -a ip-count.txt
+追記
+
+$ tail -2 ip-count.txt
+      1 192.168.1.13
+追記
+
+$ echo "ここは $(pwd)"
+ここは /home/lab/text
+
+$ echo "ここは `pwd`"
+ここは /home/lab/text
+
+$ echo "果物は $(wc -l < fruits.txt) 行"
+果物は 7 行
+
+$ wc -l $(find files -name "*.txt" | sort)
+0 files/memo.txt
+wc: files/report: No such file or directory
+wc: 2026.txt: No such file or directory
+0 files/sub/keep.txt
+0 total
+
+$ false | true; echo "exit=$? PIPESTATUS=${PIPESTATUS[*]}"
+exit=0 PIPESTATUS=1 0
+
+$ find files -name "*.tmp" | sort | xargs rm; echo "exit=$?"
+rm: cannot remove 'files/old': No such file or directory
+rm: cannot remove 'data.tmp': No such file or directory
+rm: cannot remove 'files/sub/a': No such file or directory
+rm: cannot remove 'b': No such file or directory
+rm: cannot remove 'c.tmp': No such file or directory
+exit=123
+
+$ find files -name "*.tmp" | sort
+files/old data.tmp
+files/sub/a b c.tmp
+
+$ find files -name "*.tmp" -print0 | xargs -0 rm
+
+$ find files -name "*.tmp" | wc -l
+0
+
+── lab-linuc-text 1.0.0 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 9. 正規表現と grep（1.03.4） ==========
+
+$ cd ~/text
+
+$ cat ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+ip-10-0-0-5
+
+$ grep 10.0.0.5 ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+ip-10-0-0-5
+
+$ grep -F 10.0.0.5 ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+
+$ grep "10\.0\.0\.5" ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+
+$ grep -x "10\.0\.0\.5" ips.txt
+10.0.0.5
+
+$ grep -w 10.0.0.5 ips.txt
+10.0.0.5
+ip-10-0-0-5
+
+$ grep -Fx 10.0.0.5 ips.txt
+10.0.0.5
+
+$ cat server.log
+2026-10-13 09:00:01 INFO  server started on port 8080
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:00 INFO  user alice logged in
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:04:00 info  lowercase level from old client
+2026-10-13 09:05:00 WARNING deprecated option -x
+2026-10-13 09:06:00 INFO  peer 10.0.0.50 connected
+
+$ grep ERROR server.log
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+
+$ grep -c ERROR server.log
+3
+
+$ grep -n ERROR server.log
+3:2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+5:2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+6:2026-10-13 09:03:00 ERROR timeout after 30s
+
+$ grep -E "^[0-9-]+ [0-9:]+ ERROR" server.log
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:03:00 ERROR timeout after 30s
+
+$ grep -v INFO server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:04:00 info  lowercase level from old client
+2026-10-13 09:05:00 WARNING deprecated option -x
+
+$ grep -i info server.log
+2026-10-13 09:00:01 INFO  server started on port 8080
+2026-10-13 09:02:00 INFO  user alice logged in
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:04:00 info  lowercase level from old client
+2026-10-13 09:06:00 INFO  peer 10.0.0.50 connected
+
+$ grep WARN server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:05:00 WARNING deprecated option -x
+
+$ grep -w WARN server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+
+$ grep -l ERROR access.log server.log app.conf
+server.log
+
+$ grep -c 8080 access.log server.log app.conf
+access.log:0
+server.log:1
+app.conf:2
+
+$ grep -rl 8080 . | sort
+./app.conf
+./server.log
+
+$ grep -E "ERROR|WARN" server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:05:00 WARNING deprecated option -x
+
+$ grep "ERROR|WARN" server.log; echo "exit=$?"
+exit=1
+
+$ grep "ERROR\|WARN" server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:05:00 WARNING deprecated option -x
+
+$ egrep "ERROR|WARN" server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:05:00 WARNING deprecated option -x
+
+$ cat /usr/bin/egrep
+#!/bin/sh
+cmd=${0##*/}
+exec grep -E "$@"
+
+$ cat /usr/bin/fgrep
+#!/bin/sh
+cmd=${0##*/}
+exec grep -F "$@"
+
+$ zcat /usr/share/doc/grep/changelog.Debian.gz | grep -m1 disable-egrep
+  * Add 01-disable-egrep-fgrep-warnings.patch (Closes: #1019335)
+
+$ fgrep 10.0.0.5 ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+
+$ egrep -c ERROR server.log 2>/dev/null
+3
+
+$ grep "ap+le" fruits.txt; echo "exit=$?"
+exit=1
+
+$ grep -E "ap+le" fruits.txt
+apple
+apple
+apple
+
+$ grep "ap\+le" fruits.txt
+apple
+apple
+apple
+
+$ grep "^b" fruits.txt
+banana
+banana
+
+$ grep "a$" fruits.txt
+banana
+banana
+
+$ grep "^[A-Z]" fruits.txt
+Durian
+
+$ grep -E "^(apple|cherry)$" fruits.txt
+apple
+cherry
+apple
+apple
+
+$ grep -c "" fruits.txt
+7
+
+$ grep -c "x*" fruits.txt
+7
+
+$ grep "an*a" fruits.txt
+banana
+banana
+
+$ grep -o "an*a" fruits.txt
+ana
+ana
+
+$ grep -E "[0-9]{3}" server.log | head -3
+2026-10-13 09:00:01 INFO  server started on port 8080
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+
+$ grep "[0-9]\{3\}" server.log | head -3
+2026-10-13 09:00:01 INFO  server started on port 8080
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+
+$ grep -v "^$" blank.txt
+first
+third
+
+$ grep "line1$" unix.txt win.txt
+unix.txt:line1
+
+$ echo grep a* fruits.txt
+grep access.log app.conf fruits.txt
+
+$ grep a* fruits.txt; echo "exit=$?"
+exit=1
+
+$ grep "a*" fruits.txt | head -3
+banana
+apple
+cherry
+
+$ grep -E "^.{6,}$" fruits.txt
+banana
+cherry
+banana
+Durian
+
+$ sed -n "/^b/p" fruits.txt
+banana
+banana
+
+$ sed -E "s/^([0-9-]+) ([0-9:]+) /\2 /" server.log | head -2
+09:00:01 INFO  server started on port 8080
+09:00:05 WARN  disk usage 85%
+
+$ sed "s/[0-9]\{1,\}/N/g" ips.txt
+N.N.N.N
+N.N.N.N
+N.N.N.N
+ip-N-N-N-N
+
+$ man 7 regex | grep -A1 "^NAME"
+NAME
+       regex - POSIX.2 regular expressions
+
+$ man grep | grep -E "^ +-[EFGP], --"
+       -E, --extended-regexp
+       -F, --fixed-strings
+       -G, --basic-regexp
+       -P, --perl-regexp
+
+── lab-linuc-text 1.0.0 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+========== 10. vi とエディタの切り替え（1.03.5） ==========
+
+$ cd ~/text
+
+$ cat memo.txt
+apple
+banana
+cherry
+date
+
+$ cp memo.txt v1.txt
+
+$ vim v1.txt
+（打鍵: j dd :wq⏎）
+
+$ cat v1.txt
+apple
+cherry
+date
+
+$ vim v1.txt
+（打鍵: :call writefile([line(".")], "/tmp/pos.txt")⏎ :q⏎）
+
+$ cat /tmp/pos.txt
+2
+
+$ grep -n -A3 "jump to the last known cursor" /usr/share/vim/vim91/defaults.vim
+93:    " When editing a file, always jump to the last known cursor position.
+94-    " Don't do it when the position is invalid, when inside an event handler
+95-    " (happens when dropping a file on gvim), for a commit or rebase message
+96-    " (likely a different one than last time), and when using xxd(1) to filter
+
+$ cp memo.txt v2.txt
+
+$ vim v2.txt
+（打鍵: yy p :wq⏎）
+
+$ cat v2.txt
+apple
+apple
+banana
+cherry
+date
+
+$ cp memo.txt v3.txt
+
+$ vim v3.txt
+（打鍵: j dd p :wq⏎）
+
+$ cat v3.txt
+apple
+cherry
+banana
+date
+
+$ cp memo.txt v4.txt
+
+$ vim v4.txt
+（打鍵: G yy k P :wq⏎）
+
+$ cat v4.txt
+apple
+banana
+date
+cherry
+date
+
+$ cp memo.txt v5.txt
+
+$ vim v5.txt
+（打鍵: o fig ESC :wq⏎）
+
+$ cat v5.txt
+apple
+fig
+banana
+cherry
+date
+
+$ cp memo.txt v6.txt
+
+$ vim v6.txt
+（打鍵: O fruits: ESC :wq⏎）
+
+$ cat v6.txt
+fruits:
+apple
+banana
+cherry
+date
+
+$ cp memo.txt v7.txt
+
+$ vim v7.txt
+（打鍵: i big␣ ESC :wq⏎）
+
+$ cat v7.txt
+big apple
+banana
+cherry
+date
+
+$ cp memo.txt v8.txt
+
+$ vim v8.txt
+（打鍵: a - ESC :wq⏎）
+
+$ cat v8.txt
+a-pple
+banana
+cherry
+date
+
+$ cp memo.txt v9.txt
+
+$ vim v9.txt
+（打鍵: /an⏎ x :wq⏎）
+
+$ cat v9.txt
+apple
+bnana
+cherry
+date
+
+$ cp memo.txt v10.txt
+
+$ vim v10.txt
+（打鍵: G ?an⏎ x :wq⏎）
+
+$ cat v10.txt
+apple
+banna
+cherry
+date
+
+$ cp memo.txt v11.txt
+
+$ vim v11.txt
+（打鍵: jj cw CHERRY ESC :wq⏎）
+
+$ cat v11.txt
+apple
+banana
+CHERRY
+date
+
+$ cp memo.txt v12.txt
+
+$ vim v12.txt
+（打鍵: j l l x :wq⏎）
+
+$ cat v12.txt
+apple
+baana
+cherry
+date
+
+$ cp memo.txt v13.txt
+
+$ vim v13.txt
+（打鍵: j $ h x :wq⏎）
+
+$ cat v13.txt
+apple
+banaa
+cherry
+date
+
+$ cp memo.txt v14.txt
+
+$ vim v14.txt
+（打鍵: j d$ :wq⏎）
+
+$ cat -A v14.txt
+apple$
+$
+cherry$
+date$
+
+$ cp memo.txt v15.txt
+
+$ vim v15.txt
+（打鍵: j yw P :wq⏎）
+
+$ cat v15.txt
+apple
+bananabanana
+cherry
+date
+
+$ cp memo.txt v16.txt
+
+$ vim v16.txt
+（打鍵: 2dd :wq⏎）
+
+$ cat v16.txt
+cherry
+date
+
+$ cp memo.txt v17.txt
+
+$ vim v17.txt
+（打鍵: dd ZZ）
+
+$ cat v17.txt
+banana
+cherry
+date
+
+$ cp memo.txt q1.txt
+
+$ vim q1.txt
+（打鍵: dd :q⏎ :q!⏎）
+E37: No write since last change (add ! to override)
+
+$ cat q1.txt
+apple
+banana
+cherry
+date
+
+$ cp memo.txt q2.txt
+
+$ vim q2.txt
+（打鍵: dd dd :e!⏎ :wq⏎）
+
+$ cat q2.txt
+apple
+banana
+cherry
+date
+
+$ cp memo.txt ro.txt; chmod 444 ro.txt
+
+$ stat -c "%A %s %n" ro.txt
+-r--r--r-- 25 ro.txt
+
+$ echo kiwi >> ro.txt; echo "exit=$?"
+bash: ro.txt: Permission denied
+exit=1
+
+$ vim ro.txt
+（打鍵: dd :w⏎ :w!⏎ :q⏎）
+E45: 'readonly' option is set (add ! to override)
+
+$ cat ro.txt
+banana
+cherry
+date
+
+$ stat -c "%A %s %n" ro.txt
+-r--r--r-- 19 ro.txt
+
+$ cp memo.txt ro2.txt; chmod 444 ro2.txt
+
+$ vim -es -c "normal! dd" -c "w!" -c q ro2.txt; echo "exit=$?"
+exit=1
+
+$ cat ro2.txt
+apple
+banana
+cherry
+date
+
+$ vim -es -N -c "normal! dd" -c "w!" -c q ro2.txt; echo "exit=$?"
+exit=0
+
+$ cat ro2.txt
+apple
+banana
+cherry
+
+$ cp memo.txt n1.txt
+
+$ nano n1.txt
+（打鍵: ^K ^O ⏎ ^X）
+
+$ cat n1.txt
+banana
+cherry
+date
+
+$ cp memo.txt n2.txt
+
+$ nano n2.txt
+（打鍵: ^W cherry⏎ ^K ^X y ⏎）
+
+$ cat n2.txt
+apple
+banana
+date
+
+$ ls -l /usr/bin/vi /etc/alternatives/vi
+lrwxrwxrwx 1 root root 18 Aug 25 07:13 /etc/alternatives/vi -> /usr/bin/vim.basic
+lrwxrwxrwx 1 root root 20 Aug 25 07:13 /usr/bin/vi -> /etc/alternatives/vi
+
+$ ls -l /usr/bin/editor /etc/alternatives/editor
+lrwxrwxrwx 1 root root  9 Oct 13 09:27 /etc/alternatives/editor -> /bin/nano
+lrwxrwxrwx 1 root root 24 Aug 25 07:13 /usr/bin/editor -> /etc/alternatives/editor
+
+$ update-alternatives --display editor | head -4
+editor - auto mode
+  link best version is /bin/nano
+  link currently points to /bin/nano
+  link editor is /usr/bin/editor
+
+$ update-alternatives --display editor | grep priority
+/bin/nano - priority 40
+/usr/bin/vim.basic - priority 30
+
+$ editor --version | head -1
+ GNU nano, version 7.2
+
+$ echo "[$EDITOR]"
+[]
+
+$ EDITOR=vi sensible-editor --version | head -1
+VIM - Vi IMproved 9.1 (2024 Jan 02, compiled Aug 24 2026 22:13:04)
+
+$ EDITOR=nano sensible-editor --version | head -1
+ GNU nano, version 7.2
+
+$ EDITOR=vi
+
+$ bash -c "sensible-editor --version" < /dev/null | head -1
+ GNU nano, version 7.2
+
+$ export EDITOR
+
+$ bash -c "sensible-editor --version" | head -1
+VIM - Vi IMproved 9.1 (2024 Jan 02, compiled Aug 24 2026 22:13:04)
+
+$ env | grep "^EDITOR="
+EDITOR=vi
+
+$ unset EDITOR
+
+$ command -v emacs; echo "exit=$?"
+exit=1
+
+$ nano --version | head -1
+ GNU nano, version 7.2
+
+$ vim --version | head -1
+VIM - Vi IMproved 9.1 (2024 Jan 02, compiled Aug 24 2026 22:13:04)
+
+$ ls -l ~/.viminfo | cut -c1-10
+-rw-------

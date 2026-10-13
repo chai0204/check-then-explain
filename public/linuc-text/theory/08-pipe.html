@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>8. xargs は空白で区切って引数にする — 確かめて説明する LinuC 主題1.03</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="8" data-theme="linuc-text">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-text/theory/">理論編</a> › 第8章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+</div>
+<h1>8. xargs は空白で区切って引数にする</h1>
+<p class="lead"><code>find</code> が見つけた3つのファイルを <code>xargs ls -l</code> に渡すと、「見つからない」というエラーが5つ出る。<code>xargs</code> は受け取った文字を<b>空白と改行で区切って</b>引数に並べるので、ファイル名の中の空白も区切りになる。パイプは文字の流れをつなぐだけで、どこが1つの名前なのかという情報は運ばない。</p>
+<div class="badges"><span>前提: 第7章</span><span>前提: 檻が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.03.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>パイプ <code>|</code> がつなぐのは1番（標準出力）だけで、2番もつなぐには <code>2&gt;&amp;1 |</code> か <code>|&amp;</code> を使うと言える</li><li><code>xargs</code> の区切り方と、<code>-n</code> <code>-I{}</code> <code>-0</code>（と <code>find -print0</code>）の使いどころを言える</li><li><code>tee</code>（<code>-a</code>）と、コマンド置換 <code>$(...)</code> / <code>`...`</code> を使える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>xargs -P</code>（並列実行）、名前付きパイプ（<code>mkfifo</code>）、プロセス置換 <code>&lt;(...)</code>、<code>set -o pipefail</code> の細部。<code>find</code> の条件の書き方は主題1.02 の側で扱う。</div></div>
+
+<h2 id="pipe">パイプがつなぐのは1番だけ</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>|</code> が何をどこへつないでいるか。</div>
+<pre><code>$ cd ~/text
+$ cut -d" " -f9 access.log | sort | uniq -c | sort -rn
+      4 200
+      3 404
+      1 500
+      1 403
+      1 302</code></pre>
+<p>第5章の集計を、アクセスログのステータスコードに当てた。<code>|</code>（<b>パイプ</b>）は、左のコマンドの1番（標準出力）を、右のコマンドの0番（標準入力）につなぐ。シェルはつなぎ終えてから4つのコマンドを<b>同時に</b>起動し、各コマンドは届いた分から処理していく。</p>
+<pre><code>$ ls nosuch.txt | wc -l
+ls: cannot access 'nosuch.txt': No such file or directory
+0
+$ ls nosuch.txt 2&gt;&amp;1 | wc -l
+1
+$ ls nosuch.txt |&amp; wc -l
+1</code></pre>
+<p>1つ目は、エラーが画面に出て、<code>wc</code> は 0 行と数えた。エラーは2番に出たので、パイプを通らなかった。<code>2&gt;&amp;1 |</code>（2番を、パイプにつながった1番の先へ）か、bash の短い書き方 <code>|&amp;</code> で、両方をパイプに流せる。</p>
+<pre><code>$ false | true; echo "exit=$? PIPESTATUS=${PIPESTATUS[*]}"
+exit=0 PIPESTATUS=1 0</code></pre>
+<p>パイプ全体の終了コード（<code>$?</code>）は<b>最後のコマンドのもの</b>で、途中の <code>false</code> の失敗は隠れる。各段の終了コードは bash の配列 <code>PIPESTATUS</code> に残っている。</p>
+<div class="analogy"><b>たとえ</b>: <b>バケツリレー</b>に近い。各人は前の人から受け取った水（1番の出力）を、手を加えて次の人に渡す。
+文句（2番のエラー）は列に流さず、観客席（画面）に向かって叫ぶ。
+<br>ただし<b>崩れる点</b>: バケツリレーは前の人が渡すまで次の人は待っているだけだが、パイプの各コマンドは最初から全員が同時に動いていて、
+流れてきた分から少しずつ処理する。だから <code>tail -f</code> のように終わらないコマンドも、パイプの左に置ける。</div>
+
+<h2 id="xargs">標準入力を、引数に組み替える</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>xargs</code> が何をしているか。</div>
+<p><code>ls</code> や <code>rm</code> は、操作する相手を<b>引数</b>で受け取り、標準入力は読まない。パイプで名前を流しても、受け取る口が無い。<code>xargs</code> は標準入力から読んだ文字を区切り、それを引数に並べてコマンドを起動する。</p>
+<pre><code>$ echo a b c | xargs echo
+a b c
+$ echo a b c | xargs -n 1 echo
+a
+b
+c
+$ echo a b c | xargs -n 2 echo
+a b
+c
+$ printf "%s\n" apple banana | xargs -I{} echo "果物: {}"
+果物: apple
+果物: banana</code></pre>
+<p>既定では、受け取ったもの全部を1回のコマンドの引数に並べる。<code>-n 1</code> は「1回に1つずつ」で、<code>echo</code> が3回起動した。<code>-I{}</code> は1行ずつ、<code>{}</code> の位置に差し込んで起動する。</p>
+
+<h2 id="space">名前の中の空白も、区切りになる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>xargs</code> が名前を壊す仕組みと、壊さない渡し方。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>find</code> が見つけたファイルの一覧を <code>xargs</code> に渡せば、1行に1つずつのファイル名が、そのまま1つずつの引数になるはずだ。
+<code>find</code> は名前を1行に1つずつ出しているのだから。</p>
+<pre><code>$ find files -type f | sort
+files/cache.tmp
+files/memo.txt
+files/old data.tmp
+files/report 2026.txt
+files/sub/a b c.tmp
+files/sub/keep.txt
+$ find files -name "*.tmp" | sort
+files/cache.tmp
+files/old data.tmp
+files/sub/a b c.tmp
+$ find files -name "*.tmp" | sort | xargs ls -l
+ls: cannot access 'files/old': No such file or directory
+ls: cannot access 'data.tmp': No such file or directory
+ls: cannot access 'files/sub/a': No such file or directory
+ls: cannot access 'b': No such file or directory
+ls: cannot access 'c.tmp': No such file or directory
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/cache.tmp</code></pre>
+<div class="then"><b>だめな理由</b>: 3つのファイルを渡したのに、<code>ls</code> は「見つからない」を5回出し、見つけたのは空白の無い <code>cache.tmp</code> だけだった。
+<code>xargs</code> は<b>改行だけでなく空白でも</b>区切る。<code>files/old data.tmp</code> は <code>files/old</code> と <code>data.tmp</code> の2つの引数になり、
+どちらもそんなファイルは無い。パイプに流れているのはただの文字の並びで、「ここからここまでが1つの名前」という印は付いていない。</div></div>
+<p>区切られ方は、<code>xargs</code> に1つずつ <code>echo</code> させると見える。</p>
+<pre><code>$ find files -name "*.tmp" | sort | xargs -n 1 echo
+files/cache.tmp
+files/old
+data.tmp
+files/sub/a
+b
+c.tmp
+$ find files -name "*.tmp" -print0 | sort -z | xargs -0 -n 1 echo
+files/cache.tmp
+files/old data.tmp
+files/sub/a b c.tmp</code></pre>
+<p><code>find -print0</code> は名前の区切りに改行ではなく <b>NUL 文字</b>（値が 0 のバイト）を使い、<code>xargs -0</code> は NUL だけを区切りとして扱う。ファイル名には NUL を入れられないので、どんな名前も1つの引数のまま届く（<code>sort -z</code> は NUL 区切りのまま並べる）。</p>
+<pre><code>$ find files -name "*.tmp" -print0 | sort -z | xargs -0 ls -l
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/cache.tmp
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/old data.tmp
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/sub/a b c.tmp
+$ find files -name "*.tmp" -exec ls -l {} +
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/cache.tmp
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/old data.tmp
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/sub/a b c.tmp
+$ printf "%s\n" "files/old data.tmp" | xargs -d "\n" ls -l
+-rw-r--r-- 1 lab lab 0 Oct 13 09:00 files/old data.tmp</code></pre>
+<p><code>find -exec コマンド {} +</code> は <code>xargs</code> を通さず、<code>find</code> が名前を直接引数に並べる。<code>xargs -d "\n"</code> は「改行だけで区切る」という GNU の書き方である（改行を含む名前には効かない）。</p>
+<p>消すときにこれを間違えると、消したつもりのファイルが残る。</p>
+<pre><code>$ find files -name "*.tmp" | sort | xargs rm; echo "exit=$?"
+rm: cannot remove 'files/old': No such file or directory
+rm: cannot remove 'data.tmp': No such file or directory
+rm: cannot remove 'files/sub/a': No such file or directory
+rm: cannot remove 'b': No such file or directory
+rm: cannot remove 'c.tmp': No such file or directory
+exit=123
+$ find files -name "*.tmp" | sort
+files/old data.tmp
+files/sub/a b c.tmp
+$ find files -name "*.tmp" -print0 | xargs -0 rm
+$ find files -name "*.tmp" | wc -l
+0</code></pre>
+<p><code>xargs</code> は、起動したコマンドが1つでも失敗すると終了コード <code>123</code> を返す。空白の無い <code>cache.tmp</code> だけが消え、2つが残った。<code>-print0</code> と <code>-0</code> で渡し直すと、残りも消えた。</p>
+<div class="analogy"><b>たとえ</b>: 名簿を読み上げて<b>宛名ラベルを1枚ずつ作る係</b>に近い。この係は「空白が来たら次のラベル」と決めているので、
+「old data」さんのラベルは「old」と「data」の2枚になる。<code>-0</code> は「区切りは空白ではなく、名簿の線（NUL）で」と頼むことだ。
+<br>ただし<b>崩れる点</b>: 人の係なら「old data」が1人の名前だと文脈で分かるが、<code>xargs</code> は文字しか見ない。
+区切りを決めるのは、渡す側（<code>-print0</code>）と受け取る側（<code>-0</code>）の約束だけである。</div>
+
+<h2 id="tee">途中を保存する — tee</h2>
+<div class="sgoal"><b>この節で分かること</b>: パイプの途中の流れを、ファイルにも残す方法。</div>
+<pre><code>$ cut -d" " -f1 access.log | sort | uniq -c | sort -rn | tee ip-count.txt | head -2
+      4 192.168.1.10
+      2 192.168.1.12
+$ cat ip-count.txt
+      4 192.168.1.10
+      2 192.168.1.12
+      2 192.168.1.11
+      1 192.168.1.14
+      1 192.168.1.13
+$ echo "追記" | tee -a ip-count.txt
+追記
+$ tail -2 ip-count.txt
+      1 192.168.1.13
+追記</code></pre>
+<p><code>tee</code> は標準入力から読んだものを、<b>標準出力とファイルの両方</b>に書く。画面には <code>head -2</code> の2行しか出なかったが、<code>ip-count.txt</code> には全部が残っている。<code>-a</code> は上書きせずに追記する（<code>&gt;&gt;</code> と同じ）。</p>
+<div class="analogy"><b>たとえ</b>: 水道管の <b>T 字の継ぎ手</b>（名前の由来）に近い。流れの途中に挟むと、同じ流れが2方向へ出ていく。
+<br>ただし<b>崩れる点</b>: 水道の T 字管は流れが2つに<b>分かれる</b>（片方の量が減る）が、<code>tee</code> は同じ内容を<b>丸ごと2つ</b>作る。
+画面側にもファイル側にも、全部が流れる。</div>
+
+<h2 id="subst">出力を、コマンドの引数に埋め込む</h2>
+<div class="sgoal"><b>この節で分かること</b>: コマンド置換と、そこでも起きる空白での区切り。</div>
+<pre><code>$ echo "ここは $(pwd)"
+ここは /home/lab/text
+$ echo "ここは `pwd`"
+ここは /home/lab/text
+$ echo "果物は $(wc -l &lt; fruits.txt) 行"
+果物は 7 行</code></pre>
+<p><code>$(コマンド)</code> と <code>`コマンド`</code>（バッククォート）は、中のコマンドを先に実行し、その出力（最後の改行を除く）で置き換える。<b>コマンド置換</b>と呼ぶ。<code>$(...)</code> は入れ子にでき、読みやすいので、新しく書くならこちらを使う。</p>
+<pre><code>$ wc -l $(find files -name "*.txt" | sort)
+0 files/memo.txt
+wc: files/report: No such file or directory
+wc: 2026.txt: No such file or directory
+0 files/sub/keep.txt
+0 total</code></pre>
+<p>引用符で囲まないコマンド置換は、第1章の変数と同じように、展開した後で<b>空白で区切られる</b>。<code>files/report 2026.txt</code> が2つの引数になった。<code>xargs</code> と同じ壊れ方である。</p>
+<div class="quiz"><b>確認</b>
+<p>カレントディレクトリ以下の <code>.log</code> ファイルを、名前に空白が含まれていても安全にすべて <code>gzip</code> したい。正しいものはどれか。</p>
+<p>A. <code>find . -name '*.log' | xargs gzip</code>　B. <code>find . -name '*.log' -print0 | xargs -0 gzip</code>　C. <code>find . -name '*.log' | xargs -n 1 gzip</code>　D. <code>gzip $(find . -name '*.log')</code></p>
+<details><summary>答え</summary>
+<p>B。A・C・D はどれも空白で名前が割れる（実測の <code>xargs ls -l</code> と <code>wc -l $(...)</code> と同じ）。
+<code>-n 1</code> は1回に渡す数を決めるだけで、区切り方は変えない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>コマンド <code>make</code> の出力を画面に表示しながら、同時に <code>build.log</code> にも保存したい。エラー出力も含めたい。どう書くか。</p>
+<details><summary>答え</summary>
+<p><code>make 2&gt;&amp;1 | tee build.log</code>（bash なら <code>make |&amp; tee build.log</code> も同じ）。
+パイプは1番しかつながないので、2番を先に1番へ合流させる。追記なら <code>tee -a</code>。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>echo a b c d e | xargs -n 2 echo</code> の出力は何行になるか。</p>
+<details><summary>答え</summary>
+<p>3行（<code>a b</code> / <code>c d</code> / <code>e</code>）。<code>-n 2</code> は「1回に2つずつ」なので <code>echo</code> が3回起動する。
+実測の <code>echo a b c | xargs -n 2 echo</code> は <code>a b</code> と <code>c</code> の2行だった。</p></details></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-text/">演習06</a>は、名前に空白を含むものも含めて <code>.tmp</code> だけを <code>find</code> と <code>xargs</code> で消す課題である。
+判定は残っているファイルを数えるので、<code>-print0</code> / <code>-0</code> を付け忘れると「空白入りの名前だけが残っている」と観測される。</div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>|</code> は左の1番を右の0番につなぐ。2番は通らない（<code>2&gt;&amp;1 |</code> か <code>|&amp;</code>）。パイプの終了コードは最後のコマンドのもの</li><li><code>xargs</code> は標準入力を区切って引数に並べる。区切りは空白と改行なので、名前の空白でも割れる</li><li>名前を壊さずに渡すには <code>find -print0 | xargs -0</code>（区切りを NUL にする）か <code>find -exec ... {} +</code></li><li><code>-n 数</code> は1回に渡す数、<code>-I{}</code> は1行ずつ差し込み</li><li><code>tee</code> は画面とファイルの両方へ（<code>-a</code> で追記）。<code>$(...)</code> と <code>`...`</code> はコマンド置換で、引用符が無いと空白で区切られる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-text/theory/07-redirect">← 7. リダイレクトは、左から順に配線する</a><a href="/linuc-text/theory/09-regex">次: 9. . は何にでも当たる1文字 →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-text/chapters.js"></script>
+<script src="/linuc-text/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

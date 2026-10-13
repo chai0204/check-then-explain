@@ -1,0 +1,990 @@
+
+── lab-linuc-text 1.0.0 ────────────────────────────────────────
+lab-linuc-text  進捗 0/8
+  次 → 01 「標準のエディタを vi にする」 (目安 8分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-text-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+
+
+########## A. 何もしていない状態で lab check（01 は ✗、ほかは lab start 前なので ⚠ になるはず） ##########
+
+$ lab check; echo "exit=$?"
+✗ 01 未達
+  判定 : 観測型（判定はこのシェルの子プロセス。子から見えた EDITOR と、それで起動したエディタの名乗りを見た）
+  観測 : 子プロセスから見た EDITOR = []
+         sensible-editor が起動したエディタ = GNU nano, version 7.2
+         → EDITOR が子プロセスに渡っていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+⚠ 02 この環境では判定できません
+  前提不足: /home/lab/work/02/bin/greet がありません。先に lab start 02 を打ってください
+⚠ 03 この環境では判定できません
+  前提不足: ~/work/03 がありません。先に lab start 03 を打ってください
+⚠ 04 この環境では判定できません
+  前提不足: ~/work/04 がありません。先に lab start 04 を打ってください
+⚠ 05 この環境では判定できません
+  前提不足: ~/work/05 がありません。先に lab start 05 を打ってください
+⚠ 06 この環境では判定できません
+  前提不足: ~/work/06 がありません。先に lab start 06 を打ってください
+⚠ 07 この環境では判定できません
+  前提不足: ~/work/07 がありません。先に lab start 07 を打ってください
+⚠ 08 この環境では判定できません
+  前提不足: ~/work/08 がありません。先に lab start 08 を打ってください
+exit=2
+
+$ lab ls
+演習一覧
+  · 01  標準のエディタを vi にする        8分 / 影響度 B
+  · 02  自作のコマンドを名前だけで動かす 10分 / 影響度 B
+  · 03  アクセスログのステータスを数える 12分 / 影響度 B
+  · 04  設定ファイルを sed で書き換える 10分 / 影響度 B
+  · 05  出力を2本に分けて保存する        10分 / 影響度 B
+  · 06  名前に空白のあるファイルもまとめて消す 12分 / 影響度 B
+  · 07  レベルが ERROR か WARN の行だけを抜き出す 12分 / 影響度 B
+  · 08  vi で TODO を直す                        12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+
+########## B. 演習01 — 標準のエディタを vi にする ##########
+
+$ lab start 01
+
+演習 01 — 標準のエディタを vi にする                              影響度 B / 目安 8分
+
+  変えるのは、いま開いているシェルの状態です。ファイルは触りません。
+
+【いまの状態を見てください】
+
+    echo "[$EDITOR]"
+    editor --version | head -1
+
+  EDITOR は空です。それでもエディタを開くプログラム（less の v キー、
+  sudoedit、bash の fc など）は、どれも nano を開きます。
+
+【やること】
+
+  このシェルから起動するプログラムが、エディタとして vi（vim）を開くように
+  してください。
+
+  判定では、lab check がこのシェルの子プロセスとして sensible-editor を起動し、
+  呼び出されたエディタに --version で名乗らせます。画面は開きません。
+
+【できたら】
+
+    lab check 01
+
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+
+
+$ echo "[$EDITOR]"; editor --version | head -1
+[]
+ GNU nano, version 7.2
+
+$ lab check 01; echo "exit=$?"
+✗ 01 未達
+  判定 : 観測型（判定はこのシェルの子プロセス。子から見えた EDITOR と、それで起動したエディタの名乗りを見た）
+  観測 : 子プロセスから見た EDITOR = []
+         sensible-editor が起動したエディタ = GNU nano, version 7.2
+         → EDITOR が子プロセスに渡っていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+exit=1
+
+$ echo "--- 値を入れただけ（シェル変数）---"
+--- 値を入れただけ（シェル変数）---
+
+$ EDITOR=vi
+
+$ echo "[$EDITOR]"; bash -c "echo \"子から見ると [\$EDITOR]\""
+[vi]
+子から見ると []
+
+$ lab check 01; echo "exit=$?"
+✗ 01 未達
+  判定 : 観測型（判定はこのシェルの子プロセス。子から見えた EDITOR と、それで起動したエディタの名乗りを見た）
+  観測 : 子プロセスから見た EDITOR = []
+         sensible-editor が起動したエディタ = GNU nano, version 7.2
+         → EDITOR が子プロセスに渡っていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+exit=1
+
+$ echo "--- export する ---"
+--- export する ---
+
+$ export EDITOR
+
+$ lab check 01; echo "exit=$?"
+✔ 01 達成
+  判定 : 観測型（判定はこのシェルの子プロセス。子から見えた EDITOR と、それで起動したエディタの名乗りを見た）
+  観測 : 子プロセスから見た EDITOR = [vi]
+         sensible-editor が起動したエディタ = VIM - Vi IMproved 9.1 (2024 Jan 02, compiled Aug 24 2026 22:13:04)
+         EDITOR が環境変数として子に渡り、それを読んだ sensible-editor が vim を起動した
+exit=0
+
+
+########## C. 演習02 — 自作のコマンドを名前だけで動かす ##########
+
+$ lab start 02
+作業ファイルを ~/work/02 に展開しました（bin ）
+
+演習 02 — 自作のコマンドを名前だけで動かす                        影響度 B / 目安 10分
+
+  ~/work/02/bin/greet は、あいさつを1行出すだけのコマンドです。
+
+【いまの状態を見てください】
+
+    cd ~/work/02
+    ls -l bin/
+    ~/work/02/bin/greet
+    greet
+
+  フルパスなら動くのに、名前だけだと command not found になります。
+
+【やること】
+
+  どのディレクトリにいても、greet と打つだけで ~/work/02/bin/greet が
+  動くようにしてください。
+
+  判定では、lab check が /tmp に移動してから、名前だけで greet を探して
+  実行します。~/work/02 の中でだけ動く状態では通りません。
+
+  注意: PATH を丸ごと書き換えると、ls も lab も見つからなくなります。
+  そうなったら exit して起動し直してください（進捗は消えません）。
+
+【できたら】
+
+    lab check 02
+
+▶ 次はこれを打ってください
+    cd ~/work/02
+
+
+$ cd ~/work/02
+
+$ ls -l bin/
+total 4
+-rwxr-xr-x 1 lab lab 165 Oct 13 11:01 greet
+
+$ ~/work/02/bin/greet
+greet: こんにちは。私は /home/lab/work/02/bin/greet として呼ばれました
+
+$ greet; echo "exit=$?"
+bash: greet: command not found
+exit=127
+
+$ lab check 02; echo "exit=$?"
+✗ 02 未達
+  判定 : 観測型（/tmp に移動してから、名前だけで greet を探して実行した）
+  観測 : PATH = /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+         /tmp から名前で探した greet = （見つからない）
+         → PATH をたどっても greet が見つからない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+exit=1
+
+$ echo "--- 相対パスで足す（よくある間違い）---"
+--- 相対パスで足す（よくある間違い）---
+
+$ PATH="$PATH:bin"
+
+$ greet
+greet: こんにちは。私は bin/greet として呼ばれました
+
+$ lab check 02; echo "exit=$?"
+✗ 02 未達
+  判定 : 観測型（/tmp に移動してから、名前だけで greet を探して実行した）
+  観測 : PATH = /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:bin
+         PATH の中の相対パス = bin （/tmp から見た場所を指す）
+         /tmp から名前で探した greet = （見つからない）
+         → PATH をたどっても greet が見つからない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+exit=1
+
+$ PATH="${PATH%:bin}"; echo "$PATH"
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+$ echo "--- 絶対パスで足す ---"
+--- 絶対パスで足す ---
+
+$ PATH="$PATH:$HOME/work/02/bin"
+
+$ cd /tmp; greet; cd ~/work/02
+greet: こんにちは。私は /home/lab/work/02/bin/greet として呼ばれました
+
+$ lab check 02; echo "exit=$?"
+✔ 02 達成
+  判定 : 観測型（/tmp に移動してから、名前だけで greet を探して実行した）
+  観測 : PATH = /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/lab/work/02/bin
+         /tmp から名前で探した greet = /home/lab/work/02/bin/greet
+         実行結果 = greet: こんにちは。私は /home/lab/work/02/bin/greet として呼ばれました（終了コード 0）
+         どこにいても、名前だけで配った greet が見つかって動いた
+exit=0
+
+$ echo "--- 参考: 引用符の中の ~ は文字のまま PATH に入る ---"
+--- 参考: 引用符の中の ~ は文字のまま PATH に入る ---
+
+$ bash -c 'PATH="/usr/bin:/bin:~/work/02/bin"; echo "$PATH"; cd /tmp; type -P greet; env greet; echo "env の終了コード=$?"'
+/usr/bin:/bin:~/work/02/bin
+/home/lab/work/02/bin/greet
+env: ‘greet’: No such file or directory
+env の終了コード=127
+
+
+########## D. 演習03 — アクセスログのステータスを数える ##########
+
+$ lab start 03
+作業ファイルを ~/work/03 に展開しました（access.log ）
+
+演習 03 — アクセスログのステータスを数える                        影響度 B / 目安 12分
+
+  ~/work/03/access.log は、30行のアクセスログです。
+
+【いまの状態を見てください】
+
+    cd ~/work/03
+    head -3 access.log
+    wc -l access.log
+
+  空白で区切ると、9番目の欄が HTTP のステータスコード（200 や 404）です。
+
+【やること】
+
+  ステータスコードごとの行数を数え、多い順に並べて ~/work/03/answer.txt に
+  保存してください。1行に「件数 ステータス」の2つを書きます
+  （間や行頭の空白の数は問いません）。
+
+      例（数字は架空）:      7 200
+                             3 404
+
+  パイプでつないだフィルタで作ってください。手で数えると数え間違えます。
+
+【できたら】
+
+    lab check 03
+
+▶ 次はこれを打ってください
+    cd ~/work/03
+
+
+$ cd ~/work/03
+
+$ head -3 access.log; wc -l access.log
+192.168.0.21 - - [14/Oct/2026:09:00:40 +0900] "GET /api/items HTTP/1.1" 200 1024
+172.16.0.9 - - [14/Oct/2026:09:01:19 +0900] "GET /style.css HTTP/1.1" 304 0
+10.1.2.4 - - [14/Oct/2026:09:01:45 +0900] "GET /index.html HTTP/1.1" 200 734
+30 access.log
+
+$ lab check 03; echo "exit=$?"
+✗ 03 未達
+  判定 : 観測型（配ったログの9番目の欄を数え直し、answer.txt と突き合わせた）
+  観測 : ~/work/03/answer.txt が存在しない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+exit=1
+
+$ echo "--- sort を抜くと（よくある間違い）---"
+--- sort を抜くと（よくある間違い）---
+
+$ cut -d" " -f9 access.log | uniq -c | sort -rn > answer.txt; head -4 answer.txt; wc -l answer.txt
+      3 200
+      2 200
+      1 500
+      1 500
+27 answer.txt
+
+$ lab check 03; echo "exit=$?"
+✗ 03 未達
+  判定 : 観測型（配ったログの9番目の欄を数え直し、answer.txt と突き合わせた）
+  観測 : answer.txt の行数 = 27（ログの9番目の欄に出てくるステータスは 5 種類）
+         200: answer.txt の 9 行に分かれて出てくる（件数の合計 12 / ログでは 12 行）
+         302: answer.txt の 2 行に分かれて出てくる（件数の合計 2 / ログでは 2 行）
+         304: answer.txt の 5 行に分かれて出てくる（件数の合計 5 / ログでは 5 行）
+         404: answer.txt の 8 行に分かれて出てくる（件数の合計 8 / ログでは 8 行）
+         500: answer.txt の 3 行に分かれて出てくる（件数の合計 3 / ログでは 3 行）
+         件数の並び = 3 2 1 1 1 1 1 1 1 1 …
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+exit=1
+
+$ echo "--- 模範解答 ---"
+--- 模範解答 ---
+
+$ cut -d" " -f9 access.log | uniq -c | head -4
+      1 200
+      1 304
+      1 200
+      1 404
+
+$ cut -d" " -f9 access.log | sort | uniq -c | sort -rn > answer.txt
+
+$ cat answer.txt
+     12 200
+      8 404
+      5 304
+      3 500
+      2 302
+
+$ lab check 03; echo "exit=$?"
+✔ 03 達成
+  判定 : 観測型（配ったログの9番目の欄を数え直し、answer.txt と突き合わせた）
+  観測 : answer.txt の行数 = 5（ログの9番目の欄に出てくるステータスは 5 種類）
+         件数の並び = 12 8 5 3 2 
+         各ステータスが1行ずつ、ログの実際の件数で、多い順に並んでいる
+exit=0
+
+
+########## E. 演習04 — 設定ファイルを sed で書き換える ##########
+
+$ lab start 04
+作業ファイルを ~/work/04 に展開しました（app.conf ）
+
+演習 04 — 設定ファイルを sed で書き換える                         影響度 B / 目安 10分
+
+  ~/work/04/app.conf を、エディタを開かずに sed だけで書き換えます。
+
+【いまの状態を見てください】
+
+    cd ~/work/04
+    cat app.conf
+
+【やること】
+
+  次の3つを満たしてください。
+
+    1. port の値を 9090 にする（port=9090）。
+       port_admin の行と、url の中の 8080 は変えない
+    2. # で始まるコメント行をすべて消す
+    3. 書き換える前の app.conf を app.conf.bak として残す
+       （中身は配られたときのまま）
+
+  やり直したいときは lab reset 04 で配られたときの状態に戻せます
+  （ディレクトリごと作り直されるので、そのあと cd ~/work/04 し直してください）。
+
+【できたら】
+
+    lab check 04
+
+▶ 次はこれを打ってください
+    cd ~/work/04
+
+
+$ cd ~/work/04
+
+$ cat app.conf
+# サンプルアプリの設定
+host=localhost
+port=8080
+port_admin=8081
+# debug=true
+log_level=info
+url=http://localhost:8080/health
+
+$ lab check 04; echo "exit=$?"
+✗ 04 未達
+  判定 : 観測型（app.conf と app.conf.bak の中身を、配ったときの中身と比べた）
+  観測 : port の行       = port=8080
+         port_admin の行 = port_admin=8081
+         url の行        = url=http://localhost:8080/health
+         # で始まる行    = 2 行
+         その他の行      = host=localhost log_level=info
+         → port の行が port=9090 の1行になっていない
+         → コメント行が残っている
+         app.conf.bak    = 存在しない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+exit=1
+
+$ echo "--- 行頭を決めずに置換し、.bak も残さない（よくある間違い）---"
+--- 行頭を決めずに置換し、.bak も残さない（よくある間違い）---
+
+$ sed "s/8080/9090/" app.conf | grep 9090
+port=9090
+url=http://localhost:9090/health
+
+$ sed -i "s/8080/9090/" app.conf
+
+$ lab check 04; echo "exit=$?"
+✗ 04 未達
+  判定 : 観測型（app.conf と app.conf.bak の中身を、配ったときの中身と比べた）
+  観測 : port の行       = port=9090
+         port_admin の行 = port_admin=8081
+         url の行        = url=http://localhost:9090/health
+         # で始まる行    = 2 行
+         その他の行      = host=localhost log_level=info
+         → url の行が配ったときと違う
+         → コメント行が残っている
+         app.conf.bak    = 存在しない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+exit=1
+
+$ lab reset 04
+演習 04 を初期状態に戻しました（~/work/04）
+
+$ cat app.conf; echo "exit=$?"
+cat: app.conf: No such file or directory
+exit=1
+
+$ cd ~/work/04; cat app.conf
+# サンプルアプリの設定
+host=localhost
+port=8080
+port_admin=8081
+# debug=true
+log_level=info
+url=http://localhost:8080/health
+
+$ echo "--- 模範解答 ---"
+--- 模範解答 ---
+
+$ sed -i.bak -e "s/^port=8080$/port=9090/" -e "/^#/d" app.conf
+
+$ cat app.conf
+host=localhost
+port=9090
+port_admin=8081
+log_level=info
+url=http://localhost:8080/health
+
+$ diff app.conf.bak app.conf
+1d0
+< # サンプルアプリの設定
+3c2
+< port=8080
+---
+> port=9090
+5d3
+< # debug=true
+
+$ lab check 04; echo "exit=$?"
+✔ 04 達成
+  判定 : 観測型（app.conf と app.conf.bak の中身を、配ったときの中身と比べた）
+  観測 : port の行       = port=9090
+         port_admin の行 = port_admin=8081
+         url の行        = url=http://localhost:8080/health
+         # で始まる行    = 0 行
+         その他の行      = host=localhost log_level=info
+         app.conf.bak    = 配ったときの app.conf と同じ中身
+         port だけが 9090 になり、コメントが消え、元の中身が .bak に残っている
+exit=0
+
+
+########## F. 演習05 — 出力を2本に分けて保存する ##########
+
+$ lab start 05
+作業ファイルを ~/work/05 に展開しました（check.sh ）
+
+演習 05 — 出力を2本に分けて保存する                               影響度 B / 目安 10分
+
+  ~/work/05/check.sh は、点検結果を5行出すスクリプトです。
+  OK の行は標準出力に、NG の行は標準エラー出力に出します。
+
+【いまの状態を見てください】
+
+    cd ~/work/05
+    ./check.sh
+
+  画面では5行が混ざって見えます。どれがどちらに出たのかは、画面からは分かりません。
+
+【やること】
+
+  check.sh の出力から、次の3つのファイルを作ってください。
+
+    ok.log   … 標準出力に出た行だけ（3行）
+    ng.log   … 標準エラー出力に出た行だけ（2行）
+    all.log  … 両方。画面に出たのと同じ順で（5行）
+
+  check.sh は何回実行しても構いません。
+
+【できたら】
+
+    lab check 05
+
+▶ 次はこれを打ってください
+    cd ~/work/05
+
+
+$ cd ~/work/05
+
+$ ./check.sh
+OK: disk
+NG: memory
+OK: network
+NG: cpu
+OK: clock
+
+$ lab check 05; echo "exit=$?"
+✗ 05 未達
+  判定 : 観測型（ok.log / ng.log / all.log の中身と行の順番を読んだ）
+  観測 :
+         ok.log  = 存在しない
+         ng.log  = 存在しない
+         all.log = 存在しない
+         → ok.log が「標準出力の3行だけ」になっていない
+         → ng.log が「標準エラー出力の2行だけ」になっていない
+         → all.log が「5行すべてを画面と同じ順で」になっていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+exit=1
+
+$ echo "--- 2>&1 を先に書く（よくある間違い）---"
+--- 2>&1 を先に書く（よくある間違い）---
+
+$ ./check.sh > ok.log
+NG: memory
+NG: cpu
+
+$ ./check.sh 2>&1 > all.log
+NG: memory
+NG: cpu
+
+$ lab check 05; echo "exit=$?"
+✗ 05 未達
+  判定 : 観測型（ok.log / ng.log / all.log の中身と行の順番を読んだ）
+  観測 :
+         ok.log  = 3 行（OK 3 行 / NG 0 行）: OK: disk|OK: network|OK: clock
+         ng.log  = 存在しない
+         all.log = 3 行（OK 3 行 / NG 0 行）: OK: disk|OK: network|OK: clock
+         → ng.log が「標準エラー出力の2行だけ」になっていない
+         → all.log が「5行すべてを画面と同じ順で」になっていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+exit=1
+
+$ echo "--- 模範解答 ---"
+--- 模範解答 ---
+
+$ ./check.sh > ok.log 2> ng.log
+
+$ ./check.sh > all.log 2>&1
+
+$ cat all.log
+OK: disk
+NG: memory
+OK: network
+NG: cpu
+OK: clock
+
+$ lab check 05; echo "exit=$?"
+✔ 05 達成
+  判定 : 観測型（ok.log / ng.log / all.log の中身と行の順番を読んだ）
+  観測 :
+         ok.log  = 3 行（OK 3 行 / NG 0 行）: OK: disk|OK: network|OK: clock
+         ng.log  = 2 行（OK 0 行 / NG 2 行）: NG: memory|NG: cpu
+         all.log = 5 行（OK 3 行 / NG 2 行）: OK: disk|NG: memory|OK: network|NG: cpu|OK: clock
+         標準出力と標準エラー出力が、それぞれの行き先に分かれて入っている
+exit=0
+
+
+########## G. 演習06 — 名前に空白のあるファイルもまとめて消す ##########
+
+$ lab start 06
+作業ファイルを ~/work/06 に展開しました（data logs ）
+
+演習 06 — 名前に空白のあるファイルもまとめて消す                  影響度 B / 目安 12分
+
+  ~/work/06 の下に、名前が .tmp で終わる一時ファイルが散らばっています。
+  名前に空白を含むものもあります。
+
+【いまの状態を見てください】
+
+    cd ~/work/06
+    find . -type f | sort
+
+【やること】
+
+  ~/work/06 の下の「名前が .tmp で終わるファイル」を、find と xargs を
+  パイプでつないで、すべて消してください。
+  それ以外のファイルは1つも消さないでください（keep.tmp.txt は .txt で終わります）。
+
+  find の -delete や -exec でも消せますが、この演習は xargs の練習です。
+  判定は結果（残っているファイル）だけを見ます。
+
+  やり直したいときは lab reset 06 で配られたときの状態に戻せます
+  （ディレクトリごと作り直されるので、そのあと cd ~/work/06 し直してください）。
+
+【できたら】
+
+    lab check 06
+
+▶ 次はこれを打ってください
+    cd ~/work/06
+
+
+$ cd ~/work/06
+
+$ find . -type f | sort
+./data/keep.tmp.txt
+./data/old copy.tmp
+./data/report final.txt
+./data/sub dir/notes.txt
+./data/sub dir/x y.tmp
+./logs/app 2026-10-01.tmp
+./logs/app.log
+./logs/cache.tmp
+
+$ lab check 06; echo "exit=$?"
+✗ 06 未達
+  判定 : 観測型（~/work/06 の下に残っているファイルを数えた）
+  観測 : 残っている .tmp ファイル = 4 個
+           ./data/old copy.tmp
+           ./data/sub dir/x y.tmp
+           ./logs/app 2026-10-01.tmp
+           ./logs/cache.tmp
+         残すべきファイル 4 個のうち、無くなったもの = 0 個
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+exit=1
+
+$ echo "--- -print0 / -0 なしで消す（よくある間違い）---"
+--- -print0 / -0 なしで消す（よくある間違い）---
+
+$ find . -name "*.tmp" | xargs -n 1 echo
+./data/sub
+dir/x
+y.tmp
+./data/old
+copy.tmp
+./logs/cache.tmp
+./logs/app
+2026-10-01.tmp
+
+$ find . -name "*.tmp" | xargs rm; echo "exit=$?"
+rm: cannot remove './data/sub': No such file or directory
+rm: cannot remove 'dir/x': No such file or directory
+rm: cannot remove 'y.tmp': No such file or directory
+rm: cannot remove './data/old': No such file or directory
+rm: cannot remove 'copy.tmp': No such file or directory
+rm: cannot remove './logs/app': No such file or directory
+rm: cannot remove '2026-10-01.tmp': No such file or directory
+exit=123
+
+$ lab check 06; echo "exit=$?"
+✗ 06 未達
+  判定 : 観測型（~/work/06 の下に残っているファイルを数えた）
+  観測 : 残っている .tmp ファイル = 3 個
+           ./data/old copy.tmp
+           ./data/sub dir/x y.tmp
+           ./logs/app 2026-10-01.tmp
+         残すべきファイル 4 個のうち、無くなったもの = 0 個
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 06
+exit=1
+
+$ echo "--- 模範解答 ---"
+--- 模範解答 ---
+
+$ find . -name "*.tmp" -print0 | xargs -0 rm
+
+$ find . -type f | sort
+./data/keep.tmp.txt
+./data/report final.txt
+./data/sub dir/notes.txt
+./logs/app.log
+
+$ lab check 06; echo "exit=$?"
+✔ 06 達成
+  判定 : 観測型（~/work/06 の下に残っているファイルを数えた）
+  観測 : 残っている .tmp ファイル = 0 個
+         残すべきファイル 4 個のうち、無くなったもの = 0 個
+         .tmp だけが、名前の空白に関係なくすべて消え、ほかは残っている
+exit=0
+
+
+########## H. 演習07 — レベルが ERROR か WARN の行だけを抜き出す ##########
+
+$ lab start 07
+作業ファイルを ~/work/07 に展開しました（server.log ）
+
+演習 07 — レベルが ERROR か WARN の行だけを抜き出す               影響度 B / 目安 12分
+
+  ~/work/07/server.log は14行のログです。1行は「日付 時刻 レベル 本文」の順です。
+
+【いまの状態を見てください】
+
+    cd ~/work/07
+    cat server.log
+    grep -c ERROR server.log
+
+【やること】
+
+  レベル（3番目の欄）がちょうど ERROR か WARN の行だけを、元の順のまま
+  ~/work/07/hits.txt に保存してください。grep と正規表現を使います。
+
+  次の行は含めません。
+
+    - 本文の中に ERROR や WARN という語が出てくるだけの行
+    - レベルが WARNING の行
+    - レベルが小文字の error の行
+
+【できたら】
+
+    lab check 07
+
+▶ 次はこれを打ってください
+    cd ~/work/07
+
+
+$ cd ~/work/07
+
+$ grep -c ERROR server.log
+4
+
+$ lab check 07; echo "exit=$?"
+✗ 07 未達
+  判定 : 観測型（hits.txt の各行を配ったログと突き合わせ、レベル欄を調べた）
+  観測 : ~/work/07/hits.txt が存在しない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+exit=1
+
+$ echo "--- 位置を決めずに選ぶ（よくある間違い）---"
+--- 位置を決めずに選ぶ（よくある間違い）---
+
+$ grep -E "ERROR|WARN" server.log > hits.txt; wc -l hits.txt
+8 hits.txt
+
+$ lab check 07; echo "exit=$?"
+✗ 07 未達
+  判定 : 観測型（hits.txt の各行を配ったログと突き合わせ、レベル欄を調べた）
+  観測 : hits.txt の行数 = 8（レベル欄が ERROR か WARN の行はログに 5 行）
+         6行目が入っている: レベル欄は INFO
+         7行目が入っている: レベル欄は WARNING
+         9行目が入っている: レベル欄は INFO
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+exit=1
+
+$ echo "--- 模範解答 ---"
+--- 模範解答 ---
+
+$ grep -E "^[^ ]+ [^ ]+ (ERROR|WARN) " server.log > hits.txt
+
+$ cat hits.txt
+2026-10-14 10:01:03 WARN  slow response 1200ms
+2026-10-14 10:02:11 ERROR database connection lost
+2026-10-14 10:04:02 ERROR disk full on /var
+2026-10-14 10:05:41 WARN  certificate expires in 7 days
+2026-10-14 10:06:55 ERROR job 8 failed
+
+$ lab check 07; echo "exit=$?"
+✔ 07 達成
+  判定 : 観測型（hits.txt の各行を配ったログと突き合わせ、レベル欄を調べた）
+  観測 : hits.txt の行数 = 5（レベル欄が ERROR か WARN の行はログに 5 行）
+         レベル欄が ERROR か WARN の行だけが、元の順で入っている
+exit=0
+
+
+########## I. 演習08 — vi で TODO を直す（本物の vim に打鍵を流し込む） ##########
+
+$ lab start 08
+作業ファイルを ~/work/08 に展開しました（todo.txt ）
+
+演習 08 — vi で TODO を直す                                        影響度 B / 目安 12分
+
+  ~/work/08/todo.txt を vi で開いて、4か所を直します。
+
+【いまの状態を見てください】
+
+    cd ~/work/08
+    cat todo.txt
+
+【やること】
+
+    1. 2行ある「call bob」を1行にする
+    2. 「buy bread」のすぐ下に「buy eggs」という行を足す
+    3. 「write report」を「write summary」に直す
+    4. 「buy milk」の行を、ファイルの一番最後へ移す
+
+  保存して vi を終えてから判定します。判定はファイルの中身だけを見ます。
+
+  vi が初めてなら: 困ったら ESC を押してから :q! と打って Enter。
+  保存せずに抜けられます。lab reset 08 で配られたときの状態に戻せます
+  （ディレクトリごと作り直されるので、そのあと cd ~/work/08 し直してください）。
+
+【できたら】
+
+    lab check 08
+
+▶ 次はこれを打ってください
+    cd ~/work/08
+
+
+$ cd ~/work/08
+
+$ cat todo.txt
+TODO
+buy milk
+buy bread
+call bob
+call bob
+write report
+
+$ lab check 08; echo "exit=$?"
+✗ 08 未達
+  判定 : 観測型（保存された todo.txt の中身を読んだ）
+  観測 : 行数 = 6
+         1. call bob の行     = 2 行
+         2. buy bread の次の行 = call bob
+         3. write summary     = 0 行 / write report = 1 行
+         4. 最後の行           = write report（buy milk は全部で 1 行）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 08
+exit=1
+
+$ echo "--- buy milk を切り取った後に call bob も dd してから貼る（順番の間違い）---"
+--- buy milk を切り取った後に call bob も dd してから貼る（順番の間違い）---
+
+$ vim todo.txt
+（打鍵: j dd j dd G p :wq⏎）
+
+$ cat todo.txt
+TODO
+buy bread
+call bob
+write report
+call bob
+
+$ lab check 08; echo "exit=$?"
+✗ 08 未達
+  判定 : 観測型（保存された todo.txt の中身を読んだ）
+  観測 : 行数 = 5
+         1. call bob の行     = 2 行
+         2. buy bread の次の行 = call bob
+         3. write summary     = 0 行 / write report = 1 行
+         4. 最後の行           = call bob（buy milk は全部で 0 行）
+         （参考: ~/.viminfo がある = この檻で vim を使って終了したことがある）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 08
+exit=1
+
+$ lab reset 08
+演習 08 を初期状態に戻しました（~/work/08）
+
+$ cd ~/work/08
+
+$ echo "--- 模範解答 ---"
+--- 模範解答 ---
+
+$ vim todo.txt
+（打鍵: gg j dd G p gg j o buy␣eggs ESC j dd /report⏎ cw summary ESC :wq⏎）
+
+$ cat todo.txt
+TODO
+buy bread
+buy eggs
+call bob
+write summary
+buy milk
+
+$ lab check 08; echo "exit=$?"
+✔ 08 達成
+  判定 : 観測型（保存された todo.txt の中身を読んだ）
+  観測 : 行数 = 6
+         1. call bob の行     = 1 行
+         2. buy bread の次の行 = buy eggs
+         3. write summary     = 1 行 / write report = 0 行
+         4. 最後の行           = buy milk（buy milk は全部で 1 行）
+         （参考: ~/.viminfo がある = この檻で vim を使って終了したことがある）
+         4か所とも指示どおりで、ほかの行は変わっていない
+
+  ════════════════════════════════════════
+   確かめて説明する LinuC 主題1.03 — 全8演習クリア
+  ════════════════════════════════════════
+
+  自分の手で確かめたこと
+
+   ✔ 01  シェル変数は子に渡らず、export した環境変数だけが渡ること
+   ✔ 02  名前だけのコマンドは PATH の中でしか探されず、カレントは探されないこと
+   ✔ 03  uniq は隣どうししか比べないので、数える前に sort が要ること
+   ✔ 04  sed は結果を出すだけで、ファイルを書き換えるのは -i を付けたときだけなこと
+   ✔ 05  2>&1 は「2番を、いま1番が向いている先へ」なので、書く順番で結果が変わること
+   ✔ 06  xargs は空白で区切って引数にするので、名前に空白があると -print0 / -0 が要ること
+   ✔ 07  grep は行のどこかに当たれば出すので、位置を ^ から決めないと本文に当たること
+   ✔ 08  dd は消すのではなく切り取りで、p で別の場所に貼れること
+
+  この8つは全部、1つの事実から出ていました。
+
+      コマンドが受け取るのは、シェルが組み立て終えた後の文字列だけである。
+      引用符・変数・ワイルドカード・リダイレクト・パイプは、コマンドが動き出す前にシェルが片づけている。
+      出力の謎は「このコマンドは何を受け取ったか」と問えば解ける。
+
+  理論編の最終章に、それぞれがどう繋がるかを書いてあります → /linuc-text/theory/10-vi
+
+exit=0
+
+
+########## J. 全問通した状態で lab check と lab ls ##########
+
+$ lab check; echo "exit=$?"
+✔ 01 達成
+  判定 : 観測型（判定はこのシェルの子プロセス。子から見えた EDITOR と、それで起動したエディタの名乗りを見た）
+  観測 : 子プロセスから見た EDITOR = [vi]
+         sensible-editor が起動したエディタ = VIM - Vi IMproved 9.1 (2024 Jan 02, compiled Aug 24 2026 22:13:04)
+         EDITOR が環境変数として子に渡り、それを読んだ sensible-editor が vim を起動した
+✔ 02 達成
+  判定 : 観測型（/tmp に移動してから、名前だけで greet を探して実行した）
+  観測 : PATH = /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/lab/work/02/bin
+         /tmp から名前で探した greet = /home/lab/work/02/bin/greet
+         実行結果 = greet: こんにちは。私は /home/lab/work/02/bin/greet として呼ばれました（終了コード 0）
+         どこにいても、名前だけで配った greet が見つかって動いた
+✔ 03 達成
+  判定 : 観測型（配ったログの9番目の欄を数え直し、answer.txt と突き合わせた）
+  観測 : answer.txt の行数 = 5（ログの9番目の欄に出てくるステータスは 5 種類）
+         件数の並び = 12 8 5 3 2 
+         各ステータスが1行ずつ、ログの実際の件数で、多い順に並んでいる
+✔ 04 達成
+  判定 : 観測型（app.conf と app.conf.bak の中身を、配ったときの中身と比べた）
+  観測 : port の行       = port=9090
+         port_admin の行 = port_admin=8081
+         url の行        = url=http://localhost:8080/health
+         # で始まる行    = 0 行
+         その他の行      = host=localhost log_level=info
+         app.conf.bak    = 配ったときの app.conf と同じ中身
+         port だけが 9090 になり、コメントが消え、元の中身が .bak に残っている
+✔ 05 達成
+  判定 : 観測型（ok.log / ng.log / all.log の中身と行の順番を読んだ）
+  観測 :
+         ok.log  = 3 行（OK 3 行 / NG 0 行）: OK: disk|OK: network|OK: clock
+         ng.log  = 2 行（OK 0 行 / NG 2 行）: NG: memory|NG: cpu
+         all.log = 5 行（OK 3 行 / NG 2 行）: OK: disk|NG: memory|OK: network|NG: cpu|OK: clock
+         標準出力と標準エラー出力が、それぞれの行き先に分かれて入っている
+✔ 06 達成
+  判定 : 観測型（~/work/06 の下に残っているファイルを数えた）
+  観測 : 残っている .tmp ファイル = 0 個
+         残すべきファイル 4 個のうち、無くなったもの = 0 個
+         .tmp だけが、名前の空白に関係なくすべて消え、ほかは残っている
+✔ 07 達成
+  判定 : 観測型（hits.txt の各行を配ったログと突き合わせ、レベル欄を調べた）
+  観測 : hits.txt の行数 = 5（レベル欄が ERROR か WARN の行はログに 5 行）
+         レベル欄が ERROR か WARN の行だけが、元の順で入っている
+✔ 08 達成
+  判定 : 観測型（保存された todo.txt の中身を読んだ）
+  観測 : 行数 = 6
+         1. call bob の行     = 1 行
+         2. buy bread の次の行 = buy eggs
+         3. write summary     = 1 行 / write report = 0 行
+         4. 最後の行           = buy milk（buy milk は全部で 1 行）
+         （参考: ~/.viminfo がある = この檻で vim を使って終了したことがある）
+         4か所とも指示どおりで、ほかの行は変わっていない
+exit=0
+
+$ lab ls
+演習一覧
+  ✔ 01  標準のエディタを vi にする        8分 / 影響度 B
+  ✔ 02  自作のコマンドを名前だけで動かす 10分 / 影響度 B
+  ✔ 03  アクセスログのステータスを数える 12分 / 影響度 B
+  ✔ 04  設定ファイルを sed で書き換える 10分 / 影響度 B
+  ✔ 05  出力を2本に分けて保存する        10分 / 影響度 B
+  ✔ 06  名前に空白のあるファイルもまとめて消す 12分 / 影響度 B
+  ✔ 07  レベルが ERROR か WARN の行だけを抜き出す 12分 / 影響度 B
+  ✔ 08  vi で TODO を直す                        12分 / 影響度 B
+
+  ✔ 自力で達成   ◍ solve を見た   · 未着手
+
+
+########## K. 最終環境 ##########
+
+$ lab env
+テーマ    : lab-linuc-text 1.0.0
+イメージ  : ghcr.io/chai0204/lab-linuc:text-1.0.0
+ベース    : Ubuntu 24.04.5 LTS
+apt 固定  : 20260929T000000Z
+カーネル  : 7.2.6
+アーキ    : x86_64
+ランタイム: docker
+道具の版  : bash 5.2.21-2ubuntu4 / coreutils 9.4-3ubuntu6.3 / grep 3.11-4build1 / sed 4.9-2ubuntu0.24.04.1 / findutils 4.9.0-5build1
+エディタ  : vim 2:9.1.0016-1ubuntu7.20 / nano 7.2-2ubuntu0.2 / less 590-2ubuntu2.1 / man-db 2.12.0-4build2
+ロケール  : LANG=C.UTF-8 LC_ALL=
+EDITOR    : vi
+特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb

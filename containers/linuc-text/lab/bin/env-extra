@@ -1,0 +1,12 @@
+#!/bin/bash
+# lab env の追加行。このテーマの出力を左右するのは、道具の版と、ロケールと、EDITOR の3つ。
+#   - 版: grep 3.8 以降は egrep / fgrep が警告を出す。sed / coreutils も版で出力が変わることがある
+#   - ロケール: sort の並び順と [a-z] の範囲が変わる（この檻は C.UTF-8）
+#   - EDITOR: 演習01 の判定がこれを見る
+v() { dpkg-query -W -f='${Version}' "$1" 2>/dev/null || echo '?'; }
+printf '道具の版  : bash %s / coreutils %s / grep %s / sed %s / findutils %s\n' \
+  "$(v bash)" "$(v coreutils)" "$(v grep)" "$(v sed)" "$(v findutils)"
+printf 'エディタ  : vim %s / nano %s / less %s / man-db %s\n' \
+  "$(v vim)" "$(v nano)" "$(v less)" "$(v man-db)"
+printf 'ロケール  : LANG=%s LC_ALL=%s\n' "${LANG:-}" "${LC_ALL:-}"
+printf 'EDITOR    : %s\n' "${EDITOR:-（未設定）}"

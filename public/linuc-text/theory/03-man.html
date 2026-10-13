@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. man が説明しているのは、打ったものと別物のことがある — 確かめて説明する LinuC 主題1.03</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="linuc-text">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-text/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+</div>
+<h1>3. man が説明しているのは、打ったものと別物のことがある</h1>
+<p class="lead"><code>man echo</code> には <code>--version</code> というオプションが書いてある。ところが <code>echo --version</code> と打つと、<code>--version</code> という文字がそのまま出てくる。読んだ説明書は <code>/usr/bin/echo</code> のもので、打ったのはシェルに組み込まれた別の <code>echo</code> だった。</p>
+<div class="badges"><span>前提: 第2章（type）</span><span>前提: 檻が起動している</span><span>所要 14分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.03.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>組み込みコマンドの説明は <code>help</code> で、外部コマンドの説明は <code>man</code> で引くと使い分けられる</li><li>セクション番号（1・5・7・8）を指定して、同じ名前の別のページを開ける</li><li>名前を知らないときに <code>man -k</code>（<code>apropos</code>）で、名前を知っているときに <code>man -f</code>（<code>whatis</code>）で探せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: man ページの書き方（groff）、<code>MANPATH</code> と <code>/etc/manpath.config</code> の細部、<code>info</code> コマンド、<code>mandb</code> による索引の作り直し。日本語の man ページはこの檻には入れていない（試験は英語の man を前提にしない）。</div></div>
+
+<h2 id="builtin">説明書と、打ったものが食い違う</h2>
+<div class="sgoal"><b>この節で分かること</b>: man が説明していないコマンドがあることと、その見分け方。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>man echo</code> に <code>--version</code> と書いてあるのだから、<code>echo --version</code> と打てば版が出るはずだ。
+man はそのコマンドの説明書なのだから。</p>
+<pre><code>$ man -f echo
+echo (1)             - display a line of text
+$ man echo | grep -A1 "^NAME"
+NAME
+       echo - display a line of text
+$ man echo | grep -E "^ +--version"
+       --version
+$ echo --version
+--version</code></pre>
+<div class="then"><b>だめな理由</b>: 版は出ず、<code>--version</code> という文字が出力された。
+打った <code>echo</code> は、man が説明している <code>echo</code> ではなかった。
+第2章で見たとおり、シェルは <code>PATH</code> を探す前に<b>組み込みコマンド</b>を使う。
+組み込みの <code>echo</code> は <code>--version</code> を知らないので、ただの文字として出した。
+man の <code>echo(1)</code> は、<code>/usr/bin/echo</code> という別のプログラムの説明書である。</div></div>
+<pre><code>$ type echo
+echo is a shell builtin
+$ type -a echo
+echo is a shell builtin
+echo is /usr/bin/echo
+echo is /bin/echo
+$ /usr/bin/echo --version | head -1
+echo (GNU coreutils) 9.4
+$ help echo | head -3
+echo: echo [-neE] [arg ...]
+    Write arguments to the standard output.
+    </code></pre>
+<p><code>type -a</code> は同じ名前を全部並べる。先頭の「shell builtin」が、名前だけで打ったときに動くものだ。<code>/usr/bin/echo</code> と場所を書けば、man が説明しているほうが動いて版を出す。組み込みのほうの説明は <code>help</code> が出す。</p>
+<p>組み込みにしか無いコマンドは、man を引いても何も出てこない。</p>
+<pre><code>$ man cd; echo "exit=$?"
+No manual entry for cd
+exit=16
+$ man -f cd; echo "exit=$?"
+cd: nothing appropriate.
+exit=16
+$ type cd
+cd is a shell builtin
+$ help cd | head -3
+cd: cd [-L|[-P [-e]] [-@]] [dir]
+    Change the shell working directory.
+    
+$ man bash | grep -E "^ +history \[n\]"
+       history [n]</code></pre>
+<p><code>cd</code> も <code>history</code> も組み込みコマンドで、独立した man ページを持たない。説明は <code>help</code> か、<code>man bash</code> の中（SHELL BUILTIN COMMANDS の節）にある。</p>
+<div class="analogy"><b>たとえ</b>: ホテルの部屋に<b>備え付けのドライヤー</b>と、フロントで貸し出す<b>高機能なドライヤー</b>があり、
+説明書はフロントの機種のものしか置いていない状況に近い。「ターボボタン」と書いてあっても、手元の備え付けには付いていない。
+<br>ただし<b>崩れる点</b>: ドライヤーは見た目で別物と分かるが、コマンドは名前が同じで画面からは区別できない。
+<code>type</code> で聞くまで、どちらが動くかは分からない。</div>
+
+<h2 id="section">同じ名前でも、セクションごとに別のページがある</h2>
+<div class="sgoal"><b>この節で分かること</b>: セクション番号の意味と、指定して開く方法。</div>
+<pre><code>$ man -f passwd
+passwd (1)           - change user password
+passwd (5)           - the password file
+$ whatis passwd
+passwd (1)           - change user password
+passwd (5)           - the password file
+$ man -w passwd
+/usr/share/man/man1/passwd.1.gz
+$ man -w 5 passwd
+/usr/share/man/man5/passwd.5.gz
+$ man passwd | grep -A1 "^NAME"
+NAME
+       passwd - change user password
+$ man 5 passwd | grep -A1 "^NAME"
+NAME
+       passwd - the password file</code></pre>
+<p><code>passwd</code> という名前のページは2つある。<code>passwd(1)</code> はパスワードを変えるコマンド、<code>passwd(5)</code> は <code>/etc/passwd</code> というファイルの書式だ。番号を付けずに <code>man passwd</code> と打つと、先に見つかったセクション1が開く。<code>/etc/passwd</code> の書式を読みたいなら <code>man 5 passwd</code> と番号を書く。<code>man -w</code> は、開くファイルの場所を出す。ディレクトリ名の <code>man1</code> <code>man5</code> がセクション番号である。</p>
+<pre><code>$ ls -d /usr/share/man/man[0-9]
+/usr/share/man/man1
+/usr/share/man/man2
+/usr/share/man/man3
+/usr/share/man/man4
+/usr/share/man/man5
+/usr/share/man/man6
+/usr/share/man/man7
+/usr/share/man/man8</code></pre>
+<div class="scroll"><table>
+<tr><th>セクション</th><th>中身</th><th>例</th></tr>
+<tr><td>1</td><td>一般ユーザのコマンド</td><td><code>ls(1)</code> <code>passwd(1)</code> <code>grep(1)</code></td></tr>
+<tr><td>2</td><td>システムコール</td><td><code>open(2)</code></td></tr>
+<tr><td>3</td><td>ライブラリ関数</td><td><code>printf(3)</code></td></tr>
+<tr><td>4</td><td>デバイスファイル</td><td><code>null(4)</code></td></tr>
+<tr><td>5</td><td>設定ファイルの書式</td><td><code>passwd(5)</code> <code>crontab(5)</code></td></tr>
+<tr><td>6</td><td>ゲーム</td><td>—</td></tr>
+<tr><td>7</td><td>概念・規約・その他</td><td><code>regex(7)</code> <code>hier(7)</code></td></tr>
+<tr><td>8</td><td>管理者用のコマンド</td><td><code>useradd(8)</code> <code>mount(8)</code></td></tr>
+</table></div>
+<p>セクション3はこの檻には入れていない（プログラムを書く人向けの <code>manpages-dev</code> が要る）。だから <code>printf</code> はセクション1しか見つからない。</p>
+<pre><code>$ man -f printf
+printf (1)           - format and print data
+$ man -w 3 printf; echo "exit=$?"
+No manual entry for printf in section 3
+exit=16</code></pre>
+<p>試験の問題文や man の中では、<code>passwd(5)</code> のように<b>名前の後ろに括弧でセクション番号</b>を書いて区別する。出題範囲の「<code>regex(7)</code>」も、「セクション7の regex のページ」という意味である。</p>
+<div class="analogy"><b>たとえ</b>: 図書館の<b>分類番号</b>に近い。「パスワード」という同じ題の本が、
+「使い方の棚（1）」と「様式集の棚（5）」に1冊ずつある。番号を言わずに頼むと、先に見つかった棚の本を渡される。
+<br>ただし<b>崩れる点</b>: 図書館なら司書が「どちらの本ですか」と聞き返してくれるが、
+man は聞き返さない。黙って最初の1冊を開く。2冊目があることは <code>man -f</code> を打たないと分からない。</div>
+
+<h2 id="search">名前を知らないときは、説明の一行から探す</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>man -k</code> と <code>man -f</code> の違い。</div>
+<pre><code>$ man -k "^regex"
+regex (7)            - POSIX.2 regular expressions
+$ apropos "^regex"
+regex (7)            - POSIX.2 regular expressions
+$ man -f regex
+regex (7)            - POSIX.2 regular expressions
+$ man 7 regex | grep -A1 "^NAME"
+NAME
+       regex - POSIX.2 regular expressions
+$ man -k "regular expression" | sort
+re_format (7)        - POSIX.2 regular expressions
+regex (7)            - POSIX.2 regular expressions
+zegrep (1)           - search possibly compressed files for a regular expression
+zfgrep (1)           - search possibly compressed files for a regular expression
+zgrep (1)            - search possibly compressed files for a regular expression</code></pre>
+<p><code>man -k</code>（<code>apropos</code> と同じ）は、各ページの名前と<b>NAME 欄の一行説明</b>を、正規表現で探す。<code>"regular expression"</code> のように、名前を知らなくても説明の言葉から当たる。<code>man -f</code>（<code>whatis</code> と同じ）は、<b>名前が完全に一致する</b>ページだけを、セクション番号付きで出す。</p>
+<div class="scroll"><table>
+<tr><th>打ち方</th><th>同じもの</th><th>探す対象</th><th>使いどころ</th></tr>
+<tr><td><code>man -k 語</code></td><td><code>apropos 語</code></td><td>名前と一行説明（部分一致・正規表現）</td><td>名前を知らない</td></tr>
+<tr><td><code>man -f 名前</code></td><td><code>whatis 名前</code></td><td>名前（完全一致）</td><td>どのセクションにあるかを知りたい</td></tr>
+<tr><td><code>man -w 名前</code></td><td>—</td><td>開くファイルの場所</td><td>どのファイルを読んでいるか確かめる</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: <code>man -f</code> は本の<b>題名で引く目録</b>、<code>man -k</code> は<b>帯の宣伝文句まで含めた全文検索</b>に近い。
+題名を正確に知っていれば目録が速いが、「正規表現の本はないか」なら宣伝文句から探すしかない。
+<br>ただし<b>崩れる点</b>: 全文検索といっても、<code>man -k</code> が見るのは NAME 欄の一行だけで、本文は探さない。
+本文にしか出てこない言葉では当たらない。</div>
+
+<h2 id="read">man の画面の読み方</h2>
+<div class="sgoal"><b>この節で分かること</b>: man を開いた後の操作と、ページの読む順番。</div>
+<p><code>man ls</code> と打つと、ページャ（既定は <code>less</code>）で画面いっぱいに開く。操作は <code>less</code> と同じである（第4章）。</p>
+<div class="scroll"><table>
+<tr><th>キー</th><th>動き</th></tr>
+<tr><td><kbd>Space</kbd> / <kbd>b</kbd></td><td>1画面進む / 戻る</td></tr>
+<tr><td><kbd>/</kbd>文字列 <kbd>Enter</kbd></td><td>下向きに探す。<kbd>n</kbd> で次、<kbd>N</kbd> で前</td></tr>
+<tr><td><kbd>g</kbd> / <kbd>G</kbd></td><td>先頭 / 末尾へ</td></tr>
+<tr><td><kbd>h</kbd></td><td>操作の一覧</td></tr>
+<tr><td><kbd>q</kbd></td><td>閉じる</td></tr>
+</table></div>
+<p>ページは <b>NAME</b>（一行説明）→ <b>SYNOPSIS</b>（書式）→ <b>DESCRIPTION</b>（説明とオプション）→ <b>SEE ALSO</b>（関連ページ）の順に並ぶ。SYNOPSIS の <code>[ ]</code> は省略できる部分、<code>...</code> は繰り返せる部分を表す。オプションの説明は、<code>/</code> で <code>-l</code> のように探すのが速い。</p>
+<pre><code>$ man ls | grep -E "^ +-l +"
+       -l     use a long listing format
+$ man ls | grep -A1 -E "^ +-a, --all"
+       -a, --all
+              do not ignore entries starting with .</code></pre>
+<p class="detail">man は<b>端末の幅に合わせて</b>文章を折り返す（パイプの先に出すときも、端末の幅を見る）。説明の段落は読者の画面の幅で折り返し位置が変わるので、この教材では幅に左右されない短い行だけを載せている。</p>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/passwd</code> の各欄の意味を man で調べたい。正しい打ち方はどれか。</p>
+<p>A. <code>man passwd</code>　B. <code>man 5 passwd</code>　C. <code>man -k /etc/passwd</code>　D. <code>man 1 passwd</code></p>
+<details><summary>答え</summary>
+<p>B。ファイルの書式はセクション5にある。A と D はセクション1（パスワードを変えるコマンド）を開く。
+どのセクションにあるか分からなければ、先に <code>man -f passwd</code> で一覧を見る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>「regular expression」という語を一行説明に含む man ページの一覧を出すコマンドを2つ挙げよ。</p>
+<details><summary>答え</summary>
+<p><code>man -k "regular expression"</code> と <code>apropos "regular expression"</code>。
+実測では <code>re_format(7)</code> <code>regex(7)</code> <code>zgrep(1)</code> などが並んだ。
+<code>man -f</code>（<code>whatis</code>）は名前が完全に一致するものしか出さない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>man cd</code> が <code>No manual entry for cd</code> になった。理由と、<code>cd</code> の説明を読む方法を答えよ。</p>
+<details><summary>答え</summary>
+<p><code>cd</code> は bash の組み込みコマンドで、独立した man ページが無いため（<code>type cd</code> で <code>shell builtin</code> と出る）。
+<code>help cd</code> か、<code>man bash</code> の SHELL BUILTIN COMMANDS の節で読む。</p></details></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-text/">演習03</a>で <code>uniq</code> の数え方に詰まったら、<code>man uniq</code> を開いて <code>/count</code> と探してみる。
+ヒントを読む前に man で答えにたどり着けるかが、この章の練習になる。</div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>名前だけで打ったコマンドが組み込みなら、man の説明は別物（外部コマンド）のもの。<code>type</code> で確かめ、組み込みは <code>help</code> で引く</li><li>同じ名前のページがセクションごとにある。1 はコマンド、5 はファイルの書式、7 は概念（<code>regex(7)</code>）、8 は管理コマンド</li><li><code>man 5 passwd</code> のように番号を指定して開く。<code>man -f</code>（<code>whatis</code>）でどのセクションにあるかを見る</li><li>名前を知らないときは <code>man -k</code>（<code>apropos</code>）で一行説明から探す</li><li>開いた後は <code>/</code> で探して <code>n</code> で次、<code>q</code> で閉じる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-text/theory/02-path">← 2. コマンドを探すのはシェルで、カレントは探さない</a><a href="/linuc-text/theory/04-lines">次: 4. 1行とは、改行で終わっている範囲のこと →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-text/chapters.js"></script>
+<script src="/linuc-text/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>7. リダイレクトは、左から順に配線する — 確かめて説明する LinuC 主題1.03</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="7" data-theme="linuc-text">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-text/theory/">理論編</a> › 第7章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+</div>
+<h1>7. リダイレクトは、左から順に配線する</h1>
+<p class="lead"><code>&gt; out.txt</code> を付けても、エラーは画面に出る。<code>&gt;</code> が付け替えるのは出力の口のうち1本だけだからだ。そして <code>2&gt;&amp;1</code> は「エラーもまとめる」という呪文ではなく、「2番の口を、<b>いま</b>1番が向いている先へつなぐ」という1回きりの配線である。配線はコマンドが動き出す前に、シェルが左から順に済ませている。</p>
+<div class="badges"><span>前提: 第6章まで</span><span>前提: 檻が起動している</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.03.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>標準入力（0番）・標準出力（1番）・標準エラー出力（2番）と、<code>&gt;</code> <code>&gt;&gt;</code> <code>&lt;</code> <code>2&gt;</code> <code>2&gt;&amp;1</code> <code>&amp;&gt;</code> の意味を言える</li><li><code>cmd &gt; f 2&gt;&amp;1</code> と <code>cmd 2&gt;&amp;1 &gt; f</code> の結果の違いを、左から順に処理される規則で説明できる</li><li><code>sort f &gt; f</code> が空になる理由と、<code>noclobber</code> <code>&gt;|</code> <code>/dev/null</code> ヒアドキュメントの使いどころを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: 3番以降の口を開く <code>exec 3&gt;</code>、プロセス置換 <code>&lt;(...)</code>、読み書き両用の <code>&lt;&gt;</code>、名前付きパイプ。パイプ（<code>|</code>）は第8章で扱う。</div></div>
+
+<h2 id="fd">出力の口は2本ある</h2>
+<div class="sgoal"><b>この節で分かること</b>: 標準出力と標準エラー出力が別の口であること。</div>
+<pre><code>@@
+$ cd ~/text
+$ ls fruits.txt nosuch.txt
+$ ls fruits.txt nosuch.txt > out.txt
+$ cat out.txt
+$ ls fruits.txt nosuch.txt 2> err.txt
+$ cat err.txt
+@@</code></pre>
+<p>どのプロセスも、生まれたときから3本の口を持っている。番号で呼ぶ。</p>
+<pre><code>  0番 標準入力        どこから読むか（既定は端末のキーボード）
+  1番 標準出力        結果をどこへ書くか（既定は端末の画面）
+  2番 標準エラー出力  エラーや警告をどこへ書くか（既定も端末の画面）</code></pre>
+<p>1番と2番はどちらも画面につながっているので、ふだんは混ざって見える。<code>&gt; out.txt</code>（<code>1&gt;</code> の略）は1番だけを付け替えたので、<code>ls</code> のエラーは2番を通って画面に残った。<code>2&gt; err.txt</code> は2番だけを付け替えた。<code>ls</code> 自身はどちらの場合も同じように「1番に結果、2番にエラー」を書いただけで、行き先が変わったことを知らない。</p>
+<div class="analogy"><b>たとえ</b>: 郵便受けが<b>2つある家</b>に近い。ふつうの郵便（1番）と督促状（2番）は別の箱に届き、
+どちらも初めは同じ玄関先（画面）に置いてある。<code>&gt;</code> は「ふつうの郵便だけ別の住所へ転送して」という届けで、督促状は玄関に届き続ける。
+<br>ただし<b>崩れる点</b>: 郵便は差出人が宛先を書くが、ここでは差出人（コマンド）は「1番の箱」「2番の箱」と書くだけで、
+その箱がどこにつながっているかを知らない。転送の届けを出すのはシェルである。</div>
+
+<h2 id="order">2&gt;&amp;1 は、書く順番で結果が変わる</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>2&gt;&amp;1</code> の正確な意味と、リダイレクトが処理される順番。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>2&gt;&amp;1</code> は「エラーも標準出力にまとめる」という意味だから、<code>&gt; ファイル</code> の前に書いても後に書いても、両方がファイルに入るはずだ。</p>
+<pre><code>@@
+$ ls fruits.txt nosuch.txt > both.txt 2>&1
+$ cat both.txt
+$ ls fruits.txt nosuch.txt 2>&1 > only.txt
+$ cat only.txt
+@@</code></pre>
+<div class="then"><b>だめな理由</b>: 後ろに書いた1つ目は両方がファイルに入ったが、前に書いた2つ目はエラーが画面に出て、ファイルには1行しか入らなかった。
+<code>2&gt;&amp;1</code> は「2番を、<b>この時点で</b>1番がつながっている先へつなぐ」という操作で、
+その後に1番を付け替えても、2番はついていかない。シェルはリダイレクトを<b>左から順に</b>処理する。</div></div>
+<div class="scroll"><table>
+<tr><th>書き方</th><th>1つ目の処理</th><th>2つ目の処理</th><th>結果</th></tr>
+<tr><td><code>&gt; both.txt 2&gt;&amp;1</code></td><td>1番 → both.txt</td><td>2番 → 1番の今の先（both.txt）</td><td>両方 both.txt</td></tr>
+<tr><td><code>2&gt;&amp;1 &gt; only.txt</code></td><td>2番 → 1番の今の先（画面）</td><td>1番 → only.txt</td><td>結果は only.txt、エラーは画面</td></tr>
+</table></div>
+<p>bash には、両方を1つのファイルへ送る短い書き方 <code>&amp;&gt;</code> もある。</p>
+<pre><code>@@
+$ ls fruits.txt nosuch.txt &> amp.txt
+$ cat amp.txt
+@@</code></pre>
+<div class="analogy"><b>たとえ</b>: <code>2&gt;&amp;1</code> は「督促状は、ふつうの郵便と同じ転送先へ」という<b>転送届</b>に近い。
+窓口はこの届けを受け取ると、ふつうの郵便の<b>その時点の転送先</b>を書き写して処理する。
+<br>ただし<b>崩れる点</b>: 人の窓口なら「同じ先へ」を覚えておいて、後から変わった転送先にも合わせてくれそうに思えるが、
+シェルは書き写したら終わりで、後の変更を追いかけない。だから届けを出す順番がすべてになる。</div>
+
+<h2 id="append">上書きと追記、捨て場所</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>&gt;</code> と <code>&gt;&gt;</code> の違いと、<code>/dev/null</code>。</div>
+<pre><code>@@
+$ echo first > note.txt
+$ echo second > note.txt
+$ cat note.txt
+$ echo third >> note.txt
+$ cat note.txt
+$ ls nosuch.txt 2>> note.txt
+$ cat note.txt
+@@</code></pre>
+<p><code>&gt;</code> はファイルを開くときに<b>中身を空にしてから</b>書く。<code>&gt;&gt;</code> は末尾に足す。<code>2&gt;&gt;</code> のように番号と組み合わせられる。</p>
+<pre><code>@@
+$ ls fruits.txt nosuch.txt 2> /dev/null
+$ ls fruits.txt nosuch.txt > /dev/null
+$ stat -c "%A %F" /dev/null
+@@</code></pre>
+<p><code>/dev/null</code> は書いたものを全部捨て、読むと何も返さない特殊なファイル（キャラクタデバイス）である。エラーだけ見たくないなら <code>2&gt; /dev/null</code>、結果を捨ててエラーだけ見たいなら <code>&gt; /dev/null</code> と書く。</p>
+
+<h2 id="input">標準入力を付け替える</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>&lt;</code> とヒアドキュメント。</div>
+<pre><code>@@
+$ wc -l < fruits.txt
+$ tr a-z A-Z < fruits.txt > upper.txt
+$ cat upper.txt
+@@</code></pre>
+<p><code>&lt;</code> は0番（標準入力）をファイルにつなぐ。第4章で見たとおり、<code>wc</code> にはファイル名が届かないので、数だけが出る。入力と出力を同時に付け替えることもできる。</p>
+<p>短い文章をその場で標準入力に渡すには、<b>ヒアドキュメント</b> <code>&lt;&lt; 終わりの印</code> を使う。端末では2行目から <code>&gt; </code> という続きのプロンプトが出る。</p>
+<pre><code>@@
+$ cat << EOF > greet.txt ⟪noout⟫
+> hello, $HOME
+> EOF
+$ cat greet.txt
+$ cat << 'EOF' ⟪noout⟫
+> hello, $HOME
+> EOF
+hello, $HOME
+$ tr a-z A-Z <<< "here string"
+@@</code></pre>
+<p>終わりの印を引用符で囲むと（<code>'EOF'</code>）、中の <code>$HOME</code> は展開されない。第1章の引用符の規則が、ここでもそのまま効いている。<code>&lt;&lt;&lt;</code>（ヒアストリング）は1行だけを渡す bash の書き方である。</p>
+
+<h2 id="truncate">読みながら同じファイルに書くと、空になる</h2>
+<div class="sgoal"><b>この節で分かること</b>: リダイレクトの処理がコマンドより先に起きることの、いちばん痛い結果。</div>
+<pre><code>@@
+$ cp fruits.txt copy.txt
+$ sort copy.txt > copy.txt
+$ wc -c copy.txt
+@@</code></pre>
+<p>並べ替えたかったファイルが、0バイトになった。シェルは <code>sort</code> を動かす<b>前に</b> <code>&gt; copy.txt</code> を処理し、ファイルを空にして開く。<code>sort</code> が読み始めたときには、もう何も残っていない。<code>sort</code> には <code>-o</code> という自分で書き出すオプションがあり、全部読んでから書くので同じファイルを指定できる（第6章の <code>sed -i</code> も同じ問題を避けるための仕組み）。</p>
+<pre><code>@@
+$ cp fruits.txt copy.txt
+$ sort copy.txt -o copy.txt
+$ head -2 copy.txt
+@@</code></pre>
+<p>うっかり上書きを防ぐには、シェルのオプション <code>noclobber</code> を入れる（第1章の <code>set -o</code>）。入れていても、<code>&gt;|</code> と書けば上書きできる。</p>
+<pre><code>@@
+$ set -o noclobber
+$ echo again > note.txt
+$ echo again >| note.txt
+$ cat note.txt
+$ set +o noclobber
+@@</code></pre>
+<div class="analogy"><b>たとえ</b>: 原本を書き写そうとして、<b>書き写す先の紙を用意する作業で原本を消しゴムで消してしまう</b>のに近い。
+写す係（<code>sort</code>）が来る前に、紙の準備係（シェル）が同じ紙をまっさらにしている。
+<br>ただし<b>崩れる点</b>: 人なら「それは原本です」と止めるが、シェルは名前が同じかどうかを確かめない。
+<code>noclobber</code> を入れたときだけ、既にあるファイルへの <code>&gt;</code> を拒む。</div>
+<p>最後に、コマンドの成否はどの口にも出ない<b>終了コード</b>（<code>$?</code>）で受け取る。0 が成功で、それ以外が失敗である。</p>
+<pre><code>@@
+$ ls nosuch.txt; echo "exit=$?"
+$ ls fruits.txt; echo "exit=$?"
+@@</code></pre>
+<div class="quiz"><b>確認</b>
+<p>コマンド <code>backup.sh</code> の標準出力と標準エラー出力の両方を <code>result.log</code> に書きたい。正しいものを2つ選べ。</p>
+<p>A. <code>backup.sh 2&gt;&amp;1 &gt; result.log</code>　B. <code>backup.sh &gt; result.log 2&gt;&amp;1</code>　C. <code>backup.sh &amp;&gt; result.log</code>　D. <code>backup.sh 2&gt; result.log</code></p>
+<details><summary>答え</summary>
+<p>B と C。A は2番が画面につながったまま残る（実測の <code>only.txt</code> と同じ）。D はエラーだけがファイルに入る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>find / -name passwd</code> を一般ユーザで実行すると、<code>Permission denied</code> が大量に出る。見つかった結果だけを画面に出すには、どう書くか。</p>
+<details><summary>答え</summary>
+<p><code>find / -name passwd 2&gt; /dev/null</code>。エラーは2番に出るので、2番だけを <code>/dev/null</code> へ捨てる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>&gt;</code> と <code>&gt;&gt;</code> の違いを説明せよ。また、<code>sort data.txt &gt; data.txt</code> を実行すると <code>data.txt</code> はどうなるか。</p>
+<details><summary>答え</summary>
+<p><code>&gt;</code> はファイルを空にしてから書き、<code>&gt;&gt;</code> は末尾に追記する。
+<code>sort data.txt &gt; data.txt</code> は、<code>sort</code> が読む前にシェルが <code>data.txt</code> を空にするので、空のファイルになる（実測 0 バイト）。
+同じファイルに書き戻すなら <code>sort data.txt -o data.txt</code>。</p></details></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-text/">演習05</a>は、1つのスクリプトの出力を「標準出力だけ」「標準エラー出力だけ」「両方を順番どおり」の3つのファイルに分ける課題である。
+<code>2&gt;&amp;1</code> を先に書くと、判定は「all.log に NG の行が入っていない」と観測する。</div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>出力の口は2本ある。1番が標準出力、2番が標準エラー出力。0番が標準入力</li><li><code>&gt;</code>（<code>1&gt;</code>）は1番だけ、<code>2&gt;</code> は2番だけを付け替える。<code>&gt;&gt;</code> は追記、<code>&lt;</code> は0番</li><li><code>2&gt;&amp;1</code> は「2番を、いま1番が向いている先へ」。リダイレクトは左から順に処理されるので、<code>&gt; f 2&gt;&amp;1</code> と <code>2&gt;&amp;1 &gt; f</code> は違う。<code>&amp;&gt; f</code> は前者と同じ</li><li>リダイレクトはコマンドより先に処理される。だから <code>sort f &gt; f</code> は空になる（<code>sort -o</code> を使う）</li><li>捨てるなら <code>/dev/null</code>。上書きを防ぐ <code>set -o noclobber</code> と、それを越える <code>&gt;|</code></li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-text/theory/06-sed">← 6. sed は書き換えた結果を見せるだけ</a><a href="/linuc-text/theory/08-pipe">次: 8. xargs は空白で区切って引数にする →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-text/chapters.js"></script>
+<script src="/linuc-text/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

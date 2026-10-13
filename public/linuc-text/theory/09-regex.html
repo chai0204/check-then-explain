@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>9. . は何にでも当たる1文字 — 確かめて説明する LinuC 主題1.03</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="9" data-theme="linuc-text">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc/">LinuC</a> › <a href="/linuc-text/theory/">理論編</a> › 第9章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+</div>
+<h1>9. . は何にでも当たる1文字</h1>
+<p class="lead"><code>grep 10.0.0.5 ips.txt</code> は、4行のうち4行すべてに当たる。<code>.</code> はピリオドではなく「任意の1文字」で、しかも <code>grep</code> は行のどこかに当たればその行を出す。<code>grep</code> に渡したのは IP アドレスではなく<b>正規表現</b>という小さな言語だった。そしてその言語は、<code>grep</code> に届く前にシェルに書き換えられることがある。</p>
+<div class="badges"><span>前提: 第8章まで</span><span>前提: 檻が起動している</span><span>所要 22分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.03.4（重要度2）</span><span>最終検証 2026-10-13</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>正規表現の部品（<code>.</code> <code>*</code> <code>^</code> <code>$</code> <code>[ ]</code> <code>[^ ]</code> <code>\</code>、拡張の <code>+</code> <code>?</code> <code>{ }</code> <code>|</code> <code>( )</code>）を読める</li><li><code>grep</code> の <code>-E -F -v -i -n -c -l -w -x -r</code> を使い分けられる</li><li>基本正規表現と拡張正規表現の違いと、<code>egrep</code> <code>fgrep</code> が何者かを言える</li><li>パターンを引用符で囲む理由を、シェルのワイルドカード展開から説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: Perl 互換の正規表現（<code>grep -P</code>）、後方参照を使った検索、POSIX 文字クラス（<code>[[:digit:]]</code>）の全種類、最長一致の細かい規則。<code>regex(7)</code> の中身を全部読む必要もない。</div></div>
+
+<h2 id="dot">. は、ピリオドではない</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>grep</code> がパターンをどう解釈し、行のどこに当てているか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>grep 10.0.0.5</code> は「<code>10.0.0.5</code> という文字列を含む行」を探す。だから <code>10.0.0.5</code> の行が1つだけ出るはずだ。</p>
+<pre><code>$ cd ~/text
+$ cat ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+ip-10-0-0-5
+$ grep 10.0.0.5 ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+ip-10-0-0-5</code></pre>
+<div class="then"><b>だめな理由</b>: 4行全部が出た。理由は2つある。
+1つは、<code>grep</code> のパターンが<b>正規表現</b>で、<code>.</code> が「任意の1文字」を表すこと。<code>ip-10-0-0-5</code> は <code>-</code> が <code>.</code> に当たった。
+もう1つは、<code>grep</code> が<b>行のどこかに当たれば</b>その行を出すこと。<code>10.0.0.50</code> と <code>110.0.0.5</code> は、行の一部が当たった。</div></div>
+<pre><code>$ grep -F 10.0.0.5 ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+$ grep "10\.0\.0\.5" ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5
+$ grep -x "10\.0\.0\.5" ips.txt
+10.0.0.5
+$ grep -w 10.0.0.5 ips.txt
+10.0.0.5
+ip-10-0-0-5
+$ grep -Fx 10.0.0.5 ips.txt
+10.0.0.5</code></pre>
+<p><code>-F</code>（fixed strings）は正規表現として読まず、文字どおりに探す。<code>\.</code> は「<code>.</code> の特別な意味を消す」書き方で、<code>-F</code> と同じ3行になった。それでも部分一致は残る。<code>-x</code> は行全体が一致するものだけ、<code>-w</code> は前後が単語の区切りになっているものだけを出す。<code>-w</code> は <code>-</code> を単語の区切りと見るので、<code>ip-10-0-0-5</code> がまた当たった。</p>
+<div class="scroll"><table>
+<tr><th>部品</th><th>意味</th><th>例</th></tr>
+<tr><td><code>.</code></td><td>任意の1文字</td><td><code>a.c</code> は abc, a-c, a.c</td></tr>
+<tr><td><code>*</code></td><td>直前の1文字（か部品）の<b>0回以上</b>の繰り返し</td><td><code>an*a</code> は aa, ana, anna</td></tr>
+<tr><td><code>^</code> / <code>$</code></td><td>行頭 / 行末</td><td><code>^#</code> は # で始まる行</td></tr>
+<tr><td><code>[abc]</code> / <code>[a-z]</code></td><td>括弧の中のどれか1文字 / 範囲</td><td><code>^[A-Z]</code> は大文字で始まる行</td></tr>
+<tr><td><code>[^ ]</code></td><td>括弧の中<b>以外</b>の1文字</td><td><code>[^ ]</code> は空白以外の1文字</td></tr>
+<tr><td><code>\</code></td><td>直後の記号の特別な意味を消す</td><td><code>\.</code> はピリオドそのもの</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 新聞の<b>伏せ字（○）</b>に近い。「1○.○.○.5」と書けば、○にはどんな文字でも入れられる。
+<br>ただし<b>崩れる点</b>: 伏せ字は「元の文字が何かは決まっているが隠している」印だが、<code>.</code> は「どの1文字でもよい」という指定で、
+<code>-</code> でも <code>.</code> でも同じように当たる。しかも <code>grep</code> は文の途中に伏せ字の並びが現れても当たりにする。</div>
+
+<h2 id="grep">grep のオプション</h2>
+<div class="sgoal"><b>この節で分かること</b>: 試験に出る <code>grep</code> のオプションの実際の出力。</div>
+<pre><code>$ cat server.log
+2026-10-13 09:00:01 INFO  server started on port 8080
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:00 INFO  user alice logged in
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:04:00 info  lowercase level from old client
+2026-10-13 09:05:00 WARNING deprecated option -x
+2026-10-13 09:06:00 INFO  peer 10.0.0.50 connected
+$ grep ERROR server.log
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+$ grep -c ERROR server.log
+3
+$ grep -n ERROR server.log
+3:2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+5:2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+6:2026-10-13 09:03:00 ERROR timeout after 30s
+$ grep -E "^[0-9-]+ [0-9:]+ ERROR" server.log
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:03:00 ERROR timeout after 30s</code></pre>
+<p><code>ERROR</code> とだけ書くと、本文に <code>ERROR</code> を含む <code>INFO</code> の行も当たる。レベルが <code>ERROR</code> の行だけにしたいなら、<code>^</code> から「日付・空白・時刻・空白」と位置を決めてから <code>ERROR</code> と書く（<code>-E</code> の <code>+</code> は次の節）。</p>
+<pre><code>$ grep -v INFO server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:04:00 info  lowercase level from old client
+2026-10-13 09:05:00 WARNING deprecated option -x
+$ grep -i info server.log
+2026-10-13 09:00:01 INFO  server started on port 8080
+2026-10-13 09:02:00 INFO  user alice logged in
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:04:00 info  lowercase level from old client
+2026-10-13 09:06:00 INFO  peer 10.0.0.50 connected
+$ grep WARN server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:05:00 WARNING deprecated option -x
+$ grep -w WARN server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+$ grep -l ERROR access.log server.log app.conf
+server.log
+$ grep -c 8080 access.log server.log app.conf
+access.log:0
+server.log:1
+app.conf:2
+$ grep -rl 8080 . | sort
+./app.conf
+./server.log</code></pre>
+<div class="scroll"><table>
+<tr><th>オプション</th><th>意味</th></tr>
+<tr><td><code>-v</code></td><td>当たら<b>ない</b>行を出す</td></tr>
+<tr><td><code>-i</code></td><td>大文字と小文字を区別しない</td></tr>
+<tr><td><code>-n</code></td><td>行番号を付ける</td></tr>
+<tr><td><code>-c</code></td><td>当たった行の数だけを出す（ファイルが複数ならファイルごと）</td></tr>
+<tr><td><code>-l</code></td><td>当たる行があったファイルの名前だけを出す</td></tr>
+<tr><td><code>-w</code> / <code>-x</code></td><td>単語として一致 / 行全体が一致</td></tr>
+<tr><td><code>-r</code></td><td>ディレクトリの下を再帰的に探す</td></tr>
+<tr><td><code>-E</code> / <code>-F</code></td><td>拡張正規表現として読む / 文字どおりに読む</td></tr>
+<tr><td><code>-o</code></td><td>行全体ではなく、当たった部分だけを出す</td></tr>
+</table></div>
+
+<h2 id="ere">基本正規表現と拡張正規表現</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>+</code> や <code>|</code> が効かない理由と、<code>egrep</code> <code>fgrep</code> の正体。</div>
+<pre><code>$ grep -E "ERROR|WARN" server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:05:00 WARNING deprecated option -x
+$ grep "ERROR|WARN" server.log; echo "exit=$?"
+exit=1
+$ grep "ERROR\|WARN" server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:05:00 WARNING deprecated option -x</code></pre>
+<p><code>-E</code> を付けない <code>grep</code> は<b>基本正規表現</b>（BRE）で読む。基本正規表現では <code>|</code> はただの文字なので、「<code>ERROR|WARN</code> という11文字」を探して見つからなかった（終了コード 1 は「見つからない」）。<code>-E</code> は<b>拡張正規表現</b>（ERE）で読み、<code>|</code> が「どちらか」になる。GNU の <code>grep</code> は基本正規表現でも <code>\|</code> と書けば同じ意味に読む。</p>
+<pre><code>$ grep "ap+le" fruits.txt; echo "exit=$?"
+exit=1
+$ grep -E "ap+le" fruits.txt
+apple
+apple
+apple
+$ grep "ap\+le" fruits.txt
+apple
+apple
+apple
+$ grep -E "[0-9]{3}" server.log | head -3
+2026-10-13 09:00:01 INFO  server started on port 8080
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+$ grep "[0-9]\{3\}" server.log | head -3
+2026-10-13 09:00:01 INFO  server started on port 8080
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5</code></pre>
+<div class="scroll"><table>
+<tr><th>意味</th><th>拡張（<code>grep -E</code> / <code>egrep</code>）</th><th>基本（<code>grep</code>）</th></tr>
+<tr><td>直前の1回以上</td><td><code>+</code></td><td><code>\+</code>（GNU の拡張）</td></tr>
+<tr><td>直前の0回か1回</td><td><code>?</code></td><td><code>\?</code>（GNU の拡張）</td></tr>
+<tr><td>回数の指定</td><td><code>{3}</code> <code>{1,}</code></td><td><code>\{3\}</code> <code>\{1,\}</code></td></tr>
+<tr><td>どちらか</td><td><code>A|B</code></td><td><code>A\|B</code>（GNU の拡張）</td></tr>
+<tr><td>まとめる</td><td><code>(A|B)</code></td><td><code>\(A\|B\)</code></td></tr>
+<tr><td><code>.</code> <code>*</code> <code>^</code> <code>$</code> <code>[ ]</code></td><td colspan="2">どちらも同じ意味</td></tr>
+</table></div>
+<p><code>egrep</code> は <code>grep -E</code>、<code>fgrep</code> は <code>grep -F</code> と同じものである。中身を見ると、どちらも1行の小さなスクリプトだった。</p>
+<pre><code>$ egrep "ERROR|WARN" server.log
+2026-10-13 09:00:05 WARN  disk usage 85%
+2026-10-13 09:01:10 ERROR connection refused from 10.0.0.5
+2026-10-13 09:02:30 INFO  retry finished after ERROR in job 42
+2026-10-13 09:03:00 ERROR timeout after 30s
+2026-10-13 09:05:00 WARNING deprecated option -x
+$ cat /usr/bin/egrep
+#!/bin/sh
+cmd=${0##*/}
+exec grep -E "$@"
+$ cat /usr/bin/fgrep
+#!/bin/sh
+cmd=${0##*/}
+exec grep -F "$@"
+$ fgrep 10.0.0.5 ips.txt
+10.0.0.5
+10.0.0.50
+110.0.0.5</code></pre>
+<p class="detail">本家の GNU grep 3.8 以降の <code>egrep</code> は、実行するたびに「<code>egrep: warning: egrep is obsolescent; using grep -E</code>」と警告を出す。この檻（Ubuntu 24.04 の grep 3.11）では警告が出なかった。<code>cat</code> で見た2行目の <code>cmd=${0##*/}</code> は、警告文を作るための行の名残で、警告を出す行は Debian が取り除いている（パッケージの変更履歴に記録がある）。試験の答えは「<code>egrep</code> = <code>grep -E</code>、<code>fgrep</code> = <code>grep -F</code>」で変わらないが、新しく書くなら <code>grep -E</code> / <code>grep -F</code> を使う。</p>
+<pre><code>$ zcat /usr/share/doc/grep/changelog.Debian.gz | grep -m1 disable-egrep
+  * Add 01-disable-egrep-fgrep-warnings.patch (Closes: #1019335)</code></pre>
+<div class="analogy"><b>たとえ</b>: 同じ記号を使う<b>2つの方言</b>に近い。拡張正規表現では <code>+</code> や <code>|</code> がそのまま命令として通じるが、
+基本正規表現では「<code>\</code> を前に付けたときだけ命令」で、付けなければただの文字として読まれる。
+<br>ただし<b>崩れる点</b>: 方言なら聞き手が文脈で察してくれるが、<code>grep</code> は察しない。
+<code>-E</code> を付け忘れた <code>ap+le</code> は、エラーも出さずに「<code>+</code> という文字を含む行」を探し、見つからないと黙って終わる。</div>
+
+<h2 id="anchor">位置と繰り返し</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>^</code> <code>$</code> と <code>*</code> の実際の当たり方。</div>
+<pre><code>$ grep "^b" fruits.txt
+banana
+banana
+$ grep "a$" fruits.txt
+banana
+banana
+$ grep "^[A-Z]" fruits.txt
+Durian
+$ grep -E "^(apple|cherry)$" fruits.txt
+apple
+cherry
+apple
+apple
+$ grep -E "^.{6,}$" fruits.txt
+banana
+cherry
+banana
+Durian
+$ grep "an*a" fruits.txt
+banana
+banana
+$ grep -o "an*a" fruits.txt
+ana
+ana</code></pre>
+<p><code>*</code> は「直前の1文字の0回以上」なので、<code>an*a</code> は <code>aa</code> にも <code>ana</code> にも <code>anna</code> にも当たる。<code>banana</code> の中では <code>-o</code> で見ると <code>ana</code> が当たっている。</p>
+<p>「0回以上」には、0回も含まれる。</p>
+<pre><code>$ grep -c "" fruits.txt
+7
+$ grep -c "x*" fruits.txt
+7
+$ grep -v "^$" blank.txt
+first
+third
+$ grep "line1$" unix.txt win.txt
+unix.txt:line1</code></pre>
+<p><code>x*</code> は「<code>x</code> が0個以上」で、<code>x</code> を1つも含まない行にも（長さ0の部分で）当たるので、7行すべてが数えられた。<code>^$</code> は「行頭の直後が行末」＝空行で、<code>-v</code> と組み合わせると空行を除ける。最後の行は第4章の CRLF のファイルで、<code>line1</code> の後ろに見えない <code>\r</code> があるので、<code>line1$</code>（行末が line1）に当たらなかった。</p>
+
+<h2 id="glob">シェルが先に * を使ってしまう</h2>
+<div class="sgoal"><b>この節で分かること</b>: パターンを引用符で囲む理由。</div>
+<pre><code>$ echo grep a* fruits.txt
+grep access.log app.conf fruits.txt
+$ grep a* fruits.txt; echo "exit=$?"
+exit=1
+$ grep "a*" fruits.txt | head -3
+banana
+apple
+cherry</code></pre>
+<p>引用符の無い <code>a*</code> は、<code>grep</code> に届く前に<b>シェルが</b>ワイルドカードとして展開する（第1章の <code>echo *.csv</code> と同じ）。<code>~/text</code> に <code>a</code> で始まるファイルが2つあったので、<code>grep</code> が受け取ったのは「パターン <code>access.log</code>、ファイル <code>app.conf</code> と <code>fruits.txt</code>」だった。どちらにも <code>access.log</code> という文字は無いので、何も出ずに終わった。引用符で囲めば、<code>a*</code> はそのまま <code>grep</code> に届く。</p>
+<div class="scroll"><table>
+<tr><th>記号</th><th>シェルのワイルドカード（ファイル名）</th><th>正規表現（grep / sed の中身）</th></tr>
+<tr><td><code>*</code></td><td>任意の長さの任意の文字列</td><td>直前の1文字の0回以上</td></tr>
+<tr><td><code>?</code></td><td>任意の1文字</td><td>直前の0回か1回（拡張）</td></tr>
+<tr><td><code>.</code></td><td>ただの文字</td><td>任意の1文字</td></tr>
+<tr><td><code>[abc]</code></td><td>どれか1文字</td><td>どれか1文字</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 同じ「<code>*</code>」が、<b>トランプのジョーカー</b>（何にでもなれる1枚。シェルのワイルドカード）と、
+<b>「直前の札を何枚でも」という特別ルール</b>（正規表現）の2つの意味で使われているのに近い。
+<br>ただし<b>崩れる点</b>: トランプなら今どちらのゲームをしているか全員が知っているが、コマンド行では<b>先にシェルが</b>ジョーカーとして使ってしまい、
+<code>grep</code> の番が来たときには札がもう別の物に置き換わっている。どちらのルールで読ませるかは、引用符で決めるしかない。</div>
+
+<h2 id="sed">sed の中の正規表現と regex(7)</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じ正規表現が <code>sed</code> でも使えることと、規則の一次資料のありか。</div>
+<pre><code>$ sed -n "/^b/p" fruits.txt
+banana
+banana
+$ sed -E "s/^([0-9-]+) ([0-9:]+) /\2 /" server.log | head -2
+09:00:01 INFO  server started on port 8080
+09:00:05 WARN  disk usage 85%
+$ sed "s/[0-9]\{1,\}/N/g" ips.txt
+N.N.N.N
+N.N.N.N
+N.N.N.N
+ip-N-N-N-N</code></pre>
+<p><code>sed</code> も既定は基本正規表現で、<code>-E</code> で拡張正規表現になる。<code>( )</code> で囲んだ部分は <code>\1</code> <code>\2</code> で置き換え側に使える（2行目は日付の欄を落とした）。正規表現の規則の正式な説明は <code>regex(7)</code>、つまり <code>man 7 regex</code> にある（第3章）。</p>
+<pre><code>$ man 7 regex | grep -A1 "^NAME"
+NAME
+       regex - POSIX.2 regular expressions
+$ man grep | grep -E "^ +-[EFGP], --"
+       -E, --extended-regexp
+       -F, --fixed-strings
+       -G, --basic-regexp
+       -P, --perl-regexp</code></pre>
+<div class="quiz"><b>確認</b>
+<p>設定ファイル <code>app.conf</code> から、<code>#</code> で始まるコメント行と空行を除いて表示したい。正しいものはどれか。</p>
+<p>A. <code>grep -v '#' app.conf</code>　B. <code>grep -v '^#' app.conf | grep -v '^$'</code>　C. <code>grep '^[^#]' app.conf | grep -v '$'</code>　D. <code>grep -x '#' app.conf</code></p>
+<details><summary>答え</summary>
+<p>B。A は行の途中に <code>#</code> がある行（URL の <code>#</code> など）も消してしまう。
+C の後半 <code>grep -v '$'</code> は全行に当たる <code>$</code> を除くので何も残らない。<code>grep -Ev '^(#|$)'</code> と1回で書いてもよい。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>拡張正規表現を使うための <code>grep</code> のオプションと、同じ働きをする古いコマンド名を答えよ。正規表現を使わず文字どおりに探す場合はどうか。</p>
+<details><summary>答え</summary>
+<p>拡張正規表現は <code>grep -E</code> で、古い名前は <code>egrep</code>。文字どおりに探すのは <code>grep -F</code> で、古い名前は <code>fgrep</code>。
+この檻の <code>/usr/bin/egrep</code> は <code>exec grep -E "$@"</code> の1行を実行するだけのスクリプトだった。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>拡張正規表現 <code>^[0-9]{3}-[0-9]{4}$</code> に一致するものをすべて選べ。</p>
+<p>A. <code>123-4567</code>　B. <code>1234-567</code>　C. <code>〒123-4567</code>　D. <code>123-45678</code></p>
+<details><summary>答え</summary>
+<p>A だけ。<code>^</code> と <code>$</code> で行全体を「数字3桁・ハイフン・数字4桁」に固定している。
+C は先頭に別の文字があり、D は末尾が5桁なので外れる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>ディレクトリ <code>/etc</code> の下で、<code>ssh</code> という文字列を含むファイルの名前だけを一覧したい。<code>grep</code> のオプションの組み合わせはどれか。</p>
+<details><summary>答え</summary>
+<p><code>grep -rl ssh /etc</code>。<code>-r</code> で再帰的に探し、<code>-l</code> でファイル名だけを出す（一般ユーザでは読めないファイルのエラーが混ざるので、<code>2&gt; /dev/null</code> を足すとよい。第7章）。</p></details></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-text/">演習07</a>は、ログからレベルが <code>ERROR</code> か <code>WARN</code> の行だけを抜き出す課題である。
+判定は各行を元のログと突き合わせ、本文に <code>ERROR</code> を含むだけの行や <code>WARNING</code> の行が混ざると、その行番号を観測として出す。</div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>grep</code> のパターンは正規表現。<code>.</code> は任意の1文字で、行のどこかに当たれば出る。文字どおりなら <code>-F</code> か <code>\.</code>、行全体なら <code>-x</code>、単語なら <code>-w</code></li><li><code>^</code> 行頭、<code>$</code> 行末、<code>*</code> 直前の0回以上（だから <code>x*</code> は全行に当たる）、<code>[ ]</code> どれか1文字、<code>[^ ]</code> それ以外の1文字</li><li>基本正規表現（<code>grep</code>）では <code>+ ? { } | ( )</code> に <code>\</code> が要る。拡張（<code>grep -E</code> = <code>egrep</code>）では要らない。<code>grep -F</code> = <code>fgrep</code></li><li><code>-v -i -n -c -l -r -o</code> の意味</li><li>パターンは引用符で囲む。囲まないと <code>*</code> がシェルのワイルドカードとして先に展開される</li><li>規則の一次資料は <code>regex(7)</code>（<code>man 7 regex</code>）。<code>sed</code> も同じ正規表現を使う</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:text-1.0.0@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / bash 5.2.21 / coreutils 9.4 / grep 3.11 / sed 4.9 / findutils 4.9.0 / vim 9.1.0016 / nano 7.2 / less 590 / man-db 2.12.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<nav class="pager"><a href="/linuc-text/theory/08-pipe">← 8. xargs は空白で区切って引数にする</a><a href="/linuc-text/theory/10-vi">次: 10. :w! は、読み取り専用のファイルにも書く →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc/">LinuC 出題範囲マップ</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-text/chapters.js"></script>
+<script src="/linuc-text/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>
