@@ -2,7 +2,7 @@
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>WebAssembly（WASM） — 確かめて説明する</title>
-<meta name="description" content="（下書き待ち）">
+<meta name="description" content="41バイトのバイナリを手で書いて、それが何もできないことを確かめる5章。WAT を手で書いて .wasm にし、wasmtime と node の2つのホストで走らせ、最後は配布されたバイナリを実行せずに調べる。WASM は外の世界を一切知らず、できることは全部、ホストが import として手渡したものだけだ。">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-theme="wasm">
@@ -11,13 +11,16 @@
 <div class="draftbar compact"><p><b>ドラフト</b>: この記事は<b>著者が読者として通していません</b>。本文の出力はすべて実機の記録で、演習は模範解答で通ること・未達のときに判定が鳴ることを確かめてあります。それでも導線の不備は残っている可能性があります。詰まったら各ページ下のコメントか <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> へ。</p></div>
 <h1>WebAssembly（WASM）</h1>
 <div class="badges"><span>中級</span><span>演習あり（コンテナ）</span><span>約2時間23分</span><span>状態: ドラフト</span></div>
-<p class="lead">（下書き待ち）</p>
+<p class="lead">41バイトのバイナリを手で書いて、それが何もできないことを確かめる5章。WAT を手で書いて .wasm にし、wasmtime と node の2つのホストで走らせ、最後は配布されたバイナリを実行せずに調べる。WASM は外の世界を一切知らず、できることは全部、ホストが import として手渡したものだけだ。</p>
 
-<div class="card"><h3>想定読者</h3><p>（下書き待ち）</p></div>
+<div class="card"><h3>想定読者</h3><p>JavaScript が読めて、WASM が速いらしいことは知っているが、「なぜサンドボックスなのか」を説明できない人。Rust も C も使わず、演習は docker で動かす。</p></div>
 
 <h2 id="outcomes">得られるもの</h2>
 <ul>
-<li>（下書き待ち）</li>
+<li>WAT を手で書いて .wasm にし、関数を呼び出せる</li>
+<li>配布された .wasm が何を要求しているかを、実行せずに調べられる</li>
+<li>WASM が「できないこと」を、檻の形として説明できる</li>
+<li>文字列を、ポインタと長さの2つの数値だけでホストに渡せる</li>
 </ul>
 
 <h2 id="start">進め方</h2>
@@ -39,7 +42,7 @@
 
 
 
-<p class="detail">作成 2026-09-30 ／ 最終更新 2026-10-08 ／ 関連領域: ウェブ</p>
+<p class="detail">作成 2026-09-30 ／ 最終更新 2026-10-08 ／ 関連領域: セキュリティ・ウェブ</p>
 
 <section id="comments">
 <h2>コメント</h2>
