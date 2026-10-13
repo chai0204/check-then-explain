@@ -66,7 +66,7 @@ docker exec -it lab-linuc-disks bash -l</code></pre>
 <ul>
 <li>コンテナを起動すると、中で練習機も起動します。KVM を使わない完全エミュレーションなので、<b>起動に 40〜90 秒</b>かかります。</li>
 <li><code>--stop-timeout 30</code> は必須です（権限ではありません）。<code>docker stop</code> したとき、練習機を正常に止めるのに約 13 秒かかり、docker の既定の猶予 10 秒では電源を抜かれてしまうためです。</li>
-<li>Linux で <code>--device /dev/kvm</code> を足すと起動が数秒になりますが、<code>/proc/cpuinfo</code> などの表示が変わります。本文の出力は KVM なしで取ったものです。</li>
+<li><code>--device /dev/kvm</code> を足しても速くはなりません。練習機の定義が <code>type='qemu'</code>（KVM を使わない完全エミュレーション）に固定されているので、<code>/dev/kvm</code> を渡しても TCG のまま動きます（<a href="/kvm/theory/06-site">KVM の記事の6章</a>で測っています）。</li>
 <li>podman でも、同じオプションのまま <code>docker</code> を <code>podman</code> に替えて起動できるはずです。同じ土台（仮想マシン型の檻の共通部分）を使う別のコースの檻は、podman 5.8.6（rootless）で起動・練習機への ssh・<code>podman stop</code> まで確かめてあります（<code>logs/linuc-machine-podman.log</code>）。<b>このコースの檻そのものは、podman ではまだ確かめていません</b>。</li>
 </ul>
 <p>入ると、練習機の状態と現在地が出ます。</p>
@@ -149,7 +149,7 @@ apt 固定  : 20260929T000000Z
 特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb</code></pre>
 <p><a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。
 <code>練習機</code> の行が <code>running</code> 以外のときは、外で <code>vm start</code> を打ってください。
-<code>仮想化</code> が <code>qemu</code> 以外（<code>kvm</code>）なら、KVM を使っています。表示が本文と変わるのはそのためです。
+<code>仮想化</code> は練習機の中から見た仮想化の種類で、この檻ではいつも <code>qemu</code>（KVM を使わない TCG）です。
 記録は端末の幅 80 桁で取りました。<code>ls</code> の段組みは幅で変わります。</p>
 
 <h2 id="end">終わったら</h2>

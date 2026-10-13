@@ -96,8 +96,8 @@ student@linuc:~$ exit
 logout</code></pre>
 <p>プロンプトが <code>lab@host</code> なら外、<code>student@linuc</code> なら練習機の中です。本文の端末表示には、どちらで打つかを見出しで付けてあります。
 student は <code>sudo</code> をパスワード無しで使えます。<code>lab check</code> などの <code>lab</code> コマンドは、外でも練習機の中でも打てます。</p>
-<p>速くしたい Linux の読者は、起動コマンドに <code>--device /dev/kvm</code> を足せます（起動が数秒になります）。
-ただし <code>/proc/cpuinfo</code> などの画面が変わります。<b>本文の出力はすべて KVM なしで取ったもの</b>です。</p>
+<p>起動コマンドに <code>--device /dev/kvm</code> を足しても速くはなりません。練習機の定義が、KVM を使わない完全エミュレーション（libvirt の <code>type='qemu'</code>）に固定されているからです。
+<code>/dev/kvm</code> を渡しても QEMU は TCG のまま動きます（<a href="/kvm/theory/06-site">KVM の記事の6章</a>で測っています）。<b>本文の出力はすべて KVM なしで取ったもの</b>で、何も足さずに起動すれば同じ条件になります。</p>
 
 <h2 id="vm">練習機の操作</h2>
 <div class="scroll"><table>
@@ -151,7 +151,7 @@ QEMU      : 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
 特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb</code></pre>
 <p><a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。
 <code>練習機</code> の行が <code>running</code> 以外のときは、外で <code>vm start</code> を打ってから見直してください。
-<code>KVM</code> の行が「あり」のときは、本文と画面が違うことがあります（本文は KVM なしで取っています）。</p>
+<code>KVM</code> の行は、檻に <code>/dev/kvm</code> を渡したかどうかを示すだけです。「あり」でも練習機は KVM を使わず、本文と同じ TCG で動きます。</p>
 
 <h2 id="end">終わったら</h2>
 <pre><code>docker stop lab-linuc-admin        # 練習機を正常に止めてから止まる（docker start で続きから）

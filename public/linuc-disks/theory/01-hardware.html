@@ -46,7 +46,7 @@ $ head -3 /proc/meminfo
 MemTotal:        1459124 kB
 MemFree:         1176520 kB
 MemAvailable:    1216776 kB</code></pre>
-<p>読んだ瞬間にカーネルが答えを作るので、大きさを持たない。CPU は <code>QEMU TCG CPU</code> で、これは QEMU が CPU の命令をソフトウェアで翻訳しながら動かしている（完全エミュレーション）という意味である。KVM を使う読者は、ここに自分の CPU の名前が出る。</p>
+<p>読んだ瞬間にカーネルが答えを作るので、大きさを持たない。CPU は <code>QEMU TCG CPU</code> で、これは QEMU が CPU の命令をソフトウェアで翻訳しながら動かしている（完全エミュレーション）という意味である。この檻は KVM を使わないので、どの PC で動かしてもここは同じ表示になる。</p>
 <p>出題範囲の「ハードウェアの情報の取得」には、装置ごとの割り当ても入る。<b>割り込み</b>（IRQ。装置が CPU に「用がある」と知らせる番号）、<b>I/O ポート</b>（CPU が装置とやりとりする番地）、<b>DMA</b>（装置が CPU を通さずメモリに読み書きする通り道）である。どれも <code>/proc</code> で読める。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ head -4 /proc/interrupts
            CPU0       CPU1       
