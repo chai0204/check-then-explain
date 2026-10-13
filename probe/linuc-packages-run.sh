@@ -14,8 +14,8 @@
 # --hostname linuc は読者と同じに付ける（出力に出るホスト名を揃えるため）。
 set -u
 cd /home/shun/learning-labs || exit 1
-DEB=lab-linuc-packages-deb:1.0.0
-RPM=lab-linuc-packages-rpm:1.0.0
+DEB=lab-linuc-packages-deb:1.0.1
+RPM=lab-linuc-packages-rpm:1.0.1
 
 one() {  # one <image> <script> <section>
   local image="$1" script="$2" section="$3"
@@ -43,7 +43,7 @@ case "${1:-}" in
     fi
     ;;
   extra)
-    # 事実確認（2026-10-13）を受けて足した記録。イメージは作り直していない（push 済みと同じ）。
+    # 事実確認（2026-10-13）を受けて足した記録（本文の端末表示の一部はここから引く）。
     { for s in x-upgrade x-autoremove x-root x-aptcmds x-un x-pending x-depends x-docs; do
         one "$DEB" probe/linuc-packages-deb-extra.sh "$s"; done; } > logs/linuc-packages-deb-extra.log 2>&1
     { for s in x-qp x-repoquery x-rpmsave; do

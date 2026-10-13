@@ -3,8 +3,8 @@
 ========== 0. 環境（RPM 系の檻・起動直後） ==========
 
 $ lab env
-テーマ    : lab-linuc-packages-rpm 1.0.0
-イメージ  : ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.0
+テーマ    : lab-linuc-packages-rpm 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.1
 ベース    : AlmaLinux 9.7 (Moss Jungle Cat)
 apt 固定  : なし（RPM 系。下の dnf 固定の行を見る）
 カーネル  : 7.2.6
@@ -150,7 +150,7 @@ $ find /srv/lab-rpm -type f | sort
 /srv/lab-rpm/repodata/repomd.xml
 
 $ yum list labapp
-Last metadata expiration check: 0:38:22 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:29:56 ago on Tue Oct 13 10:08:56 2026.
 Available Packages
 labapp.noarch                             1.0-1                              lab
 
@@ -270,7 +270,7 @@ labhello.noarch                            1.0-1                            @lab
 labmotd.noarch                             1.0-1                            @lab
 
 $ yum list available 'lab*'
-Last metadata expiration check: 0:38:23 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:29:57 ago on Tue Oct 13 10:08:56 2026.
 Available Packages
 labapp.noarch                                1.0-1                           lab
 labhello.noarch                              1.1-1                           lab
@@ -278,14 +278,14 @@ labtool.noarch                               1.0-1                           lab
 labtool-data.noarch                          1.0-1                           lab
 
 $ yum list labhello
-Last metadata expiration check: 0:38:23 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:29:58 ago on Tue Oct 13 10:08:56 2026.
 Installed Packages
 labhello.noarch                            1.0-1                            @lab
 Available Packages
 labhello.noarch                            1.1-1                            lab 
 
 $ yum info labapp
-Last metadata expiration check: 0:38:24 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:29:58 ago on Tue Oct 13 10:08:56 2026.
 Available Packages
 Name         : labapp
 Version      : 1.0
@@ -301,14 +301,14 @@ Description  : Prints a greeting. The greeting is read from /etc/labapp.conf.
 
 
 $ yum search liblab
-Last metadata expiration check: 0:38:24 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:29:58 ago on Tue Oct 13 10:08:56 2026.
 ========================= Name Exactly Matched: liblab =========================
 liblab.noarch : small shell library for lab programs
 =========================== Summary Matched: liblab ============================
 labapp.noarch : sample application that needs liblab
 
 $ yum provides /usr/bin/labapp
-Last metadata expiration check: 0:38:24 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:29:58 ago on Tue Oct 13 10:08:56 2026.
 labapp-1.0-1.noarch : sample application that needs liblab
 Repo        : lab
 Matched from:
@@ -316,7 +316,7 @@ Filename    : /usr/bin/labapp
 
 
 $ yum provides '*/liblab.sh'
-Last metadata expiration check: 0:38:24 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:29:59 ago on Tue Oct 13 10:08:56 2026.
 liblab-1.0-1.noarch : small shell library for lab programs
 Repo        : lab
 Matched from:
@@ -328,7 +328,7 @@ error: file /usr/bin/dig: No such file or directory
 exit=1
 
 $ yum provides /usr/bin/dig
-Last metadata expiration check: 0:38:25 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:29:59 ago on Tue Oct 13 10:08:56 2026.
 bind-utils-32:9.16.23-34.el9_7.1.x86_64 : Utilities for querying DNS name servers
 Repo        : appstream
 Matched from:
@@ -356,7 +356,7 @@ Filename    : /usr/bin/dig
 
 
 $ yum deplist labapp
-Last metadata expiration check: 0:38:25 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:29:59 ago on Tue Oct 13 10:08:56 2026.
 package: labapp-1.0-1.noarch
   dependency: /usr/bin/sh
    provider: bash-5.1.8-9.el9.x86_64
@@ -366,7 +366,7 @@ package: labapp-1.0-1.noarch
 ---- 入れる・消す ----
 
 $ sudo yum install -y labapp
-Last metadata expiration check: 0:38:25 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:29:59 ago on Tue Oct 13 10:08:56 2026.
 Dependencies resolved.
 ================================================================================
  Package            Architecture       Version            Repository       Size
@@ -461,7 +461,7 @@ $ find /srv/lab-extra-rpm -type f | sort
 /srv/lab-extra-rpm/repodata/repomd.xml
 
 $ yum list labextra; echo "exit=$?"
-Last metadata expiration check: 0:38:26 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:30:00 ago on Tue Oct 13 10:08:56 2026.
 Error: No matching Packages to list
 exit=1
 
@@ -473,7 +473,7 @@ gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab
 
 $ sudo yum install -y labextra
-lab extra (LinuC 1.04)                          150 kB/s | 935  B     00:00    
+lab extra (LinuC 1.04)                           63 kB/s | 935  B     00:00    
 Dependencies resolved.
 ================================================================================
  Package            Architecture     Version          Repository           Size
@@ -516,13 +516,13 @@ lab-extra                       lab extra (LinuC 1.04)
 ---- 更新 ----
 
 $ yum check-update; echo "exit=$?"
-Last metadata expiration check: 0:00:01 ago on Tue Oct 13 10:47:22 2026.
+Last metadata expiration check: 0:00:01 ago on Tue Oct 13 11:38:56 2026.
 
 labhello.noarch                            1.1-1                             lab
 exit=100
 
 $ sudo yum update -y labhello
-Last metadata expiration check: 0:00:01 ago on Tue Oct 13 10:47:22 2026.
+Last metadata expiration check: 0:00:01 ago on Tue Oct 13 11:38:56 2026.
 Dependencies resolved.
 ================================================================================
  Package             Architecture      Version             Repository      Size
@@ -556,7 +556,7 @@ $ labhello
 labhello 1.1
 
 $ yum check-update; echo "exit=$?"
-Last metadata expiration check: 0:00:01 ago on Tue Oct 13 10:47:22 2026.
+Last metadata expiration check: 0:00:02 ago on Tue Oct 13 11:38:56 2026.
 exit=0
 
 ---- yumdownloader ----
@@ -567,11 +567,11 @@ lrwxrwxrwx 1 root root 22 Nov 12  2025 /usr/bin/yumdownloader -> /usr/libexec/dn
 $ cd ~/work
 
 $ yumdownloader labtool
-Last metadata expiration check: 0:00:02 ago on Tue Oct 13 10:47:22 2026.
+Last metadata expiration check: 0:00:02 ago on Tue Oct 13 11:38:56 2026.
 
 $ ls -l
 total 8
--rw-r--r-- 1 lab lab 6859 Oct 13 10:47 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6859 Oct 13 11:38 labtool-1.0-1.noarch.rpm
 
 $ rpm -q labtool; echo "exit=$?"
 package labtool is not installed
@@ -589,12 +589,12 @@ rpmlib(PayloadFilesHavePrefix) <= 4.0-1
 rpmlib(PayloadIsZstd) <= 5.4.18-1
 
 $ yumdownloader --resolve --destdir dl labtool
-Last metadata expiration check: 0:00:02 ago on Tue Oct 13 10:47:22 2026.
+Last metadata expiration check: 0:00:02 ago on Tue Oct 13 11:38:56 2026.
 
 $ ls -l dl/
 total 16
--rw-r--r-- 1 lab lab 6859 Oct 13 10:47 labtool-1.0-1.noarch.rpm
--rw-r--r-- 1 lab lab 6729 Oct 13 10:47 labtool-data-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6859 Oct 13 11:38 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6729 Oct 13 11:38 labtool-data-1.0-1.noarch.rpm
 
 $ cd
 
@@ -674,7 +674,7 @@ $ rpm -qf /usr/bin/labhello
 labhello-1.0-1.noarch
 
 $ sudo yum install -y labapp
-Last metadata expiration check: 0:38:29 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:30:03 ago on Tue Oct 13 10:08:56 2026.
 Dependencies resolved.
 ================================================================================
  Package            Architecture       Version            Repository       Size
@@ -776,7 +776,7 @@ S.5....T.  c /etc/labapp.conf
 exit=2
 
 $ sudo yum reinstall -y labhello
-Last metadata expiration check: 0:38:30 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:30:04 ago on Tue Oct 13 10:08:56 2026.
 Dependencies resolved.
 ================================================================================
  Package             Architecture      Version             Repository      Size
@@ -813,7 +813,7 @@ $ labhello
 labhello 1.0
 
 $ sudo yum reinstall -y labapp
-Last metadata expiration check: 0:38:30 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:30:04 ago on Tue Oct 13 10:08:56 2026.
 Dependencies resolved.
 ================================================================================
  Package            Architecture       Version            Repository       Size
@@ -848,13 +848,13 @@ S.5....T.  c /etc/labapp.conf
 exit=1
 
 $ ls -l /etc/labapp.conf*
--rw-r--r-- 1 root root 118 Oct 13 10:47 /etc/labapp.conf
+-rw-r--r-- 1 root root 118 Oct 13 11:38 /etc/labapp.conf
 
 $ sudo rpm -e labapp
 warning: /etc/labapp.conf saved as /etc/labapp.conf.rpmsave
 
 $ ls -l /etc/labapp.conf*
--rw-r--r-- 1 root root 118 Oct 13 10:47 /etc/labapp.conf.rpmsave
+-rw-r--r-- 1 root root 118 Oct 13 11:38 /etc/labapp.conf.rpmsave
 
 $ sudo rpm -ivh /srv/lab-rpm/labapp-1.0-1.noarch.rpm
 Verifying...                          ########################################

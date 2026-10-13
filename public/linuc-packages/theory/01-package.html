@@ -288,7 +288,7 @@ exit=1</code></pre>
 ...
 /srv/lab-rpm/repodata/repomd.xml
 $ yum list labapp
-Last metadata expiration check: 0:38:22 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:29:56 ago on Tue Oct 13 10:08:56 2026.
 Available Packages
 labapp.noarch                             1.0-1                              lab</code></pre>
 <p><code>Available Packages</code>（入れられるもの）の欄に載っているのは、yum が目録を読んだからである。1行目の時刻は「目録を最後に確かめた時刻」で、読者の画面では違う値になる。</p>
@@ -329,7 +329,7 @@ Debian 系なら <code>dpkg -c pkg.deb</code>（= <code>dpkg-deb -c</code>）が
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>パッケージのファイルは「中身」と「情報（名前・版・依存関係）」の2つでできている。.deb は <code>dpkg -I</code> / <code>-c</code>、.rpm は <code>rpm -qpi</code> / <code>-qpl</code> / <code>-qpR</code> で読める</li><li>「入っているか」に答えているのはディスクではなく台帳（<code>/var/lib/dpkg/</code>・<code>/var/lib/rpm/</code>）。中身だけ広げても（<code>dpkg-deb -x</code>・<code>rpm2cpio</code>）台帳には載らない</li><li>台帳を書くのは <code>dpkg -i</code> と <code>rpm -i</code>。<code>dpkg -S</code> と <code>rpm -qf</code> は台帳のファイル一覧を引いている</li><li>リポジトリは中身の置き場（<code>pool/</code>・.rpm）と目録（<code>dists/…/Packages</code>・<code>repodata/</code>）でできている</li><li>同じパッケージについて <code>apt-cache policy</code> と <code>dpkg -l</code> が違うことを言うのは、目録と台帳という別の帳簿を読んでいるから</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0@sha256:556b75a379fdee91de07d7b828b45545cfd71f206c7c9761d9c375825c604457（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）と ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.0@sha256:0a42363b7f56353a30c1a56b89986ee9c030bd867dbf89236060f7d4c3661a84（AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / vault.almalinux.org 9.7）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.0.1@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）と ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.1@sha256:__DIGEST__（AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / vault.almalinux.org 9.7）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/">← 理論編 目次</a><a href="/linuc-packages/theory/02-apt">次: 2. apt は目録を読んで、台帳に書く →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

@@ -251,7 +251,7 @@ Removing labapp (1.0) ...
 $ dpkg -l labapp | tail -1
 rc  labapp         1.0          all          sample application that needs liblab
 $ ls -l /etc/labapp.conf
--rw-r--r-- 1 root root 120 Oct 13 10:36 /etc/labapp.conf
+-rw-r--r-- 1 root root 120 Oct 13 11:40 /etc/labapp.conf
 $ sudo dpkg -P labapp
 (Reading database ... 12827 files and directories currently installed.)
 Purging configuration files for labapp (1.0) ...
@@ -271,13 +271,12 @@ Etc/UTC
 lrwxrwxrwx 1 root root 27 Sep 30 19:32 /etc/localtime -&gt; /usr/share/zoneinfo/Etc/UTC
 $ env -u TZ date -d @1790812800
 Thu Oct  1 00:00:00 UTC 2026
-$ sudo debconf-show tzdata
+$ sudo debconf-show tzdata | sort
+  tzdata/Areas: Etc
 ...
   tzdata/Zones/Etc: UTC
-...
-  tzdata/Areas: Etc
 ...</code></pre>
-<p>（<code>env -u TZ</code> は、この檻が環境変数 <code>TZ=Asia/Tokyo</code> を持っているので、それを外して <code>/etc/localtime</code> の効き目だけを見るためである。<code>debconf-show</code> の行の順番は、打つたびに変わる。）</p>
+<p>（<code>env -u TZ</code> は、この檻が環境変数 <code>TZ=Asia/Tokyo</code> を持っているので、それを外して <code>/etc/localtime</code> の効き目だけを見るためである。<code>debconf-show</code> の行の順番は打つたびに変わるので、<code>sort</code> で並べている。）</p>
 <p>質問をもう一度してもらうのが <code>dpkg-reconfigure</code> である。画面で <code>sudo dpkg-reconfigure tzdata</code> と打つと、地域の一覧が出るので矢印キーで <code>Asia</code> を選んで Enter、次の一覧で <code>Tokyo</code> を選んで Enter を押す。ここでは同じ質問を文字だけの形（<code>-f teletype</code>）で出させ、番号を流し込んで記録した。</p>
 <pre><code>$ printf '5\n78\n' | sudo dpkg-reconfigure -f teletype tzdata
 Configuring tzdata
@@ -294,19 +293,19 @@ Please select the city or region corresponding to your time zone.
 Time zone:
 
 Current default time zone: 'Asia/Tokyo'
-Local time is now:      Tue Oct 13 10:36:17 JST 2026.
-Universal Time is now:  Tue Oct 13 01:36:17 UTC 2026.
+Local time is now:      Tue Oct 13 11:40:43 JST 2026.
+Universal Time is now:  Tue Oct 13 02:40:43 UTC 2026.
 $ cat /etc/timezone; ls -l /etc/localtime
 Asia/Tokyo
-lrwxrwxrwx 1 root root 30 Oct 13 10:36 /etc/localtime -&gt; /usr/share/zoneinfo/Asia/Tokyo
+lrwxrwxrwx 1 root root 30 Oct 13 11:40 /etc/localtime -&gt; /usr/share/zoneinfo/Asia/Tokyo
 $ env -u TZ date -d @1790812800
 Thu Oct  1 09:00:00 JST 2026
-$ sudo debconf-show tzdata
+$ sudo debconf-show tzdata | sort
 ...
-* tzdata/Zones/Asia: Tokyo
+  tzdata/Zones/Etc: UTC
 ...
 * tzdata/Areas: Asia
-...</code></pre>
+* tzdata/Zones/Asia: Tokyo</code></pre>
 <p><code>dpkg-reconfigure</code> は、パッケージを入れたときの「質問して設定する」手順を、入れ直さずにもう一度走らせる。答えは debconf の記録に残り（<code>*</code> は「その質問がもう出された」印。下の man の記述を参照）、tzdata の設定の手順がその答えで <code>/etc/timezone</code> と <code>/etc/localtime</code> を書き直した。設定ファイルを手で直す代わりに、パッケージ自身に直させる方法である。</p>
 <pre><code>$ MANWIDTH=80 man debconf-show | sed -n "/The most common use/,/with an/p"
        The most common use is "debconf-show packagename", which displays all
@@ -348,7 +347,7 @@ $ sudo debconf-show tzdata
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>dpkg -i</code> は依存関係を読めるが取りに行かない。足りなければ展開済み・設定前（<code>iU</code>）で止まり、ファイルは置かれたまま残る</li><li>依存関係が満たされないまま <code>iU</code> が残っていると、apt は別の操作も断る。<code>apt --fix-broken install</code>（<code>apt-get -f install</code>）が目録から足りないものを取って続きをする（依存が満たされた <code>iU</code> なら、apt は次の操作のついでに設定する）</li><li>台帳を読む: <code>-l</code> 一覧・<code>-s</code> 状態・<code>-L</code> パッケージ→ファイル・<code>-S</code> ファイル→パッケージ。ファイルを読む: <code>-c</code> 中身・<code>-I</code> 情報</li><li><code>-r</code> は conffile を残して <code>rc</code>（conffile の無いパッケージは台帳から消える）、<code>-P</code> は全部消す。依存されているものは <code>-r</code> を拒まれる</li><li><code>dpkg -V</code> は違うファイルだけを出し、違いがあっても終了コードは 0。入れ直しても書き換えた設定ファイルは戻らない</li><li><code>dpkg-reconfigure</code> は入れたときの質問をやり直し、その答えで設定を書き直す</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0@sha256:556b75a379fdee91de07d7b828b45545cfd71f206c7c9761d9c375825c604457 / Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / debconf 1.5.86ubuntu1 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / debconf 1.5.86ubuntu1 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/03-sources">← 3. 目録は、取りに行くまで古いまま</a><a href="/linuc-packages/theory/05-yum">次: 5. yum は、目録を自分で取りに行く →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

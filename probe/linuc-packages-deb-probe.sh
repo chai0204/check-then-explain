@@ -166,11 +166,11 @@ sec_ch4() {
   echo; echo "---- dpkg-reconfigure ----"
   R 'cat /etc/timezone; ls -l /etc/localtime'
   R 'env -u TZ date -d @1790812800'
-  R 'sudo debconf-show tzdata'
+  R 'sudo debconf-show tzdata | sort'
   R "printf '5\n78\n' | sudo dpkg-reconfigure -f teletype tzdata"
   R 'cat /etc/timezone; ls -l /etc/localtime'
   R 'env -u TZ date -d @1790812800'
-  R 'sudo debconf-show tzdata'
+  R 'sudo debconf-show tzdata | sort'
 }
 
 case "${1:-}" in

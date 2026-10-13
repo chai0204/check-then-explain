@@ -182,11 +182,11 @@ $ rpm -V labapp; echo "exit=$?"
 S.5....T.  c /etc/labapp.conf
 exit=1
 $ ls -l /etc/labapp.conf*
--rw-r--r-- 1 root root 118 Oct 13 10:47 /etc/labapp.conf
+-rw-r--r-- 1 root root 118 Oct 13 11:38 /etc/labapp.conf
 $ sudo rpm -e labapp
 warning: /etc/labapp.conf saved as /etc/labapp.conf.rpmsave
 $ ls -l /etc/labapp.conf*
--rw-r--r-- 1 root root 118 Oct 13 10:47 /etc/labapp.conf.rpmsave</code></pre>
+-rw-r--r-- 1 root root 118 Oct 13 11:38 /etc/labapp.conf.rpmsave</code></pre>
 <p>同じ版を入れ直すとき、書き換えた設定ファイル（<code>%config</code> の印が付いたもの）は上書きされずに残る。だから書き足した 118 バイトのままだった。そして消したとき（<code>rpm -e</code>）は、捨てずに <code>.rpmsave</code> という名前で取っておいた。<b>書き換えた設定を勝手に捨てない</b>という考え方は、Debian の <code>rc</code>（第2章）と同じで、残し方が違う。</p>
 <p>書き換えていなければ、消すときに一緒に消える。檻を起動し直して、labapp を入れてすぐ消した記録である（別の檻）。</p>
 <pre><code>$ rpm -V labapp; echo "exit=$?"
@@ -283,7 +283,7 @@ exit=1</code></pre>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>rpm -q</code> は台帳に聞く: <code>-qa</code> 全部・<code>-qi</code> 情報・<code>-ql</code> ファイル・<code>-qf</code> ファイル→パッケージ・<code>-qc</code> 設定ファイル・<code>-qd</code> 文書・<code>-qR</code> 依存・<code>--whatrequires</code> 逆依存。ファイルに聞くなら <code>-qp</code></li><li><code>rpm -V</code> は台帳と違うファイルだけを出す。何も出ず終了コード 0 なら、全部台帳どおり</li><li>9文字の欄は SM5DLUGTP（大きさ・権限・中身の要約・…・時刻）。違った欄だけ文字が入り、<code>c</code> は設定ファイル</li><li>入れ直す（<code>yum reinstall</code>）と台帳どおりに戻るが、書き換えた設定ファイル（<code>%config</code>）は戻らない。消すと、書き換えてあれば <code>.rpmsave</code> で残り、書き換えていなければ一緒に消える。<code>noreplace</code> の差は版を上げるときに出る（<code>.rpmnew</code>）</li><li><code>rpm -Va</code> は実機でも多くの行を出す。設定ファイルでないのに 5 や M が付いた行から疑う</li><li><code>rpm2cpio | cpio -idmv</code> は入れずに中身を取り出す。台帳には載らない</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.0@sha256:0a42363b7f56353a30c1a56b89986ee9c030bd867dbf89236060f7d4c3661a84 / AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / cpio 2.13 / リポジトリ vault.almalinux.org 9.7（2026-05-20 で凍結）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.1@sha256:__DIGEST__ / AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / cpio 2.13 / リポジトリ vault.almalinux.org 9.7（2026-05-20 で凍結）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/05-yum">← 5. yum は、目録を自分で取りに行く</a><a href="/linuc-packages/theory/07-rpm-install">次: 7. OK は、確かめられた範囲の OK →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

@@ -3,7 +3,7 @@
 # yum（実体は dnf）/ yumdownloader / rpm を、AlmaLinux 9.7 の上で確かめる。
 # AlmaLinux のリポジトリは vault.almalinux.org の 9.7（9.8 が出て凍結済み）に固定し、目録もイメージに入れてある。
 # 演習の対象は自作の署名つき RPM で、檻の中の file:// リポジトリから入れる。ネットが無くても結果は同じ。
-#   build: docker build -t lab-linuc-packages-rpm:1.0.0 -f containers/linuc-packages/rpm/Dockerfile containers
+#   build: docker build -t lab-linuc-packages-rpm:1.0.1 -f containers/linuc-packages/rpm/Dockerfile containers
 #   （ビルドコンテキストを containers/ にするのは、base/bin/lab をそのまま取り込むため）
 
 # ---- build ステージ: 自作 RPM を作って署名し、リポジトリにする ----------------
@@ -77,9 +77,9 @@ LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-exp
 LABEL org.opencontainers.image.description="LinuC 主題1.04（yum・rpm・yumdownloader）を RPM 系で手で確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
 # LAB_APT_SNAPSHOT は lab env の「apt 固定」の行に出る。この檻に apt は無いので、そう書く。
-ENV LAB_THEME=linuc-packages-rpm LAB_VERSION=1.0.0 LAB_HOME=/lab \
+ENV LAB_THEME=linuc-packages-rpm LAB_VERSION=1.0.1 LAB_HOME=/lab \
     LAB_APT_SNAPSHOT="なし（RPM 系。下の dnf 固定の行を見る）" \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.0
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.1
 USER lab
 WORKDIR /home/lab
 CMD ["/bin/bash", "-l"]

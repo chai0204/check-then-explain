@@ -1,6 +1,6 @@
 #!/bin/bash
 # LinuC 主題1.04 Debian 系の檻の追加記録（2026-10-13 の事実確認を受けて足したもの）。
-# イメージは作り直していない（GHCR に push 済みの lab-linuc-packages-deb:1.0.0 と同じもの）。
+# 記録は lab-linuc-packages-deb:1.0.1 で取る（1.0.0 で取り始め、模範解答を直した 1.0.1 で取り直した）。
 # 本文に足した端末表示はここから引く。節ごとに檻を起動し直して打つ（probe/linuc-packages-run.sh extra）。
 #   bash /tmp/probe.sh x-upgrade|x-autoremove|x-root|x-aptcmds|x-un|x-pending|x-depends|x-docs
 set -u

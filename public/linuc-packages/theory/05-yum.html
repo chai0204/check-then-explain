@@ -118,7 +118,7 @@ Installed Packages
 labhello.noarch                            1.0-1                            @lab
 labmotd.noarch                             1.0-1                            @lab
 $ yum list available 'lab*'
-Last metadata expiration check: 0:38:23 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 1:29:57 ago on Tue Oct 13 10:08:56 2026.
 Available Packages
 labapp.noarch                                1.0-1                           lab
 labhello.noarch                              1.1-1                           lab
@@ -268,7 +268,7 @@ baseurl=file:///srv/lab-extra-rpm
 gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab
 $ sudo yum install -y labextra
-lab extra (LinuC 1.04)                          150 kB/s | 935  B     00:00
+lab extra (LinuC 1.04)                           63 kB/s | 935  B     00:00
 Dependencies resolved.
 ...
 Installing:
@@ -342,7 +342,7 @@ $ yumdownloader labtool
 ...
 $ ls -l
 total 8
--rw-r--r-- 1 lab lab 6859 Oct 13 10:47 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6859 Oct 13 11:38 labtool-1.0-1.noarch.rpm
 $ rpm -q labtool; echo "exit=$?"
 package labtool is not installed
 exit=1
@@ -356,8 +356,8 @@ $ yumdownloader --resolve --destdir dl labtool
 ...
 $ ls -l dl/
 total 16
--rw-r--r-- 1 lab lab 6859 Oct 13 10:47 labtool-1.0-1.noarch.rpm
--rw-r--r-- 1 lab lab 6729 Oct 13 10:47 labtool-data-1.0-1.noarch.rpm</code></pre>
+-rw-r--r-- 1 lab lab 6859 Oct 13 11:38 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6729 Oct 13 11:38 labtool-data-1.0-1.noarch.rpm</code></pre>
 <p><code>yumdownloader</code> は目録を読んで .rpm を取ってくるだけで、台帳には書かない（<code>rpm -q</code> は「入っていない」）。だから root でなくても打てる。取ったファイルは、第1章の <code>rpm -qpl</code> / <code>-qpR</code> で中身と依存を確かめられる。<code>--resolve</code> は依存するものも一緒に取り、<code>--destdir</code> は置き場所を指定する。RHEL 8 以降の実体は yum-utils パッケージの <code>/usr/libexec/dnf-utils</code> で、<code>dnf download</code> を呼んでいる（RHEL 7 の <code>yumdownloader</code> は、yum-utils に入った独立した Python のプログラムである。使い方は同じ）。Debian 系なら <code>apt-get download</code>（第2章）がこれにあたる。</p>
 <div class="scroll"><table>
 <tr><th>オプション</th><th>意味</th></tr>
@@ -399,7 +399,7 @@ total 16
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>RHEL 8 以降の <code>yum</code> は <code>dnf</code> へのリンク。<code>/etc/yum.conf</code> も <code>/etc/dnf/dnf.conf</code> へのリンク</li><li>リポジトリは <code>/etc/yum.repos.d/*.repo</code> に、<code>[repo id]</code>・<code>baseurl=</code>・<code>enabled=</code>・<code>gpgcheck=</code>・<code>gpgkey=</code> で書く</li><li><code>yum list</code> の右端の <code>@lab</code> は台帳（そこから入った）、<code>lab</code> は目録（そこから入れられる）</li><li><code>yum provides</code>（ファイル → パッケージ）と <code>yum repoquery -l</code>（パッケージ → 中身）は、入っていないパッケージにも答える（apt-file が要らない）</li><li>dnf は目録が無い・期限切れだと、コマンドを打った時点で自分で取りに行く。apt は <code>apt update</code> まで取りに行かない</li><li><code>yum remove</code> は依存のために入った不要なものも消す（dnf の既定 <code>clean_requirements_on_remove=True</code>。RHEL 7 の yum は既定 <code>False</code> で残す）</li><li><code>yumdownloader</code>（RHEL 8 以降の実体は <code>dnf download</code>）は入れずに .rpm を取る。<code>--resolve</code> で依存も</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.0@sha256:0a42363b7f56353a30c1a56b89986ee9c030bd867dbf89236060f7d4c3661a84 / AlmaLinux 9.7 / dnf 4.14.0 / rpm 4.16.1.3 / yum-utils 4.3.0 / リポジトリ vault.almalinux.org 9.7（2026-05-20 で凍結）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.1@sha256:__DIGEST__ / AlmaLinux 9.7 / dnf 4.14.0 / rpm 4.16.1.3 / yum-utils 4.3.0 / リポジトリ vault.almalinux.org 9.7（2026-05-20 で凍結）/ docker 29.8.0・amd64 で検証 / 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-packages/theory/04-dpkg">← 4. dpkg は依存を読めるが、取りに行かない</a><a href="/linuc-packages/theory/06-rpm-query">次: 6. rpm -V が黙っているのは、台帳どおりだから →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

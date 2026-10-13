@@ -6,7 +6,7 @@ $ bash -lic true
 bash: cannot set terminal process group (7): Inappropriate ioctl for device
 bash: no job control in this shell
 
-── lab-linuc-packages-rpm 1.0.0 ────────────────────────────────────────
+── lab-linuc-packages-rpm 1.0.1 ────────────────────────────────────────
 lab-linuc-packages-rpm  進捗 0/3
   次 → 04 「labcalc を、署名の確認を切らずに入れる」 (目安 15分 / 影響度 B)
   lab start 04 で課題を開く
@@ -113,7 +113,7 @@ lab                             lab packages (LinuC 1.04)
 lab-tools                       lab tools
 
 $ yum provides '*/labcalc'
-lab tools                                       107 kB/s | 941  B     00:00    
+lab tools                                       160 kB/s | 941  B     00:00    
 lab-mathtools-1.0-1.noarch : small number utilities for the lab
 Repo        : lab-tools
 Matched from:
@@ -122,7 +122,7 @@ Filename    : /usr/bin/labcalc
 
 $ echo "--- gpgkey を書かずに入れようとする ---"; sudo yum install -y lab-mathtools; echo "exit=$?"
 --- gpgkey を書かずに入れようとする ---
-Last metadata expiration check: 0:00:01 ago on Tue Oct 13 10:47:29 2026.
+Last metadata expiration check: 0:00:01 ago on Tue Oct 13 11:39:12 2026.
 Dependencies resolved.
 ================================================================================
  Package                Architecture    Version        Repository          Size
@@ -271,7 +271,7 @@ $ echo "--- 権限だけ戻した（中身は違うまま） ---"; lab check 05;
 exit=1
 
 $ sudo yum reinstall -y labmotd
-Last metadata expiration check: 0:00:01 ago on Tue Oct 13 10:47:30 2026.
+Last metadata expiration check: 0:00:01 ago on Tue Oct 13 11:39:13 2026.
 Dependencies resolved.
 ================================================================================
  Package             Architecture       Version           Repository       Size
@@ -352,9 +352,9 @@ $ lab start 06
 
 
 $ cd ~/work/06 && yumdownloader labtool && ls -l
-Last metadata expiration check: 0:00:02 ago on Tue Oct 13 10:47:30 2026.
+Last metadata expiration check: 0:00:02 ago on Tue Oct 13 11:39:13 2026.
 total 8
--rw-r--r-- 1 lab lab 6859 Oct 13 10:47 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6859 Oct 13 11:39 labtool-1.0-1.noarch.rpm
 
 $ cd ~/work/06 && sudo rpm -ivh labtool-1.0-1.noarch.rpm; echo "exit=$?"
 error: Failed dependencies:
@@ -377,10 +377,10 @@ $ echo "--- labtool だけ取って rpm -ivh した（依存で止まった） -
 exit=1
 
 $ cd ~/work/06 && yumdownloader --resolve labtool && ls -l
-Last metadata expiration check: 0:00:02 ago on Tue Oct 13 10:47:30 2026.
+Last metadata expiration check: 0:00:02 ago on Tue Oct 13 11:39:13 2026.
 total 16
--rw-r--r-- 1 lab lab 6859 Oct 13 10:47 labtool-1.0-1.noarch.rpm
--rw-r--r-- 1 lab lab 6729 Oct 13 10:47 labtool-data-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6859 Oct 13 11:39 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6729 Oct 13 11:39 labtool-data-1.0-1.noarch.rpm
 
 $ cd ~/work/06 && sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
 Verifying...                          ########################################
@@ -531,8 +531,8 @@ exit=1
 ########## G. 最終環境 ##########
 
 $ lab env
-テーマ    : lab-linuc-packages-rpm 1.0.0
-イメージ  : ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.0
+テーマ    : lab-linuc-packages-rpm 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.1
 ベース    : AlmaLinux 9.7 (Moss Jungle Cat)
 apt 固定  : なし（RPM 系。下の dnf 固定の行を見る）
 カーネル  : 7.2.6

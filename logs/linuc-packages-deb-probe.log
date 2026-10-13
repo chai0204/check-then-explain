@@ -3,8 +3,8 @@
 ========== 0. 環境（Debian 系の檻・起動直後） ==========
 
 $ lab env
-テーマ    : lab-linuc-packages-deb 1.0.0
-イメージ  : ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0
+テーマ    : lab-linuc-packages-deb 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:packages-deb-1.0.1
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -509,7 +509,7 @@ $ apt-get download liblab
 Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
 
 $ ls -l *.deb
--rw-r--r-- 1 lab lab 746 Oct 13 10:36 liblab_1.0_all.deb
+-rw-r--r-- 1 lab lab 746 Oct 13 11:40 liblab_1.0_all.deb
 
 $ dpkg -l liblab; echo "exit=$?"
 dpkg-query: no packages found matching liblab
@@ -640,11 +640,11 @@ Ign:1 file:/srv/lab-repo lab InRelease
 Get:2 file:/srv/lab-extra extra InRelease
 Ign:2 file:/srv/lab-extra extra InRelease
 Get:3 file:/srv/lab-repo lab Release [1983 B]
-Get:4 file:/srv/lab-extra extra Release [1991 B]
 Get:3 file:/srv/lab-repo lab Release [1983 B]
 Get:4 file:/srv/lab-extra extra Release [1991 B]
 Get:5 file:/srv/lab-repo lab Release.gpg
 Ign:5 file:/srv/lab-repo lab Release.gpg
+Get:4 file:/srv/lab-extra extra Release [1991 B]
 Get:6 file:/srv/lab-extra extra Release.gpg
 Ign:6 file:/srv/lab-extra extra Release.gpg
 Get:7 file:/srv/lab-extra extra/main amd64 Packages [448 B]
@@ -737,9 +737,9 @@ Ign:2 file:/srv/lab-extra extra InRelease
 Get:3 file:/srv/lab-repo lab Release [1983 B]
 Get:4 file:/srv/lab-extra extra Release [1991 B]
 Get:3 file:/srv/lab-repo lab Release [1983 B]
-Get:4 file:/srv/lab-extra extra Release [1991 B]
 Get:5 file:/srv/lab-repo lab Release.gpg
 Ign:5 file:/srv/lab-repo lab Release.gpg
+Get:4 file:/srv/lab-extra extra Release [1991 B]
 Get:6 file:/srv/lab-extra extra Release.gpg
 Ign:6 file:/srv/lab-extra extra Release.gpg
 Hit:7 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
@@ -973,7 +973,7 @@ $ dpkg -l labapp | tail -1
 rc  labapp         1.0          all          sample application that needs liblab
 
 $ ls -l /etc/labapp.conf
--rw-r--r-- 1 root root 120 Oct 13 10:36 /etc/labapp.conf
+-rw-r--r-- 1 root root 120 Oct 13 11:40 /etc/labapp.conf
 
 $ sudo dpkg -P labapp
 (Reading database ... 12827 files and directories currently installed.)
@@ -996,20 +996,20 @@ lrwxrwxrwx 1 root root 27 Sep 30 19:32 /etc/localtime -> /usr/share/zoneinfo/Etc
 $ env -u TZ date -d @1790812800
 Thu Oct  1 00:00:00 UTC 2026
 
-$ sudo debconf-show tzdata
-  tzdata/Zones/Atlantic:
-  tzdata/Zones/Indian:
-  tzdata/Zones/Legacy:
-  tzdata/Zones/Arctic:
+$ sudo debconf-show tzdata | sort
+  tzdata/Areas: Etc
+  tzdata/Zones/Africa:
   tzdata/Zones/America:
+  tzdata/Zones/Antarctica:
+  tzdata/Zones/Arctic:
+  tzdata/Zones/Asia:
+  tzdata/Zones/Atlantic:
   tzdata/Zones/Australia:
   tzdata/Zones/Etc: UTC
-  tzdata/Zones/Antarctica:
-  tzdata/Zones/Asia:
-  tzdata/Zones/Pacific:
   tzdata/Zones/Europe:
-  tzdata/Zones/Africa:
-  tzdata/Areas: Etc
+  tzdata/Zones/Indian:
+  tzdata/Zones/Legacy:
+  tzdata/Zones/Pacific:
 
 $ printf '5\n78\n' | sudo dpkg-reconfigure -f teletype tzdata
 Configuring tzdata
@@ -1050,28 +1050,28 @@ Please select the city or region corresponding to your time zone.
 Time zone: 
 
 Current default time zone: 'Asia/Tokyo'
-Local time is now:      Tue Oct 13 10:36:17 JST 2026.
-Universal Time is now:  Tue Oct 13 01:36:17 UTC 2026.
+Local time is now:      Tue Oct 13 11:40:43 JST 2026.
+Universal Time is now:  Tue Oct 13 02:40:43 UTC 2026.
 
 
 $ cat /etc/timezone; ls -l /etc/localtime
 Asia/Tokyo
-lrwxrwxrwx 1 root root 30 Oct 13 10:36 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
+lrwxrwxrwx 1 root root 30 Oct 13 11:40 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
 
 $ env -u TZ date -d @1790812800
 Thu Oct  1 09:00:00 JST 2026
 
-$ sudo debconf-show tzdata
-  tzdata/Zones/Pacific:
-  tzdata/Zones/Australia:
-  tzdata/Zones/Indian:
-  tzdata/Zones/Antarctica:
-  tzdata/Zones/Atlantic:
-  tzdata/Zones/Arctic:
-  tzdata/Zones/Etc: UTC
+$ sudo debconf-show tzdata | sort
   tzdata/Zones/Africa:
-* tzdata/Zones/Asia: Tokyo
   tzdata/Zones/America:
-  tzdata/Zones/Legacy:
+  tzdata/Zones/Antarctica:
+  tzdata/Zones/Arctic:
+  tzdata/Zones/Atlantic:
+  tzdata/Zones/Australia:
+  tzdata/Zones/Etc: UTC
   tzdata/Zones/Europe:
+  tzdata/Zones/Indian:
+  tzdata/Zones/Legacy:
+  tzdata/Zones/Pacific:
 * tzdata/Areas: Asia
+* tzdata/Zones/Asia: Tokyo

@@ -2,7 +2,7 @@
 # LinuC 主題1.04（リポジトリとパッケージ管理）の Debian 系の檻。
 # apt / apt-get / apt-cache / apt-file / dpkg / dpkg-reconfigure を、本物のパッケージ管理の上で確かめる。
 # 演習の対象は自作の小さな .deb（依存関係つき）で、檻の中の file: リポジトリから入れる。ネットが無くても結果は同じ。
-#   build: docker build -t lab-linuc-packages-deb:1.0.0 containers/linuc-packages/deb
+#   build: docker build -t lab-linuc-packages-deb:1.0.1 containers/linuc-packages/deb
 
 # ---- build ステージ: 自作パッケージとリポジトリを作る -----------------------
 #   索引（Packages / Contents / Release）は apt-ftparchive（apt-utils）で作る。作業用のツリーは檻に入れない。
@@ -57,8 +57,8 @@ COPY --from=build --chown=root:root --chmod=0444 /out/labnote_1.0_all.deb /lab/s
 LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-explain
 LABEL org.opencontainers.image.description="LinuC 主題1.04（apt・dpkg・apt-file）を Debian 系で手で確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
-ENV LAB_THEME=linuc-packages-deb LAB_VERSION=1.0.0 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0
+ENV LAB_THEME=linuc-packages-deb LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-deb-1.0.1
 USER lab
 WORKDIR /home/lab
 CMD ["/bin/bash", "-l"]

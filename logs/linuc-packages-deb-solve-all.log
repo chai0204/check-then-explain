@@ -6,7 +6,7 @@ $ bash -lic true
 bash: cannot set terminal process group (6): Inappropriate ioctl for device
 bash: no job control in this shell
 
-── lab-linuc-packages-deb 1.0.0 ────────────────────────────────────────
+── lab-linuc-packages-deb 1.0.1 ────────────────────────────────────────
 lab-linuc-packages-deb  進捗 0/3
   次 → 01 「labsvc を、跡形なく消す」 (目安 10分 / 影響度 B)
   lab start 01 で課題を開く
@@ -355,7 +355,7 @@ $ lab start 03
 
 $ cd ~/work/03 && ls -l
 total 4
--rw-r--r-- 1 lab lab 708 Oct 13 10:22 labnote_1.0_all.deb
+-rw-r--r-- 1 lab lab 708 Oct 13 11:39 labnote_1.0_all.deb
 
 $ cd ~/work/03 && dpkg -I labnote_1.0_all.deb | grep Depends
  Depends: labnote-data (>= 1.0)
@@ -436,7 +436,7 @@ $ lab check 03; echo "exit=$?"
 
   自分の手で確かめたこと
 
-   ✔ 01  apt remove は設定ファイルを残し（rc）、一緒に入った依存は autoremove まで残ること
+   ✔ 01  conffile を持つパッケージは apt remove で rc として残り、一緒に入った依存は autoremove まで残ること
    ✔ 02  ソースに書いても apt update するまで目録は変わらず、ファイル名からは apt-file で探すこと
    ✔ 03  dpkg -i は依存が足りないと iU で止まり、apt --fix-broken install が目録から補うこと
 
@@ -558,8 +558,8 @@ exit=0
 ########## G. 最終環境 ##########
 
 $ lab env
-テーマ    : lab-linuc-packages-deb 1.0.0
-イメージ  : ghcr.io/chai0204/lab-linuc:packages-deb-1.0.0
+テーマ    : lab-linuc-packages-deb 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:packages-deb-1.0.1
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
