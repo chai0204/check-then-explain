@@ -22,7 +22,7 @@
 <p>この章はホームで作業する。<code>locate</code> は名前の一部を渡すと、一致するパスを並べる。</p>
 <pre><code>$ cd ~
 $ ls -l /var/lib/plocate/plocate.db
--rw-r----- 1 root plocate 413088 Oct 13 11:09 /var/lib/plocate/plocate.db
+-rw-r----- 1 root plocate 413089 Oct 13 11:42 /var/lib/plocate/plocate.db
 $ locate bashrc
 /etc/bash.bashrc
 /etc/skel/.bashrc
@@ -65,7 +65,7 @@ exit=1
 $ sudo locate alice-note
 /home/alice/alice-note.txt
 $ ls -ld /home/alice
-drwxr-x--- 1 alice alice 4096 Oct 13 11:09 /home/alice</code></pre>
+drwxr-x--- 1 alice alice 4096 Oct 13 11:43 /home/alice</code></pre>
 <p>索引には載っているのに、lab の <code>locate</code> には出ず、root には出た。<code>/home/alice</code> は <code>drwxr-x---</code> で、lab には x が無い。第1章のとおり、x の無いディレクトリの先へは進めない。<code>locate</code> は結果を出す前に、呼んだ人が<b>親ディレクトリすべてに r と x を持っているか</b>を確かめ、持っていないものは出さない（<code>man plocate</code> にそう書いてある）。索引そのものも <code>-rw-r----- root plocate</code> で一般ユーザには直接読めず、<code>locate</code> だけが読める作りになっている。他人の持ち物の<b>名前</b>が漏れないようにしているのである。</p>
 
 <h2 id="conf">/etc/updatedb.conf — 索引から外す場所</h2>
@@ -103,7 +103,7 @@ Persistent=true
 
 [Install]
 WantedBy=timers.target</code></pre>
-<p>実機では、systemd のタイマー（<code>OnCalendar=daily</code>）が1日1回 <code>updatedb</code> を呼ぶ。systemd が動いていない環境のために <code>/etc/cron.daily/plocate</code> も置かれていて、こちらは中で「タイマーが使えるなら何もしない」と確かめてから動く。タイマーは呼ぶ時刻を最大12時間ずらす（<code>RandomizedDelaySec=12h</code>）ので、索引はふだん1日前後、長いと1日半ほど古い。この檻の中では systemd も cron のデーモンも動いていないので、どちらも起動しない。索引は、自分で <code>sudo updatedb</code> を打つまで変わらない。</p>
+<p>実機では、systemd のタイマー（<code>OnCalendar=daily</code>）が1日1回 <code>updatedb</code> を呼ぶ。systemd が動いていない環境のために <code>/etc/cron.daily/plocate</code> も置かれていて、こちらは中で「タイマーが使えるなら何もしない」と確かめてから動く。タイマーは毎回、呼ぶ時刻を 0〜12時間の範囲で選び直してずらす（<code>RandomizedDelaySec=12h</code>）。そのため索引の古さは 0 から最大でおよそ1日半（36時間）で、平均すると半日ほどになる。この檻の中では systemd も cron のデーモンも動いていないので、どちらも起動しない。索引は、自分で <code>sudo updatedb</code> を打つまで変わらない。</p>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-files/">演習08</a>は、<code>locate</code> で見つからない2つのファイルを見つかるようにする課題である。
 2つは見つからない理由が違い、片方は <code>/etc/updatedb.conf</code> を直さないと出てこない。
@@ -121,7 +121,7 @@ $ which -a ls
 /bin/ls
 $ which cd; echo "exit=$?"
 exit=1</code></pre>
-<p><code>which</code> は PATH を順に探して、最初に見つかったファイルを出す。<code>-a</code> なら全部出す。<code>/bin/ls</code> も出たのは、第7章のとおり <code>/bin</code> が <code>usr/bin</code> へのリンクだからである。そして <code>cd</code> は見つからなかった。<code>cd</code> はファイルではなく、シェルに組み込まれた命令だからである。シェルの目で答えるのが <code>type</code> である。</p>
+<p><code>which</code> は PATH を順に探して、最初に見つかったファイルを出す。<code>-a</code> なら全部出す。<code>/bin/ls</code> も出たのは、第7章のとおり <code>/bin</code> が <code>usr/bin</code> へのリンクだからである。そして <code>cd</code> は見つからなかった。<code>cd</code> はシェルに組み込まれた命令で、Ubuntu には <code>cd</code> という名前のファイルが無いからである（Red Hat 系の bash パッケージには <code>/usr/bin/cd</code> という小さなスクリプトがあり、<code>which cd</code> はそれを返す。それでも、打った <code>cd</code> が動かすのはシェルの組み込みのほうである）。シェルが実際に何を動かすかを答えるのが <code>type</code> である。</p>
 <pre><code>$ type ls
 ls is aliased to `ls --color=auto'
 $ type -a ls
@@ -136,7 +136,7 @@ $ type type
 type is a shell builtin
 $ type if
 if is a shell keyword</code></pre>
-<p>あなたが打つ <code>ls</code> は、実は <code>ls --color=auto</code> という<b>エイリアス</b>だった（Ubuntu の <code>~/.bashrc</code> が定義している）。<code>which</code> はファイルしか探さないので、この事実を知らない。<code>type</code> はシェル自身に聞くので、その名前がエイリアス・予約語・関数・<b>組み込みコマンド</b>・PATH 上のファイルのどれに当たるかを答える。<code>-a</code> を付けると、当たるものを全部、シェルが優先する順に並べる。打ったときに実際に動くのは、その先頭である。</p>
+<p>あなたが打つ <code>ls</code> は、実は <code>ls --color=auto</code> という<b>エイリアス</b>だった（Ubuntu の <code>~/.bashrc</code> が定義している）。Ubuntu の <code>which</code> はファイルしか探さないので、この事実を知らない（Red Hat 系では <code>which</code> 自体が <code>/etc/profile.d/which2.sh</code> の関数になっていて、エイリアスも出す。ディストリビューションで答えが変わる）。<code>type</code> はシェル自身に聞くので、その名前がエイリアス・予約語・関数・<b>組み込みコマンド</b>・PATH 上のファイルのどれに当たるかを答える。<code>-a</code> を付けると、当たるものを全部、シェルが優先する順に並べる。打ったときに実際に動くのは、その先頭である。</p>
 <pre><code>$ whereis ls
 ls: /usr/bin/ls /usr/share/man/man1/ls.1.gz
 $ whereis -b ls
@@ -148,9 +148,9 @@ cd:</code></pre>
 <p><code>whereis</code> は Linux の標準の場所（と PATH・MANPATH）を探して、実行ファイル・マニュアル（・ソース）をまとめて出す。<code>-b</code> は実行ファイルだけ。<code>passwd</code> では、同じ名前の設定ファイル <code>/etc/passwd</code> と、その書式を説明する5章のマニュアルまで並んだ。</p>
 <div class="scroll"><table>
 <tr><th>コマンド</th><th>何を探すか</th><th><code>ls</code> の答え</th><th><code>cd</code> の答え</th></tr>
-<tr><td><code>which</code></td><td>PATH の上の実行ファイル</td><td><code>/usr/bin/ls</code></td><td>何も出ない（終了コード 1）</td></tr>
+<tr><td><code>which</code></td><td>PATH の上の実行ファイル</td><td><code>/usr/bin/ls</code></td><td>Ubuntu では何も出ない（終了コード 1）</td></tr>
 <tr><td><code>type</code></td><td>シェルが実際に何を動かすか</td><td>エイリアス</td><td><code>shell builtin</code></td></tr>
-<tr><td><code>whereis</code></td><td>標準の場所の実行ファイル・マニュアル・ソース</td><td>本体とマニュアル</td><td><code>cd:</code>（空）</td></tr>
+<tr><td><code>whereis</code></td><td>標準の場所の実行ファイル・マニュアル・ソース</td><td>本体とマニュアル</td><td>Ubuntu では <code>cd:</code>（空）</td></tr>
 <tr><td><code>locate</code></td><td>索引に載った名前（パスの一部一致）</td><td>（名前に ls を含むパスが大量に出る）</td><td>—</td></tr>
 </table></div>
 <div class="analogy"><b>たとえ</b>: <code>which</code> は駅の路線図だけを見て駅を探す人、<code>type</code> はこの駅の駅員に聞く人に近い。
@@ -168,7 +168,7 @@ lrwxrwxrwx 1 root root 7 Apr 22  2024 /lib -&gt; usr/lib
 lrwxrwxrwx 1 root root 9 Apr 22  2024 /lib64 -&gt; usr/lib64
 lrwxrwxrwx 1 root root 8 Apr 22  2024 /sbin -&gt; usr/sbin
 $ ls -ld /tmp /var/tmp
-drwxrwxrwt 1 root root 4096 Oct 13 11:09 /tmp
+drwxrwxrwt 1 root root 4096 Oct 13 11:43 /tmp
 drwxrwxrwt 2 root root 4096 Sep 11 11:10 /var/tmp
 $ ls -d /var/log /var/spool /var/lib /usr/local/bin /usr/share/man /etc/skel
 /etc/skel  /usr/local/bin  /usr/share/man  /var/lib  /var/log  /var/spool</code></pre>
@@ -233,7 +233,7 @@ Ubuntu の既定では <code>/tmp</code> が <code>PRUNEPATHS</code> に入っ�
 a. <code>which</code>　b. <code>whereis</code>　c. <code>type</code>　d. <code>locate</code></p>
 <details><summary>答え</summary>
 <p>c。<code>type</code> はシェル自身に聞くので、エイリアス（<code>ll is aliased to `ls -alF'</code>）や組み込み（<code>cd is a shell builtin</code>）も答える。
-<code>which</code> は PATH 上のファイルしか探さない。</p></details></div>
+Ubuntu の <code>which</code> は PATH 上のファイルしか探さない（Red Hat 系の <code>which</code> はエイリアスも出すが、組み込みかどうかは答えない）。確実に見分けられるのは <code>type</code> である。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>FHS で、次のものを置くディレクトリを答えよ。（1）システムのログ　（2）再起動しても消えない一時ファイル　（3）管理者が自分で入れたプログラム</p>
 <details><summary>答え</summary>
@@ -241,8 +241,8 @@ a. <code>which</code>　b. <code>whereis</code>　c. <code>type</code>　d. <cod
 パッケージ単位の追加アプリケーションなら <code>/opt</code>。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>locate</code> は <code>updatedb</code> が作った索引を引くだけ。作った直後は出ず、消した後も出る（<code>-e</code> で実在を確かめる）</li><li><code>updatedb</code> は root で打つ。実機ではタイマーか <code>/etc/cron.daily</code> が1日1回呼ぶ</li><li><code>/etc/updatedb.conf</code> の <code>PRUNEPATHS</code>・<code>PRUNEFS</code>・<code>PRUNENAMES</code> が索引から外す。<code>/tmp</code> は最初から外れている</li><li>一般ユーザの <code>locate</code> には、親ディレクトリに r と x を持たない場所のものは出ない</li><li><code>which</code> は PATH 上のファイル、<code>type</code> はシェルが実際に動かすもの、<code>whereis</code> は実行ファイルとマニュアルの標準の場所</li><li>FHS は置き場所の約束。<code>/etc</code> 設定、<code>/var/log</code> ログ、<code>/tmp</code> と <code>/var/tmp</code> 一時、<code>/usr/local</code> 自分で入れたもの。いまの Ubuntu では <code>/bin</code> は <code>usr/bin</code> へのリンク</li><li>この主題の全部が「名前はディレクトリに、それ以外は inode に」の上にある</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / bash 5.2.21 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>locate</code> は <code>updatedb</code> が作った索引を引くだけ。作った直後は出ず、消した後も出る（<code>-e</code> で実在を確かめる）</li><li><code>updatedb</code> は root で打つ。実機ではタイマーか <code>/etc/cron.daily</code> が1日1回呼ぶ</li><li><code>/etc/updatedb.conf</code> の <code>PRUNEPATHS</code>・<code>PRUNEFS</code>・<code>PRUNENAMES</code> が索引から外す。<code>/tmp</code> は最初から外れている</li><li>一般ユーザの <code>locate</code> には、親ディレクトリに r と x を持たない場所のものは出ない</li><li><code>which</code> は PATH 上のファイル（Ubuntu。Red Hat 系はエイリアスも出す）、<code>type</code> はシェルが実際に動かすもの、<code>whereis</code> は実行ファイルとマニュアルの場所。組み込みかどうかを確かめるのは <code>type</code></li><li>FHS は置き場所の約束。<code>/etc</code> 設定、<code>/var/log</code> ログ、<code>/tmp</code> と <code>/var/tmp</code> 一時、<code>/usr/local</code> 自分で入れたもの。いまの Ubuntu では <code>/bin</code> は <code>usr/bin</code> へのリンク</li><li>この主題の全部が「名前はディレクトリに、それ以外は inode に」の上にある</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / bash 5.2.21 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-files/theory/07-links">← 7. ハードリンクは名前を増やし、シンボリックリンクは道順を書く</a><a href="/linuc-files/">実践編へ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

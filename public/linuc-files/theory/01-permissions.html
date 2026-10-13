@@ -25,9 +25,9 @@ $ cd ~/work/ch1
 $ echo "メモ" &gt; memo.txt
 $ mkdir box
 $ ls -l memo.txt
--rw-r--r-- 1 lab lab 7 Oct 13 11:09 memo.txt
+-rw-r--r-- 1 lab lab 7 Oct 13 11:43 memo.txt
 $ ls -ld box
-drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 box</code></pre>
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 box</code></pre>
 <p>先頭の10文字が<b>パーミッション</b>（と種類）である。1文字目が種類で、残りの9文字は3文字ずつ「所有者」「グループ」「その他」に分かれる。</p>
 <pre><code>-  rw-  r--  r--   1  lab  lab   7  Oct 13 10:11  memo.txt
 ^  ^^^  ^^^  ^^^   ^  ^^^  ^^^   ^  ^^^^^^^^^^^^  ^^^^^^^^
@@ -47,7 +47,7 @@ drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 box</code></pre>
 <pre><code>$ echo "持ち主だけが読めない" &gt; /tmp/owner.txt
 $ chmod 044 /tmp/owner.txt
 $ ls -l /tmp/owner.txt
-----r--r-- 1 lab lab 31 Oct 13 11:09 /tmp/owner.txt
+----r--r-- 1 lab lab 31 Oct 13 11:43 /tmp/owner.txt
 $ cat /tmp/owner.txt
 cat: /tmp/owner.txt: Permission denied
 $ sudo -u alice cat /tmp/owner.txt
@@ -63,10 +63,10 @@ $ sudo -u alice cat /tmp/owner.txt
 <h2 id="special">スペシャルファイル — 大きさの欄に数字が2つある</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>/dev</code> の下のファイルが何で、大きさの欄に何が入っているか。</div>
 <pre><code>$ ls -l /dev/null /dev/tty /dev/zero /dev/urandom
-crw-rw-rw- 1 root root 1, 3 Oct 13 11:09 /dev/null
-crw-rw-rw- 1 root root 5, 0 Oct 13 11:09 /dev/tty
-crw-rw-rw- 1 root root 1, 9 Oct 13 11:09 /dev/urandom
-crw-rw-rw- 1 root root 1, 5 Oct 13 11:09 /dev/zero
+crw-rw-rw- 1 root root 1, 3 Oct 13 11:43 /dev/null
+crw-rw-rw- 1 root root 5, 0 Oct 13 11:43 /dev/tty
+crw-rw-rw- 1 root root 1, 9 Oct 13 11:43 /dev/urandom
+crw-rw-rw- 1 root root 1, 5 Oct 13 11:43 /dev/zero
 $ file /dev/null /dev/tty
 /dev/null: character special (1/3)
 /dev/tty:  character special (5/0)</code></pre>
@@ -79,7 +79,7 @@ $ head -c 8 /dev/zero | od -c
 <p>パイプ（<code>|</code>）に名前を付けてファイルとして置いたものが<b>名前付きパイプ</b>（FIFO）で、種類は <code>p</code> になる。</p>
 <pre><code>$ mkfifo pipe
 $ ls -l pipe
-prw-r--r-- 1 lab lab 0 Oct 13 11:09 pipe
+prw-r--r-- 1 lab lab 0 Oct 13 11:43 pipe
 $ file pipe
 pipe: fifo (named pipe)</code></pre>
 <p>ディスクのようにブロック単位で読み書きする装置は<b>ブロックデバイス</b>（種類 <code>b</code>）になる。実機なら <code>/dev/sda</code> や <code>/dev/nvme0n1</code> がそうだが、この檻には1つも無い。</p>
@@ -96,15 +96,15 @@ $ find / -xdev -type s 2&gt;/dev/null | wc -l
 $ echo "別の中身" &gt; box/other.txt
 $ ls -l box
 total 8
--rw-r--r-- 1 lab lab  7 Oct 13 11:09 known.txt
--rw-r--r-- 1 lab lab 13 Oct 13 11:09 other.txt</code></pre>
+-rw-r--r-- 1 lab lab  7 Oct 13 11:43 known.txt
+-rw-r--r-- 1 lab lab 13 Oct 13 11:43 other.txt</code></pre>
 <p>ここから <code>box</code> の権限を1つずつ外していく。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>ディレクトリの r（読む）を残しておけば、中のファイルの一覧も、<code>ls -l</code> の詳しい情報も見られるはずだ。
 x は「実行」の権限だから、プログラムではないディレクトリには関係ないだろう。</p>
 <pre><code>$ chmod u-x box
 $ ls -ld box
-drw-r-xr-x 2 lab lab 4096 Oct 13 11:09 box
+drw-r-xr-x 2 lab lab 4096 Oct 13 11:43 box
 $ ls box
 ls: cannot access 'box/known.txt': Permission denied
 ls: cannot access 'box/other.txt': Permission denied
@@ -128,7 +128,7 @@ r はこの表を読む権限で、名前が出るところまでしか届かな
 <p>逆に、x だけを残して r を外す。</p>
 <pre><code>$ chmod u=x box
 $ ls -ld box
-d--xr-xr-x 2 lab lab 4096 Oct 13 11:09 box
+d--xr-xr-x 2 lab lab 4096 Oct 13 11:43 box
 $ ls box
 ls: cannot open directory 'box': Permission denied
 $ cat box/known.txt
@@ -157,7 +157,7 @@ x だけの人は、名簿を見ることはできないが、会いたい人の
 <pre><code>$ echo "残す" &gt; ro.txt
 $ chmod 444 ro.txt
 $ ls -l ro.txt
--r--r--r-- 1 lab lab 7 Oct 13 11:09 ro.txt
+-r--r--r-- 1 lab lab 7 Oct 13 11:43 ro.txt
 $ echo "追記" &gt;&gt; ro.txt
 bash: ro.txt: Permission denied
 $ rm ro.txt
@@ -167,7 +167,7 @@ ls: cannot access 'ro.txt': No such file or directory</code></pre>
 <p>中身には1文字も足せないのに、<code>rm</code> は確認を1回聞いただけで消した（<code>y</code> は自分で打つ）。他人のファイルでも同じである。</p>
 <pre><code>$ sudo touch rootfile
 $ ls -l rootfile
--rw-r--r-- 1 root root 0 Oct 13 11:09 rootfile
+-rw-r--r-- 1 root root 0 Oct 13 11:43 rootfile
 $ rm rootfile
 rm: remove write-protected regular empty file 'rootfile'? y
 $ ls -l rootfile
@@ -175,11 +175,11 @@ ls: cannot access 'rootfile': No such file or directory</code></pre>
 <p>root のファイルを、一般ユーザの lab が消せた。消すという操作は「ディレクトリの表から名前を1行消す」ことで、書き換わるのはファイルではなく<b>ディレクトリ</b>だからである。だから問われるのは、ディレクトリの w（と、中へ進むための x）になる。逆向きも確かめる。</p>
 <pre><code>$ chmod u-w box
 $ ls -ld box
-dr-xr-xr-x 2 lab lab 4096 Oct 13 11:09 box
+dr-xr-xr-x 2 lab lab 4096 Oct 13 11:43 box
 $ rm box/other.txt
 rm: cannot remove 'box/other.txt': Permission denied
 $ ls -l box/other.txt
--rw-r--r-- 1 lab lab 13 Oct 13 11:09 box/other.txt
+-rw-r--r-- 1 lab lab 13 Oct 13 11:43 box/other.txt
 $ chmod u+w box</code></pre>
 <p>自分のファイルで、自分は書き込めるのに、消せない。表のほうに w が無いからである。<code>rm</code> が聞いてくる「write-protected」は親切な警告にすぎず、可否を決めているのはディレクトリの w と x である（第3章のスティッキービットが付いていれば、もう1つ条件が増える）。</p>
 <div class="analogy"><b>たとえ</b>: 図書館の蔵書目録から1行消す作業に近い。
@@ -197,7 +197,7 @@ alice に「一覧は見せないが、1つのファイルだけは読ませる�
 <pre><code>$ echo "ひみつ" &gt; secret.txt
 $ chmod 000 secret.txt
 $ ls -l secret.txt
----------- 1 lab lab 10 Oct 13 11:09 secret.txt
+---------- 1 lab lab 10 Oct 13 11:43 secret.txt
 $ cat secret.txt
 cat: secret.txt: Permission denied
 $ sudo cat secret.txt
@@ -212,7 +212,7 @@ $ sudo bash -c ./run.sh
 bash: line 1: ./run.sh: Permission denied
 $ chmod 100 run.sh
 $ ls -l run.sh
----x------ 1 lab lab 27 Oct 13 11:09 run.sh
+---x------ 1 lab lab 27 Oct 13 11:43 run.sh
 $ ./run.sh
 /bin/bash: ./run.sh: Permission denied
 $ sudo ./run.sh
@@ -230,7 +230,7 @@ root のシェル（<code>sudo bash -c</code>）から打つと、カーネル�
 <p>ディレクトリの x は、root にとっては壁にならない。</p>
 <pre><code>$ chmod 000 box
 $ ls -ld box
-d--------- 2 lab lab 4096 Oct 13 11:09 box
+d--------- 2 lab lab 4096 Oct 13 11:43 box
 $ ls box
 ls: cannot open directory 'box': Permission denied
 $ sudo ls box
@@ -244,7 +244,7 @@ $ chmod 755 box</code></pre>
 <br>ただし<b>崩れる点</b>: 管理人でも、「実行してよい」と誰も印を付けていない書類を手順書として扱うことはしない。
 合鍵は扉を開けるだけで、ファイルの性質（実行できるものかどうか）までは変えない。</div>
 <div class="quiz"><b>確認</b>
-<p><code>ls -l</code> の出力が <code>crw-rw-rw- 1 root root 1, 3 Oct 13 11:09 /dev/null</code> だった。
+<p><code>ls -l</code> の出力が <code>crw-rw-rw- 1 root root 1, 3 Oct 13 11:43 /dev/null</code> だった。
 このファイルの種類は何か。また <code>1, 3</code> は何を表すか。</p>
 <details><summary>答え</summary>
 <p>キャラクタデバイス（スペシャルファイル）。<code>1, 3</code> は大きさではなく、メジャー番号とマイナー番号で、
@@ -271,7 +271,7 @@ x が1つでもあれば、root は r が無くても実行できる。</p></det
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>ls -l</code> の先頭10文字は「種類1文字 ＋ 所有者・グループ・その他の rwx」</li><li>種類: <code>-</code> 通常 / <code>d</code> ディレクトリ / <code>l</code> シンボリックリンク / <code>c</code> キャラクタデバイス / <code>b</code> ブロックデバイス / <code>p</code> 名前付きパイプ / <code>s</code> ソケット</li><li>ディレクトリの中身は「名前 → 実体の番号」の表。r は表を読む、x は表を引いて先へ進む、w は表を書き換える</li><li>r だけのディレクトリでは名前しか見えず、<code>ls -l</code> の残りは <code>?</code> になる。権限も大きさも名前の先（inode）にあるから</li><li>3つの欄のうち使われるのは1つだけ（所有者 → グループ → その他の順に、最初に当てはまった欄）</li><li>ファイルを消せるかどうかはディレクトリの w と x が決める。ファイル自身の w ではない</li><li>root は r・w とディレクトリの x を無視するが、x が1つも無い通常ファイルは実行しない</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-files/theory/">← 理論編 目次</a><a href="/linuc-files/theory/02-umask">次: 2. umask は引き算ではなく、ビットを落とす印 →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

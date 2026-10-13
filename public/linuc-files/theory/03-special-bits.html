@@ -34,7 +34,7 @@ $ ls -l /usr/bin/passwd /etc/shadow
 $ sudo chown root:root whoami.sh
 $ sudo chmod 4755 whoami.sh
 $ ls -l whoami.sh
--rwsr-xr-x 1 root root 19 Oct 13 11:09 whoami.sh
+-rwsr-xr-x 1 root root 19 Oct 13 11:43 whoami.sh
 $ ./whoami.sh
 lab</code></pre>
 <div class="then"><b>だめな理由</b>: 表示は <code>passwd</code> と同じ <code>-rwsr-xr-x root root</code> なのに、名乗ったのは lab だった。
@@ -45,7 +45,7 @@ SUID が効くのは、カーネルが直接実行する機械語のプログラ
 <pre><code>$ sudo cp /usr/bin/id ./myid
 $ sudo chmod 4755 myid
 $ ls -l myid
--rwsr-xr-x 1 root root 39432 Oct 13 11:09 myid
+-rwsr-xr-x 1 root root 39432 Oct 13 11:43 myid
 $ ./myid
 uid=1000(lab) gid=1000(lab) euid=0(root) groups=1000(lab)
 $ id
@@ -64,23 +64,23 @@ myid:      setuid ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynam
 <p>特殊なビットは3つあり、<code>chmod</code> の数値では先頭にもう1桁足して書く。表示は x の位置に重ねて出る。</p>
 <pre><code>$ touch s.txt
 $ chmod 4755 s.txt; ls -l s.txt
--rwsr-xr-x 1 lab lab 0 Oct 13 11:09 s.txt
+-rwsr-xr-x 1 lab lab 0 Oct 13 11:43 s.txt
 $ chmod 4644 s.txt; ls -l s.txt
--rwSr--r-- 1 lab lab 0 Oct 13 11:09 s.txt
+-rwSr--r-- 1 lab lab 0 Oct 13 11:43 s.txt
 $ chmod 2755 s.txt; ls -l s.txt
--rwxr-sr-x 1 lab lab 0 Oct 13 11:09 s.txt
+-rwxr-sr-x 1 lab lab 0 Oct 13 11:43 s.txt
 $ chmod 2644 s.txt; ls -l s.txt
--rw-r-Sr-- 1 lab lab 0 Oct 13 11:09 s.txt
+-rw-r-Sr-- 1 lab lab 0 Oct 13 11:43 s.txt
 $ mkdir t
 $ chmod 1777 t; ls -ld t
-drwxrwxrwt 2 lab lab 4096 Oct 13 11:09 t
+drwxrwxrwt 2 lab lab 4096 Oct 13 11:43 t
 $ chmod 1770 t; ls -ld t
-drwxrwx--T 2 lab lab 4096 Oct 13 11:09 t</code></pre>
+drwxrwx--T 2 lab lab 4096 Oct 13 11:43 t</code></pre>
 <p>小文字は「印 ＋ x あり」、大文字は「印はあるが x が無い」である。<b>ファイル</b>の <code>-rwSr--r--</code> は、印は付いているのに実行できないので、SUID が働く場面が無い。一方、<b>ディレクトリ</b>の <code>S</code>（SGID）と <code>T</code>（スティッキービット）は、x が無くても効く。演習03 の模範解答 <code>drwxrws--T</code> では、<code>T</code> のおかげで bob は alice のファイルを消せなかった（判定の記録）。記号でも付けられる。</p>
 <pre><code>$ chmod 755 s.txt; chmod u+s s.txt; ls -l s.txt
--rwsr-xr-x 1 lab lab 0 Oct 13 11:09 s.txt
+-rwsr-xr-x 1 lab lab 0 Oct 13 11:43 s.txt
 $ chmod g+s,o+t t; ls -ld t
-drwxrws--T 2 lab lab 4096 Oct 13 11:09 t
+drwxrws--T 2 lab lab 4096 Oct 13 11:43 t
 $ stat -c "%a %A %n" s.txt t
 4755 -rwsr-xr-x s.txt
 3770 drwxrws--T t</code></pre>
@@ -95,10 +95,10 @@ $ stat -c "%a %A %n" s.txt t
 <h2 id="sticky">/tmp のスティッキービット — 誰が消せるか</h2>
 <div class="sgoal"><b>この節で分かること</b>: 誰でも書けるディレクトリで、他人のファイルが消えない仕組み。</div>
 <pre><code>$ ls -ld /tmp
-drwxrwxrwt 1 root root 4096 Oct 13 11:09 /tmp
+drwxrwxrwt 1 root root 4096 Oct 13 11:43 /tmp
 $ sudo -u alice touch /tmp/alice.txt
 $ ls -l /tmp/alice.txt
--rw-rw-r-- 1 alice alice 0 Oct 13 11:09 /tmp/alice.txt
+-rw-rw-r-- 1 alice alice 0 Oct 13 11:43 /tmp/alice.txt
 $ sudo -u bob rm -f /tmp/alice.txt
 rm: cannot remove '/tmp/alice.txt': Operation not permitted
 $ rm -f /tmp/alice.txt
@@ -109,14 +109,14 @@ ls: cannot access '/tmp/alice.txt': No such file or directory</code></pre>
 <p><code>/tmp</code> は <code>rwxrwxrwt</code> で、誰でも名前を作れる。第1章の規則なら、w を持つ全員が他人の名前も消せるはずだが、bob も lab も <code>-f</code>（確認を聞かない）を付けて断られた。最後の <code>t</code> が<b>スティッキービット</b>で、「消す・名前を変える」をファイルの持ち主（とディレクトリの持ち主・root）だけに絞る。root は消せた。</p>
 <div class="analogy"><b>たとえ</b>: 誰でも貼れる共用の掲示板に近い。
 貼るのは自由だが、はがせるのは貼った本人と掲示板の管理者だけ、という決まりが付いている。
-<br>ただし<b>崩れる点</b>: 掲示板の決まりは「はがす」だけを縛るが、スティッキービットは「名前を変える」も縛る。
-一方で、他人のファイルの<b>中身</b>を書き換えられるかどうかは、そのファイル自身の権限が決める（この印は関係しない）。</div>
+<br>ただし<b>崩れる点</b>: 掲示板の決まりは「はがす」だけを縛るが、スティッキービットは「名前を変える」も縛る。</div>
+<p>スティッキービットが縛るのは「消す」と「名前を変える」で、試験はこれで答える。他人のファイルの<b>中身</b>を書き換えられるかは、基本的にはそのファイル自身の権限で決まる。ただし Linux には <code>fs.protected_regular</code> という保護もあり、有効だと <code>/tmp</code> のような誰でも書けるスティッキーなディレクトリでは、他人のファイルへの <code>&gt;</code> や <code>&gt;&gt;</code> が、ファイルが <code>rw-rw-rw-</code> でも <code>Permission denied</code> になる。値はコンテナを動かしているホストの設定で決まり（<code>cat /proc/sys/fs/protected_regular</code>）、この檻を記録したホストでは 1、Ubuntu 24.04 の実機の既定は 2 である（2 ではグループで書けるスティッキーなディレクトリにも及ぶ）。</p>
 
 <h2 id="owner">chown と chgrp — 所有者を変えられるのは root だけ</h2>
 <div class="sgoal"><b>この節で分かること</b>: 一般ユーザが所有者とグループをどこまで変えられるか。</div>
 <pre><code>$ touch g.txt
 $ ls -l g.txt
--rw-r--r-- 1 lab lab 0 Oct 13 11:09 g.txt
+-rw-r--r-- 1 lab lab 0 Oct 13 11:43 g.txt
 $ chgrp devs g.txt
 chgrp: changing group of 'g.txt': Operation not permitted
 $ chown alice g.txt
@@ -125,20 +125,20 @@ $ chgrp lab g.txt; echo "exit=$?"
 exit=0</code></pre>
 <p>自分のファイルでも、所有者を他人に変えることはできない。<code>chgrp</code> は、<b>自分が属しているグループ</b>へなら変えられる（lab は devs に入っていない）。他人に押し付けたり、入っていないグループの名義を名乗ったりできないようにしているのである。root はどちらもできる。</p>
 <pre><code>$ sudo chgrp devs g.txt; ls -l g.txt
--rw-r--r-- 1 lab devs 0 Oct 13 11:09 g.txt
+-rw-r--r-- 1 lab devs 0 Oct 13 11:43 g.txt
 $ sudo chown alice:devs g.txt; ls -l g.txt
--rw-r--r-- 1 alice devs 0 Oct 13 11:09 g.txt
+-rw-r--r-- 1 alice devs 0 Oct 13 11:43 g.txt
 $ sudo chown bob g.txt; ls -l g.txt
--rw-r--r-- 1 bob devs 0 Oct 13 11:09 g.txt
+-rw-r--r-- 1 bob devs 0 Oct 13 11:43 g.txt
 $ sudo chown :lab g.txt; ls -l g.txt
--rw-r--r-- 1 bob lab 0 Oct 13 11:09 g.txt
+-rw-r--r-- 1 bob lab 0 Oct 13 11:43 g.txt
 $ sudo chown carol: g.txt; ls -l g.txt
--rw-r--r-- 1 carol carol 0 Oct 13 11:09 g.txt
+-rw-r--r-- 1 carol carol 0 Oct 13 11:43 g.txt
 $ sudo chown bob:lab g.txt; ls -l g.txt
--rw-r--r-- 1 bob lab 0 Oct 13 11:09 g.txt
+-rw-r--r-- 1 bob lab 0 Oct 13 11:43 g.txt
 $ sudo chown carol. g.txt; ls -l g.txt
 chown: warning: '.' should be ':': ‘carol.’
--rw-r--r-- 1 carol carol 0 Oct 13 11:09 g.txt</code></pre>
+-rw-r--r-- 1 carol carol 0 Oct 13 11:43 g.txt</code></pre>
 <div class="scroll"><table>
 <tr><th>書き方</th><th>変わるもの</th></tr>
 <tr><td><code>chown alice file</code></td><td>所有者だけ</td></tr>
@@ -157,16 +157,16 @@ $ sudo mkdir /srv/team
 $ sudo chgrp devs /srv/team
 $ sudo chmod 2775 /srv/team
 $ ls -ld /srv/team
-drwxrwsr-x 2 root devs 4096 Oct 13 11:09 /srv/team
+drwxrwsr-x 2 root devs 4096 Oct 13 11:43 /srv/team
 $ sudo -u alice touch /srv/team/plan.txt
 $ sudo -u alice mkdir /srv/team/docs
 $ ls -l /srv/team
 total 4
-drwxrwsr-x 2 alice devs 4096 Oct 13 11:09 docs
--rw-rw-r-- 1 alice devs    0 Oct 13 11:09 plan.txt
+drwxrwsr-x 2 alice devs 4096 Oct 13 11:43 docs
+-rw-rw-r-- 1 alice devs    0 Oct 13 11:43 plan.txt
 $ sudo -u alice touch /tmp/plan.txt
 $ ls -l /tmp/plan.txt
--rw-rw-r-- 1 alice alice 0 Oct 13 11:09 /tmp/plan.txt</code></pre>
+-rw-rw-r-- 1 alice alice 0 Oct 13 11:43 /tmp/plan.txt</code></pre>
 <p>同じ alice が作ったのに、<code>/srv/team</code> の中ではグループが <code>devs</code>、<code>/tmp</code> では <code>alice</code> になった。SGID の付いたディレクトリの中で作ったものは、作った人の主グループではなく、<b>ディレクトリのグループ</b>を受け継ぐ。中に作ったディレクトリ <code>docs</code> にも <code>s</code> が付いて、印そのものも下へ受け継がれている。</p>
 <pre><code>$ sudo -u bob sh -c "echo bob も書ける &gt;&gt; /srv/team/plan.txt"
 $ cat /srv/team/plan.txt
@@ -174,8 +174,21 @@ bob も書ける
 $ sudo -u bob rm /srv/team/plan.txt
 $ ls -l /srv/team
 total 4
-drwxrwsr-x 2 alice devs 4096 Oct 13 11:09 docs</code></pre>
+drwxrwsr-x 2 alice devs 4096 Oct 13 11:43 docs</code></pre>
 <p>グループが devs で、権限が <code>rw-rw-r--</code> なので、bob は alice のファイルに書き足せた。ところが bob は alice のファイルを<b>消せてしまった</b>。ディレクトリにグループの w があるからである（第1章）。共有ディレクトリで「仲間は書けるが、他人のファイルは消せない」にするには、<code>/tmp</code> の節で見たスティッキービットも要る。</p>
+<p>やり直しで権限を数値で付け直すときに、1つ落とし穴がある。</p>
+<pre><code>$ mkdir sg
+$ chmod 2775 sg; ls -ld sg
+drwxrwsr-x 2 lab lab 4096 Oct 13 11:43 sg
+$ chmod 755 sg; ls -ld sg
+drwxr-sr-x 2 lab lab 4096 Oct 13 11:43 sg
+$ stat -c "%a %n" sg
+2755 sg
+$ chmod 00755 sg; ls -ld sg
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 sg
+$ chmod 2775 sg; chmod g-s sg; ls -ld sg
+drwxrwxr-x 2 lab lab 4096 Oct 13 11:43 sg</code></pre>
+<p><code>chmod 755</code> と数値で書いたのに、<code>s</code> は残った（2755）。GNU の <code>chmod</code> は、<b>ディレクトリ</b>の SUID と SGID を、3桁の数値の指定では外さない（<code>man chmod</code>）。共有ディレクトリの印をうっかり消さないための作りである。外すには <code>g-s</code> のように記号で書くか、<code>00755</code> のように 0 を2つ付けた数値で書く（<code>=755</code> でもよい）。通常ファイルにはこの例外は無い。</p>
 <div class="analogy"><b>たとえ</b>: 部署の共有キャビネットに入れた書類が、自動で部署の持ち物として登録される仕組みに近い。
 誰が入れても「総務部」の札が付くので、部署の全員が手に取れる。
 <br>ただし<b>崩れる点</b>: 札（グループ）は自動で付くが、書き込めるかどうかは入れた人の umask が決める。
@@ -213,7 +226,7 @@ d. <code>chmod</code> でパーミッションを変える</p>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>SUID（4・<code>u+s</code>）は所有者として、SGID（2・<code>g+s</code>）はグループとして動かす印。<code>/usr/bin/passwd</code> は <code>-rwsr-xr-x</code></li><li>Linux はスクリプトの SUID を無視する。効くのは機械語のプログラムだけ（実測: スクリプトは lab、<code>id</code> の複製は <code>euid=0(root)</code>）</li><li>スティッキービット（1・<code>o+t</code>）を付けたディレクトリでは、消せるのは持ち主・ディレクトリの持ち主・root だけ。<code>/tmp</code> は <code>drwxrwxrwt</code></li><li>小文字 <code>s</code> <code>t</code> は x あり、大文字 <code>S</code> <code>T</code> は x なし</li><li>SGID のディレクトリの中で作ったものは、ディレクトリのグループを受け継ぐ</li><li>所有者を変えられるのは root だけ。一般ユーザの <code>chgrp</code> は、自分が属するグループへだけ</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-files/theory/02-umask">← 2. umask は引き算ではなく、ビットを落とす印</a><a href="/linuc-files/theory/04-cp-mv-rm">次: 4. コピーは中身を作り直し、移動は名前を書き換える →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

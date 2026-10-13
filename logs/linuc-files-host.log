@@ -2,15 +2,15 @@
 $ docker version --format '{{.Server.Version}}'
 29.8.0
 
-$ docker run --rm --hostname linuc lab-linuc-files:1.0.0 bash -lc 'umask; touch /tmp/x; ls -l /tmp/x'
+$ docker run --rm --hostname linuc lab-linuc-files:1.0.1 bash -lc 'umask; touch /tmp/x; ls -l /tmp/x'
 0022
--rw-r--r-- 1 lab lab 0 Oct 13 10:32 /tmp/x
+-rw-r--r-- 1 lab lab 0 Oct 13 11:43 /tmp/x
 
-$ docker run -d --name linuc-files-host --hostname linuc lab-linuc-files:1.0.0 sleep infinity >/dev/null
+$ docker run -d --name linuc-files-host --hostname linuc lab-linuc-files:1.0.1 sleep infinity >/dev/null
 
 $ docker exec linuc-files-host bash -lc 'umask; touch /tmp/x; ls -l /tmp/x'
 0000
--rw-rw-rw- 1 lab lab 0 Oct 13 10:32 /tmp/x
+-rw-rw-rw- 1 lab lab 0 Oct 13 11:43 /tmp/x
 
 $ docker exec -u lab linuc-files-host bash -c umask
 0000

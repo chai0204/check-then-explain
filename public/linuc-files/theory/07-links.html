@@ -26,9 +26,9 @@ $ echo "第1版" &gt; memo.txt
 $ ln memo.txt hard.txt
 $ ln -s memo.txt soft.txt
 $ ls -li memo.txt hard.txt soft.txt
-18128118 -rw-r--r-- 2 lab lab 8 Oct 13 11:09 hard.txt
-18128118 -rw-r--r-- 2 lab lab 8 Oct 13 11:09 memo.txt
-18128120 lrwxrwxrwx 1 lab lab 8 Oct 13 11:09 soft.txt -&gt; memo.txt</code></pre>
+18128446 -rw-r--r-- 2 lab lab 8 Oct 13 11:43 hard.txt
+18128446 -rw-r--r-- 2 lab lab 8 Oct 13 11:43 memo.txt
+18128447 lrwxrwxrwx 1 lab lab 8 Oct 13 11:43 soft.txt -&gt; memo.txt</code></pre>
 <p><code>ls -i</code> の <code>-i</code> は、行頭に <b>inode</b> 番号を出す。第1章で「名前の先にある実体の番号」と呼んだものである。<code>memo.txt</code> と <code>hard.txt</code> は同じ番号を指していて、3列目（<b>リンク数</b>）が 2 になっている。「この中身を指している名前が2つある」という意味である。番号そのものは環境ごとに違う値になる。2つが同じであることが要点である。</p>
 <pre><code>$ echo "追記" &gt;&gt; hard.txt
 $ cat memo.txt
@@ -40,8 +40,8 @@ $ cat memo.txt
 <code>hard.txt</code> も同じ中身を指していたのだから、一緒に読めなくなるはずだ。</p>
 <pre><code>$ rm memo.txt
 $ ls -li hard.txt soft.txt
-18128118 -rw-r--r-- 1 lab lab 15 Oct 13 11:09 hard.txt
-18128120 lrwxrwxrwx 1 lab lab  8 Oct 13 11:09 soft.txt -&gt; memo.txt
+18128446 -rw-r--r-- 1 lab lab 15 Oct 13 11:43 hard.txt
+18128447 lrwxrwxrwx 1 lab lab  8 Oct 13 11:43 soft.txt -&gt; memo.txt
 $ cat hard.txt
 第1版
 追記</code></pre>
@@ -65,23 +65,23 @@ soft.txt: broken symbolic link to memo.txt</code></pre>
 $ cat soft.txt
 新しい memo
 $ ls -li memo.txt hard.txt
-18128118 -rw-r--r-- 1 lab lab 15 Oct 13 11:09 hard.txt
-18128122 -rw-r--r-- 1 lab lab 15 Oct 13 11:09 memo.txt</code></pre>
-<p><code>soft.txt</code> は新しい <code>memo.txt</code> を読むようになった。道順は名前で書かれているので、その名前に何があるかしか見ない。一方 <code>hard.txt</code> は古い中身（番号 18128118）を指したままで、新しい <code>memo.txt</code> とは別のファイルである。</p>
+18128446 -rw-r--r-- 1 lab lab 15 Oct 13 11:43 hard.txt
+18128448 -rw-r--r-- 1 lab lab 15 Oct 13 11:43 memo.txt</code></pre>
+<p><code>soft.txt</code> は新しい <code>memo.txt</code> を読むようになった。道順は名前で書かれているので、その名前に何があるかしか見ない。一方 <code>hard.txt</code> は古い中身（番号 18128446）を指したままで、新しい <code>memo.txt</code> とは別のファイルである。</p>
 <pre><code>$ ls -F
 hard.txt  memo.txt  soft.txt@
 $ ls -i hard.txt
-18128118 hard.txt</code></pre>
+18128446 hard.txt</code></pre>
 <p><code>ls -F</code> は名前の後ろに種類の印を付ける。<code>@</code> はシンボリックリンク、<code>/</code> はディレクトリ、<code>*</code> は実行できるファイルである。ハードリンクには印が付かない。普通のファイルと見分けが付かないのが、ハードリンクの性質そのものである（見分けるにはリンク数か inode 番号を見る）。</p>
 <p>シンボリックリンクの権限は、いつも <code>lrwxrwxrwx</code> と表示される。</p>
 <pre><code>$ touch target; chmod 600 target; ln -s target lnk
 $ ls -l target lnk
-lrwxrwxrwx 1 lab lab 6 Oct 13 11:09 lnk -&gt; target
--rw------- 1 lab lab 0 Oct 13 11:09 target
+lrwxrwxrwx 1 lab lab 6 Oct 13 11:43 lnk -&gt; target
+-rw------- 1 lab lab 0 Oct 13 11:43 target
 $ chmod 644 lnk
 $ ls -l target lnk
-lrwxrwxrwx 1 lab lab 6 Oct 13 11:09 lnk -&gt; target
--rw-r--r-- 1 lab lab 0 Oct 13 11:09 target</code></pre>
+lrwxrwxrwx 1 lab lab 6 Oct 13 11:43 lnk -&gt; target
+-rw-r--r-- 1 lab lab 0 Oct 13 11:43 target</code></pre>
 <p>リンクに <code>chmod</code> をかけたのに、変わったのは行き先の <code>target</code> だった。リンク自身の権限は使われず、読み書きできるかどうかは行き先の権限で決まる。<code>lrwxrwxrwx</code> は「誰でも読み書きできる」という意味ではない。</p>
 <div class="analogy"><b>たとえ</b>: 「この書類は 3階の B 棚へ」と書いた案内の付箋に近い。
 付箋そのものは書類ではなく、行き方が書いてあるだけ。書類が別の棚へ移されると、付箋は嘘になる。
@@ -95,13 +95,13 @@ $ ln d dlink
 ln: d: hard link not allowed for directory
 $ ln -s d dsoft
 $ ls -ld d dsoft
-drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 d
-lrwxrwxrwx 1 lab lab    1 Oct 13 11:09 dsoft -&gt; d
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 d
+lrwxrwxrwx 1 lab lab    1 Oct 13 11:43 dsoft -&gt; d
 $ ln ~/.bashrc bashrc-link
 ln: failed to create hard link 'bashrc-link' =&gt; '/home/lab/.bashrc': Invalid cross-device link
 $ ln -s ~/.bashrc bashrc-link
 $ ls -l bashrc-link
-lrwxrwxrwx 1 lab lab 17 Oct 13 11:09 bashrc-link -&gt; /home/lab/.bashrc
+lrwxrwxrwx 1 lab lab 17 Oct 13 11:43 bashrc-link -&gt; /home/lab/.bashrc
 $ df --output=target ~/work/ch7 ~/.bashrc
 Mounted on
 /home/lab/work
@@ -134,7 +134,7 @@ $ stat -c "%h %n" d
 <pre><code>$ mkdir sub
 $ ln -s memo.txt sub/bad
 $ ls -l sub/bad
-lrwxrwxrwx 1 lab lab 8 Oct 13 11:09 sub/bad -&gt; memo.txt
+lrwxrwxrwx 1 lab lab 8 Oct 13 11:43 sub/bad -&gt; memo.txt
 $ cat sub/bad
 cat: sub/bad: No such file or directory
 $ ln -s ../memo.txt sub/good
@@ -142,7 +142,7 @@ $ cat sub/good
 新しい memo
 $ ln -sr memo.txt sub/auto
 $ ls -l sub/auto
-lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 sub/auto -&gt; ../memo.txt</code></pre>
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:43 sub/auto -&gt; ../memo.txt</code></pre>
 <p><code>ln -s memo.txt sub/bad</code> は、<code>sub/bad</code> に「memo.txt」という文字をそのまま書く。たどるときの起点は<b>リンクが置かれた場所</b>（<code>sub/</code>）なので、<code>sub/memo.txt</code> を探して見つからない。打ったときにいた場所（<code>~/work/ch7</code>）ではない。<code>../memo.txt</code> と書くか、<code>-r</code> を付けて <code>ln</code> に<b>相対パス</b>を計算させる。<b>絶対パス</b>（<code>/home/lab/...</code>）で書けば起点の問題は無くなるが、ディレクトリごと移したときに壊れる。</p>
 
 <h2 id="version">バージョン管理 — current を付け替える</h2>
@@ -155,16 +155,16 @@ $ cat current/VERSION
 $ ln -sf releases/v2 current; echo "exit=$?"
 exit=0
 $ ls -l current
-lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 current -&gt; releases/v1
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:43 current -&gt; releases/v1
 $ ls -l releases/v1
 total 4
--rw-r--r-- 1 lab lab  4 Oct 13 11:09 VERSION
-lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 v2 -&gt; releases/v2</code></pre>
+-rw-r--r-- 1 lab lab  4 Oct 13 11:43 VERSION
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:43 v2 -&gt; releases/v2</code></pre>
 <p><code>-f</code>（あれば消してから作る）を付けたのに、<code>current</code> は v1 のままで、<code>releases/v1</code> の中に <code>v2</code> というリンクができていた。終了コードは 0 である。<code>ln</code> は最後の引数がディレクトリなら「その中に作れ」と解釈し（<code>cp</code> と同じ規則）、<code>current</code> はディレクトリを指すリンクなので、たどった先のディレクトリとして扱われた。リンクそのものとして扱わせるのが <code>-n</code> である。</p>
 <pre><code>$ rm releases/v1/v2
 $ ln -sfn releases/v2 current
 $ ls -l current
-lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 current -&gt; releases/v2
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:43 current -&gt; releases/v2
 $ cat current/VERSION
 2.0</code></pre>
 <p>システムの中も、この仕組みであふれている。</p>
@@ -180,7 +180,7 @@ lrwxrwxrwx 1 root root 18 Aug 25 07:13 /etc/alternatives/vi -&gt; /usr/bin/vim.b
 lrwxrwxrwx 1 root root 20 Aug 25 07:13 /usr/bin/vi -&gt; /etc/alternatives/vi
 $ readlink -f /usr/bin/vi
 /usr/bin/vim.basic</code></pre>
-<p><code>/bin</code> は <code>usr/bin</code> へのシンボリックリンクで、<code>/bin/ls</code> と <code>/usr/bin/ls</code> は同じ1つのファイルである（リンク数は 1。ハードリンクではなく、道が2本あるだけ）。<code>vi</code> は <code>/etc/alternatives/vi</code> を経由する2段のリンクで、真ん中の1本を付け替えると、<code>vi</code> と打ったときに動くエディタが変わる。Debian 系の alternatives という仕組みで、<code>current</code> と同じ考え方である。</p>
+<p><code>/bin</code> は <code>usr/bin</code> へのシンボリックリンクで、<code>/bin/ls</code> と <code>/usr/bin/ls</code> は同じ1つのファイルである（リンク数は 1。ハードリンクではなく、道が2本あるだけ）。<code>vi</code> は <code>/etc/alternatives/vi</code> を経由する2段のリンクで、真ん中の1本を付け替えると、<code>vi</code> と打ったときに動くエディタが変わる。alternatives という仕組みで（Debian 系は <code>update-alternatives</code>、Red Hat 系は <code>alternatives</code> というコマンドで管理し、どちらも <code>/etc/alternatives</code> を使う）、<code>current</code> と同じ考え方である。</p>
 <pre><code>$ ls -li /usr/bin/gunzip /usr/bin/uncompress
 1859225 -rwxr-xr-x 2 root root 2346 Jul  3 20:53 /usr/bin/gunzip
 1859225 -rwxr-xr-x 2 root root 2346 Jul  3 20:53 /usr/bin/uncompress
@@ -232,7 +232,7 @@ d. ディレクトリに対しては作成できない</p>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>ハードリンク（<code>ln</code>）は同じ inode へのもう1つの名前。リンク数が増え、どの名前も対等</li><li><code>rm</code> は名前を1つ外すだけ。中身はリンク数が 0 になったときに片づけられる</li><li>シンボリックリンク（<code>ln -s</code>）は道順を中身に持つ別のファイル。元が消えると壊れ、<code>ls -F</code> では <code>@</code>、<code>ls -l</code> では <code>lrwxrwxrwx ... -&gt;</code></li><li>ハードリンクはディレクトリと別のファイルシステムには作れない。シンボリックリンクは作れる</li><li>相対パスのリンクは、リンクの置き場所から読まれる（<code>ln -sr</code> で計算させられる）</li><li>版の切り替えは <code>ln -sfn 新しい版 current</code>。<code>-n</code> が無いと、古い版の中にリンクができる</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-files/theory/06-tar">← 6. tar は束ねるだけで、縮めるのは別のプログラム</a><a href="/linuc-files/theory/08-locate">次: 8. locate が探すのは、索引を作った時点の写真 →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

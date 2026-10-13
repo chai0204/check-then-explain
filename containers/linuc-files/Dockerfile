@@ -42,8 +42,8 @@ RUN updatedb
 LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-explain
 LABEL org.opencontainers.image.description="LinuC 主題1.02（ファイル・ディレクトリの操作と管理）を手で確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
-ENV LAB_THEME=linuc-files LAB_VERSION=1.0.0 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:files-1.0.0
+ENV LAB_THEME=linuc-files LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:files-1.0.1
 USER lab
 WORKDIR /home/lab
 CMD ["/bin/bash", "-l"]

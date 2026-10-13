@@ -27,12 +27,12 @@ $ touch -d "36 hours ago" logs/yesterday.log
 $ touch -d "60 hours ago" logs/twodays.log
 $ touch -d "10 days ago" logs/old/ancient.log
 $ date "+%F %H:%M"
-2026-10-13 11:09
+2026-10-13 11:43
 $ ls -l --time-style=long-iso logs/*.log logs/old/*.log
--rw-r--r-- 1 lab lab 0 2026-10-03 11:09 logs/old/ancient.log
--rw-r--r-- 1 lab lab 0 2026-10-13 11:09 logs/today.log
--rw-r--r-- 1 lab lab 0 2026-10-10 23:09 logs/twodays.log
--rw-r--r-- 1 lab lab 0 2026-10-11 23:09 logs/yesterday.log</code></pre>
+-rw-r--r-- 1 lab lab 0 2026-10-03 11:43 logs/old/ancient.log
+-rw-r--r-- 1 lab lab 0 2026-10-13 11:43 logs/today.log
+-rw-r--r-- 1 lab lab 0 2026-10-10 23:43 logs/twodays.log
+-rw-r--r-- 1 lab lab 0 2026-10-11 23:43 logs/yesterday.log</code></pre>
 <p><code>find</code> は「どこから」の後に「どんな条件で」を並べる。条件を並べると「かつ」になる。</p>
 <pre><code>$ find logs -name "*.log" | sort
 logs/old/ancient.log
@@ -120,10 +120,10 @@ find . -name second.txt top.txt</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: <code>-size -1k</code> が何に当たるか。</div>
 <pre><code>$ head -c 1 /dev/zero &gt; one.bin; head -c 1024 /dev/zero &gt; k1.bin; head -c 1025 /dev/zero &gt; k1plus.bin; : &gt; empty.bin
 $ ls -l *.bin
--rw-r--r-- 1 lab lab    0 Oct 13 11:09 empty.bin
--rw-r--r-- 1 lab lab 1024 Oct 13 11:09 k1.bin
--rw-r--r-- 1 lab lab 1025 Oct 13 11:09 k1plus.bin
--rw-r--r-- 1 lab lab    1 Oct 13 11:09 one.bin
+-rw-r--r-- 1 lab lab    0 Oct 13 11:43 empty.bin
+-rw-r--r-- 1 lab lab 1024 Oct 13 11:43 k1.bin
+-rw-r--r-- 1 lab lab 1025 Oct 13 11:43 k1plus.bin
+-rw-r--r-- 1 lab lab    1 Oct 13 11:43 one.bin
 $ find . -name "*.bin" -size -1k
 ./empty.bin
 $ find . -name "*.bin" -size 1k | sort
@@ -204,8 +204,8 @@ $ find logs -type f -exec echo {} + | wc -l
 1</code></pre>
 <p><code>\;</code> は<b>1件ごとに1回</b>コマンドを実行するので、<code>echo</code> は4回走って4行を出した。<code>+</code> は<b>まとめて1回</b>実行するので、4つの名前を並べた1行になった。<code>;</code> の前の <code>\</code> は、<code>;</code> をシェルの区切りとして読ませないためのものである。</p>
 <pre><code>$ find logs -name "*.log" -mtime +1 -exec ls -l --time-style=long-iso {} +
--rw-r--r-- 1 lab lab 0 2026-10-03 11:09 logs/old/ancient.log
--rw-r--r-- 1 lab lab 0 2026-10-10 23:09 logs/twodays.log
+-rw-r--r-- 1 lab lab 0 2026-10-03 11:43 logs/old/ancient.log
+-rw-r--r-- 1 lab lab 0 2026-10-10 23:43 logs/twodays.log
 $ find logs -name "*.log" -mtime +1 -delete
 $ find logs -type f | sort
 logs/today.log
@@ -224,7 +224,8 @@ logs/yesterday.log</code></pre>
 a. 更新から7日以内のもの　b. ちょうど7日前に更新したもの　c. 更新から8日以上たったもの　d. 更新から7日以上たったもの</p>
 <details><summary>答え</summary>
 <p>c。経過時間を24時間で割って切り捨てた日数が 7 より大きいもの、つまり 8 以上。
-実測でも、36時間前のファイルは <code>-mtime +1</code> に入らず <code>-mtime 1</code> に入った。</p></details></div>
+実測でも、36時間前のファイルは <code>-mtime +1</code> に入らず <code>-mtime 1</code> に入った。
+ただし試験の選択肢や解説は、これを「7日以上前」「7日より前」と緩く書くことがある。その書き方で問われたら <code>+7</code> を選ぶ（厳密には8日以上）。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p><code>find . -name "*.tmp" -exec rm {} \;</code> の <code>{}</code> と <code>\;</code> は、それぞれ何を表すか。</p>
 <details><summary>答え</summary>
@@ -233,12 +234,12 @@ a. 更新から7日以内のもの　b. ちょうど7日前に更新したもの
 <div class="quiz"><b>確認</b>
 <p>1MB（<code>find</code> の単位では 1MiB）を超えるファイルを探す条件と、空のファイルを探す条件を書け。</p>
 <details><summary>答え</summary>
-<p><code>-size +1M</code> と <code>-empty</code>（または <code>-size 0</code>）。<code>+1M</code> は 1048576 バイトを超えるもの。<code>-size -1M</code> は「1MiB 未満」に見えるが、
+<p><code>-size +1M</code> と <code>-type f -empty</code>（または <code>-type f -size 0</code>）。<code>-empty</code> だけだと、空のディレクトリにも当たる。<code>+1M</code> は 1048576 バイトを超えるもの。<code>-size -1M</code> は「1MiB 未満」に見えるが、
 MiB 単位に切り上げると 1 未満は 0 だけなので、空のファイルにしか当たらない（実測）。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>find 場所 条件…</code>。条件を並べると「かつ」、<code>!</code> で否定、<code>-o</code> で「または」</li><li>結果はディレクトリの表の順に出る。名前順が欲しければ <code>| sort</code></li><li><code>-mtime</code> は24時間単位に切り捨て。<code>+1</code> は48時間以上前、<code>1</code> は24〜48時間前、<code>-1</code> は24時間以内</li><li><code>-size</code> は単位に切り上げ。<code>-size -1k</code> は空のファイルだけ。正確には <code>c</code>（バイト）で</li><li><code>-perm 600</code> はちょうど、<code>-perm -4000</code> は全部、<code>-perm /111</code> はどれか</li><li>パターンは必ず引用符で囲む。囲まないとシェルがカレントの名前で広げ、黙って少なく返すことがある</li><li><code>-exec cmd {} \;</code> は1件ずつ、<code>-exec cmd {} +</code> はまとめて。消すのは一覧で確かめてから</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-files/theory/04-cp-mv-rm">← 4. コピーは中身を作り直し、移動は名前を書き換える</a><a href="/linuc-files/theory/06-tar">次: 6. tar は束ねるだけで、縮めるのは別のプログラム →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

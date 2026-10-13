@@ -34,7 +34,7 @@ exit=2
 ########## B. 演習01 — 一覧は見せずに、1つのファイルだけ読ませる ##########
 
 $ lab start 01 >/dev/null; echo "alice へ: 鍵は2番の棚" > ~/work/01/memo.txt; ls -l ~/work/01/memo.txt
--rw-r--r-- 1 lab lab 28 Oct 13 11:09 /home/lab/work/01/memo.txt
+-rw-r--r-- 1 lab lab 28 Oct 13 11:43 /home/lab/work/01/memo.txt
 
 $ sudo -u alice cat /home/lab/work/01/memo.txt; echo "exit=$?"
 cat: /home/lab/work/01/memo.txt: Permission denied
@@ -42,8 +42,8 @@ exit=1
 
 $ ls -ld /home/lab /home/lab/work /home/lab/work/01
 drwxr-x--- 1 lab lab 4096 Sep 30 19:32 /home/lab
-drwxr-xr-x 4 lab lab 4096 Oct 13 11:09 /home/lab/work
-drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 /home/lab/work/01
+drwxr-xr-x 4 lab lab 4096 Oct 13 11:43 /home/lab/work
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 /home/lab/work/01
 
 $ lab check 01; echo "exit=$?"
 ✗ 01 未達
@@ -88,7 +88,7 @@ $ echo "--- 模範解答: その他に x だけ渡す ---"
 
 $ chmod 750 ~; chmod o+x ~; chmod o-r ~/work/01; ls -ld /home/lab /home/lab/work/01
 drwxr-x--x 1 lab lab 4096 Sep 30 19:32 /home/lab
-drwxr-x--x 2 lab lab 4096 Oct 13 11:09 /home/lab/work/01
+drwxr-x--x 2 lab lab 4096 Oct 13 11:43 /home/lab/work/01
 
 $ sudo -u alice cat /home/lab/work/01/memo.txt; sudo -u alice ls /home/lab; sudo -u alice ls /home/lab/work/01
 alice へ: 鍵は2番の棚
@@ -115,8 +115,8 @@ exit=0
 
 $ lab start 02 >/dev/null; cd ~/work/02; umask; touch before.txt; mkdir before.d; ls -ld before.txt before.d
 0022
-drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 before.d
--rw-r--r-- 1 lab lab    0 Oct 13 11:09 before.txt
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 before.d
+-rw-r--r-- 1 lab lab    0 Oct 13 11:43 before.txt
 
 $ lab check 02; echo "exit=$?"
 ✗ 02 未達
@@ -134,8 +134,8 @@ $ echo "--- 誤答: いまのシェルでだけ umask を変える ---"
 --- 誤答: いまのシェルでだけ umask を変える ---
 
 $ umask 027; touch now.txt; mkdir now.d; ls -ld now.txt now.d
-drwxr-x--- 2 lab lab 4096 Oct 13 11:09 now.d
--rw-r----- 1 lab lab    0 Oct 13 11:09 now.txt
+drwxr-x--- 2 lab lab 4096 Oct 13 11:43 now.d
+-rw-r----- 1 lab lab    0 Oct 13 11:43 now.txt
 
 $ bash -lic "umask" 2>/dev/null | tail -1
 0027
@@ -201,7 +201,7 @@ $ echo "--- 誤答: SGID だけ付けて 2775 にする ---"
 --- 誤答: SGID だけ付けて 2775 にする ---
 
 $ sudo mkdir /srv/share; sudo chgrp devs /srv/share; sudo chmod 2775 /srv/share; ls -ld /srv/share
-drwxrwsr-x 2 root devs 4096 Oct 13 11:09 /srv/share
+drwxrwsr-x 2 root devs 4096 Oct 13 11:43 /srv/share
 
 $ lab check 03; echo "exit=$?"
 ✗ 03 未達
@@ -221,11 +221,11 @@ $ echo "--- 模範解答: SGID とスティッキービット、その他には�
 --- 模範解答: SGID とスティッキービット、その他には何も渡さない ---
 
 $ sudo chmod 3770 /srv/share; ls -ld /srv/share
-drwxrws--T 2 root devs 4096 Oct 13 11:09 /srv/share
+drwxrws--T 2 root devs 4096 Oct 13 11:43 /srv/share
 
 $ sudo -u alice touch /srv/share/a.txt; sudo ls -l /srv/share; sudo -u bob rm /srv/share/a.txt; sudo -u carol ls /srv/share
 total 0
--rw-rw-r-- 1 alice devs 0 Oct 13 11:09 a.txt
+-rw-rw-r-- 1 alice devs 0 Oct 13 11:43 a.txt
 rm: cannot remove '/srv/share/a.txt': Operation not permitted
 ls: cannot open directory '/srv/share': Permission denied
 
@@ -249,13 +249,13 @@ exit=0
 
 $ lab start 04 >/dev/null; cd ~/work/04; ls -la
 total 28
-drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 .
-drwxr-xr-x 5 lab lab 4096 Oct 13 11:09 ..
--rw-r--r-- 1 lab lab   21 Oct 13 11:09 .secret.conf
--rw-r--r-- 1 lab lab   26 Oct 13 11:09 app.conf
--rw-r--r-- 1 lab lab   24 Oct 13 11:09 app.conf.bak
--rw-r--r-- 1 lab lab   29 Oct 13 11:09 db.conf
--rw-r--r-- 1 lab lab   49 Oct 13 11:09 notes.txt
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 .
+drwxr-xr-x 5 lab lab 4096 Oct 13 11:43 ..
+-rw-r--r-- 1 lab lab   21 Oct 13 11:43 .secret.conf
+-rw-r--r-- 1 lab lab   26 Oct 13 11:43 app.conf
+-rw-r--r-- 1 lab lab   24 Oct 13 11:43 app.conf.bak
+-rw-r--r-- 1 lab lab   29 Oct 13 11:43 db.conf
+-rw-r--r-- 1 lab lab   49 Oct 13 11:43 notes.txt
 
 $ lab check 04; echo "exit=$?"
 ✗ 04 未達
@@ -272,18 +272,18 @@ app.conf db.conf
 
 $ mkdir backup; cp *.conf backup/; ls -la backup
 total 16
-drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 .
-drwxr-xr-x 3 lab lab 4096 Oct 13 11:09 ..
--rw-r--r-- 1 lab lab   26 Oct 13 11:09 app.conf
--rw-r--r-- 1 lab lab   29 Oct 13 11:09 db.conf
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 .
+drwxr-xr-x 3 lab lab 4096 Oct 13 11:43 ..
+-rw-r--r-- 1 lab lab   26 Oct 13 11:43 app.conf
+-rw-r--r-- 1 lab lab   29 Oct 13 11:43 db.conf
 
 $ lab check 04; echo "exit=$?"
 ✗ 04 未達
   判定 : 観測型（元のファイルと backup/ の同名ファイルの中身・更新時刻・権限を比べた）
   観測 : backup/ の中身 = app.conf db.conf
          → .secret.conf が backup/ に無い
-         → app.conf の更新時刻が違う（元 2026-10-13 11:09:14.063777972 / 写し 2026-10-13 11:09:14.089581049）
-         → db.conf の更新時刻が違う（元 2026-10-13 11:09:14.063823693 / 写し 2026-10-13 11:09:14.089606328）
+         → app.conf の更新時刻が違う（元 2026-10-13 11:43:06.656115432 / 写し 2026-10-13 11:43:06.690627571）
+         → db.conf の更新時刻が違う（元 2026-10-13 11:43:06.656165511 / 写し 2026-10-13 11:43:06.690656947）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 04
 exit=1
 
@@ -294,8 +294,8 @@ $ echo .*.conf
 .secret.conf
 
 $ cp -p *.conf .*.conf backup/; ls -la --time-style=full-iso app.conf backup/app.conf
--rw-r--r-- 1 lab lab 26 2026-10-13 11:09:14.063777972 +0900 app.conf
--rw-r--r-- 1 lab lab 26 2026-10-13 11:09:14.063777972 +0900 backup/app.conf
+-rw-r--r-- 1 lab lab 26 2026-10-13 11:43:06.656115432 +0900 app.conf
+-rw-r--r-- 1 lab lab 26 2026-10-13 11:43:06.656115432 +0900 backup/app.conf
 
 $ lab check 04; echo "exit=$?"
 ✔ 04 達成
@@ -389,11 +389,11 @@ $ cd ~; lab reset 05; cd ~/work/05
 演習 05 を初期状態に戻しました（~/work/05）
 
 $ ls -ld . cache cache/deep; ls -l f.tmp cache/a.tmp
-drwxr-xr-x 3 lab lab 4096 Oct 13 11:09 .
-drwxr-xr-x 4 lab lab 4096 Oct 13 11:09 cache
-drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 cache/deep
--rw-r--r-- 1 lab lab 3000 Oct 13 11:09 cache/a.tmp
--rw-r--r-- 1 lab lab 1025 Oct 13 11:09 f.tmp
+drwxr-xr-x 3 lab lab 4096 Oct 13 11:43 .
+drwxr-xr-x 4 lab lab 4096 Oct 13 11:43 cache
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 cache/deep
+-rw-r--r-- 1 lab lab 3000 Oct 13 11:43 cache/a.tmp
+-rw-r--r-- 1 lab lab 1025 Oct 13 11:43 f.tmp
 
 $ echo "--- 模範解答: 一覧で確かめてから消す ---"
 --- 模範解答: 一覧で確かめてから消す ---
@@ -437,17 +437,17 @@ $ cd ~
 $ lab start 06 >/dev/null; cd ~/work/06; ls -lR project
 project:
 total 12
--rw-r--r-- 1 lab lab   42 Oct 13 11:09 README.md
-drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 docs
-drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 src
+-rw-r--r-- 1 lab lab   42 Oct 13 11:43 README.md
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 docs
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 src
 
 project/docs:
 total 12
--rw-r--r-- 1 lab lab 11640 Oct 13 11:09 guide.txt
+-rw-r--r-- 1 lab lab 11640 Oct 13 11:43 guide.txt
 
 project/src:
 total 4
--rw-r--r-- 1 lab lab 38 Oct 13 11:09 main.sh
+-rw-r--r-- 1 lab lab 38 Oct 13 11:43 main.sh
 
 $ lab check 06; echo "exit=$?"
 ✗ 06 未達
@@ -522,11 +522,11 @@ $ cd ~
 
 $ lab start 07 >/dev/null; cd ~/work/07; ls -l; ls -l releases; cat current/VERSION
 total 4
-lrwxrwxrwx 1 lab lab   11 Oct 13 11:09 current -> releases/v1
-drwxr-xr-x 4 lab lab 4096 Oct 13 11:09 releases
+lrwxrwxrwx 1 lab lab   11 Oct 13 11:43 current -> releases/v1
+drwxr-xr-x 4 lab lab 4096 Oct 13 11:43 releases
 total 8
-drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 v1
-drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 v2
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 v1
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 v2
 1.0
 
 $ lab check 07; echo "exit=$?"
@@ -544,11 +544,11 @@ $ echo "--- 誤答: ln -sf で上書きしたつもり ---"
 
 $ ln -sf releases/v2 current; echo "exit=$?"; ls -l current; ls -l releases/v1
 exit=0
-lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 current -> releases/v1
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:43 current -> releases/v1
 total 8
--rw-r--r-- 1 lab lab  4 Oct 13 11:09 VERSION
--rw-r--r-- 1 lab lab 15 Oct 13 11:09 app.sh
-lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 v2 -> releases/v2
+-rw-r--r-- 1 lab lab  4 Oct 13 11:43 VERSION
+-rw-r--r-- 1 lab lab 15 Oct 13 11:43 app.sh
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:43 v2 -> releases/v2
 
 $ lab check 07; echo "exit=$?"
 ✗ 07 未達
@@ -567,7 +567,7 @@ $ echo "--- 模範解答: できてしまったリンクを消し、-n を足す
 --- 模範解答: できてしまったリンクを消し、-n を足す ---
 
 $ rm releases/v1/v2; ln -sfn releases/v2 current; ls -l current; cat current/VERSION
-lrwxrwxrwx 1 lab lab 11 Oct 13 11:09 current -> releases/v2
+lrwxrwxrwx 1 lab lab 11 Oct 13 11:43 current -> releases/v2
 2.0
 
 $ lab check 07; echo "exit=$?"
@@ -586,8 +586,8 @@ $ cd ~
 ########## I. 演習08 — locate で見つからない2つ ##########
 
 $ lab start 08 >/dev/null; touch ~/work/08/needle.txt /tmp/needle.txt; ls -l ~/work/08/needle.txt /tmp/needle.txt
--rw-r--r-- 1 lab lab 0 Oct 13 11:09 /home/lab/work/08/needle.txt
--rw-r--r-- 1 lab lab 0 Oct 13 11:09 /tmp/needle.txt
+-rw-r--r-- 1 lab lab 0 Oct 13 11:43 /home/lab/work/08/needle.txt
+-rw-r--r-- 1 lab lab 0 Oct 13 11:43 /tmp/needle.txt
 
 $ locate needle.txt; echo "exit=$?"
 exit=1
@@ -597,8 +597,8 @@ $ lab check 08; echo "exit=$?"
   判定 : 観測型（locate needle.txt を実際に引いた）
   観測 : locate needle.txt の結果:
            （何も出ない）
-         索引の更新時刻   = 2026-10-13 11:09:11
-         needle.txt の作成 = 2026-10-13 11:09:14（~/work/08）
+         索引の更新時刻   = 2026-10-13 11:42:50
+         needle.txt の作成 = 2026-10-13 11:43:07（~/work/08）
          PRUNEPATHS       = "/tmp /var/spool /media /var/lib/os-prober /var/lib/ceph /home/.ecryptfs /var/lib/schroot"
          → /home/lab/work/08/needle.txt が出ない
          → /tmp/needle.txt が出ない
@@ -620,8 +620,8 @@ $ lab check 08; echo "exit=$?"
   判定 : 観測型（locate needle.txt を実際に引いた）
   観測 : locate needle.txt の結果:
            /home/lab/work/08/needle.txt
-         索引の更新時刻   = 2026-10-13 11:09:14
-         needle.txt の作成 = 2026-10-13 11:09:14（~/work/08）
+         索引の更新時刻   = 2026-10-13 11:43:07
+         needle.txt の作成 = 2026-10-13 11:43:07（~/work/08）
          PRUNEPATHS       = "/tmp /var/spool /media /var/lib/os-prober /var/lib/ceph /home/.ecryptfs /var/lib/schroot"
          → /tmp/needle.txt が出ない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 08
@@ -646,8 +646,8 @@ $ lab check 08; echo "exit=$?"
   観測 : locate needle.txt の結果:
            /home/lab/work/08/needle.txt
            /tmp/needle.txt
-         索引の更新時刻   = 2026-10-13 11:09:14
-         needle.txt の作成 = 2026-10-13 11:09:14（~/work/08）
+         索引の更新時刻   = 2026-10-13 11:43:07
+         needle.txt の作成 = 2026-10-13 11:43:07（~/work/08）
          PRUNEPATHS       = "/var/spool /media /var/lib/os-prober /var/lib/ceph /home/.ecryptfs /var/lib/schroot"
          2つとも locate の結果に出た
          → locate は索引を引くだけ。索引を作り直し、/tmp を外す設定を消したので両方が載った
@@ -749,8 +749,8 @@ $ lab check; echo "exit=$?"
   観測 : locate needle.txt の結果:
            /home/lab/work/08/needle.txt
            /tmp/needle.txt
-         索引の更新時刻   = 2026-10-13 11:09:14
-         needle.txt の作成 = 2026-10-13 11:09:14（~/work/08）
+         索引の更新時刻   = 2026-10-13 11:43:07
+         needle.txt の作成 = 2026-10-13 11:43:07（~/work/08）
          PRUNEPATHS       = "/var/spool /media /var/lib/os-prober /var/lib/ceph /home/.ecryptfs /var/lib/schroot"
          2つとも locate の結果に出た
          → locate は索引を引くだけ。索引を作り直し、/tmp を外す設定を消したので両方が載った
@@ -805,8 +805,8 @@ current を、ディレクトリとして辿らずにリンクそのものとし
 ########## L. 最終環境 ##########
 
 $ lab env
-テーマ    : lab-linuc-files 1.0.0
-イメージ  : ghcr.io/chai0204/lab-linuc:files-1.0.0
+テーマ    : lab-linuc-files 1.0.1
+イメージ  : ghcr.io/chai0204/lab-linuc:files-1.0.1
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6

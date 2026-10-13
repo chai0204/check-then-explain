@@ -24,26 +24,26 @@
 $ cd ~/work/ch6
 $ echo hello &gt; a.txt; echo world &gt; b.txt
 $ ls -l a.txt b.txt
--rw-r--r-- 1 lab lab 6 Oct 13 11:09 a.txt
--rw-r--r-- 1 lab lab 6 Oct 13 11:09 b.txt</code></pre>
+-rw-r--r-- 1 lab lab 6 Oct 13 11:43 a.txt
+-rw-r--r-- 1 lab lab 6 Oct 13 11:43 b.txt</code></pre>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p><code>tar</code> は「まとめて小さくする」ためのコマンドだ。2つで 12 バイトなら、まとめれば 12 バイト以下になるはずだ。</p>
 <pre><code>$ tar -cvf small.tar a.txt b.txt
 a.txt
 b.txt
 $ ls -l small.tar
--rw-r--r-- 1 lab lab 10240 Oct 13 11:09 small.tar</code></pre>
+-rw-r--r-- 1 lab lab 10240 Oct 13 11:43 small.tar</code></pre>
 <div class="then"><b>だめな理由</b>: 12 バイトが 10240 バイトになった。<code>tar</code> は圧縮しない。ファイル1つごとに 512 バイトの見出し（名前・権限・所有者・大きさ・時刻）を付け、
 中身を 512 バイト単位に詰めて並べ、最後に 10240 バイト単位に切りそろえる。
 「たくさんのファイルを、属性ごと1本のファイルにする」のが <code>tar</code> の仕事で、縮めるのは別のプログラムである。</div></div>
 <pre><code>$ tar -tvf small.tar
--rw-r--r-- lab/lab           6 2026-10-13 11:09 a.txt
--rw-r--r-- lab/lab           6 2026-10-13 11:09 b.txt</code></pre>
+-rw-r--r-- lab/lab           6 2026-10-13 11:43 a.txt
+-rw-r--r-- lab/lab           6 2026-10-13 11:43 b.txt</code></pre>
 <p><code>-t</code> で中を一覧すると、<code>ls -l</code> とほとんど同じ情報が並ぶ。権限・所有者・時刻は、第1章で見た「名前の先」にある情報で、<code>tar</code> はそれを名前と一緒に記録している。ただし展開したときに記録どおりに戻るかどうかは、誰が展開するかで変わる（この章の後半で確かめる）。</p>
 <p>ハイフンを省いた古い書き方も、GNU tar では同じ意味で通る。試験の選択肢にもこの形で出る。</p>
 <pre><code>$ tar tvf small.tar
--rw-r--r-- lab/lab           6 2026-10-13 11:09 a.txt
--rw-r--r-- lab/lab           6 2026-10-13 11:09 b.txt</code></pre>
+-rw-r--r-- lab/lab           6 2026-10-13 11:43 a.txt
+-rw-r--r-- lab/lab           6 2026-10-13 11:43 b.txt</code></pre>
 <div class="scroll"><table>
 <tr><th>オプション</th><th>意味</th></tr>
 <tr><td><code>c</code> / <code>t</code> / <code>x</code></td><td>作る（create）/ 一覧する（list）/ 展開する（extract）。どれか1つ</td></tr>
@@ -62,21 +62,21 @@ $ ls -l small.tar
 <div class="sgoal"><b>この節で分かること</b>: 圧縮コマンドが元のファイルをどう扱うか。</div>
 <pre><code>$ seq 1 2000 &gt; num.txt
 $ ls -l num.txt
--rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:43 num.txt
 $ gzip num.txt
 $ ls -l num.txt*
--rw-r--r-- 1 lab lab 4226 Oct 13 11:09 num.txt.gz
+-rw-r--r-- 1 lab lab 4226 Oct 13 11:43 num.txt.gz
 $ gzip -l num.txt.gz
          compressed        uncompressed  ratio uncompressed_name
                4226                8893  52.8% num.txt</code></pre>
 <p><code>gzip</code> の後には <code>num.txt.gz</code> しか無い。元の <code>num.txt</code> は消えた。<code>gzip</code> は「圧縮した写しを作る」のではなく、<b>圧縮したものに置き換える</b>。展開する <code>gunzip</code> も同じで、<code>.gz</code> を消して元の名前に戻す。</p>
 <pre><code>$ gunzip num.txt.gz
 $ ls -l num.txt*
--rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:43 num.txt
 $ gzip -k num.txt
 $ ls -l num.txt*
--rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
--rw-r--r-- 1 lab lab 4226 Oct 13 11:09 num.txt.gz
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:43 num.txt
+-rw-r--r-- 1 lab lab 4226 Oct 13 11:43 num.txt.gz
 $ zcat num.txt.gz | tail -1
 2000
 $ gzip num.txt
@@ -86,33 +86,57 @@ gzip: num.txt.gz already exists; do you wish to overwrite (y or n)? n
 <p>bzip2 と xz も、使い方は同じ形である。</p>
 <pre><code>$ bzip2 -k num.txt; xz -k num.txt
 $ ls -l num.txt*
--rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
--rw-r--r-- 1 lab lab 2140 Oct 13 11:09 num.txt.bz2
--rw-r--r-- 1 lab lab 4226 Oct 13 11:09 num.txt.gz
--rw-r--r-- 1 lab lab  948 Oct 13 11:09 num.txt.xz
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:43 num.txt
+-rw-r--r-- 1 lab lab 2140 Oct 13 11:43 num.txt.bz2
+-rw-r--r-- 1 lab lab 4226 Oct 13 11:43 num.txt.gz
+-rw-r--r-- 1 lab lab  948 Oct 13 11:43 num.txt.xz
 $ bzcat num.txt.bz2 | tail -1; xzcat num.txt.xz | tail -1
 2000
 2000
 $ rm num.txt num.txt.gz
 $ bunzip2 num.txt.bz2
 $ ls -l num.txt*
--rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt
--rw-r--r-- 1 lab lab  948 Oct 13 11:09 num.txt.xz
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:43 num.txt
+-rw-r--r-- 1 lab lab  948 Oct 13 11:43 num.txt.xz
 $ rm num.txt
 $ unxz num.txt.xz
 $ ls -l num.txt*
--rw-r--r-- 1 lab lab 8893 Oct 13 11:09 num.txt</code></pre>
+-rw-r--r-- 1 lab lab 8893 Oct 13 11:43 num.txt</code></pre>
 <div class="scroll"><table>
 <tr><th>形式</th><th>圧縮</th><th>展開</th><th>中を見る</th><th>拡張子</th><th>tar の文字</th><th>8893 バイトが（実測）</th></tr>
 <tr><td>gzip</td><td><code>gzip</code></td><td><code>gunzip</code> / <code>gzip -d</code></td><td><code>zcat</code></td><td><code>.gz</code></td><td><code>z</code></td><td>4226</td></tr>
 <tr><td>bzip2</td><td><code>bzip2</code></td><td><code>bunzip2</code> / <code>bzip2 -d</code></td><td><code>bzcat</code></td><td><code>.bz2</code></td><td><code>j</code></td><td>2140</td></tr>
 <tr><td>xz</td><td><code>xz</code></td><td><code>unxz</code> / <code>xz -d</code></td><td><code>xzcat</code></td><td><code>.xz</code></td><td><code>J</code></td><td>948</td></tr>
 </table></div>
-<p>どれも1つのファイルを1つの圧縮ファイルにするだけで、ディレクトリは扱えない。</p>
+<p>どれも1つのファイルを1つの圧縮ファイルにする道具で、ディレクトリを1本にまとめることはしない。</p>
 <pre><code>$ mkdir -p notes/2026; cp num.txt notes/2026/log.txt
 $ gzip notes
-gzip: notes is a directory -- ignored</code></pre>
-<p>だから「束ねる <code>tar</code>」と「縮める gzip など」は組で使われる。</p>
+gzip: notes is a directory -- ignored
+$ gzip -r notes
+$ find notes | sort
+notes
+notes/2026
+notes/2026/log.txt.gz
+$ gunzip -r notes
+$ find notes | sort
+notes
+notes/2026
+notes/2026/log.txt
+$ bzip2 -r notes
+bzip2: Bad flag `-r'
+（略）
+$ xz -r notes
+xz: Try `xz --help' for more information.</code></pre>
+<p><code>gzip</code> には <code>-r</code>（再帰）があり、ディレクトリの中のファイルを<b>1つずつ</b>圧縮する（<code>gunzip -r</code> で戻せる）。それでも <code>.gz</code> がファイルの数だけできるだけで、1本にはならない。<code>bzip2</code> と <code>xz</code> には <code>-r</code> が無く、<code>bzip2</code> は <code>Bad flag</code> と言って使い方を並べ（ここでは略した）、<code>xz</code> も断った。だから「束ねる <code>tar</code>」と「縮める gzip など」は組で使われる。</p>
+<p>もう1つ、<code>gunzip</code> は名前の終わりも見る。</p>
+<pre><code>$ gzip -c num.txt &gt; packed
+$ file packed
+packed: gzip compressed data, was "num.txt", last modified: Tue Oct 13 02:43:13 2026, from Unix, original size modulo 2^32 8893
+$ gunzip packed
+gzip: packed: unknown suffix -- ignored
+$ ls packed*
+packed</code></pre>
+<p>中身は gzip だと <code>file</code> が言っているのに、<code>gunzip</code> は展開しなかった。展開した後の名前を「<code>.gz</code> などの決まった拡張子を外した名前」で作るので、拡張子が無いと名前を決められないからである。第4章で「拡張子は人間のための目印」と書いたのは <code>file</code> とカーネルにとっての話で、拡張子を見るプログラムもある。</p>
 <div class="analogy"><b>たとえ</b>: 衣類を真空パックの袋に詰め替える作業に近い。
 詰め替えた後に、元の畳んだ衣類が棚に残っているわけではない。中身は袋の中に移っている。
 <br>ただし<b>崩れる点</b>: 真空パックは中身を出せば袋が空で残るが、<code>gunzip</code> は袋（<code>.gz</code>）ごと消して元に戻す。
@@ -127,9 +151,9 @@ notes/2026/log.txt
 $ tar -cjf notes.tar.bz2 notes
 $ tar -cJf notes.tar.xz notes
 $ ls -l notes.tar.*
--rw-r--r-- 1 lab lab 2467 Oct 13 11:09 notes.tar.bz2
--rw-r--r-- 1 lab lab 4469 Oct 13 11:09 notes.tar.gz
--rw-r--r-- 1 lab lab 1124 Oct 13 11:09 notes.tar.xz
+-rw-r--r-- 1 lab lab 2462 Oct 13 11:43 notes.tar.bz2
+-rw-r--r-- 1 lab lab 4472 Oct 13 11:43 notes.tar.gz
+-rw-r--r-- 1 lab lab 1136 Oct 13 11:43 notes.tar.xz
 $ file notes.tar.gz notes.tar.bz2 notes.tar.xz
 notes.tar.gz:  gzip compressed data, from Unix, original size modulo 2^32 20480
 notes.tar.bz2: bzip2 compressed data, block size = 900k
@@ -193,18 +217,18 @@ home/lab/work/ch6/a.txt</code></pre>
 $ chmod 666 shared.txt
 $ sudo chown alice shared.txt
 $ ls -l shared.txt
--rw-rw-rw- 1 alice lab 19 Oct 13 11:09 shared.txt
+-rw-rw-rw- 1 alice lab 19 Oct 13 11:43 shared.txt
 $ tar -cf shared.tar shared.txt
 $ tar -tvf shared.tar
--rw-rw-rw- alice/lab        19 2026-10-13 11:09 shared.txt
+-rw-rw-rw- alice/lab        19 2026-10-13 11:43 shared.txt
 $ mkdir x1 x2 x3
 $ tar -xf shared.tar -C x1
 $ tar -xpf shared.tar -C x2
 $ sudo tar -xf shared.tar -C x3
 $ ls -l x1/shared.txt x2/shared.txt x3/shared.txt
--rw-r--r-- 1 lab   lab 19 Oct 13 11:09 x1/shared.txt
--rw-rw-rw- 1 lab   lab 19 Oct 13 11:09 x2/shared.txt
--rw-rw-rw- 1 alice lab 19 Oct 13 11:09 x3/shared.txt</code></pre>
+-rw-r--r-- 1 lab   lab 19 Oct 13 11:43 x1/shared.txt
+-rw-rw-rw- 1 lab   lab 19 Oct 13 11:43 x2/shared.txt
+-rw-rw-rw- 1 alice lab 19 Oct 13 11:43 x3/shared.txt</code></pre>
 <p>アーカイブには 666 と alice が記録されているのに、一般ユーザの lab が <code>-xf</code> で展開すると 644 になった。展開は「ファイルを新しく作る」操作なので、第2章の umask がかかる（第4章の <code>cp</code> と同じ理由）。<code>-p</code>（<code>--preserve-permissions</code>）を足すと、記録された 666 がそのまま戻った。所有者はどちらも lab のままで、alice に戻ったのは root で展開したときだけである。root では権限の復元も所有者の復元も最初から有効で、一般ユーザは所有者を他人にできない（第3章）。</p>
 <div class="scroll"><table>
 <tr><th>展開のしかた</th><th>権限</th><th>所有者</th><th>実測</th></tr>
@@ -219,15 +243,15 @@ $ ls -l x1/shared.txt x2/shared.txt x3/shared.txt
 <pre><code>$ dd if=/dev/zero of=zero.img bs=1M count=4
 4+0 records in
 4+0 records out
-4194304 bytes (4.2 MB, 4.0 MiB) copied, 0.00129568 s, 3.2 GB/s
+4194304 bytes (4.2 MB, 4.0 MiB) copied, 0.00134678 s, 3.1 GB/s
 $ ls -l zero.img
--rw-r--r-- 1 lab lab 4194304 Oct 13 11:09 zero.img
+-rw-r--r-- 1 lab lab 4194304 Oct 13 11:43 zero.img
 $ dd if=num.txt of=head.bin bs=512 count=1
 1+0 records in
 1+0 records out
-512 bytes copied, 2.1792e-05 s, 23.5 MB/s
+512 bytes copied, 2.1249e-05 s, 24.1 MB/s
 $ ls -l head.bin
--rw-r--r-- 1 lab lab 512 Oct 13 11:09 head.bin
+-rw-r--r-- 1 lab lab 512 Oct 13 11:43 head.bin
 $ head -3 head.bin
 1
 2
@@ -269,7 +293,7 @@ a. <code>report.txt</code> だけ　b. <code>report.txt.gz</code> だけ　c. �
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>tar</code> は束ねるだけで縮めない。名前と一緒に権限・所有者・時刻を記録する（6バイト×2が 10240 バイトになった）</li><li><code>tar</code> は c（作る）・t（一覧）・x（展開）のどれか ＋ f（直後にアーカイブ名）。v で詳しく、C で場所を指定</li><li>z = gzip、j = bzip2、J = xz。読むときは GNU tar が形式を判断するが、作るときは文字が要る</li><li><code>gzip</code>・<code>bzip2</code>・<code>xz</code> は元のファイルを置き換える。残すなら <code>-k</code>。展開は <code>gunzip</code>・<code>bunzip2</code>・<code>unxz</code>（または <code>-d</code>）、中を見るのは <code>zcat</code>・<code>bzcat</code>・<code>xzcat</code></li><li>アーカイブの中のパスは、作るときの渡し方で決まる。先頭の <code>/</code> は外される</li><li>一般ユーザが展開すると権限に umask がかかる。記録どおりに戻すには <code>-p</code>。所有者まで戻るのは root で展開したときだけ</li><li><code>dd</code> は <code>if</code> から <code>bs</code> ずつ <code>count</code> 回読んで <code>of</code> へ写す。中身を解釈しないので、ディスクの装置をそのまま写せる</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-files/theory/05-find">← 5. find は名前をたどり、中身の属性で選ぶ</a><a href="/linuc-files/theory/07-links">次: 7. ハードリンクは名前を増やし、シンボリックリンクは道順を書く →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

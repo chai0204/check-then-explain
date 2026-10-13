@@ -4,7 +4,7 @@
 # 実行: bash probe/linuc-files-host.sh > logs/linuc-files-host.log 2>&1
 set -u
 R() { printf '\n$ %s\n' "$*"; eval "$@" 2>&1; }
-IMG=lab-linuc-files:1.0.0
+IMG=lab-linuc-files:1.0.1
 R "docker version --format '{{.Server.Version}}'"
 R "docker run --rm --hostname linuc $IMG bash -lc 'umask; touch /tmp/x; ls -l /tmp/x'"
 R "docker run -d --name linuc-files-host --hostname linuc $IMG sleep infinity >/dev/null"

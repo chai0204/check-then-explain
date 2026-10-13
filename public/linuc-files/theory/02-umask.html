@@ -25,16 +25,16 @@ $ cd ~/work/ch2
 $ touch f.txt
 $ chmod 640 f.txt
 $ ls -l f.txt
--rw-r----- 1 lab lab 0 Oct 13 11:09 f.txt
+-rw-r----- 1 lab lab 0 Oct 13 11:43 f.txt
 $ chmod u=rwx,g=rx,o= f.txt
 $ ls -l f.txt
--rwxr-x--- 1 lab lab 0 Oct 13 11:09 f.txt
+-rwxr-x--- 1 lab lab 0 Oct 13 11:43 f.txt
 $ chmod g+w,o+r f.txt
 $ ls -l f.txt
--rwxrwxr-- 1 lab lab 0 Oct 13 11:09 f.txt
+-rwxrwxr-- 1 lab lab 0 Oct 13 11:43 f.txt
 $ chmod a-x f.txt
 $ ls -l f.txt
--rw-rw-r-- 1 lab lab 0 Oct 13 11:09 f.txt
+-rw-rw-r-- 1 lab lab 0 Oct 13 11:43 f.txt
 $ stat -c "%a %A %n" f.txt
 664 -rw-rw-r-- f.txt</code></pre>
 <p>数値は 8 進数で、1桁が rwx の3ビットに当たる。r=4、w=2、x=1 を足したものが1桁になる。</p>
@@ -57,7 +57,7 @@ drwx------ tree
 drwx------ tree/sub
 -rw------- tree/sub/b</code></pre>
 <div class="analogy"><b>たとえ</b>: 数値は「全部の欄を書き直す申請書」、記号は「訂正したい欄だけ書く訂正届」に近い。
-<code>chmod 640</code> は元が何であっても 640 にし、<code>chmod g+w</code> はグループの w だけを足して残りに触らない。
+<code>chmod 640</code> は元が何であっても 640 にし（ディレクトリの SUID・SGID だけは例外で、数値では外れない。第3章）、<code>chmod g+w</code> はグループの w だけを足して残りに触らない。
 <br>ただし<b>崩れる点</b>: 役所は申請書も訂正届も同じ規則で処理するが、<code>chmod</code> は違う。
 記号の書き方で「誰に」を省くと、その人の umask を見て結果を変える（2つ先の節）。数値の書き方には、この例外が無い。</div>
 
@@ -70,8 +70,8 @@ u=rwx,g=rx,o=rx
 $ touch new.txt
 $ mkdir new.d
 $ ls -ld new.txt new.d
-drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 new.d
--rw-r--r-- 1 lab lab    0 Oct 13 11:09 new.txt</code></pre>
+drwxr-xr-x 2 lab lab 4096 Oct 13 11:43 new.d
+-rw-r--r-- 1 lab lab    0 Oct 13 11:43 new.txt</code></pre>
 <p>作るプログラム（<code>touch</code> や <code>mkdir</code>）は、ファイルなら 666、ディレクトリなら 777 を要求する。そこから umask に立っているビットが落とされて、644 と 755 になった。<code>umask -S</code> は、落とした後に<b>残る</b>ほうを記号で見せる。</p>
 <p>666 − 022 = 644、777 − 022 = 755。引き算と同じ答えなので、こう覚えている人は多い。値を変えて試す。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
@@ -81,8 +81,8 @@ drwxr-xr-x 2 lab lab 4096 Oct 13 11:09 new.d
 $ touch u033.txt
 $ mkdir u033.d
 $ ls -ld u033.txt u033.d
-drwxr--r-- 2 lab lab 4096 Oct 13 11:09 u033.d
--rw-r--r-- 1 lab lab    0 Oct 13 11:09 u033.txt
+drwxr--r-- 2 lab lab 4096 Oct 13 11:43 u033.d
+-rw-r--r-- 1 lab lab    0 Oct 13 11:43 u033.txt
 $ stat -c "%a %n" u033.txt u033.d
 644 u033.txt
 744 u033.d</code></pre>
@@ -126,23 +126,23 @@ $ stat -c "%a %n" u077.txt u077.d
 <pre><code>$ chmod 777 u077.txt
 $ stat -c "%a %n" u077.txt
 777 u077.txt</code></pre>
-<p>umask は関係なく 777 になった。数値の <code>chmod</code> は言われたとおりに書く。ところが umask を 022 に戻し、記号で「誰に」を省くと様子が変わる。</p>
+<p>umask は関係なく 777 になった。数値の <code>chmod</code> は言われたとおりに書く（例外は、ディレクトリの SUID・SGID を数値では外さないことだけ。第3章で確かめる）。ところが umask を 022 に戻し、記号で「誰に」を省くと様子が変わる。</p>
 <pre><code>$ umask 022
 $ chmod 444 f.txt
 $ chmod +w f.txt
 $ ls -l f.txt
--rw-r--r-- 1 lab lab 0 Oct 13 11:09 f.txt
+-rw-r--r-- 1 lab lab 0 Oct 13 11:43 f.txt
 $ chmod a+w f.txt
 $ ls -l f.txt
--rw-rw-rw- 1 lab lab 0 Oct 13 11:09 f.txt</code></pre>
+-rw-rw-rw- 1 lab lab 0 Oct 13 11:43 f.txt</code></pre>
 <p><code>chmod +w</code> は「全員に w」ではなく、所有者にしか足さなかった。<code>u</code> <code>g</code> <code>o</code> <code>a</code> を書かないと、chmod は <code>a</code> と書いたつもりで動きつつ、<b>umask に立っているビットには触らない</b>（man chmod に書いてある規則）。umask 022 はグループとその他の w を落とす印なので、触れたのは所有者の w だけである。全員に足したいなら <code>a+w</code> と書く。外すほうも同じである。</p>
 <pre><code>$ chmod -w f.txt
 chmod: f.txt: new permissions are r--rw-rw-, not r--r--r--
 $ ls -l f.txt
--r--rw-rw- 1 lab lab 0 Oct 13 11:09 f.txt
+-r--rw-rw- 1 lab lab 0 Oct 13 11:43 f.txt
 $ chmod a-w f.txt
 $ ls -l f.txt
--r--r--r-- 1 lab lab 0 Oct 13 11:09 f.txt</code></pre>
+-r--r--r-- 1 lab lab 0 Oct 13 11:43 f.txt</code></pre>
 <p><code>chmod -w</code> は所有者の w しか外さず、<code>chmod</code> 自身が「r--r--r-- にはならず r--rw-rw- になった」と警告した。グループとその他の w は umask に守られて残っている。試験で「全員の書き込みを禁止する」を問われたら、<code>a-w</code>（か <code>ugo-w</code>）と「誰に」を書いたものを選ぶ。</p>
 
 <h2 id="where">umask はどこから来るか</h2>
@@ -210,7 +210,7 @@ umask はプロセスごとの値で、ログインし直したシェルは起�
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>chmod</code> の数値は r=4・w=2・x=1 の足し算を3桁並べたもの。記号は <code>u g o a</code> × <code>+ - =</code> × <code>r w x</code></li><li>新しいファイルは 666、ディレクトリは 777 から、umask に立っているビットを落として作られる</li><li>引き算ではない。<code>umask 033</code> のファイルは 633 ではなく 644（実測）</li><li><code>umask</code> で値を、<code>umask -S</code> で残る権限を記号で見る</li><li>数値の <code>chmod</code> は umask を見ない。「誰に」を省いた記号指定（<code>chmod +w</code>・<code>chmod -w</code>）だけは、umask に立っているビットに触らない</li><li>umask はプロセスの値で、子に受け継がれる。毎回効かせるなら <code>~/.bashrc</code>・<code>~/.profile</code>・<code>/etc/profile</code>（PAM なら <code>/etc/login.defs</code> の <code>UMASK</code>）</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-files/theory/01-permissions">← 1. 名前と中身は、別の場所にある</a><a href="/linuc-files/theory/03-special-bits">次: 3. 特殊なビットは「誰として動くか」と「誰が消せるか」を変える →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

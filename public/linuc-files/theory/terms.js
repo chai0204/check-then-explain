@@ -46,12 +46,12 @@ window.TERM_GROUPS = [
 
     { t:"スティッキービット", alt:["sticky bit"], id:"sticky",
       hint:"ディレクトリの中のファイルを、持ち主だけが消せるようにする印",
-      body:"ディレクトリに <code>chmod 1777</code> か <code>chmod o+t</code> で付ける特殊なビット。その他の x の位置に <code>t</code>（x が無ければ <code>T</code>）が出る。付いたディレクトリでは、中のファイルを消したり名前を変えたりできるのが、そのファイルの持ち主・ディレクトリの持ち主・root だけになる。<code>/tmp</code>（<code>drwxrwxrwt</code>）がその代表。<b>たとえ</b>: 誰でも貼れる<b>共用掲示板</b>で、はがせるのは貼った本人と管理者だけ、という決まり。<b>崩れる点</b>: 掲示板の決まりは中身にも及ぶが、スティッキービットは消す・名前を変えるだけを縛る。中身を書き換えられるかはファイル自身の権限で決まる。",
+      body:"ディレクトリに <code>chmod 1777</code> か <code>chmod o+t</code> で付ける特殊なビット。その他の x の位置に <code>t</code>（x が無ければ <code>T</code>）が出る。付いたディレクトリでは、中のファイルを消したり名前を変えたりできるのが、そのファイルの持ち主・ディレクトリの持ち主・root だけになる。<code>/tmp</code>（<code>drwxrwxrwt</code>）がその代表。<b>たとえ</b>: 誰でも貼れる<b>共用掲示板</b>で、はがせるのは貼った本人と管理者だけ、という決まり。<b>崩れる点</b>: 掲示板の決まりは中身にも及ぶが、スティッキービットが縛るのは消す・名前を変えるだけである。中身を書き換えられるかは基本的にはファイル自身の権限で決まるが、ホストの <code>fs.protected_regular</code> が有効だと、誰でも書けるスティッキーなディレクトリでは他人のファイルへの <code>&gt;</code>・<code>&gt;&gt;</code> も断られる（第3章）。",
       misread:"<code>rm -f</code> なら他人のファイルでも消せると思われがちだが、<code>-f</code> は確認を省くだけで、実測でも Operation not permitted だった。", ch:3 },
 
     { t:"実効ユーザ ID", alt:["euid"], id:"euid",
       hint:"権限の判定に使われるユーザ ID。SUID で所有者に変わる",
-      body:"プロセスが「誰として権限を判定されるか」を表す ID。ふつうは実行した人の ID（uid）と同じだが、SUID の付いたプログラムを動かすと、uid はそのまま、実効ユーザ ID だけがファイルの所有者に変わる。<code>id</code> の出力に <code>euid=0(root)</code> と出るのがその状態。<b>たとえ</b>: 本名（uid）と、いま名乗っている<b>代理の肩書き</b>（euid）。<b>崩れる点</b>: 肩書きは自分で名乗れるが、euid はカーネルが SUID の印を見たときにしか変えない。",
+      body:"プロセスが「誰として権限を判定されるか」を表す ID。ふつうは実行した人の ID（uid）と同じだが、SUID の付いたプログラムを動かすと、uid はそのまま、実効ユーザ ID だけがファイルの所有者に変わる。<code>id</code> の出力に <code>euid=0(root)</code> と出るのがその状態。<b>たとえ</b>: 本名（uid）と、いま名乗っている<b>代理の肩書き</b>（euid）。<b>崩れる点</b>: 肩書きは自分で名乗れるが、euid は一般のプロセスが勝手に変えることはできない。変わるのは、SUID の付いたプログラムを実行したときか、root の権限を持つプロセスが自分で <code>setuid()</code> などを呼んだとき（<code>sudo</code> や <code>su</code> は、これで別のユーザになってからコマンドを動かす）である。",
       misread:"SUID で動くと uid ごと所有者に変わると思われがちだが、変わるのは euid だけで、打った人が誰かは残っている。", ch:3 },
   ]},
 
@@ -99,7 +99,7 @@ window.TERM_GROUPS = [
     { t:"マジックナンバー", alt:[], id:"magic",
       hint:"ファイルの先頭にある、形式を示す決まったバイト列",
       body:"ファイルの中身の先頭に置かれる、形式ごとに決まったバイト列。ELF なら <code>\\x7fELF</code>、gzip なら <code>\\x1f\\x8b</code>。<code>file</code> コマンドはこれを見て種類を判定するので、名前の拡張子が何であっても中身どおりに答える。<b>たとえ</b>: 荷物に貼られた<b>中身の品名ラベル</b>。箱の色（拡張子）ではなくラベルで中身が分かる。<b>崩れる点</b>: ラベルは貼り替えれば嘘をつけるが、マジックナンバーは中身の一部なので、書き換えればその形式として読めなくなる。",
-      misread:"Linux も拡張子でファイルの種類を決めていると思われがちだが、拡張子は人間のための目印で、<code>file</code> もカーネルも中身を見る。", ch:4 },
+      misread:"Linux も拡張子でファイルの種類を決めていると思われがちだが、<code>file</code> とカーネルは中身を見る。ただし拡張子を見るプログラムもある（<code>gunzip</code> は決まった拡張子の無いファイルを unknown suffix と言って展開しない）。", ch:4 },
   ]},
 
   { g: "探す・束ねる — 名前の一覧を作る道具", terms: [
@@ -125,13 +125,13 @@ window.TERM_GROUPS = [
 
     { t:"エイリアス", alt:["alias"], id:"alias",
       hint:"コマンド名に付けた別の書き方。対話シェルが ~/.bashrc で作る",
-      body:"<code>alias ll='ls -alF'</code> のように、コマンドの打ち方に別名を付けるシェルの機能。Ubuntu の <code>~/.bashrc</code> は <code>ls</code> を <code>ls --color=auto</code> にしている。シェル自身が持つものなので、ファイルを探す <code>which</code> には見えず、<code>type</code> には見える。<b>たとえ</b>: よく使う注文に付けた<b>店の常連用の呼び名</b>。<b>崩れる点</b>: 呼び名はその店（そのシェル）でしか通じない。<code>~/.bashrc</code> を読まないスクリプトの中では、<code>ls</code> はただの <code>/usr/bin/ls</code> になる。",
-      misread:"which で見えないものは存在しないと思われがちだが、エイリアスと組み込みコマンドは which には出ない。", ch:8 },
+      body:"<code>alias ll='ls -alF'</code> のように、コマンドの打ち方に別名を付けるシェルの機能。Ubuntu の <code>~/.bashrc</code> は <code>ls</code> を <code>ls --color=auto</code> にしている。シェル自身が持つものなので、<code>type</code> には見える。Ubuntu の <code>which</code> はファイルしか探さないので見えない（Red Hat 系では <code>which</code> 自体が <code>/etc/profile.d/which2.sh</code> の関数になっていて、エイリアスも出す）。<b>たとえ</b>: よく使う注文に付けた<b>店の常連用の呼び名</b>。<b>崩れる点</b>: 呼び名はその店（そのシェル）でしか通じない。<code>~/.bashrc</code> を読まないスクリプトの中では、<code>ls</code> はただの <code>/usr/bin/ls</code> になる。",
+      misread:"which で見えないものは存在しないと思われがちだが、Ubuntu の which にはエイリアスも組み込みコマンドも出ない。何なのかを確かめるのは type である。", ch:8 },
 
     { t:"組み込みコマンド", alt:["ビルトイン"], id:"builtin",
       hint:"ファイルではなく、シェルの中に入っているコマンド（cd など）",
-      body:"<code>cd</code>・<code>type</code>・<code>umask</code>・<code>export</code> のように、シェルのプログラムの中に組み込まれていて、ファイルとして存在しないコマンド（<code>echo</code> のように、組み込みと同じ名前のファイル <code>/usr/bin/echo</code> も持つものもある）。シェル自身の状態（いまいる場所や umask）を変えるものは、外のプログラムでは変えられないので組み込みになっている。<code>type cd</code> が <code>shell builtin</code> と答え、<code>which cd</code> は何も出さない。<b>たとえ</b>: 外注せずに<b>社内でこなす業務</b>。<b>崩れる点</b>: 社内業務は外にも頼めるが、<code>cd</code> は外のプログラムに頼むと、そのプログラムの中で場所が変わるだけで、シェルの場所は変わらない。",
-      misread:"コマンドはすべて /usr/bin などのファイルだと思われがちだが、<code>cd</code> にはファイルが無い（<code>whereis cd</code> は空）。", ch:8 },
+      body:"<code>cd</code>・<code>type</code>・<code>umask</code>・<code>export</code> のように、シェルのプログラムの中に組み込まれていて、ファイルとして存在しないコマンド（<code>echo</code> のように、組み込みと同じ名前のファイル <code>/usr/bin/echo</code> も持つものもある）。シェル自身の状態（いまいる場所や umask）を変えるものは、外のプログラムでは変えられないので組み込みになっている。<code>type cd</code> が <code>shell builtin</code> と答える。Ubuntu では <code>which cd</code> は何も出さないが、Red Hat 系には <code>/usr/bin/cd</code>（中身は <code>builtin cd &quot;$@&quot;</code> だけのスクリプト）があり、<code>which cd</code> がそれを返す。組み込みかどうかは <code>type</code> で確かめる。<b>たとえ</b>: 外注せずに<b>社内でこなす業務</b>。<b>崩れる点</b>: 社内業務は外にも頼めるが、<code>cd</code> は外のプログラムに頼むと、そのプログラムの中で場所が変わるだけで、シェルの場所は変わらない。",
+      misread:"コマンドはすべて /usr/bin などのファイルだと思われがちだが、<code>cd</code> の本体はシェルの中にある（Ubuntu では <code>whereis cd</code> も空）。", ch:8 },
 
     { t:"FHS", alt:["Filesystem Hierarchy Standard","ファイルシステム階層標準"], id:"fhs",
       hint:"どのディレクトリに何を置くかの約束。/etc は設定、/var/log はログ",

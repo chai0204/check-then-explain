@@ -32,7 +32,7 @@ $ ls -l --time-style=long-iso orig.txt
 <p><code>cp</code> はファイルを複製するコマンドだから、写しは元と同じもの（中身も、権限も、時刻も）になるはずだ。</p>
 <pre><code>$ cp orig.txt copy.txt
 $ ls -l --time-style=long-iso orig.txt copy.txt
--rw-r--r-- 1 lab lab 13 2026-10-13 11:09 copy.txt
+-rw-r--r-- 1 lab lab 13 2026-10-13 11:43 copy.txt
 -rw-rw-r-- 1 lab lab 13 2025-04-01 09:00 orig.txt</code></pre>
 <div class="then"><b>だめな理由</b>: 中身は同じだが、時刻は写した瞬間になり、権限は <code>rw-rw-r--</code> から <code>rw-r--r--</code> に減った。
 <code>cp</code> は元を見ながら<b>新しいファイルを1つ作る</b>。新しく作るので、時刻は作った時刻になり、
@@ -46,14 +46,14 @@ $ ls -l --time-style=long-iso orig.txt keep.txt
 <p>所有者はどうか。root のファイルを一般ユーザが写す。</p>
 <pre><code>$ sudo cp orig.txt rootcopy.txt
 $ ls -l --time-style=long-iso rootcopy.txt
--rw-r--r-- 1 root root 13 2026-10-13 11:09 rootcopy.txt
+-rw-r--r-- 1 root root 13 2026-10-13 11:43 rootcopy.txt
 $ cp rootcopy.txt mine.txt
 $ ls -l --time-style=long-iso mine.txt
--rw-r--r-- 1 lab lab 13 2026-10-13 11:09 mine.txt
+-rw-r--r-- 1 lab lab 13 2026-10-13 11:43 mine.txt
 $ cp -p rootcopy.txt mine-p.txt; echo "exit=$?"
 exit=0
 $ ls -l --time-style=long-iso mine-p.txt
--rw-r--r-- 1 lab lab 13 2026-10-13 11:09 mine-p.txt</code></pre>
+-rw-r--r-- 1 lab lab 13 2026-10-13 11:43 mine-p.txt</code></pre>
 <p>写しの所有者は、写した人（lab）になる。<code>-p</code> を付けても所有者だけは写せず、しかもエラーにならない（終了コード 0）。所有者を変えられるのは root だけだからである（第3章）。</p>
 <div class="scroll"><table>
 <tr><th>書き方</th><th>写しの時刻</th><th>写しの権限</th><th>写しの所有者</th></tr>
@@ -73,17 +73,17 @@ cp: overwrite 'keep.txt'? n</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: <code>mv</code> が中身を動かさない場合と、動かす場合。</div>
 <p>第1章で、名前の先にある実体には番号があると言った。<code>ls -i</code> でその番号（inode 番号）が見える。</p>
 <pre><code>$ ls -i orig.txt
-18127232 orig.txt
+18127983 orig.txt
 $ mv orig.txt renamed.txt
 $ ls -i renamed.txt
-18127232 renamed.txt
+18127983 renamed.txt
 $ ls -l --time-style=long-iso renamed.txt
 -rw-rw-r-- 1 lab lab 13 2025-04-01 09:00 renamed.txt</code></pre>
 <p>番号も時刻も権限も変わらない。<code>mv</code> はディレクトリの表で名前の行を書き換えただけで、実体には触れていない。ディレクトリを変えても同じファイルシステムの中なら、表の行を別の表へ移すだけである。番号そのものはあなたの環境では違う値になる。同じ番号のまま残ることが要点である。</p>
 <p>ところが、ホームへ移すと番号が変わる。</p>
 <pre><code>$ mv renamed.txt ~/renamed.txt
 $ ls -i ~/renamed.txt
-18369915 /home/lab/renamed.txt
+18371145 /home/lab/renamed.txt
 $ mv ~/renamed.txt ~/work/ch4/
 $ df --output=target ~/work ~
 Mounted on
@@ -152,8 +152,21 @@ $ ls -l --time-style=full-iso t.txt
 -rw-r--r-- 1 lab lab 0 2020-01-02 03:04:05.000000000 +0900 t.txt
 $ touch t.txt
 $ ls -l --time-style=full-iso t.txt
--rw-r--r-- 1 lab lab 0 2026-10-13 11:09:20.096820889 +0900 t.txt</code></pre>
-<p><code>touch</code> は、無ければ空のファイルを作り、あれば更新時刻をいまにする。<code>-t [[CC]YY]MMDDhhmm[.ss]</code> か <code>-d "日時"</code> で好きな時刻にもできる。時刻は inode が持っている情報なので、データ（ファイルの中身）に1バイトも触れずに書き換えられる。</p>
+-rw-r--r-- 1 lab lab 0 2026-10-13 11:43:13.052127681 +0900 t.txt</code></pre>
+<p><code>touch</code> は、無ければ空のファイルを作り、あれば<b>アクセス時刻と更新時刻の両方</b>をいまにする。<code>-t [[CC]YY]MMDDhhmm[.ss]</code> か <code>-d "日時"</code> で好きな時刻にもできる。片方だけを変えるオプションもある。<code>stat</code> の <code>%x</code> がアクセス時刻（atime）、<code>%y</code> が更新時刻（mtime）である。</p>
+<pre><code>$ touch -d "2020-01-01 00:00" t2.txt
+$ stat -c "%x | %y" t2.txt
+2020-01-01 00:00:00.000000000 +0900 | 2020-01-01 00:00:00.000000000 +0900
+$ touch t2.txt
+$ stat -c "%x | %y" t2.txt
+2026-10-13 11:43:13.055127700 +0900 | 2026-10-13 11:43:13.055127700 +0900
+$ touch -d "2020-01-01 00:00" t2.txt; touch -a t2.txt
+$ stat -c "%x | %y" t2.txt
+2026-10-13 11:43:13.057127714 +0900 | 2020-01-01 00:00:00.000000000 +0900
+$ touch -d "2020-01-01 00:00" t2.txt; touch -m t2.txt
+$ stat -c "%x | %y" t2.txt
+2020-01-01 00:00:00.000000000 +0900 | 2026-10-13 11:43:13.060127734 +0900</code></pre>
+<p>何も付けない <code>touch</code> は両方を、<code>-a</code> はアクセス時刻だけを、<code>-m</code> は更新時刻だけをいまにした。時刻は inode が持っている情報なので、データ（ファイルの中身）に1バイトも触れずに書き換えられる。</p>
 <pre><code>$ file renamed.txt /usr/bin/passwd /bin /dev/null
 renamed.txt:     Unicode text, UTF-8 text
 /usr/bin/passwd: setuid ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=2344480b478a675609210ed886207d6cbdc8cdd7, for GNU/Linux 3.2.0, stripped
@@ -164,7 +177,7 @@ $ cp /usr/bin/ls notes.txt
 $ file photo.jpg notes.txt
 photo.jpg: Unicode text, UTF-8 text
 notes.txt: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=44900829b39271d878615772bb2a6ffa422f0891, for GNU/Linux 3.2.0, stripped</code></pre>
-<p><code>file</code> は拡張子を見ない。中身の先頭にある特徴的なバイト列（マジックナンバー）で判定するので、<code>.jpg</code> という名前の文字ファイルは文字と、<code>.txt</code> という名前のプログラムはプログラムと答える。Linux では、拡張子は人間のための目印にすぎない。</p>
+<p><code>file</code> は拡張子を見ない。中身の先頭にある特徴的なバイト列（マジックナンバー）で判定するので、<code>.jpg</code> という名前の文字ファイルは文字と、<code>.txt</code> という名前のプログラムはプログラムと答える。<code>file</code> とカーネルにとって、拡張子は人間のための目印にすぎない。ただし、拡張子を見て動きを決めるプログラムもある（第6章の <code>gunzip</code> は、決まった拡張子の無いファイルを展開しない）。</p>
 
 <h2 id="glob">ワイルドカードを広げているのはシェル</h2>
 <div class="sgoal"><b>この節で分かること</b>: ワイルドカードが誰に、いつ、どう広げられるか。</div>
@@ -243,8 +256,8 @@ a. <code>rmdir old</code>　b. <code>rm old</code>　c. <code>rm -r old</code>�
 別のファイルシステムへの <code>mv</code> だけは、写してから元を消すので inode 番号が変わる（実測: <code>~/work</code> からホームへ移したとき）。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>cp</code> は新しいファイルを作る。時刻は写した時刻、権限は umask を落としたもの、所有者は写した人になる</li><li><code>-p</code> で時刻と権限を写す。<code>-a</code> はそれに加えて再帰し、リンクをリンクのまま写す。所有者まで写せるのは root だけ</li><li><code>mv</code> は同じファイルシステムなら名前を書き換えるだけ（inode 番号も時刻も変わらない）。別のファイルシステムへは写して消す</li><li>ディレクトリは <code>mkdir -p</code> でまとめて作り、<code>rmdir</code>（空だけ）か <code>rm -r</code> で消す。<code>cp -r</code> の行き先が既にあると、その中へ写す</li><li><code>touch</code> は時刻を書き換え、<code>file</code> は拡張子ではなく中身で種類を判定する</li><li>ワイルドカード（<code>*</code> <code>?</code> <code>[...]</code>）を広げるのはシェル。<code>*</code> は隠しファイルに一致せず、一致しないとパターンがそのまま渡る</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.0@sha256:4256795176d29929daf038166cbcf1e8289df4783a9337690ee6a4cdbceb9f86 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / bash 5.2.21 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>cp</code> は新しいファイルを作る。時刻は写した時刻、権限は umask を落としたもの、所有者は写した人になる</li><li><code>-p</code> で時刻と権限を写す。<code>-a</code> はそれに加えて再帰し、リンクをリンクのまま写す。所有者まで写せるのは root だけ</li><li><code>mv</code> は同じファイルシステムなら名前を書き換えるだけ（inode 番号も時刻も変わらない）。別のファイルシステムへは写して消す</li><li>ディレクトリは <code>mkdir -p</code> でまとめて作り、<code>rmdir</code>（空だけ）か <code>rm -r</code> で消す。<code>cp -r</code> の行き先が既にあると、その中へ写す</li><li><code>touch</code> はアクセス時刻と更新時刻の両方を書き換える（<code>-a</code> / <code>-m</code> で片方だけ）。<code>file</code> は拡張子ではなく中身で種類を判定する</li><li>ワイルドカード（<code>*</code> <code>?</code> <code>[...]</code>）を広げるのはシェル。<code>*</code> は隠しファイルに一致せず、一致しないとパターンがそのまま渡る</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / bash 5.2.21 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
 <nav class="pager"><a href="/linuc-files/theory/03-special-bits">← 3. 特殊なビットは「誰として動くか」と「誰が消せるか」を変える</a><a href="/linuc-files/theory/05-find">次: 5. find は名前をたどり、中身の属性で選ぶ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
