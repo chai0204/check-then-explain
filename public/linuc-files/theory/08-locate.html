@@ -85,7 +85,7 @@ $ locate -i DOT.BASHRC
 $ locate -q bashrc; echo "exit=$?"
 locate: invalid option -- 'q'
 exit=1</code></pre>
-<p><code>-c</code> は件数だけを出す。最初に打った <code>locate bashrc</code> は7行だったのに 8 になったのは、間に打った <code>sudo updatedb</code> で索引が撮り直され、第7章で作った <code>~/work/ch7/bashrc-link</code> も写ったからである（第7章を飛ばしていれば 7 のまま）。</p>
+<p><code>-c</code> は件数だけを出す。最初に打った <code>locate bashrc</code> は7行だったのに 8 になったのは、間に打った <code>sudo updatedb</code> で索引が撮り直され、第7章で作った <code>~/work/ch7/bashrc-link</code> も写ったからである（第7章を飛ばしていれば 7 のままで、次の <code>locate bashrc-link</code> も何も出さない）。</p>
 <p><code>locate skel</code> はパスのどこかに skel を含むものを全部出す（<code>/etc/skel/.bashrc</code> も、名前に skel を含む <code>haskell.vim</code> も）。<code>-b</code> は名前の最後の部分（ベース名）だけで照合するので、<code>/etc/skel</code> の下のファイルは消え、<code>haskell</code> は残った。<code>-d</code> は既定以外の索引を使う指定で、自分で作った索引で確かめられる。</p>
 <pre><code>$ mkdir -p ~/work/dbdemo; touch ~/work/dbdemo/only-here.txt
 $ updatedb -l 0 -U ~/work/dbdemo -o ~/work/dbdemo.db; echo "exit=$?"
