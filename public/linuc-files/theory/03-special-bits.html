@@ -12,7 +12,7 @@
 </div>
 <h1>3. 特殊なビットは「誰として動くか」と「誰が消せるか」を変える</h1>
 <p class="lead">root が持ち主で SUID を付けたシェルスクリプトを動かすと、名乗るのは root ではなく lab のままだった。同じ印を付けた <code>id</code> の複製は <code>euid=0(root)</code> と名乗る。特殊なビットは中身（inode）に付いた印にすぎず、その印をどう扱うかはカーネルが決めている。</p>
-<div class="badges"><span>前提: 第2章まで読了</span><span>前提: sudo が打てる</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.02.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
+<div class="badges"><span>前提: 第2章まで読了</span><span>前提: sudo が打てる</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.02.1（重要度3）</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>SUID・SGID・スティッキービットを、<code>ls -l</code> の表示と <code>chmod</code> の先頭の桁（4桁で書いたときの左端）の両方で読み書きできる</li><li>3つの特殊なビットが、ファイルとディレクトリでそれぞれ何を変えるかを言える</li><li><code>chown</code> と <code>chgrp</code> を誰がどこまで使えるかを、実測の結果から説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: ケーパビリティ（<code>setcap</code>）、<code>nosuid</code> マウント、SUID のプログラムを安全に書く方法、<code>newgrp</code> や <code>sg</code> でグループを切り替える方法は扱わない。ユーザやグループの作り方（<code>useradd</code>・<code>groupadd</code>）は主題1.08 の範囲なので、この檻では alice・bob・carol とグループ devs を最初から用意してある。</div></div>
@@ -226,7 +226,7 @@ d. <code>chmod</code> でパーミッションを変える</p>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>SUID（4・<code>u+s</code>）は所有者として、SGID（2・<code>g+s</code>）はグループとして動かす印。<code>/usr/bin/passwd</code> は <code>-rwsr-xr-x</code></li><li>Linux はスクリプトの SUID を無視する。効くのは機械語のプログラムだけ（実測: スクリプトは lab、<code>id</code> の複製は <code>euid=0(root)</code>）</li><li>スティッキービット（1・<code>o+t</code>）を付けたディレクトリでは、消せるのは持ち主・ディレクトリの持ち主・root だけ。<code>/tmp</code> は <code>drwxrwxrwt</code></li><li>小文字 <code>s</code> <code>t</code> は x あり、大文字 <code>S</code> <code>T</code> は x なし</li><li>SGID のディレクトリの中で作ったものは、ディレクトリのグループを受け継ぐ</li><li>所有者を変えられるのは root だけ。一般ユーザの <code>chgrp</code> は、自分が属するグループへだけ</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:6b256ca7b7f40bb879761737a315e018979ae26ab8b0ef71dcaaf0d77031fa69 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:files-1.0.1@sha256:6b256ca7b7f40bb879761737a315e018979ae26ab8b0ef71dcaaf0d77031fa69 / Ubuntu 24.04.5 LTS / coreutils 9.4 / findutils 4.9.0 / tar 1.35 / gzip 1.12 / bzip2 1.0.8 / xz-utils 5.4.5 / plocate 1.1.19 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証（作業ボリュームは ext4）/ 検証日 2026-10-14</div>
 <nav class="pager"><a href="/linuc-files/theory/02-umask">← 2. umask は引き算ではなく、ビットを落とす印</a><a href="/linuc-files/theory/04-cp-mv-rm">次: 4. コピーは中身を作り直し、移動は名前を書き換える →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
