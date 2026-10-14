@@ -54,7 +54,9 @@ exit=1</code></pre>
 <p><code>-e</code> を付けると、写真に写っているものが<b>いまも存在するか</b>を1つずつ確かめてから出す。実機では <code>updatedb</code> は1日1回、自動で呼ばれる（次の節）。この檻ではそれが動かないので、イメージを作った時刻の写真が残り続けている。</p>
 <p>試験に出る <code>locate</code> のオプションを、まとめて打っておく。</p>
 <pre><code>$ locate -c bashrc
-7
+8
+$ locate bashrc-link
+/home/lab/work/ch7/bashrc-link
 $ locate -l 2 bashrc
 /etc/bash.bashrc
 /etc/skel/.bashrc
@@ -83,6 +85,7 @@ $ locate -i DOT.BASHRC
 $ locate -q bashrc; echo "exit=$?"
 locate: invalid option -- 'q'
 exit=1</code></pre>
+<p><code>-c</code> は件数だけを出す。最初に打った <code>locate bashrc</code> は7行だったのに 8 になったのは、間に打った <code>sudo updatedb</code> で索引が撮り直され、第7章で作った <code>~/work/ch7/bashrc-link</code> も写ったからである（第7章を飛ばしていれば 7 のまま）。</p>
 <p><code>locate skel</code> はパスのどこかに skel を含むものを全部出す（<code>/etc/skel/.bashrc</code> も、名前に skel を含む <code>haskell.vim</code> も）。<code>-b</code> は名前の最後の部分（ベース名）だけで照合するので、<code>/etc/skel</code> の下のファイルは消え、<code>haskell</code> は残った。<code>-d</code> は既定以外の索引を使う指定で、自分で作った索引で確かめられる。</p>
 <pre><code>$ mkdir -p ~/work/dbdemo; touch ~/work/dbdemo/only-here.txt
 $ updatedb -l 0 -U ~/work/dbdemo -o ~/work/dbdemo.db; echo "exit=$?"
@@ -95,7 +98,7 @@ $ locate -d ~/work/dbdemo.db only-here
 <div class="scroll"><table>
 <tr><th>オプション</th><th>意味</th><th>実測</th></tr>
 <tr><td><code>-b</code></td><td>名前の最後の部分（ベース名）だけで照合する</td><td><code>locate -b skel</code></td></tr>
-<tr><td><code>-c</code></td><td>一致した件数だけを出す</td><td><code>7</code></td></tr>
+<tr><td><code>-c</code></td><td>一致した件数だけを出す</td><td><code>8</code>（第7章を飛ばしていれば <code>7</code>）</td></tr>
 <tr><td><code>-d 索引</code></td><td>既定以外の索引を使う</td><td><code>locate -d ~/work/dbdemo.db</code></td></tr>
 <tr><td><code>-e</code></td><td>いま実在するものだけを出す</td><td>前の <code>locate -e new-note</code></td></tr>
 <tr><td><code>-i</code></td><td>大文字小文字を区別しない</td><td><code>locate -i DOT.BASHRC</code></td></tr>

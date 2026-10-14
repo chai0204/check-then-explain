@@ -14,7 +14,7 @@ ssh の切断で処理が消える理由を SIGHUP で説明し、nohup や tmux
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-boot', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-files', 'ファイルとパーミッション', 'ドラフト', 'LinuC レベル1', '101', '1.02', '初級', '演習あり（コンテナ）', '2026-10-13', '2026-10-13',
+  'linuc-files', 'ファイルとパーミッション', 'ドラフト', 'LinuC レベル1', '101', '1.02', '初級', '演習あり（コンテナ）', '2026-10-13', '2026-10-14',
   'LinuC レベル1 101 試験の主題1.02（所有者とパーミッション、ファイル管理、リンク、ファイルの検索）を、コンテナの中で実際に打って確かめる8章。他人の立場は alice・bob・carol として借りる。ファイルの名前はディレクトリに書かれた1行にすぎず、権限・所有者・時刻・中身は inode の側にある。chmod・find・tar・ln を、この1つの構造で説明する。',
   'LinuC レベル1（101）の受験者で、chmod 4755 や find -mtime +7 が、覚えたそばから抜けていく人。端末でコマンドを打てて、docker を動かせることが前提。',
   '「消せるかどうか」を、ファイルではなくディレクトリの権限から判断できる

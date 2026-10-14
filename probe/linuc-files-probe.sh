@@ -51,6 +51,8 @@ R 'ls -l /dev/null /dev/tty /dev/zero /dev/urandom'
 R 'file /dev/null /dev/tty'
 R 'echo "どこにも残らない" > /dev/null'
 R 'head -c 8 /dev/zero | od -c'
+# 名前付きパイプに書いて読む例（& のジョブ・jobs・Done の表示）と grep -w mem /proc/devices は、端末つきの対話シェルで
+# 読者と同じ表示になるよう probe/linuc-files-seq.py で記録した（logs/linuc-files-seq.log。2026-10-14）。
 R 'mkfifo pipe'
 R 'ls -l pipe'
 R 'file pipe'
@@ -94,7 +96,9 @@ R 'chmod 000 secret.txt'
 R 'ls -l secret.txt'
 R 'cat secret.txt'
 R 'sudo cat secret.txt'
-R 'printf "#!/bin/bash\necho 動いた\n" > run.sh'
+# 読者は対話シェルで打つので、二重引用符の中の ! は履歴展開になり event not found で止まる（通しの再現で発見 2026-10-14）。
+# 本文はシングルクォートで書く。この probe は eval で流すので、どちらでも同じファイルができる。
+R "printf '#!/bin/bash\necho 動いた\n' > run.sh"
 R 'chmod 000 run.sh'
 R 'sudo ./run.sh'
 R 'sudo bash -c ./run.sh'
@@ -169,7 +173,7 @@ R 'grep -n bashrc ~/.profile'
 S "3. 特殊なビット（1.02.1）"
 R 'mkdir -p ~/work/ch3; cd ~/work/ch3'
 R 'ls -l /usr/bin/passwd /etc/shadow'
-R 'printf "#!/bin/bash\nid -un\n" > whoami.sh'
+R "printf '#!/bin/bash\nid -un\n' > whoami.sh"
 R 'sudo chown root:root whoami.sh'
 R 'sudo chmod 4755 whoami.sh'
 R 'ls -l whoami.sh'
