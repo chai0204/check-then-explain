@@ -1,53 +1,31 @@
+# 本文の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run --rm -it --hostname linuc、
+# 名前の無いボリューム2つ、PID 1 の bash -l、umask 022、TERM=xterm）の檻に、章ごとに起動し直して打った記録。
+# 端末 80 桁 × 24 行（tmux）。画面に最後に残ったものを書く。作り方: python3 -I probe/linuc-packages-seq.py --script /dev/stdin --cage deb（イメージ lab-linuc-packages-deb:1.1.0）
+# 本文の表と説明が拠っている man の記述
 
 
-========== e-showpkg. 依存を出すのは depends と showpkg。showpkg は版・逆向きの依存・依存をまとめて出す（例題 4932） ==========
+========== 第5章: autoremove の説明と、印は apt-mark で付け替えられること（man apt） ==========
 
-$ apt-cache show labapp | grep '^Depends'
-Depends: liblab (>= 1.0)
+$ man apt | sed -n '/^       autoremove (apt-get(8))$/,/^       satisfy (apt-get(8))$/p'
+       autoremove (apt-get(8))
+           autoremove is used to remove packages that were automatically
+           installed to satisfy dependencies for other packages and are now no
+           longer needed as dependencies changed or the package(s) needing
+           them were removed in the meantime.
 
-$ apt-cache depends labapp
-labapp
-  Depends: liblab
+           You should check that the list does not include applications you
+           have grown to like even though they were once installed just as a
+           dependency of another package. You can mark such a package as
+           manually installed by using apt-mark(8). Packages which you have
+           installed explicitly via install are also never proposed for
+           automatic removal.
 
-$ apt-cache showpkg labapp
-Package: labapp
-Versions: 
-1.0 (/var/lib/apt/lists/_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4)
- Description Language: 
-                 File: /var/lib/apt/lists/_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4
-                  MD5: 
-
-
-Reverse Depends: 
-Dependencies: 
-1.0 - liblab (2 1.0) 
-Provides: 
-1.0 - 
-Reverse Provides: 
-
-$ apt-cache rdepends liblab
-liblab
-Reverse Depends:
-  labapp
-
-$ apt-cache showpkg liblab
-Package: liblab
-Versions: 
-1.0 (/var/lib/apt/lists/_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4)
- Description Language: 
-                 File: /var/lib/apt/lists/_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4
-                  MD5: 
+       satisfy (apt-get(8))
 
 
-Reverse Depends: 
-  labapp,liblab 1.0
-Dependencies: 
-1.0 - 
-Provides: 
-1.0 - 
-Reverse Provides: 
+========== 第5章: apt-cache showpkg は、版ごとの依存関係と逆向きの依存関係をまとめて出す（man apt-cache） ==========
 
-$ MANWIDTH=80 man apt-cache | sed -n "/^ *showpkg pkg\.\.\.$/,/^ *stats$/p"
+$ man apt-cache | sed -n '/^       showpkg pkg\.\.\.$/,/^       stats$/p'
 troff:<standard input>:528: warning [p 6, 1.2i]: cannot break line
        showpkg pkg...
            showpkg displays information about the packages listed on the
@@ -81,3 +59,201 @@ troff:<standard input>:528: warning [p 6, 1.2i]: cannot break line
            apt source code.
 
        stats
+
+
+========== 第6章: sources.list.d/ のファイルは .list（1行の形式）か .sources（deb822 形式）で終わる。1行の形式の欄と、[ ] のオプションは省ける（man sources.list） ==========
+
+$ man sources.list | sed -n '/^SOURCES.LIST.D$/,/^DEB822-STYLE FORMAT$/p'
+SOURCES.LIST.D
+       The /etc/apt/sources.list.d directory provides a way to add
+       sources.list entries in separate files. Two different file formats are
+       allowed as described in the next two sections. Filenames need to have
+       either the extension .list or .sources depending on the contained
+       format. The filenames may only contain letters (a-z and A-Z), digits
+       (0-9), underscore (_), hyphen (-) and period (.) characters. Otherwise
+       APT will print a notice that it has ignored a file, unless that file
+       matches a pattern in the Dir::Ignore-Files-Silently configuration list
+       - in which case it will be silently ignored.
+
+ONE-LINE-STYLE FORMAT
+       Files in this format have the extension .list. Each line specifying a
+       source starts with a type (e.g.  deb-src) followed by options and
+       arguments for this type. Individual entries cannot be continued onto a
+       following line. Empty lines are ignored, and a # character anywhere on
+       a line marks the remainder of that line as a comment. Consequently an
+       entry can be disabled by commenting out the entire line. If options
+       should be provided they are separated by spaces and all of them
+       together are enclosed by square brackets ([]) included in the line
+       after the type separated from it with a space. If an option allows
+       multiple values these are separated from each other with a comma (,).
+       An option name is separated from its value(s) by an equals sign (=).
+       Multivalue options also have -= and += as separators, which instead of
+       replacing the default with the given value(s) modify the default
+       value(s) to remove or include the given values.
+
+       This is the traditional format and supported by all apt versions. Note
+       that not all options as described below are supported by all apt
+       versions. Note also that some older applications parsing this format on
+       their own might not expect to encounter options as they were uncommon
+       before the introduction of multi-architecture support.
+
+DEB822-STYLE FORMAT
+
+
+========== 第6章の表: apt の upgrade と full-upgrade（man apt） ==========
+
+$ man apt | sed -n '/^       upgrade (apt-get(8))$/,/^       install, reinstall, remove, purge (apt-get(8))$/p'
+       upgrade (apt-get(8))
+           upgrade is used to install available upgrades of all packages
+           currently installed on the system from the sources configured via
+           sources.list(5). New packages will be installed if required to
+           satisfy dependencies, but existing packages will never be removed.
+           If an upgrade for a package requires the removal of an installed
+           package the upgrade for this package isn't performed.
+
+           When a package is supplied as an argument, the package will be
+           installed prior to the upgrade action.
+
+       full-upgrade (apt-get(8))
+           full-upgrade performs the function of upgrade but will remove
+           currently installed packages if this is needed to upgrade the
+           system as a whole.
+
+           When a package is supplied as an argument, the package will be
+           installed prior to the upgrade action.
+
+       install, reinstall, remove, purge (apt-get(8))
+
+
+========== 第6章の表: apt-get の upgrade と dist-upgrade（man apt-get） ==========
+
+$ man apt-get | sed -n '/^       upgrade$/,/^       dselect-upgrade$/p'
+       upgrade
+           upgrade is used to install the newest versions of all packages
+           currently installed on the system from the sources enumerated in
+           /etc/apt/sources.list. Packages currently installed with new
+           versions available are retrieved and upgraded; under no
+           circumstances are currently installed packages removed, or packages
+           not already installed retrieved and installed. New versions of
+           currently installed packages that cannot be upgraded without
+           changing the install status of another package will be left at
+           their current version. An update must be performed first so that
+           apt-get knows that new versions of packages are available.
+
+           When a package is supplied as an argument, the package will be
+           installed prior to the upgrade action.
+
+       dist-upgrade
+           dist-upgrade in addition to performing the function of upgrade,
+           also intelligently handles changing dependencies with new versions
+           of packages; apt-get has a "smart" conflict resolution system, and
+           it will attempt to upgrade the most important packages at the
+           expense of less important ones if necessary. The dist-upgrade
+           command may therefore remove some packages. The
+           /etc/apt/sources.list file contains a list of locations from which
+           to retrieve desired package files. See also apt_preferences(5) for
+           a mechanism for overriding the general settings for individual
+           packages.
+
+           When a package is supplied as an argument, the package will be
+           installed prior to the upgrade action.
+
+       dselect-upgrade
+
+
+========== 第6章の表: install は、入っているものを1つだけ上げるのにも使う（man apt-get） ==========
+
+$ man apt-get | grep -A5 'This is also the target to use'
+           This is also the target to use if you want to upgrade one or more
+           already-installed packages without upgrading every package you have
+           on your system. Unlike the "upgrade" target, which installs the
+           newest version of all currently installed packages, "install" will
+           install the newest version of only the package(s) specified. Simply
+           provide the name of the package(s) you wish to upgrade, and if a
+
+
+========== 第7章: -f は --fix-broken（man apt-get） ==========
+
+$ man apt-get | sed -n '/^       -f, --fix-broken$/,/^       -m, --ignore-missing, --fix-missing$/p'
+       -f, --fix-broken
+           Fix; attempt to correct a system with broken dependencies in place.
+           This option, when used with install/remove, can omit any packages
+           to permit APT to deduce a likely solution. If packages are
+           specified, these have to completely correct the problem. The option
+           is sometimes necessary when running APT for the first time; APT
+           itself does not allow broken package dependencies to exist on a
+           system. It is possible that a system's dependency structure can be
+           so corrupt as to require manual intervention (which usually means
+           using dpkg --remove to eliminate some of the offending packages).
+           Use of this option together with -m may produce an error in some
+           situations. Configuration Item: APT::Get::Fix-Broken.
+
+       -m, --ignore-missing, --fix-missing
+
+
+========== 第7章: dpkg --configure の -a（man dpkg） ==========
+
+$ man dpkg | sed -n '/^       --configure package\.\.\.|-a|--pending$/,/^           Configuring consists of the following steps:$/p'
+       --configure package...|-a|--pending
+           Configure a package which has been unpacked but not yet configured.
+           If -a or --pending is given instead of package,  all  unpacked  but
+           unconfigured packages are configured.
+
+           To reconfigure a package which has already been configured, try the
+           dpkg-reconfigure(8)  command  instead (which is part of the debconf
+           project).
+
+           Configuring consists of the following steps:
+
+
+========== 第7章: debconf-show は、そのパッケージの質問と答えを出し、もう出された質問に * を付ける（man debconf-show） ==========
+
+$ man debconf-show | sed -n '/^DESCRIPTION$/,/^OPTIONS$/p'
+DESCRIPTION
+       debconf-show lets you query the debconf database in different ways.
+
+       The most common use is "debconf-show packagename", which displays all
+       items in the debconf database owned by a given package, and their
+       current values.  Questions that have been asked already are prefixed
+       with an '*'.
+
+       This can be useful as a debugging aid, and especially handy in bug
+       reports involving a package's use of debconf.
+
+OPTIONS
+
+
+========== 第7章: dpkg-reconfigure の -f（使う画面の種類）（man dpkg-reconfigure） ==========
+
+$ man dpkg-reconfigure | sed -n '/^       -ftype, --frontend=type$/,/^       -pvalue, --priority=value$/p'
+       -ftype, --frontend=type
+           Select the frontend to use. The default frontend can be permanently
+           changed by:
+
+            dpkg-reconfigure debconf
+
+           Note   that   if   you   normally  have  debconf  set  to  use  the
+           noninteractive  frontend,  dpkg-reconfigure  will  use  the  dialog
+           frontend instead, so you actually get to reconfigure the package.
+
+       -pvalue, --priority=value
+
+
+========== 第10章の表: apt-get clean と distclean（man apt-get） ==========
+
+$ man apt-get | sed -n '/^       clean$/,/^       autoclean (and the auto-clean alias since 1.1)$/p'
+       clean
+           clean clears out the local repository of retrieved package files.
+           It removes everything but the lock file from
+           /var/cache/apt/archives/ and /var/cache/apt/archives/partial/.
+
+       autoclean (and the auto-clean alias since 1.1)
+
+$ man apt-get | sed -n '/^       distclean (and the dist-clean alias)$/,/^       autoremove (and the auto-remove alias since 1.1)$/p'
+       distclean (and the dist-clean alias)
+           distclean removes all files under /var/lib/apt/lists except
+           Release, Release.gpg, and InRelease. It can be used for example,
+           when finalizing images distributed to users. The release files are
+           kept for security reasons, to prevent various types of attacks.
+
+       autoremove (and the auto-remove alias since 1.1)

@@ -1,18 +1,308 @@
 # 本文の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run --rm -it --hostname linuc、
 # 名前の無いボリューム2つ、PID 1 の bash -l、umask 022、TERM=xterm）の檻に、章ごとに起動し直して打った記録。
-# 端末 80 桁 × 24 行（tmux）。画面に最後に残ったものを書く。作り方: python3 -I probe/linuc-packages-seq.py（イメージ lab-linuc-packages-deb:1.0.1）
+# 端末 80 桁 × 24 行（tmux）。画面に最後に残ったものを書く。作り方: python3 -I probe/linuc-packages-seq.py（イメージ lab-linuc-packages-deb:1.1.0）
 
 
-========== 1. 01-package.html ==========
+========== 1. 01-install.html ==========
 
-$ ls -l /srv/lab-repo/pool/main/l/labapp/
-total 4
--rw-r--r-- 1 root root 1076 Oct 13 09:57 labapp_1.0_all.deb
+$ labhello
+bash: labhello: command not found
 
-$ file /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb
-/srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb: Debian binary package (format 2.0), with control.tar.zst, data compression zst
+$ sudo apt install labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following NEW packages will be installed:
+  labhello
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1120 B of archives.
+After this operation, 77.8 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+Selecting previously unselected package labhello.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
 
-$ dpkg-deb -I /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb
+$ labhello
+labhello 1.0
+
+$ sudo apt remove labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages will be REMOVED:
+  labhello
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
+After this operation, 77.8 kB disk space will be freed.
+Do you want to continue? [Y/n] y
+(Reading database ... 12837 files and directories currently installed.)
+Removing labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ labhello
+bash: /usr/bin/labhello: No such file or directory
+
+$ hash -r
+
+$ labhello
+bash: labhello: command not found
+
+
+========== 2. 02-list.html ==========
+
+$ dpkg -l
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name                        Version                           Architecture >
++++-===========================-=================================-============->
+ii  apt                         2.8.3                             amd64        >
+ii  apt-file                    3.3                               all          >
+ii  apt-utils                   2.8.3                             amd64        >
+ii  base-files                  13ubuntu10.5                      amd64        >
+ii  base-passwd                 3.6.3build1                       amd64        >
+ii  bash                        5.2.21-2ubuntu4                   amd64        >
+ii  bash-completion             1:2.11-8                          all          >
+ii  bc                          1.07.1-3ubuntu4                   amd64        >
+ii  bsdextrautils               2.39.3-9ubuntu6.6                 amd64        >
+ii  bsdutils                    1:2.39.3-9ubuntu6.6               amd64        >
+ii  ca-certificates             20260601~24.04.1                  all          >
+ii  coreutils                   9.4-3ubuntu6.3                    amd64        >
+ii  curl                        8.5.0-2ubuntu10.15                amd64        >
+ii  dash                        0.5.12-6ubuntu5                   amd64        >
+ii  debconf                     1.5.86ubuntu1                     all          >
+ii  debianutils                 5.17build1                        amd64        >
+ii  diffutils                   1:3.10-1ubuntu0.1                 amd64        >
+ii  dpkg                        1.22.6ubuntu6.6                   amd64        >
+
+$ dpkg -l | grep -c '^ii'
+168
+
+$ dpkg -l 'lab*'
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-==================================>
+ii  labbackup      1.0          all          practice backup command
+ii  labfortune     1.0          all          prints a fortune for the day
+ii  labsvc         1.0          all          sample service tool with a config >
+ii  labsvc-common  1.0          all          data files for labsvc
+ii  labweb         1.0          all          sample web board with a config file
+ii  labweb-data    1.0          all          data files for labweb
+
+$ dpkg -l 'lab*' | cat
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-======================================
+ii  labbackup      1.0          all          practice backup command
+ii  labfortune     1.0          all          prints a fortune for the day
+ii  labsvc         1.0          all          sample service tool with a config file
+ii  labsvc-common  1.0          all          data files for labsvc
+ii  labweb         1.0          all          sample web board with a config file
+ii  labweb-data    1.0          all          data files for labweb
+
+$ dpkg -l labhello
+dpkg-query: no packages found matching labhello
+
+$ apt list labhello
+Listing... Done
+labhello/lab 1.0 all
+
+$ labhello
+bash: labhello: command not found
+
+$ apt list --installed 'lab*'
+Listing... Done
+labbackup/lab,now 1.0 all [installed]
+labfortune/lab,now 1.0 all [installed]
+labsvc-common/lab,now 1.0 all [installed,automatic]
+labsvc/lab,now 1.0 all [installed]
+labweb-data/lab,now 1.0 all [installed,automatic]
+labweb/lab,now 1.0 all [installed]
+
+$ dpkg -s labsvc
+Package: labsvc
+Status: install ok installed
+Priority: optional
+Section: admin
+Installed-Size: 40
+Maintainer: check-then-explain <lab@example.invalid>
+Architecture: all
+Version: 1.0
+Depends: labsvc-common (>= 1.0)
+Conffiles:
+ /etc/labsvc.conf b80eac61a4576d1a58b32b4df52a77dd
+Description: sample service tool with a config file
+ Used to practice remove, purge and autoremove.
+
+$ apt show labsvc
+Package: labsvc
+Version: 1.0
+Priority: optional
+Section: admin
+Maintainer: check-then-explain <lab@example.invalid>
+Installed-Size: 41.0 kB
+Depends: labsvc-common (>= 1.0)
+Download-Size: 932 B
+APT-Manual-Installed: yes
+APT-Sources: file:/srv/lab-repo lab/main amd64 Packages
+Description: sample service tool with a config file
+ Used to practice remove, purge and autoremove.
+
+
+$ dpkg -s labhello
+dpkg-query: package 'labhello' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+
+$ apt show labhello
+Package: labhello
+Version: 1.0
+Priority: optional
+Section: utils
+Maintainer: check-then-explain <lab@example.invalid>
+Installed-Size: 77.8 kB
+Download-Size: 1120 B
+APT-Sources: file:/srv/lab-repo lab/main amd64 Packages
+Description: prints its own version
+ A tiny package used to practice upgrades.
+
+
+$ sudo apt install labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following NEW packages will be installed:
+  labhello
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1120 B of archives.
+After this operation, 77.8 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+Selecting previously unselected package labhello.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ dpkg -l labhello | tail -1
+ii  labhello       1.0          all          prints its own version
+
+$ sudo apt remove labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages will be REMOVED:
+  labhello
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
+After this operation, 77.8 kB disk space will be freed.
+Do you want to continue? [Y/n] y
+(Reading database ... 12837 files and directories currently installed.)
+Removing labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ dpkg -l labhello
+dpkg-query: no packages found matching labhello
+
+
+========== 3. 03-files.html ==========
+
+$ sudo apt install labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following NEW packages will be installed:
+  labhello
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1120 B of archives.
+After this operation, 77.8 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+Selecting previously unselected package labhello.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ which labhello
+/usr/bin/labhello
+
+$ dpkg -L labhello
+/.
+/usr
+/usr/bin
+/usr/bin/labhello
+/usr/share
+/usr/share/doc
+/usr/share/doc/labhello
+/usr/share/doc/labhello/README
+/usr/share/man
+/usr/share/man/man1
+/usr/share/man/man1/labhello.1.gz
+
+$ cat /usr/share/doc/labhello/README
+labhello 1.0 - 確かめて説明する LinuC 主題1.04 の練習用パッケージ
+自分の版を1行表示するだけのコマンドです。
+
+  labhello      → labhello 1.0 と表示する
+
+$ man -w labhello
+/usr/share/man/man1/labhello.1.gz
+
+$ dpkg -L ls
+dpkg-query: package 'ls' is not installed
+Use dpkg --contents (= dpkg-deb --contents) to list archive files contents.
+
+$ which ls
+/usr/bin/ls
+
+$ dpkg -S /usr/bin/ls
+coreutils: /usr/bin/ls
+
+$ dpkg -S /usr/bin/labhello
+labhello: /usr/bin/labhello
+
+$ dpkg -S /etc/sudoers
+sudo: /etc/sudoers
+
+$ dpkg -L sudo | grep etc
+/etc
+/etc/pam.d
+/etc/pam.d/sudo
+/etc/pam.d/sudo-i
+/etc/sudo.conf
+/etc/sudo_logsrvd.conf
+/etc/sudoers
+/etc/sudoers.d
+/etc/sudoers.d/README
+
+$ apt download labapp
+Get:1 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
+
+$ ls -l
+total 8
+-rw-r--r-- 1 lab lab 1076 Oct 20 21:33 labapp_1.0_all.deb
+drwxr-xr-x 2 lab lab 4096 Sep 30 19:32 work
+
+$ dpkg -c labapp_1.0_all.deb
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./etc/
+-rw-r--r-- root/root        93 2026-10-01 09:00 ./etc/labapp.conf
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/bin/
+-rwxr-xr-x root/root       188 2026-10-01 09:00 ./usr/bin/labapp
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/share/
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/share/doc/
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/share/doc/labapp/
+-rw-r--r-- root/root       128 2026-10-01 09:00 ./usr/share/doc/labapp/README
+
+$ dpkg -I labapp_1.0_all.deb
  new Debian package, version 2.0.
  size 1076 bytes: control archive=347 bytes.
       17 bytes,     1 lines      conffiles
@@ -28,175 +318,181 @@ $ dpkg-deb -I /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb
  Description: sample application that needs liblab
   Prints a greeting. The greeting is read from /etc/labapp.conf.
 
-$ dpkg-deb -c /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb
-drwxr-xr-x root/root         0 2026-10-01 09:00 ./
-drwxr-xr-x root/root         0 2026-10-01 09:00 ./etc/
--rw-r--r-- root/root        93 2026-10-01 09:00 ./etc/labapp.conf
-drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/
-drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/bin/
--rwxr-xr-x root/root       188 2026-10-01 09:00 ./usr/bin/labapp
-drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/share/
-drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/share/doc/
-drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/share/doc/labapp/
--rw-r--r-- root/root       128 2026-10-01 09:00 ./usr/share/doc/labapp/README
+$ dpkg -l labapp
+dpkg-query: no packages found matching labapp
 
-$ dpkg-deb -f /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb Package Version Depends
-Package: labapp
+
+========== 4. 04-ledger.html ==========
+
+$ ls /var/lib/dpkg/
+alternatives  diversions      lock           status      updates
+available     diversions-old  lock-frontend  status-old
+cmethopt      info            parts          triggers
+
+$ sudo apt install labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following NEW packages will be installed:
+  labhello
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1120 B of archives.
+After this operation, 77.8 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+Selecting previously unselected package labhello.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ grep -A9 '^Package: labhello$' /var/lib/dpkg/status
+Package: labhello
+Status: install ok installed
+Priority: optional
+Section: utils
+Installed-Size: 76
+Maintainer: check-then-explain <lab@example.invalid>
+Architecture: all
 Version: 1.0
-Depends: liblab (>= 1.0)
+Description: prints its own version
+ A tiny package used to practice upgrades.
 
-$ sudo dpkg-deb -x /srv/lab-repo/pool/main/libl/liblab/liblab_1.0_all.deb /
+$ cat /var/lib/dpkg/info/labhello.list
+/.
+/usr
+/usr/bin
+/usr/bin/labhello
+/usr/share
+/usr/share/doc
+/usr/share/doc/labhello
+/usr/share/doc/labhello/README
+/usr/share/man
+/usr/share/man/man1
+/usr/share/man/man1/labhello.1.gz
+
+$ cat /var/lib/dpkg/info/labhello.md5sums
+6be84e0d8606ca3736aa91842490e59b  usr/bin/labhello
+8e9bcd880a99bacdc323fd47fd5d93ec  usr/share/doc/labhello/README
+b05396f6cf7828a35df2ccec28d866ec  usr/share/man/man1/labhello.1.gz
+
+$ md5sum /usr/bin/labhello
+6be84e0d8606ca3736aa91842490e59b  /usr/bin/labhello
+
+$ sudo rm /usr/bin/labhello
+
+$ labhello
+bash: labhello: command not found
+
+$ dpkg -l labhello | tail -1
+ii  labhello       1.0          all          prints its own version
+
+$ dpkg -L labhello
+/.
+/usr
+/usr/bin
+/usr/bin/labhello
+/usr/share
+/usr/share/doc
+/usr/share/doc/labhello
+/usr/share/doc/labhello/README
+/usr/share/man
+/usr/share/man/man1
+/usr/share/man/man1/labhello.1.gz
+
+$ dpkg -V labhello
+missing     /usr/bin/labhello
+
+$ echo $?
+0
+
+$ sudo apt reinstall labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+0 upgraded, 0 newly installed, 1 reinstalled, 0 to remove and 0 not upgraded.
+Need to get 0 B/1120 B of archives.
+After this operation, 0 B of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+(Reading database ... 12837 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.0_all.deb ...
+Unpacking labhello (1.0) over (1.0) ...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ dpkg -V labhello
+
+$ labhello
+labhello 1.0
+
+$ echo '# 書き足した' | sudo tee -a /usr/bin/labhello
+# 書き足した
+
+$ dpkg -V labhello
+??5??????   /usr/bin/labhello
+
+$ apt download liblab
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+
+$ sudo dpkg-deb -x liblab_1.0_all.deb /
 
 $ ls -l /usr/lib/liblab/liblab.sh
 -rw-r--r-- 1 root root 106 Oct  1 09:00 /usr/lib/liblab/liblab.sh
 
-$ . /usr/lib/liblab/liblab.sh; lab_greet "ファイルは置けた"
-liblab: ファイルは置けた
-
-$ dpkg -l liblab; echo "exit=$?"
-dpkg-query: no packages found matching liblab
-exit=1
-
-$ dpkg -S /usr/lib/liblab/liblab.sh; echo "exit=$?"
+$ dpkg -S /usr/lib/liblab/liblab.sh
 dpkg-query: no path found matching pattern /usr/lib/liblab/liblab.sh
-exit=1
 
-$ sudo dpkg -i /srv/lab-repo/pool/main/libl/liblab/liblab_1.0_all.deb
+$ dpkg -l liblab
+dpkg-query: no packages found matching liblab
+
+$ sudo apt install liblab
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following NEW packages will be installed:
+  liblab
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/746 B of archives.
+After this operation, 36.9 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
 Selecting previously unselected package liblab.
-(Reading database ... 12824 files and directories currently installed.)
+(Reading database ... 12837 files and directories currently installed.)
 Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
 Unpacking liblab (1.0) ...
 Setting up liblab (1.0) ...
 
-$ dpkg -l liblab
-（打鍵: q）
-Desired=Unknown/Install/Remove/Purge/Hold
-| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
-|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
-||/ Name           Version      Architecture Description
-+++-==============-============-============-==================================>
-ii  liblab         1.0          all          small shell library for lab progra>
-
 $ dpkg -S /usr/lib/liblab/liblab.sh
 liblab: /usr/lib/liblab/liblab.sh
 
-$ ls /var/lib/dpkg/info/liblab.*
-/var/lib/dpkg/info/liblab.list  /var/lib/dpkg/info/liblab.md5sums
 
-$ cat /var/lib/dpkg/info/liblab.list
-/.
-/usr
-/usr/lib
-/usr/lib/liblab
-/usr/lib/liblab/liblab.sh
+========== 5. 05-depends.html ==========
 
-$ cat /var/lib/dpkg/info/liblab.md5sums
-edf88576797eb2b33ac55dfd8c17cbe2  usr/lib/liblab/liblab.sh
+$ sudo apt install labapp
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following additional packages will be installed:
+  liblab
+The following NEW packages will be installed:
+  labapp liblab
+0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1822 B of archives.
+After this operation, 106 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+Get:2 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
+Selecting previously unselected package liblab.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Selecting previously unselected package labapp.
+Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
+Unpacking labapp (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labapp (1.0) ...
 
-$ grep -A10 '^Package: liblab$' /var/lib/dpkg/status
-Package: liblab
-Status: install ok installed
-Priority: optional
-Section: libs
-Installed-Size: 36
-Maintainer: check-then-explain <lab@example.invalid>
-Architecture: all
-Version: 1.0
-Description: small shell library for lab programs
- labapp reads this file. It provides one shell function, lab_greet.
-
-
-$ grep -c '^Package: ' /var/lib/dpkg/status
-166
-
-$ find /srv/lab-repo -type f | sort
-/srv/lab-repo/dists/lab/Release
-/srv/lab-repo/dists/lab/main/Contents-amd64
-/srv/lab-repo/dists/lab/main/Contents-amd64.gz
-/srv/lab-repo/dists/lab/main/binary-amd64/Packages
-/srv/lab-repo/dists/lab/main/binary-amd64/Packages.gz
-/srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb
-/srv/lab-repo/pool/main/l/labhello/labhello_1.0_all.deb
-/srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
-/srv/lab-repo/pool/main/l/labnote-data/labnote-data_1.0_all.deb
-/srv/lab-repo/pool/main/l/labsvc-common/labsvc-common_1.0_all.deb
-/srv/lab-repo/pool/main/l/labsvc/labsvc_1.0_all.deb
-/srv/lab-repo/pool/main/libl/liblab/liblab_1.0_all.deb
-
-$ zcat /srv/lab-repo/dists/lab/main/binary-amd64/Packages.gz | grep -A16 '^Package: labapp$'
-Package: labapp
-Architecture: all
-Version: 1.0
-Priority: optional
-Section: utils
-Maintainer: check-then-explain <lab@example.invalid>
-Installed-Size: 68
-Depends: liblab (>= 1.0)
-Filename: pool/main/l/labapp/labapp_1.0_all.deb
-Size: 1076
-MD5sum: 6259815bebeec6475753bd94b2b2a880
-SHA1: d00f28878845e983014107666c5bcf0231a9b656
-SHA256: 0e71be90d76bc38588f1e740e536994ebf1f90abcb32297b30d96ac860a6f96e
-SHA512: 8059ff71459d2d9e14459f6e9cb1f8a3acf2124b84eaaef8de860389ecb3d9de92ec3987dae89e41b4de9e21573ae239bda1667acf2b036102135e6877245ea7
-Description: sample application that needs liblab
- Prints a greeting. The greeting is read from /etc/labapp.conf.
-
-
-$ ls -1 /var/lib/apt/lists/ | grep lab-repo
-_srv_lab-repo_dists_lab_Release
-_srv_lab-repo_dists_lab_main_Contents-amd64.lz4
-_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4
-
-$ apt-cache policy labapp
-labapp:
-  Installed: (none)
-  Candidate: 1.0
-  Version table:
-     1.0 500
-        500 file:/srv/lab-repo lab/main amd64 Packages
-
-$ dpkg -l labapp; echo "exit=$?"
-dpkg-query: no packages found matching labapp
-exit=1
-
-
-========== 2. 02-apt.html ==========
-
-$ apt-cache search liblab
-labapp - sample application that needs liblab
-liblab - small shell library for lab programs
-liblab-gamut1 - rich set of graph drawing tools - liblab_gamut library
-liblablgl-ocaml - Runtime libraries for lablgl
-liblablgl-ocaml-dev - OpenGL interface for Objective Caml
-liblablgtk3-ocaml - OCaml bindings to Gtk+ version 3 (runtime)
-liblablgtk3-ocaml-dev - OCaml bindings to Gtk+ version 3 (development files)
-liblablgtk3-ocaml-doc - OCaml bindings to Gtk+ version 3 (documentation)
-liblablgtksourceview3-ocaml - OCaml bindings for libgtksourceview3 (runtime)
-liblablgtksourceview3-ocaml-dev - OCaml bindings for libgtksourceview3 (development files)
-liblablgtkspell3-ocaml - OCaml bindings for libgtkspell3 (runtime)
-liblablgtkspell3-ocaml-dev - OCaml bindings for libgtkspell3 (development files)
-liblabltk-ocaml - OCaml bindings to Tcl/Tk (runtime libraries)
-liblabltk-ocaml-dev - OCaml bindings to Tcl/Tk (dev. libraries)
-
-$ apt-cache show labapp
-Package: labapp
-Architecture: all
-Version: 1.0
-Priority: optional
-Section: utils
-Maintainer: check-then-explain <lab@example.invalid>
-Installed-Size: 68
-Depends: liblab (>= 1.0)
-Filename: pool/main/l/labapp/labapp_1.0_all.deb
-Size: 1076
-MD5sum: 6259815bebeec6475753bd94b2b2a880
-SHA1: d00f28878845e983014107666c5bcf0231a9b656
-SHA256: 0e71be90d76bc38588f1e740e536994ebf1f90abcb32297b30d96ac860a6f96e
-SHA512: 8059ff71459d2d9e14459f6e9cb1f8a3acf2124b84eaaef8de860389ecb3d9de92ec3987dae89e41b4de9e21573ae239bda1667acf2b036102135e6877245ea7
-Description: sample application that needs liblab
- Prints a greeting. The greeting is read from /etc/labapp.conf.
-Description-md5:
-
+$ labapp
+liblab: hello from labapp 1.0
 
 $ apt-cache depends labapp
 labapp
@@ -207,41 +503,10 @@ liblab
 Reverse Depends:
   labapp
 
-$ apt-cache depends apt
-apt
- |Depends: base-passwd
-  Depends: adduser
-  Depends: gpgv
-  Depends: libapt-pkg6.0t64
-  Depends: ubuntu-keyring
-  Depends: libc6
-  Depends: libgcc-s1
-  Depends: libgnutls30t64
-  Depends: libseccomp2
-  Depends: libstdc++6
-  Depends: libsystemd0
-  Conflicts: <apt-verify>
-  Conflicts: <libnettle8>
-  Breaks: apt-transport-https
-  Breaks: apt-utils
-  Breaks: aptitude
-  Recommends: ca-certificates
-  Suggests: apt-doc
- |Suggests: aptitude
- |Suggests: synaptic
-  Suggests: wajig
-  Suggests: dpkg-dev
- |Suggests: gnupg
- |Suggests: gnupg2
-  Suggests: gnupg1
-  Suggests: powermgmt-base
-  Replaces: apt-transport-https
-  Replaces: apt-utils
-
 $ apt-cache showpkg labapp
 Package: labapp
 Versions:
-1.0 (/var/lib/apt/lists/_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4)
+1.0 (/var/lib/apt/lists/_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4) (/var/lib/dpkg/status)
  Description Language:
                  File: /var/lib/apt/lists/_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4
                   MD5:
@@ -254,81 +519,24 @@ Provides:
 1.0 -
 Reverse Provides:
 
-$ apt-cache showpkg liblab
-Package: liblab
-Versions:
-1.0 (/var/lib/apt/lists/_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4)
- Description Language:
-                 File: /var/lib/apt/lists/_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4
-                  MD5:
-
-
-Reverse Depends:
-  labapp,liblab 1.0
-Dependencies:
-1.0 -
-Provides:
-1.0 -
-Reverse Provides:
-
-$ apt-cache policy labhello
-labhello:
-  Installed: 1.0
-  Candidate: 1.1
-  Version table:
-     1.1 500
-        500 file:/srv/lab-repo lab/main amd64 Packages
- *** 1.0 500
-        500 file:/srv/lab-repo lab/main amd64 Packages
-        100 /var/lib/dpkg/status
-
-$ apt-cache policy tree
-tree:
-  Installed: 2.1.1-2ubuntu3.24.04.2
-  Candidate: 2.1.1-2ubuntu3.24.04.2
-  Version table:
- *** 2.1.1-2ubuntu3.24.04.2 500
-        500 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates/universe amd64 Packages
-        100 /var/lib/dpkg/status
-     2.1.1-2ubuntu3 500
-        500 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble/universe amd64 Packages
-
-$ sudo apt install -y labapp
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-The following additional packages will be installed:
-  liblab
-The following NEW packages will be installed:
-  labapp liblab
-0 upgraded, 2 newly installed, 0 to remove and 3 not upgraded.
-Need to get 0 B/1822 B of archives.
-After this operation, 106 kB of additional disk space will be used.
-Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
-Get:2 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
-Selecting previously unselected package liblab.
-(Reading database ... 12824 files and directories currently installed.)
-Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
-Unpacking liblab (1.0) ...
-Selecting previously unselected package labapp.
-Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
-Unpacking labapp (1.0) ...
-Setting up liblab (1.0) ...
-Setting up labapp (1.0) ...
-
-$ labapp
-liblab: hello from labapp 1.0
-
 $ apt-mark showauto | grep lab
 labsvc-common
+labweb-data
 liblab
 
 $ apt-mark showmanual | grep lab
 labapp
-labhello
+labbackup
+labfortune
 labsvc
+labweb
 
-$ sudo apt remove -y labapp
+$ grep -A2 '^Package: liblab$' /var/lib/apt/extended_states
+Package: liblab
+Architecture: amd64
+Auto-Installed: 1
+
+$ sudo apt remove labapp
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
@@ -337,9 +545,10 @@ The following package was automatically installed and is no longer required:
 Use 'sudo apt autoremove' to remove it.
 The following packages will be REMOVED:
   labapp
-0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
 After this operation, 69.6 kB disk space will be freed.
-(Reading database ... 12830 files and directories currently installed.)
+Do you want to continue? [Y/n] y
+(Reading database ... 12839 files and directories currently installed.)
 Removing labapp (1.0) ...
 
 $ dpkg -l labapp | tail -1
@@ -348,11 +557,14 @@ rc  labapp         1.0          all          sample application that needs libla
 $ ls -l /etc/labapp.conf
 -rw-r--r-- 1 root root 93 Oct  1 09:00 /etc/labapp.conf
 
+$ dpkg -l liblab | tail -1
+ii  liblab         1.0          all          small shell library for lab programs
+
 $ dpkg -s labapp | head -2
 Package: labapp
 Status: deinstall ok config-files
 
-$ sudo apt purge -y labapp
+$ sudo apt purge labapp
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
@@ -361,243 +573,102 @@ The following package was automatically installed and is no longer required:
 Use 'sudo apt autoremove' to remove it.
 The following packages will be REMOVED:
   labapp*
-0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
 After this operation, 0 B of additional disk space will be used.
-(Reading database ... 12827 files and directories currently installed.)
+Do you want to continue? [Y/n] y
+(Reading database ... 12836 files and directories currently installed.)
 Purging configuration files for labapp (1.0) ...
 
-$ dpkg -l labapp; echo "exit=$?"
+$ dpkg -l labapp
 dpkg-query: no packages found matching labapp
-exit=1
-
-$ ls -l /etc/labapp.conf; echo "exit=$?"
-ls: cannot access '/etc/labapp.conf': No such file or directory
-exit=2
-
-$ dpkg -l liblab | tail -1
-ii  liblab         1.0          all          small shell library for lab programs
-
-$ sudo apt autoremove -y
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-The following packages will be REMOVED:
-  liblab
-0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
-After this operation, 36.9 kB disk space will be freed.
-(Reading database ... 12826 files and directories currently installed.)
-Removing liblab (1.0) ...
-
-$ dpkg -l liblab; echo "exit=$?"
-dpkg-query: no packages found matching liblab
-exit=1
-
-$ sudo apt install -y labapp
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-The following additional packages will be installed:
-  liblab
-The following NEW packages will be installed:
-  labapp liblab
-0 upgraded, 2 newly installed, 0 to remove and 3 not upgraded.
-Need to get 0 B/1822 B of archives.
-After this operation, 106 kB of additional disk space will be used.
-Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
-Get:2 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
-Selecting previously unselected package liblab.
-(Reading database ... 12824 files and directories currently installed.)
-Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
-Unpacking liblab (1.0) ...
-Selecting previously unselected package labapp.
-Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
-Unpacking labapp (1.0) ...
-Setting up liblab (1.0) ...
-Setting up labapp (1.0) ...
-
-$ sudo apt autoremove -y labapp
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-The following packages will be REMOVED:
-  labapp liblab
-0 upgraded, 0 newly installed, 2 to remove and 3 not upgraded.
-After this operation, 106 kB disk space will be freed.
-(Reading database ... 12830 files and directories currently installed.)
-Removing labapp (1.0) ...
-Removing liblab (1.0) ...
-
-$ dpkg -l labapp | tail -1
-rc  labapp         1.0          all          sample application that needs liblab
 
 $ ls -l /etc/labapp.conf
--rw-r--r-- 1 root root 93 Oct  1 09:00 /etc/labapp.conf
+ls: cannot access '/etc/labapp.conf': No such file or directory
 
-$ sudo apt purge -y labapp
+$ sudo apt autoremove
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
 The following packages will be REMOVED:
-  labapp*
-0 upgraded, 0 newly installed, 1 to remove and 3 not upgraded.
-After this operation, 0 B of additional disk space will be used.
-(Reading database ... 12825 files and directories currently installed.)
-Purging configuration files for labapp (1.0) ...
+  liblab
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
+After this operation, 36.9 kB disk space will be freed.
+Do you want to continue? [Y/n] y
+(Reading database ... 12835 files and directories currently installed.)
+Removing liblab (1.0) ...
 
-$ dpkg -l labapp; echo "exit=$?"
-dpkg-query: no packages found matching labapp
-exit=1
+$ dpkg -l liblab
+dpkg-query: no packages found matching liblab
 
-$ apt list --upgradable
-Listing... Done
-labhello/lab 1.1 all [upgradable from: 1.0]
-libaudit-common/noble-updates 1:3.1.2-2.1ubuntu0.1 all [upgradable from: 1:3.1.2-2.1build1.1]
-libaudit1/noble-updates 1:3.1.2-2.1ubuntu0.1 amd64 [upgradable from: 1:3.1.2-2.1build1.1]
 
-$ sudo apt-get -s upgrade
+========== 6. 06-repository.html ==========
+
+$ sudo apt install labhello
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
-Calculating upgrade... Done
-The following packages will be upgraded:
-  labhello libaudit-common libaudit1
-3 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
-Inst libaudit-common [1:3.1.2-2.1build1.1] (1:3.1.2-2.1ubuntu0.1 Ubuntu:24.04/noble-updates [all])
-Conf libaudit-common (1:3.1.2-2.1ubuntu0.1 Ubuntu:24.04/noble-updates [all])
-Inst libaudit1 [1:3.1.2-2.1build1.1] (1:3.1.2-2.1ubuntu0.1 Ubuntu:24.04/noble-updates [amd64])
-Conf libaudit1 (1:3.1.2-2.1ubuntu0.1 Ubuntu:24.04/noble-updates [amd64])
-Inst labhello [1.0] (1.1 lab lab:lab [all])
-Conf labhello (1.1 lab lab:lab [all])
-
-$ labhello
-labhello 1.0
-
-$ sudo apt install -y labhello
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-The following packages will be upgraded:
+The following NEW packages will be installed:
   labhello
-1 upgraded, 0 newly installed, 0 to remove and 2 not upgraded.
-Need to get 0 B/620 B of archives.
-After this operation, 0 B of additional disk space will be used.
-Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.1 [620 B]
-(Reading database ... 12824 files and directories currently installed.)
-Preparing to unpack .../labhello/labhello_1.1_all.deb ...
-Unpacking labhello (1.1) over (1.0) ...
-Setting up labhello (1.1) ...
-
-$ labhello
-labhello 1.1
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1120 B of archives.
+After this operation, 77.8 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+Selecting previously unselected package labhello.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
 
 $ apt-cache policy labhello
 labhello:
-  Installed: 1.1
-  Candidate: 1.1
+  Installed: 1.0
+  Candidate: 1.0
   Version table:
- *** 1.1 500
+ *** 1.0 500
         500 file:/srv/lab-repo lab/main amd64 Packages
         100 /var/lib/dpkg/status
-     1.0 500
-        500 file:/srv/lab-repo lab/main amd64 Packages
 
-$ MANWIDTH=80 man apt | sed -n "/^ *upgrade (apt-get(8))/,/^ *full-upgrade/p"
-       upgrade (apt-get(8))
-           upgrade is used to install available upgrades of all packages
-           currently installed on the system from the sources configured via
-           sources.list(5). New packages will be installed if required to
-           satisfy dependencies, but existing packages will never be removed.
-           If an upgrade for a package requires the removal of an installed
-           package the upgrade for this package isn't performed.
+$ find /srv/lab-repo -type f | sort
+/srv/lab-repo/dists/lab-updates/Release
+/srv/lab-repo/dists/lab-updates/main/Contents-amd64
+/srv/lab-repo/dists/lab-updates/main/Contents-amd64.gz
+/srv/lab-repo/dists/lab-updates/main/binary-amd64/Packages
+/srv/lab-repo/dists/lab-updates/main/binary-amd64/Packages.gz
+/srv/lab-repo/dists/lab/Release
+/srv/lab-repo/dists/lab/main/Contents-amd64
+/srv/lab-repo/dists/lab/main/Contents-amd64.gz
+/srv/lab-repo/dists/lab/main/binary-amd64/Packages
+/srv/lab-repo/dists/lab/main/binary-amd64/Packages.gz
+/srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb
+/srv/lab-repo/pool/main/l/labbackup/labbackup_1.0_all.deb
+/srv/lab-repo/pool/main/l/labfortune/labfortune_1.0_all.deb
+/srv/lab-repo/pool/main/l/labhello/labhello_1.0_all.deb
+/srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
+/srv/lab-repo/pool/main/l/labnote-data/labnote-data_1.0_all.deb
+/srv/lab-repo/pool/main/l/labsvc-common/labsvc-common_1.0_all.deb
+/srv/lab-repo/pool/main/l/labsvc/labsvc_1.0_all.deb
+/srv/lab-repo/pool/main/l/labweb-data/labweb-data_1.0_all.deb
+/srv/lab-repo/pool/main/l/labweb/labweb_1.0_all.deb
+/srv/lab-repo/pool/main/libl/liblab/liblab_1.0_all.deb
 
-           When a package is supplied as an argument, the package will be
-           installed prior to the upgrade action.
-
-       full-upgrade (apt-get(8))
-
-$ MANWIDTH=80 man apt-get | sed -n "/^ *upgrade$/,/^ *dist-upgrade/p"
-       upgrade
-           upgrade is used to install the newest versions of all packages
-           currently installed on the system from the sources enumerated in
-           /etc/apt/sources.list. Packages currently installed with new
-           versions available are retrieved and upgraded; under no
-           circumstances are currently installed packages removed, or packages
-           not already installed retrieved and installed. New versions of
-           currently installed packages that cannot be upgraded without
-           changing the install status of another package will be left at
-           their current version. An update must be performed first so that
-           apt-get knows that new versions of packages are available.
-
-           When a package is supplied as an argument, the package will be
-           installed prior to the upgrade action.
-
-       dist-upgrade
-
-$ MANWIDTH=80 man apt | sed -n "/^ *full-upgrade (apt-get(8))/,/^ *install, reinstall/p"
-       full-upgrade (apt-get(8))
-           full-upgrade performs the function of upgrade but will remove
-           currently installed packages if this is needed to upgrade the
-           system as a whole.
-
-           When a package is supplied as an argument, the package will be
-           installed prior to the upgrade action.
-
-       install, reinstall, remove, purge (apt-get(8))
-
-$ apt-cache show labhello | grep -E "^(Package|Version):"
+$ zcat /srv/lab-repo/dists/lab/main/binary-amd64/Packages.gz | grep -A15 '^Package: labhello$'
 Package: labhello
-Version: 1.1
-Package: labhello
-Version: 1.0
-
-$ apt show labhello 2>/dev/null | grep -E "^(Package|Version):"
-Package: labhello
-Version: 1.1
-
-$ apt show labapp | head -3
-
-WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-
-Package: labapp
+Architecture: all
 Version: 1.0
 Priority: optional
+Section: utils
+Maintainer: check-then-explain <lab@example.invalid>
+Installed-Size: 76
+Filename: pool/main/l/labhello/labhello_1.0_all.deb
+Size: 1120
+MD5sum: 8dc12cfc72d3df5612a807666a6d5aa0
+SHA1: 1031302b8cce72950e97c8e87f00768574959a74
+SHA256: ece77a42e06fec6b141e0d39a192527387b7f55d2fe450d285f85665f766bfe3
+SHA512: f4908cdc9b50b0309215ecefced170ee5c72d2392c55f36069e41881029ca2655cb0379f032b3225aafe34808e9950a52f93c11aed2265bd4e12a17a0026de80
+Description: prints its own version
+ A tiny package used to practice upgrades.
 
-$ apt depends labapp
-labapp
-  Depends: liblab (>= 1.0)
-
-$ apt policy labhello
-labhello:
-  Installed: 1.1
-  Candidate: 1.1
-  Version table:
- *** 1.1 500
-        500 file:/srv/lab-repo lab/main amd64 Packages
-        100 /var/lib/dpkg/status
-     1.0 500
-        500 file:/srv/lab-repo lab/main amd64 Packages
-
-$ MANWIDTH=80 man apt | sed -n "/^ *showsrc, depends, rdepends, policy/,/(summarised in apt-get(8))/p"
-       showsrc, depends, rdepends, policy (summarised in apt-cache(8))
-
-       source, build-dep, download, changelog, clean, distclean, autoclean
-       (summarised in apt-get(8))
-
-$ apt-get download liblab
-Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
-
-$ ls -l *.deb
--rw-r--r-- 1 lab lab 746 Oct 13 21:24 liblab_1.0_all.deb
-
-$ dpkg -l liblab; echo "exit=$?"
-dpkg-query: no packages found matching liblab
-exit=1
-
-$ ls /var/cache/apt/archives/
-lock  partial
-
-
-========== 3. 03-sources.html ==========
 
 $ cat /etc/apt/sources.list
 # Ubuntu sources have moved to the /etc/apt/sources.list.d/ubuntu.sources
@@ -609,10 +680,6 @@ $ cat /etc/apt/sources.list
 # 署名していないので [trusted=yes] で署名の確認を外している。本物のリポジトリでは外さない。
 deb [trusted=yes] file:/srv/lab-repo lab main
 
-$ ls -l /etc/apt/sources.list.d/
-total 4
--rw-r--r-- 1 root root 196 Sep 30 19:04 ubuntu.sources
-
 $ cat /etc/apt/sources.list.d/ubuntu.sources
 Types: deb
 URIs: https://snapshot.ubuntu.com/ubuntu/20260929T000000Z
@@ -620,49 +687,28 @@ Suites: noble noble-updates noble-security
 Components: main universe
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
-$ find /srv/lab-repo/dists -type f | sort
-/srv/lab-repo/dists/lab/Release
-/srv/lab-repo/dists/lab/main/Contents-amd64
-/srv/lab-repo/dists/lab/main/Contents-amd64.gz
-/srv/lab-repo/dists/lab/main/binary-amd64/Packages
-/srv/lab-repo/dists/lab/main/binary-amd64/Packages.gz
+$ echo 'deb [trusted=yes] file:/srv/lab-repo lab-updates main' | sudo tee /etc/apt/sources.list.d/lab-updates.list
+deb [trusted=yes] file:/srv/lab-repo lab-updates main
 
-$ head -9 /srv/lab-repo/dists/lab/Release
-Architectures: amd64
-Codename: lab
-Components: main
-Date: Tue, 13 Oct 2026 00:57:22 +0000
-Description: LinuC 1.04 practice repository (lab)
-Label: lab lab
-Origin: check-then-explain
-Suite: lab
-MD5Sum:
+$ apt-cache policy labhello
+labhello:
+  Installed: 1.0
+  Candidate: 1.0
+  Version table:
+ *** 1.0 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+        100 /var/lib/dpkg/status
 
-$ find /srv/lab-extra -type f | sort
-/srv/lab-extra/dists/extra/Release
-/srv/lab-extra/dists/extra/main/Contents-amd64
-/srv/lab-extra/dists/extra/main/Contents-amd64.gz
-/srv/lab-extra/dists/extra/main/binary-amd64/Packages
-/srv/lab-extra/dists/extra/main/binary-amd64/Packages.gz
-/srv/lab-extra/pool/main/l/labextra/labextra_1.0_all.deb
+$ apt list --upgradable
+Listing... Done
 
-$ echo 'deb file:/srv/lab-extra extra main' | sudo tee /etc/apt/sources.list.d/lab-extra.list
-deb file:/srv/lab-extra extra main
-
-$ apt-cache policy labextra
-N: Unable to locate package labextra
-
-$ sudo apt install -y labextra; echo "exit=$?"
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-E: Unable to locate package labextra
-exit=100
-
-$ ls -1 /var/lib/apt/lists/ | grep -v -e lock -e partial -e auxfiles
+$ ls /var/lib/apt/lists/
 _srv_lab-repo_dists_lab_Release
 _srv_lab-repo_dists_lab_main_Contents-amd64.lz4
 _srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4
+auxfiles
+lock
+partial
 snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-security_InRelease
 snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-security_main_binary-amd64_Packages.lz4
 snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-security_universe_binary-amd64_Packages.lz4
@@ -673,166 +719,144 @@ snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_InRelease
 snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_main_binary-amd64_Packages.lz4
 snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_universe_binary-amd64_Packages.lz4
 
-$ sudo apt update; echo "exit=$?"
-Get:1 file:/srv/lab-repo lab InRelease
-Ign:1 file:/srv/lab-repo lab InRelease
-Get:2 file:/srv/lab-extra extra InRelease
-Ign:2 file:/srv/lab-extra extra InRelease
-Get:3 file:/srv/lab-repo lab Release [1983 B]
-Get:4 file:/srv/lab-extra extra Release [1991 B]
-Get:3 file:/srv/lab-repo lab Release [1983 B]
-Get:4 file:/srv/lab-extra extra Release [1991 B]
-Get:5 file:/srv/lab-repo lab Release.gpg
-Ign:5 file:/srv/lab-repo lab Release.gpg
-Get:6 file:/srv/lab-extra extra Release.gpg
-Ign:6 file:/srv/lab-extra extra Release.gpg
-Hit:7 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
-Hit:8 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
-Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
-Reading package lists... Done
-E: The repository 'file:/srv/lab-extra extra Release' is not signed.
-N: Updating from such a repository can't be done securely, and is therefore disabled by default.
-N: See apt-secure(8) manpage for repository creation and user configuration details.
-exit=100
-
-$ ls -1 /var/lib/apt/lists/ | grep lab-extra; echo "exit=$?"
-exit=1
-
-$ echo 'deb [trusted=yes] file:/srv/lab-extra extra main' | sudo tee /etc/apt/sources.list.d/lab-extra.list
-deb [trusted=yes] file:/srv/lab-extra extra main
-
 $ sudo apt update
 Get:1 file:/srv/lab-repo lab InRelease
 Ign:1 file:/srv/lab-repo lab InRelease
-Get:2 file:/srv/lab-extra extra InRelease
-Ign:2 file:/srv/lab-extra extra InRelease
+Get:2 file:/srv/lab-repo lab-updates InRelease
+Ign:2 file:/srv/lab-repo lab-updates InRelease
 Get:3 file:/srv/lab-repo lab Release [1983 B]
-Get:4 file:/srv/lab-extra extra Release [1991 B]
+Get:4 file:/srv/lab-repo lab-updates Release [2015 B]
 Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-repo lab-updates Release [2015 B]
 Get:5 file:/srv/lab-repo lab Release.gpg
-Get:4 file:/srv/lab-extra extra Release [1991 B]
 Ign:5 file:/srv/lab-repo lab Release.gpg
-Get:6 file:/srv/lab-extra extra Release.gpg
-Ign:6 file:/srv/lab-extra extra Release.gpg
-Get:7 file:/srv/lab-extra extra/main amd64 Packages [448 B]
-Get:8 file:/srv/lab-extra extra/main amd64 Contents (deb) [44 B]
+Get:6 file:/srv/lab-repo lab-updates Release.gpg
+Ign:6 file:/srv/lab-repo lab-updates Release.gpg
+Get:7 file:/srv/lab-repo lab-updates/main amd64 Packages [431 B]
+Get:8 file:/srv/lab-repo lab-updates/main amd64 Contents (deb) [81 B]
 Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
 Hit:10 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
 Hit:11 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
-3 packages can be upgraded. Run 'apt list --upgradable' to see them.
+1 package can be upgraded. Run 'apt list --upgradable' to see it.
 
-$ ls -1 /var/lib/apt/lists/ | grep lab-extra
-_srv_lab-extra_dists_extra_Release
-_srv_lab-extra_dists_extra_main_Contents-amd64.lz4
-_srv_lab-extra_dists_extra_main_binary-amd64_Packages.lz4
-
-$ apt-cache policy labextra
-labextra:
-  Installed: (none)
-  Candidate: 1.0
+$ apt-cache policy labhello
+labhello:
+  Installed: 1.0
+  Candidate: 1.1
   Version table:
-     1.0 500
-        500 file:/srv/lab-extra extra/main amd64 Packages
+     1.1 500
+        500 file:/srv/lab-repo lab-updates/main amd64 Packages
+ *** 1.0 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+        100 /var/lib/dpkg/status
 
-$ sudo apt install -y labextra
+$ apt list --upgradable
+Listing... Done
+labhello/lab-updates 1.1 all [upgradable from: 1.0]
+N: There is 1 additional version. Please use the '-a' switch to see it
+
+$ sudo apt upgrade
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
-The following NEW packages will be installed:
-  labextra
-0 upgraded, 1 newly installed, 0 to remove and 3 not upgraded.
-Need to get 0 B/668 B of archives.
-After this operation, 28.7 kB of additional disk space will be used.
-Get:1 file:/srv/lab-extra extra/main amd64 labextra all 1.0 [668 B]
-Selecting previously unselected package labextra.
-(Reading database ... 12824 files and directories currently installed.)
-Preparing to unpack .../labextra/labextra_1.0_all.deb ...
-Unpacking labextra (1.0) ...
-Setting up labextra (1.0) ...
+Calculating upgrade... Done
+The following packages will be upgraded:
+  labhello
+1 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1120 B of archives.
+After this operation, 0 B of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 file:/srv/lab-repo lab-updates/main amd64 labhello all 1.1 [1120 B]
+(Reading database ... 12837 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.1_all.deb ...
+Unpacking labhello (1.1) over (1.0) ...
+Setting up labhello (1.1) ...
+Processing triggers for man-db (2.12.0-4build2) ...
 
-$ labextra
-labextra 1.0 (/srv/lab-extra から入った)
+$ labhello
+labhello 1.1
 
-$ apt update; echo "exit=$?"
-Reading package lists... Done
-E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
-E: Unable to lock directory /var/lib/apt/lists/
-W: Problem unlinking the file /var/cache/apt/pkgcache.bin - RemoveCaches (13: Permission denied)
-W: Problem unlinking the file /var/cache/apt/srcpkgcache.bin - RemoveCaches (13: Permission denied)
-exit=100
+$ apt-cache policy labhello
+labhello:
+  Installed: 1.1
+  Candidate: 1.1
+  Version table:
+ *** 1.1 500
+        500 file:/srv/lab-repo lab-updates/main amd64 Packages
+        100 /var/lib/dpkg/status
+     1.0 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
 
-$ dpkg -S liblab.sh; echo "exit=$?"
+$ apt show labhello | head -3
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Package: labhello
+Version: 1.1
+Priority: optional
+
+$ apt search labhello
+Sorting... Done
+Full Text Search... Done
+labhello/lab-updates,now 1.1 all [installed]
+  prints its own version
+
+
+$ dpkg -S liblab.sh
 dpkg-query: no path found matching pattern *liblab.sh*
-exit=1
 
 $ apt-file search liblab.sh
 liblab: /usr/lib/liblab/liblab.sh
-
-$ apt-file search bin/labapp
-labapp: /usr/bin/labapp
 
 $ apt-file list labapp
 labapp: /etc/labapp.conf
 labapp: /usr/bin/labapp
 labapp: /usr/share/doc/labapp/README
 
-$ apt-file search labextra
-labextra: /usr/bin/labextra
-
-$ ls -1 /var/lib/apt/lists/ | grep Contents
-_srv_lab-extra_dists_extra_main_Contents-amd64.lz4
+$ ls /var/lib/apt/lists/ | grep Contents
+_srv_lab-repo_dists_lab-updates_main_Contents-amd64.lz4
 _srv_lab-repo_dists_lab_main_Contents-amd64.lz4
 
-$ apt-file search bin/dig; echo "exit=$?"
-exit=1
-
-$ grep -v "^//" /etc/apt/apt.conf.d/60lab-apt-file
-Acquire::IndexTargets::deb::Contents-deb-legacy::DefaultEnabled "false";
-
-$ sudo apt-file update
-Get:1 file:/srv/lab-repo lab InRelease
-Ign:1 file:/srv/lab-repo lab InRelease
-Get:2 file:/srv/lab-extra extra InRelease
-Ign:2 file:/srv/lab-extra extra InRelease
-Get:3 file:/srv/lab-repo lab Release [1983 B]
-Get:4 file:/srv/lab-extra extra Release [1991 B]
-Get:3 file:/srv/lab-repo lab Release [1983 B]
-Get:4 file:/srv/lab-extra extra Release [1991 B]
-Get:5 file:/srv/lab-repo lab Release.gpg
-Ign:5 file:/srv/lab-repo lab Release.gpg
-Get:6 file:/srv/lab-extra extra Release.gpg
-Ign:6 file:/srv/lab-extra extra Release.gpg
-Hit:7 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
-Hit:8 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
-Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-3 packages can be upgraded. Run 'apt list --upgradable' to see them.
-
-$ MANWIDTH=80 man apt-file | sed -n "/^ *update$/,/on whether a tty is available/p"
-       update
-           This action that just calls apt update or apt-get update (depending
-           on whether a tty is available).
-
-$ apt-file update; echo "exit=$?"
-Reading package lists... Done
-E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
-E: Unable to lock directory /var/lib/apt/lists/
-W: Problem unlinking the file /var/cache/apt/pkgcache.bin - RemoveCaches (13: Permission denied)
-W: Problem unlinking the file /var/cache/apt/srcpkgcache.bin - RemoveCaches (13: Permission denied)
-exit=100
+$ apt-file search bin/dig
 
 
-========== 4. 04-dpkg.html ==========
+========== 7. 07-deb-file.html ==========
 
-$ sudo dpkg -i /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb; echo "exit=$?"
+$ apt download labhello
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+
+$ sudo dpkg -i labhello_1.0_all.deb
+Selecting previously unselected package labhello.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ labhello
+labhello 1.0
+
+$ dpkg -l labhello | tail -1
+ii  labhello       1.0          all          prints its own version
+
+$ sudo dpkg -r labhello
+(Reading database ... 12837 files and directories currently installed.)
+Removing labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ dpkg -l labhello
+dpkg-query: no packages found matching labhello
+
+$ apt download labapp
+Get:1 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
+
+$ sudo dpkg -i labapp_1.0_all.deb
 Selecting previously unselected package labapp.
-(Reading database ... 12824 files and directories currently installed.)
-Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack labapp_1.0_all.deb ...
 Unpacking labapp (1.0) ...
 dpkg: dependency problems prevent configuration of labapp:
  labapp depends on liblab (>= 1.0); however:
@@ -842,24 +866,15 @@ dpkg: error processing package labapp (--install):
  dependency problems - leaving unconfigured
 Errors were encountered while processing:
  labapp
-exit=1
 
 $ dpkg -l labapp liblab | tail -2
 iU  labapp         1.0          all          sample application that needs liblab
 un  liblab         <none>       <none>       (no description available)
 
-$ labapp; echo "exit=$?"
+$ labapp
 /usr/bin/labapp: 3: .: cannot open /usr/lib/liblab/liblab.sh: No such file
-exit=2
 
-$ grep -c '^Package: liblab$' /var/lib/dpkg/status
-0
-
-$ dpkg -s labapp | grep -E '^(Status|Depends):'
-Status: install ok unpacked
-Depends: liblab (>= 1.0)
-
-$ sudo apt install -y labhello; echo "exit=$?"
+$ sudo apt install labhello
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
@@ -867,9 +882,8 @@ You might want to run 'apt --fix-broken install' to correct these.
 The following packages have unmet dependencies:
  labapp : Depends: liblab (>= 1.0) but it is not going to be installed
 E: Unmet dependencies. Try 'apt --fix-broken install' with no packages (or specify a solution).
-exit=100
 
-$ sudo apt --fix-broken install -y
+$ sudo apt --fix-broken install
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
@@ -878,13 +892,14 @@ The following additional packages will be installed:
   liblab
 The following NEW packages will be installed:
   liblab
-0 upgraded, 1 newly installed, 0 to remove and 3 not upgraded.
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
 1 not fully installed or removed.
 Need to get 0 B/746 B of archives.
 After this operation, 36.9 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
 Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
 Selecting previously unselected package liblab.
-(Reading database ... 12828 files and directories currently installed.)
+(Reading database ... 12837 files and directories currently installed.)
 Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
 Unpacking liblab (1.0) ...
 Setting up liblab (1.0) ...
@@ -897,129 +912,7 @@ ii  liblab         1.0          all          small shell library for lab program
 $ labapp
 liblab: hello from labapp 1.0
 
-$ sudo dpkg --unpack /srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
-(Reading database ... 12830 files and directories currently installed.)
-Preparing to unpack .../labhello/labhello_1.1_all.deb ...
-Unpacking labhello (1.1) over (1.0) ...
-
-$ dpkg -l labhello | tail -1
-iU  labhello       1.1          all          prints its own version
-
-$ sudo apt install -y liblab
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-liblab is already the newest version (1.0).
-liblab set to manually installed.
-0 upgraded, 0 newly installed, 0 to remove and 2 not upgraded.
-1 not fully installed or removed.
-After this operation, 0 B of additional disk space will be used.
-Setting up labhello (1.1) ...
-
-$ dpkg -l labhello | tail -1
-ii  labhello       1.1          all          prints its own version
-
-$ dpkg -l | head -8
-Desired=Unknown/Install/Remove/Purge/Hold
-| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
-|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
-||/ Name                        Version                           Architecture Description
-+++-===========================-=================================-============-================================================================================
-ii  apt                         2.8.3                             amd64        commandline package manager
-ii  apt-file                    3.3                               all          search for files within Debian packages (command-line interface)
-ii  apt-utils                   2.8.3                             amd64        package management related utility programs
-
-$ dpkg -l 'lab*' | tail -n +6
-ii  labapp         1.0          all          sample application that needs liblab
-ii  labhello       1.1          all          prints its own version
-ii  labsvc         1.0          all          sample service tool with a config file
-ii  labsvc-common  1.0          all          data files for labsvc
-
-$ dpkg -L labapp
-/.
-/etc
-/etc/labapp.conf
-/usr
-/usr/bin
-/usr/bin/labapp
-/usr/share
-/usr/share/doc
-/usr/share/doc/labapp
-/usr/share/doc/labapp/README
-
-$ dpkg -S /usr/bin/labapp
-labapp: /usr/bin/labapp
-
-$ dpkg -S labapp.conf
-labapp: /etc/labapp.conf
-
-$ dpkg -s labapp
-Package: labapp
-Status: install ok installed
-Priority: optional
-Section: utils
-Installed-Size: 68
-Maintainer: check-then-explain <lab@example.invalid>
-Architecture: all
-Version: 1.0
-Depends: liblab (>= 1.0)
-Conffiles:
- /etc/labapp.conf dfe81d66c11f9fc2a4cfd67014f23bad
-Description: sample application that needs liblab
- Prints a greeting. The greeting is read from /etc/labapp.conf.
-
-$ dpkg -c /srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
-drwxr-xr-x root/root         0 2026-10-01 09:00 ./
-drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/
-drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/bin/
--rwxr-xr-x root/root        30 2026-10-01 09:00 ./usr/bin/labhello
-
-$ dpkg -I /srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
- new Debian package, version 2.0.
- size 620 bytes: control archive=284 bytes.
-     234 bytes,     9 lines      control
- Package: labhello
- Version: 1.1
- Section: utils
- Priority: optional
- Architecture: all
- Installed-Size: 28
- Maintainer: check-then-explain <lab@example.invalid>
- Description: prints its own version
-  A tiny package used to practice upgrades.
-
-$ dpkg -V labapp; echo "exit=$?"
-exit=0
-
-$ echo 'greeting="こんにちは"' | sudo tee -a /etc/labapp.conf
-greeting="こんにちは"
-
-$ echo '# 書き足した' | sudo tee -a /usr/bin/labapp
-# 書き足した
-
-$ dpkg -V labapp; echo "exit=$?"
-??5?????? c /etc/labapp.conf
-??5??????   /usr/bin/labapp
-exit=0
-
-$ sudo apt install -y --reinstall labapp
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-0 upgraded, 0 newly installed, 1 reinstalled, 0 to remove and 2 not upgraded.
-Need to get 0 B/1076 B of archives.
-After this operation, 0 B of additional disk space will be used.
-Get:1 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
-(Reading database ... 12830 files and directories currently installed.)
-Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
-Unpacking labapp (1.0) over (1.0) ...
-Setting up labapp (1.0) ...
-
-$ dpkg -V labapp; echo "exit=$?"
-??5?????? c /etc/labapp.conf
-exit=0
-
-$ sudo dpkg -r liblab; echo "exit=$?"
+$ sudo dpkg -r liblab
 dpkg: dependency problems prevent removal of liblab:
  labapp depends on liblab (>= 1.0).
 
@@ -1027,36 +920,68 @@ dpkg: error processing package liblab (--remove):
  dependency problems - not removing
 Errors were encountered while processing:
  liblab
-exit=1
 
 $ sudo dpkg -r labapp
-(Reading database ... 12830 files and directories currently installed.)
+(Reading database ... 12839 files and directories currently installed.)
 Removing labapp (1.0) ...
 
 $ dpkg -l labapp | tail -1
 rc  labapp         1.0          all          sample application that needs liblab
 
-$ ls -l /etc/labapp.conf
--rw-r--r-- 1 root root 120 Oct 13 21:25 /etc/labapp.conf
-
 $ sudo dpkg -P labapp
-(Reading database ... 12827 files and directories currently installed.)
+(Reading database ... 12836 files and directories currently installed.)
 Purging configuration files for labapp (1.0) ...
 
-$ dpkg -l labapp; echo "exit=$?"
-dpkg-query: no packages found matching labapp
-exit=1
-
 $ sudo dpkg -P liblab
-(Reading database ... 12826 files and directories currently installed.)
+(Reading database ... 12835 files and directories currently installed.)
 Removing liblab (1.0) ...
 
-$ cat /etc/timezone; ls -l /etc/localtime
-Etc/UTC
-lrwxrwxrwx 1 root root 27 Sep 30 19:32 /etc/localtime -> /usr/share/zoneinfo/Etc/UTC
+$ sudo apt install ./labapp_1.0_all.deb
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Note, selecting 'labapp' instead of './labapp_1.0_all.deb'
+The following additional packages will be installed:
+  liblab
+The following NEW packages will be installed:
+  labapp liblab
+0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1822 B of archives.
+After this operation, 106 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+Get:2 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
+Selecting previously unselected package liblab.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Selecting previously unselected package labapp.
+Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
+Unpacking labapp (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labapp (1.0) ...
 
-$ env -u TZ date -d @1790812800
-Thu Oct  1 00:00:00 UTC 2026
+$ sudo dpkg --unpack labhello_1.0_all.deb
+Selecting previously unselected package labhello.
+(Reading database ... 12839 files and directories currently installed.)
+Preparing to unpack labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ dpkg -l labhello | tail -1
+iU  labhello       1.0          all          prints its own version
+
+$ sudo dpkg --configure labhello
+Setting up labhello (1.0) ...
+
+$ dpkg -l labhello | tail -1
+ii  labhello       1.0          all          prints its own version
+
+$ cat /etc/timezone
+Etc/UTC
+
+$ ls -l /etc/localtime
+lrwxrwxrwx 1 root root 27 Sep 30 19:32 /etc/localtime -> /usr/share/zoneinfo/Etc/UTC
 
 $ sudo debconf-show tzdata | sort
   tzdata/Areas: Etc
@@ -1073,7 +998,7 @@ $ sudo debconf-show tzdata | sort
   tzdata/Zones/Legacy:
   tzdata/Zones/Pacific:
 
-$ printf '5\n78\n' | sudo dpkg-reconfigure -f teletype tzdata
+$ sudo dpkg-reconfigure -f teletype tzdata
 Configuring tzdata
 ------------------
 
@@ -1084,7 +1009,8 @@ the time zones in which they are located.
   1. Africa      4. Arctic    7. Australia  10. Pacific
   2. America     5. Asia      8. Europe     11. Etc
   3. Antarctica  6. Atlantic  9. Indian     12. Legacy
-Geographic area:
+Geographic area: 5
+
 Please select the city or region corresponding to your time zone.
 
   1. Aden         23. Dili         45. Krasnoyarsk   67. Samarkand
@@ -1106,22 +1032,24 @@ Please select the city or region corresponding to your time zone.
   17. Chita       39. Kamchatka    61. Pyongyang     83. Vientiane
   18. Choibalsan  40. Karachi      62. Qatar         84. Vladivostok
   19. Chongqing   41. Kashgar      63. Qostanay      85. Yakutsk
+[More]
+
   20. Colombo     42. Kathmandu    64. Qyzylorda     86. Yangon
   21. Damascus    43. Khandyga     65. Riyadh        87. Yekaterinburg
   22. Dhaka       44. Kolkata      66. Sakhalin      88. Yerevan
-Time zone:
+Time zone: 78
+
 
 Current default time zone: 'Asia/Tokyo'
-Local time is now:      Tue Oct 13 21:25:42 JST 2026.
-Universal Time is now:  Tue Oct 13 12:25:42 UTC 2026.
+Local time is now:      Tue Oct 20 21:35:30 JST 2026.
+Universal Time is now:  Tue Oct 20 12:35:30 UTC 2026.
 
 
-$ cat /etc/timezone; ls -l /etc/localtime
+$ cat /etc/timezone
 Asia/Tokyo
-lrwxrwxrwx 1 root root 30 Oct 13 21:25 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
 
-$ env -u TZ date -d @1790812800
-Thu Oct  1 09:00:00 JST 2026
+$ ls -l /etc/localtime
+lrwxrwxrwx 1 root root 30 Oct 20 21:35 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
 
 $ sudo debconf-show tzdata | sort
   tzdata/Zones/Africa:
@@ -1138,8 +1066,106 @@ $ sudo debconf-show tzdata | sort
 * tzdata/Areas: Asia
 * tzdata/Zones/Asia: Tokyo
 
-$ MANWIDTH=80 man debconf-show | sed -n "/The most common use/,/with an/p"
-       The most common use is "debconf-show packagename", which displays all
-       items in the debconf database owned by a given package, and their
-       current values.  Questions that have been asked already are prefixed
-       with an '*'.
+
+========== 8. 08-build.html ==========
+
+$ mkdir -p myhello/usr/bin
+
+$ cat > myhello/usr/bin/myhello <<'END'
+> #!/bin/sh
+> echo "myhello 1.0: 自分で作ったパッケージから入りました"
+> END
+
+$ chmod 755 myhello/usr/bin/myhello
+
+$ dpkg-deb --build myhello
+dpkg-deb: error: failed to open package info file 'myhello/DEBIAN/control' for reading: No such file or directory
+
+$ mkdir myhello/DEBIAN
+
+$ cat > myhello/DEBIAN/control <<'END'
+> Package: myhello
+> Version: 1.0
+> Architecture: all
+> Maintainer: lab <lab@example.invalid>
+> Description: my first package
+> END
+
+$ dpkg-deb --build myhello .
+dpkg-deb: building package 'myhello' in './myhello_1.0_all.deb'.
+
+$ dpkg -c myhello_1.0_all.deb
+drwxr-xr-x lab/lab           0 2026-10-20 21:35 ./
+drwxr-xr-x lab/lab           0 2026-10-20 21:35 ./usr/
+drwxr-xr-x lab/lab           0 2026-10-20 21:35 ./usr/bin/
+-rwxr-xr-x lab/lab          85 2026-10-20 21:35 ./usr/bin/myhello
+
+$ dpkg-deb --build --root-owner-group myhello .
+dpkg-deb: building package 'myhello' in './myhello_1.0_all.deb'.
+
+$ dpkg -c myhello_1.0_all.deb
+drwxr-xr-x root/root         0 2026-10-20 21:35 ./
+drwxr-xr-x root/root         0 2026-10-20 21:35 ./usr/
+drwxr-xr-x root/root         0 2026-10-20 21:35 ./usr/bin/
+-rwxr-xr-x root/root        85 2026-10-20 21:35 ./usr/bin/myhello
+
+$ dpkg -I myhello_1.0_all.deb
+ new Debian package, version 2.0.
+ size 610 bytes: control archive=201 bytes.
+     116 bytes,     5 lines      control
+ Package: myhello
+ Version: 1.0
+ Architecture: all
+ Maintainer: lab <lab@example.invalid>
+ Description: my first package
+
+$ sudo apt install ./myhello_1.0_all.deb
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Note, selecting 'myhello' instead of './myhello_1.0_all.deb'
+The following NEW packages will be installed:
+  myhello
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/610 B of archives.
+After this operation, 0 B of additional disk space will be used.
+Get:1 /home/lab/myhello_1.0_all.deb myhello all 1.0 [610 B]
+Selecting previously unselected package myhello.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack /home/lab/myhello_1.0_all.deb ...
+Unpacking myhello (1.0) ...
+Setting up myhello (1.0) ...
+N: Download is performed unsandboxed as root as file '/home/lab/myhello_1.0_all.deb' couldn't be accessed by user '_apt'. - pkgAcquire::Run (13: Permission denied)
+
+$ myhello
+myhello 1.0: 自分で作ったパッケージから入りました
+
+$ dpkg -l myhello | tail -1
+ii  myhello        1.0          all          my first package
+
+$ dpkg -L myhello
+/.
+/usr
+/usr/bin
+/usr/bin/myhello
+
+$ dpkg -S /usr/bin/myhello
+myhello: /usr/bin/myhello
+
+$ ls -l /usr/bin/myhello
+-rwxr-xr-x 1 root root 85 Oct 20 21:35 /usr/bin/myhello
+
+$ sudo apt remove myhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages will be REMOVED:
+  myhello
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
+After this operation, 0 B of additional disk space will be used.
+Do you want to continue? [Y/n] y
+(Reading database ... 12834 files and directories currently installed.)
+Removing myhello (1.0) ...
+
+$ dpkg -l myhello
+dpkg-query: no packages found matching myhello

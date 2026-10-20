@@ -1,39 +1,215 @@
 # 本文の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run --rm -it --hostname linuc、
 # 名前の無いボリューム2つ、PID 1 の bash -l、umask 022、TERM=xterm）の檻に、章ごとに起動し直して打った記録。
-# 端末 80 桁 × 24 行（tmux）。画面に最後に残ったものを書く。作り方: python3 -I probe/linuc-packages-seq.py（イメージ lab-linuc-packages-rpm:1.0.1）
+# 端末 80 桁 × 24 行（tmux）。画面に最後に残ったものを書く。作り方: python3 -I probe/linuc-packages-seq.py（イメージ lab-linuc-packages-rpm:1.1.0）
 
 
-========== 1. 01-package.html ==========
+========== 9. 09-rpm.html ==========
 
-$ file /srv/lab-rpm/labapp-1.0-1.noarch.rpm
-/srv/lab-rpm/labapp-1.0-1.noarch.rpm: RPM v3.0 bin i386/x86_64 labapp-1.0-1
+$ labhello
+bash: labhello: command not found
 
-$ rpm -qpi /srv/lab-rpm/labapp-1.0-1.noarch.rpm
-Name        : labapp
+$ sudo yum install labhello
+Last metadata expiration check: 2:06:26 ago on Tue Oct 20 19:34:06 2026.
+Dependencies resolved.
+================================================================================
+ Package             Architecture      Version             Repository      Size
+================================================================================
+Installing:
+ labhello            noarch            1.0-1               lab            7.4 k
+
+Transaction Summary
+================================================================================
+Install  1 Package
+
+Total size: 7.4 k
+Installed size: 382
+Is this ok [y/N]: y
+Downloading Packages:
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1
+  Installing       : labhello-1.0-1.noarch                                  1/1
+  Running scriptlet: labhello-1.0-1.noarch                                  1/1
+  Verifying        : labhello-1.0-1.noarch                                  1/1
+
+Installed:
+  labhello-1.0-1.noarch
+
+Complete!
+
+$ labhello
+labhello 1.0
+
+$ sudo yum remove labhello
+Dependencies resolved.
+================================================================================
+ Package             Architecture      Version            Repository       Size
+================================================================================
+Removing:
+ labhello            noarch            1.0-1              @lab            382
+
+Transaction Summary
+================================================================================
+Remove  1 Package
+
+Freed space: 382
+Is this ok [y/N]: y
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1
+  Erasing          : labhello-1.0-1.noarch                                  1/1
+  Running scriptlet: labhello-1.0-1.noarch                                  1/1
+  Verifying        : labhello-1.0-1.noarch                                  1/1
+
+Removed:
+  labhello-1.0-1.noarch
+
+Complete!
+
+$ labhello
+bash: /usr/bin/labhello: No such file or directory
+
+$ hash -r
+
+$ labhello
+bash: labhello: command not found
+
+$ sudo yum install labhello
+Last metadata expiration check: 2:06:30 ago on Tue Oct 20 19:34:06 2026.
+Dependencies resolved.
+================================================================================
+ Package             Architecture      Version             Repository      Size
+================================================================================
+Installing:
+ labhello            noarch            1.0-1               lab            7.4 k
+
+Transaction Summary
+================================================================================
+Install  1 Package
+
+Total size: 7.4 k
+Installed size: 382
+Is this ok [y/N]: y
+Downloading Packages:
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1
+  Installing       : labhello-1.0-1.noarch                                  1/1
+  Running scriptlet: labhello-1.0-1.noarch                                  1/1
+  Verifying        : labhello-1.0-1.noarch                                  1/1
+
+Installed:
+  labhello-1.0-1.noarch
+
+Complete!
+
+$ rpm -qa | wc -l
+182
+
+$ rpm -qa 'lab*'
+labmotd-1.0-1.noarch
+labhello-1.0-1.noarch
+
+$ rpm -q labhello
+labhello-1.0-1.noarch
+
+$ yum list installed 'lab*'
+Installed Packages
+labhello.noarch                            1.0-1                            @lab
+labmotd.noarch                             1.0-1                            @lab
+
+$ rpm -qi labhello
+Name        : labhello
 Version     : 1.0
 Release     : 1
 Architecture: noarch
-Install Date: (not installed)
+Install Date: Tue Oct 20 21:40:37 2026
 Group       : Unspecified
-Size        : 409
+Size        : 382
 License     : MIT
-Signature   : RSA/SHA256, Tue Oct 13 10:08:48 2026, Key ID 0ba6fe4393f77b82
-Source RPM  : labapp-1.0-1.src.rpm
+Signature   : RSA/SHA256, Tue Oct 20 19:33:57 2026, Key ID ed81483d5236f3f6
+Source RPM  : labhello-1.0-1.src.rpm
 Build Date  : Thu Oct  1 09:00:00 2026
 Build Host  : linuc-build
 Packager    : check-then-explain <lab@example.invalid>
 Vendor      : check-then-explain
 URL         : https://github.com/chai0204/check-then-explain
-Summary     : sample application that needs liblab
+Summary     : prints its own version
 Description :
-Prints a greeting. The greeting is read from /etc/labapp.conf.
+A tiny package used to practice upgrades.
 
-$ rpm -qpl /srv/lab-rpm/labapp-1.0-1.noarch.rpm
-/etc/labapp.conf
-/usr/bin/labapp
-/usr/share/doc/labapp/README
+$ rpm -ql labhello
+/usr/bin/labhello
+/usr/share/doc/labhello/README
+/usr/share/man/man1/labhello.1.gz
 
-$ rpm -qpR /srv/lab-rpm/labapp-1.0-1.noarch.rpm
+$ rpm -qf /usr/bin/labhello
+labhello-1.0-1.noarch
+
+$ rpm -qf /etc/sudoers
+sudo-1.9.5p2-15.el9_7.x86_64
+
+$ rpm -qd labhello
+/usr/share/doc/labhello/README
+/usr/share/man/man1/labhello.1.gz
+
+$ rpm -qc sudo
+/etc/dnf/protected.d/sudo.conf
+/etc/pam.d/sudo
+/etc/pam.d/sudo-i
+/etc/sudo-ldap.conf
+/etc/sudo.conf
+/etc/sudoers
+
+$ ls /var/lib/rpm/
+rpmdb.sqlite  rpmdb.sqlite-shm  rpmdb.sqlite-wal
+
+$ sudo yum install labapp
+Last metadata expiration check: 2:06:37 ago on Tue Oct 20 19:34:06 2026.
+Dependencies resolved.
+================================================================================
+ Package            Architecture       Version            Repository       Size
+================================================================================
+Installing:
+ labapp             noarch             1.0-1              lab             7.3 k
+Installing dependencies:
+ liblab             noarch             1.0-1              lab             6.7 k
+
+Transaction Summary
+================================================================================
+Install  2 Packages
+
+Total size: 14 k
+Installed size: 515
+Is this ok [y/N]: y
+Downloading Packages:
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1
+  Installing       : liblab-1.0-1.noarch                                    1/2
+  Installing       : labapp-1.0-1.noarch                                    2/2
+  Running scriptlet: labapp-1.0-1.noarch                                    2/2
+  Verifying        : labapp-1.0-1.noarch                                    1/2
+  Verifying        : liblab-1.0-1.noarch                                    2/2
+
+Installed:
+  labapp-1.0-1.noarch                    liblab-1.0-1.noarch
+
+Complete!
+
+$ rpm -qR labapp
 /usr/bin/sh
 config(labapp) = 1.0-1
 liblab >= 1.0
@@ -42,72 +218,50 @@ rpmlib(FileDigests) <= 4.6.0-1
 rpmlib(PayloadFilesHavePrefix) <= 4.0-1
 rpmlib(PayloadIsZstd) <= 5.4.18-1
 
-$ rpm -q labhello
-labhello-1.0-1.noarch
+$ rpm -q --whatrequires liblab
+labapp-1.0-1.noarch
 
-$ rpm -qpi /srv/lab-rpm/labhello-1.0-1.noarch.rpm | grep -E '^(Name|Version|Install Date)'
-Name        : labhello
-Version     : 1.0
-Install Date: (not installed)
+$ sudo yum remove labapp
+Dependencies resolved.
+================================================================================
+ Package            Architecture       Version           Repository        Size
+================================================================================
+Removing:
+ labapp             noarch             1.0-1             @lab             409
+Removing unused dependencies:
+ liblab             noarch             1.0-1             @lab             106
 
-$ rpm -qi labhello | grep -E '^(Name|Version|Install Date)'
-Name        : labhello
-Version     : 1.0
-Install Date: Tue Oct 13 10:08:56 2026
+Transaction Summary
+================================================================================
+Remove  2 Packages
 
-$ cd / && rpm2cpio /srv/lab-rpm/liblab-1.0-1.noarch.rpm | sudo cpio -idmv
-./usr/lib/liblab/liblab.sh
-1 block
+Freed space: 515
+Is this ok [y/N]: y
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1
+  Erasing          : labapp-1.0-1.noarch                                    1/2
+  Erasing          : liblab-1.0-1.noarch                                    2/2
+  Verifying        : labapp-1.0-1.noarch                                    1/2
+  Verifying        : liblab-1.0-1.noarch                                    2/2
 
-$ ls -l /usr/lib/liblab/liblab.sh
--rw-r--r-- 1 root root 106 Oct  1 09:00 /usr/lib/liblab/liblab.sh
+Removed:
+  labapp-1.0-1.noarch                    liblab-1.0-1.noarch
 
-$ rpm -q liblab; echo "exit=$?"
+Complete!
+
+$ rpm -q labapp liblab
+package labapp is not installed
 package liblab is not installed
-exit=1
 
-$ rpm -qf /usr/lib/liblab/liblab.sh; echo "exit=$?"
-file /usr/lib/liblab/liblab.sh is not owned by any package
-exit=1
-
-$ sudo rpm -ivh /srv/lab-rpm/liblab-1.0-1.noarch.rpm
-Verifying...                          ################################# [100%]
-Preparing...                          ################################# [100%]
-Updating / installing...
-   1:liblab-1.0-1                     ################################# [100%]
-
-$ rpm -q liblab
-liblab-1.0-1.noarch
-
-$ rpm -qf /usr/lib/liblab/liblab.sh
-liblab-1.0-1.noarch
-
-$ ls /var/lib/rpm/
-rpmdb.sqlite  rpmdb.sqlite-shm  rpmdb.sqlite-wal
-
-$ find /srv/lab-rpm -type f | sort
-/srv/lab-rpm/labapp-1.0-1.noarch.rpm
-/srv/lab-rpm/labhello-1.0-1.noarch.rpm
-/srv/lab-rpm/labhello-1.1-1.noarch.rpm
-/srv/lab-rpm/labmotd-1.0-1.noarch.rpm
-/srv/lab-rpm/labtool-1.0-1.noarch.rpm
-/srv/lab-rpm/labtool-data-1.0-1.noarch.rpm
-/srv/lab-rpm/liblab-1.0-1.noarch.rpm
-/srv/lab-rpm/repodata/5b96949f1857b965eeca9891726b9fe09513fb72b2b7a917189d5b2667b93bb4-primary.sqlite.bz2
-/srv/lab-rpm/repodata/6697ed834febe0a0b8eecc3967845da6ee73d748516d804918c845f46629f108-filelists.sqlite.bz2
-/srv/lab-rpm/repodata/7dc5b1cf519f7f49d151bed46c45efb157692793b1b303bf9aec89db565280c5-other.sqlite.bz2
-/srv/lab-rpm/repodata/8f40d3c83a541ea4ec06339717924838cced09c3882ff0c645c3438597f6628d-primary.xml.gz
-/srv/lab-rpm/repodata/cdd5bf24442cd7ec47309c2de60614bd5a9d91b85bd0a855ef046e674de63326-filelists.xml.gz
-/srv/lab-rpm/repodata/e1c1703b736420f28844a0af28ee1aabdb0848aa6a8c430081220b8dbabe9189-other.xml.gz
-/srv/lab-rpm/repodata/repomd.xml
-
-$ yum list labapp
-Last metadata expiration check: 11:15:19 ago on Tue Oct 13 10:08:56 2026.
-Available Packages
-labapp.noarch                             1.0-1                              lab
+$ grep clean_requirements_on_remove /etc/yum.conf
+clean_requirements_on_remove=True
 
 
-========== 5. 05-yum.html ==========
+========== 10. 10-yum-repo.html ==========
 
 $ ls -l /usr/bin/yum /usr/bin/dnf
 lrwxrwxrwx 1 root root 5 Sep 22  2025 /usr/bin/dnf -> dnf-3
@@ -124,27 +278,13 @@ clean_requirements_on_remove=True
 best=True
 skip_if_unavailable=False
 
-$ rpm -qf /etc/yum.conf /etc/dnf/dnf.conf /usr/bin/yum
-yum-4.14.0-31.el9.alma.1.noarch
-dnf-data-4.14.0-31.el9.alma.1.noarch
-yum-4.14.0-31.el9.alma.1.noarch
-
-$ yum --version | head -1
-4.14.0
-
-$ ls -1 /etc/yum.repos.d/
-almalinux-appstream.repo
-almalinux-baseos.repo
-almalinux-crb.repo
-almalinux-extras.repo
-almalinux-highavailability.repo
-almalinux-nfv.repo
-almalinux-plus.repo
-almalinux-resilientstorage.repo
-almalinux-rt.repo
-almalinux-sap.repo
-almalinux-saphana.repo
-lab.repo
+$ ls /etc/yum.repos.d/
+almalinux-appstream.repo         almalinux-plus.repo
+almalinux-baseos.repo            almalinux-resilientstorage.repo
+almalinux-crb.repo               almalinux-rt.repo
+almalinux-extras.repo            almalinux-sap.repo
+almalinux-highavailability.repo  almalinux-saphana.repo
+almalinux-nfv.repo               lab.repo
 
 $ cat /etc/yum.repos.d/lab.repo
 # 檻の中の練習用リポジトリ（確かめて説明する LinuC 主題1.04）。
@@ -156,19 +296,6 @@ enabled=1
 gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab
 metadata_expire=-1
-
-$ grep -A10 '^\[baseos\]' /etc/yum.repos.d/almalinux-baseos.repo
-[baseos]
-name=AlmaLinux $releasever - BaseOS
-#mirrorlist=https://mirrors.almalinux.org/mirrorlist/$releasever/baseos
-baseurl=https://vault.almalinux.org/9.7/BaseOS/$basearch/os/
-enabled=1
-gpgcheck=1
-countme=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-AlmaLinux-9
-metadata_expire=-1
-enabled_metadata=1
-
 
 $ yum repolist
 repo id                         repo name
@@ -214,122 +341,213 @@ saphana                      AlmaLinux 9 - SAPHANA                      disabled
 saphana-debuginfo            AlmaLinux 9 - SAPHANA - Debug              disabled
 saphana-source               AlmaLinux 9 - SAPHANA - Source             disabled
 
-$ yum list installed 'lab*'
-Installed Packages
-labhello.noarch                            1.0-1                            @lab
-labmotd.noarch                             1.0-1                            @lab
+$ sudo yum install labhello
+Last metadata expiration check: 2:06:49 ago on Tue Oct 20 19:34:06 2026.
+Dependencies resolved.
+================================================================================
+ Package             Architecture      Version             Repository      Size
+================================================================================
+Installing:
+ labhello            noarch            1.0-1               lab            7.4 k
 
-$ yum list available 'lab*'
-Last metadata expiration check: 11:16:57 ago on Tue Oct 13 10:08:56 2026.
-Available Packages
-labapp.noarch                                1.0-1                           lab
-labhello.noarch                              1.1-1                           lab
-labtool.noarch                               1.0-1                           lab
-labtool-data.noarch                          1.0-1                           lab
+Transaction Summary
+================================================================================
+Install  1 Package
 
-$ yum list labhello
-Last metadata expiration check: 11:16:57 ago on Tue Oct 13 10:08:56 2026.
-Installed Packages
-labhello.noarch                            1.0-1                            @lab
-Available Packages
-labhello.noarch                            1.1-1                            lab
+Total size: 7.4 k
+Installed size: 382
+Is this ok [y/N]: y
+Downloading Packages:
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1
+  Installing       : labhello-1.0-1.noarch                                  1/1
+  Running scriptlet: labhello-1.0-1.noarch                                  1/1
+  Verifying        : labhello-1.0-1.noarch                                  1/1
 
-$ yum list installed | head -4
-Installed Packages
-acl.x86_64                            2.3.1-4.el9                     @baseos
-almalinux-gpg-keys.x86_64             9.7-1.el9                       @baseos
-almalinux-release.x86_64              9.7-1.el9                       @baseos
+Installed:
+  labhello-1.0-1.noarch
 
-$ yum info installed | head -14
-Installed Packages
-Name         : acl
-Version      : 2.3.1
-Release      : 4.el9
-Architecture : x86_64
-Size         : 207 k
-Source       : acl-2.3.1-4.el9.src.rpm
-Repository   : @System
-From repo    : baseos
-Summary      : Access control list utilities
-URL          : https://savannah.nongnu.org/projects/acl
-License      : GPLv2+
-Description  : This package contains the getfacl and setfacl utilities needed for
-             : manipulating access control lists.
+Complete!
 
-$ yum info updates
-Last metadata expiration check: 11:16:59 ago on Tue Oct 13 10:08:56 2026.
-Available Upgrades
-Name         : labhello
-Version      : 1.1
-Release      : 1
-Architecture : noarch
-Size         : 6.6 k
-Source       : labhello-1.1-1.src.rpm
-Repository   : lab
-Summary      : prints its own version
-URL          : https://github.com/chai0204/check-then-explain
-License      : MIT
-Description  : A tiny package used to practice upgrades.
+$ ls /srv/lab-updates-rpm
+labhello-1.1-1.noarch.rpm  repodata
 
+$ sudo tee /etc/yum.repos.d/lab-updates.repo <<'END'
+> [lab-updates]
+> name=lab updates (LinuC 1.04)
+> baseurl=file:///srv/lab-updates-rpm
+> gpgcheck=1
+> gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab-updates
+> END
+[lab-updates]
+name=lab updates (LinuC 1.04)
+baseurl=file:///srv/lab-updates-rpm
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab-updates
 
-$ yum installed; echo "exit=$?"
-No such command: installed. Please use /usr/bin/yum --help
-It could be a YUM plugin command, try: "yum install 'dnf-command(installed)'"
-exit=1
+$ yum check-update
+lab updates (LinuC 1.04)                         64 kB/s | 960  B     00:00
 
-$ yum info labapp
-Last metadata expiration check: 11:17:00 ago on Tue Oct 13 10:08:56 2026.
-Available Packages
-Name         : labapp
-Version      : 1.0
-Release      : 1
-Architecture : noarch
-Size         : 7.3 k
-Source       : labapp-1.0-1.src.rpm
-Repository   : lab
-Summary      : sample application that needs liblab
-URL          : https://github.com/chai0204/check-then-explain
-License      : MIT
-Description  : Prints a greeting. The greeting is read from /etc/labapp.conf.
+labhello.noarch                        1.1-1                         lab-updates
 
+$ echo $?
+100
+
+$ ls /var/cache/dnf/
+appstream-69125d5665712457  extras-filenames.solvx
+appstream-filenames.solvx   extras.solv
+appstream-updateinfo.solvx  hawkey.log
+appstream.solv              lab-f54269022358d74c
+baseos-a0068bac1404caa3     lab-filenames.solvx
+baseos-filenames.solvx      lab-updates-562a72ee6b8fd388
+baseos-updateinfo.solvx     lab-updates-filenames.solvx
+baseos.solv                 lab-updates.solv
+dnf.librepo.log             lab.solv
+dnf.log                     locks
+dnf.rpm.log                 packages.db
+expired_repos.json          tempfiles.json
+extras-6ca639b91115fc97
+
+$ sudo yum update labhello
+Last metadata expiration check: 0:00:01 ago on Tue Oct 20 21:40:57 2026.
+Dependencies resolved.
+================================================================================
+ Package           Architecture    Version           Repository            Size
+================================================================================
+Upgrading:
+ labhello          noarch          1.1-1             lab-updates          7.4 k
+
+Transaction Summary
+================================================================================
+Upgrade  1 Package
+
+Total size: 7.4 k
+Is this ok [y/N]: y
+Downloading Packages:
+lab updates (LinuC 1.04)                        1.2 MB/s | 1.3 kB     00:00
+Importing GPG key 0xA5824B40:
+ Userid     : "lab updates <updates@example.invalid>"
+ Fingerprint: 4691 C941 40A5 0E17 00D1 873C F097 D1AD A582 4B40
+ From       : /etc/pki/rpm-gpg/RPM-GPG-KEY-lab-updates
+Is this ok [y/N]: y
+Key imported successfully
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1
+  Upgrading        : labhello-1.1-1.noarch                                  1/2
+  Cleanup          : labhello-1.0-1.noarch                                  2/2
+  Running scriptlet: labhello-1.0-1.noarch                                  2/2
+  Verifying        : labhello-1.1-1.noarch                                  1/2
+  Verifying        : labhello-1.0-1.noarch                                  2/2
+
+Upgraded:
+  labhello-1.1-1.noarch
+
+Complete!
+
+$ labhello
+labhello 1.1
+
+$ rpm -q gpg-pubkey --qf '%{NAME}-%{VERSION}-%{RELEASE}  %{SUMMARY}\n'
+gpg-pubkey-b86b3716-61e69f29  AlmaLinux OS 9 <packager@almalinux.org> public key
+gpg-pubkey-5236f3f6-6ad74395  lab packages <lab@example.invalid> public key
+gpg-pubkey-a5824b40-6ad74395  lab updates <updates@example.invalid> public key
+
+$ rpm -K /srv/lab-updates-rpm/labhello-1.1-1.noarch.rpm
+/srv/lab-updates-rpm/labhello-1.1-1.noarch.rpm: digests signatures OK
+
+$ rpm -K /srv/lab-files/labnosig-1.0-1.noarch.rpm
+/srv/lab-files/labnosig-1.0-1.noarch.rpm: digests OK
+
+$ rpm -K /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm
+/srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm: digests SIGNATURES NOT OK
+
+$ rpm -Kv /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm
+/srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm:
+    Header V4 RSA/SHA256 Signature, key ID b0f3d614: NOKEY
+    Header SHA256 digest: OK
+    Header SHA1 digest: OK
+    Payload SHA256 digest: OK
+    MD5 digest: OK
+
+$ sudo rpm --import /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+
+$ rpm -K /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm
+/srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm: digests signatures OK
+
+$ rpm -K /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm
+/srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm: digests signatures OK
+
+$ cp /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm ~/tree-copy.rpm
+
+$ printf 'A' | dd of=$HOME/tree-copy.rpm bs=1 seek=55888 conv=notrunc status=none
+
+$ rpm -K ~/tree-copy.rpm
+/home/lab/tree-copy.rpm: DIGESTS SIGNATURES NOT OK
 
 $ yum search liblab
-Last metadata expiration check: 11:17:01 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 0:00:10 ago on Tue Oct 20 21:40:57 2026.
 ========================= Name Exactly Matched: liblab =========================
 liblab.noarch : small shell library for lab programs
 =========================== Summary Matched: liblab ============================
 labapp.noarch : sample application that needs liblab
 
-$ yum deplist labapp
-Last metadata expiration check: 11:17:02 ago on Tue Oct 13 10:08:56 2026.
-package: labapp-1.0-1.noarch
-  dependency: /usr/bin/sh
-   provider: bash-5.1.8-9.el9.x86_64
-  dependency: liblab >= 1.0
-   provider: liblab-1.0-1.noarch
+$ yum info labtool
+Last metadata expiration check: 0:00:10 ago on Tue Oct 20 21:40:57 2026.
+Available Packages
+Name         : labtool
+Version      : 1.0
+Release      : 1
+Architecture : noarch
+Size         : 6.7 k
+Source       : labtool-1.0-1.src.rpm
+Repository   : lab
+Summary      : tool that needs labtool-data
+URL          : https://github.com/chai0204/check-then-explain
+License      : MIT
+Description  : Prints a line shipped in labtool-data.
 
-$ yum provides /usr/bin/labapp
-Last metadata expiration check: 11:17:02 ago on Tue Oct 13 10:08:56 2026.
-labapp-1.0-1.noarch : sample application that needs liblab
+
+$ yum provides /usr/bin/labtool
+Last metadata expiration check: 0:00:11 ago on Tue Oct 20 21:40:57 2026.
+labtool-1.0-1.noarch : tool that needs labtool-data
 Repo        : lab
 Matched from:
-Filename    : /usr/bin/labapp
+Filename    : /usr/bin/labtool
 
 
 $ yum provides '*/liblab.sh'
-Last metadata expiration check: 11:17:03 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 0:00:12 ago on Tue Oct 20 21:40:57 2026.
 liblab-1.0-1.noarch : small shell library for lab programs
 Repo        : lab
 Matched from:
 Filename    : /usr/lib/liblab/liblab.sh
 
 
-$ rpm -qf /usr/bin/dig; echo "exit=$?"
+$ yum repoquery -l labtool
+Last metadata expiration check: 0:00:13 ago on Tue Oct 20 21:40:57 2026.
+/usr/bin/labtool
+
+$ yum deplist labtool
+Last metadata expiration check: 0:00:13 ago on Tue Oct 20 21:40:57 2026.
+package: labtool-1.0-1.noarch
+  dependency: /usr/bin/sh
+   provider: bash-5.1.8-9.el9.x86_64
+  dependency: labtool-data >= 1.0
+   provider: labtool-data-1.0-1.noarch
+
+$ rpm -qf /usr/bin/dig
 error: file /usr/bin/dig: No such file or directory
-exit=1
 
 $ yum provides /usr/bin/dig
-Last metadata expiration check: 11:17:04 ago on Tue Oct 13 10:08:56 2026.
+Last metadata expiration check: 0:00:14 ago on Tue Oct 20 21:40:57 2026.
 bind-utils-32:9.16.23-34.el9_7.1.x86_64 : Utilities for querying DNS name
                                         : servers
 Repo        : appstream
@@ -361,310 +579,39 @@ Matched from:
 Filename    : /usr/bin/dig
 
 
-$ rpm -q labtool; echo "exit=$?"
-package labtool is not installed
-exit=1
 
-$ yum repoquery -l labtool
-Last metadata expiration check: 11:17:06 ago on Tue Oct 13 10:08:56 2026.
-/usr/bin/labtool
-
-$ ls -l /usr/bin/repoquery
-lrwxrwxrwx 1 root root 22 Nov 12  2025 /usr/bin/repoquery -> /usr/libexec/dnf-utils
-
-$ repoquery -l labtool
-Last metadata expiration check: 11:17:07 ago on Tue Oct 13 10:08:56 2026.
-/usr/bin/labtool
-
-$ sudo yum install -y labapp
-Last metadata expiration check: 11:17:07 ago on Tue Oct 13 10:08:56 2026.
-Dependencies resolved.
-================================================================================
- Package            Architecture       Version            Repository       Size
-================================================================================
-Installing:
- labapp             noarch             1.0-1              lab             7.3 k
-Installing dependencies:
- liblab             noarch             1.0-1              lab             6.7 k
-
-Transaction Summary
-================================================================================
-Install  2 Packages
-
-Total size: 14 k
-Installed size: 515
-Downloading Packages:
-Running transaction check
-Transaction check succeeded.
-Running transaction test
-Transaction test succeeded.
-Running transaction
-  Preparing        :                                                        1/1
-  Installing       : liblab-1.0-1.noarch                                    1/2
-  Installing       : labapp-1.0-1.noarch                                    2/2
-  Running scriptlet: labapp-1.0-1.noarch                                    2/2
-  Verifying        : labapp-1.0-1.noarch                                    1/2
-  Verifying        : liblab-1.0-1.noarch                                    2/2
-
-Installed:
-  labapp-1.0-1.noarch                    liblab-1.0-1.noarch
-
-Complete!
-
-$ yum list installed labapp liblab
-Installed Packages
-labapp.noarch                             1.0-1                             @lab
-liblab.noarch                             1.0-1                             @lab
-
-$ sudo yum remove -y labapp
-Dependencies resolved.
-================================================================================
- Package            Architecture       Version           Repository        Size
-================================================================================
-Removing:
- labapp             noarch             1.0-1             @lab             409
-Removing unused dependencies:
- liblab             noarch             1.0-1             @lab             106
-
-Transaction Summary
-================================================================================
-Remove  2 Packages
-
-Freed space: 515
-Running transaction check
-Transaction check succeeded.
-Running transaction test
-Transaction test succeeded.
-Running transaction
-  Preparing        :                                                        1/1
-  Erasing          : labapp-1.0-1.noarch                                    1/2
-  Erasing          : liblab-1.0-1.noarch                                    2/2
-  Verifying        : labapp-1.0-1.noarch                                    1/2
-  Verifying        : liblab-1.0-1.noarch                                    2/2
-
-Removed:
-  labapp-1.0-1.noarch                    liblab-1.0-1.noarch
-
-Complete!
-
-$ rpm -q labapp liblab; echo "exit=$?"
-package labapp is not installed
-package liblab is not installed
-exit=2
-
-$ grep clean_requirements_on_remove /etc/yum.conf
-clean_requirements_on_remove=True
-
-$ sudo yum install -y labapp
-Last metadata expiration check: 11:17:10 ago on Tue Oct 13 10:08:56 2026.
-Dependencies resolved.
-================================================================================
- Package            Architecture       Version            Repository       Size
-================================================================================
-Installing:
- labapp             noarch             1.0-1              lab             7.3 k
-Installing dependencies:
- liblab             noarch             1.0-1              lab             6.7 k
-
-Transaction Summary
-================================================================================
-Install  2 Packages
-
-Total size: 14 k
-Installed size: 515
-Downloading Packages:
-Running transaction check
-Transaction check succeeded.
-Running transaction test
-Transaction test succeeded.
-Running transaction
-  Preparing        :                                                        1/1
-  Installing       : liblab-1.0-1.noarch                                    1/2
-  Installing       : labapp-1.0-1.noarch                                    2/2
-  Running scriptlet: labapp-1.0-1.noarch                                    2/2
-  Verifying        : labapp-1.0-1.noarch                                    1/2
-  Verifying        : liblab-1.0-1.noarch                                    2/2
-
-Installed:
-  labapp-1.0-1.noarch                    liblab-1.0-1.noarch
-
-Complete!
-
-$ sudo yum autoremove -y labapp
-Dependencies resolved.
-================================================================================
- Package            Architecture       Version           Repository        Size
-================================================================================
-Removing:
- labapp             noarch             1.0-1             @lab             409
-Removing unused dependencies:
- liblab             noarch             1.0-1             @lab             106
-
-Transaction Summary
-================================================================================
-Remove  2 Packages
-
-Freed space: 515
-Running transaction check
-Transaction check succeeded.
-Running transaction test
-Transaction test succeeded.
-Running transaction
-  Preparing        :                                                        1/1
-  Erasing          : labapp-1.0-1.noarch                                    1/2
-  Erasing          : liblab-1.0-1.noarch                                    2/2
-  Verifying        : labapp-1.0-1.noarch                                    1/2
-  Verifying        : liblab-1.0-1.noarch                                    2/2
-
-Removed:
-  labapp-1.0-1.noarch                    liblab-1.0-1.noarch
-
-Complete!
-
-$ rpm -q labapp liblab; echo "exit=$?"
-package labapp is not installed
-package liblab is not installed
-exit=2
-
-$ find /srv/lab-extra-rpm -type f | sort
-/srv/lab-extra-rpm/labextra-1.0-1.noarch.rpm
-/srv/lab-extra-rpm/repodata/5dd2854da38fd1c14d69ca9c2976e3db924c8dd2e356e9f356a6793537a199a9-filelists.xml.gz
-/srv/lab-extra-rpm/repodata/6ce17d7ec69c18f3e05b4abf79143684c104abc60770cea4cfa5db636786f798-other.xml.gz
-/srv/lab-extra-rpm/repodata/bede4ca05c10755a3c72439778df0ea25f76b40a9c555f831f17438119119e6a-primary.sqlite.bz2
-/srv/lab-extra-rpm/repodata/d082f8298b1c7d7e669eacb7dfacf17d841a93489ea4397400a9a96883369b7d-primary.xml.gz
-/srv/lab-extra-rpm/repodata/efdb4d85f49b7b3152368bb4e41ca5d25f568e9f29f0f07fee70bbc43218602f-other.sqlite.bz2
-/srv/lab-extra-rpm/repodata/fe879cffea08ec897d2c3f5b91590e172bae59ba6ae8966628fae189a50a886f-filelists.sqlite.bz2
-/srv/lab-extra-rpm/repodata/repomd.xml
-
-$ yum list labextra; echo "exit=$?"
-Last metadata expiration check: 11:17:13 ago on Tue Oct 13 10:08:56 2026.
-Error: No matching Packages to list
-exit=1
-
-$ printf '%s\n' '[lab-extra]' 'name=lab extra (LinuC 1.04)' 'baseurl=file:///srv/lab-extra-rpm' 'gpgcheck=1' 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab' | sudo tee /etc/yum.repos.d/lab-extra.repo
-[lab-extra]
-name=lab extra (LinuC 1.04)
-baseurl=file:///srv/lab-extra-rpm
-gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab
-
-$ sudo yum install -y labextra
-lab extra (LinuC 1.04)                           63 kB/s | 935  B     00:00
-Dependencies resolved.
-================================================================================
- Package            Architecture     Version          Repository           Size
-================================================================================
-Installing:
- labextra           noarch           1.0-1            lab-extra           6.7 k
-
-Transaction Summary
-================================================================================
-Install  1 Package
-
-Total size: 6.7 k
-Installed size: 71
-Downloading Packages:
-Running transaction check
-Transaction check succeeded.
-Running transaction test
-Transaction test succeeded.
-Running transaction
-  Preparing        :                                                        1/1
-  Installing       : labextra-1.0-1.noarch                                  1/1
-  Verifying        : labextra-1.0-1.noarch                                  1/1
-
-Installed:
-  labextra-1.0-1.noarch
-
-Complete!
-
-$ labextra
-labextra 1.0 (/srv/lab-extra-rpm から入った)
-
-$ yum repolist
-repo id                         repo name
-appstream                       AlmaLinux 9 - AppStream
-baseos                          AlmaLinux 9 - BaseOS
-extras                          AlmaLinux 9 - Extras
-lab                             lab packages (LinuC 1.04)
-lab-extra                       lab extra (LinuC 1.04)
-
-$ ls -ld /var/cache/dnf
-lrwxrwxrwx 1 root root 22 Oct 13 10:08 /var/cache/dnf -> /var/tmp/dnf-lab-cache
-
-$ ls /var/cache/dnf/
-appstream-69125d5665712457  dnf.log                     lab-extra.solv
-appstream-filenames.solvx   dnf.rpm.log                 lab-f54269022358d74c
-appstream-updateinfo.solvx  expired_repos.json          lab-filenames.solvx
-appstream.solv              extras-6ca639b91115fc97     lab.solv
-baseos-a0068bac1404caa3     extras-filenames.solvx      locks
-baseos-filenames.solvx      extras.solv                 packages.db
-baseos-updateinfo.solvx     hawkey.log                  tempfiles.json
-baseos.solv                 lab-extra-87753e023cd3c28c
-dnf.librepo.log             lab-extra-filenames.solvx
-
-$ yum check-update; echo "exit=$?"
-Last metadata expiration check: 0:00:03 ago on Tue Oct 13 21:26:10 2026.
-
-labhello.noarch                            1.1-1                             lab
-exit=100
-
-$ sudo yum update -y labhello
-Last metadata expiration check: 0:00:04 ago on Tue Oct 13 21:26:10 2026.
-Dependencies resolved.
-================================================================================
- Package             Architecture      Version             Repository      Size
-================================================================================
-Upgrading:
- labhello            noarch            1.1-1               lab            6.6 k
-
-Transaction Summary
-================================================================================
-Upgrade  1 Package
-
-Total size: 6.6 k
-Downloading Packages:
-Running transaction check
-Transaction check succeeded.
-Running transaction test
-Transaction test succeeded.
-Running transaction
-  Preparing        :                                                        1/1
-  Upgrading        : labhello-1.1-1.noarch                                  1/2
-  Cleanup          : labhello-1.0-1.noarch                                  2/2
-  Verifying        : labhello-1.1-1.noarch                                  1/2
-  Verifying        : labhello-1.0-1.noarch                                  2/2
-
-Upgraded:
-  labhello-1.1-1.noarch
-
-Complete!
-
-$ labhello
-labhello 1.1
-
-$ yum check-update; echo "exit=$?"
-Last metadata expiration check: 0:00:05 ago on Tue Oct 13 21:26:10 2026.
-exit=0
-
-$ yum update --help | head -1
-usage: yum upgrade [-c CONFIG_FILE] [-q] [-v] [--version] [--installroot PATH]
-
-$ ls -l /usr/bin/yumdownloader
-lrwxrwxrwx 1 root root 22 Nov 12  2025 /usr/bin/yumdownloader -> /usr/libexec/dnf-utils
-
-$ cd ~/work
+========== 11. 11-rpm-file.html ==========
 
 $ yumdownloader labtool
-Last metadata expiration check: 0:00:07 ago on Tue Oct 13 21:26:10 2026.
+Last metadata expiration check: 2:07:10 ago on Tue Oct 20 19:34:06 2026.
 
 $ ls -l
-total 8
--rw-r--r-- 1 lab lab 6859 Oct 13 21:26 labtool-1.0-1.noarch.rpm
+total 12
+-rw-r--r-- 1 lab lab 6859 Oct 20 21:41 labtool-1.0-1.noarch.rpm
+drwxr-xr-x 2 lab lab 4096 Oct 20 19:34 work
 
-$ rpm -q labtool; echo "exit=$?"
+$ rpm -q labtool
 package labtool is not installed
-exit=1
+
+$ rpm -qpi labtool-1.0-1.noarch.rpm
+Name        : labtool
+Version     : 1.0
+Release     : 1
+Architecture: noarch
+Install Date: (not installed)
+Group       : Unspecified
+Size        : 98
+License     : MIT
+Signature   : RSA/SHA256, Tue Oct 20 19:33:57 2026, Key ID ed81483d5236f3f6
+Source RPM  : labtool-1.0-1.src.rpm
+Build Date  : Thu Oct  1 09:00:00 2026
+Build Host  : linuc-build
+Packager    : check-then-explain <lab@example.invalid>
+Vendor      : check-then-explain
+URL         : https://github.com/chai0204/check-then-explain
+Summary     : tool that needs labtool-data
+Description :
+Prints a line shipped in labtool-data.
 
 $ rpm -qpl labtool-1.0-1.noarch.rpm
 /usr/bin/labtool
@@ -677,59 +624,131 @@ rpmlib(FileDigests) <= 4.6.0-1
 rpmlib(PayloadFilesHavePrefix) <= 4.0-1
 rpmlib(PayloadIsZstd) <= 5.4.18-1
 
-$ yumdownloader --resolve --destdir dl labtool
-Last metadata expiration check: 0:00:10 ago on Tue Oct 13 21:26:10 2026.
+$ sudo rpm -ivh labtool-1.0-1.noarch.rpm
+error: Failed dependencies:
+        labtool-data >= 1.0 is needed by labtool-1.0-1.noarch
 
-$ ls -l dl/
-total 16
--rw-r--r-- 1 lab lab 6859 Oct 13 21:26 labtool-1.0-1.noarch.rpm
--rw-r--r-- 1 lab lab 6729 Oct 13 21:26 labtool-data-1.0-1.noarch.rpm
+$ echo $?
+1
 
+$ rpm -q labtool
+package labtool is not installed
 
-========== 6. 06-rpm-query.html ==========
+$ ls /usr/bin/labtool
+ls: cannot access '/usr/bin/labtool': No such file or directory
 
-$ rpm -qa | wc -l
-182
+$ yumdownloader --resolve labtool
+Last metadata expiration check: 2:07:15 ago on Tue Oct 20 19:34:06 2026.
 
-$ rpm -qa 'lab*'
-labmotd-1.0-1.noarch
-labhello-1.0-1.noarch
+$ ls -l
+total 20
+-rw-r--r-- 1 lab lab 6859 Oct 20 21:41 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6729 Oct 20 21:41 labtool-data-1.0-1.noarch.rpm
+drwxr-xr-x 2 lab lab 4096 Oct 20 19:34 work
+
+$ sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
+Updating / installing...
+   1:labtool-data-1.0-1               ################################# [ 50%]
+   2:labtool-1.0-1                    ################################# [100%]
+
+$ labtool
+labtool: labtool-data から読んだ1行です
+
+$ yum list installed labtool labtool-data
+Installed Packages
+labtool.noarch                             1.0-1                         @System
+labtool-data.noarch                        1.0-1                         @System
+
+$ sudo rpm -e labtool-data
+error: Failed dependencies:
+        labtool-data >= 1.0 is needed by (installed) labtool-1.0-1.noarch
+
+$ sudo rpm -e labtool labtool-data
+
+$ rpm -q labtool labtool-data
+package labtool is not installed
+package labtool-data is not installed
+
+$ yumdownloader labhello
+Last metadata expiration check: 2:07:22 ago on Tue Oct 20 19:34:06 2026.
+
+$ cp /srv/lab-updates-rpm/labhello-1.1-1.noarch.rpm .
+
+$ ls
+labhello-1.0-1.noarch.rpm  labtool-1.0-1.noarch.rpm       work
+labhello-1.1-1.noarch.rpm  labtool-data-1.0-1.noarch.rpm
+
+$ sudo rpm -Fvh labhello-1.0-1.noarch.rpm
+
+$ echo $?
+0
 
 $ rpm -q labhello
-labhello-1.0-1.noarch
+package labhello is not installed
 
-$ rpm -q labapp; echo "exit=$?"
-package labapp is not installed
-exit=1
+$ sudo rpm -ivh labhello-1.0-1.noarch.rpm
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
+Updating / installing...
+   1:labhello-1.0-1                   ################################# [100%]
 
-$ rpm -qi labhello
-Name        : labhello
-Version     : 1.0
-Release     : 1
-Architecture: noarch
-Install Date: Tue Oct 13 10:08:56 2026
-Group       : Unspecified
-Size        : 34
-License     : MIT
-Signature   : RSA/SHA256, Tue Oct 13 10:08:48 2026, Key ID 0ba6fe4393f77b82
-Source RPM  : labhello-1.0-1.src.rpm
-Build Date  : Thu Oct  1 09:00:00 2026
-Build Host  : linuc-build
-Packager    : check-then-explain <lab@example.invalid>
-Vendor      : check-then-explain
-URL         : https://github.com/chai0204/check-then-explain
-Summary     : prints its own version
-Description :
-A tiny package used to practice upgrades.
+$ sudo rpm -ivh labhello-1.1-1.noarch.rpm
+warning: labhello-1.1-1.noarch.rpm: Header V4 RSA/SHA256 Signature, key ID a5824b40: NOKEY
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
+        file /usr/bin/labhello from install of labhello-1.1-1.noarch conflicts with file from package labhello-1.0-1.noarch
+        file /usr/share/doc/labhello/README from install of labhello-1.1-1.noarch conflicts with file from package labhello-1.0-1.noarch
+        file /usr/share/man/man1/labhello.1.gz from install of labhello-1.1-1.noarch conflicts with file from package labhello-1.0-1.noarch
 
-$ rpm -ql labhello
-/usr/bin/labhello
+$ sudo rpm -Uvh labhello-1.1-1.noarch.rpm
+warning: labhello-1.1-1.noarch.rpm: Header V4 RSA/SHA256 Signature, key ID a5824b40: NOKEY
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
+Updating / installing...
+   1:labhello-1.1-1                   ################################# [ 50%]
+Cleaning up / removing...
+   2:labhello-1.0-1                   ################################# [100%]
 
-$ rpm -qf /usr/bin/labhello
-labhello-1.0-1.noarch
+$ labhello
+labhello 1.1
 
-$ sudo yum install -y labapp
-Last metadata expiration check: 11:17:32 ago on Tue Oct 13 10:08:56 2026.
+$ rpm -V labhello
+
+$ echo $?
+0
+
+$ sudo chmod 644 /usr/bin/labhello
+
+$ echo '# 書き足した' | sudo tee -a /usr/bin/labhello
+# 書き足した
+
+$ rpm -V labhello
+SM5....T.    /usr/bin/labhello
+
+$ echo $?
+1
+
+$ labhello
+bash: /usr/bin/labhello: Permission denied
+
+$ sudo rpm -Uvh --replacepkgs labhello-1.1-1.noarch.rpm
+warning: labhello-1.1-1.noarch.rpm: Header V4 RSA/SHA256 Signature, key ID a5824b40: NOKEY
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
+Updating / installing...
+   1:labhello-1.1-1                   ################################# [ 50%]
+Cleaning up / removing...
+   2:labhello-1.1-1                   ################################# [100%]
+
+$ rpm -V labhello
+
+$ labhello
+labhello 1.1
+
+$ sudo yum install labapp
+Last metadata expiration check: 2:07:31 ago on Tue Oct 20 19:34:06 2026.
 Dependencies resolved.
 ================================================================================
  Package            Architecture       Version            Repository       Size
@@ -745,6 +764,7 @@ Install  2 Packages
 
 Total size: 14 k
 Installed size: 515
+Is this ok [y/N]: y
 Downloading Packages:
 Running transaction check
 Transaction check succeeded.
@@ -763,174 +783,33 @@ Installed:
 
 Complete!
 
-$ rpm -ql labapp
-/etc/labapp.conf
-/usr/bin/labapp
-/usr/share/doc/labapp/README
-
-$ rpm -qc labapp
-/etc/labapp.conf
-
-$ rpm -qd labapp
-/usr/share/doc/labapp/README
-
-$ rpm -qR labapp
-/usr/bin/sh
-config(labapp) = 1.0-1
-liblab >= 1.0
-rpmlib(CompressedFileNames) <= 3.0.4-1
-rpmlib(FileDigests) <= 4.6.0-1
-rpmlib(PayloadFilesHavePrefix) <= 4.0-1
-rpmlib(PayloadIsZstd) <= 5.4.18-1
-
-$ rpm -q --provides liblab
-liblab = 1.0-1
-
-$ rpm -q --whatrequires liblab
-labapp-1.0-1.noarch
-
-$ rpm -ql labtool; echo "exit=$?"
-package labtool is not installed
-exit=1
-
-$ rpm -qpl /srv/lab-rpm/labtool-1.0-1.noarch.rpm
-/usr/bin/labtool
-
-$ rpm -qpi /srv/lab-rpm/labtool-1.0-1.noarch.rpm | head -4
-Name        : labtool
-Version     : 1.0
-Release     : 1
-Architecture: noarch
-
-$ rpm -ql /srv/lab-rpm/labtool-1.0-1.noarch.rpm; echo "exit=$?"
-/usr/bin/labtool
-exit=0
-
-$ rpm --version
-RPM version 4.16.1.3
-
-$ rpm -V labhello
-
-$ rpm -V labhello; echo "exit=$?"
-exit=0
-
-$ rpm -V nosuchpkg; echo "exit=$?"
-package nosuchpkg is not installed
-exit=1
-
-$ echo 'greeting="こんにちは"' | sudo tee -a /etc/labapp.conf
-greeting="こんにちは"
+$ sudo rpm -e --nodeps liblab
 
 $ labapp
-liblab: こんにちは from labapp 1.0
+/usr/bin/labapp: line 3: /usr/lib/liblab/liblab.sh: No such file or directory
 
-$ sudo chmod 0644 /usr/bin/labhello
+$ rpm -V labapp
+Unsatisfied dependencies for labapp-1.0-1.noarch:
+        liblab >= 1.0 is needed by (installed) labapp-1.0-1.noarch
 
-$ labhello; echo "exit=$?"
-bash: /usr/bin/labhello: Permission denied
-exit=126
-
-$ rpm -V labapp labhello; echo "exit=$?"
-S.5....T.  c /etc/labapp.conf
-.M.......    /usr/bin/labhello
-exit=2
-
-$ sudo yum reinstall -y labhello
-Last metadata expiration check: 11:17:42 ago on Tue Oct 13 10:08:56 2026.
-Dependencies resolved.
-================================================================================
- Package             Architecture      Version             Repository      Size
-================================================================================
-Reinstalling:
- labhello            noarch            1.0-1               lab            6.6 k
-
-Transaction Summary
-================================================================================
-
-Total size: 6.6 k
-Installed size: 34
-Downloading Packages:
-Running transaction check
-Transaction check succeeded.
-Running transaction test
-Transaction test succeeded.
-Running transaction
-  Preparing        :                                                        1/1
-  Reinstalling     : labhello-1.0-1.noarch                                  1/2
-  Cleanup          : labhello-1.0-1.noarch                                  2/2
-  Verifying        : labhello-1.0-1.noarch                                  1/2
-  Verifying        : labhello-1.0-1.noarch                                  2/2
-
-Reinstalled:
-  labhello-1.0-1.noarch
-
-Complete!
-
-$ rpm -V labhello; echo "exit=$?"
-exit=0
-
-$ labhello
-labhello 1.0
-
-$ sudo yum reinstall -y labapp
-Last metadata expiration check: 11:17:44 ago on Tue Oct 13 10:08:56 2026.
+$ sudo yum reinstall labapp
+Last metadata expiration check: 2:07:34 ago on Tue Oct 20 19:34:06 2026.
 Dependencies resolved.
 ================================================================================
  Package            Architecture       Version            Repository       Size
 ================================================================================
 Reinstalling:
  labapp             noarch             1.0-1              lab             7.3 k
-
-Transaction Summary
-================================================================================
-
-Total size: 7.3 k
-Installed size: 409
-Downloading Packages:
-Running transaction check
-Transaction check succeeded.
-Running transaction test
-Transaction test succeeded.
-Running transaction
-  Preparing        :                                                        1/1
-  Reinstalling     : labapp-1.0-1.noarch                                    1/2
-  Cleanup          : labapp-1.0-1.noarch                                    2/2
-  Verifying        : labapp-1.0-1.noarch                                    1/2
-  Verifying        : labapp-1.0-1.noarch                                    2/2
-
-Reinstalled:
-  labapp-1.0-1.noarch
-
-Complete!
-
-$ rpm -V labapp; echo "exit=$?"
-S.5....T.  c /etc/labapp.conf
-exit=1
-
-$ ls -l /etc/labapp.conf*
--rw-r--r-- 1 root root 118 Oct 13 21:26 /etc/labapp.conf
-
-$ sudo rpm -e labapp
-warning: /etc/labapp.conf saved as /etc/labapp.conf.rpmsave
-
-$ ls -l /etc/labapp.conf*
--rw-r--r-- 1 root root 118 Oct 13 21:26 /etc/labapp.conf.rpmsave
-
-$ sudo yum install -y labapp
-Last metadata expiration check: 11:17:47 ago on Tue Oct 13 10:08:56 2026.
-Dependencies resolved.
-================================================================================
- Package            Architecture       Version            Repository       Size
-================================================================================
-Installing:
- labapp             noarch             1.0-1              lab             7.3 k
+Installing dependencies:
+ liblab             noarch             1.0-1              lab             6.7 k
 
 Transaction Summary
 ================================================================================
 Install  1 Package
 
-Total size: 7.3 k
-Installed size: 409
+Total size: 14 k
+Installed size: 515
+Is this ok [y/N]: y
 Downloading Packages:
 Running transaction check
 Transaction check succeeded.
@@ -938,249 +817,43 @@ Running transaction test
 Transaction test succeeded.
 Running transaction
   Preparing        :                                                        1/1
-  Installing       : labapp-1.0-1.noarch                                    1/1
-  Verifying        : labapp-1.0-1.noarch                                    1/1
+  Installing       : liblab-1.0-1.noarch                                    1/3
+  Reinstalling     : labapp-1.0-1.noarch                                    2/3
+  Cleanup          : labapp-1.0-1.noarch                                    3/3
+  Running scriptlet: labapp-1.0-1.noarch                                    3/3
+  Verifying        : labapp-1.0-1.noarch                                    1/3
+  Verifying        : labapp-1.0-1.noarch                                    2/3
+  Verifying        : liblab-1.0-1.noarch                                    3/3
 
 Installed:
+  liblab-1.0-1.noarch
+Reinstalled:
   labapp-1.0-1.noarch
 
 Complete!
 
-$ rpm -V labapp; echo "exit=$?"
-exit=0
-
-$ sudo rpm -e labapp; echo "exit=$?"
-exit=0
-
-$ ls -l /etc/labapp.conf*; echo "exit=$?"
--rw-r--r-- 1 root root 118 Oct 13 21:26 /etc/labapp.conf.rpmsave
-exit=0
+$ labapp
+liblab: hello from labapp 1.0
 
 $ rpm -Va | wc -l
 31
 
-$ rpm -Va
-S.5....T.  c /etc/yum.repos.d/almalinux-appstream.repo
-S.5....T.  c /etc/yum.repos.d/almalinux-baseos.repo
-S.5....T.  c /etc/yum.repos.d/almalinux-crb.repo
-S.5....T.  c /etc/yum.repos.d/almalinux-extras.repo
-S.5....T.  c /etc/yum.repos.d/almalinux-highavailability.repo
-S.5....T.  c /etc/yum.repos.d/almalinux-nfv.repo
-S.5....T.  c /etc/yum.repos.d/almalinux-plus.repo
-S.5....T.  c /etc/yum.repos.d/almalinux-resilientstorage.repo
-S.5....T.  c /etc/yum.repos.d/almalinux-rt.repo
-S.5....T.  c /etc/yum.repos.d/almalinux-sap.repo
-S.5....T.  c /etc/yum.repos.d/almalinux-saphana.repo
-.M.......    /
-missing     /boot
-missing     /usr/share/i18n/charmaps
-missing     /usr/share/i18n/locales
-..?......  c /etc/libaudit.conf
-..?......    /usr/libexec/utempter/utempter
-..?......  c /etc/security/opasswd
-..?......    /usr/sbin/unix_update
-.M.......  c /etc/machine-id
-......G..  g /run/utmp
-.M...UG..    /var/cache/dnf
-.....UG..  g /var/cache/dnf/packages.db
-..?......  c /etc/sudo-ldap.conf
-..?......  c /etc/sudo.conf
-..?......  c /etc/sudoers
-..?......    /usr/bin/sudo
-..?......    /usr/bin/sudoreplay
-missing     /var/db/sudo/lectured (Permission denied)
-.M.......    /usr/bin/labmotd
-S.5....T.    /usr/share/labmotd/motd.txt
-
-$ rpm2cpio /srv/lab-rpm/labtool-1.0-1.noarch.rpm | cpio -t
+$ rpm2cpio labtool-1.0-1.noarch.rpm | cpio -t
 ./usr/bin/labtool
 1 block
 
-$ cd ~/work && rpm2cpio /srv/lab-rpm/labtool-1.0-1.noarch.rpm | cpio -idmv
+$ mkdir ext
+
+$ cd ext
+
+$ rpm2cpio ../labtool-1.0-1.noarch.rpm | cpio -idmv
 ./usr/bin/labtool
 1 block
 
-$ ls -l ~/work/usr/bin/labtool
--rwxr-xr-x 1 lab lab 98 Oct  1 09:00 /home/lab/work/usr/bin/labtool
+$ ls -l usr/bin/labtool
+-rwxr-xr-x 1 lab lab 98 Oct  1 09:00 usr/bin/labtool
 
-$ rpm -qf ~/work/usr/bin/labtool; echo "exit=$?"
-file /home/lab/work/usr/bin/labtool is not owned by any package
-exit=1
+$ rpm -qf usr/bin/labtool
+file /home/lab/ext/usr/bin/labtool is not owned by any package
 
-$ rpm -q labtool; echo "exit=$?"
-package labtool is not installed
-exit=1
-
-
-========== 7. 07-rpm-install.html ==========
-
-$ sudo rpm -ivh /srv/lab-rpm/labapp-1.0-1.noarch.rpm; echo "exit=$?"
-error: Failed dependencies:
-        liblab >= 1.0 is needed by labapp-1.0-1.noarch
-exit=1
-
-$ sudo rpm -ivh /srv/lab-rpm/liblab-1.0-1.noarch.rpm /srv/lab-rpm/labapp-1.0-1.noarch.rpm
-Verifying...                          ################################# [100%]
-Preparing...                          ################################# [100%]
-Updating / installing...
-   1:liblab-1.0-1                     ################################# [ 50%]
-   2:labapp-1.0-1                     ################################# [100%]
-
-$ sudo rpm -e liblab; echo "exit=$?"
-error: Failed dependencies:
-        liblab >= 1.0 is needed by (installed) labapp-1.0-1.noarch
-exit=1
-
-$ sudo rpm -e --nodeps liblab
-
-$ labapp; echo "exit=$?"
-/usr/bin/labapp: line 3: /usr/lib/liblab/liblab.sh: No such file or directory
-exit=1
-
-$ rpm -V labapp; echo "exit=$?"
-Unsatisfied dependencies for labapp-1.0-1.noarch:
-        liblab >= 1.0 is needed by (installed) labapp-1.0-1.noarch
-exit=1
-
-$ sudo rpm -ivh /srv/lab-rpm/liblab-1.0-1.noarch.rpm
-Verifying...                          ################################# [100%]
-Preparing...                          ################################# [100%]
-Updating / installing...
-   1:liblab-1.0-1                     ################################# [100%]
-
-$ sudo rpm -e labapp liblab
-
-$ rpm -q labapp liblab; echo "exit=$?"
-package labapp is not installed
-package liblab is not installed
-exit=2
-
-$ rpm -q labhello labtool-data; echo "exit=$?"
-labhello-1.0-1.noarch
-package labtool-data is not installed
-exit=1
-
-$ sudo rpm -ivh /srv/lab-rpm/labhello-1.1-1.noarch.rpm; echo "exit=$?"
-Verifying...                          ################################# [100%]
-Preparing...                          ################################# [100%]
-        file /usr/bin/labhello from install of labhello-1.1-1.noarch conflicts with file from package labhello-1.0-1.noarch
-exit=1
-
-$ sudo rpm -Fvh /srv/lab-rpm/labtool-data-1.0-1.noarch.rpm; echo "exit=$?"
-exit=0
-
-$ rpm -q labtool-data; echo "exit=$?"
-package labtool-data is not installed
-exit=1
-
-$ sudo rpm -Fvh /srv/lab-rpm/labhello-1.1-1.noarch.rpm
-Verifying...                          ################################# [100%]
-Preparing...                          ################################# [100%]
-Updating / installing...
-   1:labhello-1.1-1                   ################################# [ 50%]
-Cleaning up / removing...
-   2:labhello-1.0-1                   ################################# [100%]
-
-$ sudo rpm -Uvh /srv/lab-rpm/labtool-data-1.0-1.noarch.rpm
-Verifying...                          ################################# [100%]
-Preparing...                          ################################# [100%]
-Updating / installing...
-   1:labtool-data-1.0-1               ################################# [100%]
-
-$ rpm -q labhello labtool-data
-labhello-1.1-1.noarch
-labtool-data-1.0-1.noarch
-
-$ yum list installed labhello labtool-data
-Installed Packages
-labhello.noarch                            1.1-1                         @System
-labtool-data.noarch                        1.0-1                         @System
-
-$ ls -l /srv/lab-files/
-total 64
--rw-r--r-- 1 root root  6879 Oct 13 10:08 labnosig-1.0-1.noarch.rpm
--rw-r--r-- 1 root root 55988 Oct 13 10:08 tree-1.8.0-10.el9.x86_64.rpm
-
-$ rpm -K /srv/lab-files/labnosig-1.0-1.noarch.rpm; echo "exit=$?"
-/srv/lab-files/labnosig-1.0-1.noarch.rpm: digests OK
-exit=0
-
-$ rpm -K /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm; echo "exit=$?"
-/srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm: digests SIGNATURES NOT OK
-exit=1
-
-$ rpm -K /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm; echo "exit=$?"
-/srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm: digests signatures OK
-exit=0
-
-$ rpm -Kv /srv/lab-files/labnosig-1.0-1.noarch.rpm
-/srv/lab-files/labnosig-1.0-1.noarch.rpm:
-    Header SHA256 digest: OK
-    Header SHA1 digest: OK
-    Payload SHA256 digest: OK
-    MD5 digest: OK
-
-$ rpm -Kv /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm
-/srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm:
-    Header V4 RSA/SHA256 Signature, key ID 484bd981: NOKEY
-    Header SHA256 digest: OK
-    Header SHA1 digest: OK
-    Payload SHA256 digest: OK
-    MD5 digest: OK
-
-$ rpm -Kv /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm
-/srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm:
-    Header V4 RSA/SHA256 Signature, key ID b86b3716: OK
-    Header SHA256 digest: OK
-    Header SHA1 digest: OK
-    Payload SHA256 digest: OK
-    V4 RSA/SHA256 Signature, key ID b86b3716: OK
-    MD5 digest: OK
-
-$ rpm -q gpg-pubkey --qf '%{NAME}-%{VERSION}-%{RELEASE}\t%{SUMMARY}\n'
-gpg-pubkey-b86b3716-61e69f29    AlmaLinux OS 9 <packager@almalinux.org> public key
-gpg-pubkey-93f77b82-6acd849f    lab packages <lab@example.invalid> public key
-
-$ head -3 /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
------BEGIN PGP PUBLIC KEY BLOCK-----
-
-mQGNBGrNhJ8BDACs4CZvLuZBw9OXnQ8OZ7QlK2pVIlW1nNDyBJD8XBlDHAEU6M7G
-
-$ sudo rpm --import /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
-
-$ rpm -q gpg-pubkey --qf '%{NAME}-%{VERSION}-%{RELEASE}\t%{SUMMARY}\n'
-gpg-pubkey-b86b3716-61e69f29    AlmaLinux OS 9 <packager@almalinux.org> public key
-gpg-pubkey-93f77b82-6acd849f    lab packages <lab@example.invalid> public key
-gpg-pubkey-484bd981-6acd849f    lab tools <tools@example.invalid> public key
-
-$ rpm -K /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm; echo "exit=$?"
-/srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm: digests signatures OK
-exit=0
-
-$ cp /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm ~/work/tree-copy.rpm
-
-$ printf 'A' | dd of=$HOME/work/tree-copy.rpm bs=1 seek=55888 conv=notrunc status=none
-
-$ rpm -K ~/work/tree-copy.rpm; echo "exit=$?"
-/home/lab/work/tree-copy.rpm: DIGESTS SIGNATURES NOT OK
-exit=1
-
-$ rpm -Kv ~/work/tree-copy.rpm
-/home/lab/work/tree-copy.rpm:
-    Header V4 RSA/SHA256 Signature, key ID b86b3716: OK
-    Header SHA256 digest: OK
-    Header SHA1 digest: OK
-    Payload SHA256 ALT digest: BAD (Expected f9d0fd749e84ee900257bc2a5622ebabd2b70753d2b9b6543236323569482623 != b919680458a5815223df9b6d15131bfd94ed1a796c6534314382155994bed20e)
-    Payload SHA256 digest: BAD (Expected 995477b62f2b6338425309a804cc5bc146eda7820c74494e50a5f49f12fc3e25 != b919680458a5815223df9b6d15131bfd94ed1a796c6534314382155994bed20e)
-    V4 RSA/SHA256 Signature, key ID b86b3716: BAD
-    MD5 digest: BAD (Expected 02e31b29f7f0057ef4433a66aa68821b != 35e582b31f509ef95879bf04663e60c6)
-
-$ sudo rpm -ivh /srv/lab-files/labnosig-1.0-1.noarch.rpm
-Verifying...                          ################################# [100%]
-Preparing...                          ################################# [100%]
-Updating / installing...
-   1:labnosig-1.0-1                   ################################# [100%]
-
-$ rpm -q --qf '%{NAME}: %{RSAHEADER:pgpsig}\n' labnosig labhello
-labnosig: (none)
-labhello: RSA/SHA256, Tue Oct 13 10:08:48 2026, Key ID 0ba6fe4393f77b82
+$ cd

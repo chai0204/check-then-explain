@@ -1,332 +1,499 @@
+# 本文の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run --rm -it --hostname linuc、
+# 名前の無いボリューム2つ、PID 1 の bash -l、umask 022、TERM=xterm）の檻に、章ごとに起動し直して打った記録。
+# 端末 80 桁 × 24 行（tmux）。画面に最後に残ったものを書く。作り方: python3 -I probe/linuc-packages-seq.py --script /dev/stdin --cage deb（イメージ lab-linuc-packages-deb:1.1.0）
+# 課題文の「いまの状態」の画面（演習ごとに檻を起動し直し、lab start NN のあとに打った）
 
 
-========== x-upgrade. apt upgrade と apt-get upgrade と full-upgrade の違い（man の記述） ==========
-
-$ MANWIDTH=80 man apt | sed -n "/^ *upgrade (apt-get(8))/,/^ *full-upgrade/p"
-       upgrade (apt-get(8))
-           upgrade is used to install available upgrades of all packages
-           currently installed on the system from the sources configured via
-           sources.list(5). New packages will be installed if required to
-           satisfy dependencies, but existing packages will never be removed.
-           If an upgrade for a package requires the removal of an installed
-           package the upgrade for this package isn't performed.
-
-           When a package is supplied as an argument, the package will be
-           installed prior to the upgrade action.
-
-       full-upgrade (apt-get(8))
-
-$ MANWIDTH=80 man apt-get | sed -n "/^ *upgrade$/,/^ *dist-upgrade/p"
-       upgrade
-           upgrade is used to install the newest versions of all packages
-           currently installed on the system from the sources enumerated in
-           /etc/apt/sources.list. Packages currently installed with new
-           versions available are retrieved and upgraded; under no
-           circumstances are currently installed packages removed, or packages
-           not already installed retrieved and installed. New versions of
-           currently installed packages that cannot be upgraded without
-           changing the install status of another package will be left at
-           their current version. An update must be performed first so that
-           apt-get knows that new versions of packages are available.
-
-           When a package is supplied as an argument, the package will be
-           installed prior to the upgrade action.
-
-       dist-upgrade
-
-$ MANWIDTH=80 man apt | sed -n "/^ *full-upgrade (apt-get(8))/,/^ *install, reinstall/p"
-       full-upgrade (apt-get(8))
-           full-upgrade performs the function of upgrade but will remove
-           currently installed packages if this is needed to upgrade the
-           system as a whole.
-
-           When a package is supplied as an argument, the package will be
-           installed prior to the upgrade action.
-
-       install, reinstall, remove, purge (apt-get(8))
-
-
-========== x-autoremove. autoremove に名前を渡すと ==========
-
-$ sudo apt install -y labapp
-
-WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-
-Reading package lists...
-Building dependency tree...
-Reading state information...
-The following additional packages will be installed:
-  liblab
-The following NEW packages will be installed:
-  labapp liblab
-0 upgraded, 2 newly installed, 0 to remove and 3 not upgraded.
-Need to get 0 B/1822 B of archives.
-After this operation, 106 kB of additional disk space will be used.
-Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
-Get:2 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
-debconf: unable to initialize frontend: Dialog
-debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
-debconf: falling back to frontend: Readline
-debconf: unable to initialize frontend: Readline
-debconf: (This frontend requires a controlling tty.)
-debconf: falling back to frontend: Teletype
-dpkg-preconfigure: unable to re-open stdin: 
-Selecting previously unselected package liblab.
-(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12824 files and directories currently installed.)
-Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
-Unpacking liblab (1.0) ...
-Selecting previously unselected package labapp.
-Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
-Unpacking labapp (1.0) ...
-Setting up liblab (1.0) ...
-Setting up labapp (1.0) ...
-
-$ apt-mark showauto | grep lab
-labsvc-common
-liblab
-
-$ sudo apt autoremove -y labapp
-
-WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-
-Reading package lists...
-Building dependency tree...
-Reading state information...
-The following packages will be REMOVED:
-  labapp liblab
-0 upgraded, 0 newly installed, 2 to remove and 3 not upgraded.
-After this operation, 106 kB disk space will be freed.
-(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12830 files and directories currently installed.)
-Removing labapp (1.0) ...
-Removing liblab (1.0) ...
+========== 演習01 ==========
 
-$ dpkg -l labapp
-Desired=Unknown/Install/Remove/Purge/Hold
-| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
-|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
-||/ Name           Version      Architecture Description
-+++-==============-============-============-====================================
-rc  labapp         1.0          all          sample application that needs liblab
+$ lab start 01
 
-$ ls -l /etc/labapp.conf
--rw-r--r-- 1 root root 93 Oct  1 09:00 /etc/labapp.conf
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 01   labhello を入れて、使えるようにする
+          影響度 B / 目安 5分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-$ dpkg -l liblab | tail -1
-un  liblab         <none>       <none>       (no description available)
+  この演習はシステム全体を触ります（パッケージを入れます）。作業ディレクトリは使いません。
 
-$ grep -c '^Package: liblab$' /var/lib/dpkg/status
-0
+【いまの状態】
 
+  labhello と打つと、次のように出ます。
 
-========== x-root. 一般ユーザのまま打つと（root が要るもの・要らないもの） ==========
+    $ labhello
+    bash: labhello: command not found
 
-$ apt update; echo "exit=$?"
+  labhello はまだ入っていないので、これが始まりの正しい状態です。
+  （第1章を同じ檻で打って入れて消したあとなら、
+    bash: /usr/bin/labhello: No such file or directory
+   と出ることもあります。どちらも「いまは入っていない」という意味です）
 
-WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+【やること】
 
-Reading package lists...
-E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
-E: Unable to lock directory /var/lib/apt/lists/
-exit=100
+  パッケージ labhello を入れて、labhello コマンドを使えるようにしてください。
 
-$ apt-get update; echo "exit=$?"
-Reading package lists...
-E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
-E: Unable to lock directory /var/lib/apt/lists/
-exit=100
+【判定のしかた】
 
-$ apt-file update; echo "exit=$?"
-Reading package lists...
-E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
-E: Unable to lock directory /var/lib/apt/lists/
-exit=100
+  labhello を実際に動かし、自分の版（labhello 1.0 のような1行）を出すかを見ます。
+  あわせて、パッケージとして入ったことになっているか
+  （パッケージ管理の道具が覚えている記録）も見ます。
 
-$ apt-cache policy labhello | head -3
-labhello:
-  Installed: 1.0
-  Candidate: 1.1
+【できたら】
 
-$ dpkg -l labhello | tail -1
-ii  labhello       1.0          all          prints its own version
+    lab check 01
 
-$ cd ~/work && apt-get download labhello && ls *.deb
-Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.1 [620 B]
-labhello_1.1_all.deb
+──────────────────────────────────────
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 01）
 
-
-========== x-aptcmds. apt にも depends・rdepends・policy・download・clean がある ==========
-
-$ apt depends labapp
-
-WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-
-labapp
-  Depends: liblab (>= 1.0)
-
-$ apt rdepends liblab
-
-WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-
-liblab
-Reverse Depends:
-  Depends: labapp (>= 1.0)
-
-$ apt policy labhello
-
-WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-
-labhello:
-  Installed: 1.0
-  Candidate: 1.1
-  Version table:
-     1.1 500
-        500 file:/srv/lab-repo lab/main amd64 Packages
- *** 1.0 500
-        500 file:/srv/lab-repo lab/main amd64 Packages
-        100 /var/lib/dpkg/status
-
-$ cd ~/work && apt download liblab && ls *.deb
-
-WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-
-Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
-liblab_1.0_all.deb
-
-$ sudo apt clean; echo "exit=$?"
-
-WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-
-exit=0
-
-$ MANWIDTH=80 man apt | sed -n "/^ *showsrc, depends, rdepends, policy/,/(summarised in apt-get(8))/p"
-       showsrc, depends, rdepends, policy (summarised in apt-cache(8))
-
-       source, build-dep, download, changelog, clean, distclean, autoclean
-       (summarised in apt-get(8))
-
-
-========== x-un. dpkg -l の un は、台帳に行があるという意味ではない ==========
-
-$ sudo dpkg -i /srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb; echo "exit=$?"
-Selecting previously unselected package labapp.
-(Reading database ... 12824 files and directories currently installed.)
-Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
-Unpacking labapp (1.0) ...
-dpkg: dependency problems prevent configuration of labapp:
- labapp depends on liblab (>= 1.0); however:
-  Package liblab is not installed.
-
-dpkg: error processing package labapp (--install):
- dependency problems - leaving unconfigured
-Errors were encountered while processing:
- labapp
-exit=1
-
-$ dpkg -l labapp liblab
-Desired=Unknown/Install/Remove/Purge/Hold
-| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
-|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
-||/ Name           Version      Architecture Description
-+++-==============-============-============-====================================
-iU  labapp         1.0          all          sample application that needs liblab
-un  liblab         <none>       <none>       (no description available)
-
-$ grep -c '^Package: liblab$' /var/lib/dpkg/status
-0
-
-$ dpkg -s labapp | grep -E '^(Status|Depends):'
-Status: install ok unpacked
-Depends: liblab (>= 1.0)
-
-
-========== x-pending. 依存が満たされた iU は、apt が次の操作のついでに設定する ==========
-
-$ sudo dpkg --unpack /srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
-(Reading database ... 12824 files and directories currently installed.)
-Preparing to unpack .../labhello/labhello_1.1_all.deb ...
-Unpacking labhello (1.1) over (1.0) ...
-
-$ dpkg -l labhello | tail -1
-iU  labhello       1.1          all          prints its own version
-
-$ sudo apt install -y liblab
-
-WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-
-Reading package lists...
-Building dependency tree...
-Reading state information...
-The following NEW packages will be installed:
-  liblab
-0 upgraded, 1 newly installed, 0 to remove and 2 not upgraded.
-1 not fully installed or removed.
-Need to get 0 B/746 B of archives.
-After this operation, 36.9 kB of additional disk space will be used.
-Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
-debconf: unable to initialize frontend: Dialog
-debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
-debconf: falling back to frontend: Readline
-debconf: unable to initialize frontend: Readline
-debconf: (This frontend requires a controlling tty.)
-debconf: falling back to frontend: Teletype
-dpkg-preconfigure: unable to re-open stdin: 
-Selecting previously unselected package liblab.
-(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 12824 files and directories currently installed.)
-Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
-Unpacking liblab (1.0) ...
-Setting up labhello (1.1) ...
-Setting up liblab (1.0) ...
-
-$ dpkg -l labhello | tail -1
-ii  labhello       1.1          all          prints its own version
 
 $ labhello
-labhello 1.1
+bash: labhello: command not found
 
 
-========== x-depends. apt-cache depends が出すのは Depends: だけではない ==========
+========== 演習02 ==========
 
-$ apt-cache depends apt
-apt
- |Depends: base-passwd
-  Depends: adduser
-  Depends: gpgv
-  Depends: libapt-pkg6.0t64
-  Depends: ubuntu-keyring
-  Depends: libc6
-  Depends: libgcc-s1
-  Depends: libgnutls30t64
-  Depends: libseccomp2
-  Depends: libstdc++6
-  Depends: libsystemd0
-  Conflicts: <apt-verify>
-  Conflicts: <libnettle8>
-  Breaks: apt-transport-https
-  Breaks: apt-utils
-  Breaks: aptitude
-  Recommends: ca-certificates
-  Suggests: apt-doc
- |Suggests: aptitude
- |Suggests: synaptic
-  Suggests: wajig
-  Suggests: dpkg-dev
- |Suggests: gnupg
- |Suggests: gnupg2
-  Suggests: gnupg1
-  Suggests: powermgmt-base
-  Replaces: apt-transport-https
-  Replaces: apt-utils
+$ lab start 02
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 02   仕事に要らない遊びのパッケージを、見つけて消す
+          影響度 B / 目安 8分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  この演習はシステム全体を触ります（パッケージを消します）。作業ディレクトリは使いません。
+
+【いまの状態】
+
+  このサーバ（檻）には、lab で始まる名前の練習用パッケージがいくつか入っています。
+
+    $ apt list --installed 'lab*'
+    Listing... Done
+    labbackup/lab,now 1.0 all [installed]
+    labfortune/lab,now 1.0 all [installed]
+    labsvc-common/lab,now 1.0 all [installed,automatic]
+    labsvc/lab,now 1.0 all [installed]
+    labweb-data/lab,now 1.0 all [installed,automatic]
+    labweb/lab,now 1.0 all [installed]
+
+【やること】
+
+  このうち1つは、仕事のサーバには要らない遊び（ゲーム）のパッケージです。
+  パッケージの分類（Section）が games になっています。
+  それを見つけて消してください。ほかのパッケージは消さないでください。
+
+  名前や説明文の印象で決めずに、分類を1つずつ確かめてください。
+
+【判定のしかた】
+
+  dpkg の台帳で、分類が games のパッケージがもう入っていないことと、
+  ほかのパッケージが入ったままであることを見ます。
+  未達のときも、どれが games かは判定の出力には出しません。
+
+【できたら】
+
+    lab check 02
+
+──────────────────────────────────────
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 02）
 
 
-========== x-docs. apt-file update と debconf-show の * の意味（man の記述） ==========
+$ apt list --installed 'lab*'
+Listing... Done
+labbackup/lab,now 1.0 all [installed]
+labfortune/lab,now 1.0 all [installed]
+labsvc-common/lab,now 1.0 all [installed,automatic]
+labsvc/lab,now 1.0 all [installed]
+labweb-data/lab,now 1.0 all [installed,automatic]
+labweb/lab,now 1.0 all [installed]
 
-$ MANWIDTH=80 man apt-file | sed -n "/^ *update$/,/on whether a tty is available/p"
-       update
-           This action that just calls apt update or apt-get update (depending
-           on whether a tty is available).
 
-$ MANWIDTH=80 man debconf-show | sed -n "/The most common use/,/with an/p"
-       The most common use is "debconf-show packagename", which displays all
-       items in the debconf database owned by a given package, and their
-       current values.  Questions that have been asked already are prefixed
-       with an '*'.
+========== 演習03 ==========
+
+$ lab start 03
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 03   labsvc の設定ファイルを探して、ポートを 9090 に変える
+          影響度 B / 目安 10分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  この演習はシステム全体を触ります（/etc の設定ファイルを書き換えます）。作業ディレクトリは使いません。
+
+【いまの状態】
+
+    $ labsvc
+    labsvc: 動いています
+    port=8080
+
+  labsvc は、設定ファイルに書かれたポート番号を読んで表示する練習用の道具です
+  （ポート番号は、通信の相手のプログラムを見分けるための番号。
+   labsvc は表示するだけで、本当には待ち受けません）。
+
+【やること】
+
+  labsvc が port=9090 と表示するように、labsvc の設定ファイルを書き換えてください。
+
+  設定ファイルの場所は教えません。labsvc というコマンドがどのパッケージから来たのか、
+  そのパッケージがどこにファイルを置いたのかを調べて、見つけてください。
+  書き換えるのは設定ファイルだけです。/usr/bin/labsvc は書き換えないでください。
+
+  設定ファイルは root しか書けません。主題1.03 で使った vi か sed に sudo を付けて
+  書き換えてください（sudo vi ファイル、または sudo sed -i 's/前/後/' ファイル）。
+
+【判定のしかた】
+
+  labsvc を動かして、port=9090 と出るかを見ます。
+  あわせて、パッケージの台帳に記録された「入れたときの中身」と比べて、
+  設定ファイル以外のファイルが入れたときのままかを見ます。
+
+【できたら】
+
+    lab check 03
+
+──────────────────────────────────────
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 03）
+
+
+$ labsvc
+labsvc: 動いています
+port=8080
+
+
+========== 演習04 ==========
+
+$ lab start 04
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 04   見つからなくなった labbackup を、パッケージから戻す
+          影響度 B / 目安 10分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  この演習はシステム全体を触ります（/usr/bin にファイルを戻します）。作業ディレクトリは使いません。
+
+【いまの状態】
+
+    $ labbackup
+    bash: labbackup: command not found
+    $ dpkg -l labbackup | tail -1
+    ii  labbackup      1.0          all          practice backup command
+
+  コマンドは見つからないのに、台帳は「入っていて、使える状態（ii）」と言っています。
+  これが始まりの正しい状態です（誰かが、パッケージを通さずにファイルだけを消してしまった、
+  という想定です）。
+
+【やること】
+
+  1. 台帳と照らし合わせて、labbackup のどのファイルが、どうなっているかを確かめる
+  2. labbackup を、パッケージから入れたときの状態に戻す
+
+  消して入れ直すのではなく、入ったまま元に戻すコマンドを使ってください。
+
+【判定のしかた】
+
+  labbackup を動かして、1行のメッセージが出るかを見ます。
+  あわせて、台帳との照らし合わせ（dpkg -V labbackup）が何も出さないこと、
+  つまり labbackup のファイルが全部、台帳の記録どおりであることを見ます。
+
+【できたら】
+
+    lab check 04
+
+──────────────────────────────────────
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 04）
+
+
+$ labbackup
+bash: labbackup: command not found
+
+$ dpkg -l labbackup | tail -1
+ii  labbackup      1.0          all          practice backup command
+
+
+========== 演習05 ==========
+
+$ lab start 05
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 05   labweb を、跡形なく消す
+          影響度 B / 目安 10分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  この演習はシステム全体を触ります（dpkg の台帳と /etc）。作業ディレクトリは使いません。
+
+【いまの状態】
+
+    $ apt list --installed 'labweb*'
+    Listing... Done
+    labweb-data/lab,now 1.0 all [installed,automatic]
+    labweb/lab,now 1.0 all [installed]
+
+  labweb と labweb-data の2つが入っています。
+  自分で名指しして入れたのは labweb だけで、labweb-data は labweb を入れたときに
+  「必要だから」と一緒に入ってきたもの（automatic の印）です。
+  設定ファイル /etc/labweb.conf もあります。
+
+【やること】
+
+  labweb を、このシステムから跡形なく消してください。
+  次の3つがそろえば完了です。
+
+      labweb が dpkg の台帳に残っていない（rc の行も残っていない）
+      /etc/labweb.conf が無い
+      labweb のために入ってきた labweb-data も消えている
+
+  labweb-data は名前を打たずに消してください。
+  「もう誰にも必要とされていない」ことを apt に判断させるのが、この演習の半分です。
+
+【判定のしかた】
+
+  dpkg の台帳で labweb と labweb-data の行を見ます（rc で残っていても未達）。
+  あわせて、/etc/labweb.conf があるかを見ます。
+
+【できたら】
+
+    lab check 05
+
+──────────────────────────────────────
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 05）
+
+
+$ apt list --installed 'labweb*'
+Listing... Done
+labweb-data/lab,now 1.0 all [installed,automatic]
+labweb/lab,now 1.0 all [installed]
+
+
+========== 演習06 ==========
+
+$ lab start 06
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 06   labcalc コマンドを使えるようにする
+          影響度 B / 目安 15分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  この演習はシステム全体を触ります（apt のソースと dpkg の台帳）。作業ディレクトリは使いません。
+
+【いまの状態】
+
+    $ labcalc 2 3
+    bash: labcalc: command not found
+    $ find /srv/lab-tools -maxdepth 3
+    /srv/lab-tools
+    /srv/lab-tools/dists
+    /srv/lab-tools/dists/tools
+    /srv/lab-tools/dists/tools/main
+    /srv/lab-tools/dists/tools/Release
+    /srv/lab-tools/pool
+    /srv/lab-tools/pool/main
+    /srv/lab-tools/pool/main/l
+
+  labcalc はまだ入っていないので、command not found が出るのが始まりの正しい状態です。
+  （find は、指定したディレクトリの下にあるものを並べるコマンドで、-maxdepth 3 は「3段下まで」という指定です）
+
+  /srv/lab-tools に、apt のリポジトリが1つ置いてあります。
+  まだ apt のソース（どこからパッケージを取るかの表）には入っていません。
+
+  この中のどれかのパッケージに、labcalc というコマンドが入っています。
+  パッケージの名前は教えません。説明文にも labcalc という語は出てきません
+  （つまり apt search では見つかりません）。
+
+【やること】
+
+  labcalc コマンドを使えるようにしてください。
+
+      labcalc 2 3     →   5 と出れば使えている
+
+【判定のしかた】
+
+  次の3つを確かめます。
+
+      labcalc がコマンドとして見つかり、2 と 3 を渡すと 5 を返す
+      labcalc が dpkg の台帳にあるパッケージから入っている（手で置いたファイルではない）
+      そのパッケージを、apt が /srv/lab-tools から入れられる状態になっている
+
+【できたら】
+
+    lab check 06
+
+──────────────────────────────────────
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 06）
+
+
+$ labcalc 2 3
+bash: labcalc: command not found
+
+$ find /srv/lab-tools -maxdepth 3
+/srv/lab-tools
+/srv/lab-tools/dists
+/srv/lab-tools/dists/tools
+/srv/lab-tools/dists/tools/main
+/srv/lab-tools/dists/tools/Release
+/srv/lab-tools/pool
+/srv/lab-tools/pool/main
+/srv/lab-tools/pool/main/l
+
+
+========== 演習07 ==========
+
+$ lab start 07
+作業ファイルを ~/work/07 に展開しました（labnote_1.0_all.deb ）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 07   配られた .deb を、動く状態まで入れる
+          影響度 B / 目安 12分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  作業ファイルは ~/work/07 にあります。
+
+【いまの状態】
+
+    $ cd ~/work/07
+    $ ls
+    labnote_1.0_all.deb
+    $ labnote
+    bash: labnote: command not found
+    $ dpkg -I labnote_1.0_all.deb
+     new Debian package, version 2.0.
+     size 708 bytes: control archive=315 bytes.
+         295 bytes,    10 lines      control
+     Package: labnote
+     Version: 1.0
+     Section: utils
+     Priority: optional
+     Architecture: all
+     Depends: labnote-data (>= 1.0)
+     Installed-Size: 28
+     Maintainer: check-then-explain <lab@example.invalid>
+     Description: prints a note shipped in labnote-data
+      Distributed as a single .deb file, not from a repository.
+
+  labnote はまだ入っていないので、command not found が出るのが始まりの正しい状態です。
+
+  labnote_1.0_all.deb は、リポジトリには無い「単体で配られた .deb ファイル」です
+  （どこかのサイトから落としてきた、という想定です）。
+
+【やること】
+
+  labnote を入れて、labnote コマンドが動く状態にしてください。
+
+      labnote   →   1行のメッセージが出れば動いている
+
+【判定のしかた】
+
+  dpkg の台帳で、labnote と、labnote が必要とするパッケージの両方が
+  ii（入っていて、設定も済んでいる）になっていることと、labnote が実際に動くことを見ます。
+
+【できたら】
+
+    lab check 07
+
+──────────────────────────────────────
+▶ 次はこれを打ってください
+    cd ~/work/07
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 07）
+
+
+$ cd ~/work/07
+
+$ ls
+labnote_1.0_all.deb
+
+$ labnote
+bash: labnote: command not found
+
+$ dpkg -I labnote_1.0_all.deb
+ new Debian package, version 2.0.
+ size 708 bytes: control archive=315 bytes.
+     295 bytes,    10 lines      control
+ Package: labnote
+ Version: 1.0
+ Section: utils
+ Priority: optional
+ Architecture: all
+ Depends: labnote-data (>= 1.0)
+ Installed-Size: 28
+ Maintainer: check-then-explain <lab@example.invalid>
+ Description: prints a note shipped in labnote-data
+  Distributed as a single .deb file, not from a repository.
+
+
+========== 演習08 ==========
+
+$ lab start 08
+作業ファイルを ~/work/08 に展開しました（labmine.sh ）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 08   配られたスクリプトを、自分でパッケージにして入れる
+          影響度 B / 目安 15分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  作業ファイルは ~/work/08 にあります。
+
+【いまの状態】
+
+    $ cd ~/work/08
+    $ ls
+    labmine.sh
+    $ cat labmine.sh
+    #!/bin/sh
+    # labmine - liblab の lab_greet を使って1行出す（演習08 で、あなたがパッケージにするスクリプト）
+    . /usr/lib/liblab/liblab.sh
+    lab_greet "自分で作ったパッケージから入りました"
+    $ sh labmine.sh
+    labmine.sh: 3: .: cannot open /usr/lib/liblab/liblab.sh: No such file
+
+  labmine.sh は、パッケージ liblab が置くファイル /usr/lib/liblab/liblab.sh を読み込みます。
+  liblab はまだ入っていないので、このエラーが出るのが始まりの正しい状態です。
+
+【やること】
+
+  labmine.sh を /usr/bin/labmine として置くパッケージを作り、入れてください。
+
+      パッケージの名前   labmine
+      版                 1.0
+      依存関係           liblab（labmine は liblab が無いと動かないので、パッケージの情報に書く）
+
+  liblab を apt install liblab で先に入れるのではなく、labmine を入れるときに
+  依存関係から一緒に入るようにしてください。
+
+      labmine   →   liblab: 自分で作ったパッケージから入りました   と出れば完成
+
+【判定のしかた】
+
+  dpkg の台帳で、labmine が版 1.0 で ii になっていること、依存関係に liblab が書かれていること、
+  /usr/bin/labmine が labmine のファイルとして載っていて、持ち主が root であることを見ます。
+  そして labmine を実際に動かし、上の1行が出るかを見ます。
+
+【できたら】
+
+    lab check 08
+
+──────────────────────────────────────
+▶ 次はこれを打ってください
+    cd ~/work/08
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 08）
+
+
+$ cd ~/work/08
+
+$ ls
+labmine.sh
+
+$ cat labmine.sh
+#!/bin/sh
+# labmine - liblab の lab_greet を使って1行出す（演習08 で、あなたがパッケージにするスクリプト）
+. /usr/lib/liblab/liblab.sh
+lab_greet "自分で作ったパッケージから入りました"
+
+$ sh labmine.sh
+labmine.sh: 3: .: cannot open /usr/lib/liblab/liblab.sh: No such file
