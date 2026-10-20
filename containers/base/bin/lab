@@ -32,7 +32,8 @@ if [ "${RO_STATE:-0}" = 1 ]; then
 fi
 
 c_ok=$'\033[32m'; c_ng=$'\033[31m'; c_wr=$'\033[33m'; c_d=$'\033[2m'; c_b=$'\033[1m'; c_0=$'\033[0m'
-[ -t 1 ] || { c_ok=; c_ng=; c_wr=; c_d=; c_b=; c_0=; }
+c_hd=$'\033[1;36m'; c_tag=$'\033[1;7m'
+[ -t 1 ] || { c_ok=; c_ng=; c_wr=; c_d=; c_b=; c_0=; c_hd=; c_tag=; }
 
 die() { printf '%s\n' "$*" >&2; exit 1; }
 
@@ -79,7 +80,12 @@ cmd_status() {
     esac
   done
   printf '%s\n' "${c_b}lab-${THEME}${c_0}  進捗 ${done_n}/${total}"
-  if [ -n "$next" ]; then
+  local cur; cur=$(current_get)
+  if [ -n "$cur" ] && [ -f "$LAB_HOME/tasks/$cur.md" ] && ! is_cleared "$cur"; then
+    printf '  作業中 → %s 「%s」 %s\n' "$cur" "$(meta_get "$cur" title)" \
+      "${c_d}(目安 $(meta_get "$cur" est_min)分 / 影響度 $(meta_get "$cur" impact))${c_0}"
+    printf '  %s\n' "${c_d}lab show で課題文をもう一度 / lab check $cur で答え合わせ${c_0}"
+  elif [ -n "$next" ]; then
     printf '  次 → %s 「%s」 %s\n' "$next" "$(meta_get "$next" title)" \
       "${c_d}(目安 $(meta_get "$next" est_min)分 / 影響度 $(meta_get "$next" impact))${c_0}"
     printf '  %s\n' "${c_d}lab start $next で課題を開く${c_0}"
@@ -98,6 +104,46 @@ cmd_ls() {
   printf '\n  %s\n' "${c_d}✔ 自力で達成   ◍ solve を見た   · 未着手${c_0}"
 }
 
+# 開いている演習（lab show を引数なしで打ったときに出すもの）。進捗とは別のファイルに置く。
+# progress.json に足すと、全演習の .at を集める finale の計算に混ざるため。
+current_get() { cat "$STATE/current" 2>/dev/null | head -1; }
+current_set() { printf '%s\n' "$1" > "$STATE/current" 2>/dev/null || true; }
+is_cleared() { case "$(prog_get "$1")" in done|solve) return 0 ;; *) return 1 ;; esac; }
+
+# 課題文を見出しつきで出す（副作用なし。lab start と lab show の両方が使う）。
+# 罫線は38字にする。罫線の文字は端末の設定で2桁ぶんの幅になることがあり、そのときも 80 桁に収まるように。
+rule() { local ch=$1 i out=""; for i in $(seq 1 38); do out+="$ch"; done; printf '%s' "$out"; }
+show_task() {
+  local n=$1 task="$LAB_HOME/tasks/$1.md"
+  printf '\n%s\n' "${c_hd}$(rule ━)${c_0}"
+  local tag="【演習 $n】"; [ -n "$c_tag" ] && tag="${c_tag} 演習 $n ${c_0}"   # 色が無い端末では括弧で囲む
+  printf ' %s  %s\n' "$tag" "${c_b}$(meta_get "$n" title)${c_0}"
+  printf '          %s\n' "${c_d}影響度 $(meta_get "$n" impact) / 目安 $(meta_get "$n" est_min)分${c_0}"
+  printf '%s\n\n' "${c_hd}$(rule ━)${c_0}"
+  # 課題文の1行目（「演習 NN — 題 … 影響度 / 目安」）は上の見出しと同じなので省き、続く空行も省く
+  awk -v n="$n" 'NR==1 && index($0, "演習 " n " — ")==1 {skip=1; next}
+                 skip && NR==2 && $0=="" {next} {print}' "$task"
+  printf '\n%s\n' "${c_d}$(rule ─)${c_0}"
+}
+
+# 課題文の後に、作業を始める場所と、課題文をもう一度出す方法を出す。
+# 移動するコマンドをそのまま打てる形で出す。これを出していなかったとき、読者が書き込めない
+# ディレクトリ（/home 等）のまま作業を始めて `unable to open database file` で詰まった。
+# 演習がシステム全体を触る型（workdir=no）のときは ~/work へ誘導しない。
+# 誘導すると、読者は /etc を触る課題なのに作業ディレクトリを探し始める。
+# 元に戻す方法は檻ごとに違う（練習機のある檻は起動し直しても戻らない）ので、イメージが LAB_RESET_HINT で渡す。
+task_footer() {
+  local n=$1
+  if [ "$(meta_get "$n" workdir)" = "no" ]; then
+    printf '%s\n' "${c_d}この演習はシステム全体を触ります（作業ディレクトリは使いません）${c_0}"
+    printf '%s\n' "${c_d}${LAB_RESET_HINT:-元に戻すには起動し直してください}${c_0}"
+  else
+    printf '%s\n' "${c_b}▶ 次はこれを打ってください${c_0}"
+    printf '%s\n' "    cd ~/work/$n"
+  fi
+  printf '%s\n\n' "${c_d}この課題文は lab show でいつでももう一度出せます（答え合わせは lab check $n）${c_0}"
+}
+
 cmd_start() {
   local n; n=$(norm "${1:?lab start NN}")
   local task="$LAB_HOME/tasks/$n.md"
@@ -112,19 +158,21 @@ cmd_start() {
     chmod -R u+w "$WORK/$n" 2>/dev/null || true
     printf '%s\n' "${c_d}作業ファイルを ~/work/$n に展開しました（$(ls -A "$seed" | tr '\n' ' ')）${c_0}"
   fi
-  printf '\n'; cat "$task"; printf '\n'
-  # 課題文の後に、移動するコマンドをそのまま打てる形で出す。
-  # これを出していなかったとき、読者が書き込めないディレクトリ（/home 等）のまま
-  # 作業を始めて `unable to open database file` で詰まった。
-  # 演習がシステム全体を触る型（workdir=no）のときは ~/work へ誘導しない。
-  # 誘導すると、読者は /etc を触る課題なのに作業ディレクトリを探し始める。
-  if [ "$(meta_get "$n" workdir)" = "no" ]; then
-    printf '%s\n' "${c_d}この演習はシステム全体を触ります（作業ディレクトリは使いません）${c_0}"
-    printf '%s\n\n' "${c_d}元に戻すには起動し直してください${c_0}"
-  else
-    printf '%s\n' "${c_b}▶ 次はこれを打ってください${c_0}"
-    printf '%s\n\n' "    cd ~/work/$n"
-  fi
+  current_set "$n"
+  show_task "$n"
+  task_footer "$n"
+}
+
+# 課題文をもう一度出す。作業ファイルの展開も進捗の記録もしない。
+# 番号を省くと、最後に lab start で開いた演習を出す（読者フィードバック 2026-10-20:
+# 「start の文は後で見返しやすいように」。作業を進めると課題文が画面の上へ流れて見えなくなる）。
+cmd_show() {
+  local n
+  if [ $# -ge 1 ]; then n=$(norm "$1"); else n=$(current_get); fi
+  [ -n "$n" ] || die "まだ課題を開いていません。lab start NN で開いた後は、lab show だけで出せます（演習の一覧は lab ls）"
+  [ -f "$LAB_HOME/tasks/$n.md" ] || die "演習 $n は存在しません（lab ls で一覧）"
+  show_task "$n"
+  task_footer "$n"
 }
 
 cmd_check() {
@@ -302,6 +350,7 @@ lab — 学習ラボのコマンド
   lab                現在地と次の一手
   lab ls             演習一覧と達成状況
   lab start NN       課題を開き、作業ファイルを ~/work/NN に展開する
+  lab show [NN]      課題文をもう一度出す（省略時は最後に開いた演習）
   lab check [NN]     答え合わせ（省略時は全問）
   lab hint NN        ヒントを1段出す（呼ぶたび深くなる）
   lab solve NN       模範解答を見る（使ったことは記録に残る）
@@ -314,6 +363,7 @@ case "${1:-status}" in
   ""|status) cmd_status ;;
   ls)     cmd_ls ;;
   start)  shift; cmd_start "$@" ;;
+  show)   shift; cmd_show "$@" ;;
   check)  shift; cmd_check "$@" ;;
   hint)   shift; cmd_hint "$@" ;;
   solve)  shift; cmd_solve "$@" ;;
