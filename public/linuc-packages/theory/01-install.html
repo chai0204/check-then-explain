@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. パッケージを入れて、使って、消す — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="1" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第1章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>1. パッケージを入れて、使って、消す</h1>
+<p class="lead"><b>このコースでやること</b>: Linux にソフトウェアを入れる・調べる・消す方法を、2つの系統の Linux で、実際に打って確かめる。Linux には、ソフトウェアの配り方と、それを扱う道具が違う系統がいくつかあり、ここでは代表の2つを使う。Debian 系（Debian と、それをもとに作られた Ubuntu など）と、RPM 系（Red Hat Enterprise Linux と、それと同じ作りの AlmaLinux など）である。第1〜8章は Debian 系で、第9〜11章は RPM 系で同じことをする。<b>この章でやること</b>: いちばん普通の使い方を1回やる。まだ入っていないコマンドを1つ入れて、使って、消す。<b>始める前に要るもの</b>: docker が動く PC と、端末（80 桁 × 24 行の大きさで確かめてある）。</p>
+<div class="badges"><span>前提: docker が動く</span><span>前提: 端末でコマンドを打てる</span><span>前提: sudo の意味が分かる</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>まだ入っていないコマンドを、パッケージとして <code>sudo apt install</code> で入れて使える</li><li>入れたパッケージを <code>sudo apt remove</code> で消せる</li><li><code>apt install</code> の出力から、何を・どこから取ってきて・何をしたかを読める</li><li>パッケージを入れたり消したりするのに <code>sudo</code> が要る理由を言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>apt</code> のほかのサブコマンドとオプション、出力のうち意味をまだ説明していない行（<code>Building dependency tree</code> など）、パッケージのファイルの中身の形、Debian 系と RPM 系の違い。この章は「入れて、使って、消す」が1回できれば足りる。</div></div>
+
+<h2 id="cage">檻を起動する</h2>
+<div class="sgoal"><b>この節で分かること</b>: この教材のコマンドを、どこで、どう打つか。</div>
+<p>この教材のコマンドは、あなたの PC の上では打たない。<b>コンテナ</b>（1台の PC の中に、ほかと切り離した小さな Linux の部屋を作るしくみ。docker はそれを作る道具）の中で打つ。この教材では、このコンテナを<b>檻</b>と呼ぶ。パッケージを入れたり消したりすると、その Linux 全体が書き換わる。壊しても困らない部屋でやるためである。</p>
+<p>あなたの PC の端末で、次の1行（4行に折ってある）をそのまま打つ。この章から第8章までは、この Debian 系の檻を使う。</p>
+<pre data-where="あなたの PC の端末（檻の外）"><code>docker run --rm -it --name lab-linuc-packages-deb --hostname linuc \
+  -v lab-linuc-packages-deb-work:/home/lab/work \
+  -v lab-linuc-packages-deb-state:/home/lab/.lab \
+  ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__</code></pre>
+<p>初めて打つときは、檻の元になるイメージ（檻の中身をまとめたファイル。約 800MB）を取ってくるので、少し待つ。起動すると案内が数行出て、<code>lab@linuc:~$</code> というプロンプトが出る。ここからが檻の中で、あなたは一般ユーザ <code>lab</code> として動いている。<b>この教材では、檻の中のプロンプトを <code>$</code> と短く書く</b>。</p>
+<div class="scroll"><table>
+<tr><th>起動の1行の部品</th><th>何のためにあるか</th></tr>
+<tr><td><code>--rm</code></td><td>檻を抜けたら、檻を消す。次に起動すると最初の状態から始まる</td></tr>
+<tr><td><code>-it</code></td><td>あなたの端末を檻につなぐ。これが無いと、打ったものが檻に届かない</td></tr>
+<tr><td><code>--name</code> / <code>--hostname</code></td><td>檻の名前と、檻の中の機械の名前（プロンプトの <code>linuc</code>）</td></tr>
+<tr><td><code>-v …-work:/home/lab/work</code> / <code>-v …-state:/home/lab/.lab</code></td><td>檻を消しても残る置き場（ボリューム）を2つつなぐ。演習の作業ファイルと、演習の進み具合を残すため</td></tr>
+<tr><td><code>ghcr.io/…@sha256:…</code></td><td>使うイメージ。<code>@sha256:</code> の後ろで中身を1つに決めてあるので、誰が起動しても同じ檻になる</td></tr>
+</table></div>
+<p><b>章ごとに起動し直す</b>。この教材に載せた出力は、章ごとに檻を起動し直した直後から、本文の順に打った記録である。前の章で入れたものが残っていると出力が変わるので、章が変わったら <code>exit</code> で檻を抜け、もう一度上の1行を打つ。檻の中で打つコマンドの枠には「Debian 系の檻」と書いてある。</p>
+<div class="analogy"><b>たとえ</b>: ホテルの部屋に近い。チェックアウト（<code>exit</code>）すると部屋は片付けられ、次に泊まると最初の状態に戻っている。ただ、フロントに預けた荷物（ボリュームの中身）だけは、次に泊まったときも受け取れる。
+<br>ただし<b>崩れる点</b>: ホテルの部屋は1つの建物に並んでいるが、檻はあなたの PC の中に作られ、PC の力（CPU やメモリ）をそのまま分けて使う。檻の中で重い作業をすると、PC 全体が重くなる。</div>
+
+<h2 id="missing">まだ入っていないコマンド</h2>
+<div class="sgoal"><b>この節で分かること</b>: パッケージ・パッケージ管理・apt が、それぞれ何か。</div>
+<p><code>labhello</code> というコマンドを打ってみる。この教材のために作った、自分の版（バージョン）を1行出すだけのコマンドである。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ labhello
+bash: labhello: command not found</code></pre>
+<p><code>command not found</code>（コマンドが見つからない）と言われた。この檻には、まだ入っていないからである。</p>
+<p>Linux では、コマンドやアプリは<b>パッケージ</b>の形で配られる。パッケージは、プログラムと、それが使うファイル（説明書や設定ファイル）を1つにまとめて、名前と版を付けたものである。パッケージを入れる・消す・何を入れたかを覚えておく、という仕事を<b>パッケージ管理</b>と呼び、それをするコマンドがある。Ubuntu のような Debian 系の Linux では <code>apt</code> を使う。</p>
+<div class="analogy"><b>たとえ</b>: スマートフォンのアプリストアに近い。名前を指定して「入手」すれば、どこから取ってくるかを自分で探さなくても入り、要らなくなれば消せる。
+<br>ただし<b>崩れる点</b>: スマートフォンのアプリはあなた専用だが、<code>apt</code> で入れたものは、その機械を使う全員が使う場所に置かれる。だから、次の節で見るとおり、入れるには特別な権限が要る。</div>
+
+<h2 id="install">入れる — apt install</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>apt install</code> の打ち方と、出力の読み方。</div>
+<p>入れるコマンドは <code>apt install パッケージの名前</code> である。このパッケージの名前は、コマンドと同じ <code>labhello</code> である。パッケージを入れると、<code>/usr/bin</code> のような、その機械の全員が使う場所にファイルが置かれ、何を入れたかの記録も書き換わる。どちらも root（その機械の管理者）しか書けない場所にあるので、前に <code>sudo</code> を付けて、root の権限で打つ。この檻の <code>lab</code> は、パスワードを聞かれずに <code>sudo</code> を使えるようにしてある。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following NEW packages will be installed:
+  labhello
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1120 B of archives.
+After this operation, 77.8 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+Selecting previously unselected package labhello.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...</code></pre>
+<p>入った。出力の1行ずつの意味はこうである。</p>
+<div class="scroll"><table>
+<tr><th>行</th><th>意味</th></tr>
+<tr><td><code>Reading package lists... Done</code></td><td>入れられるパッケージの一覧を読み込んだ</td></tr>
+<tr><td><code>Building dependency tree... Done</code></td><td>頼まれたものを入れるのに、一緒に要るものが無いかを調べた（今回は無かった）</td></tr>
+<tr><td><code>Reading state information... Done</code></td><td>いま入っているものの記録を読み込んだ</td></tr>
+<tr><td><code>The following NEW packages will be installed:</code></td><td>これから新しく入れるもの（次の行の <code>labhello</code>）</td></tr>
+<tr><td><code>0 upgraded, 1 newly installed, 0 to remove …</code></td><td>新しい版に上げるもの 0・新しく入れるもの 1・消すもの 0</td></tr>
+<tr><td><code>Need to get 0 B/1120 B of archives.</code></td><td>パッケージのファイルは 1120 バイトで、ネットから取ってくる量は 0 バイト（この檻では置き場が同じ機械の中にあるので）</td></tr>
+<tr><td><code>After this operation, … kB of additional disk space will be used.</code></td><td>入れると、ディスクをこれだけ使う</td></tr>
+<tr><td><code>Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]</code></td><td>パッケージを取ってきた。どこから（<code>file:/srv/lab-repo</code>）・何を（<code>labhello</code>）・どの版を（<code>1.0</code>）</td></tr>
+<tr><td><code>Selecting previously unselected package labhello.</code></td><td>これまで入っていなかったパッケージとして、入れる側に選んだ</td></tr>
+<tr><td><code>(Reading database ... 12833 files and directories currently installed.)</code></td><td>入っているものの記録を読み込んだ。数は、パッケージから入ったファイルとディレクトリの数</td></tr>
+<tr><td><code>Preparing to unpack .../labhello/labhello_1.0_all.deb ...</code></td><td>取ってきたファイル <code>labhello_1.0_all.deb</code> を広げる用意をした</td></tr>
+<tr><td><code>Unpacking labhello (1.0) ...</code></td><td>中身のファイルを置いた</td></tr>
+<tr><td><code>Setting up labhello (1.0) ...</code></td><td>使える状態に整えた</td></tr>
+<tr><td><code>Processing triggers for man-db …</code></td><td>labhello が説明書（man のページ）も一緒に置いたので、man の索引を作り直した</td></tr>
+</table></div>
+<p><code>Get:1</code> の行の <code>file:/srv/lab-repo</code> が、パッケージを取ってきた場所である。パッケージを配っている置き場を<b>リポジトリ</b>と呼ぶ。この檻では、練習用のリポジトリを檻の中の <code>/srv/lab-repo</code> に置いてある。本物の Ubuntu では、インターネットの向こうのサーバがリポジトリになる。同じ行の <code>amd64</code> はこの機械の CPU の種類（アーキテクチャ）、<code>all</code> は「どの種類の CPU でも動くパッケージ」という印である。</p>
+<p>途中で <code>Do you want to continue? [Y/n]</code> と尋ねられることはなかった。頼んだ1つだけを入れるときは、apt は尋ねずに進める。使ってみる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ labhello
+labhello 1.0</code></pre>
+<div class="analogy"><b>たとえ</b>: 引っ越しの荷物の搬入に近い。荷物を部屋に運び込む（<code>Unpacking</code>）だけでは暮らせず、電気やガスをつないで初めて使える（<code>Setting up</code>）。apt は両方をまとめてやる。
+<br>ただし<b>崩れる点</b>: 引っ越しは何日もかかるが、ここでは一瞬で終わり、途中で止まることはめったにない。止まるのは、運び込んだあとで「つなぐ」ための別のものが足りないときで、そのときは2つ目の手順の手前で止まる。</div>
+
+<h2 id="remove">消す — apt remove</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>apt remove</code> の打ち方と、消したあとの bash の言い方。</div>
+<p>消すコマンドは <code>apt remove パッケージの名前</code> である。これも root の権限が要る。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt remove labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages will be REMOVED:
+  labhello
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
+After this operation, 77.8 kB disk space will be freed.
+Do you want to continue? [Y/n] y
+(Reading database ... 12837 files and directories currently installed.)
+Removing labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...</code></pre>
+<p><code>The following packages will be REMOVED:</code> が「これから消すもの」で、消す前に <code>Do you want to continue? [Y/n]</code>（続けますか？）と尋ねてきた。<code>y</code> と打って Enter を押す。<code>Y</code> だけが大文字なのは、何も打たずに Enter だけを押しても <code>Y</code>（はい）になるという印である。<code>Removing labhello (1.0) ...</code> がファイルを外した行で、<code>Processing triggers for man-db</code> は、説明書が無くなったので man の索引をまた作り直した行である。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>消したのだから、もう一度 labhello と打てば、入れる前と同じ <code>command not found</code> に戻るはずだ。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ labhello
+bash: /usr/bin/labhello: No such file or directory</code></pre>
+<div class="then"><b>だめな理由</b>: 入れる前の <code>command not found</code> とは違う言い方になった。<code>No such file or directory</code> は「そのファイルが無い」という意味である。
+bash（このプロンプトを出しているシェル）は、一度見つけたコマンドの場所（<code>/usr/bin/labhello</code>）を覚えていて、2回目からは探さずにその場所を直接開く。
+ファイルは消えたので、その場所を開けなかった、と言っている。パッケージは消えている。違うのは bash の覚え方のほうである。</div></div>
+<p>覚えている場所を忘れさせるのが <code>hash -r</code> である。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ hash -r
+$ labhello
+bash: labhello: command not found</code></pre>
+<p><code>hash -r</code> は何も出さずに終わる。そのあとは、最初と同じ <code>command not found</code> に戻った。入れる前の状態に戻ったということである。</p>
+<div class="analogy"><b>たとえ</b>: よく行く店の場所を覚えていて、地図を見ずに直接行くのに近い。店が閉まっていても、行ってみるまで気づかない（<code>No such file or directory</code>）。<code>hash -r</code> は覚えた場所を全部忘れて、次からまた地図を見るようにする。
+<br>ただし<b>崩れる点</b>: 人なら、店が無ければその場で別の店を探すが、bash は覚えた場所が無いと、そこで止まって探し直さない。だから2回目に打っても同じ言い方になる。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/practice/">演習01</a>は、この章のとおりに labhello を入れて使えるようにする課題である。
+判定は、labhello を実際に動かして版を出すかと、パッケージとして入ったことになっているかを見る。</div>
+<div class="quiz"><b>確認</b>
+<p><code>sudo</code> を付けずに <code>apt install labhello</code> と打つと、どうなるか。そうなるのはなぜか。</p>
+<details><summary>答え</summary>
+<p><code>Permission denied</code> と <code>are you root?</code> が出て、何も入らない（実測）。
+パッケージを入れると <code>/usr/bin</code> のようなその機械の全員が使う場所にファイルが置かれ、何を入れたかの記録も書き換わる。
+どちらも root しか書けないので、<code>sudo</code> を付けて root の権限で打つ。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>apt install</code> の出力にあった次の1行から、何が読み取れるか。<br>
+<code>Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]</code></p>
+<details><summary>答え</summary>
+<p>パッケージ labhello の版 1.0 を、リポジトリ（パッケージの配り場所）<code>file:/srv/lab-repo</code> から取ってきたこと。
+<code>all</code> はどの種類の CPU でも動くパッケージだという印で、<code>amd64</code> はこの機械の CPU の種類である。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>sudo apt remove labhello</code> のあと、同じシェルで <code>labhello</code> と打つと
+<code>bash: /usr/bin/labhello: No such file or directory</code> と出た。<code>command not found</code> と出ないのはなぜか。</p>
+<details><summary>答え</summary>
+<p>bash が、前に見つけた labhello の場所（<code>/usr/bin/labhello</code>）を覚えていて、探し直さずにそこを開いたから。
+ファイルは消えているので「そのファイルが無い」と言う。<code>hash -r</code> で覚えた場所を忘れさせると、<code>command not found</code> に戻る（実測）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>Linux のコマンドやアプリは、パッケージ（プログラムと関係するファイルに名前と版を付けたもの）の形で配られる</li><li>Debian 系では <code>sudo apt install 名前</code> で入れ、<code>sudo apt remove 名前</code> で消す。<code>sudo</code> が要るのは、全員が使う場所と、入れたものの記録を書き換えるから</li><li><code>apt install</code> は、リポジトリ（配り場所）から取ってきて（<code>Get</code>）、中身を置き（<code>Unpacking</code>）、使える状態に整える（<code>Setting up</code>）</li><li>消したあとに <code>No such file or directory</code> と出るのは、bash が前の場所を覚えているから。<code>hash -r</code> で忘れさせる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-packages/theory/">← 理論編 目次</a><a href="/linuc-packages/theory/02-list">次: 2. いま何が入っているかを調べる →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

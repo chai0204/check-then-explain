@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6. パッケージはどこから来るか — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="6" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第6章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>6. パッケージはどこから来るか</h1>
+<p class="lead"><b>前の章までにやったこと</b>: パッケージを入れる・調べる・消すを一通りやり、台帳とファイルの関係（第4章）と、依存関係で一緒に入るもの・消しても残るもの（第5章）を確かめた。そのたびに apt は <code>file:/srv/lab-repo</code> というリポジトリから取ってきていた（<code>Get:</code> の行）。<b>この章でやること</b>: apt がどのリポジトリへ、何を見て取りに行くのかを確かめる。新しい版の置き場を足して、labhello を新しい版に上げる。最後に、名前やファイルからパッケージを探す。</p>
+<div class="badges"><span>前提: 第5章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>/etc/apt/sources.list</code> の1行（種類・URI・ディストリビューション・コンポーネント）を読み書きできる</li><li><code>apt update</code> が目録を取り直し、<code>apt upgrade</code> が入っているものを新しい版に上げる、という違いを、実際に上げて示せる</li><li>入っていないパッケージも、名前と説明（<code>apt search</code>）やファイル名（<code>apt-file search</code>）から探せる</li><li><code>apt</code> と <code>apt-get</code>・<code>apt-cache</code> の使い分けを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: リポジトリに署名する手順と鍵の配り方、署名を確かめるしくみの細部、ミラー（同じ中身を配る別のサーバ）の選び方、ソースパッケージ（<code>deb-src</code>）、優先度の数字（<code>500</code>・<code>100</code>）の決め方の細部。<code>apt-cache policy</code> の数字は「どこから来た版か」の印として読めれば足りる。</div></div>
+
+<h2 id="policy">どこから来た版か — apt-cache policy</h2>
+<div class="sgoal"><b>この節で分かること</b>: 入っている版と、入れられる版が、それぞれどこに載っているか。</div>
+<p>labhello を入れて（出力は略す）、<code>apt-cache policy</code> で版の出どころを聞く。<code>apt-cache</code> は第5章で使った、パッケージの情報を引くだけのコマンドである。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install labhello
+...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+$ apt-cache policy labhello
+labhello:
+  Installed: 1.0
+  Candidate: 1.0
+  Version table:
+ *** 1.0 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+        100 /var/lib/dpkg/status</code></pre>
+<div class="scroll"><table>
+<tr><th>行</th><th>意味</th></tr>
+<tr><td><code>Installed: 1.0</code></td><td>いま入っている版（台帳に書いてある版）</td></tr>
+<tr><td><code>Candidate: 1.0</code></td><td>入れるならこの版（入れられる版のうち、いちばん新しいもの）</td></tr>
+<tr><td><code>*** 1.0 500</code></td><td><code>***</code> はいま入っている版の印。<code>500</code> は優先度（同じ名前の版が何か所かにあるとき、どれを選ぶかの数）</td></tr>
+<tr><td><code>500 file:/srv/lab-repo lab/main amd64 Packages</code></td><td>この版が、リポジトリ <code>file:/srv/lab-repo</code> の区分 <code>lab</code> の一覧に載っている</td></tr>
+<tr><td><code>100 /var/lib/dpkg/status</code></td><td>この版が、台帳（第4章で開いたファイル）に載っている</td></tr>
+</table></div>
+<p>apt は、リポジトリの一覧と台帳の両方を見比べて答えている。いまは入っている版と入れられる版が同じ 1.0 なので、上げるものは無い。</p>
+
+<h2 id="repo">リポジトリの中 — 中身と目録</h2>
+<div class="sgoal"><b>この節で分かること</b>: リポジトリが、何と何でできているか。</div>
+<p>この檻のリポジトリは、ただのディレクトリである。中のファイルを全部並べる。<code>find</code> は、指定したディレクトリの下を順にたどってファイルを探すコマンドで、<code>-type f</code> は「ふつうのファイルだけ」という指定である。<code>sort</code> は受け取った行を並べ替える（<code>find</code> はたどった順に出すので、読みやすいように並べた）。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ find /srv/lab-repo -type f | sort
+/srv/lab-repo/dists/lab-updates/Release
+/srv/lab-repo/dists/lab-updates/main/Contents-amd64
+/srv/lab-repo/dists/lab-updates/main/Contents-amd64.gz
+/srv/lab-repo/dists/lab-updates/main/binary-amd64/Packages
+/srv/lab-repo/dists/lab-updates/main/binary-amd64/Packages.gz
+/srv/lab-repo/dists/lab/Release
+/srv/lab-repo/dists/lab/main/Contents-amd64
+/srv/lab-repo/dists/lab/main/Contents-amd64.gz
+/srv/lab-repo/dists/lab/main/binary-amd64/Packages
+/srv/lab-repo/dists/lab/main/binary-amd64/Packages.gz
+/srv/lab-repo/pool/main/l/labapp/labapp_1.0_all.deb
+/srv/lab-repo/pool/main/l/labbackup/labbackup_1.0_all.deb
+/srv/lab-repo/pool/main/l/labfortune/labfortune_1.0_all.deb
+/srv/lab-repo/pool/main/l/labhello/labhello_1.0_all.deb
+/srv/lab-repo/pool/main/l/labhello/labhello_1.1_all.deb
+/srv/lab-repo/pool/main/l/labnote-data/labnote-data_1.0_all.deb
+/srv/lab-repo/pool/main/l/labsvc-common/labsvc-common_1.0_all.deb
+/srv/lab-repo/pool/main/l/labsvc/labsvc_1.0_all.deb
+/srv/lab-repo/pool/main/l/labweb-data/labweb-data_1.0_all.deb
+/srv/lab-repo/pool/main/l/labweb/labweb_1.0_all.deb
+/srv/lab-repo/pool/main/libl/liblab/liblab_1.0_all.deb</code></pre>
+<p>2つに分かれている。<code>pool/</code> の下が中身（.deb ファイル）で、<code>dists/</code> の下が<b>目録</b>（リポジトリにあるパッケージの名前・版・依存関係・置き場所を並べた一覧）である。<code>dists/lab/</code> と <code>dists/lab-updates/</code> の2つの区分があり、<code>pool/</code> には labhello の 1.0 と 1.1 が両方置いてある。区分ごとの <code>Release</code> は、その区分にある目録のファイルの一覧（大きさとダイジェストつき）、<code>Packages</code> がパッケージの一覧、<code>Contents-amd64</code> が「どのファイルがどのパッケージに入っているか」の一覧で、<code>.gz</code> の付いたものは gzip で縮めたものである。目録の中身を見る。<code>zcat</code> は gzip で縮めたファイルを広げながら表示するコマンドである。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ zcat /srv/lab-repo/dists/lab/main/binary-amd64/Packages.gz | grep -A15 '^Package: labhello$'
+Package: labhello
+Architecture: all
+Version: 1.0
+Priority: optional
+Section: utils
+Maintainer: check-then-explain &lt;lab@example.invalid&gt;
+Installed-Size: 76
+Filename: pool/main/l/labhello/labhello_1.0_all.deb
+Size: 1120
+MD5sum: 8dc12cfc72d3df5612a807666a6d5aa0
+SHA1: 1031302b8cce72950e97c8e87f00768574959a74
+SHA256: ece77a42e06fec6b141e0d39a192527387b7f55d2fe450d285f85665f766bfe3
+SHA512: f4908cdc9b50b0309215ecefced170ee5c72d2392c55f36069e41881029ca2655cb0379f032b3225aafe34808e9950a52f93c11aed2265bd4e12a17a0026de80
+Description: prints its own version
+ A tiny package used to practice upgrades.</code></pre>
+<p>第3章の <code>dpkg -I</code> で見た情報に、<code>Filename:</code>（中身の置き場所）と、<code>Size:</code>・<code>MD5sum:</code>・<code>SHA256:</code> などの値が足されている。値は、取ってきた .deb ファイルが壊れていないかを確かめるためのダイジェストである。区分 <code>lab</code> の目録には、labhello は 1.0 しか載っていない。1.1 は <code>lab-updates</code> の目録に載っている。</p>
+<div class="analogy"><b>たとえ</b>: 倉庫と、その在庫の一覧表に近い。品物（.deb）は棚（<code>pool/</code>）に並び、一覧表（目録）に「どの棚に・何の何版が・どんな大きさで」と書いてある。apt は一覧表を見て、棚から取ってくる。
+<br>ただし<b>崩れる点</b>: 人なら倉庫に行けば棚を直接見られるが、apt は一覧表しか見ない。棚に品物を置いても、一覧表に載っていなければ「無い」ことになる（<code>pool/</code> に 1.1 があるのに、Candidate は 1.0 だった）。</div>
+
+<h2 id="sources">apt が見に行く場所の表 — sources.list</h2>
+<div class="sgoal"><b>この節で分かること</b>: どのリポジトリのどの区分を使うかを、どこに書くか。</div>
+<p>apt がどのリポジトリを使うかは、<code>/etc/apt/sources.list</code> に書いてある。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ cat /etc/apt/sources.list
+# Ubuntu sources have moved to the /etc/apt/sources.list.d/ubuntu.sources
+# file, which uses the deb822 format. Use deb822-formatted .sources files
+# to manage package sources in the /etc/apt/sources.list.d/ directory.
+# See the sources.list(5) manual page for details.
+
+# 檻の中の練習用リポジトリ（確かめて説明する LinuC 主題1.04）。
+# 署名していないので [trusted=yes] で署名の確認を外している。本物のリポジトリでは外さない。
+deb [trusted=yes] file:/srv/lab-repo lab main</code></pre>
+<p><code>#</code> で始まる行は説明書き（コメント）で、最後の1行が設定である。空白で区切って読む（<code>[ ]</code> は書かなくてもよい）。</p>
+<pre class="wire"><code>deb  [trusted=yes]  file:/srv/lab-repo  lab                     main
+^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^  ^^^                     ^^^^
+種類  オプション      URI（どこ）          ディストリビューション   コンポーネント（複数並べられる）</code></pre>
+<div class="scroll"><table>
+<tr><th>欄</th><th>この行では</th><th>何のためにあるか</th></tr>
+<tr><td>種類</td><td><code>deb</code></td><td>取ってくるものの種類。<code>deb</code> はそのまま入れられるパッケージ（<code>deb-src</code> ならプログラムの元のソース）</td></tr>
+<tr><td>オプション</td><td><code>[trusted=yes]</code></td><td>この行だけの特別な扱い。ここでは「署名を確かめない」。署名は、リポジトリの作り手が目録に付ける印で、誰が作ったか・途中で書き換えられていないかを確かめるのに使う。作り手だけが持つ鍵で付け、対になる公開鍵（誰に配ってもよい鍵）で確かめる（この練習用リポジトリには署名を付けていないので、確かめないことにしている。本物のリポジトリには、この指定を付けない）</td></tr>
+<tr><td>URI</td><td><code>file:/srv/lab-repo</code></td><td>リポジトリの場所。ふつうは <code>http://</code> や <code>https://</code> で始まるサーバ</td></tr>
+<tr><td>ディストリビューション</td><td><code>lab</code></td><td>リポジトリの中の区分（スイートとも呼ぶ）。<code>dists/</code> の下のディレクトリの名前</td></tr>
+<tr><td>コンポーネント</td><td><code>main</code></td><td>区分の中をさらに分けたもの。<code>dists/lab/</code> の下のディレクトリの名前</td></tr>
+</table></div>
+<p>Ubuntu 本体の分は、1行目のコメントのとおり、別のファイルに別の書き方で書いてある。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ cat /etc/apt/sources.list.d/ubuntu.sources
+Types: deb
+URIs: https://snapshot.ubuntu.com/ubuntu/20260929T000000Z
+Suites: noble noble-updates noble-security
+Components: main universe
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg</code></pre>
+<p>これは <b>deb822 形式</b>という書き方で、Ubuntu 24.04 からの既定である。<code>URIs</code> の <code>snapshot.ubuntu.com/…/20260929T000000Z</code> は、Ubuntu のリポジトリを 2026-09-29 の時点のまま残した写しで、この檻は、いつ起動しても同じ版を見るように、そこを指している。中身は同じで、欄に名前が付いている（<code>Types</code> が種類、<code>URIs</code> が URI、<code>Suites</code> がディストリビューション、<code>Components</code> がコンポーネント、<code>Signed-By</code> は署名を確かめる鍵の場所）。<code>Suites:</code> の <code>noble</code> は Ubuntu 24.04 が出たときの版の区分、<code>noble-updates</code> はその後に出た修正版、<code>noble-security</code> は安全のための修正版の区分である。練習用のリポジトリの <code>lab</code> と <code>lab-updates</code> も、同じ分け方にしてある。<code>/etc/apt/sources.list.d/</code> には、名前が <code>.list</code>（1行の形式）か <code>.sources</code>（deb822 形式）で終わるファイルをいくつでも置け、どれも <code>/etc/apt/sources.list</code> と同じように読まれる。</p>
+
+<h2 id="update">新しい版の置き場を足して、上げる</h2>
+<div class="sgoal"><b>この節で分かること</b>: リポジトリの区分を足したあと、新しい版を入れるまでに要ること。</div>
+<p>labhello 1.1 が載っている区分 <code>lab-updates</code> を、apt の表に足す。<code>/etc/apt/sources.list.d/</code> に1行のファイルを置く。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>どこにあるかを表に書いたのだから、apt はもう 1.1 を知っているはずだ。Candidate が 1.1 になり、上げられるものの一覧（<code>apt list --upgradable</code>）に labhello が出るだろう。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ echo 'deb [trusted=yes] file:/srv/lab-repo lab-updates main' | sudo tee /etc/apt/sources.list.d/lab-updates.list
+deb [trusted=yes] file:/srv/lab-repo lab-updates main
+$ apt-cache policy labhello
+labhello:
+  Installed: 1.0
+  Candidate: 1.0
+  Version table:
+ *** 1.0 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+        100 /var/lib/dpkg/status
+$ apt list --upgradable
+Listing... Done</code></pre>
+<div class="then"><b>だめな理由</b>: Candidate は 1.0 のままで、上げられるものも無い。
+apt が読んでいるのは <code>sources.list</code> ではなく、前に取ってきておいた<b>目録の写し</b>である。<code>sources.list</code> は「どこへ取りに行くか」の表にすぎず、書いただけでは何も取りに行かない。
+写しの置き場を見ると、<code>lab-updates</code> の分はまだ無い。</div></div>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ ls /var/lib/apt/lists/
+_srv_lab-repo_dists_lab_Release
+_srv_lab-repo_dists_lab_main_Contents-amd64.lz4
+_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4
+auxfiles
+lock
+partial
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-security_InRelease
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-security_main_binary-amd64_Packages.lz4
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-security_universe_binary-amd64_Packages.lz4
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-updates_InRelease
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-updates_main_binary-amd64_Packages.lz4
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-updates_universe_binary-amd64_Packages.lz4
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_InRelease
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_main_binary-amd64_Packages.lz4
+snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_universe_binary-amd64_Packages.lz4</code></pre>
+<p>ファイルの名前は、取りに行った場所のパスの <code>/</code> を <code>_</code> に置き換えたものである（<code>snapshot.ubuntu.com_…</code> は Ubuntu 本体の分。<code>lock</code>・<code>partial</code>・<code>auxfiles</code> は作業用）。写しを作り直すのが <code>apt update</code> である。目録の写しを書き換えるので、root が要る。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt update
+...
+Get:7 file:/srv/lab-repo lab-updates/main amd64 Packages [431 B]
+Get:8 file:/srv/lab-repo lab-updates/main amd64 Contents (deb) [81 B]
+Hit:9 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Hit:10 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Hit:11 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+1 package can be upgraded. Run 'apt list --upgradable' to see it.</code></pre>
+<p>行の頭の印はこう読む。</p>
+<div class="scroll"><table>
+<tr><th>印</th><th>意味</th></tr>
+<tr><td><code>Get</code></td><td>取りに行った。同じ番号の <code>Ign</code> が続けば、そのファイルは無かった。続かなければ取れた（<code>lab-updates/main amd64 Packages</code> の行）</td></tr>
+<tr><td><code>Ign</code></td><td>無かったが、無くてもよいものなので無視した（ここでは署名のファイル）</td></tr>
+<tr><td><code>Hit</code></td><td>前に取ったものから変わっていなかったので、取り直さなかった</td></tr>
+<tr><td><code>Err</code></td><td>取れなかった（ネットにつながっていない など）</td></tr>
+</table></div>
+<p><code>file:</code> の2つの区分の行は入り混じって出て、並びは打つたびに少し入れ替わる（同じ番号の <code>Get</code> が2回出ることもある）ので、途中を略した。<code>Hit</code> の3行は Ubuntu 本体の分で、この檻は Ubuntu の写しを最初から持っている。<b>ネットにつながっていないと、この3行が <code>Err</code> や <code>Ign</code> になり、警告が出る</b>。それでも練習用のリポジトリは檻の中にあるので、この先の結果は同じになる。最後の行は「上げられるパッケージが1つある」という知らせである。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt-cache policy labhello
+labhello:
+  Installed: 1.0
+  Candidate: 1.1
+  Version table:
+     1.1 500
+        500 file:/srv/lab-repo lab-updates/main amd64 Packages
+ *** 1.0 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+        100 /var/lib/dpkg/status
+$ apt list --upgradable
+Listing... Done
+labhello/lab-updates 1.1 all [upgradable from: 1.0]
+N: There is 1 additional version. Please use the '-a' switch to see it</code></pre>
+<p>今度は Candidate が 1.1 になり、<code>lab-updates</code> の目録から来ていると分かる。<code>[upgradable from: 1.0]</code> は「1.0 から上げられる」。最後の <code>N:</code>（知らせ）の行は「ほかにも版が1つある（1.0）。<code>-a</code> を付ければそれも出す」という意味である。上げる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt upgrade
+...
+The following packages will be upgraded:
+  labhello
+...
+Do you want to continue? [Y/n] y
+Get:1 file:/srv/lab-repo lab-updates/main amd64 labhello all 1.1 [1120 B]
+...
+Unpacking labhello (1.1) over (1.0) ...
+Setting up labhello (1.1) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+$ labhello
+labhello 1.1
+$ apt-cache policy labhello
+labhello:
+  Installed: 1.1
+  Candidate: 1.1
+  Version table:
+ *** 1.1 500
+        500 file:/srv/lab-repo lab-updates/main amd64 Packages
+        100 /var/lib/dpkg/status
+     1.0 500
+        500 file:/srv/lab-repo lab/main amd64 Packages</code></pre>
+<p><code>The following packages will be upgraded:</code>（次のものを上げる）、<code>Unpacking labhello (1.1) over (1.0)</code>（1.0 の上に 1.1 を置いた）と出て、labhello が 1.1 になった。<code>***</code> と <code>100 /var/lib/dpkg/status</code> が 1.1 のほうへ移った。台帳が書き換わったのである。</p>
+<p>2つのコマンドは名前が似ているが、することが違う。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>何のためにあるか</th><th>パッケージを入れ替えるか</th></tr>
+<tr><td><code>apt update</code></td><td>リポジトリの目録を取り直して、写しを新しくする</td><td>1つも入れ替えない</td></tr>
+<tr><td><code>apt upgrade</code></td><td>入っているパッケージを、写しに載っている新しい版に上げる</td><td>上げる（上げるのに要るなら新しく入れることもあるが、消しはしない）</td></tr>
+<tr><td><code>apt full-upgrade</code></td><td>全体を上げるために、必要なら消すこともする</td><td>上げる・入れる・消す</td></tr>
+<tr><td><code>apt install 名前</code></td><td>入っていなければ入れ、入っていて新しい版があれば上げる</td><td>その1つだけ</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: <code>apt update</code> は新しいカタログを取り寄せること、<code>apt upgrade</code> はカタログを見て、持っている古い型の品物を新しい型に買い替えることに近い。カタログを取り寄せただけでは、家の中の品物は1つも変わらない。
+<br>ただし<b>崩れる点</b>: 人なら、手元のカタログが古いと気づけるが、apt は手元の写しを疑わない。<code>apt update</code> で取り直すまで、どれだけ古くても「これが最新」として比べる。</div>
+
+<h2 id="family">apt と apt-get・apt-cache</h2>
+<div class="sgoal"><b>この節で分かること</b>: 似た名前のコマンドを、どう使い分けるか。</div>
+<p>第5章で <code>apt-get</code>（apt より前からある、ほぼ同じ働きのコマンド）と <code>apt-cache</code> の名前を出した。<code>apt</code> は、この2つのよく使う働きを、人が画面で打ちやすいようにまとめた入口である。出力の行き先が画面ではなくパイプだと、注意を出す。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt show labhello | head -3
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Package: labhello
+Version: 1.1
+Priority: optional</code></pre>
+<p><code>WARNING: apt does not have a stable CLI interface. Use with caution in scripts.</code> は「apt のコマンドの形は今後変わりうるので、スクリプト（コマンドを並べて自動で動かすファイル）では注意して使え」という意味である。パイプの先はスクリプトかもしれないので出している（画面に直接出すときは出ない）。スクリプトには、形を変えない <code>apt-get</code> と <code>apt-cache</code> を使う。</p>
+<div class="scroll"><table>
+<tr><th>apt（人が画面で打つ）</th><th>apt-get / apt-cache（スクリプトに書く）</th><th>何をするか</th></tr>
+<tr><td><code>apt update</code></td><td><code>apt-get update</code></td><td>目録を取り直す</td></tr>
+<tr><td><code>apt install</code> / <code>remove</code> / <code>purge</code> / <code>autoremove</code></td><td><code>apt-get install</code> / <code>remove</code> / <code>purge</code> / <code>autoremove</code></td><td>入れる・消す</td></tr>
+<tr><td><code>apt upgrade</code> / <code>full-upgrade</code></td><td><code>apt-get upgrade</code> / <code>dist-upgrade</code></td><td>上げる（<code>apt-get upgrade</code> は、上げるのに新しいパッケージを入れる必要があるものを、上げずに残す）</td></tr>
+<tr><td><code>apt search</code> / <code>apt show</code></td><td><code>apt-cache search</code> / <code>apt-cache show</code></td><td>目録を読む</td></tr>
+<tr><td><code>apt download</code></td><td><code>apt-get download</code></td><td>入れずに .deb ファイルを取ってくる（第3章）</td></tr>
+</table></div>
+
+<h2 id="search">名前とファイルから探す — apt search と apt-file</h2>
+<div class="sgoal"><b>この節で分かること</b>: 入っていないパッケージを、名前や説明、ファイル名から探す方法。</div>
+<p><code>apt search</code> は、目録の名前と説明から語を探す。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt search labhello
+Sorting... Done
+Full Text Search... Done
+labhello/lab-updates,now 1.1 all [installed]
+  prints its own version</code></pre>
+<p>見つかったパッケージが「名前/区分,now 版 アーキテクチャ [印]」と、その下の説明の2行で出る（<code>now</code> と <code>[installed]</code> は入っているものだけに付く）。名前も説明も分からず、「このファイルを入れるパッケージ」だけが分かっていることもある。第3章の <code>dpkg -S</code> は台帳を引くので、入っていないパッケージのファイルは知らない。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -S liblab.sh
+dpkg-query: no path found matching pattern *liblab.sh*
+$ apt-file search liblab.sh
+liblab: /usr/lib/liblab/liblab.sh
+$ apt-file list labapp
+labapp: /etc/labapp.conf
+labapp: /usr/bin/labapp
+labapp: /usr/share/doc/labapp/README</code></pre>
+<p><code>apt-file</code> は、目録のうち <b>Contents</b>（どのファイルがどのパッケージに入っているかの一覧）を引く道具である。<code>search</code> はファイル名からパッケージを、<code>list</code> はパッケージから中のファイルを、入っていなくても答える（<code>dpkg -S</code> に渡した <code>liblab.sh</code> のように、パスの一部だけでよい）。Contents は、さっきの <code>apt update</code> で <code>Contents (deb)</code> として一緒に取ってきた。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ ls /var/lib/apt/lists/ | grep Contents
+_srv_lab-repo_dists_lab-updates_main_Contents-amd64.lz4
+_srv_lab-repo_dists_lab_main_Contents-amd64.lz4
+$ apt-file search bin/dig</code></pre>
+<p><code>bin/dig</code>（dig は、DNS ＝ ホスト名から IP アドレスなどを引くしくみ、を調べるコマンド）では何も出なかった。<b>この檻では、apt-file が引く Contents を練習用のリポジトリの分だけに絞ってある</b>。Ubuntu 本体の Contents は3つの区分で合わせて約 195MB あり、<code>apt update</code> のたびに取りに行くと重すぎるからである（設定は <code>/etc/apt/apt.conf.d/60lab-apt-file</code>。消して <code>apt update</code> すれば Ubuntu の分も引ける）。ふつうの Ubuntu で <code>apt-file search bin/dig</code> と打てば、dig を入れるパッケージの名前が出る。</p>
+<div class="scroll"><table>
+<tr><th>聞きたいこと</th><th>入っているものだけ（台帳）</th><th>入っていなくてよい（目録）</th></tr>
+<tr><td>名前や説明に語を含むパッケージ</td><td>—</td><td><code>apt search 語</code>（<code>apt-cache search</code>）</td></tr>
+<tr><td>このファイルはどのパッケージにあるか</td><td><code>dpkg -S パス</code></td><td><code>apt-file search パス</code></td></tr>
+<tr><td>このパッケージにはどのファイルがあるか</td><td><code>dpkg -L 名前</code></td><td><code>apt-file list 名前</code></td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 本の目次と巻末の索引に近い。目次（目録の Packages）では章の題名（パッケージの名前と説明）しか分からないが、巻末の索引（Contents）を引けば、ある言葉（ファイル名）がどの章にあるかが分かる。
+<br>ただし<b>崩れる点</b>: 本の索引は本と一緒に手元に来るが、Contents は別に取りに行く目録で、しかも目次よりずっと大きい。取らない設定にもでき、取っていなければ引けない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/practice/">演習06</a>は、まだ apt の表に入っていないリポジトリから、名前の分からないパッケージに入っている <code>labcalc</code> コマンドを使えるようにする課題である。
+1行書く・目録を取りに行く・Contents を引く、の3つが要る。判定は labcalc を実際に動かし、dpkg の台帳と apt の目録を見る。</div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/apt/sources.list</code> の次の1行について、各欄の意味を答えよ。<br>
+<code>deb http://jp.archive.ubuntu.com/ubuntu noble main restricted</code></p>
+<details><summary>答え</summary>
+<p><code>deb</code> がそのまま入れられるパッケージの取得先であること（ソースなら <code>deb-src</code>）、
+<code>http://jp.archive.ubuntu.com/ubuntu</code> がリポジトリの URI、
+<code>noble</code> がディストリビューション（区分）、<code>main restricted</code> がコンポーネント（2つ並べてある）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/etc/apt/sources.list.d/</code> に新しいリポジトリの行を足した。続けて <code>apt install</code> したところ
+<code>E: Unable to locate package</code>（パッケージが見つからない）になった。まず実行すべきコマンドは何か。</p>
+<details><summary>答え</summary>
+<p><code>sudo apt update</code>（または <code>sudo apt-get update</code>）。apt が引くのは <code>/var/lib/apt/lists/</code> の目録の写しで、行を足しただけでは写しは作られない（実測では、行を足したあとも Candidate が変わらなかった）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>apt update</code> と <code>apt upgrade</code> の違いを説明せよ。</p>
+<details><summary>答え</summary>
+<p><code>update</code> は目録（パッケージの一覧）を取り直すだけで、パッケージは1つも入れ替えない。
+<code>upgrade</code> は、手元の目録の新しい版と台帳の版を比べて、入っているパッケージを上げる。
+実測では、<code>update</code> のあとに初めて labhello 1.1 が見え、<code>upgrade</code> で 1.0 から 1.1 に上がった。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>入っていないパッケージも含めて、<code>/usr/bin/xyz</code> というファイルを入れるパッケージを探すコマンドはどれか。<br>
+(a) <code>dpkg -S /usr/bin/xyz</code>　(b) <code>dpkg -L xyz</code>　(c) <code>apt-file search /usr/bin/xyz</code>　(d) <code>apt-cache search xyz</code></p>
+<details><summary>答え</summary>
+<p>(c)。(a) は台帳を引くので入っているものしか答えない（実測）。(b) はパッケージからファイルを引くもので向きが逆。
+(d) は名前と説明を探すもので、ファイル名は見ない。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>リポジトリは、中身（<code>pool/</code> の .deb）と目録（<code>dists/</code> の一覧）でできている。apt は目録を見て、中身を取ってくる</li><li>どのリポジトリを使うかは <code>/etc/apt/sources.list</code> と <code>/etc/apt/sources.list.d/</code> に「種類・URI・ディストリビューション・コンポーネント」で書く</li><li>apt が読むのは手元の目録の写し（<code>/var/lib/apt/lists/</code>）。表に書いただけでは変わらず、<code>apt update</code> で取り直す。<code>apt upgrade</code> は、その写しと台帳の版を比べて上げる</li><li>入っていないパッケージは、名前と説明なら <code>apt search</code>、ファイル名なら <code>apt-file search</code>（Contents を引く）で探す</li><li><code>apt</code> は人が画面で打つ入口、<code>apt-get</code>・<code>apt-cache</code> はスクリプトに書くもの</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt-file 3.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行・ネットにつながった状態で検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-packages/theory/05-depends">← 5. 一緒に入るもの・残るもの</a><a href="/linuc-packages/theory/07-deb-file">次: 7. .deb ファイルを直接入れる →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

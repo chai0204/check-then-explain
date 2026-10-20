@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>10. yum のリポジトリを足して、署名を確かめる — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="10" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第10章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>10. yum のリポジトリを足して、署名を確かめる</h1>
+<p class="lead"><b>前の章までにやったこと</b>: RPM 系の檻で、yum で入れて消し、rpm に入っているものと置かれたファイルを聞き、yum が要らなくなった依存関係も消すことを確かめた（第9章）。Debian 系では、apt が見に行くリポジトリの表（<code>sources.list</code>）を読み、区分を足して <code>apt update</code> と <code>apt upgrade</code> で新しい版に上げた（第6章）。<b>この章でやること</b>: yum の設定とリポジトリの表を読み、新しい版の置き場を足して labhello を上げる。その途中で「鍵を取り込んでよいか」と聞かれるので、パッケージの署名と鍵を確かめる。最後に、入っていないパッケージを yum で探す。</p>
+<div class="badges"><span>前提: 第9章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 28分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.3（重要度3）</span><span>出題範囲 1.04.4（重要度1）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>yum</code> と <code>dnf</code>、<code>/etc/yum.conf</code> と <code>/etc/dnf/dnf.conf</code> の関係を <code>ls -l</code> で示せる</li><li><code>/etc/yum.repos.d/</code> の .repo ファイル（<code>[repo id]</code>・<code>name</code>・<code>baseurl</code>・<code>enabled</code>・<code>gpgcheck</code>・<code>gpgkey</code>）を読み書きでき、足したリポジトリから <code>yum update</code> で上げられる</li><li><code>rpm -K</code> の出力（<code>digests</code>・<code>signatures</code>・大文字）を読み、署名が確かめられたかを判断でき、<code>rpm --import</code> で鍵を取り込める</li><li>入っていないパッケージを <code>yum search</code>・<code>info</code>・<code>provides</code>・<code>repoquery -l</code>・<code>deplist</code> で調べられる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: パッケージに署名する手順と鍵の作り方、鍵の失効、yum のモジュール（<code>dnf module</code>）とグループ（<code>yum groupinstall</code>）、RHEL のサブスクリプションの登録、<code>yum.conf</code> のこの章に出てこない項目。<code>Last metadata expiration check</code> の行は「目録を最後に確かめた時刻」と読めれば足りる（時刻は読者ごとに違う）。</div></div>
+
+<h2 id="conf">yum の正体と設定ファイル</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>yum</code> と打つと何が動き、どこに設定があるか。</div>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ ls -l /usr/bin/yum /usr/bin/dnf
+lrwxrwxrwx 1 root root 5 Sep 22  2025 /usr/bin/dnf -&gt; dnf-3
+lrwxrwxrwx 1 root root 5 Sep 22  2025 /usr/bin/yum -&gt; dnf-3
+$ ls -l /etc/yum.conf
+lrwxrwxrwx 1 root root 12 Sep 22  2025 /etc/yum.conf -&gt; dnf/dnf.conf</code></pre>
+<p><code>yum</code> も <code>dnf</code> も、同じ <code>dnf-3</code> を指すシンボリックリンク（別の名前で同じファイルを指すもの）である。RHEL 8 から、yum の中身は <b>dnf</b> という新しい道具に置き換わった。<code>yum</code> という名前は、古い手順や試験の問題がそのまま使えるように残してある。打ち方（サブコマンドとオプション）はそのまま使えるが、既定の動きと出力の見た目は、RHEL 7 の yum と違うところがある（第9章の <code>clean_requirements_on_remove</code> のように）。設定ファイル <code>/etc/yum.conf</code> も、<code>dnf/dnf.conf</code>（つまり <code>/etc/dnf/dnf.conf</code>）へのリンクで、どちらを書き換えても同じファイルが変わる。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ cat /etc/yum.conf
+[main]
+gpgcheck=1
+installonly_limit=3
+clean_requirements_on_remove=True
+best=True
+skip_if_unavailable=False</code></pre>
+<div class="scroll"><table>
+<tr><th>項目</th><th>意味と、何のためにあるか</th></tr>
+<tr><td><code>[main]</code></td><td>この下が yum 全体の設定だという見出し</td></tr>
+<tr><td><code>gpgcheck=1</code></td><td>入れるパッケージの署名を確かめる。作った人が確かめられないパッケージを入れないため（この章の後半）</td></tr>
+<tr><td><code>installonly_limit=3</code></td><td>カーネル（OS の中心で動くプログラム）のように、上書きせずに並べて入れるものを、3世代まで残す。新しいものが動かないとき、古いものに戻れるようにするため</td></tr>
+<tr><td><code>clean_requirements_on_remove=True</code></td><td>消すとき、要らなくなった依存関係も消す（第9章）</td></tr>
+<tr><td><code>best=True</code></td><td>いちばん新しい版を入れられないなら、失敗にする。古い版で黙って済ませないため</td></tr>
+<tr><td><code>skip_if_unavailable=False</code></td><td>目録を取れないリポジトリがあれば止まる。取れないまま古い目録で進めないため</td></tr>
+</table></div>
+
+<h2 id="repos">リポジトリの表 — /etc/yum.repos.d/</h2>
+<div class="sgoal"><b>この節で分かること</b>: yum がどのリポジトリを使うかを、どこにどう書くか。</div>
+<p>Debian 系の <code>sources.list</code> にあたるのが、<code>/etc/yum.repos.d/</code> の <code>.repo</code> ファイルである。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ ls /etc/yum.repos.d/
+almalinux-appstream.repo         almalinux-plus.repo
+almalinux-baseos.repo            almalinux-resilientstorage.repo
+almalinux-crb.repo               almalinux-rt.repo
+almalinux-extras.repo            almalinux-sap.repo
+almalinux-highavailability.repo  almalinux-saphana.repo
+almalinux-nfv.repo               lab.repo
+$ cat /etc/yum.repos.d/lab.repo
+# 檻の中の練習用リポジトリ（確かめて説明する LinuC 主題1.04）。
+# 中身はイメージを作ったときから変わらないので、目録を期限切れにしない（metadata_expire=-1）。
+[lab]
+name=lab packages (LinuC 1.04)
+baseurl=file:///srv/lab-rpm
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab
+metadata_expire=-1</code></pre>
+<p><code>almalinux-…</code> は AlmaLinux 本体のリポジトリで、<code>lab.repo</code> が練習用のリポジトリである。1つのリポジトリは <code>[ ]</code> で始まる1つのまとまりで、<code>[ ]</code> の中が <b>repo id</b>（そのリポジトリを指す名前）である。1つのファイルにいくつ書いてもよく、ファイルの名前は <code>.repo</code> で終わっていれば自由である。</p>
+<div class="scroll"><table>
+<tr><th>項目</th><th>この例では</th><th>何のためにあるか</th></tr>
+<tr><td><code>[lab]</code></td><td><code>lab</code></td><td>repo id。<code>yum list</code> の <code>@lab</code> や、<code>yum repolist</code> に出る名前</td></tr>
+<tr><td><code>name=</code></td><td><code>lab packages (LinuC 1.04)</code></td><td>人が読むための説明</td></tr>
+<tr><td><code>baseurl=</code></td><td><code>file:///srv/lab-rpm</code></td><td>リポジトリの場所。ふつうは <code>https://</code> で始まるサーバ</td></tr>
+<tr><td><code>enabled=</code></td><td><code>1</code></td><td>使う（<code>0</code> なら書いてあっても使わない。必要なときだけ使うリポジトリのため）</td></tr>
+<tr><td><code>gpgcheck=</code></td><td><code>1</code></td><td>このリポジトリのパッケージの署名を確かめる</td></tr>
+<tr><td><code>gpgkey=</code></td><td><code>file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab</code></td><td>署名を確かめる鍵のファイルの場所</td></tr>
+<tr><td><code>metadata_expire=</code></td><td><code>-1</code></td><td>目録の期限。目録の写しを何秒で古いとみなすか。<code>-1</code> は「古くならない」（この練習用リポジトリは中身が変わらないので、そうしてある）</td></tr>
+</table></div>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ yum repolist
+repo id                         repo name
+appstream                       AlmaLinux 9 - AppStream
+baseos                          AlmaLinux 9 - BaseOS
+extras                          AlmaLinux 9 - Extras
+lab                             lab packages (LinuC 1.04)
+$ yum repolist all
+repo id                      repo name                                  status
+appstream                    AlmaLinux 9 - AppStream                    enabled
+appstream-debuginfo          AlmaLinux 9 - AppStream - Debug            disabled
+appstream-source             AlmaLinux 9 - AppStream - Source           disabled
+baseos                       AlmaLinux 9 - BaseOS                       enabled
+...
+lab                          lab packages (LinuC 1.04)                  enabled
+...</code></pre>
+<p><code>repolist</code> は使っている（<code>enabled=1</code>）リポジトリだけ、<code>repolist all</code> は <code>enabled=0</code> のものも含めて全部を、<code>status</code> の欄つきで出す。<b>この檻の AlmaLinux 本体のリポジトリは、更新の止まった 9.7 の保存庫に向けてある</b>（日ごとに中身が変わる本来の配り先に向けると、読者ごと・日ごとに出力が変わるため）。</p>
+<div class="analogy"><b>たとえ</b>: 取引先ごとに1枚ずつ作った連絡先カードに近い。カードには、呼び名（repo id）・住所（baseurl）・取引中か（enabled）・印鑑を確かめるか（gpgcheck）・照合用の印影の場所（gpgkey）が書いてあり、カードを足せば取引先が増える。
+<br>ただし<b>崩れる点</b>: 連絡先カードは書いただけでは何も起きないが、yum は次にコマンドを打ったとき、カードに書いた住所へ自分から目録を取りに行く。それを次の節で確かめる。</div>
+
+<h2 id="add">新しい版の置き場を足す</h2>
+<div class="sgoal"><b>この節で分かること</b>: リポジトリを足したあと、新しい版が見えるまでに要ること。</div>
+<p>labhello を入れて（出力は略す）、新しい版 1.1 が置いてあるリポジトリ <code>/srv/lab-updates-rpm</code> の中を見る。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo yum install labhello
+...
+Installing:
+ labhello            noarch            1.0-1               lab            7.4 k
+
+...
+Is this ok [y/N]: y
+...
+Installed:
+  labhello-1.0-1.noarch
+
+Complete!
+$ ls /srv/lab-updates-rpm
+labhello-1.1-1.noarch.rpm  repodata</code></pre>
+<p>.rpm ファイルと、<code>repodata</code>（RPM 系のリポジトリの目録の置き場）がある。これを .repo ファイルに書く。<code>sudo tee ファイル</code> は、受け取ったものを root の権限でファイルに書き、画面にも出す。ヒアドキュメント（第8章）で中身を渡す。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>第6章の apt と同じで、リポジトリを書き足したら、まず目録を取り直すコマンドが要るはずだ。それを打たずに更新できるものを聞いても、新しい版は出てこないだろう。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo tee /etc/yum.repos.d/lab-updates.repo &lt;&lt;'END'
+&gt; [lab-updates]
+&gt; name=lab updates (LinuC 1.04)
+&gt; baseurl=file:///srv/lab-updates-rpm
+&gt; gpgcheck=1
+&gt; gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab-updates
+&gt; END
+[lab-updates]
+name=lab updates (LinuC 1.04)
+baseurl=file:///srv/lab-updates-rpm
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab-updates
+$ yum check-update
+lab updates (LinuC 1.04)                         64 kB/s | 960  B     00:00
+
+labhello.noarch                        1.1-1                         lab-updates
+$ echo $?
+100</code></pre>
+<div class="then"><b>だめな理由</b>: 出てきた。<code>yum check-update</code>（更新できるものを並べる）の1行目 <code>lab updates (LinuC 1.04) … B/s | … B 00:00</code> は、目録を取りに行った記録である（速さと大きさは打つたびに違う）。この行の下に、第9章で見た <code>Last metadata expiration check</code>（目録を最後に確かめた時刻の知らせ）の行が出ることもある（取ってきてから1秒たったかどうかで、出たり出なかったりする）。
+yum は、コマンドを打たれるたびに、使うリポジトリの目録の写しが手元にあるか、目録の期限（<code>metadata_expire</code>）が切れていないかを確かめ、無いか古ければ、<b>その場で自分で取りに行く</b>。足したばかりのリポジトリには写しが無いので、必ず取りに行く。
+apt は <code>apt update</code> と言われるまで決して取りに行かなかった。同じ「目録の写し」を持つ道具でも、取り直す時機の決め方が違う。</div></div>
+<p><code>check-update</code> は、更新できるものが<b>あれば終了コード 100、無ければ 0</b> を返す（失敗なら 1）。スクリプトで「更新があるか」を決めるのに使える。目録の写しは <code>/var/cache/dnf/</code> に置かれ、いま取ってきた <code>lab-updates</code> の分が増えている。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ ls /var/cache/dnf/
+appstream-69125d5665712457  extras-filenames.solvx
+appstream-filenames.solvx   extras.solv
+appstream-updateinfo.solvx  hawkey.log
+appstream.solv              lab-f54269022358d74c
+baseos-a0068bac1404caa3     lab-filenames.solvx
+baseos-filenames.solvx      lab-updates-562a72ee6b8fd388
+baseos-updateinfo.solvx     lab-updates-filenames.solvx
+baseos.solv                 lab-updates.solv
+dnf.librepo.log             lab.solv
+dnf.log                     locks
+dnf.rpm.log                 packages.db
+expired_repos.json          tempfiles.json
+extras-6ca639b91115fc97</code></pre>
+<p><code>lab-updates-…</code> のディレクトリと、<code>lab-updates.solv</code>・<code>lab-updates-filenames.solvx</code> が、いま取ってきた分である。ディレクトリには取ってきた目録がそのまま入り、<code>.solv</code> は yum が速く読めるように作り直した形の目録、<code>-filenames</code> の付いたものは中のファイルの一覧である。ほかは AlmaLinux 本体と lab の分と、yum の作業の記録（<code>.log</code> など）である。</p>
+<p>手で取り直させるコマンドもある。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>何のためにあるか</th><th>apt でいえば</th></tr>
+<tr><td><code>yum makecache</code></td><td>全部のリポジトリの目録を取ってきて、写しを作る（期限の内側でも中身が変わったと分かっているとき）</td><td><code>apt update</code></td></tr>
+<tr><td><code>yum clean all</code></td><td>手元の目録の写しと、取ってきた .rpm を捨てる（写しが壊れたと疑わしいとき）</td><td><code>apt-get clean</code>（取ってきた .deb を捨てる）と <code>apt-get distclean</code>（目録の写しを捨てる）を合わせたもの</td></tr>
+</table></div>
+
+<h2 id="update">上げる — 鍵を取り込んでよいか、と聞かれる</h2>
+<div class="sgoal"><b>この節で分かること</b>: yum で上げるときの出力と、鍵を取り込む問い。</div>
+<p>上げるのは <code>yum update</code> である（名前を付ければそれだけ、付けなければ入っているもの全部。dnf では <code>yum upgrade</code> と同じもの）。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo yum update labhello
+Last metadata expiration check: 0:00:01 ago on Tue Oct 20 21:40:57 2026.
+Dependencies resolved.
+================================================================================
+ Package           Architecture    Version           Repository            Size
+================================================================================
+Upgrading:
+ labhello          noarch          1.1-1             lab-updates          7.4 k
+
+Transaction Summary
+================================================================================
+Upgrade  1 Package
+
+Total size: 7.4 k
+Is this ok [y/N]: y
+Downloading Packages:
+lab updates (LinuC 1.04)                        1.2 MB/s | 1.3 kB     00:00
+Importing GPG key 0xA5824B40:
+ Userid     : "lab updates &lt;updates@example.invalid&gt;"
+ Fingerprint: 4691 C941 40A5 0E17 00D1 873C F097 D1AD A582 4B40
+ From       : /etc/pki/rpm-gpg/RPM-GPG-KEY-lab-updates
+Is this ok [y/N]: y
+Key imported successfully
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1
+  Upgrading        : labhello-1.1-1.noarch                                  1/2
+  Cleanup          : labhello-1.0-1.noarch                                  2/2
+  Running scriptlet: labhello-1.0-1.noarch                                  2/2
+  Verifying        : labhello-1.1-1.noarch                                  1/2
+  Verifying        : labhello-1.0-1.noarch                                  2/2
+
+Upgraded:
+  labhello-1.1-1.noarch
+
+Complete!
+$ labhello
+labhello 1.1</code></pre>
+<p>1つ目の <code>Is this ok [y/N]</code> は「表の内容（<code>Upgrading:</code> labhello 1.1）で進めてよいか」である。そのあと .rpm を取ってきたところで、<code>Importing GPG key 0xA5824B40</code>（鍵 A5824B40 を取り込む）と出て、2つ目の問いが来た。これは「このリポジトリのパッケージの署名を確かめるための鍵を、取り込んでよいか」という問いで、鍵の持ち主（<code>Userid</code>）・鍵の指紋（<code>Fingerprint</code>）・鍵のファイル（<code>From</code>、.repo の <code>gpgkey=</code> に書いた場所）が並んでいる。<code>y</code> と答えると <code>Key imported successfully</code>（取り込んだ）と出て、署名を確かめてから上げた。</p>
+
+<h2 id="sign">署名と鍵 — rpm -K</h2>
+<div class="sgoal"><b>この節で分かること</b>: 署名が何を保証し、<code>rpm -K</code> の出力をどう読むか。</div>
+<p><b>署名</b>は、パッケージを作った人が、自分だけが持つ鍵（秘密鍵）で付ける印である。受け取った側は、それと対になる鍵（<b>公開鍵</b>。配ってよい鍵）で確かめると、「その人が作ったもので、あとから1バイトも書き換えられていない」ことが分かる。yum が取り込んだのは、この公開鍵である。rpm は、取り込んだ公開鍵を台帳に <code>gpg-pubkey</code> という名前で記録している。<code>--qf</code> は、出す形を自分で決めるオプションである。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm -q gpg-pubkey --qf '%{NAME}-%{VERSION}-%{RELEASE}  %{SUMMARY}\n'
+gpg-pubkey-b86b3716-61e69f29  AlmaLinux OS 9 &lt;packager@almalinux.org&gt; public key
+gpg-pubkey-5236f3f6-6ad74395  lab packages &lt;lab@example.invalid&gt; public key
+gpg-pubkey-a5824b40-6ad74395  lab updates &lt;updates@example.invalid&gt; public key</code></pre>
+<p>3つある。AlmaLinux の鍵、最初から入れてあった練習用リポジトリ lab の鍵、そしていま取り込んだ lab updates の鍵である。<code>gpg-pubkey-</code> の後ろの8桁が鍵の ID で、yum の問いに出た <code>A5824B40</code> と同じ（小文字で書いている）。.rpm ファイルの署名を、取り込んである鍵で確かめるのが <code>rpm -K</code>（checksig）である。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm -K /srv/lab-updates-rpm/labhello-1.1-1.noarch.rpm
+/srv/lab-updates-rpm/labhello-1.1-1.noarch.rpm: digests signatures OK</code></pre>
+<p><code>digests</code> は「中身の要約（ダイジェスト）が合った＝壊れていない」、<code>signatures</code> は「署名を鍵で確かめた」、<code>OK</code> は「確かめたものが全部正しかった」である。次の2つは、檻の中の別の .rpm ファイルである。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm -K /srv/lab-files/labnosig-1.0-1.noarch.rpm
+/srv/lab-files/labnosig-1.0-1.noarch.rpm: digests OK
+$ rpm -K /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm
+/srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm: digests SIGNATURES NOT OK
+$ rpm -Kv /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm
+/srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm:
+    Header V4 RSA/SHA256 Signature, key ID b0f3d614: NOKEY
+    Header SHA256 digest: OK
+    Header SHA1 digest: OK
+    Payload SHA256 digest: OK
+    MD5 digest: OK</code></pre>
+<p>labnosig は誰も署名していないパッケージで、<code>signatures</code> という語自体が出ずに <code>digests OK</code> になった。<b>署名が無くても OK と出る</b>。OK は「確かめられたものは正しかった」という意味で、「作った人が確かめられた」という意味ではない。lab-mathtools は「lab tools」という別の鍵で署名してあり、その鍵は取り込んでいないので、<code>SIGNATURES</code> が大文字（確かめられなかったもの）で出て <code>NOT OK</code> になった。<code>-v</code> を足すと1行ずつ出て、<code>NOKEY</code>（その鍵 b0f3d614 を持っていない）が理由だと分かる。鍵は、yum を使わずに <code>rpm --import</code> で取り込むこともできる。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo rpm --import /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+$ rpm -K /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm
+/srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm: digests signatures OK</code></pre>
+<p>パッケージは1バイトも変えていないのに、<code>signatures OK</code> になった。変わったのは台帳（取り込んだ鍵）のほうである。最後に、中身を書き換えたらどう出るかを見る。AlmaLinux が署名した本物のパッケージ（tree）を写し、<code>dd</code> で末尾近くの1バイトを書き換える（<code>dd</code> は、決めた位置のバイトをそのまま書くコマンド。<code>bs=1</code> は1バイトずつ、<code>seek=55888</code> は先頭から 55888 バイト進んだ所、<code>conv=notrunc</code> は残りを切り捨てない、<code>status=none</code> は経過を出さない、という指定である。壊れたファイルを作るためだけの操作なので、覚えなくてよい）。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm -K /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm
+/srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm: digests signatures OK
+$ cp /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm ~/tree-copy.rpm
+$ printf 'A' | dd of=$HOME/tree-copy.rpm bs=1 seek=55888 conv=notrunc status=none
+$ rpm -K ~/tree-copy.rpm
+/home/lab/tree-copy.rpm: DIGESTS SIGNATURES NOT OK</code></pre>
+<p>今度は <code>DIGESTS</code> まで大文字になった。中身の要約が合わず、署名も合わない。鍵が無いだけの <code>NOKEY</code> とは別で、こちらが「壊れている・書き換えられている」の印である。</p>
+<div class="scroll"><table>
+<tr><th><code>rpm -K</code> の出力</th><th>意味</th><th>入れてよいか</th></tr>
+<tr><td><code>digests signatures OK</code></td><td>壊れておらず、取り込んである鍵で署名を確かめられた</td><td>その鍵の持ち主を信じるなら、よい</td></tr>
+<tr><td><code>digests OK</code></td><td>壊れていない。<b>署名は無い</b>（誰が作ったかは分からない）</td><td>出どころを別の手段で確かめてから</td></tr>
+<tr><td><code>digests SIGNATURES NOT OK</code></td><td>署名はあるが、確かめられなかった（<code>-Kv</code> で <code>NOKEY</code> なら鍵が無いだけ）</td><td>正しい鍵を取り込んでから確かめ直す</td></tr>
+<tr><td><code>DIGESTS SIGNATURES NOT OK</code></td><td>中身が壊れているか、書き換えられている</td><td>入れない</td></tr>
+</table></div>
+<p>読み方は1つにまとめられる。<b>署名の語（<code>signatures</code>）が小文字で、最後が OK のときだけ、署名が確かめられている。大文字の語は、その確かめが失敗したことを表す</b>。yum の <code>gpgcheck=1</code> は、リポジトリから入れるときに、この確かめが通らないパッケージを入れないようにする設定である。</p>
+<div class="analogy"><b>たとえ</b>: 書類の印鑑を、登録してある印影の帳簿と照らし合わせる窓口に近い。印鑑の無い書類は照らし合わせようが無いので「照合で問題は見つからなかった」と言われ、登録の無い印鑑の書類は「照合できない」と言われる。照合できるようにするには、印影を帳簿に登録する（<code>rpm --import</code>）。
+<br>ただし<b>崩れる点</b>: 役所なら印鑑の無い書類はそもそも受け付けないが、<code>rpm -K</code> は「印鑑が無い」を失敗として扱わない。印鑑の無いものを断るのは、窓口の規則（yum の <code>gpgcheck=1</code>）のほうである。</div>
+
+<h2 id="query">入っていないパッケージを探す — yum の目録を引く</h2>
+<div class="sgoal"><b>この節で分かること</b>: 入れる前に、yum に何を聞けるか。</div>
+<p>yum は目録を持っているので、入っていないパッケージについても答える。名前と説明から探すのが <code>search</code>、1つを詳しく見るのが <code>info</code> である。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ yum search liblab
+Last metadata expiration check: 0:00:10 ago on Tue Oct 20 21:40:57 2026.
+========================= Name Exactly Matched: liblab =========================
+liblab.noarch : small shell library for lab programs
+=========================== Summary Matched: liblab ============================
+labapp.noarch : sample application that needs liblab</code></pre>
+<p><code>search</code> は、名前が一致したもの（<code>Name Exactly Matched</code>）と、説明（Summary）に語を含むもの（<code>Summary Matched</code>）を分けて出す。1行目は第9章で見た、目録を最後に確かめた時刻の知らせである。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ yum info labtool
+Last metadata expiration check: 0:00:10 ago on Tue Oct 20 21:40:57 2026.
+Available Packages
+Name         : labtool
+Version      : 1.0
+Release      : 1
+Architecture : noarch
+Size         : 6.7 k
+Source       : labtool-1.0-1.src.rpm
+Repository   : lab
+Summary      : tool that needs labtool-data
+URL          : https://github.com/chai0204/check-then-explain
+License      : MIT
+Description  : Prints a line shipped in labtool-data.</code></pre>
+<p><code>info</code> の <code>Available Packages</code> は「入れられるもの」の印で、入っていれば <code>Installed Packages</code> になる。欄は第9章の <code>rpm -qi</code> と同じで、<code>Repository</code> がどのリポジトリの目録に載っているかである。</p>
+<p>ファイル名からパッケージを探すのが <code>provides</code> である。入れる前でも答える。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ yum provides /usr/bin/labtool
+Last metadata expiration check: 0:00:11 ago on Tue Oct 20 21:40:57 2026.
+labtool-1.0-1.noarch : tool that needs labtool-data
+Repo        : lab
+Matched from:
+Filename    : /usr/bin/labtool
+$ yum provides '*/liblab.sh'
+Last metadata expiration check: 0:00:12 ago on Tue Oct 20 21:40:57 2026.
+liblab-1.0-1.noarch : small shell library for lab programs
+Repo        : lab
+Matched from:
+Filename    : /usr/lib/liblab/liblab.sh</code></pre>
+<p>答えは「パッケージ名-版-リリース.アーキテクチャ : 説明」の行と、どのリポジトリか（<code>Repo</code>）、どの名前で当たったか（<code>Filename</code>）である。パスの一部しか分からないときは、<code>'*/liblab.sh'</code> のように <code>*</code> を使う（シェルに先に解釈させないよう <code>'</code> で囲む）。逆向きに、パッケージの中のファイルの一覧を出すのが <code>repoquery -l</code> である。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ yum repoquery -l labtool
+Last metadata expiration check: 0:00:13 ago on Tue Oct 20 21:40:57 2026.
+/usr/bin/labtool</code></pre>
+<p>labtool が置くファイルは <code>/usr/bin/labtool</code> の1つである。<code>repoquery</code> は、もとは yum-utils という別の道具の中のコマンドで、いまの yum では <code>yum repoquery</code> とも <code>repoquery</code> とも打てる。依存関係を出すのが <code>deplist</code> である。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ yum deplist labtool
+Last metadata expiration check: 0:00:13 ago on Tue Oct 20 21:40:57 2026.
+package: labtool-1.0-1.noarch
+  dependency: /usr/bin/sh
+   provider: bash-5.1.8-9.el9.x86_64
+  dependency: labtool-data &gt;= 1.0
+   provider: labtool-data-1.0-1.noarch</code></pre>
+<p><code>deplist</code> は、依存関係（<code>dependency</code>）と、それを満たすパッケージ（<code>provider</code>）の組を出す。labtool は、シェル（<code>/usr/bin/sh</code>。bash が満たす）と labtool-data を必要としている。</p>
+<p>Debian 系では、ファイル名から探すのに apt-file と、その分の目録（Contents）が別に要った（第6章）。yum は追加の道具なしでできる。dnf の目録には、最初からファイルの一覧も入っているからである。入っていない本物のパッケージでも同じである。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm -qf /usr/bin/dig
+error: file /usr/bin/dig: No such file or directory
+$ yum provides /usr/bin/dig
+Last metadata expiration check: 0:00:14 ago on Tue Oct 20 21:40:57 2026.
+bind-utils-32:9.16.23-34.el9_7.1.x86_64 : Utilities for querying DNS name
+                                        : servers
+Repo        : appstream
+Matched from:
+Filename    : /usr/bin/dig
+
+...</code></pre>
+<p>台帳しか読まない <code>rpm -qf</code> は、無いファイルには答えられない。<code>yum provides</code> は、dig（第6章で名前が出た、DNS を調べるコマンド）を入れるパッケージを、版ごとに全部並べた（長いので最初の1つの後を略した）。</p>
+<div class="scroll"><table>
+<tr><th>聞きたいこと</th><th>入っているものだけ（rpm・台帳）</th><th>入っていなくてよい（yum・目録）</th><th>Debian 系（目録）</th></tr>
+<tr><td>名前や説明で探す</td><td>—</td><td><code>yum search 語</code></td><td><code>apt search</code></td></tr>
+<tr><td>1つの詳しい情報</td><td><code>rpm -qi 名前</code></td><td><code>yum info 名前</code></td><td><code>apt show</code></td></tr>
+<tr><td>ファイル → パッケージ</td><td><code>rpm -qf パス</code></td><td><code>yum provides パス</code></td><td><code>apt-file search</code></td></tr>
+<tr><td>パッケージ → ファイル</td><td><code>rpm -ql 名前</code></td><td><code>yum repoquery -l 名前</code></td><td><code>apt-file list</code></td></tr>
+<tr><td>依存関係</td><td><code>rpm -qR 名前</code></td><td><code>yum deplist 名前</code></td><td><code>apt-cache depends</code></td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 品物ごとの部品表まで載っている通販カタログに近い。部品の名前（ファイル名）から、それを使っている品物（パッケージ）を引ける。
+<br>ただし<b>崩れる点</b>: 紙のカタログは届いたときのままだが、yum のカタログ（目録の写し）は、期限が切れたり、リポジトリを足したりすると、次に引くときに yum が自分で取り直す。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/practice/">演習10</a>は、まだ登録されていない別のリポジトリから、名前の分からないパッケージに入っている <code>labcalc</code> を入れる課題である（<code>.repo</code> を書く・<code>yum provides</code> で探す・署名の確認を切らずに入れる）。
+判定は labcalc を動かし、そのリポジトリから yum で入ったかと、鍵が台帳に入ったかを見る。</div>
+<div class="quiz"><b>確認</b>
+<p>独自のリポジトリを yum に登録したい。どのディレクトリに、どんな名前のファイルを置き、リポジトリの場所はどの項目に書くか。</p>
+<details><summary>答え</summary>
+<p><code>/etc/yum.repos.d/</code> に、名前が <code>.repo</code> で終わるファイルを置く。中は <code>[repo id]</code> で始まるまとまりにし、場所を <code>baseurl=</code> に書く。<code>enabled=1</code> で使い、<code>gpgcheck=1</code> と <code>gpgkey=</code> で署名の確かめ方を指定する（実測では、置いただけで yum が目録を取りに行った）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>yum check-update</code> の終了コードが 100 だった。何を意味するか。</p>
+<details><summary>答え</summary>
+<p>更新できるパッケージがある（目録に、入っている版より新しい版がある）。0 なら無い、1 ならエラー（実測で、labhello 1.1 が見えたときに 100）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>rpm -K foo.rpm</code> の結果が <code>digests OK</code> だった。foo.rpm の作り手は確かめられたか。</p>
+<details><summary>答え</summary>
+<p>確かめられていない。<code>digests OK</code> は中身が壊れていないことだけで、<code>signatures</code> の語が無いのは署名が無いから（実測で、誰も署名していない labnosig がこう出た）。
+署名が確かめられたときは <code>digests signatures OK</code> と出る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>インストールされていないパッケージも含めて、<code>/usr/bin/dig</code> を入れるパッケージを調べる yum のサブコマンドはどれか。<br>
+(a) <code>yum search</code>　(b) <code>yum info</code>　(c) <code>yum provides</code>　(d) <code>yum list</code></p>
+<details><summary>答え</summary>
+<p>(c)（<code>whatprovides</code> とも書ける）。(a) は名前と説明しか見ない。入っているファイルなら <code>rpm -qf</code> でも分かるが、入っていなければ答えられない（実測）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>RHEL 8 以降の <code>yum</code> は <code>dnf</code> へのリンク。<code>/etc/yum.conf</code> も <code>/etc/dnf/dnf.conf</code> へのリンク</li><li>リポジトリは <code>/etc/yum.repos.d/*.repo</code> に <code>[repo id]</code>・<code>name=</code>・<code>baseurl=</code>・<code>enabled=</code>・<code>gpgcheck=</code>・<code>gpgkey=</code> で書く。<code>yum repolist</code>（<code>all</code>）で一覧</li><li>yum は目録が無い・古いと、コマンドを打った時点で自分で取りに行く（apt は <code>apt update</code> まで取りに行かない）。<code>yum check-update</code> は更新があれば終了コード 100</li><li>署名は作った人と無改ざんを確かめる印。<code>rpm -K</code> は <code>signatures</code> が小文字で OK のときだけ確かめられている（署名が無いと <code>digests OK</code>、鍵が無いと <code>SIGNATURES NOT OK</code>、書き換えは <code>DIGESTS</code>）。鍵は yum の問いか <code>rpm --import</code> で台帳に取り込む</li><li>入っていなくても、<code>yum search</code>・<code>info</code>・<code>provides</code>・<code>repoquery -l</code>・<code>deplist</code> で目録から調べられる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.1.0@sha256:__DIGEST__（AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / yum-utils 4.3.0 / vault.almalinux.org 9.7）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-packages/theory/09-rpm">← 9. RPM 系で同じことをする</a><a href="/linuc-packages/theory/11-rpm-file">次: 11. .rpm ファイルを rpm で直接入れて、確かめる →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

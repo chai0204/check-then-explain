@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. 台帳とファイルを見比べる — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>4. 台帳とファイルを見比べる</h1>
+<p class="lead"><b>前の章までにやったこと</b>: パッケージを入れて・使って・消し（第1章）、入っているものを調べ（第2章）、置かれたファイルとパッケージを <code>dpkg -L</code>・<code>dpkg -S</code> で両方向に引いた（第3章）。どの答えも、入れたときに dpkg が書く台帳から来ていた。<b>この章でやること</b>: 台帳の実物のファイルを開く。そして、パッケージ管理を通さずにファイルだけを消したり置いたりして、台帳とファイルを見比べる。</p>
+<div class="badges"><span>前提: 第3章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.2（重要度1）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>台帳が <code>/var/lib/dpkg/</code> の下のどのファイルで、<code>dpkg -s</code>・<code>dpkg -L</code> がどれを読んでいるかを言える</li><li>ファイルを消しても台帳は「入っている」のままになることを示し、<code>dpkg -V</code> で台帳とファイルの違いを見つけられる</li><li>台帳どおりに戻すのに <code>apt reinstall</code> を使える</li><li>中身だけを置いても（<code>dpkg-deb -x</code>）台帳に載らず、「入っている」ことにならないと言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>/var/lib/dpkg/</code> のほかのファイル（<code>available</code>・<code>triggers</code> など）、台帳を手で書き換える方法（書き換えてはいけない）、ダイジェストの計算のしくみ、<code>dpkg -V</code> の9文字の欄のうち <code>5</code> 以外。この章では「台帳とファイルは別にあって、別々に変わりうる」が確かめられれば足りる。</div></div>
+
+<h2 id="files">台帳の実物</h2>
+<div class="sgoal"><b>この節で分かること</b>: 台帳がどのファイルで、何が書いてあるか。</div>
+<p>第2章で、台帳は <code>/var/lib/dpkg/</code> の下にあるファイルだと書いた。中を見る。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ ls /var/lib/dpkg/
+alternatives  diversions      lock           status      updates
+available     diversions-old  lock-frontend  status-old
+cmethopt      info            parts          triggers</code></pre>
+<p>使うのは <code>status</code> と <code>info</code> の2つである。labhello を入れてから、labhello について何が書かれたかを見る（入れる出力は略す）。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install labhello
+...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+$ grep -A9 '^Package: labhello$' /var/lib/dpkg/status
+Package: labhello
+Status: install ok installed
+Priority: optional
+Section: utils
+Installed-Size: 76
+Maintainer: check-then-explain &lt;lab@example.invalid&gt;
+Architecture: all
+Version: 1.0
+Description: prints its own version
+ A tiny package used to practice upgrades.</code></pre>
+<p><code>grep -A9</code> は、当たった行と、その後ろ9行を出す。<code>/var/lib/dpkg/status</code> は、入っているパッケージごとに、この形の段落が並ぶテキストのファイルである。第2章で <code>dpkg -s labsvc</code> が出したのも、この中の labsvc の段落である（<code>dpkg -s</code> は、この段落をそのまま出す）。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ cat /var/lib/dpkg/info/labhello.list
+/.
+/usr
+/usr/bin
+/usr/bin/labhello
+/usr/share
+/usr/share/doc
+/usr/share/doc/labhello
+/usr/share/doc/labhello/README
+/usr/share/man
+/usr/share/man/man1
+/usr/share/man/man1/labhello.1.gz
+$ cat /var/lib/dpkg/info/labhello.md5sums
+6be84e0d8606ca3736aa91842490e59b  usr/bin/labhello
+8e9bcd880a99bacdc323fd47fd5d93ec  usr/share/doc/labhello/README
+b05396f6cf7828a35df2ccec28d866ec  usr/share/man/man1/labhello.1.gz</code></pre>
+<p><code>info/labhello.list</code> は、第3章で <code>dpkg -L labhello</code> が出したのと同じ一覧である。<code>dpkg -L</code> はこのファイルを読み、<code>dpkg -S</code> は全部のパッケージの <code>.list</code> から探している。</p>
+<p><code>info/labhello.md5sums</code> には、ファイルごとに32桁の値が書いてある。これは、入れたときのファイルの中身から計算した<b>ダイジェスト</b>（中身の要約。中身が1文字でも違えば、まったく別の値になる短い値）である。<code>md5sum</code> コマンドで、いまのファイルのダイジェストを計算して比べる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ md5sum /usr/bin/labhello
+6be84e0d8606ca3736aa91842490e59b  /usr/bin/labhello</code></pre>
+<p>同じ値になった。いまの <code>/usr/bin/labhello</code> は、入れたときと中身が同じである。</p>
+<div class="scroll"><table>
+<tr><th>台帳のファイル</th><th>書いてあること</th><th>何のためにあるか</th><th>読むコマンド</th></tr>
+<tr><td><code>/var/lib/dpkg/status</code></td><td>パッケージごとの状態・版・依存関係など</td><td>何が・どの版で・どんな状態で入っているかを答える</td><td><code>dpkg -l</code>・<code>dpkg -s</code></td></tr>
+<tr><td><code>/var/lib/dpkg/info/名前.list</code></td><td>そのパッケージが置いたファイルの一覧</td><td>ファイルとパッケージを両方向に引く</td><td><code>dpkg -L</code>・<code>dpkg -S</code></td></tr>
+<tr><td><code>/var/lib/dpkg/info/名前.md5sums</code></td><td>置いたときのファイルの中身のダイジェスト</td><td>いまのファイルが入れたときのままかを確かめる</td><td><code>dpkg -V</code>（次の節）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: ダイジェストは書類の指紋に近い。書類そのものを並べて読み比べなくても、指紋が同じなら同じ書類だと見なせる。
+<br>ただし<b>崩れる点</b>: 人の指紋は誰のものかを示すが、ダイジェストは「中身が同じか」しか示さない。誰が作ったファイルかは、ダイジェストからは分からない。</div>
+
+<h2 id="remove">ファイルだけを消すと</h2>
+<div class="sgoal"><b>この節で分かること</b>: パッケージ管理を通さずにファイルを消したとき、台帳がどう答えるか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>パッケージは、結局はファイルである。要らなくなったら、ファイルを消してしまえば「入っていない」ことになるはずだ。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo rm /usr/bin/labhello
+$ labhello
+bash: labhello: command not found
+$ dpkg -l labhello | tail -1
+ii  labhello       1.0          all          prints its own version
+$ dpkg -L labhello
+/.
+/usr
+/usr/bin
+/usr/bin/labhello
+/usr/share
+/usr/share/doc
+/usr/share/doc/labhello
+/usr/share/doc/labhello/README
+/usr/share/man
+/usr/share/man/man1
+/usr/share/man/man1/labhello.1.gz</code></pre>
+<div class="then"><b>だめな理由</b>: コマンドは無くなったが、台帳は <code>ii</code>（入っていて使える）のままで、<code>dpkg -L</code> も <code>/usr/bin/labhello</code> を並べ続けた。
+<code>rm</code> はファイルを消しただけで、台帳（<code>/var/lib/dpkg/</code>）には触れていない。台帳を書き換えるのは dpkg だけで、dpkg は答えるとき台帳しか読まない。
+だから、ファイルと台帳が食い違ったまま、台帳のほうの答えが返ってくる。消すなら <code>apt remove</code> で、ファイルと台帳を一緒に変える。</div></div>
+<div class="analogy"><b>たとえ</b>: 引っ越しと住民票に近い。荷物を運び出しても、転出届を出さなければ、役所の台帳ではまだそこに住んでいることになっている。<code>rm</code> は届けを出さない引っ越しで、<code>apt remove</code> は届けを出す引っ越しである。
+<br>ただし<b>崩れる点</b>: 住民票は本人が窓口へ行って直すが、dpkg の台帳を書き換えるのは dpkg だけである（apt も、中で dpkg を呼んで書かせている）。台帳を直すにも、パッケージを入れる・消す操作を通す。</div>
+
+<h2 id="verify">台帳と照らし合わせる — dpkg -V</h2>
+<div class="sgoal"><b>この節で分かること</b>: 台帳とファイルの食い違いを見つける方法と、台帳どおりに戻す方法。</div>
+<p><code>dpkg -V</code>（verify）は、台帳に書いてあるファイルの一覧とダイジェストを、いまのディスクと照らし合わせる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -V labhello
+missing     /usr/bin/labhello
+$ echo $?
+0</code></pre>
+<p><code>missing</code> は「台帳には載っているのに、ファイルが無い」という意味である。違いのあるファイルだけが1行ずつ出て、全部台帳どおりなら何も出ない。<code>echo $?</code> は直前のコマンドの終了コード（うまくいったかを表す数。0 が成功）を出す。<b>違いが見つかっても、終了コードは 0</b> だった。違いがあるかは、出力が空かどうかで見る。</p>
+<p>台帳どおりに戻すには、同じ版を入れ直す。<code>apt reinstall</code> である。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt reinstall labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+0 upgraded, 0 newly installed, 1 reinstalled, 0 to remove and 0 not upgraded.
+Need to get 0 B/1120 B of archives.
+After this operation, 0 B of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+(Reading database ... 12837 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.0_all.deb ...
+Unpacking labhello (1.0) over (1.0) ...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+$ dpkg -V labhello
+$ labhello
+labhello 1.0</code></pre>
+<p><code>1 reinstalled</code>（入れ直し 1）、<code>Unpacking labhello (1.0) over (1.0)</code>（1.0 の上に 1.0 を置いた）と出て、ファイルが戻った。<code>dpkg -V</code> は何も出さなくなり、labhello も動いた。</p>
+<p>ファイルが無いのではなく、中身が書き換わった場合も見つける。<code>tee -a</code> はファイルの末尾に書き足す（<code>sudo</code> を付けて root として書くため、<code>echo … | sudo tee</code> の形にする）。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ echo '# 書き足した' | sudo tee -a /usr/bin/labhello
+# 書き足した
+$ dpkg -V labhello
+??5??????   /usr/bin/labhello</code></pre>
+<p>左の9文字は、台帳と比べた項目の結果を並べたものである。3文字目の <code>5</code> が「ダイジェスト（MD5）が違う」で、<code>?</code> は「確かめていない」である。dpkg の台帳にはダイジェストしか書いていないので、ほかの項目は確かめようがない。</p>
+<div class="analogy"><b>たとえ</b>: 納品書の控えと、倉庫の現物を突き合わせる棚卸しに近い。控え（<code>.md5sums</code>）に書いてある要約と、いまの現物の要約が違うものだけを報告する。
+<br>ただし<b>崩れる点</b>: 棚卸しなら数も色も傷も見るが、dpkg の控えには中身の要約しか無い。ファイルの権限や持ち主が変わっても、<code>dpkg -V</code> は何も言わない（中身が同じなら黙っている）。</div>
+
+<h2 id="extract">中身だけを置くと</h2>
+<div class="sgoal"><b>この節で分かること</b>: ファイルがあることと、パッケージが入っていることの違い。</div>
+<p>逆の向きも確かめる。第3章の <code>apt download</code> で liblab の .deb ファイルを取ってきて、<code>dpkg-deb -x</code> で中身を <code>/</code> に広げる。<code>dpkg-deb</code> は .deb ファイルを扱う道具で、<code>-x</code>（extract）は中身のファイルの木だけを、指定した場所に取り出す。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt download liblab
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+$ sudo dpkg-deb -x liblab_1.0_all.deb /
+$ ls -l /usr/lib/liblab/liblab.sh
+-rw-r--r-- 1 root root 106 Oct  1 09:00 /usr/lib/liblab/liblab.sh
+$ dpkg -S /usr/lib/liblab/liblab.sh
+dpkg-query: no path found matching pattern /usr/lib/liblab/liblab.sh
+$ dpkg -l liblab
+dpkg-query: no packages found matching liblab</code></pre>
+<p>ファイルは置かれたのに、<code>dpkg -S</code> は「そのパスを持つパッケージは無い」、<code>dpkg -l</code> は「そんなパッケージは無い」と答えた。<code>dpkg-deb -x</code> は箱を開けて中身を並べただけで、台帳には1行も書いていない。apt で入れ直すと、台帳に載る。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install liblab
+...
+The following NEW packages will be installed:
+  liblab
+...
+Unpacking liblab (1.0) ...
+Setting up liblab (1.0) ...
+$ dpkg -S /usr/lib/liblab/liblab.sh
+liblab: /usr/lib/liblab/liblab.sh</code></pre>
+<p>置かれているファイルは同じなのに、答えが変わった。変わったのは台帳のほうである。この章で見たことをまとめる。</p>
+<pre class="wire"><code>apt install / apt remove   … ファイルを置く・外す ＋ 台帳を書く（いつも両方）
+rm                          … ファイルだけを消す（台帳は「入っている」のまま）
+dpkg-deb -x                 … ファイルだけを置く（台帳には書かない）
+dpkg -l / -s / -L / -S      … 台帳だけを読む
+dpkg -V                     … 台帳とファイルを見比べる（違うものだけを出す）</code></pre>
+<p>パッケージが「入っている」とは、ファイルがそこにあることではなく、<b>台帳に書かれている</b>ことである。ファイルと台帳は別々にあるので、片方だけを変えると食い違う。食い違いを見つけるのが <code>dpkg -V</code>、台帳どおりに戻すのが <code>apt reinstall</code> である。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/practice/">演習04</a>は、コマンドが見つからないのに台帳は「入っている」と言っている labbackup を、台帳と照らし合わせて、パッケージから入れたときの状態に戻す課題である。
+判定は labbackup を実際に動かし、<code>dpkg -V labbackup</code> が何も出さないかを見る。</div>
+<div class="quiz"><b>確認</b>
+<p>入っているパッケージ foo のファイル <code>/usr/bin/foo</code> を <code>sudo rm</code> で消した。このあと <code>dpkg -l foo</code> はどう答えるか。そうなる理由は何か。</p>
+<details><summary>答え</summary>
+<p>行頭 <code>ii</code>（入っていて使える）のまま答える（実測では labhello がそうだった）。<code>dpkg -l</code> が読むのは台帳（<code>/var/lib/dpkg/status</code>）で、<code>rm</code> は台帳を書き換えないから。
+食い違いは <code>dpkg -V foo</code> で <code>missing</code> として見つかる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>dpkg -V foo</code> の出力に <code>??5??????   /usr/bin/foo</code> とあった。何を意味するか。終了コードで違いの有無を判断できるか。</p>
+<details><summary>答え</summary>
+<p><code>/usr/bin/foo</code> の中身のダイジェストが、入れたときと違う（中身が書き換わっている）。<code>?</code> は確かめていない項目。
+終了コードは違いがあっても 0 なので、判断できない（実測）。出力が空かどうかで見る。台帳どおりに戻すなら <code>sudo apt reinstall foo</code>。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>パッケージ bar の .deb ファイルを <code>sudo dpkg-deb -x bar_1.0_all.deb /</code> で展開した。このあと <code>dpkg -S</code> に bar のファイルのパスを渡すと、何が返るか。</p>
+<details><summary>答え</summary>
+<p>「そのパスを持つパッケージは無い」（<code>dpkg-query: no path found matching pattern …</code>）。<code>dpkg-deb -x</code> は中身を置くだけで、<code>dpkg -S</code> が読む台帳（<code>info/*.list</code>）には何も書かないから（実測）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>台帳は <code>/var/lib/dpkg/</code> の <code>status</code>（状態・版・依存関係）と <code>info/名前.list</code>（置いたファイル）・<code>info/名前.md5sums</code>（ダイジェスト）。<code>dpkg -s</code>・<code>-l</code>・<code>-L</code>・<code>-S</code> はこれを読む</li><li>ファイルと台帳は別々にある。<code>rm</code> でファイルを消しても台帳は <code>ii</code> のまま、<code>dpkg-deb -x</code> で置いても台帳には載らない</li><li><code>dpkg -V</code> は台帳とファイルを見比べ、違うものだけを出す（<code>missing</code> は無い、<code>5</code> は中身が違う）。違いがあっても終了コードは 0</li><li>台帳どおりに戻すのは <code>sudo apt reinstall 名前</code></li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-packages/theory/03-files">← 3. 入れたファイルがどこに置かれたかを調べる</a><a href="/linuc-packages/theory/05-depends">次: 5. 一緒に入るもの・残るもの →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>11. .rpm ファイルを rpm で直接入れて、確かめる — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="11" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第11章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>11. .rpm ファイルを rpm で直接入れて、確かめる</h1>
+<p class="lead"><b>前の章までにやったこと</b>: RPM 系で、yum で入れて消し、rpm に台帳を聞き（第9章）、yum のリポジトリを足して上げ、署名を <code>rpm -K</code> で確かめた（第10章）。Debian 系では、.deb ファイルを dpkg で直接入れ（第7章）、台帳とファイルを <code>dpkg -V</code> で見比べた（第4章）。<b>この章でやること</b>: RPM 系で同じことをする。.rpm ファイルを入れずに取ってきて中を見て、<code>rpm</code> で直接入れ、上げて、消す。台帳と照らし合わせる <code>rpm -V</code> と、入れずに中身を取り出す <code>rpm2cpio</code> も使う。最後に、この11章を1つにまとめる。</p>
+<div class="badges"><span>前提: 第10章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 28分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.4（重要度1）</span><span>出題範囲 1.04.3（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>yumdownloader</code> で .rpm ファイルを取り、<code>rpm -qp…</code> で入れる前に中を見られる</li><li><code>rpm -ivh</code> で入れ、依存関係が足りないときの止まり方（1つも入れない）を示せる。<code>-U</code>・<code>-F</code>・<code>-e</code> の違いを言える</li><li><code>rpm -V</code> の出力の9文字を読み、何が変わったかを言える</li><li><code>rpm2cpio</code> で、入れずに中身を取り出せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>rpm</code> のこの章に出てこないオプション（<code>--force</code> など）、<code>rpm -V</code> の <code>D</code>・<code>L</code>・<code>P</code> の欄が出る場面、設定ファイルを書き換えたまま消したときの扱い（<code>.rpmsave</code>）、台帳の作り直し。この章は「ファイルから入れる・上げる・照らし合わせる・取り出す」が1回できれば足りる。</div></div>
+
+<h2 id="download">入れずに取ってくる — yumdownloader</h2>
+<div class="sgoal"><b>この節で分かること</b>: .rpm ファイルを手に入れて、入れる前に中を見る方法。</div>
+<p>Debian 系の <code>apt download</code>（第3章）にあたるのが <code>yumdownloader</code> である。目録を見て .rpm ファイルを取ってくるだけで、入れない。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ yumdownloader labtool
+Last metadata expiration check: 2:07:10 ago on Tue Oct 20 19:34:06 2026.
+$ ls -l
+total 12
+-rw-r--r-- 1 lab lab 6859 Oct 20 21:41 labtool-1.0-1.noarch.rpm
+drwxr-xr-x 2 lab lab 4096 Oct 20 19:34 work
+$ rpm -q labtool
+package labtool is not installed</code></pre>
+<p>1行目は第10章の、目録を最後に確かめた時刻の知らせで、取ってきたファイルが <code>labtool-1.0-1.noarch.rpm</code> である（日時は、あなたが打った時刻になる）。台帳には何も書いていない。だから root でなくても打てる。このファイルに、rpm で中を聞く。台帳ではなくファイルに聞くときは、<code>-q</code> に <code>p</code>（package file）を足す。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm -qpi labtool-1.0-1.noarch.rpm
+Name        : labtool
+Version     : 1.0
+Release     : 1
+Architecture: noarch
+Install Date: (not installed)
+Group       : Unspecified
+Size        : 98
+License     : MIT
+Signature   : RSA/SHA256, Tue Oct 20 19:33:57 2026, Key ID ed81483d5236f3f6
+Source RPM  : labtool-1.0-1.src.rpm
+Build Date  : Thu Oct  1 09:00:00 2026
+Build Host  : linuc-build
+Packager    : check-then-explain &lt;lab@example.invalid&gt;
+Vendor      : check-then-explain
+URL         : https://github.com/chai0204/check-then-explain
+Summary     : tool that needs labtool-data
+Description :
+Prints a line shipped in labtool-data.
+$ rpm -qpl labtool-1.0-1.noarch.rpm
+/usr/bin/labtool
+$ rpm -qpR labtool-1.0-1.noarch.rpm
+/usr/bin/sh
+labtool-data &gt;= 1.0
+rpmlib(CompressedFileNames) &lt;= 3.0.4-1
+rpmlib(FileDigests) &lt;= 4.6.0-1
+rpmlib(PayloadFilesHavePrefix) &lt;= 4.0-1
+rpmlib(PayloadIsZstd) &lt;= 5.4.18-1</code></pre>
+<p><code>-qpi</code> は情報（欄の読み方は第9章の <code>rpm -qi</code> と同じ）、<code>-qpl</code> は中のファイル、<code>-qpR</code> は依存関係である（第3章の <code>dpkg -I</code>・<code>dpkg -c</code> にあたる）。<code>Install Date: (not installed)</code> は、ファイルの中には入れた日時が書かれていないので、いつもこう出る。labtool は <code>labtool-data &gt;= 1.0</code> が要ると分かる。</p>
+<div class="scroll"><table>
+<tr><th>聞く相手</th><th>書き方</th><th>答えられること</th></tr>
+<tr><td>台帳（入っているもの）</td><td><code>rpm -q□ 名前</code>（<code>-qi</code>・<code>-ql</code>・<code>-qR</code> など）</td><td>入っているパッケージだけ</td></tr>
+<tr><td>.rpm ファイル</td><td><code>rpm -qp□ ファイル</code>（<code>-qpi</code>・<code>-qpl</code>・<code>-qpR</code> など）</td><td>入れる前のファイルの中身</td></tr>
+</table></div>
+
+<h2 id="install">rpm で入れる — rpm -ivh</h2>
+<div class="sgoal"><b>この節で分かること</b>: rpm が依存関係をどう扱い、どこで止まるか。</div>
+<p>.rpm ファイルを入れるのは <code>rpm -i</code>（install）である。<code>v</code> は経過を表示し、<code>h</code> は進み具合を <code>#</code> で表示する。たいてい <code>-ivh</code> と3つ並べて使う。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>第7章の <code>dpkg -i</code> と同じで、依存関係が足りなくても、中身を置くところまでは進めて止まるはずだ。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo rpm -ivh labtool-1.0-1.noarch.rpm
+error: Failed dependencies:
+        labtool-data &gt;= 1.0 is needed by labtool-1.0-1.noarch
+$ echo $?
+1
+$ rpm -q labtool
+package labtool is not installed
+$ ls /usr/bin/labtool
+ls: cannot access '/usr/bin/labtool': No such file or directory</code></pre>
+<div class="then"><b>だめな理由</b>: <code>Failed dependencies</code>（依存関係が満たされない）で止まり、labtool は台帳にも無く、ファイルも置かれていない。
+rpm も dpkg と同じく、依存関係を読めるが、取りに行かない。違うのは止まり方で、<b>足りないと分かった時点で、1つも入れずに止まる</b>。dpkg は展開まで進めて <code>iU</code> を残したが、rpm は台帳にもディスクにも何も残さない。</div></div>
+<p>足りない labtool-data も取ってきて、2つ並べて渡す。<code>yumdownloader</code> の <code>--resolve</code> は、依存関係のパッケージも一緒に取ってくる。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ yumdownloader --resolve labtool
+Last metadata expiration check: 2:07:15 ago on Tue Oct 20 19:34:06 2026.
+$ ls -l
+total 20
+-rw-r--r-- 1 lab lab 6859 Oct 20 21:41 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6729 Oct 20 21:41 labtool-data-1.0-1.noarch.rpm
+drwxr-xr-x 2 lab lab 4096 Oct 20 19:34 work
+$ sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
+Updating / installing...
+   1:labtool-data-1.0-1               ################################# [ 50%]
+   2:labtool-1.0-1                    ################################# [100%]
+$ labtool
+labtool: labtool-data から読んだ1行です</code></pre>
+<p><code>Verifying</code>（署名とダイジェストを確かめる）・<code>Preparing</code>（準備）のあと、<code>Updating / installing</code> の下に入れた順が出る。渡した順は labtool が先だったが、rpm は依存関係を見て labtool-data を先に入れた。yum からはどう見えるか。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ yum list installed labtool labtool-data
+Installed Packages
+labtool.noarch                             1.0-1                         @System
+labtool-data.noarch                        1.0-1                         @System</code></pre>
+<p>右端が <code>@System</code> になった。rpm で直接入れたものは、どのリポジトリから来たかの記録が無いからである（yum で入れれば、第9章のように <code>@lab</code> になる）。</p>
+<div class="analogy"><b>たとえ</b>: 部品表を見て「この部品が無いと組めない」と言う検品係に近い。足りなければ、作業台に何も載せずに、作業票ごと突き返す。部品を取りに倉庫へ行くのは別の係（yum）の仕事である。
+<br>ただし<b>崩れる点</b>: 人の検品係なら「急ぎだから部品なしで組んで」と言われても事情を聞き返すが、rpm に依存関係を確かめさせない指示（<code>--nodeps</code>）を付けると、聞き返さずに組めないものを組む。それを「台帳と照らし合わせる」の節で確かめる。</div>
+
+<h2 id="erase">rpm で消す — rpm -e</h2>
+<div class="sgoal"><b>この節で分かること</b>: rpm で消すときに何が拒まれるか。</div>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo rpm -e labtool-data
+error: Failed dependencies:
+        labtool-data &gt;= 1.0 is needed by (installed) labtool-1.0-1.noarch
+$ sudo rpm -e labtool labtool-data
+$ rpm -q labtool labtool-data
+package labtool is not installed
+package labtool-data is not installed</code></pre>
+<p><code>-e</code>（erase）は消す。入っている labtool が必要としている labtool-data は、先に消すことを断られた（<code>needed by (installed)</code>）。2つ並べて渡せば、順番は rpm が決めて消す。<code>rpm -e</code> は、うまくいくと何も出さない。</p>
+
+<h2 id="upgrade">上げる — -i・-U・-F の違い</h2>
+<div class="sgoal"><b>この節で分かること</b>: 新しい版のファイルを入れるときの3つのオプションの違い。</div>
+<p>labhello の 1.0 を <code>yumdownloader</code> で取り、1.1 は第10章で足したリポジトリの置き場から写す（この檻では、まだそのリポジトリを足していない）。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ yumdownloader labhello
+Last metadata expiration check: 2:07:22 ago on Tue Oct 20 19:34:06 2026.
+$ cp /srv/lab-updates-rpm/labhello-1.1-1.noarch.rpm .
+$ ls
+labhello-1.0-1.noarch.rpm  labtool-1.0-1.noarch.rpm       work
+labhello-1.1-1.noarch.rpm  labtool-data-1.0-1.noarch.rpm</code></pre>
+<p>まず、labhello が入っていない状態で <code>-F</code>（freshen）を使う。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo rpm -Fvh labhello-1.0-1.noarch.rpm
+$ echo $?
+0
+$ rpm -q labhello
+package labhello is not installed</code></pre>
+<p>何も出ず、終了コード 0 で、何も入らなかった。<code>-F</code> は「入っているものだけを新しくする」オプションで、入っていないものには何もしない。次に 1.0 を <code>-i</code> で入れてから、1.1 を <code>-i</code> で入れようとする。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo rpm -ivh labhello-1.0-1.noarch.rpm
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
+Updating / installing...
+   1:labhello-1.0-1                   ################################# [100%]
+$ sudo rpm -ivh labhello-1.1-1.noarch.rpm
+warning: labhello-1.1-1.noarch.rpm: Header V4 RSA/SHA256 Signature, key ID a5824b40: NOKEY
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
+        file /usr/bin/labhello from install of labhello-1.1-1.noarch conflicts with file from package labhello-1.0-1.noarch
+        file /usr/share/doc/labhello/README from install of labhello-1.1-1.noarch conflicts with file from package labhello-1.0-1.noarch
+        file /usr/share/man/man1/labhello.1.gz from install of labhello-1.1-1.noarch conflicts with file from package labhello-1.0-1.noarch</code></pre>
+<p>1行目の <code>warning … NOKEY</code> は、1.1 の署名を確かめる鍵（lab updates）をこの檻ではまだ取り込んでいない、という警告である（第10章）。rpm は警告を出すだけで先へ進む。止まったのはその後で、<code>conflicts with file from package labhello-1.0-1</code>（1.0 のファイルとぶつかる）と言われた。<code>-i</code> は「新しく入れる」で、古い版を消さずに並べて入れようとするので、同じファイルがぶつかる。上げるのは <code>-U</code>（upgrade）である。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo rpm -Uvh labhello-1.1-1.noarch.rpm
+warning: labhello-1.1-1.noarch.rpm: Header V4 RSA/SHA256 Signature, key ID a5824b40: NOKEY
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
+Updating / installing...
+   1:labhello-1.1-1                   ################################# [ 50%]
+Cleaning up / removing...
+   2:labhello-1.0-1                   ################################# [100%]
+$ labhello
+labhello 1.1</code></pre>
+<p>1.1 を入れ（<code>Updating / installing</code>）、1.0 を片付けた（<code>Cleaning up / removing</code>）。</p>
+<div class="scroll"><table>
+<tr><th>オプション</th><th>入っていないとき</th><th>古い版が入っているとき</th><th>何のためにあるか</th></tr>
+<tr><td><code>-i</code>（install）</td><td>入れる</td><td><b>止まる</b>（ファイルがぶつかる）</td><td>新しく入れる。カーネルのように、古い版を残して並べて入れたいものにも使う</td></tr>
+<tr><td><code>-U</code>（upgrade）</td><td>入れる</td><td>上げる（古い版を消す）</td><td>入っていてもいなくても、この版にする</td></tr>
+<tr><td><code>-F</code>（freshen）</td><td><b>何もしない</b></td><td>上げる（古い版を消す）</td><td>入っているものだけを新しくする（入っていないものを増やさない）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 名簿を更新するときの3通りの指示に近い。<code>-i</code> は「新しく名前を書け」、<code>-U</code> は「名前があれば書き換え、無ければ足せ」、<code>-F</code> は「名前があるときだけ書き換えよ」である。
+<br>ただし<b>崩れる点</b>: 名簿なら同じ人の名前を2行書いても困るだけだが、rpm の <code>-i</code> は、同じファイルを持つ2つの版を見つけると、書く前に止まる。</div>
+
+<h2 id="verify">台帳と照らし合わせる — rpm -V</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>rpm -V</code> が何を比べ、どう答えるか。</div>
+<p>第4章の <code>dpkg -V</code> にあたるのが <code>rpm -V</code>（verify）である。いまの labhello を照らし合わせる。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm -V labhello
+$ echo $?
+0</code></pre>
+<p>何も出ず、終了コードは 0 だった。<code>dpkg -V</code> と同じく、違うファイルだけを出すので、何も出ないのは「全部台帳どおり」という答えである。2か所変える。実行の許可を外し（<code>chmod 644</code>）、中身に1行書き足す。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo chmod 644 /usr/bin/labhello
+$ echo '# 書き足した' | sudo tee -a /usr/bin/labhello
+# 書き足した
+$ rpm -V labhello
+SM5....T.    /usr/bin/labhello
+$ echo $?
+1
+$ labhello
+bash: /usr/bin/labhello: Permission denied</code></pre>
+<p>labhello は <code>Permission denied</code>（実行の許可が無い）で動かなくなった。<code>rpm -V</code> の左の9文字は、台帳と比べた項目ごとに、違った項目だけ文字が入り、同じなら <code>.</code> になる。</p>
+<div class="scroll"><table>
+<tr><th>文字</th><th>比べたもの</th><th>何のために見るか</th></tr>
+<tr><td><code>S</code></td><td>大きさ（Size）</td><td>書き足し・切り詰めを見つける</td></tr>
+<tr><td><code>M</code></td><td>権限と種類（Mode）</td><td>実行の許可や書き込みの許可の変化を見つける（いまの <code>chmod 644</code>）</td></tr>
+<tr><td><code>5</code></td><td>中身の要約（ダイジェスト）</td><td>中身が1バイトでも変わったかを見つける</td></tr>
+<tr><td><code>D</code></td><td>デバイスの番号</td><td>装置ファイルのすり替えを見つける</td></tr>
+<tr><td><code>L</code></td><td>シンボリックリンクの行き先</td><td>リンクの付け替えを見つける</td></tr>
+<tr><td><code>U</code> / <code>G</code></td><td>持ち主 / グループ</td><td>持ち主の変化を見つける</td></tr>
+<tr><td><code>T</code></td><td>更新時刻（mTime）</td><td>いつか書き換えられたことを見つける</td></tr>
+<tr><td><code>P</code></td><td>ケーパビリティ（root の力の一部を分けて与える印）</td><td>与えられた力の変化を見つける</td></tr>
+</table></div>
+<p><code>SM5....T.</code> は「大きさ・権限・中身・時刻が違う」と読む。ファイル名の前に <code>c</code> があれば設定ファイル、<code>d</code> なら説明書である（ここは空白なのでふつうのファイル）。<code>dpkg -V</code> と違い、台帳に大きさや権限も記録されているので欄が埋まり、違いがあれば<b>終了コードも 0 以外</b>（ここでは 1）になる。台帳どおりに戻すには、同じ版をもう一度入れる。<code>--replacepkgs</code> は「同じ版が入っていても入れ直す」の印である。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo rpm -Uvh --replacepkgs labhello-1.1-1.noarch.rpm
+warning: labhello-1.1-1.noarch.rpm: Header V4 RSA/SHA256 Signature, key ID a5824b40: NOKEY
+Verifying...                          ################################# [100%]
+Preparing...                          ################################# [100%]
+Updating / installing...
+   1:labhello-1.1-1                   ################################# [ 50%]
+Cleaning up / removing...
+   2:labhello-1.1-1                   ################################# [100%]
+$ rpm -V labhello
+$ labhello
+labhello 1.1</code></pre>
+<p>黙った。権限も中身も台帳どおりに戻り、labhello が動いた。リポジトリにある版なら、<code>sudo yum reinstall 名前</code> でも入れ直せる。<code>rpm -V</code> は依存関係も照らし合わせる。第9章の labapp を入れ、依存関係を確かめずに消す <code>--nodeps</code> で liblab だけを消してみる。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo yum install labapp
+...
+Installing:
+ labapp             noarch             1.0-1              lab             7.3 k
+Installing dependencies:
+ liblab             noarch             1.0-1              lab             6.7 k
+
+...
+Is this ok [y/N]: y
+...
+Complete!
+$ sudo rpm -e --nodeps liblab
+$ labapp
+/usr/bin/labapp: line 3: /usr/lib/liblab/liblab.sh: No such file or directory
+$ rpm -V labapp
+Unsatisfied dependencies for labapp-1.0-1.noarch:
+        liblab &gt;= 1.0 is needed by (installed) labapp-1.0-1.noarch</code></pre>
+<p><code>--nodeps</code> を付けると、rpm は labapp が liblab を必要としていることを確かめずに、黙って消した。labapp は動かなくなり、<code>rpm -V</code> は「満たされていない依存関係がある（<code>Unsatisfied dependencies</code>）」と報告した。<code>--nodeps</code> は台帳の整合を自分で崩すオプションで、使ったら後始末も自分でする。<code>yum reinstall</code> で入れ直すと、足りない liblab も一緒に入る。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo yum reinstall labapp
+...
+Reinstalling:
+ labapp             noarch             1.0-1              lab             7.3 k
+Installing dependencies:
+ liblab             noarch             1.0-1              lab             6.7 k
+
+...
+Is this ok [y/N]: y
+...
+Installed:
+  liblab-1.0-1.noarch
+Reinstalled:
+  labapp-1.0-1.noarch
+
+Complete!
+$ labapp
+liblab: hello from labapp 1.0</code></pre>
+<p>全部のパッケージをまとめて照らし合わせるのは <code>rpm -Va</code>（all）である。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm -Va | wc -l
+31</code></pre>
+<p>31 は、台帳と違うところのあった行の数である（<code>wc -l</code> は第9章で使った、行を数えるコマンド）。このように何十行も出ることがあり、全部が異常ではない。設定ファイル（<code>c</code>）は書き換えて使うものであり（この檻では、AlmaLinux のリポジトリの向き先を書き換えてある）、コンテナには省かれたディレクトリもある。読むときは、<b>設定ファイルでないのに <code>5</code> や <code>M</code> が付いた行</b>から先に疑う。</p>
+<div class="analogy"><b>たとえ</b>: 賃貸の退去点検で、入居したときの写真と、いまの部屋を比べる作業に近い。点検表には違う項目だけが書かれ、何も書かれていなければ元どおりということである。
+<br>ただし<b>崩れる点</b>: 写真で比べられるのは見た目だけだが、<code>rpm -V</code> は中身の要約（<code>5</code>）まで比べる。見た目（大きさや時刻）をそろえても、中身が1文字違えば見つかる。</div>
+
+<h2 id="rpm2cpio">入れずに中身を取り出す — rpm2cpio</h2>
+<div class="sgoal"><b>この節で分かること</b>: .rpm の中のファイルを、台帳に触らずに取り出す方法。</div>
+<p><code>rpm2cpio</code> は、.rpm ファイルの中身を cpio という形式のひとかたまりにして出す。受け取った <code>cpio</code> の <code>-t</code> は一覧を出し、<code>-i</code> は取り出す（<code>-d</code> は途中のディレクトリを作る、<code>-m</code> は時刻を保つ、<code>-v</code> は取り出したものを表示する）。</p>
+<pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm2cpio labtool-1.0-1.noarch.rpm | cpio -t
+./usr/bin/labtool
+1 block
+$ mkdir ext
+$ cd ext
+$ rpm2cpio ../labtool-1.0-1.noarch.rpm | cpio -idmv
+./usr/bin/labtool
+1 block
+$ ls -l usr/bin/labtool
+-rwxr-xr-x 1 lab lab 98 Oct  1 09:00 usr/bin/labtool
+$ rpm -qf usr/bin/labtool
+file /home/lab/ext/usr/bin/labtool is not owned by any package
+$ cd</code></pre>
+<p><code>1 block</code> は cpio が読んだ量の知らせである。いまいるディレクトリの下に <code>usr/bin/labtool</code> として取り出されたので、root も要らない。<code>rpm -qf</code> は「どのパッケージのものでもない（<code>not owned by any package</code>）」と答えた。台帳は何も知らない。第4章の <code>dpkg-deb -x</code> と同じで、壊れた設定ファイルの元の姿を1つだけ見たいときなどに使う。</p>
+<div class="analogy"><b>たとえ</b>: 届いた箱から説明書だけを抜き出して読み、品物は棚に入れない使い方に近い。
+<br>ただし<b>崩れる点</b>: 箱から抜いた説明書は箱の付属品だと分かるが、取り出したファイルには「どのパッケージから出たか」の記録が残らない。<code>rpm -qf</code> に聞いても、誰のものでもないと答える。</div>
+
+<h2 id="whole">11章を1つにまとめる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 2つの系統のパッケージ管理が、同じ形をしていること。</div>
+<p>Debian 系と RPM 系で、道具の名前は違うが、形は同じだった。</p>
+<pre class="wire"><code>                     Debian 系                      RPM 系
+パッケージのファイル   .deb（中身＋情報）              .rpm（中身＋情報）
+リポジトリの表         /etc/apt/sources.list(.d)       /etc/yum.repos.d/*.repo
+目録の写し             /var/lib/apt/lists/             /var/cache/dnf/
+目録を取り直す         apt update（言われたときだけ）  yum が自分で（makecache でも）
+取ってきて入れる       apt                             yum（= dnf）
+ファイルを置いて書く   dpkg                            rpm
+台帳                   /var/lib/dpkg/（テキスト）       /var/lib/rpm/（データベース）
+台帳とファイルを比べる dpkg -V                         rpm -V</code></pre>
+<p>どちらも、パッケージを入れると、<b>ファイルが置かれ、入れたという記録（台帳）が書かれる</b>。ファイルと台帳は別々にあるので、片方だけが変わることがある（ファイルだけ消す・中身だけ広げる）。apt と yum は、リポジトリの<b>目録</b>を読んで取ってきて、dpkg と rpm がファイルを置き、台帳に書く。コマンドの答えが食い違ったり、思ったのと違ったりしたら、いま見ているのが「ファイル」「台帳」「目録」のどれかを確かめる。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/practice/">演習11</a>は、入れたあとで2か所いじられた labmotd を、台帳と照らし合わせて突き止め、入れた直後の状態に戻す課題である。
+<a href="/linuc-packages/practice/">演習12</a>は、yumdownloader で取ってきた .rpm ファイルを、yum を使わずに rpm だけで入れる。判定は台帳と、入った経路（<code>@System</code>）を見る。</div>
+<div class="quiz"><b>確認</b>
+<p>入っているパッケージだけを新しい版に更新し、入っていなければ何もしない rpm のオプションはどれか。<br>
+(a) <code>-i</code>　(b) <code>-U</code>　(c) <code>-F</code>　(d) <code>-e</code></p>
+<details><summary>答え</summary>
+<p>(c) <code>-F</code>（freshen）。実測では、入っていない labhello には何もせず終了コード 0 だった。
+(b) の <code>-U</code> は入っていなければ新しく入れる。(a) の <code>-i</code> は古い版が入っているとファイルがぶつかって止まる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>rpm -V httpd</code> の出力に <code>S.5....T.  c /etc/httpd/conf/httpd.conf</code> とあった。何を意味するか。</p>
+<details><summary>答え</summary>
+<p>設定ファイル（<code>c</code>）の大きさ（S）・中身の要約（5）・更新時刻（T）が、入れたときと違う。つまり書き換えられている。
+設定ファイルなら、意図して書き換えたことが多い。権限（M）・持ち主（U）・グループ（G）は入れたときのままである。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>依存関係を確かめずにパッケージを消す rpm のコマンドを答えよ。また、そのあと何が起きうるか。</p>
+<details><summary>答え</summary>
+<p><code>rpm -e --nodeps パッケージ名</code>。それを必要としていたパッケージが動かなくなる
+（実測: liblab を消すと labapp が動かなくなり、<code>rpm -V labapp</code> が <code>Unsatisfied dependencies</code> を報告した）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>.rpm ファイルを入れずに、中のファイルをいまいるディレクトリに取り出すコマンドを答えよ。</p>
+<details><summary>答え</summary>
+<p><code>rpm2cpio foo.rpm | cpio -idmv</code>。<code>rpm2cpio</code> が中身を cpio の形式で出し、<code>cpio -i</code> が取り出す。
+一覧だけなら <code>rpm2cpio foo.rpm | cpio -t</code>、または <code>rpm -qpl foo.rpm</code>。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>yumdownloader</code>（<code>--resolve</code> で依存関係も）で .rpm を取り、<code>rpm -qpi</code>・<code>-qpl</code>・<code>-qpR</code> で入れる前に中を見る</li><li><code>rpm -ivh</code> は依存関係が足りないと1つも入れずに止まる（dpkg は <code>iU</code> を残した）。必要なファイルを並べて渡せば、順番は rpm が決める。rpm で入れたものは yum から見ると <code>@System</code></li><li><code>-i</code> は新しく入れる（古い版があればぶつかる）、<code>-U</code> は上げるか入れる、<code>-F</code> は入っているものだけ上げる、<code>-e</code> は消す（依存されていれば断る。<code>--nodeps</code> は確かめない）</li><li><code>rpm -V</code> は違うファイルだけを出す。9文字は SM5DLUGTP（違った項目だけ文字が入る）で、違いがあれば終了コードも 0 以外</li><li><code>rpm2cpio | cpio -idmv</code> は入れずに中身を取り出す。台帳には載らない</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.1.0@sha256:__DIGEST__（AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / yum-utils 4.3.0 / cpio 2.13 / vault.almalinux.org 9.7）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-packages/theory/10-yum-repo">← 10. yum のリポジトリを足して、署名を確かめる</a><a href="/linuc-packages/practice/">実践編へ →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

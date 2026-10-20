@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>7. .deb ファイルを直接入れる — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="7" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第7章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>7. .deb ファイルを直接入れる</h1>
+<p class="lead"><b>前の章までにやったこと</b>: apt でパッケージを入れる・調べる・消すをやり、apt がリポジトリの目録を見て取ってくること、依存関係があれば一緒に入れることを確かめた（第5・6章）。<b>この章でやること</b>: リポジトリを通さずに、手元にある .deb ファイルを <code>dpkg</code> で直接入れる。依存関係が足りないと何が起きるかを見て、apt に続きをさせる。最後に、パッケージを入れたときの質問をやり直す <code>dpkg-reconfigure</code> を使う。</p>
+<div class="badges"><span>前提: 第6章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.2（重要度1）</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>.deb ファイルを <code>dpkg -i</code> で入れ、<code>dpkg -r</code>・<code>dpkg -P</code> で消せる</li><li><code>dpkg -i</code> が依存関係で止まったときの台帳の状態（<code>iU</code>）を読み、<code>apt --fix-broken install</code> で続きを済ませられる（最初から <code>apt install ./ファイル</code> でもよいと言える）</li><li>「展開」と「設定」の2段を <code>dpkg --unpack</code> と <code>dpkg --configure</code> で分けて示せる</li><li><code>dpkg-reconfigure</code> で、入れたときの質問をもう一度出し、設定し直せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>dpkg</code> のそのほかのオプション（<code>--set-selections</code>・<code>--force-…</code> など）、パッケージの中で動く設定の手順（スクリプト）の書き方、debconf（質問と答えを覚えるしくみ）の記録の形、<code>dpkg-reconfigure</code> の画面の種類の違い。この章は「ファイルから入れる・止まったら apt に続きをさせる・設定をやり直す」が1回できれば足りる。</div></div>
+
+<h2 id="install">.deb ファイルを入れる — dpkg -i</h2>
+<div class="sgoal"><b>この節で分かること</b>: 手元の .deb ファイルを、dpkg で入れて消す方法。</div>
+<p>リポジトリに無いパッケージを、.deb ファイルの形で配られることがある（ソフトウェアの会社が自分のサイトで配る場合など）。ここでは第3章の <code>apt download</code> で labhello の .deb ファイルを取ってきて、それを手元のファイルとして入れる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt download labhello
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+$ sudo dpkg -i labhello_1.0_all.deb
+Selecting previously unselected package labhello.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+$ labhello
+labhello 1.0
+$ dpkg -l labhello | tail -1
+ii  labhello       1.0          all          prints its own version</code></pre>
+<p><code>dpkg -i</code>（install）は、渡された .deb ファイルを展開して（<code>Unpacking</code>）、使える状態に整える（<code>Setting up</code>）。第1章の <code>apt install</code> の出力の後半と同じ行が並んでいる。apt は、目録を見てリポジトリから .deb ファイルを取ってきて、それを dpkg に渡しているのである。消すのは <code>dpkg -r</code>（remove）である。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo dpkg -r labhello
+(Reading database ... 12837 files and directories currently installed.)
+Removing labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+$ dpkg -l labhello
+dpkg-query: no packages found matching labhello</code></pre>
+<p>dpkg は、消してよいかを尋ねない。</p>
+
+<h2 id="broken">依存関係が足りない .deb ファイル</h2>
+<div class="sgoal"><b>この節で分かること</b>: 依存関係が足りないとき、dpkg がどこまで進めて、何を残すか。</div>
+<p>第5章で <code>apt install labapp</code> は liblab を一緒に入れた。同じ labapp を、今度は .deb ファイルから dpkg で入れる。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>dpkg -i</code> もパッケージを入れるコマンドなのだから、足りない liblab も一緒に入れてくれるはずだ。少なくとも、入れられないなら何もせずに終わるだろう。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt download labapp
+Get:1 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
+$ sudo dpkg -i labapp_1.0_all.deb
+Selecting previously unselected package labapp.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack labapp_1.0_all.deb ...
+Unpacking labapp (1.0) ...
+dpkg: dependency problems prevent configuration of labapp:
+ labapp depends on liblab (&gt;= 1.0); however:
+  Package liblab is not installed.
+
+dpkg: error processing package labapp (--install):
+ dependency problems - leaving unconfigured
+Errors were encountered while processing:
+ labapp
+$ dpkg -l labapp liblab | tail -2
+iU  labapp         1.0          all          sample application that needs liblab
+un  liblab         &lt;none&gt;       &lt;none&gt;       (no description available)
+$ labapp
+/usr/bin/labapp: 3: .: cannot open /usr/lib/liblab/liblab.sh: No such file</code></pre>
+<div class="then"><b>だめな理由</b>: どちらの予想も外れた。dpkg は liblab を取りに行かず、かといって何もせずに終わってもいない。
+<b>展開（<code>Unpacking</code>）までは進めて</b>、設定の手前で止まった（<code>dependency problems - leaving unconfigured</code>＝依存関係の問題があるので、設定しないままにする）。
+台帳には labapp が <code>iU</code> と書かれた。1文字目 <code>i</code> は「入れたい」、2文字目 <code>U</code> は「展開済み（Unpacked）・設定前」である。
+ファイルは置かれたので、labapp を打つと動きかけて、liblab のファイルが無いところで失敗する。
+dpkg は .deb ファイルの <code>Depends:</code> を読めるので「足りない」とは分かる。しかし、どこへ取りに行けばいいかを知らない。リポジトリの目録を持っているのは apt のほうである。
+（liblab の <code>un</code> は「知らない・入っていない」で、台帳に行は無いが、labapp の依存関係に名前が出てくるので表示だけしている。）</div></div>
+<p>しかもこの状態は、関係ないパッケージの操作も止める。labhello を入れようとしてみる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+You might want to run 'apt --fix-broken install' to correct these.
+The following packages have unmet dependencies:
+ labapp : Depends: liblab (&gt;= 1.0) but it is not going to be installed
+E: Unmet dependencies. Try 'apt --fix-broken install' with no packages (or specify a solution).</code></pre>
+<p>apt は「依存関係が満たされていない（<code>Unmet dependencies</code>）」と言って断った。apt は、台帳全体で依存関係が満たされた状態しか作らないので、満たされていないもの（liblab の無い labapp）が残っていると、それを直す以外の操作を受け付けない。直し方は出力の中に書いてある。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt --fix-broken install
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Correcting dependencies... Done
+The following additional packages will be installed:
+  liblab
+The following NEW packages will be installed:
+  liblab
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+1 not fully installed or removed.
+Need to get 0 B/746 B of archives.
+After this operation, 36.9 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+Selecting previously unselected package liblab.
+(Reading database ... 12837 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labapp (1.0) ...
+$ dpkg -l labapp liblab | tail -2
+ii  labapp         1.0          all          sample application that needs liblab
+ii  liblab         1.0          all          small shell library for lab programs
+$ labapp
+liblab: hello from labapp 1.0</code></pre>
+<p><code>1 not fully installed or removed.</code>（設定し終わっていないものが1つある）が labapp の <code>iU</code> のことで、apt が目録から liblab を取ってきて入れ、続けて labapp の設定（<code>Setting up labapp</code>）を済ませた。<code>apt --fix-broken install</code> は <code>apt-get -f install</code> とも書く（<code>-f</code> は fix-broken）。</p>
+<div class="analogy"><b>たとえ</b>: 組み立て家具の箱を開けたら「別売りの部品 B が要る」と書いてあった場面に近い。dpkg は、箱を開けて部品を床に並べたところで手を止める係で、apt は、倉庫の在庫表を見て部品 B を取ってくる係である。
+<br>ただし<b>崩れる点</b>: 家具なら、部品を床に並べたまま放っておいても困るのはその家具だけだが、依存関係が足りないまま残った <code>iU</code> は、apt のほかの操作まで止める。片付けるか続けるかを、先に決めなければならない。</div>
+
+<h2 id="remove">dpkg で消す — -r と -P</h2>
+<div class="sgoal"><b>この節で分かること</b>: dpkg で消すときに、何が拒まれ、何が残るか。</div>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo dpkg -r liblab
+dpkg: dependency problems prevent removal of liblab:
+ labapp depends on liblab (&gt;= 1.0).
+
+dpkg: error processing package liblab (--remove):
+ dependency problems - not removing
+Errors were encountered while processing:
+ liblab</code></pre>
+<p>labapp が必要としている liblab は、先に消すことを断られた。入れるときは依存関係を取りに行かないのに、消すときは依存関係を守る。どちらも、台帳を読むだけでできる判断だからである。labapp のほうから消す。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo dpkg -r labapp
+(Reading database ... 12839 files and directories currently installed.)
+Removing labapp (1.0) ...
+$ dpkg -l labapp | tail -1
+rc  labapp         1.0          all          sample application that needs liblab
+$ sudo dpkg -P labapp
+(Reading database ... 12836 files and directories currently installed.)
+Purging configuration files for labapp (1.0) ...
+$ sudo dpkg -P liblab
+(Reading database ... 12835 files and directories currently installed.)
+Removing liblab (1.0) ...</code></pre>
+<p><code>dpkg -r</code> は第5章の <code>apt remove</code> と同じく、設定ファイルを残して <code>rc</code> にした。<code>dpkg -P</code>（purge）は設定ファイルも消し、台帳の行も消す（<code>apt purge</code> と同じ）。入っているパッケージにいきなり <code>-P</code> を使うと、中身と設定ファイルが一度に消える（最後の liblab）。dpkg に <code>autoremove</code> にあたるものは無い。「自動で入った」という印は、apt だけが持っているからである。</p>
+<div class="analogy"><b>たとえ</b>: 積み木で、上に別の積み木が乗っている土台だけを抜こうとする場面に近い。上の積み木（labapp）を先に下ろせば、土台（liblab）も抜ける。
+<br>ただし<b>崩れる点</b>: 積み木は形のうえで抜けないが、dpkg が断るのは、台帳に「labapp は liblab に依存する」と書いてあるからである。台帳を通さずに <code>rm</code> でファイルを消せば、誰も止めない（第4章で <code>/usr/bin/labhello</code> を消したときも、台帳は <code>ii</code> のままだった）。</div>
+
+<h2 id="aptfile">.deb ファイルを apt に渡す — apt install ./ファイル</h2>
+<div class="sgoal"><b>この節で分かること</b>: 手元の .deb ファイルを、依存関係ごと1回で入れる方法。</div>
+<p>最初から apt に .deb ファイルを渡せば、止まらずに入る。名前ではなくファイルだと分かるように、<code>./</code>（いまいるディレクトリ）を付ける。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install ./labapp_1.0_all.deb
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Note, selecting 'labapp' instead of './labapp_1.0_all.deb'
+The following additional packages will be installed:
+  liblab
+The following NEW packages will be installed:
+  labapp liblab
+0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1822 B of archives.
+After this operation, 106 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+Get:2 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
+Selecting previously unselected package liblab.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Selecting previously unselected package labapp.
+Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
+Unpacking labapp (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labapp (1.0) ...</code></pre>
+<p><code>Note, selecting 'labapp' instead of './labapp_1.0_all.deb'</code> は「ファイル ./labapp_1.0_all.deb を、中に書いてある名前の labapp として扱う」という知らせである。あとは第5章と同じで、依存関係を読んで liblab も一緒に入れた（同じ版の labapp がリポジトリにもあるので、apt はそちらから取っている。中身は同じである）。<code>./</code> を付けないと、apt はファイル名をパッケージの名前として目録から探し、見つからない。リポジトリに無いファイルを渡すと（演習07 の labnote など）、最後に <code>N: Download is performed unsandboxed as root …</code> という行が出る。これは失敗ではなく知らせ（Notice）で、apt は取ってきたファイルを読む作業を、権限を絞った専用の利用者 <code>_apt</code> にさせる決まりだが、そのファイルが <code>_apt</code> の入れない場所（あなたのホームディレクトリの下）にあったので、root のまま読んだ、という意味である。</p>
+<div class="scroll"><table>
+<tr><th>やり方</th><th>何のためにあるか（いつ使うか）</th><th>依存関係</th><th>結果</th></tr>
+<tr><td><code>sudo dpkg -i ファイル.deb</code></td><td>手元のファイルをそのまま入れる。依存関係が無いか、もう入っているとき</td><td>読んで確かめるだけ。足りなければ止まる</td><td>足りないと展開済み・設定前（<code>iU</code>）で残る</td></tr>
+<tr><td>続けて <code>sudo apt --fix-broken install</code></td><td><code>dpkg -i</code> が依存関係で止まったあとに、続きを済ませる</td><td>目録から足りないものを取ってくる</td><td>全部 <code>ii</code> になる</td></tr>
+<tr><td><code>sudo apt install ./ファイル.deb</code></td><td>手元のファイルを、足りない依存関係ごと1回で入れる</td><td>最初から目録で解決する</td><td>1回で <code>ii</code> になる</td></tr>
+</table></div>
+
+<h2 id="configure">展開と設定を分けて打つ — dpkg --unpack と --configure</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>dpkg -i</code> がしている2つの段を、分けて打つ方法。</div>
+<p>第1章から出ている <code>Unpacking</code>（展開）と <code>Setting up</code>（設定）は、別々に打つこともできる。依存関係の無い labhello で確かめる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo dpkg --unpack labhello_1.0_all.deb
+Selecting previously unselected package labhello.
+(Reading database ... 12839 files and directories currently installed.)
+Preparing to unpack labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+$ dpkg -l labhello | tail -1
+iU  labhello       1.0          all          prints its own version
+$ sudo dpkg --configure labhello
+Setting up labhello (1.0) ...
+$ dpkg -l labhello | tail -1
+ii  labhello       1.0          all          prints its own version</code></pre>
+<p><code>--unpack</code> は展開だけをして台帳を <code>iU</code> にし、<code>--configure</code> が設定を済ませて <code>ii</code> にした。<code>dpkg -i</code> は、この2つを続けてやっている。依存関係で止まったのは、2つ目の段の手前だったわけである。止まっているものを全部まとめて設定するのは <code>dpkg --configure -a</code> である。</p>
+
+<h2 id="reconfigure">設定をやり直す — dpkg-reconfigure</h2>
+<div class="sgoal"><b>この節で分かること</b>: 入れたあとで、パッケージの設定を質問からやり直す方法。</div>
+<p>パッケージの中には、設定の段で利用者に質問をするものがある。代表が、機械のタイムゾーン（どの地域の時刻を使うか）を決める <code>tzdata</code> である。質問と答えは <b>debconf</b>（パッケージの質問と、その答えを覚えておくしくみ）が記録している。いまの設定を見る。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ cat /etc/timezone
+Etc/UTC
+$ ls -l /etc/localtime
+lrwxrwxrwx 1 root root 27 Sep 30 19:32 /etc/localtime -&gt; /usr/share/zoneinfo/Etc/UTC
+$ sudo debconf-show tzdata | sort
+  tzdata/Areas: Etc
+  tzdata/Zones/Africa:
+  tzdata/Zones/America:
+  tzdata/Zones/Antarctica:
+  tzdata/Zones/Arctic:
+  tzdata/Zones/Asia:
+  tzdata/Zones/Atlantic:
+  tzdata/Zones/Australia:
+  tzdata/Zones/Etc: UTC
+  tzdata/Zones/Europe:
+  tzdata/Zones/Indian:
+  tzdata/Zones/Legacy:
+  tzdata/Zones/Pacific:</code></pre>
+<p>タイムゾーンは <code>Etc/UTC</code>（世界の基準の時刻）である。<code>ls -l</code> の行頭の <code>l</code> と、名前のあとの <code>-&gt;</code> は、<code>/etc/localtime</code> が別のファイル（<code>/usr/share/zoneinfo/Etc/UTC</code>）を指す名札（シンボリックリンク。別の名前で同じファイルを指すもの）だという印である。<code>debconf-show</code> は、そのパッケージについて debconf が覚えている答えを出す（行の順番は打つたびに変わるので、<code>sort</code> で並べた）。質問をもう一度してもらうのが <code>dpkg-reconfigure</code> である。ふつうに打つと矢印キーで選ぶ画面が出るが、ここでは同じ質問を文字だけで出す形（<code>-f teletype</code>）にする。地域の一覧が出たら <code>5</code>（Asia）と打って Enter、都市の一覧の途中で <code>[More]</code>（続きがある）と出たら Enter、最後に <code>78</code>（Tokyo）と打って Enter を押す。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo dpkg-reconfigure -f teletype tzdata
+Configuring tzdata
+------------------
+
+Please select the geographic area in which you live. Subsequent configuration
+questions will narrow this down by presenting a list of cities, representing
+the time zones in which they are located.
+
+  1. Africa      4. Arctic    7. Australia  10. Pacific
+  2. America     5. Asia      8. Europe     11. Etc
+  3. Antarctica  6. Atlantic  9. Indian     12. Legacy
+Geographic area: 5
+
+Please select the city or region corresponding to your time zone.
+
+  1. Aden         23. Dili         45. Krasnoyarsk   67. Samarkand
+...
+  12. Bangkok     34. Istanbul     56. Novosibirsk   78. Tokyo
+...
+[More]
+
+...
+Time zone: 78
+
+
+Current default time zone: 'Asia/Tokyo'
+Local time is now:      Tue Oct 20 21:35:30 JST 2026.
+Universal Time is now:  Tue Oct 20 12:35:30 UTC 2026.
+$ cat /etc/timezone
+Asia/Tokyo
+$ ls -l /etc/localtime
+lrwxrwxrwx 1 root root 30 Oct 20 21:35 /etc/localtime -&gt; /usr/share/zoneinfo/Asia/Tokyo
+$ sudo debconf-show tzdata | sort
+  tzdata/Zones/Africa:
+  tzdata/Zones/America:
+  tzdata/Zones/Antarctica:
+  tzdata/Zones/Arctic:
+  tzdata/Zones/Atlantic:
+  tzdata/Zones/Australia:
+  tzdata/Zones/Etc: UTC
+  tzdata/Zones/Europe:
+  tzdata/Zones/Indian:
+  tzdata/Zones/Legacy:
+  tzdata/Zones/Pacific:
+* tzdata/Areas: Asia
+* tzdata/Zones/Asia: Tokyo</code></pre>
+<p>最後の3行は、新しい設定での時刻の表示である（時刻は、あなたが打った時刻になる）。<code>/etc/timezone</code> が <code>Asia/Tokyo</code> に書き換わり、<code>/etc/localtime</code> の指す先が <code>/usr/share/zoneinfo/Asia/Tokyo</code> に付け替わった。<code>dpkg-reconfigure</code> は、パッケージを入れたときの「質問して設定する」手順を、入れ直さずにもう一度走らせる。答えは debconf の記録に残り（行頭の <code>*</code> は「その質問がもう出された」という印）、tzdata の設定の手順がその答えで設定ファイルを書き直した。設定ファイルを手で直す代わりに、パッケージ自身に直させる方法である。</p>
+<div class="analogy"><b>たとえ</b>: 家電の「初期設定をやり直す」メニューに近い。買ったときに答えた質問（地域・言語）にもう一度答えると、本体の設定が書き換わる。
+<br>ただし<b>崩れる点</b>: 家電の設定は本体の中だけで変わるが、<code>dpkg-reconfigure</code> の答えは2か所に残る。<code>/etc</code> の設定ファイル（<code>/etc/timezone</code>・<code>/etc/localtime</code>）と、debconf の記録（<code>debconf-show</code> の行頭の <code>*</code>）である。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/practice/">演習07</a>は、リポジトリに無い単体の .deb ファイル（labnote）を、動く状態まで入れる課題である。
+判定は dpkg の台帳で labnote と、labnote が必要とするパッケージの両方が <code>ii</code> になり、labnote が実際に動くかを見る。</div>
+<div class="quiz"><b>確認</b>
+<p><code>sudo dpkg -i foo.deb</code> を実行したところ、依存関係のエラーで foo が設定されずに残った。
+依存するパッケージをリポジトリから取ってきて、foo の設定まで済ませるコマンドを答えよ。</p>
+<details><summary>答え</summary>
+<p><code>sudo apt --fix-broken install</code>（<code>sudo apt-get -f install</code>）。dpkg は依存関係を取りに行けないので、目録を持つ apt に続きをさせる（実測）。
+最初から <code>sudo apt install ./foo.deb</code> と打てば、依存関係も解決して1回で入る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>dpkg -l</code> の行頭が <code>iU</code> のパッケージは、どういう状態か。</p>
+<details><summary>答え</summary>
+<p>入れたい（<code>i</code>）が、展開しただけで設定が済んでいない（<code>U</code> = Unpacked）。ファイルは置かれている。
+依存関係が足りなくて <code>dpkg -i</code> が止まったときにこうなった（実測）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>入っているパッケージを、入れたときの質問からやり直して設定し直すコマンドはどれか。<br>
+(a) <code>dpkg --configure</code>　(b) <code>dpkg-reconfigure</code>　(c) <code>apt reinstall</code>　(d) <code>debconf-show</code></p>
+<details><summary>答え</summary>
+<p>(b)。例: <code>dpkg-reconfigure tzdata</code>。(a) は展開済み・設定前（<code>iU</code>）のものを設定するもので、設定済みのものの質問はしない。
+(c) は中身を入れ直すもの（第4章）。(d) は記録された答えを見るだけ。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>dpkg -r</code> と <code>dpkg -P</code> の違いを答えよ。</p>
+<details><summary>答え</summary>
+<p><code>-r</code> は中身を消し、設定ファイル（conffile）は残して台帳を <code>rc</code> にする。<code>-P</code> は設定ファイルも消し、台帳の行も消す（実測）。
+apt の <code>remove</code> と <code>purge</code> にあたる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>dpkg -i ファイル.deb</code> は手元のファイルを入れる。apt は、リポジトリから取ってきたファイルを dpkg に渡している</li><li>dpkg は依存関係を読めるが取りに行かない。足りなければ展開まで進めて <code>iU</code>（展開済み・設定前）で止まり、apt はほかの操作も断る。<code>apt --fix-broken install</code>（<code>apt-get -f install</code>）が目録から取って続きをする。最初から <code>apt install ./ファイル.deb</code> でもよい</li><li><code>dpkg -r</code> は設定ファイルを残して <code>rc</code>、<code>dpkg -P</code> は全部消す。依存されているものは消すのを断られる</li><li><code>dpkg -i</code> は「展開（<code>--unpack</code>）」と「設定（<code>--configure</code>）」の2段</li><li><code>dpkg-reconfigure</code> は入れたときの質問をやり直し、その答えで設定し直す。答えは <code>debconf-show</code> で見られる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / debconf 1.5.86ubuntu1 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-packages/theory/06-repository">← 6. パッケージはどこから来るか</a><a href="/linuc-packages/theory/08-build">次: 8. パッケージを自分で作る →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

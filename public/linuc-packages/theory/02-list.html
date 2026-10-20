@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. いま何が入っているかを調べる — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="2" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第2章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>2. いま何が入っているかを調べる</h1>
+<p class="lead"><b>前の章までにやったこと</b>: labhello を <code>apt install</code> で入れて、使って、<code>apt remove</code> で消した。<b>この章でやること</b>: いまこの檻にどんなパッケージが入っているかを、一覧と、1つずつの詳しい情報で調べる。そして、その答えがどこから来ているかを確かめる。</p>
+<div class="badges"><span>前提: 第1章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>出題範囲 1.04.2（重要度1）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>入っているパッケージの一覧を <code>dpkg -l</code> と <code>apt list --installed</code> で出し、行頭の <code>ii</code> を読める</li><li>1つのパッケージの版・分類・依存関係などを <code>dpkg -s</code> と <code>apt show</code> で調べられる</li><li>「入っているか」の答えが、入れたときに書かれる記録（台帳）から来ていると言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>dpkg -l</code> の行頭に出る <code>ii</code> 以外の記号、<code>dpkg -s</code> の全部の欄、台帳のファイルの中身の形。この章では「一覧で探して、1つを詳しく見る」ができれば足りる。</div></div>
+
+<h2 id="list">入っているものの一覧 — dpkg -l</h2>
+<div class="sgoal"><b>この節で分かること</b>: 入っているパッケージを全部並べる方法と、その行の読み方。</div>
+<p><code>dpkg</code> は、パッケージのファイルを実際に置いたり外したりして、何を入れたかを覚えておく道具である（第1章の apt は、中でこれを呼んでいる）。<code>dpkg -l</code>（list）は、覚えているものを一覧にする。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -l
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name                        Version                           Architecture &gt;
++++-===========================-=================================-============-&gt;
+ii  apt                         2.8.3                             amd64        &gt;
+ii  apt-file                    3.3                               all          &gt;
+ii  apt-utils                   2.8.3                             amd64        &gt;
+...</code></pre>
+<p>行が端末の幅（80 桁）に収まらないので、<code>dpkg</code> はこの一覧を <code>less</code>（長い出力を1画面ずつ見せる道具）で開く。右端は <code>&gt;</code> で切られ、画面の一番下で止まる。矢印キーやスペースで先を見られ、<code>q</code> で抜ける（抜けると上の画面がそのまま残る）。</p>
+<p>上の5行は見出しで、6行目から1行に1つのパッケージが並ぶ。</p>
+<div class="scroll"><table>
+<tr><th>欄</th><th>何を表すか</th></tr>
+<tr><td>1文字目（<code>Desired</code>）</td><td>そのパッケージを「どうしたいか」。<code>i</code> は入れたい（Install）</td></tr>
+<tr><td>2文字目（<code>Status</code>）</td><td>いま「どうなっているか」。<code>i</code> は入っていて使える（Installed）</td></tr>
+<tr><td><code>Name</code></td><td>パッケージの名前</td></tr>
+<tr><td><code>Version</code></td><td>入っている版</td></tr>
+<tr><td><code>Architecture</code></td><td>どの CPU 向けか（第1章の <code>amd64</code>・<code>all</code>）</td></tr>
+<tr><td><code>Description</code></td><td>短い説明</td></tr>
+</table></div>
+<p>行頭の <code>ii</code> は「入れたい・入っている」で、ふつうに入っているものは全部これになる。見出しの3行は、1文字目・2文字目・3文字目に出うる文字の凡例である（大文字は異常の印）。いくつ入っているかを数える。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -l | grep -c '^ii'
+168</code></pre>
+<p><code>grep -c</code> は当てはまった行の数を出す。<code>'^ii'</code> は「行頭が ii」。この檻には、それだけのパッケージが入っている。名前を渡すと、その名前のものだけを出す。<code>*</code> は「何文字でもよい」の印で、シェルに先に解釈させないように <code>'</code> で囲む。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -l 'lab*'
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-==================================&gt;
+ii  labbackup      1.0          all          practice backup command
+ii  labfortune     1.0          all          prints a fortune for the day
+ii  labsvc         1.0          all          sample service tool with a config &gt;
+ii  labsvc-common  1.0          all          data files for labsvc
+ii  labweb         1.0          all          sample web board with a config file
+ii  labweb-data    1.0          all          data files for labweb</code></pre>
+<p>練習用のパッケージが並んだ。これも1行が端末の幅を超えるので、<code>less</code> で開いて右端を切っている。出力をパイプ（<code>|</code>）でほかのコマンドに渡すと、<code>dpkg</code> は <code>less</code> を使わず、右端も切らない。<code>cat</code> は受け取ったものをそのまま出すだけのコマンドで、ここではパイプの受け手としてだけ使う。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -l 'lab*' | cat
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-======================================
+ii  labbackup      1.0          all          practice backup command
+ii  labfortune     1.0          all          prints a fortune for the day
+ii  labsvc         1.0          all          sample service tool with a config file
+ii  labsvc-common  1.0          all          data files for labsvc
+ii  labweb         1.0          all          sample web board with a config file
+ii  labweb-data    1.0          all          data files for labweb</code></pre>
+<p>第1章で入れて消した labhello は、起動し直したこの檻にも入っていないので、並んでいない。名前を指定して聞くと、こう答える（<code>dpkg-query</code> は dpkg の中で問い合わせを受け持つ部分の名前）。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -l labhello
+dpkg-query: no packages found matching labhello</code></pre>
+<div class="analogy"><b>たとえ</b>: 家の持ち物リストに近い。物を買うたびに1行書き足し、捨てるたびに線を引いて消す。「家に何があるか」を聞かれたら、家じゅうを見て回らずに、このリストを読み上げる。
+<br>ただし<b>崩れる点</b>: 家のリストなら、ときどき家じゅうを見回して書き直せるが、dpkg は見回さない。答えるときに読むのはリストだけで、物が本当にそこにあるかは見に行かない。</div>
+
+<h2 id="aptlist">apt で一覧を出す — apt list --installed</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>apt list</code> の出力と、入っているものの印。</div>
+<p><code>apt</code> にも一覧を出すサブコマンド <code>list</code> がある。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>apt list labhello</code> と打って名前が出てくれば、labhello は入っているはずだ。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt list labhello
+Listing... Done
+labhello/lab 1.0 all
+$ labhello
+bash: labhello: command not found</code></pre>
+<div class="then"><b>だめな理由</b>: 名前は出たのに、labhello は入っていない。
+<code>apt list</code> は、入っているものだけでなく、<b>入れられるもの</b>（リポジトリにあるもの）も全部並べる。
+第1章で apt が名前だけで labhello を見つけられたのは、入れられるパッケージの一覧を持っているからで、<code>apt list</code> はその一覧から探している。
+入っているかどうかは、行末の印で見分ける。入っていれば <code>[installed]</code> が付く。上の行には付いていない。</div></div>
+<p>入っているものだけを出すのが <code>--installed</code> である。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt list --installed 'lab*'
+Listing... Done
+labbackup/lab,now 1.0 all [installed]
+labfortune/lab,now 1.0 all [installed]
+labsvc-common/lab,now 1.0 all [installed,automatic]
+labsvc/lab,now 1.0 all [installed]
+labweb-data/lab,now 1.0 all [installed,automatic]
+labweb/lab,now 1.0 all [installed]</code></pre>
+<p>1行目の <code>Listing... Done</code> は「一覧を作り終えた」という知らせで、2行目からがパッケージである。<code>labsvc/lab,now 1.0 all [installed]</code> は、名前 <code>labsvc</code>・どこから来た版か（<code>lab</code> はリポジトリの中の区分の名前で、第1章の <code>Get:</code> の行にも <code>lab/main</code> と出ていた）・いま入っている（<code>now</code>）・版 <code>1.0</code>・アーキテクチャ <code>all</code>・印 <code>[installed]</code> と読む。</p>
+<p>labsvc-common と labweb-data には、<code>automatic</code> も付いている。これは「利用者が名前を指定したのではなく、ほかのパッケージに必要なので一緒に入った」という印である（labsvc-common は labsvc と、labweb-data は labweb と一緒に入った）。</p>
+<div class="analogy"><b>たとえ</b>: 店のカタログのうち、もう持っている品物に「購入済み」の印が付いているものに近い。カタログには持っていない品物も載っているので、載っていることと持っていることは別である。
+<br>ただし<b>崩れる点</b>: 店のカタログは1冊だが、apt はリポジトリの区分ごとに一覧を持っていて、それをまとめて1つに見せている。<code>apt list</code> の <code>/</code> の後ろ（<code>lab</code>）が、どの一覧から来た行かの印である。</div>
+
+<h2 id="show">1つを詳しく調べる — dpkg -s と apt show</h2>
+<div class="sgoal"><b>この節で分かること</b>: 1つのパッケージについて、版・分類・依存関係などを調べる方法。</div>
+<p><code>dpkg -s</code>（status）に名前を渡すと、そのパッケージについて覚えていることを全部出す。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -s labsvc
+Package: labsvc
+Status: install ok installed
+Priority: optional
+Section: admin
+Installed-Size: 40
+Maintainer: check-then-explain &lt;lab@example.invalid&gt;
+Architecture: all
+Version: 1.0
+Depends: labsvc-common (&gt;= 1.0)
+Conffiles:
+ /etc/labsvc.conf b80eac61a4576d1a58b32b4df52a77dd
+Description: sample service tool with a config file
+ Used to practice remove, purge and autoremove.</code></pre>
+<p>欄は「名前: 値」の形で並ぶ。主な欄の意味と、何のためにあるかはこうである。</p>
+<div class="scroll"><table>
+<tr><th>欄</th><th>値の意味</th><th>何のためにあるか</th></tr>
+<tr><td><code>Status</code></td><td><code>install ok installed</code> ＝ 入れたい・問題なし・入っている</td><td>いま入っているかを確かめる</td></tr>
+<tr><td><code>Priority</code></td><td><code>optional</code> ＝ 無くてもシステムは動く</td><td>システムに欠かせないもの（<code>required</code> など）と見分ける</td></tr>
+<tr><td><code>Section</code></td><td><code>admin</code> ＝ 管理用の道具の分類</td><td>パッケージを種類で分ける（<code>utils</code> 便利な道具・<code>games</code> 遊び・<code>libs</code> ほかから使われる部品 など）</td></tr>
+<tr><td><code>Installed-Size</code></td><td>入れたときに使うディスクの量（KiB）</td><td>入れる前に、どれだけ場所を取るかを知る</td></tr>
+<tr><td><code>Maintainer</code></td><td>パッケージを作って面倒を見ている人</td><td>不具合を誰に知らせるかを知る</td></tr>
+<tr><td><code>Version</code></td><td>入っている版</td><td>新しい版があるか・どの版の説明書を読むかを決める</td></tr>
+<tr><td><code>Depends</code></td><td><code>labsvc-common (&gt;= 1.0)</code> ＝ labsvc-common の 1.0 以上が要る</td><td>このパッケージが動くのに、先に入っていなければならない別のパッケージ（<b>依存関係</b>）を示す</td></tr>
+<tr><td><code>Conffiles</code></td><td><code>/etc/labsvc.conf</code> と、その中身の要約</td><td>利用者が書き換える設定ファイルに印を付ける（消すときの扱いが、ほかのファイルと変わる）</td></tr>
+<tr><td><code>Description</code></td><td>1行目が短い説明、2行目から長い説明</td><td>何をするパッケージかを知る</td></tr>
+</table></div>
+<p>apt にも、1つを詳しく見る <code>show</code> がある。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt show labsvc
+Package: labsvc
+Version: 1.0
+Priority: optional
+Section: admin
+Maintainer: check-then-explain &lt;lab@example.invalid&gt;
+Installed-Size: 41.0 kB
+Depends: labsvc-common (&gt;= 1.0)
+Download-Size: 932 B
+APT-Manual-Installed: yes
+APT-Sources: file:/srv/lab-repo lab/main amd64 Packages
+Description: sample service tool with a config file
+ Used to practice remove, purge and autoremove.</code></pre>
+<p>ほとんど同じだが、dpkg に無い欄が3つある。<code>Download-Size</code> は取ってくるパッケージのファイルの大きさ、<code>APT-Manual-Installed: yes</code> は「利用者が名前を指定して入れた」（<code>automatic</code> の反対）、<code>APT-Sources</code> は「どのリポジトリから入ったか」である。<code>Installed-Size</code> が <code>41.0 kB</code> と、dpkg の <code>40</code>（KiB。1 KiB は 1024 バイト）と違うのは、単位を 1000 バイトの kB に直して見せているからである。</p>
+<p>入っていないパッケージに聞くと、2つの答え方が分かれる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -s labhello
+dpkg-query: package 'labhello' is not installed and no information is available
+Use dpkg --info (= dpkg-deb --info) to examine archive files.
+$ apt show labhello
+Package: labhello
+Version: 1.0
+Priority: optional
+Section: utils
+Maintainer: check-then-explain &lt;lab@example.invalid&gt;
+Installed-Size: 77.8 kB
+Download-Size: 1120 B
+APT-Sources: file:/srv/lab-repo lab/main amd64 Packages
+Description: prints its own version
+ A tiny package used to practice upgrades.</code></pre>
+<p><code>dpkg -s</code> は「入っていないので、情報が無い」と答えた（2行目は「.deb ファイルを調べるなら --info を使え」という案内。.deb ファイルは、第1章で apt が取ってきた <code>labhello_1.0_all.deb</code> のような、パッケージのファイルである）。<code>apt show</code> は、入っていない labhello についても答えた。前の節の <code>apt list</code> と同じく、入れられるパッケージの一覧を持っているからである。<code>APT-Manual-Installed</code> の欄が無いのは、入っていないからである。</p>
+<div class="analogy"><b>たとえ</b>: 家電の裏に貼ってある銘板に近い。型番・製造元・必要な電源（ここでは依存関係）が書いてあり、本体を分解しなくても読める。
+<br>ただし<b>崩れる点</b>: 銘板は本体に貼ってあるが、<code>dpkg -s</code> が読んでいるのは、入れたときに書き写した控えである。本体（ファイル）がその後どうなっていても、控えの内容は変わらない。</div>
+
+<h2 id="ledger">答えはどこから来るか — 台帳</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>dpkg -l</code> や <code>dpkg -s</code> の答えが、いつ書かれ、いつ消えるか。</div>
+<p><code>dpkg -l</code> も <code>dpkg -s</code> も <code>apt list --installed</code> も、ディスクを探し回って答えているのではない。パッケージを入れたときに dpkg が書いておいた記録を読んでいる。この記録を、この教材では<b>台帳</b>と呼ぶ。入れると台帳に行が増え、消すと減ることを確かめる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install labhello
+...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+$ dpkg -l labhello | tail -1
+ii  labhello       1.0          all          prints its own version
+$ sudo apt remove labhello
+...
+Do you want to continue? [Y/n] y
+...
+Removing labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+$ dpkg -l labhello
+dpkg-query: no packages found matching labhello</code></pre>
+<p><code>| tail -1</code> は最後の1行だけを見るため（パイプに渡すので <code>less</code> も開かない）。入れたら台帳に <code>ii</code> の行ができ、消したら行ごと無くなって「見つからない」に戻った。台帳は <code>/var/lib/dpkg/</code> の下にあるファイルで、書き換えるのは dpkg だけである。</p>
+<div class="scroll"><table>
+<tr><th>知りたいこと</th><th>コマンド</th><th>入っていないパッケージには</th></tr>
+<tr><td>入っているものの一覧</td><td><code>dpkg -l</code>（名前で絞るなら <code>dpkg -l '名前'</code>）・<code>apt list --installed</code></td><td>—</td></tr>
+<tr><td>入れられるものも含めた一覧</td><td><code>apt list 名前</code>（入っていれば <code>[installed]</code>）</td><td>答える</td></tr>
+<tr><td>1つの詳しい情報</td><td><code>dpkg -s 名前</code>・<code>apt show 名前</code></td><td><code>dpkg -s</code> は答えない。<code>apt show</code> は答える</td></tr>
+</table></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/practice/">演習02</a>は、入っているパッケージを並べ、1つずつ分類（<code>Section</code>）を確かめて、仕事に要らない遊びのパッケージだけを消す課題である。
+判定は dpkg の台帳を見て、分類が <code>games</code> のものが無くなり、ほかが入ったままかを確かめる。</div>
+<div class="quiz"><b>確認</b>
+<p><code>dpkg -l</code> の行頭が <code>ii</code> のパッケージは、どういう状態か。</p>
+<details><summary>答え</summary>
+<p>1文字目の <code>i</code> が「入れたい（Install）」、2文字目の <code>i</code> が「入っていて使える（Installed）」。ふつうに入っているパッケージは全部これになる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>apt list labhello</code> と打つと <code>labhello/lab 1.0 all</code> と出た。labhello は入っているか。確かめるにはどうするか。</p>
+<details><summary>答え</summary>
+<p>入っているとは限らない（実測では入っていなかった）。<code>apt list</code> は入れられるものも並べ、入っているものにだけ <code>[installed]</code> を付ける。
+入っているものだけを出すなら <code>apt list --installed</code>、または <code>dpkg -l labhello</code> で台帳に <code>ii</code> の行があるかを見る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>パッケージ foo が動くのに、先に入っていなければならない別のパッケージを調べたい。入っている foo について、<code>dpkg -s foo</code> のどの欄を見ればよいか。</p>
+<details><summary>答え</summary>
+<p><code>Depends</code> の欄（依存関係）。labsvc では <code>Depends: labsvc-common (&gt;= 1.0)</code> と出て、labsvc-common の 1.0 以上が要ると分かった。<code>apt show foo</code> にも同じ欄が出る。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>入っているものの一覧は <code>dpkg -l</code>（行頭 <code>ii</code> が入っているもの）と <code>apt list --installed</code>。<code>apt list</code> だけだと入れられるものも並ぶ</li><li>1つを詳しく見るのは <code>dpkg -s</code> と <code>apt show</code>。<code>Version</code>（版）・<code>Section</code>（分類）・<code>Depends</code>（依存関係）が読める。入っていないものに答えられるのは <code>apt show</code> だけ</li><li>これらの答えは、入れたときに dpkg が書く記録（台帳）から来ている。入れると行が書かれ、消すと消える</li><li><code>dpkg -l</code> は 80 桁の端末では <code>less</code> で開く（<code>q</code> で抜ける）。パイプに渡すと開かない</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-packages/theory/01-install">← 1. パッケージを入れて、使って、消す</a><a href="/linuc-packages/theory/03-files">次: 3. 入れたファイルがどこに置かれたかを調べる →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

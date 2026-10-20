@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3. 入れたファイルがどこに置かれたかを調べる — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="3" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第3章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>3. 入れたファイルがどこに置かれたかを調べる</h1>
+<p class="lead"><b>前の章までにやったこと</b>: パッケージを入れて、使って、消した（第1章）。入っているものを一覧と詳しい情報で調べ、その答えが台帳（入れたときに dpkg が書く記録）から来ていることを確かめた（第2章）。<b>この章でやること</b>: パッケージを入れたとき、ファイルが檻のどこに置かれたかを調べる。逆に、あるファイルがどのパッケージから来たかを調べる。最後に、入れる前のパッケージのファイルの中を見る。</p>
+<div class="badges"><span>前提: 第2章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.2（重要度1）</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>パッケージが置いたファイルを <code>dpkg -L</code> で並べ、<code>/usr/bin</code>・<code>/usr/share/doc</code>・<code>/usr/share/man</code>・<code>/etc</code> がそれぞれ何の置き場所かを言える</li><li>あるファイルを置いたパッケージを <code>dpkg -S</code> で引ける（コマンドなら、先に <code>which</code> で場所を出す）</li><li>.deb ファイルを入れずに取ってきて、<code>dpkg -c</code> で中身、<code>dpkg -I</code> で情報を読める</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: この章に出てこない置き場所（<code>/usr/lib</code>・<code>/var</code> など）の役目、man の索引のしくみ、.deb ファイルの中の細かい形式（中にさらに縮めたファイルが入っていること）。この章は「ファイルとパッケージを、どちら向きにも引ける」が1回できれば足りる。</div></div>
+
+<h2 id="which">コマンドの場所 — which</h2>
+<div class="sgoal"><b>この節で分かること</b>: 入れたコマンドのファイルが、どこに置かれたか。</div>
+<p>第1章と同じように labhello を入れる（出力は第1章と同じなので、途中を略す）。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install labhello
+...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+$ which labhello
+/usr/bin/labhello</code></pre>
+<p><code>which</code> は、コマンドの名前を受け取り、そのコマンドのファイルがどこにあるかを出す。シェルは、コマンドを探すディレクトリの並び（環境変数 <code>PATH</code>）を前から順に探していて、<code>which</code> はそれと同じ探し方をする。labhello は <code>/usr/bin</code> に置かれた。</p>
+
+<h2 id="listfiles">パッケージが置いたファイル — dpkg -L</h2>
+<div class="sgoal"><b>この節で分かること</b>: 1つのパッケージが置いたファイルの全部と、置き場所ごとの役目。</div>
+<p>置かれたのはコマンドのファイルだけではない。<code>dpkg -L</code>（listfiles）にパッケージの名前を渡すと、そのパッケージが置いたものを全部並べる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -L labhello
+/.
+/usr
+/usr/bin
+/usr/bin/labhello
+/usr/share
+/usr/share/doc
+/usr/share/doc/labhello
+/usr/share/doc/labhello/README
+/usr/share/man
+/usr/share/man/man1
+/usr/share/man/man1/labhello.1.gz</code></pre>
+<p>ファイルは3つで、残りの行はそれを入れておくディレクトリである（<code>/.</code> は一番上の <code>/</code> のこと）。置き場所には、それぞれ役目がある。</p>
+<div class="scroll"><table>
+<tr><th>置き場所</th><th>何のための場所か</th><th>labhello では</th></tr>
+<tr><td><code>/usr/bin</code></td><td>誰でも使うコマンドのファイル</td><td><code>labhello</code></td></tr>
+<tr><td><code>/usr/share/doc/パッケージ名</code></td><td>そのパッケージの説明書き（README など）</td><td><code>README</code></td></tr>
+<tr><td><code>/usr/share/man</code></td><td><code>man</code> コマンドで読む説明書。<code>man1</code> はコマンドの説明の区分で、<code>.gz</code> は縮めて置いてある印</td><td><code>labhello.1.gz</code></td></tr>
+<tr><td><code>/etc</code></td><td>設定ファイル（利用者や管理者が書き換えて、動きを変えるためのファイル）</td><td>無い</td></tr>
+</table></div>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ cat /usr/share/doc/labhello/README
+labhello 1.0 - 確かめて説明する LinuC 主題1.04 の練習用パッケージ
+自分の版を1行表示するだけのコマンドです。
+
+  labhello      → labhello 1.0 と表示する
+$ man -w labhello
+/usr/share/man/man1/labhello.1.gz</code></pre>
+<p><code>man -w</code> は、<code>man</code> が読むファイルの場所だけを出す。<code>man labhello</code> と打てば説明書が開く（<code>q</code> で閉じる）のは、パッケージがここに置いたからである。</p>
+<div class="analogy"><b>たとえ</b>: 新しく入った同僚の荷物の置き方に近い。仕事道具は共用の道具棚（<code>/usr/bin</code>）、取扱説明書は資料室（<code>/usr/share/doc</code>）、自分の設定の書き付けは設定の棚（<code>/etc</code>）に、決まった場所へ置く。だから誰でも、探す場所の見当が付く。
+<br>ただし<b>崩れる点</b>: 人の荷物なら、置いた本人に聞けば場所が分かるだけだが、パッケージの場合は台帳に1つずつ書いてあるので、<code>dpkg -L</code> で本人がいなくても全部引ける。逆に、台帳に書かずに置いた物は引けない。</div>
+
+<h2 id="search">ファイルからパッケージを引く — dpkg -S</h2>
+<div class="sgoal"><b>この節で分かること</b>: あるファイルが、どのパッケージから来たかを調べる方法。</div>
+<p>今度は逆向きに、ふだん使っている <code>ls</code> がどのパッケージから来たかを調べたい。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>labhello は、パッケージの名前とコマンドの名前が同じだった。<code>ls</code> も <code>ls</code> というパッケージに入っているはずだから、<code>dpkg -L ls</code> で分かるだろう。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -L ls
+dpkg-query: package 'ls' is not installed
+Use dpkg --contents (= dpkg-deb --contents) to list archive files contents.</code></pre>
+<div class="then"><b>だめな理由</b>: <code>ls</code> という名前のパッケージは入っていない（1行目）。パッケージの名前とコマンドの名前は、同じとは限らない。
+1つのパッケージがたくさんのコマンドをまとめて入れていることも多い。
+2行目は「.deb ファイルの中身を見るなら --contents を使え」という案内で、ここでは関係ない。
+コマンドから出発するなら、パッケージの名前ではなく、<b>ファイル</b>からパッケージを引く。</div></div>
+<p>まずファイルの場所を <code>which</code> で出し、そのファイルを <code>dpkg -S</code>（search）に渡す。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ which ls
+/usr/bin/ls
+$ dpkg -S /usr/bin/ls
+coreutils: /usr/bin/ls</code></pre>
+<p><code>ls</code> は <b>coreutils</b> というパッケージに入っていた。<code>ls</code>・<code>cp</code>・<code>mv</code> のような基本のコマンドをまとめたパッケージである。答えは「パッケージ名: パス」の形で出る。labhello でも、設定ファイルでも同じように引ける。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -S /usr/bin/labhello
+labhello: /usr/bin/labhello
+$ dpkg -S /etc/sudoers
+sudo: /etc/sudoers</code></pre>
+<p><code>/etc/sudoers</code> は、<code>sudo</code> が「誰に何を許すか」を読む設定ファイルで、<code>sudo</code> という名前のパッケージが置いたものだった。<code>sudo</code> パッケージが <code>/etc</code> に置いたものを、<code>dpkg -L</code> と <code>grep</code> で並べる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -L sudo | grep etc
+/etc
+/etc/pam.d
+/etc/pam.d/sudo
+/etc/pam.d/sudo-i
+/etc/sudo.conf
+/etc/sudo_logsrvd.conf
+/etc/sudoers
+/etc/sudoers.d
+/etc/sudoers.d/README</code></pre>
+<p>パッケージは、コマンドと一緒に、その設定ファイルを <code>/etc</code> に置く。設定ファイルの場所が分からないときは、こうしてパッケージから引ける。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>向き</th><th>渡すもの</th></tr>
+<tr><td><code>dpkg -L パッケージ名</code></td><td>パッケージ → それが置いたファイル</td><td>パッケージの名前</td></tr>
+<tr><td><code>dpkg -S ファイルのパス</code></td><td>ファイル → それを置いたパッケージ</td><td>ファイルのパス（<code>which</code> で出したもの など）</td></tr>
+</table></div>
+<p>どちらも台帳を読んでいる。台帳には、パッケージごとに「置いたファイルの一覧」が書いてあり、<code>-L</code> はそれを前から、<code>-S</code> は後ろから引いている。</p>
+<div class="analogy"><b>たとえ</b>: 図書館の貸出台帳に近い。「この人が借りている本」（<code>-L</code>）も、「この本を借りている人」（<code>-S</code>）も、同じ台帳を逆向きに引くだけで答えが出る。
+<br>ただし<b>崩れる点</b>: 本は1冊を1人しか借りられないが、ディレクトリは多くのパッケージが一緒に使う。<code>/usr/bin</code> のようなディレクトリを <code>dpkg -S</code> に渡すと、そこにファイルを置いたパッケージが何十も並ぶ。</div>
+
+<h2 id="deb">入れる前に中身を見る — .deb ファイル</h2>
+<div class="sgoal"><b>この節で分かること</b>: パッケージのファイル（.deb）に、何が入っているか。</div>
+<p>apt はリポジトリからパッケージのファイルを取ってきて入れていた（第1章の <code>Get:</code> の行）。<code>apt download</code> は、入れずにそのファイルだけを取ってきて、いまいるディレクトリに置く。まだ入っていない labapp を取ってくる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt download labapp
+Get:1 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
+$ ls -l
+total 8
+-rw-r--r-- 1 lab lab 1076 Oct 20 21:33 labapp_1.0_all.deb
+drwxr-xr-x 2 lab lab 4096 Sep 30 19:32 work</code></pre>
+<p><code>labapp_1.0_all.deb</code> が取れた（日時は、あなたが打った時刻になる。<code>work</code> は演習で使うディレクトリ）。ファイル名は「名前_版_アーキテクチャ.deb」の形で、<code>.deb</code> は Debian 系のパッケージのファイルの印である。<code>apt download</code> は root でなくても打てる。台帳も、ほかの誰かが使う場所も書き換えないからである。</p>
+<p>.deb ファイルの中身の一覧は <code>dpkg -c</code>（contents）で見る。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -c labapp_1.0_all.deb
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./etc/
+-rw-r--r-- root/root        93 2026-10-01 09:00 ./etc/labapp.conf
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/bin/
+-rwxr-xr-x root/root       188 2026-10-01 09:00 ./usr/bin/labapp
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/share/
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/share/doc/
+drwxr-xr-x root/root         0 2026-10-01 09:00 ./usr/share/doc/labapp/
+-rw-r--r-- root/root       128 2026-10-01 09:00 ./usr/share/doc/labapp/README</code></pre>
+<p><code>ls -l</code> と同じ形で、<code>/</code> から見たファイルの木が並ぶ。入れると、この木がそのまま <code>/etc/labapp.conf</code> や <code>/usr/bin/labapp</code> として置かれる。<code>root/root</code> は、置いたときの持ち主とグループである。.deb ファイルには、もう1つ、パッケージの情報が入っている。それを読むのが <code>dpkg -I</code>（info）である。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -I labapp_1.0_all.deb
+ new Debian package, version 2.0.
+ size 1076 bytes: control archive=347 bytes.
+      17 bytes,     1 lines      conffiles
+     292 bytes,    10 lines      control
+ Package: labapp
+ Version: 1.0
+ Section: utils
+ Priority: optional
+ Architecture: all
+ Depends: liblab (&gt;= 1.0)
+ Installed-Size: 68
+ Maintainer: check-then-explain &lt;lab@example.invalid&gt;
+ Description: sample application that needs liblab
+  Prints a greeting. The greeting is read from /etc/labapp.conf.</code></pre>
+<p>先頭の数行は情報の部分の大きさで、<code>control</code> が情報そのもの、<code>conffiles</code> が設定ファイルの印の一覧である。<code>Package:</code> から下が <code>control</code> の中身で、第2章の <code>dpkg -s</code> で見た欄と同じものが並ぶ。<code>Depends: liblab (&gt;= 1.0)</code> は、labapp を動かすには liblab の 1.0 以上が要る、という依存関係である。</p>
+<p>つまり .deb ファイルは、<b>中身（ファイルの木）</b>と<b>情報（名前・版・依存関係など）</b>の2つでできている。入れるときに、中身はディスクに置かれ、情報は台帳に写される。ファイルを取ってきただけなので、台帳にはまだ何も無い。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -l labapp
+dpkg-query: no packages found matching labapp</code></pre>
+<div class="analogy"><b>たとえ</b>: 送り状を同封した宅配の箱に近い。箱の中には品物（中身）と、品名・型番・「この部品と組み合わせて使うこと」と書いた紙（情報）が入っている。
+<br>ただし<b>崩れる点</b>: 本物の送り状は箱の外に貼ってあって開けずに読めるが、.deb の情報は箱の中にある。<code>dpkg -I</code> は、箱を開けて紙だけを取り出して読んでいる。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/practice/">演習03</a>は、labsvc というコマンドが読んでいる設定ファイルを、場所を教えられないまま見つけて書き換える課題である。
+コマンド → パッケージ → 置いたファイル、とたどる。判定は labsvc を実際に動かし、書き換わったのが設定ファイルだけかを台帳と照らし合わせて見る。</div>
+<div class="quiz"><b>確認</b>
+<p><code>/usr/bin/xyz</code> というファイルを、どのパッケージが置いたかを調べたい。<code>dpkg -L</code> と <code>dpkg -S</code> のどちらを使うか。</p>
+<details><summary>答え</summary>
+<p><code>dpkg -S /usr/bin/xyz</code>。<code>-S</code> はファイルからパッケージを引く。<code>-L</code> は向きが逆で、パッケージの名前を渡してファイルの一覧を出す。
+<code>dpkg -L ls</code> のようにコマンドの名前を渡しても、同じ名前のパッケージが無ければ「入っていない」と言われる（実測）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>まだ入れていない .deb ファイル foo.deb の中に、どんなファイルが入っているかを見るコマンドはどれか。<br>
+(a) <code>dpkg -L foo.deb</code>　(b) <code>dpkg -c foo.deb</code>　(c) <code>dpkg -S foo.deb</code>　(d) <code>dpkg -s foo.deb</code></p>
+<details><summary>答え</summary>
+<p>(b)。<code>-c</code> は .deb ファイルの中身の一覧を出す。(a)・(c)・(d) は台帳を読むもので、入っているパッケージの名前やファイルのパスを渡す。
+.deb ファイルの名前・版・依存関係を見るなら <code>dpkg -I foo.deb</code>。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>nginx_1.24.0-2ubuntu7_amd64.deb</code> というファイル名から、パッケージの名前・版・アーキテクチャを読み取れ。</p>
+<details><summary>答え</summary>
+<p>名前 <code>nginx</code>・版 <code>1.24.0-2ubuntu7</code>・アーキテクチャ <code>amd64</code>。.deb のファイル名は「名前_版_アーキテクチャ.deb」を <code>_</code> でつなぐ。
+どの CPU でも動くものは <code>all</code>（<code>labapp_1.0_all.deb</code> のように）になる。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>dpkg -L パッケージ名</code> で、そのパッケージが置いたファイルが全部分かる。コマンドは <code>/usr/bin</code>、説明書は <code>/usr/share/doc</code> と <code>/usr/share/man</code>、設定ファイルは <code>/etc</code></li><li><code>dpkg -S ファイルのパス</code> で、そのファイルを置いたパッケージが分かる。コマンドなら先に <code>which</code> で場所を出す。パッケージの名前はコマンドの名前と同じとは限らない（<code>ls</code> は coreutils）</li><li>.deb ファイルは中身（<code>dpkg -c</code>）と情報（<code>dpkg -I</code>）の2つでできている。<code>apt download</code> で、入れずに取ってこられる</li><li>入れると、中身はディスクに置かれ、情報は台帳に写される。<code>-L</code> と <code>-S</code> は、その台帳を前から・後ろから引いている</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / man-db 2.12.0 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-packages/theory/02-list">← 2. いま何が入っているかを調べる</a><a href="/linuc-packages/theory/04-ledger">次: 4. 台帳とファイルを見比べる →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

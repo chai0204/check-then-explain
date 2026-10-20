@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>8. パッケージを自分で作る — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="8" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第8章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>8. パッケージを自分で作る</h1>
+<p class="lead"><b>前の章までにやったこと</b>: パッケージをリポジトリから apt で入れ（第1・5・6章）、.deb ファイルから dpkg で入れ（第7章）、入っているもの・置かれたファイル・台帳を調べた（第2〜4章）。.deb ファイルが「中身」と「情報」でできていることも見た（第3章）。<b>この章でやること</b>: その .deb ファイルを自分で作る。中身と情報を並べて1つのファイルに固め、これまでの章の道具で中を確かめ、入れて、台帳に載ったことを確かめ、消す。パッケージを作ることは LinuC レベル1 の出題範囲には入っていないが、第1〜7章でやったことが1本につながる。</p>
+<div class="badges"><span>前提: 第7章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲の外（第1〜7章のまとめ）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>中身のファイルの木と <code>DEBIAN/control</code>（情報）を並べて、<code>dpkg-deb --build</code> で .deb ファイルを作れる</li><li>作った .deb ファイルを <code>dpkg -c</code>・<code>dpkg -I</code> で確かめ、<code>apt install ./</code> で入れ、台帳に載ったことを <code>dpkg -l</code>・<code>-L</code>・<code>-S</code> で示せる</li><li><code>--root-owner-group</code> を付ける理由を言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: パッケージを作る正式な道具（<code>dpkg-buildpackage</code> など）、<code>control</code> のこの章で使わない欄、設定ファイルの印（<code>conffiles</code>）の書き方、作ったパッケージをリポジトリに載せる方法。どれも LinuC レベル1 の出題範囲の外で、この章も試験には出ない。</div></div>
+
+<h2 id="tree">中身を並べる</h2>
+<div class="sgoal"><b>この節で分かること</b>: .deb ファイルの中身を、どんな形で用意するか。</div>
+<p>自分の版を1行出すだけのコマンド <code>myhello</code> をパッケージにする。まず、入れたあとに置きたい場所と同じ形のディレクトリの木を作る。ディレクトリ <code>myhello</code> が、入れる先の <code>/</code> にあたる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ mkdir -p myhello/usr/bin</code></pre>
+<p><code>mkdir -p</code> は、途中のディレクトリ（<code>myhello</code> と <code>myhello/usr</code>）もまとめて作る。うまくいくと何も出さない。次に、コマンドの中身のファイルを書く。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ cat &gt; myhello/usr/bin/myhello &lt;&lt;'END'
+&gt; #!/bin/sh
+&gt; echo "myhello 1.0: 自分で作ったパッケージから入りました"
+&gt; END</code></pre>
+<p><code>cat &gt; ファイル &lt;&lt;'END'</code> は、次の行から <code>END</code> だけの行までを、そのままファイルに書く書き方（ヒアドキュメント）である。2行目からは、続きの入力を待つ <code>&gt;</code> というプロンプトが出る。書いた中身の1行目 <code>#!/bin/sh</code> は「このファイルは sh（シェル）に読ませて動かす」という印で、2行目が実際に動く1行である。最後に、実行できるようにする。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ chmod 755 myhello/usr/bin/myhello</code></pre>
+<p><code>chmod 755</code> で、誰でも実行できるようにした（持ち主は読み書きと実行、ほかの人は読みと実行）。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>置きたいファイルを置き場所どおりに並べたのだから、あとはこの木を1つのファイルに固めれば .deb ファイルになるはずだ。固めるのは <code>dpkg-deb</code>（第4章で中身を取り出すのに使った、.deb ファイルを扱う道具）の <code>--build</code> である。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg-deb --build myhello
+dpkg-deb: error: failed to open package info file 'myhello/DEBIAN/control' for reading: No such file or directory</code></pre>
+<div class="then"><b>だめな理由</b>: <code>myhello/DEBIAN/control</code> が無いので開けない、と断られた。
+第3章で見たとおり、.deb ファイルは<b>中身（ファイルの木）</b>と<b>情報</b>の2つでできている。いま用意したのは中身だけで、名前も版も書いていない。
+情報は、木の一番上に <code>DEBIAN</code> というディレクトリを作り、その中の <code>control</code> というファイルに書く決まりである。</div></div>
+
+<h2 id="control">情報を書く — DEBIAN/control</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>control</code> に最低限書くことと、.deb ファイルの固め方。</div>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ mkdir myhello/DEBIAN
+$ cat &gt; myhello/DEBIAN/control &lt;&lt;'END'
+&gt; Package: myhello
+&gt; Version: 1.0
+&gt; Architecture: all
+&gt; Maintainer: lab &lt;lab@example.invalid&gt;
+&gt; Description: my first package
+&gt; END</code></pre>
+<div class="scroll"><table>
+<tr><th>欄</th><th>この例では</th><th>何のためにあるか</th></tr>
+<tr><td><code>Package</code></td><td><code>myhello</code></td><td>パッケージの名前。<code>apt install</code> や <code>dpkg -l</code> で使う名前になる</td></tr>
+<tr><td><code>Version</code></td><td><code>1.0</code></td><td>版。新しい版かどうかを比べるのに使う（第6章の upgrade）</td></tr>
+<tr><td><code>Architecture</code></td><td><code>all</code></td><td>どの CPU 向けか。シェルのスクリプトはどの CPU でも動くので <code>all</code></td></tr>
+<tr><td><code>Maintainer</code></td><td><code>lab &lt;lab@example.invalid&gt;</code></td><td>作って面倒を見る人（名前 &lt;メール&gt;）。不具合の知らせ先になる</td></tr>
+<tr><td><code>Description</code></td><td><code>my first package</code></td><td>説明。<code>dpkg -l</code> の右端や <code>apt show</code> に出る</td></tr>
+</table></div>
+<p>依存関係があるなら <code>Depends:</code> の行も書く（第3章で見た labapp の <code>control</code> の <code>Depends: liblab (&gt;= 1.0)</code> の形）。myhello は何も要らないので書かない。固める。<code>--build</code> の2つ目に置き場所のディレクトリ（ここでは <code>.</code> ＝いまいる所）を渡すと、<code>control</code> の名前・版・アーキテクチャから「名前_版_アーキテクチャ.deb」という名前で作る。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg-deb --build myhello .
+dpkg-deb: building package 'myhello' in './myhello_1.0_all.deb'.
+$ dpkg -c myhello_1.0_all.deb
+drwxr-xr-x lab/lab           0 2026-10-20 21:35 ./
+drwxr-xr-x lab/lab           0 2026-10-20 21:35 ./usr/
+drwxr-xr-x lab/lab           0 2026-10-20 21:35 ./usr/bin/
+-rwxr-xr-x lab/lab          85 2026-10-20 21:35 ./usr/bin/myhello</code></pre>
+<p>できた。ただ、第3章の labapp では <code>root/root</code> だったファイルの持ち主が、<code>lab/lab</code> になっている。dpkg-deb は、ふつう、ファイルをいまの持ち主（作業した lab）のまま詰める。このまま入れると、<code>/usr/bin/myhello</code> の持ち主が lab になり、一般ユーザがシステムのコマンドを書き換えられてしまう。持ち主を root にして詰めるのが <code>--root-owner-group</code> である。作り直して確かめる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg-deb --build --root-owner-group myhello .
+dpkg-deb: building package 'myhello' in './myhello_1.0_all.deb'.
+$ dpkg -c myhello_1.0_all.deb
+drwxr-xr-x root/root         0 2026-10-20 21:35 ./
+drwxr-xr-x root/root         0 2026-10-20 21:35 ./usr/
+drwxr-xr-x root/root         0 2026-10-20 21:35 ./usr/bin/
+-rwxr-xr-x root/root        85 2026-10-20 21:35 ./usr/bin/myhello
+$ dpkg -I myhello_1.0_all.deb
+ new Debian package, version 2.0.
+ size 610 bytes: control archive=201 bytes.
+     116 bytes,     5 lines      control
+ Package: myhello
+ Version: 1.0
+ Architecture: all
+ Maintainer: lab &lt;lab@example.invalid&gt;
+ Description: my first package</code></pre>
+<p>持ち主が <code>root/root</code> になった（<code>dpkg -c</code> の日時は、あなたが作った時刻になる。中に時刻が入るので、<code>dpkg -I</code> の先頭の大きさも、あなたの画面では数バイト違うことがある）。<code>dpkg -I</code> には、いま書いた <code>control</code> がそのまま入っている。</p>
+<div class="analogy"><b>たとえ</b>: 引っ越しの荷物を、新居の部屋割りどおりに自分で箱詰めし、送り状を書いて同封するのに近い。業者（dpkg）は、箱の中の並びのとおりに荷物を置き、送り状を台帳に写す。
+<br>ただし<b>崩れる点</b>: 人の業者なら「この荷物は台所ではなく寝室では？」と気づくことがあるが、dpkg は箱の中のパスをそのまま使う。間違った場所に詰めれば、間違った場所に置かれる。</div>
+<div class="analogy"><b>たとえ</b>: <code>--root-owner-group</code> は、荷物に付ける「持ち主」の札を、自分の名前から建物の管理人（root）の名前に書き換えて詰めることに近い。共用の棚（<code>/usr/bin</code>）に置くものは、管理人の物でなければならない。
+<br>ただし<b>崩れる点</b>: 札を書き換えても、荷物の中身や送り状は変わらない。変わるのは、置いたあとに誰が書き換えられるか（ファイルの持ち主とパーミッションの効き方）だけである。</div>
+
+<h2 id="install">入れて、台帳で確かめる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 自分で作ったパッケージも、入れれば台帳に載ること。</div>
+<p>第7章のとおり、apt にファイルとして渡す。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install ./myhello_1.0_all.deb
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Note, selecting 'myhello' instead of './myhello_1.0_all.deb'
+The following NEW packages will be installed:
+  myhello
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/610 B of archives.
+After this operation, 0 B of additional disk space will be used.
+Get:1 /home/lab/myhello_1.0_all.deb myhello all 1.0 [610 B]
+Selecting previously unselected package myhello.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack /home/lab/myhello_1.0_all.deb ...
+Unpacking myhello (1.0) ...
+Setting up myhello (1.0) ...
+N: Download is performed unsandboxed as root as file '/home/lab/myhello_1.0_all.deb' couldn't be accessed by user '_apt'. - pkgAcquire::Run (13: Permission denied)
+$ myhello
+myhello 1.0: 自分で作ったパッケージから入りました</code></pre>
+<p><code>Get:1 /home/lab/myhello_1.0_all.deb</code> は、リポジトリではなく手元のファイルから取ったという行である。最後の <code>N:</code> の行は失敗ではなく知らせ（Notice）で、「apt はファイルを読む作業を、権限を絞った専用の利用者 <code>_apt</code> にさせる決まりがあるが、<code>/home/lab</code> は lab しか入れないので、root のまま読んだ」と言っている。台帳を見る。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -l myhello | tail -1
+ii  myhello        1.0          all          my first package
+$ dpkg -L myhello
+/.
+/usr
+/usr/bin
+/usr/bin/myhello
+$ dpkg -S /usr/bin/myhello
+myhello: /usr/bin/myhello
+$ ls -l /usr/bin/myhello
+-rwxr-xr-x 1 root root 85 Oct 20 21:35 /usr/bin/myhello</code></pre>
+<p>自分で作ったパッケージも、ほかのパッケージと同じように台帳に載り、<code>dpkg -L</code>・<code>-S</code> で引ける。<code>/usr/bin/myhello</code> の持ち主は root である。消すのも同じである。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt remove myhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages will be REMOVED:
+  myhello
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
+After this operation, 0 B of additional disk space will be used.
+Do you want to continue? [Y/n] y
+(Reading database ... 12834 files and directories currently installed.)
+Removing myhello (1.0) ...
+$ dpkg -l myhello
+dpkg-query: no packages found matching myhello</code></pre>
+<div class="analogy"><b>たとえ</b>: 自分で書いた送り状の荷物でも、配送センター（apt）は同じように受け付けて、台帳に記録してくれる。
+<br>ただし<b>崩れる点</b>: 本物の配送なら差出人を確かめるが、<code>apt install ./ファイル</code> は手元のファイルを誰が作ったかを確かめない。出どころの分からない .deb ファイルを入れると、何が置かれても受け入れてしまう。</div>
+
+<h2 id="whole">第1〜8章が1つにつながる</h2>
+<div class="sgoal"><b>この節で分かること</b>: Debian 系のパッケージ管理の全体の形。</div>
+<p>自分で作ってみると、これまでの章に出てきたものが、どれも同じ形の一部だったことが分かる。</p>
+<pre class="wire"><code>.deb ファイル ＝ 中身（ファイルの木）＋ 情報（DEBIAN/control）      … 第3章・この章
+リポジトリ   ＝ 中身の置き場（pool/）＋ 目録（dists/ の Packages・Contents）  … 第6章
+apt          … 目録を読み、.deb を取ってきて dpkg に渡す（依存関係も解く）  … 第1・5・6章
+dpkg         … .deb を展開・設定し、台帳（/var/lib/dpkg/）に書く            … 第2・4・7章
+台帳とファイル … 別々にある。片方だけを変えると食い違い、dpkg -V で見つかる … 第4章</code></pre>
+<p>答えが食い違ったら、いま見ているのが「ファイル」「台帳」「目録」のどれかを確かめる。第9章からは、RPM 系の Linux で同じことをする。道具の名前は変わるが、この形は変わらない。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/practice/">演習08</a>は、配られたスクリプトを、依存関係（liblab）つきのパッケージ labmine に作って入れる課題である。
+判定は台帳で labmine の版・依存関係・ファイルの持ち主を見て、labmine を実際に動かす。</div>
+<div class="quiz"><b>確認</b>
+<p>ディレクトリ pkg を <code>dpkg-deb --build pkg</code> で .deb ファイルにしようとしたところ、<code>pkg/DEBIAN/control</code> が開けないと言われた。何が足りないか。</p>
+<details><summary>答え</summary>
+<p>パッケージの情報（<code>DEBIAN/control</code>）。.deb ファイルは中身（ファイルの木）と情報の2つでできていて、名前・版などを書いた <code>control</code> が無いと作れない（実測）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>--root-owner-group</code> を付けずに作った .deb ファイルを入れると、何が困るか。</p>
+<details><summary>答え</summary>
+<p>パッケージの中のファイルが、作った人（ここでは lab）の持ち物として詰められ、入れたあとも <code>/usr/bin</code> などのファイルの持ち主がその人になる。
+一般ユーザがシステムのコマンドを書き換えられる状態になる。<code>dpkg -c</code> で <code>root/root</code> になっているかを確かめてから入れる（実測で <code>lab/lab</code> から <code>root/root</code> に変わった）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>dpkg-deb --build --root-owner-group pkg .</code> で作られるファイルの名前は、何で決まるか。</p>
+<details><summary>答え</summary>
+<p><code>pkg/DEBIAN/control</code> の <code>Package</code>・<code>Version</code>・<code>Architecture</code>。「名前_版_アーキテクチャ.deb」になる（実測で <code>myhello_1.0_all.deb</code>）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>.deb ファイルは、置き場所どおりのファイルの木と、<code>DEBIAN/control</code>（<code>Package</code>・<code>Version</code>・<code>Architecture</code>・<code>Maintainer</code>・<code>Description</code>、要るなら <code>Depends</code>）を並べて <code>dpkg-deb --build</code> で作る</li><li><code>--root-owner-group</code> を付けて、中のファイルの持ち主を root にする。<code>dpkg -c</code> で確かめる</li><li>自分で作ったパッケージも、<code>apt install ./</code> で入れれば台帳に載り、<code>dpkg -l</code>・<code>-L</code>・<code>-S</code> で引け、<code>apt remove</code> で消せる</li><li>Debian 系のパッケージ管理は「.deb（中身＋情報）・リポジトリ（置き場＋目録）・apt・dpkg・台帳」の組み合わせでできている</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-packages/theory/07-deb-file">← 7. .deb ファイルを直接入れる</a><a href="/linuc-packages/theory/09-rpm">次: 9. RPM 系で同じことをする →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

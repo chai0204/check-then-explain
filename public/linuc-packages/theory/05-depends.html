@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5. 一緒に入るもの・残るもの — 確かめて説明する LinuC 主題1.04</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="5" data-theme="linuc-packages">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第5章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+</div>
+<h1>5. 一緒に入るもの・残るもの</h1>
+<p class="lead"><b>前の章までにやったこと</b>: 1つだけで動くパッケージ labhello を入れて・使って・消し（第1章）、入っているものとその置き場所を調べ（第2・3章）、台帳とファイルが別々にあることを確かめた（第4章）。<b>この章でやること</b>: ほかのパッケージが無いと動かないパッケージ labapp を入れて、一緒に何が入るかを見る。それから消して、何が消えて何が残るかを確かめ、残ったものを片付ける。</p>
+<div class="badges"><span>前提: 第4章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>apt install</code> が依存関係をたどって、頼んでいないパッケージも一緒に入れることを、出力から読める</li><li>依存関係を <code>apt-cache depends</code>（必要とするもの）と <code>apt-cache rdepends</code>（必要とされているもの）で調べられる</li><li><code>remove</code>・<code>purge</code>・<code>autoremove</code> が、それぞれ何を消して何を残すかを、台帳の記号（<code>ii</code>・<code>rc</code>）と <code>/etc</code> の設定ファイルで示せる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>Depends</code> 以外の関係（<code>Recommends</code>・<code>Conflicts</code> など）、印を手で付け替える方法（<code>apt-mark auto</code> / <code>manual</code>）、設定ファイルが書き換えられていたときの細かい扱い。この章は「一緒に入る・消しても残る・残りを片付ける」が1回できれば足りる。</div></div>
+
+<h2 id="depends">一緒に入るもの — 依存関係</h2>
+<div class="sgoal"><b>この節で分かること</b>: 依存関係のあるパッケージを入れると、apt が何をするか。</div>
+<p>第3章で .deb ファイルの情報を見たとき、labapp には <code>Depends: liblab (&gt;= 1.0)</code> と書いてあった。labapp は liblab が無いと動かない、という<b>依存関係</b>である。labapp を入れる。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install labapp
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following additional packages will be installed:
+  liblab
+The following NEW packages will be installed:
+  labapp liblab
+0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1822 B of archives.
+After this operation, 106 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+Get:2 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
+Selecting previously unselected package liblab.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Selecting previously unselected package labapp.
+Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
+Unpacking labapp (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labapp (1.0) ...</code></pre>
+<p>頼んだのは labapp だけだが、<code>The following additional packages will be installed: liblab</code>（次のものも追加で入れる）と出て、2つ入った。apt は labapp の依存関係を読んで、足りない liblab をリポジトリから一緒に取ってきた。頼んでいないものを入れるときは、第1章と違って <code>Do you want to continue? [Y/n]</code> と尋ねてくる。<code>Setting up</code> の順番も見てほしい。labapp を使える状態にする前に、先に liblab を整えている。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ labapp
+liblab: hello from labapp 1.0</code></pre>
+<p>行の頭の <code>liblab:</code> は、labapp が liblab の中の部品を使って挨拶を出している印である。</p>
+<p>依存関係は、入れる前にも調べられる。<code>apt-cache</code> は apt の兄弟のコマンドで、入れられるパッケージの一覧から情報を引くだけで、何も入れない（root も要らない）。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt-cache depends labapp
+labapp
+  Depends: liblab
+$ apt-cache rdepends liblab
+liblab
+Reverse Depends:
+  labapp</code></pre>
+<p><code>depends</code> は「これが必要とするもの」、<code>rdepends</code>（reverse depends）は「これを必要としているもの」で、同じ関係を前から読むか後ろから読むかの違いである。もう1つ、版ごとの依存関係と逆向きの依存関係をまとめて出す <code>showpkg</code> がある。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt-cache showpkg labapp
+Package: labapp
+Versions:
+1.0 (/var/lib/apt/lists/_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4) (/var/lib/dpkg/status)
+ Description Language:
+                 File: /var/lib/apt/lists/_srv_lab-repo_dists_lab_main_binary-amd64_Packages.lz4
+                  MD5:
+
+
+Reverse Depends:
+Dependencies:
+1.0 - liblab (2 1.0)
+Provides:
+1.0 -
+Reverse Provides:</code></pre>
+<p>行が多いが、見るのは2か所である。<code>Dependencies:</code> の <code>1.0 - liblab (2 1.0)</code> が「版 1.0 は liblab を必要とする」で、括弧の中の <code>2 1.0</code> は「1.0 以上」を番号で書いたもの（<code>2</code> が「以上」）。<code>Reverse Depends:</code> の下が空なのは、labapp を必要としているパッケージが無いからである。<code>Versions:</code> の行は、この版がどの一覧（リポジトリの一覧と台帳）に載っているかを示している。</p>
+<div class="analogy"><b>たとえ</b>: テレビを注文したら、配達の人がアンテナ線も一緒に持ってきて、先に線をつないでからテレビを置いてくれるのに近い。頼んだのはテレビだけでも、使うのに要るものは一緒に来る。
+<br>ただし<b>崩れる点</b>: 人の配達なら、テレビを引き取るときにアンテナ線も持って帰るか聞いてくれるが、apt はテレビ（labapp）だけを引き取り、線（liblab）は置いていく。それを次の節で確かめる。</div>
+
+<h2 id="auto">自動で入った印</h2>
+<div class="sgoal"><b>この節で分かること</b>: apt が、どれを利用者が頼み、どれを自分が足したかを覚えていること。</div>
+<p>第2章の <code>apt list --installed</code> で、labsvc-common に <code>automatic</code> の印が付いていた。liblab にも付いたかを、<code>apt-mark</code>（apt の「自動で入った・利用者が頼んだ」の印を見るコマンド）で見る。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt-mark showauto | grep lab
+labsvc-common
+labweb-data
+liblab
+$ apt-mark showmanual | grep lab
+labapp
+labbackup
+labfortune
+labsvc
+labweb</code></pre>
+<p><code>showauto</code> は自動で入ったもの、<code>showmanual</code> は利用者が名前を指定して入れたものを出す（どちらもほかのパッケージがたくさん並ぶので、<code>grep</code> で練習用だけにしぼった）。liblab は自動、labapp は手動である。この印は、dpkg の台帳ではなく、apt が別に持っている記録 <code>/var/lib/apt/extended_states</code> に書かれている。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ grep -A2 '^Package: liblab$' /var/lib/apt/extended_states
+Package: liblab
+Architecture: amd64
+Auto-Installed: 1</code></pre>
+<p><code>Auto-Installed: 1</code> が「自動で入った」の印である。次の節で、この印が効いてくる。</p>
+<div class="analogy"><b>たとえ</b>: 薬局が、医者の出した薬と、その薬のために一緒に出した胃薬を、分けて控えておくのに近い。控えがあれば、元の薬をやめたときに「この胃薬ももう要らない」と後で判断できる。
+<br>ただし<b>崩れる点</b>: 薬なら、どちらが付き添いかは処方箋そのものに書いてあるが、この印はパッケージにも dpkg の台帳にも書かれていない。apt が別に持っている記録（<code>/var/lib/apt/extended_states</code>）にだけある。</div>
+
+<h2 id="remove">消す — remove のあとに残るもの</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>apt remove</code> が何を消し、何を残すか。</div>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>第1章のとおり <code>apt remove</code> で消せば、labapp は跡形なく消える。設定ファイルも、一緒に入ってきた liblab も、まとめて片付くはずだ。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt remove labapp
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following package was automatically installed and is no longer required:
+  liblab
+Use 'sudo apt autoremove' to remove it.
+The following packages will be REMOVED:
+  labapp
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
+After this operation, 69.6 kB disk space will be freed.
+Do you want to continue? [Y/n] y
+(Reading database ... 12839 files and directories currently installed.)
+Removing labapp (1.0) ...
+$ dpkg -l labapp | tail -1
+rc  labapp         1.0          all          sample application that needs liblab
+$ ls -l /etc/labapp.conf
+-rw-r--r-- 1 root root 93 Oct  1 09:00 /etc/labapp.conf
+$ dpkg -l liblab | tail -1
+ii  liblab         1.0          all          small shell library for lab programs</code></pre>
+<div class="then"><b>だめな理由</b>: 3つ残っている。台帳の labapp の行（<code>rc</code>）、設定ファイル <code>/etc/labapp.conf</code>、そして liblab（<code>ii</code>）である。
+<code>rc</code> の1文字目 <code>r</code> は「消したい（Remove）」、2文字目 <code>c</code> は「設定ファイルだけ残っている（Conf-files）」。
+<code>/etc/labapp.conf</code> は、パッケージを作った人が「利用者が書き換える設定ファイル」として印を付けたファイル（<b>conffile</b>。第2章の <code>dpkg -s</code> の <code>Conffiles:</code> 欄）なので、<code>remove</code> は残す。入れ直したときに、書き換えた設定が戻ってくるようにするためである。
+liblab については、apt 自身が出力の中で「自動で入ったもので、もう要らない。<code>sudo apt autoremove</code> で消せる」と教えている。</div></div>
+<p>台帳の行が残っているので、<code>dpkg -s</code> にも答えがある（<code>head -2</code> は、受け取った行の先頭の2行だけを出す）。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -s labapp | head -2
+Package: labapp
+Status: deinstall ok config-files</code></pre>
+<p><code>deinstall ok config-files</code> は「消したい・問題なし・設定ファイルだけ」で、<code>rc</code> と同じ意味である。</p>
+
+<h2 id="purge">設定ファイルごと消す — purge</h2>
+<div class="sgoal"><b>この節で分かること</b>: 残った設定ファイルと台帳の行を消す方法。</div>
+<p>設定ファイルまで消すのが <code>purge</code> である。すでに <code>rc</code> になったものにも使える。</p>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt purge labapp
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following package was automatically installed and is no longer required:
+  liblab
+Use 'sudo apt autoremove' to remove it.
+The following packages will be REMOVED:
+  labapp*
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
+After this operation, 0 B of additional disk space will be used.
+Do you want to continue? [Y/n] y
+(Reading database ... 12836 files and directories currently installed.)
+Purging configuration files for labapp (1.0) ...
+$ dpkg -l labapp
+dpkg-query: no packages found matching labapp
+$ ls -l /etc/labapp.conf
+ls: cannot access '/etc/labapp.conf': No such file or directory</code></pre>
+<p><code>labapp*</code> の <code>*</code> が「設定ファイルも消す」の印で、<code>Purging configuration files</code>（設定ファイルを消している）と出た。台帳の行も、設定ファイルも無くなった。</p>
+
+<h2 id="autoremove">自動で入ったものを片付ける — autoremove</h2>
+<div class="sgoal"><b>この節で分かること</b>: もう誰にも必要とされていない依存を消す方法。</div>
+<pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt autoremove
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages will be REMOVED:
+  liblab
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
+After this operation, 36.9 kB disk space will be freed.
+Do you want to continue? [Y/n] y
+(Reading database ... 12835 files and directories currently installed.)
+Removing liblab (1.0) ...
+$ dpkg -l liblab
+dpkg-query: no packages found matching liblab</code></pre>
+<p>名前を渡さない <code>autoremove</code> は、「自動で入った印があり、もう誰にも必要とされていないもの」を apt が自分で探して消す。前の節の印が、ここで使われた。liblab には設定ファイルが無いので、<code>rc</code> も残さず台帳から行ごと消えた。<b><code>remove</code> で <code>rc</code> が残るのは、設定ファイル（conffile）を持つパッケージだけ</b>である。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>何のためにあるか</th><th>中身</th><th>設定ファイル（conffile）</th><th>台帳の行</th><th>自動で入った依存</th></tr>
+<tr><td><code>apt remove 名前</code></td><td>設定は残して、また入れたときに戻したい</td><td>消える</td><td><b>残る</b></td><td><code>rc</code> で残る（conffile が無ければ行ごと消える）</td><td>残る</td></tr>
+<tr><td><code>apt purge 名前</code>（= <code>apt remove --purge 名前</code>）</td><td>設定も含めて、跡形なく消したい</td><td>消える</td><td>消える</td><td>消える</td><td>残る</td></tr>
+<tr><td><code>apt autoremove</code></td><td>もう誰にも要らなくなった依存を片付けたい</td><td colspan="4">自動で入った印があって、誰にも必要とされていないものを消す</td></tr>
+</table></div>
+<p><code>apt-get</code>（apt より前からある、ほぼ同じ働きのコマンド）にも、同じ名前の <code>remove</code>・<code>purge</code>・<code>autoremove</code> がある。</p>
+<div class="analogy"><b>たとえ</b>: 賃貸の部屋を引き払うときに近い。<code>remove</code> は家具を運び出すだけで、自分で替えたカーテン（設定ファイル）と、管理会社の名簿の名前（<code>rc</code> の行）は残る。<code>purge</code> はカーテンも外して名簿からも消す。<code>autoremove</code> は、引っ越しのときに一緒に借りたトランクルームを、使う人がいなくなったので返す作業である。
+<br>ただし<b>崩れる点</b>: 実際の退去は元に戻して返すのが決まりだが、apt は<b>残すのが既定</b>である。設定まで消すには、利用者が <code>purge</code> と言わなければならない。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-packages/practice/">演習05</a>は、最初から入っている labweb を、設定ファイルも、一緒に入った labweb-data も残さずに消す課題である。
+labweb-data は名前を打たずに消す。判定は dpkg の台帳（<code>rc</code> が残っていないか）と、<code>/etc/labweb.conf</code> の有無を見る。</div>
+<div class="quiz"><b>確認</b>
+<p>入っているパッケージを、設定ファイルも含めて削除するコマンドとして正しいものを2つ選べ。<br>
+(a) <code>apt-get remove pkg</code>　(b) <code>apt-get purge pkg</code>　(c) <code>apt-get autoremove</code>　(d) <code>apt-get remove --purge pkg</code></p>
+<details><summary>答え</summary>
+<p>(b) と (d)。(a) は設定ファイルを残し、台帳に <code>rc</code> が残る（実測）。
+(c) は自動で入って要らなくなった依存を消すもので、pkg 自身の設定ファイルは消さない。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>dpkg -l</code> の結果で、行頭が <code>rc</code> のパッケージがあった。どういう状態で、完全に消すにはどうするか。</p>
+<details><summary>答え</summary>
+<p>削除されたが、設定ファイルだけが残っている状態（Remove / Conf-files）。<code>sudo apt purge パッケージ名</code> で設定ファイルごと消すと、台帳の行も消える（実測）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>labapp を <code>apt remove</code> したあと、liblab が残っていた。なぜ残ったのか。名前を指定せずに片付けるにはどうするか。</p>
+<details><summary>答え</summary>
+<p>liblab は labapp の依存関係で自動で入ったものだが、<code>remove</code> は名指しされた labapp しか消さないから。
+<code>sudo apt autoremove</code> で、自動で入った印があって誰にも必要とされていないものを、apt が探して消す（実測で liblab が消えた）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>apt install</code> は依存関係（<code>Depends</code>）を読んで、足りないものも一緒に入れる（<code>additional packages</code>）。そのときは <code>[Y/n]</code> と尋ねる</li><li>依存関係は <code>apt-cache depends</code>（必要とするもの）・<code>rdepends</code>（必要とされているもの）・<code>showpkg</code>（版ごとの依存と逆向きをまとめて）で、入れる前にも調べられる</li><li>apt は自動で入れたものに印を付ける（<code>apt-mark showauto</code>。記録は <code>/var/lib/apt/extended_states</code>）</li><li><code>remove</code> は設定ファイル（conffile）を残して台帳に <code>rc</code>、<code>purge</code> は設定ファイルも台帳の行も消す、<code>autoremove</code> は誰にも要らなくなった自動の依存を消す</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-packages/theory/04-ledger">← 4. 台帳とファイルを見比べる</a><a href="/linuc-packages/theory/06-repository">次: 6. パッケージはどこから来るか →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-packages/chapters.js"></script>
+<script src="/linuc-packages/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>
