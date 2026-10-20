@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """LinuC 主題1.04: 本文の端末ブロックを、端末つきの記録（probe/linuc-packages-seq.py）と本文の順に突き合わせる。
 
-  python3 -I probe/linuc-packages-seqcompare.py [--dir logs] [--show]
+  python3 -I probe/linuc-packages-seqcompare.py [--dir logs] [--chapters 1,2] [--show]
 
 本文の「$ コマンド＋直後の出力」の組を檻ごと（Debian 系 / RPM 系）に本文の順に並べ、端末つきの記録
 （logs/linuc-packages-deb-tty.log / -rpm-tty.log）の項目と順に組にする（記録は本文から機械的に作った入力で
@@ -11,10 +11,14 @@
   2. 記録の出力に、本文に無い行が残っていない。本文に省略の印（"..." / "…"）が無い組は、出力が行ごとに全部
      同じであること。印がある組は、印で区切った塊がそれぞれ記録の中でひと続きに現れ、最初の塊は出力の
      先頭から、最後の塊は出力の末尾まで（印で始まる・終わる場合を除く）であること。
-  3. 記録で「プロンプトに戻らなかった」組（読者の端末ではページャなどで止まって見える）は、それだけで違い。
+  3. 記録で「プロンプトに戻らなかった」組（読者の端末では止まって見える）や、問いが出なかった組は、それだけで違い。
 
-毎回変わる値は伏せて比べる: 日時（ls -l・dpkg-deb -c・date の形）、dnf の「Last metadata expiration check」の
+毎回変わる値は伏せて比べる: 日時（ls -l・dpkg -c・date の形）、dnf の「Last metadata expiration check」の
 経過時間、ダウンロードの速さ、apt の「Fetched … (速さ)」、rpm の Install Date。
+dnf がそのコマンドの中で目録を取ってきた（速さの行がある）ときは、「Last metadata expiration check」の行は
+出たり出なかったりする（取ってきてから 1 秒たったかどうかで決まる。dnf/base.py の age != 0 の条件。
+2026-10-20 に同じ手順で両方を実測）。そのときに限り、この行は本文・記録のどちらにあっても違いに数えない。
+--chapters を付けると、その章だけを突き合わせる（記録もその章だけを取ったときに使う）。
 --show を付けると、違った組の記録の出力を全部出す（本文を直すときに使う）。
 """
 import argparse, html, re, sys
@@ -22,8 +26,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 THEORY = REPO / "public" / "linuc-packages" / "theory"
-DEFAULT_CAGE = {1: "deb", 2: "deb", 3: "deb", 4: "deb", 5: "rpm", 6: "rpm", 7: "rpm"}
-SRC = ("probe", "extra", "exam")
+CAGE_OF = lambda n: "deb" if n <= 8 else "rpm"
 MON = r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
 DOW = r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)"
 
@@ -45,24 +48,26 @@ def mask(cmd, line):
     return line
 
 
-def page_groups():
+def page_groups(chapters=None):
     groups = []
-    for f in sorted(THEORY.glob("0[1-7]-*.html")):
+    for f in sorted(THEORY.glob("[01][0-9]-*.html")):
         n = int(f.name[:2])
+        if chapters and n not in chapters:
+            continue
         s = f.read_text(encoding="utf-8")
         for m in re.finditer(r"<pre\b([^>]*)><code>([\s\S]*?)</code></pre>", s):
             lines = html.unescape(re.sub(r"<[^>]+>", "", m.group(2))).split("\n")
             if not any(l.startswith("$ ") for l in lines):
                 continue
             mc = re.search(r'data-cage="(deb|rpm)"', m.group(1))
-            cage = mc.group(1) if mc else DEFAULT_CAGE[n]
+            cage = mc.group(1) if mc else CAGE_OF(n)
             cur = None
             for raw in lines:
                 l = dropnote(raw)
                 if l.startswith("$ "):
                     cur = {"page": f.name, "cage": cage, "cmd": l[2:], "outs": [], "elide": []}
                     groups.append(cur)
-                elif cur is None or l.startswith("> "):
+                elif cur is None or l.startswith("> ") or l == ">":
                     continue
                 elif l.strip() in ("...", "…"):
                     cur["elide"].append(len(cur["outs"]))
@@ -71,7 +76,7 @@ def page_groups():
     return groups
 
 
-def log_entries(path, raw_too=False):
+def log_entries(path):
     entries = []
     for raw in path.read_text(encoding="utf-8").split("\n"):
         if HEAD.match(raw.strip()):
@@ -83,8 +88,10 @@ def log_entries(path, raw_too=False):
         if not entries or entries[-1] is None:
             continue
         l = raw.strip()
-        if "プロンプトに戻らなかった" in l:
+        if "プロンプトに戻らなかった" in l or "が出なかった" in l:
             entries[-1]["stuck"] = True
+        if raw.startswith("> ") and not entries[-1]["outs"]:
+            continue                      # 続きの行のこだま
         if l:
             entries[-1]["raw"].append(raw.rstrip())
         if l and not skip(l):
@@ -128,19 +135,16 @@ def subseq(need, hay):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", default=str(REPO / "logs"))
+    ap.add_argument("--chapters", default="")
     ap.add_argument("--show", action="store_true")
     a = ap.parse_args()
-    recorded = {}
-    for cage in ("deb", "rpm"):
-        for k in SRC:
-            p = REPO / "logs" / f"linuc-packages-{cage}-{k}.log"
-            if p.exists():
-                for e in log_entries(p):
-                    recorded.setdefault(q(e["cmd"].strip()), []).append(e["outs"])
-    groups = page_groups()
+    chapters = {int(x) for x in a.chapters.split(",") if x.strip()} or None
+    groups = page_groups(chapters)
     total = 0
     for cage in ("deb", "rpm"):
         gs = [g for g in groups if g["cage"] == cage]
+        if chapters and not gs:
+            continue
         p = Path(a.dir) / f"linuc-packages-{cage}-tty.log"
         entries = log_entries(p)
         print(f"── {p.relative_to(REPO) if p.is_relative_to(REPO) else p}")
@@ -153,15 +157,21 @@ def main():
                 print(f"✗ {g['page']}: {k+1} 番目の組のコマンドが違う（本文 {g['cmd']!r} / 記録 {e['cmd']!r}）。ここで打ち切る")
                 bad += 1
                 break
-            P, S = g["outs"], e["outs"]
+            P, S, elide = g["outs"], e["outs"], g["elide"]
+            if any(l.endswith(" SPEED") for l in S):     # 目録を取ってきたコマンド: Last metadata の行は出たり出なかったりする
+                lm = "Last metadata expiration check: TIME"
+                keep = [i for i, l in enumerate(P) if l != lm]
+                elide = [sum(1 for i in keep if i < c) for c in elide]   # 省略の印の位置を、抜いたあとの行番号に直す
+                P = [P[i] for i in keep]
+                S = [l for l in S if l != lm]
             why = None
             if e.get("stuck"):
-                why = "プロンプトに戻らなかった（読者の端末では止まって見える）"
+                why = "プロンプトに戻らなかった・問いが出なかった（読者の端末では止まって見える）"
             else:
                 n = subseq(P, S)
                 if n != len(P):
                     why = f"本文の {n+1} 行目が記録に無い（または順が違う）: 「{P[n]}」"
-                elif P != S and not (g["elide"] and excerpt_ok(P, g["elide"], S)):
+                elif P != S and not (elide and excerpt_ok(P, elide, S)):
                     extra = [l for l in S if l not in P]
                     why = "記録の出力に、本文に無い行がある: " + " / ".join(extra[:6]) + (" …" if len(extra) > 6 else "")
             if why:
@@ -171,9 +181,6 @@ def main():
                 if a.show:
                     for l in e["raw"]:
                         print("    | " + l)
-                cands = recorded.get(q(g["cmd"].strip()), [])
-                if not a.show and any(o == S for o in cands):
-                    print("    （同じ出力が本文のもとの記録にもある。本文の側で行を落としていないか確かめる）")
         print(f"組 {len(gs)} 個を突き合わせた。違い {bad} 件")
         total += bad
     sys.exit(1 if total else 0)

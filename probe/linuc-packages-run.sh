@@ -1,85 +1,60 @@
 #!/bin/bash
-# LinuC 主題1.04 の記録を取り直す（母艦で走らせる）。
-# 章ごとに檻を起動し直し、その中で probe を lab ユーザとして走らせる。
+# LinuC 主題1.04 の記録を取り直す（母艦で走らせる）。2026-10-20 の作り直し（1.1.0）からの形。
 #
-#   bash probe/linuc-packages-run.sh probe          → logs/linuc-packages-deb-probe.log と -rpm-probe.log
-#   bash probe/linuc-packages-run.sh solve          → logs/linuc-packages-deb-solve-all.log と -rpm-solve-all.log
-#   bash probe/linuc-packages-run.sh extra          → logs/linuc-packages-deb-extra.log と -rpm-extra.log（事実確認の後で足した記録）
-#   bash probe/linuc-packages-run.sh exam           → logs/linuc-packages-deb-exam.log と -rpm-exam.log（公式例題の監査の後で足した記録）
-#   bash probe/linuc-packages-run.sh tty            → logs/linuc-packages-deb-tty.log と -rpm-tty.log（読者と同じ端末で本文の $ 行を
-#                                                     章ごとに打った記録）を取り、本文の組と突き合わせる（probe/linuc-packages-seq.py）
-#   bash probe/linuc-packages-run.sh one deb ch2    → 1節だけ標準出力へ（作業中の確認用）
+#   bash probe/linuc-packages-run.sh tty     → 本文の $ 行を、読者と同じ端末（80 桁 × 24 行・端末つきの対話シェル）で
+#                                              章ごとに起動し直した檻に打った記録 logs/linuc-packages-{deb,rpm}-tty.log を取り、
+#                                              本文の組と突き合わせる（probe/linuc-packages-seq.py・-seqcompare.py）。本文の出力の正本
+#   bash probe/linuc-packages-run.sh probe   → 本文が画面を載せずに言い切っていること（表・確認問題の答え・たとえの崩れる点・
+#                                              演習のヒントと解答のコマンド）を、同じ打ち方で確かめる → logs/linuc-packages-{deb,rpm}-probe.log
+#                                              （「ふつうこう考える」で詰まったやり方は、本文の順の記録 tty の各章にある）
+#   bash probe/linuc-packages-run.sh extra   → 課題文の「いまの状態」の画面（lab start NN のあとに課題文のコマンドを打つ）
+#                                              → logs/linuc-packages-{deb,rpm}-extra.log
+#   bash probe/linuc-packages-run.sh exam    → 本文の表と説明が拠っている man・--help の記述 → logs/linuc-packages-{deb,rpm}-exam.log
+#   bash probe/linuc-packages-run.sh solve   → 演習を模範解答どおりに通す（未達で ✗、解答どおりで ✔）
+#                                              → logs/linuc-packages-{deb,rpm}-solve-all.log
+#   bash probe/linuc-packages-run.sh one deb|rpm 入力.txt   → 入力ファイルを1回打って標準出力へ（作業中の確認用）
 #
-# 読者の起動コマンド（本文に書いたもの）との違いは2つだけ:
+# 端末つきの記録（tty・probe・extra・exam）は読者と同じ起動（docker run --rm -it --hostname linuc、名前の無いボリューム2つ）。
+# solve だけは、判定の出力を見るためのもので、docker exec で lab ユーザのシェルを開いて流す（端末なし）。
+#   読者の起動コマンドとの違いは2つだけ:
 #   - -it の代わりに -d と sleep infinity。シェルは docker exec で lab として開く
-#   - 名前付きボリュームの代わりに無名ボリューム。マウント先は同じ（/home/lab/work と /home/lab/.lab）。
-#     空のボリュームに中身と所有者が写される動きは名前付きと同じで、docker rm -v で一緒に片付く
-# --hostname linuc は読者と同じに付ける（出力に出るホスト名を揃えるため）。
+#   - 名前付きボリュームの代わりに無名ボリューム。マウント先は同じ（/home/lab/work と /home/lab/.lab）
 set -u
 cd /home/shun/learning-labs || exit 1
-DEB=lab-linuc-packages-deb:1.0.1
-RPM=lab-linuc-packages-rpm:1.0.1
+DEB=lab-linuc-packages-deb:1.1.0
+RPM=lab-linuc-packages-rpm:1.1.0
+SEQ="python3 -I probe/linuc-packages-seq.py"
 
-one() {  # one <image> <script> <section>
-  local image="$1" script="$2" section="$3"
-  local name="linuc-packages-probe-$section"
+one_exec() {  # one_exec <image> <script> <arg>
+  local image="$1" script="$2" arg="$3"
+  local name="linuc-packages-solve-${arg}"
   docker rm -fv "$name" >/dev/null 2>&1
   docker run -d --name "$name" --hostname linuc \
     -v /home/lab/work -v /home/lab/.lab "$image" sleep infinity >/dev/null || return 1
-  docker cp "$script" "$name:/tmp/probe.sh" >/dev/null
-  docker exec -u lab -w /home/lab "$name" bash /tmp/probe.sh "$section"
+  docker cp "$script" "$name:/tmp/solve.sh" >/dev/null
+  docker exec -u lab -w /home/lab "$name" bash /tmp/solve.sh "$arg"
   docker rm -fv "$name" >/dev/null
 }
 
 case "${1:-}" in
-  probe)
-    # 檻ごとに1本のログにまとめる。節ごとに檻を起動し直すので、節の見出しで区切って読む。
-    #   bash probe/linuc-packages-run.sh probe         両方の檻
-    #   bash probe/linuc-packages-run.sh probe rpm     片方だけ（もう片方のログの時刻を動かさない）
-    if [ "${2:-deb}" = deb ] || [ -z "${2:-}" ]; then
-      { for s in env ch1 ch2 ch3 ch4; do one "$DEB" probe/linuc-packages-deb-probe.sh "$s"; done; } \
-        > logs/linuc-packages-deb-probe.log 2>&1
-    fi
-    if [ "${2:-rpm}" = rpm ] || [ -z "${2:-}" ]; then
-      { for s in env ch1 ch5 ch6 ch7; do one "$RPM" probe/linuc-packages-rpm-probe.sh "$s"; done; } \
-        > logs/linuc-packages-rpm-probe.log 2>&1
-    fi
-    ;;
-  extra)
-    # 事実確認（2026-10-13）を受けて足した記録（本文の端末表示の一部はここから引く）。
-    { for s in x-upgrade x-autoremove x-root x-aptcmds x-un x-pending x-depends x-docs; do
-        one "$DEB" probe/linuc-packages-deb-extra.sh "$s"; done; } > logs/linuc-packages-deb-extra.log 2>&1
-    { for s in x-qp x-repoquery x-rpmsave; do
-        one "$RPM" probe/linuc-packages-rpm-extra.sh "$s"; done; } > logs/linuc-packages-rpm-extra.log 2>&1
-    ;;
-  exam)
-    # 公式例題（linuc.org/study/samples）の監査（2026-10-13）を受けて足した記録。
-    #   bash probe/linuc-packages-run.sh exam          両方の檻
-    #   bash probe/linuc-packages-run.sh exam deb      片方だけ（もう片方のログの時刻を動かさない）
-    if [ "${2:-deb}" = deb ]; then
-      { for s in e-showpkg; do
-          one "$DEB" probe/linuc-packages-deb-exam.sh "$s"; done; } > logs/linuc-packages-deb-exam.log 2>&1
-    fi
-    if [ "${2:-rpm}" = rpm ]; then
-      { for s in e-installed e-autoremove e-update; do
-          one "$RPM" probe/linuc-packages-rpm-exam.sh "$s"; done; } > logs/linuc-packages-rpm-exam.log 2>&1
-    fi
-    ;;
   tty)
-    # 上の記録は docker exec で端末なしに取った。読者は docker run -it の端末で打つので、端末の有無で変わる
-    # 出力（apt の WARNING・進み具合、ls の段組み、dpkg -l のページャ）を、端末つきで打ち直して確かめる（2026-10-13）
-    python3 -I probe/linuc-packages-seq.py && python3 -I probe/linuc-packages-seqcompare.py
+    $SEQ && python3 -I probe/linuc-packages-seqcompare.py
+    ;;
+  probe|extra|exam)
+    # 入力は probe/linuc-packages-{deb,rpm}-<種類>.sh の中のヒアドキュメント（スクリプトが seq.py を呼ぶ）
+    for cage in deb rpm; do
+      bash "probe/linuc-packages-${cage}-$1.sh"
+    done
     ;;
   solve)
-    one "$DEB" probe/linuc-packages-deb-solve-all.sh all > logs/linuc-packages-deb-solve-all.log 2>&1
-    one "$RPM" probe/linuc-packages-rpm-solve-all.sh all > logs/linuc-packages-rpm-solve-all.log 2>&1
+    one_exec "$DEB" probe/linuc-packages-deb-solve-all.sh deb > logs/linuc-packages-deb-solve-all.log 2>&1
+    one_exec "$RPM" probe/linuc-packages-rpm-solve-all.sh rpm > logs/linuc-packages-rpm-solve-all.log 2>&1
     ;;
   one)
     case "${2:-}" in
-      deb) one "$DEB" "probe/linuc-packages-deb-${4:-probe}.sh" "$3" ;;
-      rpm) one "$RPM" "probe/linuc-packages-rpm-${4:-probe}.sh" "$3" ;;
-      *) echo "使い方: bash probe/linuc-packages-run.sh one deb|rpm <節> [probe|solve-all|extra|exam]" >&2; exit 2 ;;
+      deb|rpm) $SEQ --script "$3" --cage "$2" --out /dev/stdout ;;
+      *) echo "使い方: bash probe/linuc-packages-run.sh one deb|rpm 入力.txt" >&2; exit 2 ;;
     esac
     ;;
-  *) echo "使い方: bash probe/linuc-packages-run.sh probe|solve|extra|exam|tty|one" >&2; exit 2 ;;
+  *) echo "使い方: bash probe/linuc-packages-run.sh tty|probe|extra|exam|solve|one" >&2; exit 2 ;;
 esac

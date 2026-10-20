@@ -1,23 +1,33 @@
 #!/bin/bash
-# LinuC 主題1.04 Debian 系の檻の追加記録（2026-10-13。公式例題 linuc.org/study/samples の監査を受けて足したもの）。
-# 記録は lab-linuc-packages-deb:1.0.1 で取る。本文に足した端末表示はここから引く。
-# 節ごとに檻を起動し直して打つ（probe/linuc-packages-run.sh exam）。
-#   bash /tmp/probe.sh e-showpkg
-set -u
-R() { printf '\n$ %s\n' "$*"; eval "$@" 2>&1; }
-S() { printf '\n\n========== %s ==========\n' "$*"; }
-
-case "${1:-}" in
-  e-showpkg)
-    S "e-showpkg. 依存を出すのは depends と showpkg。showpkg は版・逆向きの依存・依存をまとめて出す（例題 4932）"
-    R "apt-cache show labapp | grep '^Depends'"
-    R 'apt-cache depends labapp'
-    R 'apt-cache showpkg labapp'
-    R 'apt-cache rdepends liblab'
-    R 'apt-cache showpkg liblab'
-    # MANWIDTH=80 は折り返しの幅を固定するため（端末の幅で行の切れ目が変わらないように）
-    # 見出しの行（showpkg pkg... で終わる行）から次の見出し stats まで。書式（SYNOPSIS）の行は拾わない
-    R 'MANWIDTH=80 man apt-cache | sed -n "/^ *showpkg pkg\.\.\.$/,/^ *stats$/p"'
-    ;;
-  *) echo "使い方: bash probe.sh e-showpkg" >&2; exit 2 ;;
-esac
+# LinuC 主題1.04 Debian 系の檻: 本文の表と説明が拠っている man の記述（2026-10-20 の作り直しから）。
+# 本文は man を写さず、表の「何をするか」の欄や確認問題の答えにまとめている。そのもとの記述を、読者と同じ打ち方で取る。
+# man の出力をパイプに渡すと、ページャを使わずに、端末の幅（80 桁）で整形して出る。
+#   bash probe/linuc-packages-deb-exam.sh（または bash probe/linuc-packages-run.sh exam）
+cd "$(dirname "$0")/.." || exit 1
+exec python3 -I probe/linuc-packages-seq.py --script /dev/stdin --cage deb \
+  --out logs/linuc-packages-deb-exam.log \
+  --note "本文の表と説明が拠っている man の記述" <<'INPUT'
+========== 第5章: autoremove の説明と、印は apt-mark で付け替えられること（man apt） ==========
+$ man apt | sed -n '/^       autoremove (apt-get(8))$/,/^       satisfy (apt-get(8))$/p'
+========== 第5章: apt-cache showpkg は、版ごとの依存関係と逆向きの依存関係をまとめて出す（man apt-cache） ==========
+$ man apt-cache | sed -n '/^       showpkg pkg\.\.\.$/,/^       stats$/p'
+========== 第6章: sources.list.d/ のファイルは .list（1行の形式）か .sources（deb822 形式）で終わる。1行の形式の欄と、[ ] のオプションは省ける（man sources.list） ==========
+$ man sources.list | sed -n '/^SOURCES.LIST.D$/,/^DEB822-STYLE FORMAT$/p'
+========== 第6章の表: apt の upgrade と full-upgrade（man apt） ==========
+$ man apt | sed -n '/^       upgrade (apt-get(8))$/,/^       install, reinstall, remove, purge (apt-get(8))$/p'
+========== 第6章の表: apt-get の upgrade と dist-upgrade（man apt-get） ==========
+$ man apt-get | sed -n '/^       upgrade$/,/^       dselect-upgrade$/p'
+========== 第6章の表: install は、入っているものを1つだけ上げるのにも使う（man apt-get） ==========
+$ man apt-get | grep -A5 'This is also the target to use'
+========== 第7章: -f は --fix-broken（man apt-get） ==========
+$ man apt-get | sed -n '/^       -f, --fix-broken$/,/^       -m, --ignore-missing, --fix-missing$/p'
+========== 第7章: dpkg --configure の -a（man dpkg） ==========
+$ man dpkg | sed -n '/^       --configure package\.\.\.|-a|--pending$/,/^           Configuring consists of the following steps:$/p'
+========== 第7章: debconf-show は、そのパッケージの質問と答えを出し、もう出された質問に * を付ける（man debconf-show） ==========
+$ man debconf-show | sed -n '/^DESCRIPTION$/,/^OPTIONS$/p'
+========== 第7章: dpkg-reconfigure の -f（使う画面の種類）（man dpkg-reconfigure） ==========
+$ man dpkg-reconfigure | sed -n '/^       -ftype, --frontend=type$/,/^       -pvalue, --priority=value$/p'
+========== 第10章の表: apt-get clean と distclean（man apt-get） ==========
+$ man apt-get | sed -n '/^       clean$/,/^       autoclean (and the auto-clean alias since 1.1)$/p'
+$ man apt-get | sed -n '/^       distclean (and the dist-clean alias)$/,/^       autoremove (and the auto-remove alias since 1.1)$/p'
+INPUT

@@ -1,38 +1,25 @@
 #!/bin/bash
-# LinuC 主題1.04 RPM 系の檻の追加記録（2026-10-13 の事実確認を受けて足したもの）。
-# 記録は lab-linuc-packages-rpm:1.0.1 で取る（1.0.0 で取り始め、模範解答を直した 1.0.1 で取り直した）。
-# 本文に足した端末表示はここから引く。節ごとに檻を起動し直して打つ（probe/linuc-packages-run.sh extra）。
-#   bash /tmp/probe.sh x-qp|x-repoquery|x-rpmsave
-set -u
-R() { printf '\n$ %s\n' "$*"; eval "$@" 2>&1; }
-S() { printf '\n\n========== %s ==========\n' "$*"; }
-
-case "${1:-}" in
-  x-qp)
-    S "x-qp. -qp はファイルの中を読むだけ。.rpm で終わる引数は rpm 4.16 ではファイルとして読まれる"
-    R 'rpm -q labhello'
-    R "rpm -qpi /srv/lab-rpm/labhello-1.0-1.noarch.rpm | grep -E '^(Name|Version|Install Date)'"
-    R "rpm -qi labhello | grep -E '^(Name|Version|Install Date)'"
-    R 'rpm -q labtool; echo "exit=$?"'
-    R 'rpm -ql labtool; echo "exit=$?"'
-    R 'rpm -qpl /srv/lab-rpm/labtool-1.0-1.noarch.rpm'
-    R 'rpm -ql /srv/lab-rpm/labtool-1.0-1.noarch.rpm; echo "exit=$?"'
-    R 'rpm --version'
-    ;;
-  x-repoquery)
-    S "x-repoquery. 入っていないパッケージの中身を目録から引く"
-    R 'rpm -q labtool; echo "exit=$?"'
-    R 'yum repoquery -l labtool'
-    R 'ls -l /usr/bin/repoquery'
-    R 'repoquery -l labtool'
-    R 'yum repoquery -l labapp liblab'
-    ;;
-  x-rpmsave)
-    S "x-rpmsave. 書き換えていない設定ファイルは、消すと一緒に消える"
-    R 'sudo yum install -y labapp'
-    R 'rpm -V labapp; echo "exit=$?"'
-    R 'sudo rpm -e labapp; echo "exit=$?"'
-    R 'ls -l /etc/labapp.conf*; echo "exit=$?"'
-    ;;
-  *) echo "使い方: bash probe.sh x-qp|x-repoquery|x-rpmsave" >&2; exit 2 ;;
-esac
+# LinuC 主題1.04 RPM 系の檻: 課題文の「いまの状態」の画面を、読者と同じ打ち方で取る（2026-10-20 の作り直しから）。
+# 演習ごとに檻を起動し直し、lab start NN のあとに、課題文の「いまの状態」に書いたコマンドを順に打つ。
+# 記録 logs/linuc-packages-rpm-extra.log と課題文の突き合わせは probe/linuc-packages-taskcheck.py。
+#   bash probe/linuc-packages-rpm-extra.sh（または bash probe/linuc-packages-run.sh extra）
+cd "$(dirname "$0")/.." || exit 1
+exec python3 -I probe/linuc-packages-seq.py --script /dev/stdin --cage rpm \
+  --out logs/linuc-packages-rpm-extra.log \
+  --note "課題文の「いまの状態」の画面（演習ごとに檻を起動し直し、lab start NN のあとに打った）" <<'INPUT'
+========== 演習09 ==========
+$ lab start 09
+$ labapp
+========== 演習10 ==========
+$ lab start 10
+$ labcalc 2 3
+$ ls /srv/lab-tools-rpm
+========== 演習11 ==========
+$ lab start 11
+$ labmotd
+========== 演習12 ==========
+$ lab start 12
+$ cd ~/work/12
+$ ls
+$ labtool
+INPUT
