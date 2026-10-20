@@ -38,6 +38,8 @@ $ printf 'A' | dd of=$HOME/hello-copy.rpm bs=1 seek=7526 conv=notrunc status=non
 $ rpm -K ~/hello-copy.rpm; echo $?
 $ rpm -Kv ~/hello-copy.rpm
 $ echo $HOME
+$ printf 'A' | wc -c
+$ echo A | wc -c
 ========== 第10章: yum provides の名前のあとの 32: はエポック ==========
 $ yum info bind-utils | grep -E '^(Name|Epoch|Version|Release)' | head -4
 ========== 第10章: 更新できるものが無ければ、check-update の終了コードは 0 ==========
