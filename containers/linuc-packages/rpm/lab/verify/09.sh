@@ -29,18 +29,26 @@ fi
 ver=""; other=""
 if rpm -q labapp >/dev/null 2>&1; then
   ver=$(rpm -V labapp 2>&1)
-  # 設定ファイル（c の印）は書き換えてよいので、それ以外を数える
-  other=$(printf '%s\n' "$ver" | grep -v '^$' | grep -v '^.\{9\}  c ' || true)
+  # 行は「9文字の欄・印・パス」か、消えたファイルなら「missing・印・パス」（印 c が設定ファイル）。
+  # パスだけを出し、消えたものと設定ファイルにはそう添える。設定ファイル（書き換えてよい）でない行を other に数える
   if [ -n "$ver" ]; then
     echo "       入れたときの中身と違うファイル:"
-    # 行は「9文字の欄・空白2つ・印・パス」。パスだけを出し、設定ファイル（印 c）にはそう添える
-    printf '%s\n' "$ver" | grep -v '^$' | while IFS= read -r l; do
-      case "$l" in
-        ?????????"  c "*) echo "       │ ${l:13}（設定ファイル。書き換えてよい）" ;;
-        ?????????"    "*) echo "       │ ${l:13}" ;;
-        *) echo "       │ $l" ;;
-      esac
-    done
+    while IFS= read -r l; do
+      [ -n "$l" ] || continue
+      if [[ $l =~ ^missing\ +(c\ +)?(/.*)$ ]]; then
+        path=${BASH_REMATCH[2]}; conf=${BASH_REMATCH[1]}; gone="消えている。"
+      elif [[ $l =~ ^.{9}\ +([cdglr]\ +)?(/.*)$ ]]; then
+        path=${BASH_REMATCH[2]}; conf=""; gone=""; [[ ${BASH_REMATCH[1]} == c* ]] && conf=c
+      else
+        path=$l; conf=""; gone=""
+      fi
+      if [ -n "$conf" ]; then
+        if [ -n "$gone" ]; then echo "       │ $path（消えている。設定ファイル）"; else echo "       │ $path（設定ファイル。書き換えてよい）"; fi
+      else
+        echo "       │ $path${gone:+（消えている）}"
+        other="$other$l"
+      fi
+    done <<< "$ver"
   else
     echo "       入れたときの中身と違うファイル = 無い（どれも入れたときのまま）"
   fi

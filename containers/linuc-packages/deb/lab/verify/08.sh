@@ -39,7 +39,7 @@ ng=0
 [ "$owner" = labmine ] || { echo "       → /usr/bin/labmine が、labmine のファイルとして台帳に載っていない"; ng=1; }
 [ -z "$fo" ] || [ "$fo" = root:root ] || { echo "       → /usr/bin/labmine の持ち主が root:root ではない"; ng=1; }
 [ "$rc" = 0 ] && [ "$out" = "$want" ] || { echo "       → labmine が期待の1行を出さない"; ng=1; }
-[ "$lib" != ii ] || [ -n "$auto" ] || { echo "       → liblab が依存関係からではなく、名前を指定して入っている"; ng=1; }
+[ "$lib" != ii ] || [ -n "$auto" ] || { echo "       → liblab に「自動で入った」印が無い（依存関係から入ると付く）"; ng=1; }
 [ "$ng" = 0 ] || exit 1
 
 echo "       labmine 1.0 が、依存関係で liblab を連れて入り、"
