@@ -51,21 +51,21 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
       └─ 練習機の中の podman のコンテナ  … 本文で起動するもの（alpine・busybox）</code></pre>
 <p>影響度 <b>B</b>（変更は練習機とコンテナの中だけ。あなたの PC の設定もファイルも書き換えません）。
 壊したら外で <code>vm reset --yes</code> を打てば、練習機が最初の状態に戻ります。
-演習を始めるとき <code>lab</code> は「元に戻すには起動し直してください」と出しますが、この檻では起動し直しても練習機は戻りません（ディスクはボリュームに残ります）。戻すのは <code>vm reset --yes</code> です。</p>
+演習を始めるときの <code>lab</code> の案内にも、この戻し方が出ます（起動し直すだけでは練習機は戻りません。ディスクはボリュームに残ります）。</p>
 
 <h2 id="start">はじめる</h2>
 <p>Docker の場合。起動して、入ります。</p>
 <pre><code>docker run -d --name lab-podman --hostname host --stop-timeout 30 \
   -v lab-podman-vm:/home/lab/vm \
   -v lab-podman-state:/home/lab/.lab \
-  ghcr.io/chai0204/lab:podman-1.0.0@sha256:3f74d5a000e1df114762a2e06176fbc2afcaedfda3416168cf6a207a560f414a
+  ghcr.io/chai0204/lab:podman-1.0.1@sha256:__DIGEST__
 
 docker exec -it lab-podman bash -l</code></pre>
 <p>podman で起動するなら、同じオプションのまま <code>docker</code> を <code>podman</code> に読み替えます（rootless でも動きます。理由は<a href="/podman/theory/07-compat">第7章</a>）。</p>
 <pre><code>podman run -d --name lab-podman --hostname host --stop-timeout 30 \
   -v lab-podman-vm:/home/lab/vm \
   -v lab-podman-state:/home/lab/.lab \
-  ghcr.io/chai0204/lab:podman-1.0.0@sha256:3f74d5a000e1df114762a2e06176fbc2afcaedfda3416168cf6a207a560f414a
+  ghcr.io/chai0204/lab:podman-1.0.1@sha256:__DIGEST__
 
 podman exec -it lab-podman bash -l</code></pre>
 <ul>
@@ -78,7 +78,7 @@ podman exec -it lab-podman bash -l</code></pre>
   vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
 
 
-── lab-podman 1.0.0 ────────────────────────────────────────
+── lab-podman 1.0.1 ────────────────────────────────────────
 lab-podman  進捗 0/7
   次 → 01 「コンテナの親の conmon を突き止める」 (目安 8分 / 影響度 B)
   lab start 01 で課題を開く
@@ -107,7 +107,7 @@ Docker Hub へ取りに行く操作は全員に同じ失敗を出します。</p
 
 <h2 id="ex">演習</h2>
 <p>7本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。
-判定は外の端末でも、練習機の中でも <code>lab check NN</code> で打てます。課題は <code>lab start NN</code> で出ます。
+判定は外の端末でも、練習機の中でも <code>lab check NN</code> で打てます。課題は <code>lab start NN</code> で出て、<code>lab show</code> でいつでももう一度出せます。
 詰まったら <code>lab hint NN</code> を何度でも。使い切ったら <code>lab solve NN</code> で模範解答に必ず届きます
 （見ても構いません。進捗には「solve を見た」として残ります）。</p>
 <div class="scroll"><table>
@@ -133,8 +133,8 @@ Docker Hub へ取りに行く操作は全員に同じ失敗を出します。</p
 </ol>
 <!-- gen:LAB_ENV -->
 <pre data-where="外（lab@host）"><code>$ lab env
-テーマ    : lab-podman 1.0.0
-イメージ  : ghcr.io/chai0204/lab:podman-1.0.0
+テーマ    : lab-podman 1.0.1
+イメージ  : ghcr.io/chai0204/lab:podman-1.0.1
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -157,7 +157,7 @@ docker volume rm lab-podman-vm lab-podman-state   # 練習機のディスクと�
 あなたの PC には何も残りません（名前付きボリューム以外のファイルを作っていないため）。
 続きをやる日は <code>docker start lab-podman</code> で再開できます。</p>
 
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:podman-1.0.0@sha256:3f74d5a000e1df114762a2e06176fbc2afcaedfda3416168cf6a207a560f414a / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・podman 4.9.3・conmon 2.1.10・crun 1.14.1・slirp4netns 1.2.1・passt 0.0~git20240220）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 検証日 2026-10-14</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:podman-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0（KVM なし・TCG）/ 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・podman 4.9.3・conmon 2.1.10・crun 1.14.1・slirp4netns 1.2.1・passt 0.0~git20240220）/ コンテナのイメージ alpine:3.24.2・busybox:1.38.0（ダイジェストで照合）/ apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で検証 / 1.0.1 は 1.0.0 に lab コマンドの更新だけを重ねた版で、ほかの中身は 1.0.0 と同じ（lab start・show・check を 2026-10-20 に確認） / 検証日 2026-10-14</div>
 
 <!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
 <nav class="pager"><a href="/podman/theory/">← 理論編</a><a href="/">記事の一覧へ →</a></nav>

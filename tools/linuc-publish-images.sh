@@ -53,6 +53,26 @@ PAIRS=(
   "qemu            lab-qemu:1.0.0                $TOOLS:qemu-1.0.0"
   "docker          lab-docker:1.0.0              $TOOLS:docker-1.0.0"
   "podman          lab-podman:1.0.0              $TOOLS:podman-1.0.0"
+  # 2026-10-20: 全イメージの最上段に最新の lab（課題文の見出し・lab show）を重ねた版
+  "linuc-services  lab-linuc-services:1.0.3      ghcr.io/chai0204/lab-linuc-services:1.0.3"
+  "linuc-files     lab-linuc-files:1.0.2         $REPO:files-1.0.2"
+  "linuc-text      lab-linuc-text:1.0.2          $REPO:text-1.0.2"
+  "linuc-shell     lab-linuc-shell:1.0.3         $REPO:shell-1.0.3"
+  "linuc-boot      lab-linuc-boot:1.0.2          $REPO:boot-1.0.2"
+  "linuc-network   lab-linuc-network:1.0.2       $REPO:network-1.0.2"
+  "linuc-admin     lab-linuc-admin:1.0.2         $REPO:admin-1.0.2"
+  "linuc-security  lab-linuc-security:1.0.2      $REPO:security-1.0.2"
+  "kvm             lab-kvm:1.0.1                 $TOOLS:kvm-1.0.1"
+  "qemu            lab-qemu:1.0.1                $TOOLS:qemu-1.0.1"
+  "docker          lab-docker:1.0.1              $TOOLS:docker-1.0.1"
+  "podman          lab-podman:1.0.1              $TOOLS:podman-1.0.1"
+  # sqlite と wasm は、シリーズで最初に公開した別パッケージ（lab-sqlite・lab-wasm）に版を足す
+  "sqlite          lab-sqlite:1.0.1              ghcr.io/chai0204/lab-sqlite:1.0.1"
+  "wasm            lab-wasm:1.0.1                ghcr.io/chai0204/lab-wasm:1.0.1"
+  # 2026-10-20: 初学者が順を追えるように作り直した 1.04 と 1.05
+  "linuc-packages  lab-linuc-packages-deb:1.1.0  $REPO:packages-deb-1.1.0"
+  "linuc-packages  lab-linuc-packages-rpm:1.1.0  $REPO:packages-rpm-1.1.0"
+  "linuc-disks     lab-linuc-disks:1.1.0         $REPO:disks-1.1.0"
 )
 
 for line in "${PAIRS[@]}"; do

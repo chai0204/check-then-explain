@@ -59,13 +59,13 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <pre><code>docker run --rm -it --name lab-kvm --hostname host \
   --device /dev/kvm --group-add "$(stat -c %g /dev/kvm)" \
   -v lab-kvm-vm:/home/lab/vm -v lab-kvm-state:/home/lab/.lab \
-  ghcr.io/chai0204/lab:kvm-1.0.0@sha256:bc0de90e884cfaebe560ff7bbc0616474e28e90660368132e20ce397bb168d72</code></pre>
+  ghcr.io/chai0204/lab:kvm-1.0.1@sha256:__DIGEST__</code></pre>
 <p><b><code>/dev/kvm</code> が無い場合</b>（入れ子の仮想化が無効な仮想マシンの中など）は、<code>--device</code> と <code>--group-add</code> の行を外します。
 TCG の演習（01・05）と、理論編の TCG の章はそのままできます。KVM が要る演習は <code>lab check</code> が「前提不足」と理由を出します。
 macOS・Windows の Docker Desktop では、著者は試していません（<code>/dev/kvm</code> が渡せるかも、檻が起動するかも未確認です。この檻のイメージは amd64 用だけです）。</p>
 <pre><code>docker run --rm -it --name lab-kvm --hostname host \
   -v lab-kvm-vm:/home/lab/vm -v lab-kvm-state:/home/lab/.lab \
-  ghcr.io/chai0204/lab:kvm-1.0.0@sha256:bc0de90e884cfaebe560ff7bbc0616474e28e90660368132e20ce397bb168d72</code></pre>
+  ghcr.io/chai0204/lab:kvm-1.0.1@sha256:__DIGEST__</code></pre>
 <div class="scroll"><table>
 <tr><th>書いてあるもの</th><th>なぜ書くか</th></tr>
 <tr><td><code>--rm -it</code></td><td>端末をつないで起動し、抜けたらコンテナを消す。あなたの PC に残骸を残さない</td></tr>
@@ -90,7 +90,7 @@ macOS・Windows の Docker Desktop では、著者は試していません（<co
   qemu-linuc -accel tcg / -accel kvm   練習機の起動（中身は qemu-system-x86_64）。止めるのは qemu-linuc stop
 
 
-── lab-kvm 1.0.0 ────────────────────────────────────────
+── lab-kvm 1.0.1 ────────────────────────────────────────
 lab-kvm  進捗 0/5
   次 → 01 「練習機を TCG で起動し、中から見える CPU を確かめる」 (目安 10分 / 影響度 B)
   lab start 01 で課題を開く
@@ -131,7 +131,7 @@ lab-kvm  進捗 0/5
 <tr><td>04</td><td>練習機に、あなたの PC の CPU をそのまま見せる</td><td>要る</td><td><a href="/kvm/theory/05-guest">5</a></td><td>10分</td></tr>
 <tr><td>05</td><td>練習機の CPU から、仮想化支援の印を消す</td><td>不要</td><td><a href="/kvm/theory/05-guest">5</a></td><td>12分</td></tr>
 </table></div>
-<p>課題は <code>lab start NN</code> で開きます。<code>lab</code> は「元に戻すには起動し直してください」と出しますが、この檻では起動し直しても練習機のディスクは戻りません（ボリュームに残ります）。
+<p>課題は <code>lab start NN</code> で開き、<code>lab show</code> でいつでももう一度出せます。起動し直すだけでは練習機のディスクは戻りません（ボリュームに残ります）。
 練習機を最初の状態に戻すのは <code>qemu-linuc stop</code> の後の <code>qemu-linuc reset --yes</code> です（演習03 が見る起動の記録も消えます）。</p>
 <p>判定は外の端末でも、練習機の中でも <code>lab check NN</code> で打てます。演習03・04 を <code>/dev/kvm</code> の無い（開けない）檻で打つと、
 <code>⚠ この環境では判定できません</code> と、理由（<code>/dev/kvm</code> が無い・開けない）が出ます。読者の失敗ではありません。
@@ -148,8 +148,8 @@ lab-kvm  進捗 0/5
 <li><code>lab env</code> の全文（外で打つ）</li>
 </ol>
 <pre data-where="外（lab@host）"><code>$ lab env
-テーマ    : lab-kvm 1.0.0
-イメージ  : ghcr.io/chai0204/lab:kvm-1.0.0
+テーマ    : lab-kvm 1.0.1
+イメージ  : ghcr.io/chai0204/lab:kvm-1.0.1
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -172,7 +172,7 @@ docker volume rm lab-kvm-vm lab-kvm-state        # あなたの PC で。練習�
 <p>イメージは <code>docker rmi</code> で消せます。あなたの PC には何も残りません（名前付きボリューム以外のファイルを作っていないため）。
 続きをやる日は、同じ <code>docker run</code> をもう一度打てば、練習機のディスクも進捗もそのまま残っています。</p>
 
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:kvm-1.0.0@sha256:bc0de90e884cfaebe560ff7bbc0616474e28e90660368132e20ce397bb168d72 / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0・OVMF 2024.02 / 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4）/ apt snapshot 20260929T000000Z / ホストは Linux 7.2.6・Intel Core Ultra 9 285H（/dev/kvm は crw-rw-rw- root:302）/ docker 29.8.0・amd64 で検証。0660 の場合は Ubuntu 24.04.5 LTS・docker.io 29.1.3 で検証 / 検証日 2026-10-14</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab:kvm-1.0.1@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2・libvirt 10.0.0・OVMF 2024.02 / 練習機 Ubuntu 24.04.5 LTS（カーネル 6.8.0-142-generic・systemd 255.4）/ apt snapshot 20260929T000000Z / ホストは Linux 7.2.6・Intel Core Ultra 9 285H（/dev/kvm は crw-rw-rw- root:302）/ docker 29.8.0・amd64 で検証。0660 の場合は Ubuntu 24.04.5 LTS・docker.io 29.1.3 で検証 / 1.0.1 は 1.0.0 に lab コマンドの更新だけを重ねた版で、ほかの中身は 1.0.0 と同じ（lab start・show・check を 2026-10-20 に確認） / 検証日 2026-10-14</div>
 
 <!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
 <nav class="pager"><a href="/kvm/theory/">← 理論編</a><a href="/">記事の一覧へ →</a></nav>
