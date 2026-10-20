@@ -109,7 +109,7 @@ INSERT INTO article_domain (slug, domain) VALUES ('linuc-packages', 'サーバ�
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
   'linuc-disks', 'ハードウェアとディスク', 'ドラフト', 'LinuC レベル1', '101', '1.05', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-20',
-  'LinuC レベル1 101 試験の主題1.05（ハードウェア、パーティション、ファイルシステム）を、コンテナの中で動く仮想マシン（練習機）で確かめる11章。空のディスクを区切り、ファイルシステムを作り、マウントして使うところから始め、表の形式、ファイルシステムの種類、起動のたびのマウント、スワップ、LVM、部品の情報とドライバへと順に進む。ディスクは装置・パーティションの表・LVM・ファイルシステム・マウントの段が重なってできていて、各段は自分の印だけを読む。',
+  'LinuC レベル1 101 試験の主題1.05（ハードウェア、パーティション、ファイルシステム）を、コンテナの中で動く仮想マシン（練習機）で確かめる11章。空のディスクを区切り、ファイルシステムを作り、マウントして使うところから始め、表の形式、ファイルシステムの種類、起動のたびのマウント、スワップ、LVM、部品の情報とドライバへと順に進む。最後の章で、ディスクがどんな段の重なりでできているかを、それまでに確かめたことから振り返る。',
   'LinuC レベル1（101）の受験者で、fdisk も mount も本物のディスクで試したことが無い人。端末でコマンドを打てて、docker を動かせることが前提。',
   '空のディスクを区切り、ファイルシステムを作り、マウントして使い、外せる
 消してしまったパーティションを、表の行を書き戻して取り戻せる
@@ -325,14 +325,14 @@ INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 4, 
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 5, 'yum は目録を自分で取りに行く', '/linuc-packages/theory/05-yum', 22);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 6, 'rpm -V が黙るのは台帳どおりだから', '/linuc-packages/theory/06-rpm-query', 20);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 7, 'OK は確かめた範囲の OK', '/linuc-packages/theory/07-rpm-install', 22);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 1, '練習機に入り、つながっているディスクを眺める', '/linuc-disks/theory/01-look', 15);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 1, '練習機に入り、つながっているディスクを眺める', '/linuc-disks/theory/01-look', 17);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 2, '空のディスクを使えるようにする', '/linuc-disks/theory/02-first-disk', 20);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 3, 'パーティションの表を読む・直す', '/linuc-disks/theory/03-partition', 22);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 3, 'パーティションの表を読む・直す', '/linuc-disks/theory/03-partition', 24);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 4, '新しい形式の表（GPT）と、起動に使う区画', '/linuc-disks/theory/04-gpt', 25);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 5, 'ファイルシステムの種類と作り方', '/linuc-disks/theory/05-mkfs', 22);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 6, 'USB メモリと CD をマウントする', '/linuc-disks/theory/06-media', 24);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 7, '起動のたびにマウントする', '/linuc-disks/theory/07-fstab', 25);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 8, 'スワップと tmpfs', '/linuc-disks/theory/08-swap', 18);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 8, 'スワップと、メモリの上のファイルシステム（tmpfs）', '/linuc-disks/theory/08-swap', 18);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 9, 'LVM で、2台のディスクを1つにまとめる', '/linuc-disks/theory/09-lvm', 24);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 10, '部品の情報を読む', '/linuc-disks/theory/10-hardware', 25);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 11, 'ドライバと、USB メモリの抜き差し', '/linuc-disks/theory/11-modules', 28);
