@@ -8,6 +8,38 @@ cd "$(dirname "$0")/.." || exit 1
 exec python3 -I probe/linuc-packages-seq.py --script /dev/stdin --cage rpm \
   --out logs/linuc-packages-rpm-probe.log \
   --note "本文が画面を載せずに言い切っていることの裏づけ（節ごとに檻を起動し直した）" <<'INPUT'
+========== 第9章: Running scriptlet は labhello の手順ではない（labhello は手順を持たない）。man-db が説明書の置き場に登録した手順で、この檻では索引を作り直さない ==========
+$ rpm -qp --scripts /srv/lab-rpm/labhello-1.0-1.noarch.rpm
+$ rpm -q --filetriggers man-db
+$ sudo yum install labhello
+Is this ok [y/N]: y
+$ whatis labhello
+========== 第9章: labapp を入れたときの Running scriptlet は、liblab が /usr/lib に置いたファイルに反応した、別のパッケージ（glibc-common）の手順 ==========
+$ rpm -qp --scripts /srv/lab-rpm/labapp-1.0-1.noarch.rpm /srv/lab-rpm/liblab-1.0-1.noarch.rpm
+$ rpm -qpl /srv/lab-rpm/liblab-1.0-1.noarch.rpm
+$ rpm -q --filetriggers glibc-common
+========== 第9章: rpm -qR の /usr/bin/sh と config(labapp) は、作るときに rpm が自動で足したもの（labapp はシェルのスクリプトで、設定ファイルを持つ） ==========
+$ sudo yum install labapp
+Is this ok [y/N]: y
+$ head -1 /usr/bin/labapp
+$ rpm -q --qf '[%{REQUIRENAME}  %{REQUIREFLAGS:deptype}\n]' labapp
+$ rpm -q --provides labapp
+========== 第9章: /etc/dnf/protected.d/sudo.conf は、yum に sudo を消させない設定 ==========
+$ cat /etc/dnf/protected.d/sudo.conf
+$ sudo yum remove sudo
+========== 第10章の表: yum の baseurl は file:/srv/… の形も読める（file:///srv/… と同じ場所） ==========
+$ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:/srv/lab-tools-rpm' 'gpgcheck=0' | sudo tee /etc/yum.repos.d/lab-tools.repo
+$ yum --disablerepo='*' --enablerepo=lab-tools list available
+========== 第10章の表: 練習用のパッケージ（署名は見出しだけ）の中身を1バイト書き換えると DIGESTS signatures NOT OK ==========
+$ rpm -Kv /srv/lab-rpm/labhello-1.0-1.noarch.rpm
+$ ls -l /srv/lab-rpm/labhello-1.0-1.noarch.rpm
+$ cp /srv/lab-rpm/labhello-1.0-1.noarch.rpm ~/hello-copy.rpm
+$ printf 'A' | dd of=$HOME/hello-copy.rpm bs=1 seek=7526 conv=notrunc status=none
+$ rpm -K ~/hello-copy.rpm; echo $?
+$ rpm -Kv ~/hello-copy.rpm
+$ echo $HOME
+========== 第10章: yum provides の名前のあとの 32: はエポック ==========
+$ yum info bind-utils | grep -E '^(Name|Epoch|Version|Release)' | head -4
 ========== 第10章: 更新できるものが無ければ、check-update の終了コードは 0 ==========
 $ yum check-update
 $ echo $?
@@ -75,8 +107,22 @@ $ yum list installed labtool labtool-data
 $ yumdownloader labtool
 $ rpm2cpio labtool-1.0-1.noarch.rpm | cpio -t
 $ rpm -qpl labtool-1.0-1.noarch.rpm
-========== 第11章: rpm -Va の行の中身（設定ファイルの c と、コンテナで省かれたもの。31 行） ==========
+========== 第11章: rpm -Va の行の中身（一般ユーザで31行。読めずに確かめられなかった ? と Permission denied の10行、設定ファイルの c、コンテナで省かれた missing、目録の写しの置き場の付け替え、演習11 の labmotd）。sudo を付けると21行 ==========
 $ rpm -Va
+$ rpm -Va | wc -l
+$ sudo rpm -Va | wc -l
+$ ls -l /var/cache/dnf
+========== 第11章の表: -U に、入っているのと同じ版や古い版を渡すと is already installed と断る（終了コード 2）。-F は何もしない ==========
+$ yumdownloader labhello
+$ cp /srv/lab-updates-rpm/labhello-1.1-1.noarch.rpm .
+$ sudo rpm -ivh labhello-1.0-1.noarch.rpm
+$ sudo rpm -Uvh labhello-1.0-1.noarch.rpm
+$ echo $?
+$ sudo rpm -Uvh labhello-1.1-1.noarch.rpm
+$ sudo rpm -Uvh labhello-1.0-1.noarch.rpm
+$ echo $?
+$ sudo rpm -Fvh labhello-1.0-1.noarch.rpm
+$ echo $?
 ========== 演習11 のヒント: which は実行できないファイルを探さないので、いまの labmotd は見つからない。台帳にはパスをそのまま渡す ==========
 $ labmotd
 $ which labmotd
@@ -123,6 +169,39 @@ $ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rp
 > 'gpgcheck=1' 'gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools' \
 > | sudo tee /etc/yum.repos.d/lab-tools.repo
 $ cat /etc/yum.repos.d/lab-tools.repo
+========== 演習10 の判定と解答: gpgcheck=0 で入れたあとに鍵だけ取り込んでも通らない。gpgcheck=1 に直して入れ直すと通る ==========
+$ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' 'gpgcheck=0' | sudo tee /etc/yum.repos.d/lab-tools.repo
+$ sudo yum install lab-mathtools
+Is this ok [y/N]: y
+$ lab check 10
+$ sudo rpm --import /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+$ lab check 10
+$ sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+> [lab-tools]
+> name=lab tools
+> baseurl=file:///srv/lab-tools-rpm
+> gpgcheck=1
+> gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+> END
+$ lab check 10
+$ sudo yum reinstall lab-mathtools
+Is this ok [y/N]: y
+$ lab check 10
+========== 演習10 の解答: gpgcheck=0 で入れたものを、gpgcheck=1 に直して入れ直すと、鍵を取り込んでよいかを尋ねられる ==========
+$ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' 'gpgcheck=0' | sudo tee /etc/yum.repos.d/lab-tools.repo
+$ sudo yum install lab-mathtools
+Is this ok [y/N]: y
+$ sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+> [lab-tools]
+> name=lab tools
+> baseurl=file:///srv/lab-tools-rpm
+> gpgcheck=1
+> gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+> END
+$ sudo yum reinstall lab-mathtools
+Is this ok [y/N]: y
+Is this ok [y/N]: y
+$ lab check 10
 ========== 演習10 の解答: 台帳に取り込んだ鍵の一覧 ==========
 $ rpm -q gpg-pubkey --qf '%{SUMMARY}\n'
 ========== 演習12 の解答: yumdownloader の --destdir と --resolve ==========

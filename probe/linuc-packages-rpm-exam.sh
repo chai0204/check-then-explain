@@ -20,8 +20,14 @@ $ ls -l /usr/bin/repoquery /usr/bin/yumdownloader
 $ rpm -qf /usr/bin/yumdownloader
 $ yumdownloader --help | head -1
 $ yumdownloader --help | grep -A1 -E '^  --(destdir|source|resolve) '
+$ grep -n -E "'yumdownloader'|basename" /usr/libexec/dnf-utils
 ========== 第10章: Last metadata expiration check の行を出す条件（dnf のプログラム。いちばん新しい目録の経過秒 age が 0 なら出さない） ==========
 $ grep -n -B2 -A3 'Last metadata expiration check' /usr/lib/python3.9/site-packages/dnf/base.py
+========== 第10章: 一般ユーザが打つと、目録の写しは /var/tmp/dnf-ユーザ名-… に置かれる（dnf のプログラム。この檻では /var/cache/dnf をそこへの名札にしてある） ==========
+$ grep -n -A18 'def getCacheDir' /usr/lib/python3.9/site-packages/dnf/yum/misc.py
+$ ls -ld /var/cache/dnf /var/tmp/dnf-lab-cache
+========== 第10章: GPG は鍵と署名を扱う道具（GnuPG） ==========
+$ gpg --version | head -1
 ========== 第10章: 壊れたファイルを作るのに使った dd の bs・seek・conv=notrunc・status（dd --help） ==========
 $ dd --help | grep -E '^  (bs|seek|conv|status)=|notrunc'
 ========== 第11章: rpm の -i・-U・-F・-e と --nodeps・--replacepkgs・--setperms（rpm --help） ==========

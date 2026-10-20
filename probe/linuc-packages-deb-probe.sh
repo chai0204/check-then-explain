@@ -13,6 +13,25 @@ $ apt install labhello
 $ labhello
 $ sudo apt install labhello
 $ labhello
+========== 第1章: 消したときの man-db の知らせは、外れた説明書の行を索引から消さない（whatis には残り、man は説明書が無いと答える） ==========
+$ whatis labhello
+$ sudo apt install labhello
+$ whatis labhello
+$ sudo apt remove labhello
+Do you want to continue? [Y/n] y
+$ whatis labhello
+$ man labhello
+$ grep -n -A3 'triggered' /var/lib/dpkg/info/man-db.postinst
+========== 第5章: remove で rc が残るのは、purge のときにまだすることがあるもの。設定ファイル（conffile）か、消すときの手順（postrm）を持つもの ==========
+$ dpkg -s bc | grep -E '^(Status|Conffiles)'
+$ ls /var/lib/dpkg/info/bc.*
+$ sudo apt remove bc
+Do you want to continue? [Y/n] y
+$ dpkg -l bc | tail -1
+$ ls /var/lib/dpkg/info/bc.*
+$ sudo apt purge bc
+Do you want to continue? [Y/n] y
+$ dpkg -l bc
 ========== 第3章: man labhello で説明書が開く（パイプに渡すとページャを使わずに出る） ==========
 $ sudo apt install labhello
 $ man labhello | head -12
@@ -22,7 +41,7 @@ $ dpkg -S /usr/bin | tr ',' '\n' | wc -l
 ========== 第4章: dpkg -s は、台帳 /var/lib/dpkg/status の段落をそのまま出す ==========
 $ dpkg -s labsvc
 $ grep -A12 '^Package: labsvc$' /var/lib/dpkg/status
-========== 第4章のたとえ: 権限や持ち主が変わっても dpkg -V は何も言わない。中身が変わると言う。終了コードはどちらも 0 ==========
+========== 第4章のたとえ: 権限や持ち主が変わっても、読めるなら dpkg -V は何も言わない。一般ユーザが読めなくなると ? が並ぶ。中身が変わると言う。終了コードはどれも 0 ==========
 $ sudo apt install labhello
 $ ls -l /usr/bin/labhello
 $ sudo chmod 700 /usr/bin/labhello
@@ -30,6 +49,13 @@ $ sudo chown lab:lab /usr/bin/labhello
 $ ls -l /usr/bin/labhello
 $ dpkg -V labhello
 $ echo $?
+$ sudo chown root:root /usr/bin/labhello
+$ sudo chmod 600 /usr/bin/labhello
+$ ls -l /usr/bin/labhello
+$ dpkg -V labhello
+$ echo $?
+$ sudo dpkg -V labhello
+$ sudo chmod 755 /usr/bin/labhello
 $ echo '# 書き足した' | sudo tee -a /usr/bin/labhello
 $ dpkg -V labhello
 $ echo $?
@@ -74,6 +100,14 @@ Do you want to continue? [Y/n] y
 $ dpkg -l labweb | tail -1
 $ dpkg -l labweb-data | tail -1
 $ ls -l /etc/labweb.conf
+========== 第6章: /etc の下へは、一般ユーザの > では書けない。sudo tee なら書け、もう一度書くと中身を置き換える ==========
+$ echo 'deb [trusted=yes] file:/srv/lab-repo lab-updates main' > /etc/apt/sources.list.d/lab-updates.list
+$ echo 'deb [trusted=yes] file:/srv/lab-repo lab-updates main' | sudo tee /etc/apt/sources.list.d/lab-updates.list
+$ echo 'deb [trusted=yes] file:/srv/lab-repo lab-updates main' | sudo tee /etc/apt/sources.list.d/lab-updates.list
+$ cat /etc/apt/sources.list.d/lab-updates.list
+========== 第6章: …_InRelease は、区分の Release に署名を付けて1つにしたもの ==========
+$ head -3 /var/lib/apt/lists/snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_InRelease
+$ grep -n 'BEGIN PGP SIGNATURE' /var/lib/apt/lists/snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_InRelease
 ========== 第6章: dists/ の Release は、その区分の目録ファイルの一覧（大きさとダイジェスト） ==========
 $ head -14 /srv/lab-repo/dists/lab/Release
 ========== 第6章: Ubuntu 本体の Contents の大きさ（目録の写しの InRelease に、ファイルごとの大きさが書いてある。合わせて約 195MB） ==========
@@ -130,6 +164,7 @@ $ ls
 ========== 演習02・04・05 のヒントと解答: 問いに答えて消す・入れ直す ==========
 $ sudo apt remove labfortune
 Do you want to continue? [Y/n] y
+$ apt list --installed 'lab*'
 $ sudo apt reinstall labbackup
 $ labbackup
 $ sudo apt remove labweb
@@ -157,6 +192,29 @@ Do you want to continue? [Y/n] y
 $ labmine
 $ ls -ld /home/lab
 $ id _apt
+========== 演習08 の判定: liblab を先に名前を指定して入れると「自動で入った」印が付かず、通らない。liblab ごと消して入れ直すと通る ==========
+$ lab start 08
+$ cd ~/work/08
+$ mkdir -p labmine/usr/bin labmine/DEBIAN
+$ cp labmine.sh labmine/usr/bin/labmine
+$ chmod 755 labmine/usr/bin/labmine
+$ cat > labmine/DEBIAN/control <<'END'
+> Package: labmine
+> Version: 1.0
+> Architecture: all
+> Maintainer: lab <lab@example.invalid>
+> Depends: liblab
+> Description: my script packaged by hand
+> END
+$ dpkg-deb --build --root-owner-group labmine .
+$ sudo apt install liblab
+$ sudo apt install ./labmine_1.0_all.deb
+$ lab check 08
+$ sudo apt remove liblab
+Do you want to continue? [Y/n] y
+$ sudo apt install ./labmine_1.0_all.deb
+Do you want to continue? [Y/n] y
+$ lab check 08
 ========== 演習02〜04・06〜08 のヒントと解答に出てくる調べ方 ==========
 $ dpkg -s labbackup | grep Section
 $ dpkg -s labsvc | grep Section

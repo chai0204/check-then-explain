@@ -10,11 +10,13 @@
 #   bash probe/linuc-packages-run.sh extra   → 課題文の「いまの状態」の画面（lab start NN のあとに課題文のコマンドを打つ）
 #                                              → logs/linuc-packages-{deb,rpm}-extra.log
 #   bash probe/linuc-packages-run.sh exam    → 本文の表と説明が拠っている man・--help の記述 → logs/linuc-packages-{deb,rpm}-exam.log
+#   bash probe/linuc-packages-run.sh offline → ネットにつながっていないときに本文と違って出るところを、名前を引けない檻で打つ
+#                                              → logs/linuc-packages-{deb,rpm}-offline.log
 #   bash probe/linuc-packages-run.sh solve   → 演習を模範解答どおりに通す（未達で ✗、解答どおりで ✔）
 #                                              → logs/linuc-packages-{deb,rpm}-solve-all.log
 #   bash probe/linuc-packages-run.sh one deb|rpm 入力.txt   → 入力ファイルを1回打って標準出力へ（作業中の確認用）
 #
-# 端末つきの記録（tty・probe・extra・exam）は読者と同じ起動（docker run --rm -it --hostname linuc、名前の無いボリューム2つ）。
+# 端末つきの記録（tty・probe・extra・exam・offline）は読者と同じ起動（docker run --rm -it --hostname linuc、名前の無いボリューム2つ）。
 # solve だけは、判定の出力を見るためのもので、docker exec で lab ユーザのシェルを開いて流す（端末なし）。
 #   読者の起動コマンドとの違いは2つだけ:
 #   - -it の代わりに -d と sleep infinity。シェルは docker exec で lab として開く
@@ -40,7 +42,7 @@ case "${1:-}" in
   tty)
     $SEQ && python3 -I probe/linuc-packages-seqcompare.py
     ;;
-  probe|extra|exam)
+  probe|extra|exam|offline)
     # 入力は probe/linuc-packages-{deb,rpm}-<種類>.sh の中のヒアドキュメント（スクリプトが seq.py を呼ぶ）
     for cage in deb rpm; do
       bash "probe/linuc-packages-${cage}-$1.sh"
@@ -56,5 +58,5 @@ case "${1:-}" in
       *) echo "使い方: bash probe/linuc-packages-run.sh one deb|rpm 入力.txt" >&2; exit 2 ;;
     esac
     ;;
-  *) echo "使い方: bash probe/linuc-packages-run.sh tty|probe|extra|exam|solve|one" >&2; exit 2 ;;
+  *) echo "使い方: bash probe/linuc-packages-run.sh tty|probe|extra|exam|offline|solve|one" >&2; exit 2 ;;
 esac

@@ -137,11 +137,15 @@ def cursor_line(t):
 
 
 class Cage:
-    def __init__(self, cage, cols, rows, first, tag=""):
+    def __init__(self, cage, cols, rows, first, tag="", offline=False):
         self.cage, self.name = cage, f"linuc-packages-seq-{cage}{tag}"
         self.sess = f"{cage}{tag}"
         subprocess.run(["docker", "rm", "-f", "-v", self.name], capture_output=True)
-        run = (f"docker run --rm -it --name {self.name} --hostname linuc "
+        # --offline: ネットにつながっていない読者の代わり。名前を引けなくする（--dns 127.0.0.1）。
+        # --network none にしないのは、/etc/hosts から檻の名前 linuc が消えて、sudo のたびに
+        # 「unable to resolve host linuc」が出るから（読者の檻は、ネットが無くても docker の既定の網につながっている）
+        dns = "--dns 127.0.0.1 " if offline else ""
+        run = (f"docker run --rm -it --name {self.name} --hostname linuc {dns}"
                f"-v /home/lab/work -v /home/lab/.lab {IMG[cage]}")
         if first:   # サーバを起こし、設定を決めてから最初のセッションを作る（設定ファイルは読まない）
             tm("-f", "/dev/null", "start-server", ";", "set", "-g", "history-limit", "200000", ";",
@@ -293,7 +297,9 @@ def head(cage, a, src):
         "# 本文の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run --rm -it --hostname linuc、",
         "# 名前の無いボリューム2つ、PID 1 の bash -l、umask 022、TERM=xterm）の檻に、章ごとに起動し直して打った記録。",
         f"# 端末 {a.cols} 桁 × {a.rows} 行（tmux）。画面に最後に残ったものを書く。"
-        f"作り方: python3 -I probe/linuc-packages-seq.py{src}（イメージ {IMG[cage]}）"]
+        f"作り方: python3 -I probe/linuc-packages-seq.py{src}（イメージ {IMG[cage]}）"] + (
+        ["# ネットにつながっていない読者の代わりに、名前を引けない檻（docker run に --dns 127.0.0.1 を足した）で打った。"]
+        if getattr(a, "offline", False) else [])
 
 
 def record(steps, cage_obj, log):
@@ -318,12 +324,13 @@ def main():
     ap.add_argument("--cage", choices=["deb", "rpm"], default="deb")
     ap.add_argument("--out", help="--script のときの記録の置き場所")
     ap.add_argument("--note", default="", help="--script のときに記録の頭に足す説明（1行）")
+    ap.add_argument("--offline", action="store_true", help="--script のとき、名前を引けない檻（ネットの無い読者の代わり）で打つ")
     a = ap.parse_args()
     tm("kill-server")
     n = 0
     if a.script:
         out = Path(a.out or (REPO / "logs" / f"linuc-packages-{a.cage}-script.log"))
-        log = head(a.cage, a, f" --script {a.script} --cage {a.cage}")
+        log = head(a.cage, a, f" --script {a.script} --cage {a.cage}" + (" --offline" if a.offline else ""))
         if a.note:
             log.append(f"# {a.note}")
         parts, cur = [], ["========== はじめ ==========", []]
@@ -340,7 +347,7 @@ def main():
                 steps = parse_lines(lines)
                 if not steps:
                     continue
-                c = Cage(a.cage, a.cols, a.rows, first, tag="-script")
+                c = Cage(a.cage, a.cols, a.rows, first, tag="-script", offline=a.offline)
                 first = False
                 log.append(f"\n\n{title}")
                 try:
