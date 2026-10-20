@@ -20,7 +20,7 @@ lab-linuc-packages-rpm  進捗 0/4
 
 $ lab check; echo "exit=$?"
 ✗ 09 未達
-  判定 : 観測型（labapp を動かし、rpm の台帳・入った経路・rpm -V labapp を見た）
+  判定 : 観測型（labapp の出力・入った経路・入れたときの中身との違いを見た）
   観測 : labapp = rpm の台帳に無い
          liblab = rpm の台帳に無い
          /usr/bin/labapp = 無い（labapp と打っても見つからない）
@@ -29,7 +29,7 @@ $ lab check; echo "exit=$?"
          → labapp が「liblab: こんにちは from labapp 1.0」を出さない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 09
 ✗ 10 未達
-  判定 : 観測型（labcalc を動かし、rpm の台帳と dnf の記録と鍵の台帳を見た）
+  判定 : 観測型（labcalc を動かし、rpm と dnf の記録と .repo の設定を見た）
   観測 : labcalc = コマンドとして見つからない
          lab tools の鍵 = rpm の台帳に無い
   → この事実から何が欠けているか考えてください。詰まったら lab hint 10
@@ -43,7 +43,7 @@ $ lab check; echo "exit=$?"
          → labmotd が動かない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 11
 ✗ 12 未達
-  判定 : 観測型（~/work/12 の .rpm の中身、rpm の台帳、dnf が記録した経路を見た）
+  判定 : 観測型（~/work/12 の .rpm の中身と、rpm の台帳と、dnf の記録を見た）
   観測 : ~/work/12 の .rpm = 無い
          labtool = rpm の台帳に無い
          labtool-data = rpm の台帳に無い
@@ -84,6 +84,9 @@ $ lab start 09
     bash: labapp: command not found
 
   labapp はまだ入っていないので、これが始まりの正しい状態です。
+  （第9章を同じ檻で打って入れて消したあとなら、
+    bash: /usr/bin/labapp: No such file or directory
+   と出ることもあります。どちらも「いまは入っていない」という意味です）
 
 【やること】
 
@@ -115,7 +118,7 @@ $ lab start 09
 
 
 $ sudo yum install -y labapp
-Last metadata expiration check: 2:11:08 ago on Tue Oct 20 19:34:06 2026.
+Last metadata expiration check: 3:32:42 ago on Tue Oct 20 19:34:06 2026.
 Dependencies resolved.
 ================================================================================
  Package            Architecture       Version            Repository       Size
@@ -155,11 +158,11 @@ liblab: hello from labapp 1.0
 $ echo "--- 入れただけ（挨拶は hello のまま） ---"; lab check 09; echo "exit=$?"
 --- 入れただけ（挨拶は hello のまま） ---
 ✗ 09 未達
-  判定 : 観測型（labapp を動かし、rpm の台帳・入った経路・rpm -V labapp を見た）
+  判定 : 観測型（labapp の出力・入った経路・入れたときの中身との違いを見た）
   観測 : labapp = labapp-1.0-1.noarch（経路 @lab）
          liblab = liblab-1.0-1.noarch（経路 @lab）
          labapp の出力 = liblab: hello from labapp 1.0（終了コード 0）
-         rpm -V labapp = 何も出ない（どのファイルも台帳の記録のまま）
+         入れたときの中身と違うファイル = 無い（どれも入れたときのまま）
          → labapp が「liblab: こんにちは from labapp 1.0」を出さない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 09
 exit=1
@@ -173,18 +176,18 @@ liblab: こんにちは from labapp 1.0
 
 $ lab check 09; echo "exit=$?"
 ✗ 09 未達
-  判定 : 観測型（labapp を動かし、rpm の台帳・入った経路・rpm -V labapp を見た）
+  判定 : 観測型（labapp の出力・入った経路・入れたときの中身との違いを見た）
   観測 : labapp = labapp-1.0-1.noarch（経路 @lab）
          liblab = liblab-1.0-1.noarch（経路 @lab）
          labapp の出力 = liblab: こんにちは from labapp 1.0（終了コード 0）
-         rpm -V labapp（台帳と違うファイル）:
-         │ S.5....T.    /usr/bin/labapp
+         入れたときの中身と違うファイル:
+         │ /usr/bin/labapp
          → 設定ファイル以外のファイルが、台帳の記録と違う
   → この事実から何が欠けているか考えてください。詰まったら lab hint 09
 exit=1
 
 $ sudo yum reinstall -y labapp
-Last metadata expiration check: 2:11:10 ago on Tue Oct 20 19:34:06 2026.
+Last metadata expiration check: 3:32:43 ago on Tue Oct 20 19:34:06 2026.
 Dependencies resolved.
 ================================================================================
  Package            Architecture       Version            Repository       Size
@@ -225,13 +228,14 @@ exit=1
 
 $ lab check 09; echo "exit=$?"
 ✔ 09 達成
-  判定 : 観測型（labapp を動かし、rpm の台帳・入った経路・rpm -V labapp を見た）
+  判定 : 観測型（labapp の出力・入った経路・入れたときの中身との違いを見た）
   観測 : labapp = labapp-1.0-1.noarch（経路 @lab）
          liblab = liblab-1.0-1.noarch（経路 @lab）
          labapp の出力 = liblab: こんにちは from labapp 1.0（終了コード 0）
-         rpm -V labapp（台帳と違うファイル）:
-         │ S.5....T.  c /etc/labapp.conf
-         labapp と liblab は yum で lab から入り、書き換わったのは設定ファイルだけで、挨拶はこんにちは
+         入れたときの中身と違うファイル:
+         │ /etc/labapp.conf（設定ファイル。書き換えてよい）
+         labapp と liblab は yum で lab から入っている
+         書き換わったのは設定ファイルだけで、挨拶はこんにちは
 exit=0
 
 
@@ -254,6 +258,8 @@ $ lab start 10
     RPM-GPG-KEY-lab-tools  lab-mathtools-1.0-1.noarch.rpm  repodata
 
   labcalc はまだ入っていないので、command not found が出るのが始まりの正しい状態です。
+  第10章を読んだ檻のままなら、檻を起動し直してから始めてください。第10章で取り込んだ
+  「lab tools」の鍵が台帳に残っていると、この演習の要（鍵を取り込んでよいかの問い）が出ません。
 
   /srv/lab-tools-rpm に、yum のリポジトリが1つ置いてあります。
   まだ /etc/yum.repos.d/ には登録されていません。
@@ -275,11 +281,13 @@ $ lab start 10
 
 【判定のしかた】
 
-  次の3つを確かめます。
+  次の4つを確かめます。
 
       labcalc が動き、rpm の台帳にあるパッケージから入っている
       そのパッケージが、/srv/lab-tools-rpm を指すリポジトリから yum で入っている
-      lab tools の公開鍵が rpm の台帳に入っている（= 署名を確かめてから入れた）
+      そのリポジトリの設定が gpgcheck=1 のまま（署名の確認を切っていない）
+      lab tools の公開鍵が、そのパッケージより先に rpm の台帳に入っている
+      （= 入れるときに、署名を確かめた）
 
 【できたら】
 
@@ -335,13 +343,19 @@ exit=1
 
 $ lab check 10; echo "exit=$?"
 ✗ 10 未達
-  判定 : 観測型（labcalc を動かし、rpm の台帳と dnf の記録と鍵の台帳を見た）
+  判定 : 観測型（labcalc を動かし、rpm と dnf の記録と .repo の設定を見た）
   観測 : labcalc = コマンドとして見つからない
          lab tools の鍵 = rpm の台帳に無い
   → この事実から何が欠けているか考えてください。詰まったら lab hint 10
 exit=1
 
-$ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' 'gpgcheck=1' 'gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools' | sudo tee /etc/yum.repos.d/lab-tools.repo
+$ sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+[lab-tools]
+name=lab tools
+baseurl=file:///srv/lab-tools-rpm
+gpgcheck=1
+gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+END
 [lab-tools]
 name=lab tools
 baseurl=file:///srv/lab-tools-rpm
@@ -349,7 +363,6 @@ gpgcheck=1
 gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
 
 $ sudo yum install -y lab-mathtools
-Last metadata expiration check: 0:00:01 ago on Tue Oct 20 21:45:17 2026.
 Dependencies resolved.
 ================================================================================
  Package                Architecture    Version        Repository          Size
@@ -393,13 +406,15 @@ lab-mathtools.noarch                      1.0-1                       @lab-tools
 
 $ lab check 10; echo "exit=$?"
 ✔ 10 達成
-  判定 : 観測型（labcalc を動かし、rpm の台帳と dnf の記録と鍵の台帳を見た）
+  判定 : 観測型（labcalc を動かし、rpm と dnf の記録と .repo の設定を見た）
   観測 : labcalc = /usr/bin/labcalc
          labcalc 2 3 の出力 = 5
          rpm の台帳 = lab-mathtools-1.0-1.noarch
          入った経路 = @lab-tools（file:///srv/lab-tools-rpm）
-         lab tools の鍵 = gpg-pubkey-b0f3d614-6ad74395 lab tools <tools@example.invalid> public key
-         labcalc は lab-mathtools のもので、@lab-tools から署名を確かめて入っている
+         lab-tools の署名の確認 = gpgcheck=1
+         lab tools の鍵 = gpg-pubkey-b0f3d614-6ad74395
+         台帳に入った順 = lab tools の鍵 → lab-mathtools
+         lab-mathtools が @lab-tools から、署名を確かめて入っている
 exit=0
 
 
@@ -470,7 +485,7 @@ $ echo "--- 権限だけ戻した（中身は違うまま） ---"; lab check 11;
 exit=1
 
 $ sudo yum reinstall -y labmotd
-Last metadata expiration check: 0:00:02 ago on Tue Oct 20 21:45:17 2026.
+Last metadata expiration check: 0:00:01 ago on Tue Oct 20 23:06:51 2026.
 Dependencies resolved.
 ================================================================================
  Package             Architecture       Version           Repository       Size
@@ -535,6 +550,9 @@ $ lab start 12
     bash: labtool: command not found
 
   ~/work/12 は空で、labtool はまだ入っていません。これが始まりの正しい状態です。
+  （第11章を同じ檻で打って入れて消したあとなら、
+    bash: /usr/bin/labtool: No such file or directory
+   と出ることもあります。どちらも「いまは入っていない」という意味です）
 
   インターネットにつながらないサーバに入れる、という想定です。
   つながっている側で .rpm ファイルを取ってきて、運び込んでから rpm で入れます。
@@ -565,9 +583,9 @@ $ lab start 12
 
 
 $ cd ~/work/12 && ls && yumdownloader labtool && ls -l
-Last metadata expiration check: 0:00:02 ago on Tue Oct 20 21:45:17 2026.
+Last metadata expiration check: 0:00:02 ago on Tue Oct 20 23:06:51 2026.
 total 8
--rw-r--r-- 1 lab lab 6859 Oct 20 21:45 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6859 Oct 20 23:06 labtool-1.0-1.noarch.rpm
 
 $ cd ~/work/12 && sudo rpm -ivh labtool-1.0-1.noarch.rpm; echo "exit=$?"
 error: Failed dependencies:
@@ -577,7 +595,7 @@ exit=1
 $ echo "--- labtool だけ取って rpm -ivh した（依存で止まった） ---"; lab check 12; echo "exit=$?"
 --- labtool だけ取って rpm -ivh した（依存で止まった） ---
 ✗ 12 未達
-  判定 : 観測型（~/work/12 の .rpm の中身、rpm の台帳、dnf が記録した経路を見た）
+  判定 : 観測型（~/work/12 の .rpm の中身と、rpm の台帳と、dnf の記録を見た）
   観測 : ~/work/12 の .rpm = labtool
          labtool = rpm の台帳に無い
          labtool-data = rpm の台帳に無い
@@ -590,10 +608,10 @@ $ echo "--- labtool だけ取って rpm -ivh した（依存で止まった） -
 exit=1
 
 $ cd ~/work/12 && yumdownloader --resolve labtool && ls -l
-Last metadata expiration check: 0:00:02 ago on Tue Oct 20 21:45:17 2026.
+Last metadata expiration check: 0:00:02 ago on Tue Oct 20 23:06:51 2026.
 total 16
--rw-r--r-- 1 lab lab 6859 Oct 20 21:45 labtool-1.0-1.noarch.rpm
--rw-r--r-- 1 lab lab 6729 Oct 20 21:45 labtool-data-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6859 Oct 20 23:06 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6729 Oct 20 23:06 labtool-data-1.0-1.noarch.rpm
 
 $ cd ~/work/12 && sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
 Verifying...                          ########################################
@@ -612,7 +630,7 @@ labtool-data.noarch                        1.0-1                         @System
 
 $ lab check 12; echo "exit=$?"
 ✔ 12 達成
-  判定 : 観測型（~/work/12 の .rpm の中身、rpm の台帳、dnf が記録した経路を見た）
+  判定 : 観測型（~/work/12 の .rpm の中身と、rpm の台帳と、dnf の記録を見た）
   観測 : ~/work/12 の .rpm = labtool labtool-data
          labtool = labtool-1.0-1.noarch（経路 @System）
          labtool-data = labtool-data-1.0-1.noarch（経路 @System）
@@ -645,21 +663,24 @@ exit=0
 
 $ lab check; echo "exit=$?"
 ✔ 09 達成
-  判定 : 観測型（labapp を動かし、rpm の台帳・入った経路・rpm -V labapp を見た）
+  判定 : 観測型（labapp の出力・入った経路・入れたときの中身との違いを見た）
   観測 : labapp = labapp-1.0-1.noarch（経路 @lab）
          liblab = liblab-1.0-1.noarch（経路 @lab）
          labapp の出力 = liblab: こんにちは from labapp 1.0（終了コード 0）
-         rpm -V labapp（台帳と違うファイル）:
-         │ S.5....T.  c /etc/labapp.conf
-         labapp と liblab は yum で lab から入り、書き換わったのは設定ファイルだけで、挨拶はこんにちは
+         入れたときの中身と違うファイル:
+         │ /etc/labapp.conf（設定ファイル。書き換えてよい）
+         labapp と liblab は yum で lab から入っている
+         書き換わったのは設定ファイルだけで、挨拶はこんにちは
 ✔ 10 達成
-  判定 : 観測型（labcalc を動かし、rpm の台帳と dnf の記録と鍵の台帳を見た）
+  判定 : 観測型（labcalc を動かし、rpm と dnf の記録と .repo の設定を見た）
   観測 : labcalc = /usr/bin/labcalc
          labcalc 2 3 の出力 = 5
          rpm の台帳 = lab-mathtools-1.0-1.noarch
          入った経路 = @lab-tools（file:///srv/lab-tools-rpm）
-         lab tools の鍵 = gpg-pubkey-b0f3d614-6ad74395 lab tools <tools@example.invalid> public key
-         labcalc は lab-mathtools のもので、@lab-tools から署名を確かめて入っている
+         lab-tools の署名の確認 = gpgcheck=1
+         lab tools の鍵 = gpg-pubkey-b0f3d614-6ad74395
+         台帳に入った順 = lab tools の鍵 → lab-mathtools
+         lab-mathtools が @lab-tools から、署名を確かめて入っている
 ✔ 11 達成
   判定 : 観測型（rpm -V labmotd の結果と、labmotd を動かした結果を見た）
   観測 : rpm -V labmotd の終了コード = 0
@@ -667,7 +688,7 @@ $ lab check; echo "exit=$?"
          labmotd = 今日のひとこと: 台帳と照らし合わせれば、変わったファイルが分かる。（終了コード 0）
          labmotd のファイルはすべて台帳どおりで、パッケージの1行を出した
 ✔ 12 達成
-  判定 : 観測型（~/work/12 の .rpm の中身、rpm の台帳、dnf が記録した経路を見た）
+  判定 : 観測型（~/work/12 の .rpm の中身と、rpm の台帳と、dnf の記録を見た）
   観測 : ~/work/12 の .rpm = labtool labtool-data
          labtool = labtool-1.0-1.noarch（経路 @System）
          labtool-data = labtool-data-1.0-1.noarch（経路 @System）
@@ -737,7 +758,7 @@ $ lab solve 10 | head -6
 
 リポジトリの登録 → ファイル名から探す → 署名を確かめて入れる、の3段です。
 
-    printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' \
+    sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
 
 $ lab reset 12
 演習 12 を初期状態に戻しました（~/work/12）
@@ -753,7 +774,7 @@ $ lab ls
 
 $ lab check 12; echo "exit=$?"
 ✗ 12 未達
-  判定 : 観測型（~/work/12 の .rpm の中身、rpm の台帳、dnf が記録した経路を見た）
+  判定 : 観測型（~/work/12 の .rpm の中身と、rpm の台帳と、dnf の記録を見た）
   観測 : ~/work/12 の .rpm = 無い
          labtool = labtool-1.0-1.noarch（経路 @System）
          labtool-data = labtool-data-1.0-1.noarch（経路 @System）

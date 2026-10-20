@@ -160,7 +160,7 @@ extras-6ca639b91115fc97</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: <code>yum update</code> で上げるときの出力の読み方。</div>
 <p>上げるのは <code>yum update</code> である（名前を付ければそれだけ、付けなければ入っているもの全部。dnf では <code>yum upgrade</code> と同じもの）。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo yum update labhello
-Last metadata expiration check: 0:00:01 ago on Tue Oct 20 21:40:57 2026.
+Last metadata expiration check: 0:00:01 ago on Tue Oct 20 23:09:15 2026.
 Dependencies resolved.
 ================================================================================
  Package           Architecture    Version           Repository            Size
@@ -251,14 +251,14 @@ $ rpm -K ~/tree-copy.rpm
 <div class="sgoal"><b>この節で分かること</b>: 入れる前に、yum に何を聞けるか。</div>
 <p>yum は目録を持っているので、入っていないパッケージについても答える。名前と説明から探すのが <code>search</code>、1つを詳しく見るのが <code>info</code> である。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ yum search liblab
-Last metadata expiration check: 0:00:10 ago on Tue Oct 20 21:40:57 2026.
+Last metadata expiration check: 0:00:09 ago on Tue Oct 20 23:09:15 2026.
 ========================= Name Exactly Matched: liblab =========================
 liblab.noarch : small shell library for lab programs
 =========================== Summary Matched: liblab ============================
 labapp.noarch : sample application that needs liblab</code></pre>
 <p><code>search</code> は、名前が一致したもの（<code>Name Exactly Matched</code>）と、説明（Summary）に語を含むもの（<code>Summary Matched</code>）を分けて出す。1行目は第9章で見た、目録を最後に確かめた時刻の知らせである。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ yum info labtool
-Last metadata expiration check: 0:00:10 ago on Tue Oct 20 21:40:57 2026.
+Last metadata expiration check: 0:00:10 ago on Tue Oct 20 23:09:15 2026.
 Available Packages
 Name         : labtool
 Version      : 1.0
@@ -274,24 +274,24 @@ Description  : Prints a line shipped in labtool-data.</code></pre>
 <p><code>info</code> の <code>Available Packages</code> は「入れられるもの」の印で、入っていれば <code>Installed Packages</code> になる。欄は第9章の <code>rpm -qi</code> と同じで、<code>Repository</code> がどのリポジトリの目録に載っているかである。</p>
 <p>ファイル名からパッケージを探すのが <code>provides</code> である。入れる前でも答える。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ yum provides /usr/bin/labtool
-Last metadata expiration check: 0:00:11 ago on Tue Oct 20 21:40:57 2026.
+Last metadata expiration check: 0:00:11 ago on Tue Oct 20 23:09:15 2026.
 labtool-1.0-1.noarch : tool that needs labtool-data
 Repo        : lab
 Matched from:
 Filename    : /usr/bin/labtool
 $ yum provides '*/liblab.sh'
-Last metadata expiration check: 0:00:12 ago on Tue Oct 20 21:40:57 2026.
+Last metadata expiration check: 0:00:11 ago on Tue Oct 20 23:09:15 2026.
 liblab-1.0-1.noarch : small shell library for lab programs
 Repo        : lab
 Matched from:
 Filename    : /usr/lib/liblab/liblab.sh</code></pre>
 <p>答えは「パッケージ名-版-リリース.アーキテクチャ : 説明」の行と、どのリポジトリか（<code>Repo</code>）、どの名前で当たったか（<code>Filename</code>）である。パスの一部しか分からないときは、<code>'*/liblab.sh'</code> のように <code>*</code> を使う（シェルに先に解釈させないよう <code>'</code> で囲む）。逆向きに、パッケージの中のファイルの一覧を出すのが <code>repoquery -l</code> である。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ yum repoquery -l labtool
-Last metadata expiration check: 0:00:13 ago on Tue Oct 20 21:40:57 2026.
+Last metadata expiration check: 0:00:12 ago on Tue Oct 20 23:09:15 2026.
 /usr/bin/labtool</code></pre>
 <p>labtool が置くファイルは <code>/usr/bin/labtool</code> の1つである。<code>repoquery</code> は、もとは yum-utils という別の道具の中のコマンドで、いまの yum では <code>yum repoquery</code> とも <code>repoquery</code> とも打てる。依存関係を出すのが <code>deplist</code> である。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ yum deplist labtool
-Last metadata expiration check: 0:00:13 ago on Tue Oct 20 21:40:57 2026.
+Last metadata expiration check: 0:00:13 ago on Tue Oct 20 23:09:15 2026.
 package: labtool-1.0-1.noarch
   dependency: /usr/bin/sh
    provider: bash-5.1.8-9.el9.x86_64
@@ -302,7 +302,7 @@ package: labtool-1.0-1.noarch
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm -qf /usr/bin/dig
 error: file /usr/bin/dig: No such file or directory
 $ yum provides /usr/bin/dig
-Last metadata expiration check: 0:00:14 ago on Tue Oct 20 21:40:57 2026.
+Last metadata expiration check: 0:00:14 ago on Tue Oct 20 23:09:15 2026.
 bind-utils-32:9.16.23-34.el9_7.1.x86_64 : Utilities for querying DNS name
                                         : servers
 Repo        : appstream

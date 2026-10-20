@@ -20,14 +20,14 @@ lab-linuc-packages-deb  進捗 0/8
 
 $ lab check; echo "exit=$?"
 ✗ 01 未達
-  判定 : 観測型（labhello を動かし、dpkg の台帳を見た）
+  判定 : 観測型（labhello を動かし、パッケージを入れた記録を見た）
   観測 : /usr/bin/labhello = 無い（labhello と打っても見つからない）
-         dpkg の台帳 = labhello の行が無い
+         入れた記録 = labhello はパッケージとして入っていない
          → labhello が動かない
-         → 台帳で labhello が ii（入っていて、使える状態）になっていない
+         → labhello がパッケージとして入った記録が無い（apt で入れていない）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 01
 ✗ 02 未達
-  判定 : 観測型（dpkg の台帳で、lab で始まるパッケージの状態と分類（Section）を見た）
+  判定 : 観測型（台帳で、lab で始まるパッケージの状態と分類（Section）を見た）
   観測 : 入っていて、分類が games のパッケージ = 1 個
          labbackup      の台帳 = ii
          labsvc         の台帳 = ii
@@ -37,9 +37,9 @@ $ lab check; echo "exit=$?"
          → 分類（Section）が games のパッケージが、まだ入っている
   → この事実から何が欠けているか考えてください。詰まったら lab hint 02
 ✗ 03 未達
-  判定 : 観測型（labsvc を動かした出力と、dpkg -V labsvc の結果を見た）
+  判定 : 観測型（labsvc の出力と、台帳の「入れたときの中身」との違いを見た）
   観測 : labsvc が表示したポート = 8080（終了コード 0）
-         dpkg -V labsvc = 何も出ない（どのファイルも台帳の記録のまま）
+         入れたときの中身と違うファイル = 無い（どれも入れたときのまま）
          → labsvc が port=9090 と表示しない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 03
 ✗ 04 未達
@@ -75,13 +75,13 @@ $ lab check; echo "exit=$?"
          → labnote が終了コード 127 で終わった
   → この事実から何が欠けているか考えてください。詰まったら lab hint 07
 ✗ 08 未達
-  判定 : 観測型（dpkg の台帳の labmine と、labmine を動かした結果を見た）
+  判定 : 観測型（labmine と liblab の台帳と、labmine を動かした結果を見た）
   観測 : labmine の台帳 = 行が無い
          /usr/bin/labmine を置いたパッケージ = 台帳に無い
          liblab の台帳 = 行が無い
          /usr/bin/labmine = 無い（または実行できない）
          → labmine が台帳で ii になっていない
-         → /usr/bin/labmine が、labmine パッケージのファイルとして台帳に載っていない
+         → /usr/bin/labmine が、labmine のファイルとして台帳に載っていない
          → labmine が期待の1行を出さない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 08
 exit=1
@@ -175,10 +175,10 @@ labhello 1.0
 
 $ lab check 01; echo "exit=$?"
 ✔ 01 達成
-  判定 : 観測型（labhello を動かし、dpkg の台帳を見た）
+  判定 : 観測型（labhello を動かし、パッケージを入れた記録を見た）
   観測 : labhello の出力 = labhello 1.0（終了コード 0）
-         dpkg の台帳 = ii（版 1.0）
-         labhello はパッケージとして入っていて（ii）、動いて版を出した
+         入れた記録 = labhello はパッケージとして入っている（版 1.0）
+         labhello はパッケージとして入っていて、動いて版を出した
 exit=0
 
 
@@ -250,7 +250,7 @@ Removing labbackup (1.0) ...
 
 $ lab check 02; echo "exit=$?"
 ✗ 02 未達
-  判定 : 観測型（dpkg の台帳で、lab で始まるパッケージの状態と分類（Section）を見た）
+  判定 : 観測型（台帳で、lab で始まるパッケージの状態と分類（Section）を見た）
   観測 : 入っていて、分類が games のパッケージ = 1 個
          labbackup      の台帳 = 行が無い
          labsvc         の台帳 = ii
@@ -258,7 +258,7 @@ $ lab check 02; echo "exit=$?"
          labweb         の台帳 = ii
          labweb-data    の台帳 = ii
          → 分類（Section）が games のパッケージが、まだ入っている
-         → labbackup は遊びのパッケージではないのに、入っていない（消してしまった）
+         → labbackup は遊びのパッケージではないのに、消えている
   → この事実から何が欠けているか考えてください。詰まったら lab hint 02
 exit=1
 
@@ -310,7 +310,7 @@ Removing labfortune (1.0) ...
 
 $ lab check 02; echo "exit=$?"
 ✔ 02 達成
-  判定 : 観測型（dpkg の台帳で、lab で始まるパッケージの状態と分類（Section）を見た）
+  判定 : 観測型（台帳で、lab で始まるパッケージの状態と分類（Section）を見た）
   観測 : 入っていて、分類が games のパッケージ = 0 個
          labbackup      の台帳 = ii
          labsvc         の台帳 = ii
@@ -391,10 +391,10 @@ port=9090
 
 $ lab check 03; echo "exit=$?"
 ✗ 03 未達
-  判定 : 観測型（labsvc を動かした出力と、dpkg -V labsvc の結果を見た）
+  判定 : 観測型（labsvc の出力と、台帳の「入れたときの中身」との違いを見た）
   観測 : labsvc が表示したポート = 9090（終了コード 0）
-         dpkg -V labsvc（台帳と違うファイル）:
-         │ ??5??????   /usr/bin/labsvc
+         入れたときの中身と違うファイル:
+         │ /usr/bin/labsvc
          → 設定ファイル以外のファイルが、台帳の記録と違う
   → この事実から何が欠けているか考えてください。詰まったら lab hint 03
 exit=1
@@ -434,10 +434,10 @@ port=9090
 
 $ lab check 03; echo "exit=$?"
 ✔ 03 達成
-  判定 : 観測型（labsvc を動かした出力と、dpkg -V labsvc の結果を見た）
+  判定 : 観測型（labsvc の出力と、台帳の「入れたときの中身」との違いを見た）
   観測 : labsvc が表示したポート = 9090（終了コード 0）
-         dpkg -V labsvc（台帳と違うファイル）:
-         │ ??5?????? c /etc/labsvc.conf
+         入れたときの中身と違うファイル:
+         │ /etc/labsvc.conf（設定ファイル。書き換えてよい）
          labsvc は port=9090 を表示し、書き換わったのは設定ファイルだけ
 exit=0
 
@@ -669,7 +669,7 @@ $ lab check 05; echo "exit=$?"
   観測 : labweb           の台帳 = 行が無い
          labweb-data      の台帳 = 行が無い
          /etc/labweb.conf        = 無い
-         labweb は台帳にも /etc にも残っておらず、一緒に入った labweb-data も消えている
+         labweb は台帳にも /etc にも残らず、labweb-data も消えている
 exit=0
 
 
@@ -760,8 +760,8 @@ Ign:1 file:/srv/lab-repo lab InRelease
 Get:2 file:/srv/lab-tools tools InRelease
 Ign:2 file:/srv/lab-tools tools InRelease
 Get:3 file:/srv/lab-repo lab Release [1983 B]
-Get:3 file:/srv/lab-repo lab Release [1983 B]
 Get:4 file:/srv/lab-tools tools Release [1991 B]
+Get:3 file:/srv/lab-repo lab Release [1983 B]
 Get:4 file:/srv/lab-tools tools Release [1991 B]
 Get:5 file:/srv/lab-repo lab Release.gpg
 Ign:5 file:/srv/lab-repo lab Release.gpg
@@ -816,7 +816,7 @@ $ lab check 06; echo "exit=$?"
          labcalc 2 3 の出力 = 5
          dpkg の台帳 = lab-mathtools（ii）
          apt の目録 = lab-mathtools を file:/srv/lab-tools から取れる
-         labcalc は lab-mathtools が入れたもので、apt はそれを /srv/lab-tools から取れる
+         labcalc は lab-mathtools のもので、apt は /srv/lab-tools から取れる
 exit=0
 
 
@@ -983,6 +983,8 @@ $ lab start 08
     $ sh labmine.sh
     labmine.sh: 3: .: cannot open /usr/lib/liblab/liblab.sh: No such file
 
+  sh labmine.sh は、ファイルを sh（シェル）に読ませて動かす打ち方です。
+  1行目の #!/bin/sh は、第8章で見た「sh に読ませて動かす」という印です。
   labmine.sh は、パッケージ liblab が置くファイル /usr/lib/liblab/liblab.sh を読み込みます。
   liblab はまだ入っていないので、このエラーが出るのが始まりの正しい状態です。
 
@@ -1003,6 +1005,8 @@ $ lab start 08
 
   dpkg の台帳で、labmine が版 1.0 で ii になっていること、依存関係に liblab が書かれていること、
   /usr/bin/labmine が labmine のファイルとして載っていて、持ち主が root であることを見ます。
+  liblab には、依存関係から一緒に入ったときにだけ付く「自動で入った」印（第5章の
+  apt-mark showauto）が付いているかを見ます。
   そして labmine を実際に動かし、上の1行が出るかを見ます。
 
 【できたら】
@@ -1055,13 +1059,13 @@ Unpacking labmine (1.0) ...
 Setting up labmine (1.0) ...
 
 $ ls -l /usr/bin/labmine; labmine; echo "exit=$?"
--rwxr-xr-x 1 lab lab 233 Oct 20 21:45 /usr/bin/labmine
+-rwxr-xr-x 1 lab lab 233 Oct 20 23:06 /usr/bin/labmine
 /usr/bin/labmine: 3: .: cannot open /usr/lib/liblab/liblab.sh: No such file
 exit=2
 
 $ lab check 08; echo "exit=$?"
 ✗ 08 未達
-  判定 : 観測型（dpkg の台帳の labmine と、labmine を動かした結果を見た）
+  判定 : 観測型（labmine と liblab の台帳と、labmine を動かした結果を見た）
   観測 : labmine の台帳 = ii（版 1.0）
          labmine の依存関係（Depends）= 書かれていない
          /usr/bin/labmine を置いたパッケージ = labmine（持ち主 lab:lab）
@@ -1079,10 +1083,10 @@ $ cd ~/work/08 && dpkg-deb --build --root-owner-group labmine .
 dpkg-deb: building package 'labmine' in './labmine_1.0_all.deb'.
 
 $ cd ~/work/08 && dpkg -c labmine_1.0_all.deb && dpkg -I labmine_1.0_all.deb | grep Depends
-drwxr-xr-x root/root         0 2026-10-20 21:45 ./
-drwxr-xr-x root/root         0 2026-10-20 21:45 ./usr/
-drwxr-xr-x root/root         0 2026-10-20 21:45 ./usr/bin/
--rwxr-xr-x root/root       233 2026-10-20 21:45 ./usr/bin/labmine
+drwxr-xr-x root/root         0 2026-10-20 23:06 ./
+drwxr-xr-x root/root         0 2026-10-20 23:06 ./usr/
+drwxr-xr-x root/root         0 2026-10-20 23:06 ./usr/bin/
+-rwxr-xr-x root/root       233 2026-10-20 23:06 ./usr/bin/labmine
  Depends: liblab
 
 $ cd ~/work/08 && sudo apt install -y --reinstall ./labmine_1.0_all.deb
@@ -1099,10 +1103,10 @@ The following NEW packages will be installed:
 The following packages will be upgraded:
   labmine
 1 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
-Need to get 0 B/1468 B of archives.
+Need to get 0 B/1470 B of archives.
 After this operation, 36.9 kB of additional disk space will be used.
 Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
-Get:2 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [722 B]
+Get:2 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [724 B]
 debconf: unable to initialize frontend: Dialog
 debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
 debconf: falling back to frontend: Readline
@@ -1120,18 +1124,19 @@ Setting up liblab (1.0) ...
 Setting up labmine (1.0) ...
 
 $ ls -l /usr/bin/labmine; labmine
--rwxr-xr-x 1 root root 233 Oct 20 21:45 /usr/bin/labmine
+-rwxr-xr-x 1 root root 233 Oct 20 23:06 /usr/bin/labmine
 liblab: 自分で作ったパッケージから入りました
 
 $ lab check 08; echo "exit=$?"
 ✔ 08 達成
-  判定 : 観測型（dpkg の台帳の labmine と、labmine を動かした結果を見た）
+  判定 : 観測型（labmine と liblab の台帳と、labmine を動かした結果を見た）
   観測 : labmine の台帳 = ii（版 1.0）
          labmine の依存関係（Depends）= liblab
          /usr/bin/labmine を置いたパッケージ = labmine（持ち主 root:root）
-         liblab の台帳 = ii
+         liblab の台帳 = ii（自動で入った印 あり）
          labmine の出力 = liblab: 自分で作ったパッケージから入りました（終了コード 0）
-         labmine 1.0 が liblab への依存つきで入り、/usr/bin/labmine（root の持ち物）が動いた
+         labmine 1.0 が、依存関係で liblab を連れて入り、
+         /usr/bin/labmine（root の持ち物）が動いた
 
   ════════════════════════════════════════
    確かめて説明する LinuC 主題1.04（Debian 系） — 全8演習クリア
@@ -1163,12 +1168,12 @@ exit=0
 
 $ lab check; echo "exit=$?"
 ✔ 01 達成
-  判定 : 観測型（labhello を動かし、dpkg の台帳を見た）
+  判定 : 観測型（labhello を動かし、パッケージを入れた記録を見た）
   観測 : labhello の出力 = labhello 1.0（終了コード 0）
-         dpkg の台帳 = ii（版 1.0）
-         labhello はパッケージとして入っていて（ii）、動いて版を出した
+         入れた記録 = labhello はパッケージとして入っている（版 1.0）
+         labhello はパッケージとして入っていて、動いて版を出した
 ✔ 02 達成
-  判定 : 観測型（dpkg の台帳で、lab で始まるパッケージの状態と分類（Section）を見た）
+  判定 : 観測型（台帳で、lab で始まるパッケージの状態と分類（Section）を見た）
   観測 : 入っていて、分類が games のパッケージ = 0 個
          labbackup      の台帳 = ii
          labsvc         の台帳 = ii
@@ -1177,10 +1182,10 @@ $ lab check; echo "exit=$?"
          labweb-data    の台帳 = 行が無い
          分類が games のパッケージは無くなり、ほかのパッケージは入ったまま
 ✔ 03 達成
-  判定 : 観測型（labsvc を動かした出力と、dpkg -V labsvc の結果を見た）
+  判定 : 観測型（labsvc の出力と、台帳の「入れたときの中身」との違いを見た）
   観測 : labsvc が表示したポート = 9090（終了コード 0）
-         dpkg -V labsvc（台帳と違うファイル）:
-         │ ??5?????? c /etc/labsvc.conf
+         入れたときの中身と違うファイル:
+         │ /etc/labsvc.conf（設定ファイル。書き換えてよい）
          labsvc は port=9090 を表示し、書き換わったのは設定ファイルだけ
 ✔ 04 達成
   判定 : 観測型（labbackup を動かした結果と、dpkg -V labbackup の結果を見た）
@@ -1193,14 +1198,14 @@ $ lab check; echo "exit=$?"
   観測 : labweb           の台帳 = 行が無い
          labweb-data      の台帳 = 行が無い
          /etc/labweb.conf        = 無い
-         labweb は台帳にも /etc にも残っておらず、一緒に入った labweb-data も消えている
+         labweb は台帳にも /etc にも残らず、labweb-data も消えている
 ✔ 06 達成
   判定 : 観測型（labcalc を動かし、dpkg の台帳と apt の目録を見た）
   観測 : labcalc = /usr/bin/labcalc
          labcalc 2 3 の出力 = 5
          dpkg の台帳 = lab-mathtools（ii）
          apt の目録 = lab-mathtools を file:/srv/lab-tools から取れる
-         labcalc は lab-mathtools が入れたもので、apt はそれを /srv/lab-tools から取れる
+         labcalc は lab-mathtools のもので、apt は /srv/lab-tools から取れる
 ✔ 07 達成
   判定 : 観測型（dpkg の台帳の状態と、labnote を動かした結果を見た）
   観測 : labnote      の台帳 = ii
@@ -1208,13 +1213,14 @@ $ lab check; echo "exit=$?"
          labnote の出力 = labnote: labnote-data から読んだ1行です（終了コード 0）
          labnote と labnote-data がどちらも ii で、labnote が動いた
 ✔ 08 達成
-  判定 : 観測型（dpkg の台帳の labmine と、labmine を動かした結果を見た）
+  判定 : 観測型（labmine と liblab の台帳と、labmine を動かした結果を見た）
   観測 : labmine の台帳 = ii（版 1.0）
          labmine の依存関係（Depends）= liblab
          /usr/bin/labmine を置いたパッケージ = labmine（持ち主 root:root）
-         liblab の台帳 = ii
+         liblab の台帳 = ii（自動で入った印 あり）
          labmine の出力 = liblab: 自分で作ったパッケージから入りました（終了コード 0）
-         labmine 1.0 が liblab への依存つきで入り、/usr/bin/labmine（root の持ち物）が動いた
+         labmine 1.0 が、依存関係で liblab を連れて入り、
+         /usr/bin/labmine（root の持ち物）が動いた
 exit=0
 
 $ lab ls
@@ -1262,9 +1268,9 @@ sources.list の1行は、この3つを並べたものです。
 
     deb  <URI>  <ディストリビューション>  <コンポーネント>
 
-すでに入っている行が手本になります。
+すでに入っている行が手本になります（# で始まる行は説明書きで、最後の1行が設定です）。
 
-    grep -v '^#' /etc/apt/sources.list
+    cat /etc/apt/sources.list
 
 足すときは /etc/apt/sources.list.d/ に、名前が .list で終わるファイルを1つ置きます。
 

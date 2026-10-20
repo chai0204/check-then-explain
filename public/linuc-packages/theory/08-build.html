@@ -59,21 +59,21 @@ $ cat &gt; myhello/DEBIAN/control &lt;&lt;'END'
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg-deb --build myhello .
 dpkg-deb: building package 'myhello' in './myhello_1.0_all.deb'.
 $ dpkg -c myhello_1.0_all.deb
-drwxr-xr-x lab/lab           0 2026-10-20 21:35 ./
-drwxr-xr-x lab/lab           0 2026-10-20 21:35 ./usr/
-drwxr-xr-x lab/lab           0 2026-10-20 21:35 ./usr/bin/
--rwxr-xr-x lab/lab          85 2026-10-20 21:35 ./usr/bin/myhello</code></pre>
+drwxr-xr-x lab/lab           0 2026-10-20 23:08 ./
+drwxr-xr-x lab/lab           0 2026-10-20 23:08 ./usr/
+drwxr-xr-x lab/lab           0 2026-10-20 23:08 ./usr/bin/
+-rwxr-xr-x lab/lab          85 2026-10-20 23:08 ./usr/bin/myhello</code></pre>
 <p>できた。ただ、第3章の labapp では <code>root/root</code> だったファイルの持ち主が、<code>lab/lab</code> になっている。dpkg-deb は、ふつう、ファイルをいまの持ち主（作業した lab）のまま詰める。このまま入れると、<code>/usr/bin/myhello</code> の持ち主が lab になり、一般ユーザがシステムのコマンドを書き換えられてしまう。持ち主を root にして詰めるのが <code>--root-owner-group</code> である。作り直して確かめる。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg-deb --build --root-owner-group myhello .
 dpkg-deb: building package 'myhello' in './myhello_1.0_all.deb'.
 $ dpkg -c myhello_1.0_all.deb
-drwxr-xr-x root/root         0 2026-10-20 21:35 ./
-drwxr-xr-x root/root         0 2026-10-20 21:35 ./usr/
-drwxr-xr-x root/root         0 2026-10-20 21:35 ./usr/bin/
--rwxr-xr-x root/root        85 2026-10-20 21:35 ./usr/bin/myhello
+drwxr-xr-x root/root         0 2026-10-20 23:08 ./
+drwxr-xr-x root/root         0 2026-10-20 23:08 ./usr/
+drwxr-xr-x root/root         0 2026-10-20 23:08 ./usr/bin/
+-rwxr-xr-x root/root        85 2026-10-20 23:08 ./usr/bin/myhello
 $ dpkg -I myhello_1.0_all.deb
  new Debian package, version 2.0.
- size 610 bytes: control archive=201 bytes.
+ size 604 bytes: control archive=201 bytes.
      116 bytes,     5 lines      control
  Package: myhello
  Version: 1.0
@@ -97,9 +97,9 @@ Note, selecting 'myhello' instead of './myhello_1.0_all.deb'
 The following NEW packages will be installed:
   myhello
 0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
-Need to get 0 B/610 B of archives.
+Need to get 0 B/604 B of archives.
 After this operation, 0 B of additional disk space will be used.
-Get:1 /home/lab/myhello_1.0_all.deb myhello all 1.0 [610 B]
+Get:1 /home/lab/myhello_1.0_all.deb myhello all 1.0 [604 B]
 Selecting previously unselected package myhello.
 (Reading database ... 12833 files and directories currently installed.)
 Preparing to unpack /home/lab/myhello_1.0_all.deb ...
@@ -119,7 +119,7 @@ $ dpkg -L myhello
 $ dpkg -S /usr/bin/myhello
 myhello: /usr/bin/myhello
 $ ls -l /usr/bin/myhello
--rwxr-xr-x 1 root root 85 Oct 20 21:35 /usr/bin/myhello</code></pre>
+-rwxr-xr-x 1 root root 85 Oct 20 23:08 /usr/bin/myhello</code></pre>
 <p>自分で作ったパッケージも、ほかのパッケージと同じように台帳に載り、<code>dpkg -L</code>・<code>-S</code> で引ける。<code>/usr/bin/myhello</code> の持ち主は root である。消すのも同じである。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt remove myhello
 Reading package lists... Done
