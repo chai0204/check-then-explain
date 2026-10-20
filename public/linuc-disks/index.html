@@ -2,7 +2,7 @@
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ハードウェアとディスク — 確かめて説明する</title>
-<meta name="description" content="LinuC レベル1 101 試験の主題1.05（ハードウェア、パーティション、ファイルシステム）を、コンテナの中で動く仮想マシン（練習機）で確かめる8章。ディスクを分割し、フォーマットし、マウントし、ドライバを外し、USB メモリを抜き差しする。ディスクは装置・パーティション表・LVM・ファイルシステム・マウントの層が重なってできていて、各層は自分の印だけを読む。">
+<meta name="description" content="LinuC レベル1 101 試験の主題1.05（ハードウェア、パーティション、ファイルシステム）を、コンテナの中で動く仮想マシン（練習機）で確かめる11章。空のディスクを区切り、ファイルシステムを作り、マウントして使うところから始め、表の形式、ファイルシステムの種類、起動のたびのマウント、スワップ、LVM、部品の情報とドライバへと順に進む。ディスクは装置・パーティションの表・LVM・ファイルシステム・マウントの段が重なってできていて、各段は自分の印だけを読む。">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-theme="linuc-disks">
@@ -10,36 +10,40 @@
 <nav class="top"><a href="/">トップ</a> › <strong>ハードウェアとディスク</strong></nav>
 <div class="draftbar compact"><p><b>ドラフト</b>: この記事は<b>著者が読者として通していません</b>。本文の出力はすべて実機の記録で、演習は模範解答で通ること・未達のときに判定が鳴ることを確かめてあります。それでも導線の不備は残っている可能性があります。詰まったら各ページ下のコメントか <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> へ。</p></div>
 <h1>ハードウェアとディスク</h1>
-<div class="badges"><span>LinuC レベル1 101 主題1.05</span><span>初級</span><span>演習あり（仮想マシン）</span><span>約4時間47分</span><span>状態: ドラフト</span></div>
-<p class="lead">LinuC レベル1 101 試験の主題1.05（ハードウェア、パーティション、ファイルシステム）を、コンテナの中で動く仮想マシン（練習機）で確かめる8章。ディスクを分割し、フォーマットし、マウントし、ドライバを外し、USB メモリを抜き差しする。ディスクは装置・パーティション表・LVM・ファイルシステム・マウントの層が重なってできていて、各層は自分の印だけを読む。</p>
+<div class="badges"><span>LinuC レベル1 101 主題1.05</span><span>初級</span><span>演習あり（仮想マシン）</span><span>約6時間9分</span><span>状態: ドラフト</span></div>
+<p class="lead">LinuC レベル1 101 試験の主題1.05（ハードウェア、パーティション、ファイルシステム）を、コンテナの中で動く仮想マシン（練習機）で確かめる11章。空のディスクを区切り、ファイルシステムを作り、マウントして使うところから始め、表の形式、ファイルシステムの種類、起動のたびのマウント、スワップ、LVM、部品の情報とドライバへと順に進む。ディスクは装置・パーティションの表・LVM・ファイルシステム・マウントの段が重なってできていて、各段は自分の印だけを読む。</p>
 
 <div class="card"><h3>想定読者</h3><p>LinuC レベル1（101）の受験者で、fdisk も mount も本物のディスクで試したことが無い人。端末でコマンドを打てて、docker を動かせることが前提。</p></div>
 
 <h2 id="outcomes">得られるもの</h2>
 <ul>
-<li>USB メモリを挿したとき、カーネル・udev・modprobe が何をするかを順に言える</li>
+<li>空のディスクを区切り、ファイルシステムを作り、マウントして使い、外せる</li>
 <li>消してしまったパーティションを、表の行を書き戻して取り戻せる</li>
+<li>/etc/fstab の6列を書き、UUID やラベルで指し、再起動の前に確かめられる</li>
 <li>論理ボリュームを広げるとき、ファイルシステムの側に要る操作を言える</li>
-<li>/etc/fstab の6列を書き、装置名ではなく UUID やラベルで指せる</li>
+<li>USB メモリを挿したとき、カーネル・udev・modprobe が何をするかを順に言える</li>
 </ul>
 
 <h2 id="start">進め方</h2>
 <div class="toc">
-  <a href="/linuc-disks/theory/"><b>理論編</b><span>全8章・約3時間6分。1章ごとに「実際に打つと何が出るか」を先に置いてある。</span></a>
-  <a href="/linuc-disks/practice/"><b>実践編</b><span>演習8本・約1時間41分。docker か podman で、練習機（仮想マシン）入りの檻を1つ起動する。イメージ約2GB・起動から ssh まで約30秒。KVM も特権も要らない。</span></a>
+  <a href="/linuc-disks/theory/"><b>理論編</b><span>全11章・約4時間8分。1章ごとに「実際に打つと何が出るか」を先に置いてある。</span></a>
+  <a href="/linuc-disks/practice/"><b>実践編</b><span>演習10本・約2時間1分。docker か podman で、練習機（仮想マシン）入りの檻を1つ起動する。イメージ約2GB・起動から ssh まで約30秒。KVM も特権も要らない。</span></a>
 </div>
-<p class="detail">完了推定時間（約4時間47分）は、各章の所要時間と演習の目安の合計です。</p>
+<p class="detail">完了推定時間（約6時間9分）は、各章の所要時間と演習の目安の合計です。</p>
 
 <h2 id="chapters">章</h2>
 <ol class="chlist">
-<li><a href="/linuc-disks/theory/01-hardware">HDD か SSD かは、装置の申告で決まる</a></li>
-<li><a href="/linuc-disks/theory/02-modules">ドライバは、外しても戻ってくる</a></li>
-<li><a href="/linuc-disks/theory/03-partition">パーティションの表は、目次にすぎない</a></li>
-<li><a href="/linuc-disks/theory/04-esp">起動の入口は、マウントしなくても見つかる</a></li>
-<li><a href="/linuc-disks/theory/05-lvm">LV を広げても、ファイルシステムは広がらない</a></li>
-<li><a href="/linuc-disks/theory/06-mkfs">ファイルシステムは、作った大きさより小さく見える</a></li>
-<li><a href="/linuc-disks/theory/07-swap">tmpfs は、メモリを先に取らない</a></li>
-<li><a href="/linuc-disks/theory/08-mount">マウントは、名前ではなく中身の印で指す</a></li>
+<li><a href="/linuc-disks/theory/01-look">練習機に入り、つながっているディスクを眺める</a></li>
+<li><a href="/linuc-disks/theory/02-first-disk">空のディスクを使えるようにする</a></li>
+<li><a href="/linuc-disks/theory/03-partition">パーティションの表を読む・直す</a></li>
+<li><a href="/linuc-disks/theory/04-gpt">新しい形式の表（GPT）と、起動に使う区画</a></li>
+<li><a href="/linuc-disks/theory/05-mkfs">ファイルシステムの種類と作り方</a></li>
+<li><a href="/linuc-disks/theory/06-media">USB メモリと CD をマウントする</a></li>
+<li><a href="/linuc-disks/theory/07-fstab">起動のたびにマウントする</a></li>
+<li><a href="/linuc-disks/theory/08-swap">スワップと tmpfs</a></li>
+<li><a href="/linuc-disks/theory/09-lvm">LVM で、2台のディスクを1つにまとめる</a></li>
+<li><a href="/linuc-disks/theory/10-hardware">部品の情報を読む</a></li>
+<li><a href="/linuc-disks/theory/11-modules">ドライバと、USB メモリの抜き差し</a></li>
 </ol>
 
 <h2 id="syllabus">出題範囲（LinuC レベル1 101 試験）</h2>
@@ -59,7 +63,7 @@
 <li><a href="/linuc-files/">ファイルとパーミッション</a>（LinuC レベル1 101 主題1.02）</li>
 </ul>
 
-<p class="detail">公開 2026-10-13 ／ 最終更新 2026-10-14 ／ 関連領域: サーバー</p>
+<p class="detail">公開 2026-10-13 ／ 最終更新 2026-10-20 ／ 関連領域: サーバー</p>
 
 <section id="comments">
 <h2>コメント</h2>

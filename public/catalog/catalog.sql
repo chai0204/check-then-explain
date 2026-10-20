@@ -108,13 +108,14 @@ rpm -K の出力を読み、署名が確かめられたかを判断できる');
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-packages', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-disks', 'ハードウェアとディスク', 'ドラフト', 'LinuC レベル1', '101', '1.05', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-14',
-  'LinuC レベル1 101 試験の主題1.05（ハードウェア、パーティション、ファイルシステム）を、コンテナの中で動く仮想マシン（練習機）で確かめる8章。ディスクを分割し、フォーマットし、マウントし、ドライバを外し、USB メモリを抜き差しする。ディスクは装置・パーティション表・LVM・ファイルシステム・マウントの層が重なってできていて、各層は自分の印だけを読む。',
+  'linuc-disks', 'ハードウェアとディスク', 'ドラフト', 'LinuC レベル1', '101', '1.05', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-20',
+  'LinuC レベル1 101 試験の主題1.05（ハードウェア、パーティション、ファイルシステム）を、コンテナの中で動く仮想マシン（練習機）で確かめる11章。空のディスクを区切り、ファイルシステムを作り、マウントして使うところから始め、表の形式、ファイルシステムの種類、起動のたびのマウント、スワップ、LVM、部品の情報とドライバへと順に進む。ディスクは装置・パーティションの表・LVM・ファイルシステム・マウントの段が重なってできていて、各段は自分の印だけを読む。',
   'LinuC レベル1（101）の受験者で、fdisk も mount も本物のディスクで試したことが無い人。端末でコマンドを打てて、docker を動かせることが前提。',
-  'USB メモリを挿したとき、カーネル・udev・modprobe が何をするかを順に言える
+  '空のディスクを区切り、ファイルシステムを作り、マウントして使い、外せる
 消してしまったパーティションを、表の行を書き戻して取り戻せる
+/etc/fstab の6列を書き、UUID やラベルで指し、再起動の前に確かめられる
 論理ボリュームを広げるとき、ファイルシステムの側に要る操作を言える
-/etc/fstab の6列を書き、装置名ではなく UUID やラベルで指せる');
+USB メモリを挿したとき、カーネル・udev・modprobe が何をするかを順に言える');
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-disks', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
@@ -324,14 +325,17 @@ INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 4, 
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 5, 'yum は目録を自分で取りに行く', '/linuc-packages/theory/05-yum', 22);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 6, 'rpm -V が黙るのは台帳どおりだから', '/linuc-packages/theory/06-rpm-query', 20);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 7, 'OK は確かめた範囲の OK', '/linuc-packages/theory/07-rpm-install', 22);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 1, 'HDD か SSD かは、装置の申告で決まる', '/linuc-disks/theory/01-hardware', 18);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 2, 'ドライバは、外しても戻ってくる', '/linuc-disks/theory/02-modules', 26);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 3, 'パーティションの表は、目次にすぎない', '/linuc-disks/theory/03-partition', 25);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 4, '起動の入口は、マウントしなくても見つかる', '/linuc-disks/theory/04-esp', 24);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 5, 'LV を広げても、ファイルシステムは広がらない', '/linuc-disks/theory/05-lvm', 22);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 6, 'ファイルシステムは、作った大きさより小さく見える', '/linuc-disks/theory/06-mkfs', 24);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 7, 'tmpfs は、メモリを先に取らない', '/linuc-disks/theory/07-swap', 17);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 8, 'マウントは、名前ではなく中身の印で指す', '/linuc-disks/theory/08-mount', 30);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 1, '練習機に入り、つながっているディスクを眺める', '/linuc-disks/theory/01-look', 15);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 2, '空のディスクを使えるようにする', '/linuc-disks/theory/02-first-disk', 20);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 3, 'パーティションの表を読む・直す', '/linuc-disks/theory/03-partition', 22);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 4, '新しい形式の表（GPT）と、起動に使う区画', '/linuc-disks/theory/04-gpt', 25);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 5, 'ファイルシステムの種類と作り方', '/linuc-disks/theory/05-mkfs', 22);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 6, 'USB メモリと CD をマウントする', '/linuc-disks/theory/06-media', 24);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 7, '起動のたびにマウントする', '/linuc-disks/theory/07-fstab', 25);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 8, 'スワップと tmpfs', '/linuc-disks/theory/08-swap', 18);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 9, 'LVM で、2台のディスクを1つにまとめる', '/linuc-disks/theory/09-lvm', 24);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 10, '部品の情報を読む', '/linuc-disks/theory/10-hardware', 25);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 11, 'ドライバと、USB メモリの抜き差し', '/linuc-disks/theory/11-modules', 28);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-shell', 1, '起動ファイルはシェルの生まれ方で決まる', '/linuc-shell/theory/01-startup', 20);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-shell', 2, '子のシェルは親を書き換えられない', '/linuc-shell/theory/02-source', 18);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-shell', 3, '&& と || は直前の数だけを見る', '/linuc-shell/theory/03-lists', 15);
@@ -445,14 +449,16 @@ INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', '
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'rpm', '04', 'labcalc を、署名の確認を切らずに入れる', 15);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'rpm', '05', '書き換えられた labmotd を、入れた直後に戻す', 10);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'rpm', '06', 'labtool を yumdownloader で取り、rpm で入れる', 12);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '01', 'vdb を SSD として扱わせる（再起動しても）', 10);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '02', 'USB メモリを挿し直しても使えなくする', 15);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '03', '消してしまったパーティションを取り戻す', 12);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '04', '新しいサーバのディスクを GPT で切る', 15);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '05', '2台のディスクにまたがる箱を作り、中身ごと広げる', 15);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '06', '5種類のファイルシステムを作り、ext4 の予約を減らす', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '01', '空のディスク vde を使えるようにする', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '02', '消してしまったパーティションを取り戻す', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '03', '新しいサーバのディスクを GPT で切る', 15);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '04', '5種類のファイルシステムを作り、ext4 の予約を減らす', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '05', 'ディスクのイメージのファイルから、中のファイルを取り出す', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '06', '一般ユーザが光学メディアをマウントできるようにする', 12);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '07', 'スワップを作り、起動しても有効にする', 10);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '08', '一般ユーザが光学メディアをマウントできるようにする', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '08', '2台のディスクにまたがる箱を作り、中身ごと広げる', 15);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '09', 'vdb を SSD として扱わせる（再起動しても）', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '10', 'USB メモリを挿し直しても使えなくする', 15);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-shell', 'linuc-shell', '01', 'ログインしたときだけ挨拶を出す', 10);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-shell', 'linuc-shell', '02', '自作のコマンドを、名前だけで呼べるようにする', 10);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-shell', 'linuc-shell', '03', 'スクリプトを、全員が名前だけで使えるように置く', 15);
