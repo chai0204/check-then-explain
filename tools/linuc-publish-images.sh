@@ -58,6 +58,7 @@ PAIRS=(
   "linuc-files     lab-linuc-files:1.0.2         $REPO:files-1.0.2"
   "linuc-text      lab-linuc-text:1.0.2          $REPO:text-1.0.2"
   "linuc-shell     lab-linuc-shell:1.0.3         $REPO:shell-1.0.3"
+  "linuc-shell     lab-linuc-shell:1.0.4         $REPO:shell-1.0.4"
   "linuc-boot      lab-linuc-boot:1.0.2          $REPO:boot-1.0.2"
   "linuc-network   lab-linuc-network:1.0.2       $REPO:network-1.0.2"
   "linuc-admin     lab-linuc-admin:1.0.2         $REPO:admin-1.0.2"

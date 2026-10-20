@@ -3,8 +3,8 @@
 ########## 0. 環境 ##########
 
 $ lab env
-テーマ    : lab-linuc-shell 1.0.2
-イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.2
+テーマ    : lab-linuc-shell 1.0.4
+イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.4
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -37,8 +37,8 @@ $ lab check; echo "exit=$?"
          /home/lab/bin/today は無い
          → いまのシェルの PATH では /home/lab/bin/today が見つからない
          → 新しいログインシェルでは /home/lab/bin/today が見つからない
-         → いまのシェルでの出力が「2026年10月13日」ではない
-         → 新しいログインシェルでの出力が「2026年10月13日」ではない
+         → いまのシェルでの出力が「2026年10月21日」ではない
+         → 新しいログインシェルでの出力が「2026年10月20日」ではない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 02
 ✗ 03 未達
   判定 : 観測型（/usr/local/bin/greet の所有者と権限を読み、alice として greet を名前だけで2回実行した）
@@ -61,7 +61,10 @@ exit=2
 
 $ lab start 01
 
-演習 01 — ログインしたときだけ挨拶を出す                          影響度 B / 目安 10分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 【演習 01】  ログインしたときだけ挨拶を出す
+          影響度 B / 目安 10分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   この演習はシステム全体を触ります（ユーザ bob のホームを書き換えます）。
 
@@ -98,21 +101,23 @@ $ lab start 01
 
     lab check 01
 
+──────────────────────────────────────
 この演習はシステム全体を触ります（作業ディレクトリは使いません）
 元に戻すには起動し直してください
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 01）
 
 
 $ sudo ls -la /home/bob
 total 40
-drwxr-x--- 1 bob  bob  4096 Oct 13 19:18 .
+drwxr-x--- 1 bob  bob  4096 Oct 21 00:13 .
 drwxr-xr-x 1 root root 4096 Oct 13 10:01 ..
--rw------- 1 bob  bob    40 Oct 13 19:18 .bash_history
+-rw------- 1 bob  bob    40 Oct 21 00:13 .bash_history
 -rw-r--r-- 1 bob  bob   220 Mar 31  2024 .bash_logout
 -rw-r--r-- 1 bob  bob    68 Oct 13 10:01 .bash_profile
 -rw-r--r-- 1 bob  bob  3771 Mar 31  2024 .bashrc
-drwxrwxr-x 2 bob  bob  4096 Oct 13 19:18 .lab
+drwxrwxr-x 2 bob  bob  4096 Oct 21 00:13 .lab
 -rw-r--r-- 1 bob  bob   807 Mar 31  2024 .profile
-drwxrwxr-x 2 bob  bob  4096 Oct 13 19:18 work
+drwxrwxr-x 2 bob  bob  4096 Oct 21 00:13 work
 
 $ sudo cat /home/bob/.bash_profile
 # ~/.bash_profile — 前任者が置いた設定
@@ -220,7 +225,10 @@ exit=0
 $ lab start 02
 作業ファイルを ~/work/02 に展開しました（today ）
 
-演習 02 — 自作のコマンドを、名前だけで呼べるようにする               影響度 A / 目安 10分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 【演習 02】  自作のコマンドを、名前だけで呼べるようにする
+          影響度 A / 目安 10分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 【いまの状態を見てください】
 
@@ -250,8 +258,10 @@ $ lab start 02
 
     lab check 02
 
+──────────────────────────────────────
 ▶ 次はこれを打ってください
     cd ~/work/02
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 02）
 
 
 $ cat ~/work/02/today
@@ -260,7 +270,7 @@ $ cat ~/work/02/today
 date '+%Y年%-m月%-d日'
 
 $ ~/work/02/today
-2026年10月13日
+2026年10月21日
 
 $ today; echo "exit=$?"
 /tmp/run.sh: line 16: today: command not found
@@ -279,13 +289,13 @@ $ lab check 02; echo "exit=$?"
          /home/lab/bin/today は無い
          → いまのシェルの PATH では /home/lab/bin/today が見つからない
          → 新しいログインシェルでは /home/lab/bin/today が見つからない
-         → いまのシェルでの出力が「2026年10月13日」ではない
-         → 新しいログインシェルでの出力が「2026年10月13日」ではない
+         → いまのシェルでの出力が「2026年10月21日」ではない
+         → 新しいログインシェルでの出力が「2026年10月20日」ではない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 02
 exit=1
 
 $ mkdir -p ~/bin; cp ~/work/02/today ~/bin/; ls -l ~/bin/today
--rwxr-xr-x 1 lab lab 97 Oct 13 19:19 /home/lab/bin/today
+-rwxr-xr-x 1 lab lab 97 Oct 21 00:14 /home/lab/bin/today
 
 $ today; echo "exit=$?"
 /tmp/run.sh: line 16: today: command not found
@@ -307,10 +317,10 @@ $ echo "--- ~/bin を作っただけ（このシェルの PATH はまだ古い�
   観測 : 受け継いだ PATH = /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
            today の在りか = （見つからない）  終了ステータス 127  出力「」
          新しいログインシェルの PATH = /home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-           today の在りか = /home/lab/bin/today  終了ステータス 0  出力「2026年10月13日」
+           today の在りか = /home/lab/bin/today  終了ステータス 0  出力「2026年10月20日」
          /home/lab/bin/today の権限 = -rwxr-xr-x
          → いまのシェルの PATH では /home/lab/bin/today が見つからない
-         → いまのシェルでの出力が「2026年10月13日」ではない
+         → いまのシェルでの出力が「2026年10月21日」ではない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 02
 exit=1
 
@@ -324,15 +334,15 @@ $ echo $PATH
 /home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 $ today
-2026年10月13日
+2026年10月21日
 
 $ lab check 02; echo "exit=$?"
 ✔ 02 達成
   判定 : 観測型（today を名前だけで2回実行した。あなたのシェルから受け継いだ PATH と、新しいログインシェルの PATH）
   観測 : 受け継いだ PATH = /home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-           today の在りか = /home/lab/bin/today  終了ステータス 0  出力「2026年10月13日」
+           today の在りか = /home/lab/bin/today  終了ステータス 0  出力「2026年10月21日」
          新しいログインシェルの PATH = /home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-           today の在りか = /home/lab/bin/today  終了ステータス 0  出力「2026年10月13日」
+           today の在りか = /home/lab/bin/today  終了ステータス 0  出力「2026年10月20日」
          /home/lab/bin/today の権限 = -rwxr-xr-x
          どちらの PATH でも /home/lab/bin/today が見つかり、今日の日付が出た
          → 子のプロセスが見ている PATH は、起動したときに親から写したコピー
@@ -344,17 +354,32 @@ exit=0
 $ lab start 03
 作業ファイルを ~/work/03 に展開しました（greet ）
 
-演習 03 — スクリプトを、全員が名前だけで使えるように置く            影響度 B / 目安 15分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 【演習 03】  スクリプトを、全員が名前だけで使えるように置く
+          影響度 B / 目安 15分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   この演習はシステム全体を触ります（/usr/local/bin にファイルを置きます）。
 
 【いまの状態を見てください】
 
+  配られた greet は、そのままでは動きません。直して置くのがこの演習です。
+
     cd ~/work/03
-    cat greet
-    bash greet            ← 動く
-    ./greet               ← 動かない
-    sh greet              ← 動かない
+    cat greet             ← 中身を見る
+    bash greet            ← これは動く
+    ./greet               ← エラーで止まる
+    sh greet              ← エラーで止まる
+
+  ./greet と sh greet は、どちらも次のように出して止まります
+  （sh greet では、行の頭の ./greet: が greet: になります。日付はその日のもの）。
+
+    ./greet: 3: function: not found
+    こんにちは、 さん。今日は 10月13日 です
+    ./greet: 5: Syntax error: "}" unexpected
+
+  このエラーが出るのが、始まりの正しい状態です（教材の不具合ではありません）。
+  なぜ bash greet だけが動くのかは、理論編の第4章とヒント（lab hint 03）にあります。
 
 【やること】
 
@@ -382,13 +407,15 @@ $ lab start 03
 
     lab check 03
 
+──────────────────────────────────────
 ▶ 次はこれを打ってください
     cd ~/work/03
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 03）
 
 
 $ cd ~/work/03; ls -l
 total 4
--rwxr-xr-x 1 lab lab 227 Oct 13 19:19 greet
+-rwxr-xr-x 1 lab lab 227 Oct 21 00:14 greet
 
 $ cat greet
 #!/bin/sh
@@ -399,18 +426,18 @@ function greet {
 greet "$(id -un)"
 
 $ bash greet; echo "exit=$?"
-こんにちは、lab さん。今日は 10月13日 です
+こんにちは、lab さん。今日は 10月21日 です
 exit=0
 
 $ ./greet; echo "exit=$?"
 ./greet: 3: function: not found
-こんにちは、 さん。今日は 10月13日 です
+こんにちは、 さん。今日は 10月21日 です
 ./greet: 5: Syntax error: "}" unexpected
 exit=2
 
 $ sh greet; echo "exit=$?"
 greet: 3: function: not found
-こんにちは、 さん。今日は 10月13日 です
+こんにちは、 さん。今日は 10月21日 です
 greet: 5: Syntax error: "}" unexpected
 exit=2
 
@@ -432,22 +459,22 @@ $ sed -i '1s|.*|#!/bin/bash|' greet; head -1 greet
 #!/bin/bash
 
 $ ./greet
-こんにちは、lab さん。今日は 10月13日 です
+こんにちは、lab さん。今日は 10月21日 です
 
 $ sudo cp greet /usr/local/bin/greet; sudo chown lab /usr/local/bin/greet; ls -l /usr/local/bin/greet
--rwxr-xr-x 1 lab root 229 Oct 13 19:19 /usr/local/bin/greet
+-rwxr-xr-x 1 lab root 229 Oct 21 00:14 /usr/local/bin/greet
 
 $ sudo -iu alice greet
-こんにちは、alice さん。今日は 10月13日 です
+こんにちは、alice さん。今日は 10月21日 です
 
 $ lab check 03; echo "exit=$?"
 ✗ 03 未達
   判定 : 観測型（/usr/local/bin/greet の所有者と権限を読み、alice として greet を名前だけで2回実行した）
   観測 : /usr/local/bin/greet  -rwxr-xr-x（755）所有者 lab グループ root
-         alice のログインシェルから         終了ステータス 0  最後の行「こんにちは、alice さん。今日は 10月13日 です」
+         alice のログインシェルから         終了ステータス 0  最後の行「こんにちは、alice さん。今日は 10月21日 です」
          偽の date と id が先頭にある PATH から  終了ステータス 0  最後の行「こんにちは、偽物の id さん。今日は 偽物の date です」
          → 所有者が root ではない
-         → 2回目に「こんにちは、alice さん。今日は 10月13日 です」が出なかった
+         → 2回目に「こんにちは、alice さん。今日は 10月21日 です」が出なかった
   → この事実から何が欠けているか考えてください。詰まったら lab hint 03
 exit=1
 
@@ -455,17 +482,17 @@ $ echo "--- 所有者と権限を直す。711 だと alice は読めない ---"
 --- 所有者と権限を直す。711 だと alice は読めない ---
 
 $ sudo chown root:root /usr/local/bin/greet; sudo chmod 711 /usr/local/bin/greet; ls -l /usr/local/bin/greet
--rwx--x--x 1 root root 229 Oct 13 19:19 /usr/local/bin/greet
+-rwx--x--x 1 root root 229 Oct 21 00:14 /usr/local/bin/greet
 
 $ sudo -u alice greet; echo "exit=$?"
 /bin/bash: /usr/local/bin/greet: Permission denied
 exit=126
 
 $ sudo chmod 755 /usr/local/bin/greet; ls -l /usr/local/bin/greet
--rwxr-xr-x 1 root root 229 Oct 13 19:19 /usr/local/bin/greet
+-rwxr-xr-x 1 root root 229 Oct 21 00:14 /usr/local/bin/greet
 
 $ sudo -iu alice greet
-こんにちは、alice さん。今日は 10月13日 です
+こんにちは、alice さん。今日は 10月21日 です
 
 $ echo "--- PATH の先頭に date の偽物がある人として実行する ---"
 --- PATH の先頭に date の偽物がある人として実行する ---
@@ -479,9 +506,9 @@ $ lab check 03; echo "exit=$?"
 ✗ 03 未達
   判定 : 観測型（/usr/local/bin/greet の所有者と権限を読み、alice として greet を名前だけで2回実行した）
   観測 : /usr/local/bin/greet  -rwxr-xr-x（755）所有者 root グループ root
-         alice のログインシェルから         終了ステータス 0  最後の行「こんにちは、alice さん。今日は 10月13日 です」
+         alice のログインシェルから         終了ステータス 0  最後の行「こんにちは、alice さん。今日は 10月21日 です」
          偽の date と id が先頭にある PATH から  終了ステータス 0  最後の行「こんにちは、偽物の id さん。今日は 偽物の date です」
-         → 2回目に「こんにちは、alice さん。今日は 10月13日 です」が出なかった
+         → 2回目に「こんにちは、alice さん。今日は 10月21日 です」が出なかった
   → この事実から何が欠けているか考えてください。詰まったら lab hint 03
 exit=1
 
@@ -494,20 +521,20 @@ PATH=/usr/bin:/bin
 # 実行した人に挨拶する。全員が greet と打つだけで使えるようにしたい。
 
 $ sudo cp greet /usr/local/bin/greet; sudo chown root:root /usr/local/bin/greet; sudo chmod 755 /usr/local/bin/greet; ls -l /usr/local/bin/greet
--rwxr-xr-x 1 root root 248 Oct 13 19:19 /usr/local/bin/greet
+-rwxr-xr-x 1 root root 248 Oct 21 00:14 /usr/local/bin/greet
 
 $ sudo -u alice env PATH=/tmp/fake:/usr/local/bin:/usr/bin:/bin greet
-こんにちは、alice さん。今日は 10月13日 です
+こんにちは、alice さん。今日は 10月21日 です
 
 $ sudo -iu alice greet
-こんにちは、alice さん。今日は 10月13日 です
+こんにちは、alice さん。今日は 10月21日 です
 
 $ lab check 03; echo "exit=$?"
 ✔ 03 達成
   判定 : 観測型（/usr/local/bin/greet の所有者と権限を読み、alice として greet を名前だけで2回実行した）
   観測 : /usr/local/bin/greet  -rwxr-xr-x（755）所有者 root グループ root
-         alice のログインシェルから         終了ステータス 0  最後の行「こんにちは、alice さん。今日は 10月13日 です」
-         偽の date と id が先頭にある PATH から  終了ステータス 0  最後の行「こんにちは、alice さん。今日は 10月13日 です」
+         alice のログインシェルから         終了ステータス 0  最後の行「こんにちは、alice さん。今日は 10月21日 です」
+         偽の date と id が先頭にある PATH から  終了ステータス 0  最後の行「こんにちは、alice さん。今日は 10月21日 です」
          root 所有で他人は書き換えられず、alice の環境が違っても同じ1行が出た
          → スクリプトは使う人の PATH のコピーを受け取る。だから先頭で PATH を決める
 exit=0
@@ -520,7 +547,10 @@ $ cd ~
 $ lab start 04
 作業ファイルを ~/work/04 に展開しました（memo.txt mkbak.sh my notes.txt ）
 
-演習 04 — 引数を数えて、使い方を出すスクリプト                       影響度 A / 目安 12分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 【演習 04】  引数を数えて、使い方を出すスクリプト
+          影響度 A / 目安 12分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 【いまの状態を見てください】
 
@@ -554,15 +584,17 @@ $ lab start 04
 
     lab check 04
 
+──────────────────────────────────────
 ▶ 次はこれを打ってください
     cd ~/work/04
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 04）
 
 
 $ cd ~/work/04; ls -l
 total 12
--rwxr-xr-x 1 lab lab  27 Oct 13 19:19 memo.txt
--rwxr-xr-x 1 lab lab 325 Oct 13 19:19 mkbak.sh
--rwxr-xr-x 1 lab lab  40 Oct 13 19:19 my notes.txt
+-rwxr-xr-x 1 lab lab  27 Oct 21 00:14 memo.txt
+-rwxr-xr-x 1 lab lab 325 Oct 21 00:14 mkbak.sh
+-rwxr-xr-x 1 lab lab  40 Oct 21 00:14 my notes.txt
 
 $ lab check 04; echo "exit=$?"
 ✗ 04 未達
@@ -656,7 +688,10 @@ $ cd ~
 $ lab start 05
 作業ファイルを ~/work/05 に展開しました（isuser.sh ）
 
-演習 05 — 成功と失敗を、終了ステータスで返すスクリプト               影響度 A / 目安 12分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 【演習 05】  成功と失敗を、終了ステータスで返すスクリプト
+          影響度 A / 目安 12分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 【いまの状態を見てください】
 
@@ -690,8 +725,10 @@ $ lab start 05
 
     lab check 05
 
+──────────────────────────────────────
 ▶ 次はこれを打ってください
     cd ~/work/05
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 05）
 
 
 $ cd ~/work/05; cat isuser.sh
@@ -780,7 +817,10 @@ $ cd ~
 $ lab start 06
 作業ファイルを ~/work/06 に展開しました（menu.sh ）
 
-演習 06 — 決まったコマンドだけを選ばせるメニュー                     影響度 A / 目安 15分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 【演習 06】  決まったコマンドだけを選ばせるメニュー
+          影響度 A / 目安 15分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 【いまの状態を見てください】
 
@@ -819,8 +859,10 @@ $ lab start 06
 
     lab check 06
 
+──────────────────────────────────────
 ▶ 次はこれを打ってください
     cd ~/work/06
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 06）
 
 
 $ cd ~/work/06; cat menu.sh
@@ -921,7 +963,10 @@ $ cd ~
 $ lab start 07
 作業ファイルを ~/work/07 に展開しました（count.sh logs ）
 
-演習 07 — ファイルごとに数えて、合計を出す                           影響度 A / 目安 12分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 【演習 07】  ファイルごとに数えて、合計を出す
+          影響度 A / 目安 12分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 【いまの状態を見てください】
 
@@ -947,8 +992,10 @@ $ lab start 07
 
     lab check 07
 
+──────────────────────────────────────
 ▶ 次はこれを打ってください
     cd ~/work/07
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 07）
 
 
 $ cd ~/work/07; cat count.sh
@@ -1052,7 +1099,10 @@ $ cd ~
 $ lab start 08
 作業ファイルを ~/work/08 に展開しました（number.sh ）
 
-演習 08 — bash -x で原因を見つけて直す                               影響度 A / 目安 12分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 【演習 08】  bash -x で原因を見つけて直す
+          影響度 A / 目安 12分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 【いまの状態を見てください】
 
@@ -1086,8 +1136,10 @@ $ lab start 08
 
     lab check 08
 
+──────────────────────────────────────
 ▶ 次はこれを打ってください
     cd ~/work/08
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 08）
 
 
 $ cd ~/work/08; cat number.sh
@@ -1217,17 +1269,17 @@ $ lab check; echo "exit=$?"
 ✔ 02 達成
   判定 : 観測型（today を名前だけで2回実行した。あなたのシェルから受け継いだ PATH と、新しいログインシェルの PATH）
   観測 : 受け継いだ PATH = /home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-           today の在りか = /home/lab/bin/today  終了ステータス 0  出力「2026年10月13日」
+           today の在りか = /home/lab/bin/today  終了ステータス 0  出力「2026年10月21日」
          新しいログインシェルの PATH = /home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-           today の在りか = /home/lab/bin/today  終了ステータス 0  出力「2026年10月13日」
+           today の在りか = /home/lab/bin/today  終了ステータス 0  出力「2026年10月20日」
          /home/lab/bin/today の権限 = -rwxr-xr-x
          どちらの PATH でも /home/lab/bin/today が見つかり、今日の日付が出た
          → 子のプロセスが見ている PATH は、起動したときに親から写したコピー
 ✔ 03 達成
   判定 : 観測型（/usr/local/bin/greet の所有者と権限を読み、alice として greet を名前だけで2回実行した）
   観測 : /usr/local/bin/greet  -rwxr-xr-x（755）所有者 root グループ root
-         alice のログインシェルから         終了ステータス 0  最後の行「こんにちは、alice さん。今日は 10月13日 です」
-         偽の date と id が先頭にある PATH から  終了ステータス 0  最後の行「こんにちは、alice さん。今日は 10月13日 です」
+         alice のログインシェルから         終了ステータス 0  最後の行「こんにちは、alice さん。今日は 10月21日 です」
+         偽の date と id が先頭にある PATH から  終了ステータス 0  最後の行「こんにちは、alice さん。今日は 10月21日 です」
          root 所有で他人は書き換えられず、alice の環境が違っても同じ1行が出た
          → スクリプトは使う人の PATH のコピーを受け取る。だから先頭で PATH を決める
 ✔ 04 達成
@@ -1301,9 +1353,9 @@ $ lab reset 06
 演習 06 を初期状態に戻しました（~/work/06）
 
 $ ls -ld ~/work/06; ls -l ~/work/06
-drwxr-xr-x 2 lab lab 4096 Oct 13 19:19 /home/lab/work/06
+drwxr-xr-x 2 lab lab 4096 Oct 21 00:14 /home/lab/work/06
 total 4
--rwxr-xr-x 1 lab lab 576 Oct 13 19:19 menu.sh
+-rwxr-xr-x 1 lab lab 576 Oct 21 00:14 menu.sh
 
 $ echo '# x' >> ~/work/06/menu.sh; echo "追記の終了ステータス $?"; tail -1 ~/work/06/menu.sh
 追記の終了ステータス 0
@@ -1313,9 +1365,9 @@ $ lab reset 07
 演習 07 を初期状態に戻しました（~/work/07）
 
 $ ls -ld ~/work/07 ~/work/07/logs; ls -l ~/work/07/count.sh
-drwxr-xr-x 3 lab lab 4096 Oct 13 19:19 /home/lab/work/07
-drwxr-xr-x 2 lab lab 4096 Oct 13 19:19 /home/lab/work/07/logs
--rwxr-xr-x 1 lab lab 288 Oct 13 19:19 /home/lab/work/07/count.sh
+drwxr-xr-x 3 lab lab 4096 Oct 21 00:14 /home/lab/work/07
+drwxr-xr-x 2 lab lab 4096 Oct 21 00:14 /home/lab/work/07/logs
+-rwxr-xr-x 1 lab lab 288 Oct 21 00:14 /home/lab/work/07/count.sh
 
 $ echo "--- 写しの元（/lab/seed）は root のもので、読者は書き換えられない ---"
 --- 写しの元（/lab/seed）は root のもので、読者は書き換えられない ---
@@ -1332,8 +1384,8 @@ $ echo '# x' >> /lab/seed/06/menu.sh; echo "追記の終了ステータス $?"
 ########## K. 最終環境 ##########
 
 $ lab env
-テーマ    : lab-linuc-shell 1.0.2
-イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.2
+テーマ    : lab-linuc-shell 1.0.4
+イメージ  : ghcr.io/chai0204/lab-linuc:shell-1.0.4
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6

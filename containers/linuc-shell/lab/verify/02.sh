@@ -15,9 +15,13 @@ if [ -n "$here" ]; then here_out=$(cd / && today 2>&1); here_rc=$?; else here_ou
 new=$(cd / && env -i HOME="$HOME" USER="$(id -un)" LOGNAME="$(id -un)" TERM=dumb \
         PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
         bash -l -c 'echo "__WHERE__=$(command -v today)"; echo "__PATH__=$PATH"
+                    echo "__WANT__=$(date "+%Y年%-m月%-d日")"
                     out=$(today 2>&1); echo "__RC__=$?"; echo "__OUT__=$out"' 2>/dev/null)
 pick() { sed -n "s/^__$1__=//p" <<<"$new" | tail -1; }
 new_where=$(pick WHERE); new_path=$(pick PATH); new_rc=$(pick RC); new_out=$(pick OUT)
+# 今日の日付は、そのシェルの中で作って比べる。env -i で TZ も消えるので、日本時間の 0〜9 時は
+# このシェルの日付（Asia/Tokyo）と1日ずれる（2026-10-21 の 0 時台に、正しく解いても ✗ になっていた）
+new_want=$(pick WANT); [ -n "$new_want" ] || new_want=$want
 [ -n "$new_where" ] || { new_rc=127; new_out=""; }
 
 echo "判定 : 観測型（today を名前だけで2回実行した。あなたのシェルから受け継いだ PATH と、新しいログインシェルの PATH）"
@@ -31,7 +35,7 @@ ng=0
 [ "$here" = "$bin" ]      || { echo "       → いまのシェルの PATH では $bin が見つからない"; ng=1; }
 [ "$new_where" = "$bin" ] || { echo "       → 新しいログインシェルでは $bin が見つからない"; ng=1; }
 { [ "$here_rc" = 0 ] && [ "$here_out" = "$want" ]; } || { echo "       → いまのシェルでの出力が「$want」ではない"; ng=1; }
-{ [ "$new_rc" = 0 ] && [ "$new_out" = "$want" ]; }   || { echo "       → 新しいログインシェルでの出力が「$want」ではない"; ng=1; }
+{ [ "$new_rc" = 0 ] && [ "$new_out" = "$new_want" ]; } || { echo "       → 新しいログインシェルでの出力が「$new_want」ではない"; ng=1; }
 [ "$ng" = 0 ] || exit 1
 
 echo "       どちらの PATH でも $bin が見つかり、今日の日付が出た"

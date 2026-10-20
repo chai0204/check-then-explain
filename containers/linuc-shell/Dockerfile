@@ -2,7 +2,7 @@
 # LinuC 主題1.06（シェルおよびスクリプト）用の檻。
 # 読者 lab のほかに alice と bob を置く。どの起動ファイルがいつ読まれるかを、
 # 自分以外のユーザで実測するため（自分の ~/.bashrc を壊すと、その端末ごと使えなくなる）。
-#   build: docker build --build-context labcmd=containers/base -t lab-linuc-shell:1.0.3 containers/linuc-shell
+#   build: docker build --build-context labcmd=containers/base -t lab-linuc-shell:1.0.4 containers/linuc-shell
 #   1.0.1（2026-10-13）: 演習のヒントと模範解答の誤り（~/.bashrc を読むシェル・コマンドを探す順・
 #   dash の function の読み方ほか）を直した。lab/ の層だけが 1.0.0 と違う（useradd の層はキャッシュで同一）。
 #   1.0.2（2026-10-13）: 配布ファイル（seed）を 0755 にする層を足した。lab reset の後に演習のスクリプトを
@@ -45,13 +45,17 @@ LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-exp
 LABEL org.opencontainers.image.description="LinuC 主題1.06（シェルおよびスクリプト）を手で確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
 
-# ---- lab コマンドを最新にする（1.0.3、2026-10-20）--------------------
+# ---- lab コマンドを最新にする（1.0.3、2026-10-20。1.0.4 で模範解答も直した、2026-10-21）------
 #   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
-#   本文の記録とずれうるので、最新の lab をここで重ねる。これより前の層は 1.0.2 とキャッシュで同一。
+#   本文の記録とずれうるので、最新の lab をここで重ねる。
+#   1.0.4: 模範解答04〜07 のヒアドキュメントの塊を行頭から書いた（lab solve は .md をそのまま出すので、
+#   字下げのままでは画面から写して貼ると EOF で終わらない）。演習02 の判定は、新しいログインシェルの日付を
+#   そのシェルの中で作って比べる（env -i で TZ が消え、日本時間 0〜9 時に1日ずれていた）。
+#   lab/ を写す層より前は 1.0.3 とキャッシュで同一。
 #   build: docker build --build-context labcmd=containers/base -t lab-linuc-shell:<版> containers/linuc-shell
 COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
-ENV LAB_THEME=linuc-shell LAB_VERSION=1.0.3 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:shell-1.0.3
+ENV LAB_THEME=linuc-shell LAB_VERSION=1.0.4 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:shell-1.0.4
 USER lab
 WORKDIR /home/lab
 # ログインシェルで起動する。入口の案内（/etc/profile.d/99-lab.sh）が出るのはこのため。
