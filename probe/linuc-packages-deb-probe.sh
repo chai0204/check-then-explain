@@ -8,6 +8,11 @@ cd "$(dirname "$0")/.." || exit 1
 exec python3 -I probe/linuc-packages-seq.py --script /dev/stdin --cage deb \
   --out logs/linuc-packages-deb-probe.log \
   --note "本文が画面を載せずに言い切っていることの裏づけ（節ごとに檻を起動し直した）" <<'INPUT'
+========== 第1章の確認問題と演習01 のヒント: sudo を付けずに apt install すると、権限が無いと断られ、何も入らない ==========
+$ apt install labhello
+$ labhello
+$ sudo apt install labhello
+$ labhello
 ========== 第3章: man labhello で説明書が開く（パイプに渡すとページャを使わずに出る） ==========
 $ sudo apt install labhello
 $ man labhello | head -12
