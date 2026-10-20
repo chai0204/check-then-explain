@@ -12,10 +12,10 @@
 </div>
 <h1>5. 依存関係のあるパッケージを入れて、消す</h1>
 <p class="lead"><b>前の章までにやったこと</b>: 1つだけで動くパッケージ labhello を入れて・使って・消し（第1章）、入っているものとその置き場所を調べ（第2・3章）、台帳とファイルが別々にあることを確かめた（第4章）。<b>この章でやること</b>: ほかのパッケージが無いと動かないパッケージ labapp を入れて、一緒に何が入るかを見る。それから消して、台帳と <code>/etc</code> に何が起きるかを確かめる。</p>
-<div class="badges"><span>前提: 第4章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<div class="badges"><span>前提: 第4章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-21</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>依存関係のあるパッケージを <code>apt install</code> で入れると、何が入るかを出力から確かめる</li><li>依存関係を <code>apt-cache depends</code>（必要とするもの）と <code>apt-cache rdepends</code>（必要とされているもの）で調べる</li><li><code>remove</code>・<code>purge</code>・<code>autoremove</code> で、それぞれ何が消えて何が残るかを、台帳の記号と <code>/etc</code> の設定ファイルで確かめる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: <code>Depends</code> 以外の関係（<code>Recommends</code>・<code>Conflicts</code> など）、apt が依存関係で入れたものに付ける「自動で入った」という印を、手で付け替える方法（<code>apt-mark auto</code> / <code>manual</code>）、設定ファイルが書き換えられていたときの細かい扱い。この章は、入れて、消して、片付けるところまでが1回できれば足りる。</div></div>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>Depends</code> 以外の関係（<code>Recommends</code>・<code>Conflicts</code> など）、このあと見る apt の印を、手で付け替える方法（<code>apt-mark auto</code> / <code>manual</code>）、設定ファイルが書き換えられていたときの細かい扱い。この章は、入れて、消して、片付けるところまでが1回できれば足りる。</div></div>
 
 <h2 id="depends">依存関係のあるパッケージを入れる — apt install</h2>
 <div class="sgoal"><b>この節で分かること</b>: 依存関係のあるパッケージを入れると、apt が何をするか。</div>
@@ -71,9 +71,9 @@ Dependencies:
 Provides:
 1.0 -
 Reverse Provides:</code></pre>
-<p>行が多いが、見るのは2か所である。<code>Dependencies:</code> の <code>1.0 - liblab (2 1.0)</code> が「版 1.0 は liblab を必要とする」で、括弧の中の <code>2 1.0</code> は「1.0 以上」を番号で書いたもの（<code>2</code> が「以上」）。<code>Reverse Depends:</code> の下が空なのは、labapp を必要としているパッケージが無いからである。<code>Versions:</code> の行の括弧の中は、この版が載っている一覧のファイルである。<code>/var/lib/apt/lists/</code> の下のものは、apt がリポジトリから取ってきて手元に置いた「入れられるパッケージの一覧」（<code>.lz4</code> は縮めた形）、<code>/var/lib/dpkg/status</code> は台帳（第4章）である。</p>
+<p>行が多いが、見るのは2か所である。<code>Dependencies:</code> の <code>1.0 - liblab (2 1.0)</code> が「版 1.0 は liblab を必要とする」で、括弧の中の <code>2 1.0</code> は「1.0 以上」を番号で書いたもの（<code>2</code> が「以上」）。<code>Reverse Depends:</code> の下が空なのは、labapp を必要としているパッケージが無いからである。<code>Versions:</code> の行の括弧の中は、この版が載っている一覧のファイルである。<code>/var/lib/apt/lists/</code> の下のものは、リポジトリの「入れられるパッケージの一覧」のファイル（<code>.lz4</code> は縮めた形）、<code>/var/lib/dpkg/status</code> は台帳（第4章）である。</p>
 <div class="analogy"><b>たとえ</b>: テレビを注文したら、配達の人がアンテナ線も一緒に持ってきて、先に線をつないでからテレビを置いてくれるのに近い。頼んだのはテレビだけでも、使うのに要るものは一緒に来る。
-<br>ただし<b>崩れる点</b>: 人の配達なら、要りそうな物を配達の人が見て判断するが、apt が見るのは、パッケージに書かれた依存関係（<code>Depends:</code>）だけである。書かれていない物は、要りそうでも持ってこない。</div>
+<br>ただし<b>崩れる点</b>: 人の配達なら、要りそうな物を配達の人が見て判断するが、apt が見るのは、パッケージに書かれた関係だけである（<code>Depends:</code> のほか、既定では「一緒に入れるとよい」という <code>Recommends:</code> に書かれたものも入れる。練習用のパッケージには <code>Depends:</code> しか書いていない）。書かれていない物は、要りそうでも持ってこない。</div>
 
 <h2 id="auto">自動で入った印</h2>
 <div class="sgoal"><b>この節で分かること</b>: apt が、どれを利用者が頼み、どれを自分が足したかを覚えていること。</div>
@@ -200,7 +200,7 @@ labweb-data は名前を打たずに消す。判定は dpkg の台帳（<code>rc
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>apt install</code> は依存関係（<code>Depends</code>）を読んで、足りないものも一緒に入れる（<code>additional packages</code>）。そのときは <code>[Y/n]</code> と尋ねる</li><li>依存関係は <code>apt-cache depends</code>（必要とするもの）・<code>rdepends</code>（必要とされているもの）・<code>showpkg</code>（版ごとの依存と逆向きをまとめて）で、入れる前にも調べられる</li><li>apt は自動で入れたものに印を付ける（<code>apt-mark showauto</code>。記録は <code>/var/lib/apt/extended_states</code>）</li><li><code>remove</code> は設定ファイル（conffile）を残して台帳に <code>rc</code>、<code>purge</code> は設定ファイルも台帳の行も消す、<code>autoremove</code> は誰にも要らなくなった自動の依存を消す</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-21</div>
 <nav class="pager"><a href="/linuc-packages/theory/04-ledger">← 4. 台帳とファイルを見比べる</a><a href="/linuc-packages/theory/06-repository">次: 6. パッケージはどこから来るか →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

@@ -12,7 +12,7 @@
 </div>
 <h1>3. 入れたファイルがどこに置かれたかを調べる</h1>
 <p class="lead"><b>前の章までにやったこと</b>: パッケージを入れて、使って、消した（第1章）。入っているものを一覧と詳しい情報で調べ、その答えが台帳（入れたときに dpkg が書く記録）から来ていることを確かめた（第2章）。<b>この章でやること</b>: パッケージを入れたとき、ファイルが檻のどこに置かれたかを調べる。逆に、あるファイルがどのパッケージから来たかを調べる。最後に、入れる前のパッケージのファイルの中を見る。</p>
-<div class="badges"><span>前提: 第2章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.2（重要度1）</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<div class="badges"><span>前提: 第2章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.2（重要度1）</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-21</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>パッケージが置いたファイルを <code>dpkg -L</code> で並べ、<code>/usr/bin</code>・<code>/usr/share/doc</code>・<code>/usr/share/man</code>・<code>/etc</code> がそれぞれ何の置き場所かを確かめる</li><li>あるファイルがどのパッケージから来たかを調べる方法を確かめる（コマンドなら、先に <code>which</code> で場所を出す）</li><li>.deb ファイルを入れずに取ってきて、<code>dpkg -c</code> で中身、<code>dpkg -I</code> で情報を見る</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: この章に出てこない置き場所（<code>/usr/lib</code>・<code>/var</code> など）の役目、man の索引のしくみ、.deb ファイルの中の細かい形式（中にさらに縮めたファイルが入っていること）。この章は「ファイルとパッケージを、どちら向きにも引ける」が1回できれば足りる。</div></div>
@@ -171,7 +171,7 @@ dpkg-query: no packages found matching labapp</code></pre>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>dpkg -L パッケージ名</code> で、そのパッケージが置いたファイルが全部分かる。コマンドは <code>/usr/bin</code>、説明書は <code>/usr/share/doc</code> と <code>/usr/share/man</code>、設定ファイルは <code>/etc</code></li><li><code>dpkg -S ファイルのパス</code> で、そのファイルを置いたパッケージが分かる。コマンドなら先に <code>which</code> で場所を出す。パッケージの名前はコマンドの名前と同じとは限らない（<code>ls</code> は coreutils）</li><li>.deb ファイルは中身（<code>dpkg -c</code>）と情報（<code>dpkg -I</code>）の2つでできている。<code>apt download</code> で、入れずに取ってこられる</li><li>入れると、中身はディスクに置かれ、情報は台帳に写される。<code>-L</code> と <code>-S</code> は、その台帳を前から・後ろから引いている</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / man-db 2.12.0 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / man-db 2.12.0 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-21</div>
 <nav class="pager"><a href="/linuc-packages/theory/02-list">← 2. いま何が入っているかを調べる</a><a href="/linuc-packages/theory/04-ledger">次: 4. 台帳とファイルを見比べる →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

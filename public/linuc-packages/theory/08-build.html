@@ -12,7 +12,7 @@
 </div>
 <h1>8. パッケージを自分で作る</h1>
 <p class="lead"><b>前の章までにやったこと</b>: パッケージをリポジトリから apt で入れ（第1・5・6章）、.deb ファイルから dpkg で入れ（第7章）、入っているもの・置かれたファイル・台帳を調べた（第2〜4章）。.deb ファイルが「中身」と「情報」でできていることも見た（第3章）。<b>この章でやること</b>: その .deb ファイルを自分で作る。中身と情報を並べて1つのファイルに固め、これまでの章の道具で中を確かめ、入れて、台帳に載ったことを確かめ、消す。パッケージを作ることは LinuC レベル1 の出題範囲には入っていないが、第1〜7章でやったことが1本につながる。</p>
-<div class="badges"><span>前提: 第7章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲の外（第1〜7章のまとめ）</span><span>最終検証 2026-10-20</span></div>
+<div class="badges"><span>前提: 第7章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲の外（第1〜7章のまとめ）</span><span>最終検証 2026-10-21</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>中身のファイルの木と <code>DEBIAN/control</code>（情報）を並べて、<code>dpkg-deb --build</code> で .deb ファイルを作る</li><li>作った .deb ファイルを <code>dpkg -c</code>・<code>dpkg -I</code> で確かめてから入れ、台帳にどう載るかを <code>dpkg -l</code>・<code>-L</code>・<code>-S</code> で確かめる</li><li><code>--root-owner-group</code> を付けると何が変わるかを確かめる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: パッケージを作る正式な道具（<code>dpkg-buildpackage</code> など）、<code>control</code> のこの章で使わない欄、設定ファイルの印（<code>conffiles</code>）の書き方、作ったパッケージをリポジトリに載せる方法。どれも LinuC レベル1 の出題範囲の外で、この章も試験には出ない。</div></div>
@@ -28,7 +28,7 @@
 &gt; END</code></pre>
 <p><code>cat &gt; ファイル &lt;&lt;'END'</code> は、次の行から <code>END</code> だけの行までを、そのままファイルに書く書き方（ヒアドキュメント）である。2行目からは、続きの入力を待つ <code>&gt;</code> というプロンプトが出る。書いた中身の1行目 <code>#!/bin/sh</code> は「このファイルは sh（シェル）に読ませて動かす」という印で、2行目が実際に動く1行である。最後に、実行できるようにする。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ chmod 755 myhello/usr/bin/myhello</code></pre>
-<p><code>chmod 755</code> で、誰でも実行できるようにした。3つの数字は、左から持ち主・グループ（持ち主と同じ組に入れてある利用者）・ほかの人の許可で、それぞれ読み（4）・書き（2）・実行（1）を足した数である。<code>7</code>（4+2+1）は読み書きと実行、<code>5</code>（4+1）は読みと実行になる。</p>
+<p><code>chmod 755</code> で、誰でも実行できるようにした。3つの数字は、左から持ち主・グループ（ファイルに付いている、利用者の組。その組に入っている利用者）・ほかの人の許可で、それぞれ読み（4）・書き（2）・実行（1）を足した数である。<code>7</code>（4+2+1）は読み書きと実行、<code>5</code>（4+1）は読みと実行になる。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>置きたいファイルを置き場所どおりに並べたのだから、あとはこの木を1つのファイルに固めれば .deb ファイルになるはずだ。固めるのは <code>dpkg-deb</code>（第4章で中身を取り出すのに使った、.deb ファイルを扱う道具）の <code>--build</code> である。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg-deb --build myhello
@@ -165,7 +165,7 @@ dpkg         … .deb を展開・設定し、台帳（/var/lib/dpkg/）に書�
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>.deb ファイルは、置き場所どおりのファイルの木と、<code>DEBIAN/control</code>（<code>Package</code>・<code>Version</code>・<code>Architecture</code>・<code>Maintainer</code>・<code>Description</code>、要るなら <code>Depends</code>）を並べて <code>dpkg-deb --build</code> で作る</li><li><code>--root-owner-group</code> を付けて、中のファイルの持ち主を root にする。<code>dpkg -c</code> で確かめる</li><li>自分で作ったパッケージも、<code>apt install ./</code> で入れれば台帳に載り、<code>dpkg -l</code>・<code>-L</code>・<code>-S</code> で引け、<code>apt remove</code> で消せる</li><li>Debian 系のパッケージ管理は「.deb（中身＋情報）・リポジトリ（置き場＋目録）・apt・dpkg・台帳」の組み合わせでできている</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-21</div>
 <nav class="pager"><a href="/linuc-packages/theory/07-deb-file">← 7. .deb ファイルを直接入れる</a><a href="/linuc-packages/theory/09-rpm">次: 9. RPM 系で同じことをする →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

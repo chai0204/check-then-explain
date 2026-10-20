@@ -12,7 +12,7 @@
 </div>
 <h1>2. いま何が入っているかを調べる</h1>
 <p class="lead"><b>前の章までにやったこと</b>: labhello を <code>apt install</code> で入れて、使って、<code>apt remove</code> で消した。<b>この章でやること</b>: いまこの檻にどんなパッケージが入っているかを、一覧と、1つずつの詳しい情報で調べる。そして、その答えがどこから来ているかを確かめる。</p>
-<div class="badges"><span>前提: 第1章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>出題範囲 1.04.2（重要度1）</span><span>最終検証 2026-10-20</span></div>
+<div class="badges"><span>前提: 第1章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>出題範囲 1.04.2（重要度1）</span><span>最終検証 2026-10-21</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>入っているパッケージの一覧を <code>dpkg -l</code> と <code>apt list</code> で出し、行頭の <code>ii</code> が何を表すかを確かめる</li><li>1つのパッケージの版・分類・依存関係などを、<code>dpkg -s</code> と <code>apt show</code> で調べる</li><li>「入っているか」の答えが、いつ書かれ、いつ消えるのかを確かめる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>dpkg -l</code> の行頭に出る <code>ii</code> 以外の記号、<code>dpkg -s</code> の全部の欄、台帳のファイルの中身の形。この章では「一覧で探して、1つを詳しく見る」ができれば足りる。</div></div>
@@ -76,7 +76,7 @@ ii  labweb-data    1.0          all          data files for labweb</code></pre>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -l labhello
 dpkg-query: no packages found matching labhello</code></pre>
 <div class="analogy"><b>たとえ</b>: 家の持ち物リストに近い。物を買うたびに1行書き足し、捨てるたびに線を引いて消す。「家に何があるか」を聞かれたら、家じゅうを見て回らずに、このリストを読み上げる。
-<br>ただし<b>崩れる点</b>: 家のリストは住む人が自分で書くが、この一覧は利用者が書くのではない。パッケージを入れる・消すときに、dpkg が書く（この章の最後の節で確かめる）。</div>
+<br>ただし<b>崩れる点</b>: 家のリストに載るのは自分で買った物だけだが、この一覧には、あなたが入れていないもの（檻を作ったときから入っていたもの）も全部並ぶ。</div>
 
 <h2 id="aptlist">apt で一覧を出す — apt list</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>apt list</code> の出力の読み方。</div>
@@ -168,7 +168,7 @@ Description: prints its own version
  A tiny package used to practice upgrades.</code></pre>
 <p><code>dpkg -s</code> は「入っていないので、情報が無い」と答えた（2行目は「.deb ファイルを調べるなら --info を使え」という案内）。.deb ファイルは、第1章で apt が取ってきた <code>labhello_1.0_all.deb</code> のような、パッケージのファイルである。<code>apt show</code> は、入っていない labhello についても答えた。前の節の <code>apt list</code> と同じく、入れられるパッケージの一覧を持っているからである。<code>APT-Manual-Installed</code> の欄が無いのは、入っていないからである。</p>
 <div class="analogy"><b>たとえ</b>: 家電の裏に貼ってある銘板に近い。型番・製造元・必要な電源（ここでは依存関係）が書いてあり、本体を分解しなくても読める。
-<br>ただし<b>崩れる点</b>: 銘板は品物が手元にあれば読めるが、<code>dpkg -s</code> は入っているパッケージにしか答えない。入っていない labhello には「情報が無い」と答えた。</div>
+<br>ただし<b>崩れる点</b>: 銘板は品物が手元にあれば読めるが、<code>dpkg -s</code> が答えるのは、<code>dpkg -l</code> の一覧に行のあるパッケージだけである。一度も入れたことのない labhello には「情報が無い」と答えた。</div>
 
 <h2 id="ledger">答えはどこから来るか</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>dpkg -l</code> や <code>dpkg -s</code> の答えが、いつ書かれ、いつ消えるか。</div>
@@ -213,7 +213,7 @@ dpkg-query: no packages found matching labhello</code></pre>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>入っているものの一覧は <code>dpkg -l</code>（行頭 <code>ii</code> が入っているもの）と <code>apt list --installed</code>。<code>apt list</code> だけだと入れられるものも並ぶ</li><li>1つを詳しく見るのは <code>dpkg -s</code> と <code>apt show</code>。<code>Version</code>（版）・<code>Section</code>（分類）・<code>Depends</code>（依存関係）が読める。入っていないものに答えられるのは <code>apt show</code> だけ</li><li>これらの答えは、入れたときに dpkg が書く記録（台帳）から来ている。入れると行が書かれ、消すと消える</li><li><code>dpkg -l</code> は 80 桁の端末では <code>less</code> で開く（<code>q</code> で抜ける）。パイプに渡すと開かない</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-21</div>
 <nav class="pager"><a href="/linuc-packages/theory/01-install">← 1. パッケージを入れて、使って、消す</a><a href="/linuc-packages/theory/03-files">次: 3. 入れたファイルがどこに置かれたかを調べる →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

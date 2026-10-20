@@ -12,7 +12,7 @@
 </div>
 <h1>7. .deb ファイルを直接入れる</h1>
 <p class="lead"><b>前の章までにやったこと</b>: apt でパッケージを入れる・調べる・消すをやり、apt がリポジトリの目録を見て取ってくること、依存関係があれば一緒に入れることを確かめた（第5・6章）。<b>この章でやること</b>: リポジトリを通さずに、手元にある .deb ファイルを <code>dpkg</code> で直接入れる。依存関係が足りないと何が起きるかを見て、そのあとの片付け方を確かめる。最後に、パッケージを入れたときの質問をやり直す <code>dpkg-reconfigure</code> を使う。</p>
-<div class="badges"><span>前提: 第6章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.2（重要度1）</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<div class="badges"><span>前提: 第6章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.2（重要度1）</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-21</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>.deb ファイルを <code>dpkg -i</code> で入れ、<code>dpkg -r</code>・<code>dpkg -P</code> で消す</li><li>依存関係が足りない .deb ファイルを <code>dpkg -i</code> で入れるとどうなるかを確かめ、続きを済ませる方法を確かめる</li><li><code>dpkg -i</code> がしている「展開」と「設定」を、<code>dpkg --unpack</code> と <code>dpkg --configure</code> で分けて打つ</li><li><code>dpkg-reconfigure</code> で、入れたときの質問をもう一度出し、設定し直す</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>dpkg</code> のそのほかのオプション（<code>--set-selections</code>・<code>--force-…</code> など）、パッケージの中で動く設定の手順（スクリプト）の書き方、debconf（質問と答えを覚えるしくみ）の記録の形、<code>dpkg-reconfigure</code> の画面の種類の違い。この章は、ファイルから入れる・消す・設定をやり直す、が1回できれば足りる。</div></div>
@@ -290,7 +290,7 @@ apt の <code>remove</code> と <code>purge</code> にあたる。</p></details>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>dpkg -i ファイル.deb</code> は手元のファイルを入れる。apt は、リポジトリから取ってきたファイルを dpkg に渡している</li><li>dpkg は依存関係を読めるが取りに行かない。足りなければ展開まで進めて <code>iU</code>（展開済み・設定前）で止まり、apt はほかの操作も断る。<code>apt --fix-broken install</code>（<code>apt-get -f install</code>）が目録から取って続きをする。最初から <code>apt install ./ファイル.deb</code> でもよい</li><li><code>dpkg -r</code> は設定ファイルを残して <code>rc</code>、<code>dpkg -P</code> は全部消す。依存されているものは消すのを断られる</li><li><code>dpkg -i</code> は「展開（<code>--unpack</code>）」と「設定（<code>--configure</code>）」の2段</li><li><code>dpkg-reconfigure</code> は入れたときの質問をやり直し、その答えで設定し直す。答えは <code>debconf-show</code> で見られる</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / debconf 1.5.86ubuntu1 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / debconf 1.5.86ubuntu1 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-21</div>
 <nav class="pager"><a href="/linuc-packages/theory/06-repository">← 6. パッケージはどこから来るか</a><a href="/linuc-packages/theory/08-build">次: 8. パッケージを自分で作る →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

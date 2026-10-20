@@ -12,7 +12,7 @@
 </div>
 <h1>11. .rpm ファイルを rpm で直接入れて、確かめる</h1>
 <p class="lead"><b>前の章までにやったこと</b>: RPM 系で、yum で入れて消し、rpm に台帳を聞き（第9章）、yum のリポジトリを足して上げ、署名を <code>rpm -K</code> で確かめた（第10章）。Debian 系では、.deb ファイルを dpkg で直接入れ（第7章）、台帳とファイルを <code>dpkg -V</code> で見比べた（第4章）。<b>この章でやること</b>: RPM 系で同じことをする。.rpm ファイルを入れずに取ってきて中を見て、<code>rpm</code> で直接入れ、上げて、消す。台帳と照らし合わせる <code>rpm -V</code> と、入れずに中身を取り出す <code>rpm2cpio</code> も使う。最後に、この11章を1つにまとめる。</p>
-<div class="badges"><span>前提: 第10章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 28分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.4（重要度1）</span><span>出題範囲 1.04.3（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<div class="badges"><span>前提: 第10章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 28分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.4（重要度1）</span><span>出題範囲 1.04.3（重要度3）</span><span>最終検証 2026-10-21</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>yumdownloader</code> で .rpm ファイルを取り、<code>rpm -qp…</code> で入れる前に中を見る</li><li><code>rpm -ivh</code> で入れ、依存関係が足りないとどうなるかを確かめる。<code>-U</code>・<code>-F</code>・<code>-e</code> の違いを確かめる</li><li><code>rpm -V</code> の出力の9文字を読み、何が変わったかを確かめる</li><li><code>rpm2cpio</code> で、入れずに中身を取り出す</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>rpm</code> のこの章に出てこないオプション（<code>--force</code> など）、<code>rpm -V</code> の文字のうち、この章で実際には出てこないもの（表の <code>D</code>・<code>L</code>・<code>P</code>）が出る場面、設定ファイルを書き換えたまま消したときの扱い（<code>.rpmsave</code>）、台帳の作り直し。この章は「ファイルから入れる・上げる・照らし合わせる・取り出す」が1回できれば足りる。</div></div>
@@ -101,7 +101,7 @@ labtool: labtool-data から読んだ1行です</code></pre>
 Installed Packages
 labtool.noarch                             1.0-1                         @System
 labtool-data.noarch                        1.0-1                         @System</code></pre>
-<p>右端が <code>@System</code> になった。rpm で直接入れたものは、どのリポジトリから来たかの記録が無いからである（yum で入れれば、第9章のように <code>@lab</code> になる）。</p>
+<p>右端が <code>@System</code> になった。rpm で直接入れたものは、どのリポジトリから来たかの記録が無いからである（yum で入れれば、第9章のように <code>@lab</code> になる）。ただし、同じ版を前に yum で入れたことがあると、消して rpm で入れ直しても <code>@@System</code> や <code>@lab</code> のように、yum がその版について最後に残した記録が出続ける。</p>
 <div class="analogy"><b>たとえ</b>: 部品表を見て「この部品が無いと組めない」と言う検品係に近い。足りなければ、作業台に何も載せずに、作業票ごと突き返す。部品を取りに倉庫へ行くのは別の係（yum）の仕事である。
 <br>ただし<b>崩れる点</b>: 人の検品係なら「急ぎだから部品なしで組んで」と言われても事情を聞き返すが、rpm に依存関係を確かめさせない指示（<code>--nodeps</code>）を付けると、聞き返さずに組めないものを組む。それを「台帳と照らし合わせる」の節で確かめる。</div>
 
@@ -285,7 +285,7 @@ $ cd</code></pre>
 <p>どちらも、パッケージを入れると、<b>ファイルが置かれ、入れたという記録（台帳）が書かれる</b>。ファイルと台帳は別々にあるので、片方だけが変わることがある（ファイルだけ消す・中身だけ広げる）。apt と yum は、リポジトリの<b>目録</b>を読んで取ってきて、dpkg と rpm がファイルを置き、台帳に書く。コマンドの答えが食い違ったり、思ったのと違ったりしたら、いま見ているのが「ファイル」「台帳」「目録」のどれかを確かめる。</p>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-packages/practice/">演習11</a>は、入れたあとで2か所いじられた labmotd を、台帳と照らし合わせて突き止め、入れた直後の状態に戻す課題である。
-<a href="/linuc-packages/practice/">演習12</a>は、yumdownloader で取ってきた .rpm ファイルを、yum を使わずに rpm だけで入れる。判定は台帳と、入った経路（<code>@System</code>）を見る。</div>
+<a href="/linuc-packages/practice/">演習12</a>は、yumdownloader で取ってきた .rpm ファイルを、yum を使わずに rpm だけで入れる。判定は台帳と、rpm で入れたか（台帳の「入れた時刻」を、yum の取引の記録と比べる）を見る。</div>
 <div class="quiz"><b>確認</b>
 <p>入っているパッケージだけを新しい版に更新し、入っていなければ何もしない rpm のオプションはどれか。<br>
 (a) <code>-i</code>　(b) <code>-U</code>　(c) <code>-F</code>　(d) <code>-e</code></p>
@@ -310,7 +310,7 @@ $ cd</code></pre>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li><code>yumdownloader</code>（<code>--resolve</code> で依存関係も）で .rpm を取り、<code>rpm -qpi</code>・<code>-qpl</code>・<code>-qpR</code> で入れる前に中を見る</li><li><code>rpm -ivh</code> は依存関係が足りないと1つも入れずに止まる（dpkg は <code>iU</code> を残した）。必要なファイルを並べて渡せば、順番は rpm が決める。rpm で入れたものは yum から見ると <code>@System</code></li><li><code>-i</code> は新しく入れる（古い版があればぶつかる）、<code>-U</code> は上げるか入れる、<code>-F</code> は入っているものだけ上げる、<code>-e</code> は消す（依存されていれば断る。<code>--nodeps</code> は確かめない）</li><li><code>rpm -V</code> は違うファイルだけを出す。9文字は SM5DLUGTP（違った項目だけ文字が入る）で、違いがあれば終了コードも 0 以外</li><li><code>rpm2cpio | cpio -idmv</code> は入れずに中身を取り出す。台帳には載らない</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.1.0@sha256:__DIGEST__（AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / yum-utils 4.3.0 / cpio 2.13 / vault.almalinux.org 9.7）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.1.0@sha256:__DIGEST__（AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / yum-utils 4.3.0 / cpio 2.13 / vault.almalinux.org 9.7）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-21</div>
 <nav class="pager"><a href="/linuc-packages/theory/10-yum-repo">← 10. yum のリポジトリを足して、署名を確かめる</a><a href="/linuc-packages/practice/">実践編へ →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

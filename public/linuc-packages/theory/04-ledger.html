@@ -12,7 +12,7 @@
 </div>
 <h1>4. 台帳とファイルを見比べる</h1>
 <p class="lead"><b>前の章までにやったこと</b>: パッケージを入れて・使って・消し（第1章）、入っているものを調べ（第2章）、置かれたファイルとパッケージを <code>dpkg -L</code>・<code>dpkg -S</code> で両方向に引いた（第3章）。どの答えも、入れたときに dpkg が書く台帳から来ていた。<b>この章でやること</b>: 台帳の実物のファイルを開く。そして、パッケージ管理を通さずにファイルだけを消したり置いたりして、台帳とファイルを見比べる。</p>
-<div class="badges"><span>前提: 第3章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.2（重要度1）</span><span>最終検証 2026-10-20</span></div>
+<div class="badges"><span>前提: 第3章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.2（重要度1）</span><span>最終検証 2026-10-21</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>台帳が <code>/var/lib/dpkg/</code> の下のどのファイルで、<code>dpkg -s</code>・<code>dpkg -L</code> がどれを読んでいるかを確かめる</li><li>パッケージ管理を通さずにファイルだけを消すと、台帳がどう答えるかを確かめ、<code>dpkg -V</code> で台帳とファイルを照らし合わせる</li><li>台帳どおりに戻す方法（<code>apt reinstall</code>）を確かめる</li><li>中身だけを置くと（<code>dpkg-deb -x</code>）、台帳がどう答えるかを確かめる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>/var/lib/dpkg/</code> のほかのファイル（<code>available</code>・<code>triggers</code> など）、台帳を手で書き換える方法（書き換えてはいけない）、ファイルの中身から計算する値（ダイジェスト）の計算のしくみ、<code>dpkg -V</code> が行の頭に並べる記号のうち <code>5</code> 以外の意味。この章では、台帳とファイルを見比べることが1回できれば足りる。</div></div>
@@ -182,7 +182,7 @@ dpkg -V                     … 台帳とファイルを見比べる（違うも
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>台帳は <code>/var/lib/dpkg/</code> の <code>status</code>（状態・版・依存関係）と <code>info/名前.list</code>（置いたファイル）・<code>info/名前.md5sums</code>（ダイジェスト）。<code>dpkg -s</code>・<code>-l</code>・<code>-L</code>・<code>-S</code> はこれを読む</li><li>ファイルと台帳は別々にある。<code>rm</code> でファイルを消しても台帳は <code>ii</code> のまま、<code>dpkg-deb -x</code> で置いても台帳には載らない</li><li><code>dpkg -V</code> は台帳とファイルを見比べ、違うものだけを出す（<code>missing</code> は無い、<code>5</code> は中身が違う）。違いがあっても終了コードは 0</li><li>台帳どおりに戻すのは <code>sudo apt reinstall 名前</code></li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-21</div>
 <nav class="pager"><a href="/linuc-packages/theory/03-files">← 3. 入れたファイルがどこに置かれたかを調べる</a><a href="/linuc-packages/theory/05-depends">次: 5. 依存関係のあるパッケージを入れて、消す →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

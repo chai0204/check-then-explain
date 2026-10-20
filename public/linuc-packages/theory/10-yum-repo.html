@@ -12,7 +12,7 @@
 </div>
 <h1>10. yum のリポジトリを足して、署名を確かめる</h1>
 <p class="lead"><b>前の章までにやったこと</b>: RPM 系の檻で、yum で入れて消し、rpm に入っているものと置かれたファイルを聞き、yum が要らなくなった依存関係も消すことを確かめた（第9章）。Debian 系では、apt が見に行くリポジトリの表（<code>sources.list</code>）を読み、区分を足して <code>apt update</code> と <code>apt upgrade</code> で新しい版に上げた（第6章）。<b>この章でやること</b>: yum の設定とリポジトリの表を読み、新しい版の置き場を足して labhello を上げる。上げるときに出てくる問いをきっかけに、パッケージの署名と鍵を確かめる。最後に、入っていないパッケージを yum で探す。</p>
-<div class="badges"><span>前提: 第9章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 28分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.3（重要度3）</span><span>出題範囲 1.04.4（重要度1）</span><span>最終検証 2026-10-20</span></div>
+<div class="badges"><span>前提: 第9章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 28分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.3（重要度3）</span><span>出題範囲 1.04.4（重要度1）</span><span>最終検証 2026-10-21</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>yum</code> と <code>dnf</code>、<code>/etc/yum.conf</code> と <code>/etc/dnf/dnf.conf</code> の関係を <code>ls -l</code> で確かめる</li><li><code>/etc/yum.repos.d/</code> の .repo ファイル（<code>[repo id]</code>・<code>name</code>・<code>baseurl</code>・<code>enabled</code>・<code>gpgcheck</code>・<code>gpgkey</code>）を読み、リポジトリを足してから新しい版に上がるまでに何が要るかを確かめる</li><li><code>rpm -K</code> の出力を読んで、署名が確かめられたかを判断し、鍵を台帳に取り込む方法を確かめる</li><li>入っていないパッケージを <code>yum search</code>・<code>info</code>・<code>provides</code>・<code>repoquery -l</code>・<code>deplist</code> で調べる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: パッケージに署名する手順と鍵の作り方、鍵の失効、yum のモジュール（<code>dnf module</code>）とグループ（<code>yum groupinstall</code>）、RHEL のサブスクリプションの登録、<code>yum.conf</code> のこの章に出てこない項目。<code>Last metadata expiration check</code> の行は「目録を最後に確かめた時刻」と読めれば足りる（時刻は読者ごとに違う）。</div></div>
@@ -90,7 +90,7 @@ lab                          lab packages (LinuC 1.04)                  enabled
 ...</code></pre>
 <p><code>repolist</code> は使っている（<code>enabled=1</code>）リポジトリだけ、<code>repolist all</code> は <code>enabled=0</code> のものも含めて全部を、<code>status</code> の欄つきで出す。<b>この檻の AlmaLinux 本体のリポジトリは、更新の止まった 9.7 の保存庫に向けてある</b>（日ごとに中身が変わる本来の配り先に向けると、読者ごと・日ごとに出力が変わるため）。</p>
 <div class="analogy"><b>たとえ</b>: 取引先ごとに1枚ずつ作った連絡先カードに近い。カードには、呼び名（repo id）・住所（baseurl）・取引中か（enabled）・印鑑を確かめるか（gpgcheck）・照合用の印影の場所（gpgkey）が書いてあり、カードを足せば取引先が増える。
-<br>ただし<b>崩れる点</b>: 連絡先カードは手元にあれば誰にでも連絡できるが、yum は <code>enabled=0</code> と書いたカードを読まない。<code>yum repolist all</code> で <code>disabled</code> と出たリポジトリがそれである。</div>
+<br>ただし<b>崩れる点</b>: 連絡先カードは手元にあれば誰にでも連絡できるが、yum は <code>enabled=0</code> と書いたカードを、読みはするが使わない。<code>yum repolist all</code> で <code>disabled</code> と出たリポジトリがそれである。</div>
 
 <h2 id="add">新しい版の置き場を足す</h2>
 <div class="sgoal"><b>この節で分かること</b>: リポジトリを足したあと、新しい版が見えるまでに要ること。</div>
@@ -153,7 +153,7 @@ extras-6ca639b91115fc97</code></pre>
 <div class="scroll"><table>
 <tr><th>コマンド</th><th>何のためにあるか</th><th>apt でいえば</th></tr>
 <tr><td><code>yum makecache</code></td><td>全部のリポジトリの目録を取ってきて、写しを作る（期限の内側でも中身が変わったと分かっているとき）。この檻では AlmaLinux 本体の分をネットの向こう（vault.almalinux.org）へ確かめに行くので、ネットが無いと失敗する</td><td><code>apt update</code></td></tr>
-<tr><td><code>yum clean all</code></td><td>手元の目録の写しと、取ってきた .rpm を捨てる（写しが壊れたと疑わしいとき）。<b>この檻で打つと、次の yum が AlmaLinux 本体の目録（約 53MB）を取り直す</b>。ネットが無いと、lab から入れる操作も含めて全部が <code>Failed to download metadata for repo 'appstream'</code> で止まり、檻を起動し直すまで直らない</td><td><code>apt-get clean</code>（取ってきた .deb を捨てる）と <code>apt-get distclean</code>（目録の写しを捨てる）を合わせたもの</td></tr>
+<tr><td><code>yum clean all</code></td><td>手元の目録の写しと、取ってきた .rpm を捨てる（写しが壊れたと疑わしいとき）。<b>この檻で打つと、次の yum が AlmaLinux 本体の目録（約 53MB）を取り直す</b>。ネットが無いと、目録の要る操作（lab から入れるのも含めた install や provides など）が <code>Failed to download metadata for repo 'appstream'</code> で止まり、檻を起動し直すまで直らない（入っているものを並べる・消す操作は動く）</td><td><code>apt-get clean</code>（取ってきた .deb を捨てる）と <code>apt-get distclean</code>（目録の写しを捨てる）を合わせたもの</td></tr>
 </table></div>
 
 <h2 id="update">上げる — yum update</h2>
@@ -200,7 +200,7 @@ Upgraded:
 Complete!
 $ labhello
 labhello 1.1</code></pre>
-<p>1つ目の <code>Is this ok [y/N]</code> は「表の内容（<code>Upgrading:</code> labhello 1.1）で進めてよいか」である。そのあと .rpm を取ってきたところで、<code>Importing GPG key 0xA5824B40</code>（鍵 A5824B40 を取り込む。GPG は鍵と署名を扱う道具の名前で、<code>gpgcheck</code>・<code>gpgkey</code> の gpg もこれ。<code>0x</code> は、続く数が16進数だという印）と出て、2つ目の問いが来た。これは「このリポジトリのパッケージの署名を確かめるための鍵を、取り込んでよいか」という問いで、鍵の持ち主（<code>Userid</code>）・鍵の指紋（<code>Fingerprint</code>）・鍵のファイル（<code>From</code>、.repo の <code>gpgkey=</code> に書いた場所）が並んでいる。<code>y</code> と答えると <code>Key imported successfully</code>（取り込んだ）と出て、署名を確かめてから上げた。<code>Running transaction</code> の下では、<code>Upgrading</code> の行で 1.1 を入れ、<code>Cleanup</code> の行で古い 1.0 を片付けている。</p>
+<p>1つ目の <code>Is this ok [y/N]</code> は「表の内容（<code>Upgrading:</code> labhello 1.1）で進めてよいか」である。そのあと .rpm を取ってきたところで、<code>Importing GPG key 0xA5824B40</code>（鍵 A5824B40 を取り込む。GPG は鍵と署名を扱う道具の名前で、<code>gpgcheck</code>・<code>gpgkey</code> の gpg もこれ。<code>0x</code> は、続く数が16進数（0〜9 と A〜F の16文字で書く数）だという印）と出て、2つ目の問いが来た。これは「このリポジトリのパッケージの署名を確かめるための鍵を、取り込んでよいか」という問いで、鍵の持ち主（<code>Userid</code>）・鍵の指紋（<code>Fingerprint</code>）・鍵のファイル（<code>From</code>、.repo の <code>gpgkey=</code> に書いた場所）が並んでいる。<code>y</code> と答えると <code>Key imported successfully</code>（取り込んだ）と出て、署名を確かめてから上げた。<code>Running transaction</code> の下では、<code>Upgrading</code> の行で 1.1 を入れ、<code>Cleanup</code> の行で古い 1.0 を片付けている。</p>
 
 <h2 id="sign">署名と鍵 — rpm -K</h2>
 <div class="sgoal"><b>この節で分かること</b>: 署名が何を保証し、<code>rpm -K</code> の出力をどう読むか。</div>
@@ -228,7 +228,7 @@ $ rpm -Kv /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo rpm --import /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
 $ rpm -K /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm
 /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm: digests signatures OK</code></pre>
-<p>パッケージは1バイトも変えていないのに、<code>signatures OK</code> になった。変わったのは台帳（取り込んだ鍵）のほうである。最後に、中身を書き換えたらどう出るかを見る。AlmaLinux が署名した本物のパッケージ（tree）を写し、<code>dd</code> で末尾近くの1バイトを書き換える。<code>dd</code> は、決めた位置のバイトをそのまま書くコマンドである。<code>bs=1</code> は1バイトずつ、<code>seek=55888</code> は先頭から 55888 バイト進んだ所、<code>conv=notrunc</code> は残りを切り捨てない、<code>status=none</code> は経過を出さない、という指定で、壊れたファイルを作るためだけの操作なので、覚えなくてよい。<code>$HOME</code> は、ホーム（<code>~</code>）の場所 <code>/home/lab</code> が入った環境変数で、<code>~</code> と同じ所を指す。</p>
+<p>パッケージは1バイトも変えていないのに、<code>signatures OK</code> になった。変わったのは台帳（取り込んだ鍵）のほうである。最後に、中身を書き換えたらどう出るかを見る。AlmaLinux が署名した本物のパッケージ（tree）を写し、<code>dd</code> で末尾近くの1バイトを書き換える。<code>dd</code> は、決めた位置のバイトをそのまま書くコマンドである。<code>bs=1</code> は1バイトずつ、<code>seek=55888</code> は先頭から 55888 バイト進んだ所、<code>conv=notrunc</code> は残りを切り捨てない、<code>status=none</code> は経過を出さない、という指定で、壊れたファイルを作るためだけの操作なので、覚えなくてよい。<code>printf 'A'</code> は A の1文字だけを出す（<code>echo</code> と違って、最後に改行を付けない）。<code>$HOME</code> は、ホーム（<code>~</code>）の場所 <code>/home/lab</code> が入った環境変数で、<code>~</code> と同じ所を指す。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm -K /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm
 /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm: digests signatures OK
 $ cp /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm ~/tree-copy.rpm
@@ -345,7 +345,7 @@ Filename    : /usr/bin/dig
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>RHEL 8 以降の <code>yum</code> は <code>dnf</code> へのリンク。<code>/etc/yum.conf</code> も <code>/etc/dnf/dnf.conf</code> へのリンク</li><li>リポジトリは <code>/etc/yum.repos.d/*.repo</code> に <code>[repo id]</code>・<code>name=</code>・<code>baseurl=</code>・<code>enabled=</code>・<code>gpgcheck=</code>・<code>gpgkey=</code> で書く。<code>yum repolist</code>（<code>all</code>）で一覧</li><li>yum は目録が無い・古いと、コマンドを打った時点で自分で取りに行く（apt は <code>apt update</code> まで取りに行かない）。<code>yum check-update</code> は更新があれば終了コード 100</li><li>署名は作った人と無改ざんを確かめる印。<code>rpm -K</code> は <code>signatures</code> が小文字で OK のときだけ確かめられている（署名が無いと <code>digests OK</code>、鍵が無いと <code>SIGNATURES NOT OK</code>、書き換えは <code>DIGESTS</code>）。鍵は yum の問いか <code>rpm --import</code> で台帳に取り込む</li><li>入っていなくても、<code>yum search</code>・<code>info</code>・<code>provides</code>・<code>repoquery -l</code>・<code>deplist</code> で目録から調べられる</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.1.0@sha256:__DIGEST__（AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / yum-utils 4.3.0 / vault.almalinux.org 9.7）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-rpm-1.1.0@sha256:__DIGEST__（AlmaLinux 9.7 / rpm 4.16.1.3 / dnf 4.14.0 / yum-utils 4.3.0 / vault.almalinux.org 9.7）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-21</div>
 <nav class="pager"><a href="/linuc-packages/theory/09-rpm">← 9. RPM 系で同じことをする</a><a href="/linuc-packages/theory/11-rpm-file">次: 11. .rpm ファイルを rpm で直接入れて、確かめる →</a></nav>
 <section id="comments">
 <h2>コメント</h2>

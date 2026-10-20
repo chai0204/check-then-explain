@@ -12,7 +12,7 @@
 </div>
 <h1>1. パッケージを入れて、使って、消す</h1>
 <p class="lead"><b>このコースでやること</b>: Linux にソフトウェアを入れる・調べる・消す方法を、2つの系統の Linux で、実際に打って確かめる。Linux には、ソフトウェアの配り方と、それを扱う道具が違う系統がいくつかあり、ここでは代表の2つを使う。Debian 系（Debian と、それをもとに作られた Ubuntu など）と、RPM 系（Red Hat Enterprise Linux と、それと同じ作りの AlmaLinux など）である。第1〜8章は Debian 系で、第9〜11章は RPM 系で同じことをする。<b>この章でやること</b>: いちばん普通の使い方を1回やる。まだ入っていないコマンドを1つ入れて、使って、消す。<b>始める前に要るもの</b>: docker が動く PC と、端末（80 桁 × 24 行の大きさで確かめてある）と、下の表の「前のコースで出たもの」。</p>
-<div class="badges"><span>前提: docker が動く</span><span>前提: 端末でコマンドを打てる</span><span>前提: sudo の意味が分かる</span><span>所要 17分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<div class="badges"><span>前提: docker が動く</span><span>前提: 端末でコマンドを打てる</span><span>前提: sudo の意味が分かる</span><span>所要 17分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-21</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>まだ入っていないコマンドを、<code>sudo apt install</code> でパッケージとして入れて、使えるようになるかを確かめる</li><li>入れたパッケージを <code>sudo apt remove</code> で消すと、コマンドがどうなるかを確かめる</li><li><code>apt install</code> の出力を1行ずつ読み、何を・どこから取ってきて・何をしたかを確かめる</li><li>パッケージを入れたり消したりするのに <code>sudo</code> が要るわけを確かめる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>apt</code> の <code>install</code>・<code>remove</code> 以外の使い方と、オプション、出力のうち意味をまだ説明していない行（<code>Building dependency tree</code> など）、パッケージのファイルの中身の形、Debian 系と RPM 系の違い。この章は「入れて、使って、消す」が1回できれば足りる。</div></div>
@@ -20,7 +20,7 @@
 <div class="note"><b>前のコースで出たもの</b>: このコースは、次のものを説明なしで使う。忘れていたら、リンク先の章を読み返してから進む。
 <div class="scroll"><table>
 <tr><th>もの</th><th>何のためにあるか（一言）</th><th>出たところ</th></tr>
-<tr><td>シェル・プロンプト・オプション・<code>echo</code>・<code>printf</code></td><td>打ったコマンドを読んで動かすプログラム・打ってよい合図（<code>$</code>）・<code>-l</code> のようにコマンドの動きを変える指定・受け取った文字をそのまま出す（<code>printf</code> は書式を決めて出す）</td><td><a href="/linuc-text/theory/01-quote">主題1.03 第1章</a></td></tr>
+<tr><td>シェル・オプション・<code>echo</code></td><td>打ったコマンドを読んで動かすプログラム・<code>-l</code> のようにコマンドの動きを変える指定・受け取った文字をそのまま出す</td><td><a href="/linuc-text/theory/01-quote">主題1.03 第1章</a></td></tr>
 <tr><td>ディレクトリ・<code>cd</code>・ホーム（<code>~</code>）・<code>PATH</code></td><td>ファイルをまとめて入れておく入れ物（フォルダ）・いるディレクトリを移る・ログインしたときに最初にいる自分のディレクトリ・コマンドを探すディレクトリの並び（環境変数）</td><td><a href="/linuc-text/theory/02-path">主題1.03 第2章</a></td></tr>
 <tr><td><code>man</code>・<code>less</code></td><td>説明書を引く・長い出力を1画面ずつ見せる（<code>q</code> で抜ける）</td><td><a href="/linuc-text/theory/03-man">主題1.03 第3章</a></td></tr>
 <tr><td><code>cat</code>・<code>head</code>・<code>tail</code>・<code>wc</code></td><td>ファイルの中身を出す・先頭や末尾の数行だけ出す・行の数を数える</td><td><a href="/linuc-text/theory/04-lines">主題1.03 第4章</a></td></tr>
@@ -41,13 +41,13 @@
 <h2 id="cage">檻を起動する</h2>
 <div class="sgoal"><b>この節で分かること</b>: この教材のコマンドを、どこで、どう打つか。</div>
 <p>この教材のコマンドは、あなたの PC の上では打たない。<b>コンテナ</b>の中で打つ。コンテナは、1台の PC の中に、ほかと切り離した小さな Linux の部屋を作るしくみで、docker はそれを作る道具である。この教材では、このコンテナを<b>檻</b>と呼ぶ。パッケージを入れたり消したりすると、その Linux 全体が書き換わる。壊しても困らない部屋でやるためである。</p>
-<p class="detail"><b>前の版（1.0.x）でこの教材の演習を進めたことがある人</b>は、起動する前に、<a href="/linuc-packages/practice/#start">実践編の「はじめる」</a>の「前の版（1.0.x）で進めた人へ」の箱を読む。前の版の進み具合がボリュームに残っていて、新しい演習に混ざるからである。</p>
+<p class="detail"><b>前の版（1.0.x）でこの教材の演習を進めたことがある人</b>は、起動する前に、<a href="/linuc-packages/practice/#start">実践編の「はじめる」</a>の「前の版（1.0.x）で進めた人へ」の箱を読む。前の版の進み具合が、檻を消しても残る置き場（ボリューム。下の起動の1行の <code>-v</code> でつなぐ）に残っていて、新しい演習に混ざるからである。</p>
 <p>あなたの PC の端末で、次の1行（4行に折ってある）をそのまま打つ。この章から第8章までは、この Debian 系の檻を使う。</p>
 <pre data-where="あなたの PC の端末（檻の外）"><code>docker run --rm -it --name lab-linuc-packages-deb --hostname linuc \
   -v lab-linuc-packages-deb-work:/home/lab/work \
   -v lab-linuc-packages-deb-state:/home/lab/.lab \
   ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__</code></pre>
-<p>初めて打つときは、檻の元になるイメージ（檻の中身をまとめたファイル。約 800MB）を取ってくるので、少し待つ。起動すると案内が数行出て、<code>lab@linuc:~$</code> というプロンプトが出る。ここからが檻の中で、あなたは一般ユーザ（root のような管理者ではない、ふつうの利用者）<code>lab</code> として動いている。<b>この教材では、檻の中のプロンプトを <code>$</code> と短く書く</b>。</p>
+<p>初めて打つときは、檻の元になるイメージ（檻の中身をまとめたファイル。約 800MB）を取ってくるので、少し待つ。起動すると案内が数行出て、<code>lab@linuc:~$</code> というプロンプト（コマンドを打ってよいという合図）が出る。ここからが檻の中で、あなたは一般ユーザ（root のような管理者ではない、ふつうの利用者）<code>lab</code> として動いている。<b>この教材では、檻の中のプロンプトを <code>$</code> と短く書く</b>。</p>
 <div class="scroll"><table>
 <tr><th>起動の1行の部品</th><th>何のためにあるか</th></tr>
 <tr><td><code>--rm</code></td><td>檻を抜けたら、檻を消す。次に起動すると最初の状態から始まる</td></tr>
@@ -112,7 +112,7 @@ Processing triggers for man-db (2.12.0-4build2) ...</code></pre>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ labhello
 labhello 1.0</code></pre>
 <div class="analogy"><b>たとえ</b>: 引っ越しの荷物の搬入に近い。荷物を部屋に運び込む（<code>Unpacking</code>）だけでは暮らせず、電気やガスをつないで初めて使える（<code>Setting up</code>）。apt は両方をまとめてやる。
-<br>ただし<b>崩れる点</b>: 人の引っ越しなら、どの荷物をどこに置いたかは住む人が覚えているだけだが、apt は、何を入れたかを記録に書いておく（この節の初めに書いた「何を入れたかの記録」）。</div>
+<br>ただし<b>崩れる点</b>: 人の引っ越しなら、どの荷物をどこに置いたかは住む人が覚えているだけだが、パッケージ管理の道具は、何を入れたかを記録に書いておく（この節の初めに書いた「何を入れたかの記録」）。</div>
 
 <h2 id="remove">消す — apt remove</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>apt remove</code> の打ち方と、消したあとの bash の言い方。</div>
@@ -168,7 +168,7 @@ bash: labhello: command not found</code></pre>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>Linux のコマンドやアプリは、パッケージ（プログラムと関係するファイルに名前と版を付けたもの）の形で配られる</li><li>Debian 系では <code>sudo apt install 名前</code> で入れ、<code>sudo apt remove 名前</code> で消す。<code>sudo</code> が要るのは、全員が使う場所と、入れたものの記録を書き換えるから</li><li><code>apt install</code> は、リポジトリ（配り場所）から取ってきて（<code>Get</code>）、中身を置き（<code>Unpacking</code>）、使える状態に整える（<code>Setting up</code>）</li><li>消したあとに <code>No such file or directory</code> と出るのは、bash が前の場所を覚えているから。<code>hash -r</code> で忘れさせる</li></ul></div>
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-20</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行で検証 / 検証日 2026-10-21</div>
 <nav class="pager"><a href="/linuc-packages/theory/">← 理論編 目次</a><a href="/linuc-packages/theory/02-list">次: 2. いま何が入っているかを調べる →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
