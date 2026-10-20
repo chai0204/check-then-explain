@@ -36,6 +36,8 @@ c_hd=$'\033[1;36m'; c_tag=$'\033[1;7m'
 [ -t 1 ] || { c_ok=; c_ng=; c_wr=; c_d=; c_b=; c_0=; c_hd=; c_tag=; }
 
 die() { printf '%s\n' "$*" >&2; exit 1; }
+# 演習を2つの檻に分けたコース（主題1.04）は、この檻に無い番号を打たれたとき、もう一方の檻をイメージの LAB_ELSEWHERE で案内する
+elsewhere() { [ -z "${LAB_ELSEWHERE:-}" ] || printf '\n%s' "$LAB_ELSEWHERE"; }
 
 # 演習番号の正規化（3 → 03）
 norm() { printf '%02d' "$((10#${1#0}))" 2>/dev/null || printf '%s' "$1"; }
@@ -147,7 +149,7 @@ task_footer() {
 cmd_start() {
   local n; n=$(norm "${1:?lab start NN}")
   local task="$LAB_HOME/tasks/$n.md"
-  [ -f "$task" ] || die "演習 $n は存在しません（lab ls で一覧）"
+  [ -f "$task" ] || die "演習 $n は存在しません（lab ls で一覧）$(elsewhere)"
   # 作業ディレクトリは seed の有無に関わらず必ず作る。
   # seed だけを条件にすると、配布ファイルが無い演習で ~/work/NN が生まれず、
   # 読者が「どこで作業するのか」を自分で推測することになる。
@@ -170,7 +172,7 @@ cmd_show() {
   local n
   if [ $# -ge 1 ]; then n=$(norm "$1"); else n=$(current_get); fi
   [ -n "$n" ] || die "まだ課題を開いていません。lab start NN で開いた後は、lab show だけで出せます（演習の一覧は lab ls）"
-  [ -f "$LAB_HOME/tasks/$n.md" ] || die "演習 $n は存在しません（lab ls で一覧）"
+  [ -f "$LAB_HOME/tasks/$n.md" ] || die "演習 $n は存在しません（lab ls で一覧）$(elsewhere)"
   show_task "$n"
   task_footer "$n"
 }
@@ -181,7 +183,7 @@ cmd_check() {
   local rc_all=0
   for n in $list; do
     local v="$LAB_HOME/verify/$n.sh"
-    [ -f "$v" ] || { printf '%s\n' "演習 $n は存在しません"; rc_all=1; continue; }
+    [ -f "$v" ] || { printf '%s\n' "演習 $n は存在しません$(elsewhere)"; rc_all=1; continue; }
     local out rc
     out=$(cd "$WORK" && bash "$v" 2>&1); rc=$?
     case $rc in
