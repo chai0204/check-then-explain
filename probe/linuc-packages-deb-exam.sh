@@ -7,6 +7,11 @@ cd "$(dirname "$0")/.." || exit 1
 exec python3 -I probe/linuc-packages-seq.py --script /dev/stdin --cage deb \
   --out logs/linuc-packages-deb-exam.log \
   --note "本文の表と説明が拠っている man の記述" <<'INPUT'
+========== 第2章: dpkg は端末へ出すとき less に渡し、LESS を -FRSXMQ にする（man dpkg-query）。-F は「1画面に収まれば閉じる」、-S は「長い行を切る」（man less） ==========
+$ man dpkg-query | grep -A6 '^       LESS$'
+$ man less 2>/dev/null | grep -A2 -E '^       -(F|S) or'
+========== 第1章: man-db のトリガが動かす mandb の -p は、索引から消えた説明書の行を消さない（man mandb） ==========
+$ man mandb 2>/dev/null | grep -A3 -E '^       -p, --no-purge'
 ========== 第5章: autoremove の説明と、印は apt-mark で付け替えられること（man apt） ==========
 $ man apt | sed -n '/^       autoremove (apt-get(8))$/,/^       satisfy (apt-get(8))$/p'
 ========== 第5章: apt-cache showpkg は、版ごとの依存関係と逆向きの依存関係をまとめて出す（man apt-cache） ==========

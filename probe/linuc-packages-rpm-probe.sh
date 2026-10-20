@@ -91,10 +91,11 @@ Is this ok [y/N]: y
 $ printf '%s\n' '[lab-updates]' 'name=lab updates (LinuC 1.04)' 'baseurl=file:///srv/lab-updates-rpm' 'gpgcheck=1' 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab-updates' | sudo tee /etc/yum.repos.d/lab-updates.repo
 $ yum check-update
 $ echo $?
-========== 第10章の表: makecache は全部のリポジトリに取りに行って確かめる。clean all は手元の写しを捨てる ==========
+========== 第10章の表: makecache は全部のリポジトリに取りに行って確かめる。clean all は手元の写しを捨て、次の yum が AlmaLinux 本体の目録（合わせて約 53MB）を取り直す ==========
 $ sudo yum makecache
 $ sudo yum clean all
 $ ls /var/cache/dnf/
+$ yum search liblab
 ========== 第10章の確認問題: whatprovides は provides と同じ。repoquery は yum を付けずにも打てる ==========
 $ yum whatprovides '*/liblab.sh'
 $ repoquery -l labtool
@@ -202,8 +203,43 @@ $ sudo yum reinstall lab-mathtools
 Is this ok [y/N]: y
 Is this ok [y/N]: y
 $ lab check 10
+========== 演習10 の課題文: 第10章を打った檻のままでも始まりの画面は同じだが、lab tools の鍵が台帳に残っているので、入れるときに鍵を取り込む問いが出ない ==========
+$ sudo yum install labhello
+Is this ok [y/N]: y
+$ sudo tee /etc/yum.repos.d/lab-updates.repo <<'END'
+> [lab-updates]
+> name=lab updates (LinuC 1.04)
+> baseurl=file:///srv/lab-updates-rpm
+> gpgcheck=1
+> gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab-updates
+> END
+$ sudo yum update labhello
+Is this ok [y/N]: y
+Is this ok [y/N]: y
+$ sudo rpm --import /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+$ lab start 10
+$ labcalc 2 3
+$ ls /srv/lab-tools-rpm
+$ rpm -q gpg-pubkey --qf '%{SUMMARY}\n'
+$ sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+> [lab-tools]
+> name=lab tools
+> baseurl=file:///srv/lab-tools-rpm
+> gpgcheck=1
+> gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+> END
+$ sudo yum install lab-mathtools
+Is this ok [y/N]: y
+$ lab check 10
 ========== 演習10 の解答: 台帳に取り込んだ鍵の一覧 ==========
 $ rpm -q gpg-pubkey --qf '%{SUMMARY}\n'
+========== 演習12 の判定: yum に手元のファイルを渡して入れると @@commandline と記録され、rpm で入れたことにならない ==========
+$ lab start 12
+$ cd ~/work/12
+$ yumdownloader --resolve labtool
+$ sudo yum install ./labtool-1.0-1.noarch.rpm ./labtool-data-1.0-1.noarch.rpm
+Is this ok [y/N]: y
+$ lab check 12
 ========== 演習12 の解答: yumdownloader の --destdir と --resolve ==========
 $ yumdownloader --destdir /tmp/dl labtool
 $ ls /tmp/dl

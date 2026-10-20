@@ -67,6 +67,10 @@ $ yumdownloader --help | grep -A1 -E '^  --(destdir|source|resolve) '
   --resolve             resolve and download needed dependencies
   --alldeps             when running with --resolve, download all dependencies
 
+$ grep -n -E "'yumdownloader'|basename" /usr/libexec/dnf-utils
+41:           'yumdownloader': ['download']
+77:command = os.path.basename(sys.argv[0])
+
 
 ========== 第10章: Last metadata expiration check の行を出す条件（dnf のプログラム。いちばん新しい目録の経過秒 age が 0 なら出さない） ==========
 
@@ -77,6 +81,40 @@ $ grep -n -B2 -A3 'Last metadata expiration check' /usr/lib/python3.9/site-packa
 434-                                    datetime.timedelta(seconds=int(age)),
 435-                                    dnf.util.normalize_time(mts))
 436-            else:
+
+
+========== 第10章: 一般ユーザが打つと、目録の写しは /var/tmp/dnf-ユーザ名-… に置かれる（dnf のプログラム。この檻では /var/cache/dnf をそこへの名札にしてある） ==========
+
+$ grep -n -A18 'def getCacheDir' /usr/lib/python3.9/site-packages/dnf/yum/misc.py
+196:def getCacheDir():
+197-    """return a path to a valid and safe cachedir - only used when not running
+198-       as root or when --tempcache is set"""
+199-
+200-    uid = os.geteuid()
+201-    try:
+202-        usertup = pwd.getpwuid(uid)
+203-        username = dnf.i18n.ucd(usertup[0])
+204-        prefix = '%s-%s-' % (dnf.const.PREFIX, username)
+205-    except KeyError:
+206-        prefix = '%s-%s-' % (dnf.const.PREFIX, uid)
+207-
+208-    # check for /var/tmp/prefix-* -
+209-    dirpath = '%s/%s*' % (dnf.const.TMPDIR, prefix)
+210-    cachedirs = sorted(glob.glob(dirpath))
+211-    for thisdir in cachedirs:
+212-        stats = os.lstat(thisdir)
+213-        if S_ISDIR(stats[0]) and S_IMODE(stats[0]) == 448 and stats[4] == uid:
+214-            return thisdir
+
+$ ls -ld /var/cache/dnf /var/tmp/dnf-lab-cache
+lrwxrwxrwx 1 root root   22 Oct 20 19:34 /var/cache/dnf -> /var/tmp/dnf-lab-cache
+drwx------ 6 lab  lab  4096 Oct 20 19:34 /var/tmp/dnf-lab-cache
+
+
+========== 第10章: GPG は鍵と署名を扱う道具（GnuPG） ==========
+
+$ gpg --version | head -1
+gpg (GnuPG) 2.3.3
 
 
 ========== 第10章: 壊れたファイルを作るのに使った dd の bs・seek・conv=notrunc・status（dd --help） ==========

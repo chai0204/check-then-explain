@@ -4,6 +4,36 @@
 # 本文の表と説明が拠っている man の記述
 
 
+========== 第2章: dpkg は端末へ出すとき less に渡し、LESS を -FRSXMQ にする（man dpkg-query）。-F は「1画面に収まれば閉じる」、-S は「長い行を切る」（man less） ==========
+
+$ man dpkg-query | grep -A6 '^       LESS$'
+       LESS
+           Defined  by  dpkg-query  to  “-FRSXMQ”,  if  not  already set, when
+           spawning a pager  (since  dpkg  1.19.2).   To  change  the  default
+           behavior, this variable can be preset to some other value including
+           an empty string, or the PAGER or DPKG_PAGER variables can be set to
+           disable  specific  options  with «-+», for example DPKG_PAGER="less
+           -+F".
+
+$ man less 2>/dev/null | grep -A2 -E '^       -(F|S) or'
+       -F or --quit-if-one-screen
+              Causes less to automatically exit if the entire file can be dis‐
+              played on the first screen.
+--
+       -S or --chop-long-lines
+              Causes  lines  longer than the screen width to be chopped (trun‐
+              cated) rather than wrapped.  That is, the portion of a long line
+
+
+========== 第1章: man-db のトリガが動かす mandb の -p は、索引から消えた説明書の行を消さない（man mandb） ==========
+
+$ man mandb 2>/dev/null | grep -A3 -E '^       -p, --no-purge'
+       -p, --no-purge
+              Do  not spend time checking for deleted manual pages and purging
+              them from the databases.
+
+
+
 ========== 第5章: autoremove の説明と、印は apt-mark で付け替えられること（man apt） ==========
 
 $ man apt | sed -n '/^       autoremove (apt-get(8))$/,/^       satisfy (apt-get(8))$/p'

@@ -21,7 +21,7 @@ $ sudo apt remove labhello
 Do you want to continue? [Y/n] y
 $ whatis labhello
 $ man labhello
-$ grep -n -A3 'triggered' /var/lib/dpkg/info/man-db.postinst
+$ grep -n -A4 'triggered' /var/lib/dpkg/info/man-db.postinst
 ========== 第5章: remove で rc が残るのは、purge のときにまだすることがあるもの。設定ファイル（conffile）か、消すときの手順（postrm）を持つもの ==========
 $ dpkg -s bc | grep -E '^(Status|Conffiles)'
 $ ls /var/lib/dpkg/info/bc.*

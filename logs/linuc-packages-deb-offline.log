@@ -1,0 +1,169 @@
+# 本文の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run --rm -it --hostname linuc、
+# 名前の無いボリューム2つ、PID 1 の bash -l、umask 022、TERM=xterm）の檻に、章ごとに起動し直して打った記録。
+# 端末 80 桁 × 24 行（tmux）。画面に最後に残ったものを書く。作り方: python3 -I probe/linuc-packages-seq.py --script /dev/stdin --cage deb --offline（イメージ lab-linuc-packages-deb:1.1.0）
+# ネットにつながっていない読者の代わりに、名前を引けない檻（docker run に --dns 127.0.0.1 を足した）で打った。
+# ネットにつながっていないときに、本文と違って出るところ（節ごとに檻を起動し直した）
+
+
+========== 第6章: apt update は、Ubuntu 本体の行が Ign と Err になって W: が出る。練習用のリポジトリから上げる結果は同じ ==========
+
+$ sudo apt install labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following NEW packages will be installed:
+  labhello
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1120 B of archives.
+After this operation, 77.8 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+Selecting previously unselected package labhello.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ echo 'deb [trusted=yes] file:/srv/lab-repo lab-updates main' | sudo tee /etc/apt/sources.list.d/lab-updates.list
+deb [trusted=yes] file:/srv/lab-repo lab-updates main
+
+$ sudo apt update
+Get:1 file:/srv/lab-repo lab InRelease
+Ign:1 file:/srv/lab-repo lab InRelease
+Get:2 file:/srv/lab-repo lab-updates InRelease
+Ign:2 file:/srv/lab-repo lab-updates InRelease
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Ign:4 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Ign:5 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Ign:6 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Get:7 file:/srv/lab-repo lab-updates Release [2015 B]
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:7 file:/srv/lab-repo lab-updates Release [2015 B]
+Get:8 file:/srv/lab-repo lab Release.gpg
+Ign:8 file:/srv/lab-repo lab Release.gpg
+Get:9 file:/srv/lab-repo lab-updates Release.gpg
+Ign:9 file:/srv/lab-repo lab-updates Release.gpg
+Get:10 file:/srv/lab-repo lab-updates/main amd64 Packages [431 B]
+Get:11 file:/srv/lab-repo lab-updates/main amd64 Contents (deb) [81 B]
+Ign:4 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Ign:5 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Ign:6 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Ign:4 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Ign:5 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Ign:6 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Err:4 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+  Temporary failure resolving 'snapshot.ubuntu.com'
+Err:5 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+  Temporary failure resolving 'snapshot.ubuntu.com'
+Err:6 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+  Temporary failure resolving 'snapshot.ubuntu.com'
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+1 package can be upgraded. Run 'apt list --upgradable' to see it.
+W: Failed to fetch https://snapshot.ubuntu.com/ubuntu/20260929T000000Z/dists/noble/InRelease  Temporary failure resolving 'snapshot.ubuntu.com'
+W: Failed to fetch https://snapshot.ubuntu.com/ubuntu/20260929T000000Z/dists/noble-updates/InRelease  Temporary failure resolving 'snapshot.ubuntu.com'
+W: Failed to fetch https://snapshot.ubuntu.com/ubuntu/20260929T000000Z/dists/noble-security/InRelease  Temporary failure resolving 'snapshot.ubuntu.com'
+W: Some index files failed to download. They have been ignored, or old ones used instead.
+
+$ apt-cache policy labhello
+labhello:
+  Installed: 1.0
+  Candidate: 1.1
+  Version table:
+     1.1 500
+        500 file:/srv/lab-repo lab-updates/main amd64 Packages
+ *** 1.0 500
+        500 file:/srv/lab-repo lab/main amd64 Packages
+        100 /var/lib/dpkg/status
+
+$ sudo apt upgrade
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Calculating upgrade... Done
+The following packages will be upgraded:
+  labhello
+1 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1120 B of archives.
+After this operation, 0 B of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 file:/srv/lab-repo lab-updates/main amd64 labhello all 1.1 [1120 B]
+(Reading database ... 12837 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.1_all.deb ...
+Unpacking labhello (1.1) over (1.0) ...
+Setting up labhello (1.1) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ labhello
+labhello 1.1
+
+
+========== 演習06: 足したリポジトリから入れる（ネットが無くても通る） ==========
+
+$ echo 'deb [trusted=yes] file:/srv/lab-tools tools main' | sudo tee /etc/apt/sources.list.d/lab-tools.list
+deb [trusted=yes] file:/srv/lab-tools tools main
+
+$ sudo apt update
+Get:1 file:/srv/lab-repo lab InRelease
+Ign:1 file:/srv/lab-repo lab InRelease
+Get:2 file:/srv/lab-tools tools InRelease
+Ign:2 file:/srv/lab-tools tools InRelease
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Ign:4 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Ign:5 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Ign:6 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Get:7 file:/srv/lab-tools tools Release [1991 B]
+Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:7 file:/srv/lab-tools tools Release [1991 B]
+Get:8 file:/srv/lab-repo lab Release.gpg
+Ign:8 file:/srv/lab-repo lab Release.gpg
+Get:9 file:/srv/lab-tools tools Release.gpg
+Ign:9 file:/srv/lab-tools tools Release.gpg
+Get:10 file:/srv/lab-tools tools/main amd64 Packages [445 B]
+Get:11 file:/srv/lab-tools tools/main amd64 Contents (deb) [53 B]
+Ign:4 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Ign:5 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Ign:6 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Ign:4 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+Ign:5 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+Ign:6 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+Err:4 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
+  Temporary failure resolving 'snapshot.ubuntu.com'
+Err:5 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-updates InRelease
+  Temporary failure resolving 'snapshot.ubuntu.com'
+Err:6 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble-security InRelease
+  Temporary failure resolving 'snapshot.ubuntu.com'
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+All packages are up to date.
+W: Failed to fetch https://snapshot.ubuntu.com/ubuntu/20260929T000000Z/dists/noble/InRelease  Temporary failure resolving 'snapshot.ubuntu.com'
+W: Failed to fetch https://snapshot.ubuntu.com/ubuntu/20260929T000000Z/dists/noble-updates/InRelease  Temporary failure resolving 'snapshot.ubuntu.com'
+W: Failed to fetch https://snapshot.ubuntu.com/ubuntu/20260929T000000Z/dists/noble-security/InRelease  Temporary failure resolving 'snapshot.ubuntu.com'
+W: Some index files failed to download. They have been ignored, or old ones used instead.
+
+$ sudo apt install lab-mathtools
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following NEW packages will be installed:
+  lab-mathtools
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/804 B of archives.
+After this operation, 28.7 kB of additional disk space will be used.
+Get:1 file:/srv/lab-tools tools/main amd64 lab-mathtools all 1.0 [804 B]
+Selecting previously unselected package lab-mathtools.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../lab-mathtools_1.0_all.deb ...
+Unpacking lab-mathtools (1.0) ...
+Setting up lab-mathtools (1.0) ...
+
+$ lab check 06
+✔ 06 達成
+  判定 : 観測型（labcalc を動かし、dpkg の台帳と apt の目録を見た）
+  観測 : labcalc = /usr/bin/labcalc
+         labcalc 2 3 の出力 = 5
+         dpkg の台帳 = lab-mathtools（ii）
+         apt の目録 = lab-mathtools を file:/srv/lab-tools から取れる
+         labcalc は lab-mathtools のもので、apt は /srv/lab-tools から取れる

@@ -34,6 +34,108 @@ $ labhello
 labhello 1.0
 
 
+========== 第1章: 消したときの man-db の知らせは、外れた説明書の行を索引から消さない（whatis には残り、man は説明書が無いと答える） ==========
+
+$ whatis labhello
+labhello: nothing appropriate.
+
+$ sudo apt install labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following NEW packages will be installed:
+  labhello
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1120 B of archives.
+After this operation, 77.8 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+Selecting previously unselected package labhello.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../labhello/labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Setting up labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ whatis labhello
+labhello (1)         - print its own version
+
+$ sudo apt remove labhello
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages will be REMOVED:
+  labhello
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
+After this operation, 77.8 kB disk space will be freed.
+Do you want to continue? [Y/n] y
+(Reading database ... 12837 files and directories currently installed.)
+Removing labhello (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ whatis labhello
+labhello (1)         - print its own version
+
+$ man labhello
+No manual entry for labhello
+
+$ grep -n -A4 'triggered' /var/lib/dpkg/info/man-db.postinst
+32:if [ "$1" = triggered ]; then
+33-    ensure_catdir
+34-    # We don't print a status message here, as dpkg already said
+35-    # "Processing triggers for man-db ...".
+36-    run_mandb "" -pq
+--
+95:    # happens when we're triggered.
+96-    run_mandb "Updating database of manual pages ..." -pq
+97-fi
+98-
+99-# Automatically added by dh_apparmor/4.0.0-beta3-0ubuntu3
+
+
+========== 第5章: remove で rc が残るのは、purge のときにまだすることがあるもの。設定ファイル（conffile）か、消すときの手順（postrm）を持つもの ==========
+
+$ dpkg -s bc | grep -E '^(Status|Conffiles)'
+Status: install ok installed
+
+$ ls /var/lib/dpkg/info/bc.*
+/var/lib/dpkg/info/bc.list     /var/lib/dpkg/info/bc.postinst
+/var/lib/dpkg/info/bc.md5sums  /var/lib/dpkg/info/bc.postrm
+
+$ sudo apt remove bc
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages will be REMOVED:
+  bc
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
+After this operation, 218 kB disk space will be freed.
+Do you want to continue? [Y/n] y
+(Reading database ... 12833 files and directories currently installed.)
+Removing bc (1.07.1-3ubuntu4) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ dpkg -l bc | tail -1
+rc  bc             1.07.1-3ubuntu4 amd64        GNU bc arbitrary precision calculator language
+
+$ ls /var/lib/dpkg/info/bc.*
+/var/lib/dpkg/info/bc.list  /var/lib/dpkg/info/bc.postrm
+
+$ sudo apt purge bc
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages will be REMOVED:
+  bc*
+0 upgraded, 0 newly installed, 1 to remove and 0 not upgraded.
+After this operation, 0 B of additional disk space will be used.
+Do you want to continue? [Y/n] y
+(Reading database ... 12816 files and directories currently installed.)
+Purging configuration files for bc (1.07.1-3ubuntu4) ...
+
+$ dpkg -l bc
+dpkg-query: no packages found matching bc
+
+
 ========== 第3章: man labhello で説明書が開く（パイプに渡すとページャを使わずに出る） ==========
 
 $ sudo apt install labhello
@@ -110,7 +212,7 @@ Description: sample service tool with a config file
  Used to practice remove, purge and autoremove.
 
 
-========== 第4章のたとえ: 権限や持ち主が変わっても dpkg -V は何も言わない。中身が変わると言う。終了コードはどちらも 0 ==========
+========== 第4章のたとえ: 権限や持ち主が変わっても、読めるなら dpkg -V は何も言わない。一般ユーザが読めなくなると ? が並ぶ。中身が変わると言う。終了コードはどれも 0 ==========
 
 $ sudo apt install labhello
 Reading package lists... Done
@@ -143,6 +245,23 @@ $ dpkg -V labhello
 
 $ echo $?
 0
+
+$ sudo chown root:root /usr/bin/labhello
+
+$ sudo chmod 600 /usr/bin/labhello
+
+$ ls -l /usr/bin/labhello
+-rw------- 1 root root 30 Oct  1 09:00 /usr/bin/labhello
+
+$ dpkg -V labhello
+?????????   /usr/bin/labhello
+
+$ echo $?
+0
+
+$ sudo dpkg -V labhello
+
+$ sudo chmod 755 /usr/bin/labhello
 
 $ echo '# 書き足した' | sudo tee -a /usr/bin/labhello
 # 書き足した
@@ -348,6 +467,32 @@ dpkg-query: no packages found matching labweb-data
 
 $ ls -l /etc/labweb.conf
 ls: cannot access '/etc/labweb.conf': No such file or directory
+
+
+========== 第6章: /etc の下へは、一般ユーザの > では書けない。sudo tee なら書け、もう一度書くと中身を置き換える ==========
+
+$ echo 'deb [trusted=yes] file:/srv/lab-repo lab-updates main' > /etc/apt/sources.list.d/lab-updates.list
+bash: /etc/apt/sources.list.d/lab-updates.list: Permission denied
+
+$ echo 'deb [trusted=yes] file:/srv/lab-repo lab-updates main' | sudo tee /etc/apt/sources.list.d/lab-updates.list
+deb [trusted=yes] file:/srv/lab-repo lab-updates main
+
+$ echo 'deb [trusted=yes] file:/srv/lab-repo lab-updates main' | sudo tee /etc/apt/sources.list.d/lab-updates.list
+deb [trusted=yes] file:/srv/lab-repo lab-updates main
+
+$ cat /etc/apt/sources.list.d/lab-updates.list
+deb [trusted=yes] file:/srv/lab-repo lab-updates main
+
+
+========== 第6章: …_InRelease は、区分の Release に署名を付けて1つにしたもの ==========
+
+$ head -3 /var/lib/apt/lists/snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_InRelease
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+
+$ grep -n 'BEGIN PGP SIGNATURE' /var/lib/apt/lists/snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_InRelease
+2627:-----BEGIN PGP SIGNATURE-----
 
 
 ========== 第6章: dists/ の Release は、その区分の目録ファイルの一覧（大きさとダイジェスト） ==========
@@ -598,19 +743,19 @@ ii  labhello       1.0          all          prints its own version
 ========== 第7章: debconf-show の行の順番は打つたびに変わる ==========
 
 $ sudo debconf-show tzdata | head -3
+  tzdata/Zones/Asia:
+  tzdata/Zones/Arctic:
+  tzdata/Zones/America:
+
+$ sudo debconf-show tzdata | head -3
+  tzdata/Zones/Antarctica:
   tzdata/Zones/Pacific:
-  tzdata/Zones/Europe:
-  tzdata/Zones/America:
+  tzdata/Zones/Atlantic:
 
 $ sudo debconf-show tzdata | head -3
-  tzdata/Areas: Etc
+  tzdata/Zones/Etc: UTC
+  tzdata/Zones/Pacific:
   tzdata/Zones/America:
-  tzdata/Zones/Australia:
-
-$ sudo debconf-show tzdata | head -3
-  tzdata/Zones/Legacy:
-  tzdata/Zones/Europe:
-  tzdata/Areas: Etc
 
 
 ========== 第7章: dpkg-reconfigure をそのまま打つと、矢印キーで選ぶ画面が出る（Enter で今の答えのまま進める） ==========
@@ -643,8 +788,8 @@ Package configuration
 （打鍵: <Enter> <Enter>）
 
 Current default time zone: 'Etc/UTC'
-Local time is now:      Tue Oct 20 12:27:49 UTC 2026.
-Universal Time is now:  Tue Oct 20 12:27:49 UTC 2026.
+Local time is now:      Tue Oct 20 14:25:59 UTC 2026.
+Universal Time is now:  Tue Oct 20 14:25:59 UTC 2026.
 
 
 
@@ -725,6 +870,14 @@ Do you want to continue? [Y/n] y
 (Reading database ... 12833 files and directories currently installed.)
 Removing labfortune (1.0) ...
 
+$ apt list --installed 'lab*'
+Listing... Done
+labbackup/lab,now 1.0 all [installed]
+labsvc-common/lab,now 1.0 all [installed,automatic]
+labsvc/lab,now 1.0 all [installed]
+labweb-data/lab,now 1.0 all [installed,automatic]
+labweb/lab,now 1.0 all [installed]
+
 $ sudo apt reinstall labbackup
 Reading package lists... Done
 Building dependency tree... Done
@@ -785,6 +938,8 @@ $ lab start 08
     $ sh labmine.sh
     labmine.sh: 3: .: cannot open /usr/lib/liblab/liblab.sh: No such file
 
+  sh labmine.sh は、ファイルを sh（シェル）に読ませて動かす打ち方です。
+  1行目の #!/bin/sh は、第8章で見た「sh に読ませて動かす」という印です。
   labmine.sh は、パッケージ liblab が置くファイル /usr/lib/liblab/liblab.sh を読み込みます。
   liblab はまだ入っていないので、このエラーが出るのが始まりの正しい状態です。
 
@@ -805,6 +960,8 @@ $ lab start 08
 
   dpkg の台帳で、labmine が版 1.0 で ii になっていること、依存関係に liblab が書かれていること、
   /usr/bin/labmine が labmine のファイルとして載っていて、持ち主が root であることを見ます。
+  liblab には、依存関係から一緒に入ったときにだけ付く「自動で入った」印（第5章の
+  apt-mark showauto）が付いているかを見ます。
   そして labmine を実際に動かし、上の1行が出るかを見ます。
 
 【できたら】
@@ -839,7 +996,7 @@ dpkg-deb: building package 'labmine' in './labmine_1.0_all.deb'.
 
 $ dpkg -I labmine_1.0_all.deb
  new Debian package, version 2.0.
- size 722 bytes: control archive=215 bytes.
+ size 724 bytes: control archive=215 bytes.
      142 bytes,     6 lines      control
  Package: labmine
  Version: 1.0
@@ -849,10 +1006,10 @@ $ dpkg -I labmine_1.0_all.deb
  Description: my script packaged by hand
 
 $ dpkg -c labmine_1.0_all.deb
-drwxr-xr-x root/root         0 2026-10-20 21:28 ./
-drwxr-xr-x root/root         0 2026-10-20 21:28 ./usr/
-drwxr-xr-x root/root         0 2026-10-20 21:28 ./usr/bin/
--rwxr-xr-x root/root       233 2026-10-20 21:28 ./usr/bin/labmine
+drwxr-xr-x root/root         0 2026-10-20 23:26 ./
+drwxr-xr-x root/root         0 2026-10-20 23:26 ./usr/
+drwxr-xr-x root/root         0 2026-10-20 23:26 ./usr/bin/
+-rwxr-xr-x root/root       233 2026-10-20 23:26 ./usr/bin/labmine
 
 $ sudo apt install ./labmine_1.0_all.deb
 Reading package lists... Done
@@ -864,11 +1021,11 @@ The following additional packages will be installed:
 The following NEW packages will be installed:
   labmine liblab
 0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
-Need to get 0 B/1468 B of archives.
+Need to get 0 B/1470 B of archives.
 After this operation, 36.9 kB of additional disk space will be used.
 Do you want to continue? [Y/n] y
 Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
-Get:2 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [722 B]
+Get:2 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [724 B]
 Selecting previously unselected package liblab.
 (Reading database ... 12833 files and directories currently installed.)
 Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
@@ -888,6 +1045,183 @@ drwxr-x--- 1 lab lab 4096 Sep 30 19:32 /home/lab
 
 $ id _apt
 uid=42(_apt) gid=65534(nogroup) groups=65534(nogroup)
+
+
+========== 演習08 の判定: liblab を先に名前を指定して入れると「自動で入った」印が付かず、通らない。liblab ごと消して入れ直すと通る ==========
+
+$ lab start 08
+作業ファイルを ~/work/08 に展開しました（labmine.sh ）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 08   配られたスクリプトを、自分でパッケージにして入れる
+          影響度 B / 目安 15分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  作業ファイルは ~/work/08 にあります。
+
+【いまの状態】
+
+    $ cd ~/work/08
+    $ ls
+    labmine.sh
+    $ cat labmine.sh
+    #!/bin/sh
+    # labmine - liblab の lab_greet を使って1行出す（演習08 で、あなたがパッケージにするスクリプト）
+    . /usr/lib/liblab/liblab.sh
+    lab_greet "自分で作ったパッケージから入りました"
+    $ sh labmine.sh
+    labmine.sh: 3: .: cannot open /usr/lib/liblab/liblab.sh: No such file
+
+  sh labmine.sh は、ファイルを sh（シェル）に読ませて動かす打ち方です。
+  1行目の #!/bin/sh は、第8章で見た「sh に読ませて動かす」という印です。
+  labmine.sh は、パッケージ liblab が置くファイル /usr/lib/liblab/liblab.sh を読み込みます。
+  liblab はまだ入っていないので、このエラーが出るのが始まりの正しい状態です。
+
+【やること】
+
+  labmine.sh を /usr/bin/labmine として置くパッケージを作り、入れてください。
+
+      パッケージの名前   labmine
+      版                 1.0
+      依存関係           liblab（labmine は liblab が無いと動かないので、パッケージの情報に書く）
+
+  liblab を apt install liblab で先に入れるのではなく、labmine を入れるときに
+  依存関係から一緒に入るようにしてください。
+
+      labmine   →   liblab: 自分で作ったパッケージから入りました   と出れば完成
+
+【判定のしかた】
+
+  dpkg の台帳で、labmine が版 1.0 で ii になっていること、依存関係に liblab が書かれていること、
+  /usr/bin/labmine が labmine のファイルとして載っていて、持ち主が root であることを見ます。
+  liblab には、依存関係から一緒に入ったときにだけ付く「自動で入った」印（第5章の
+  apt-mark showauto）が付いているかを見ます。
+  そして labmine を実際に動かし、上の1行が出るかを見ます。
+
+【できたら】
+
+    lab check 08
+
+──────────────────────────────────────
+▶ 次はこれを打ってください
+    cd ~/work/08
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 08）
+
+
+$ cd ~/work/08
+
+$ mkdir -p labmine/usr/bin labmine/DEBIAN
+
+$ cp labmine.sh labmine/usr/bin/labmine
+
+$ chmod 755 labmine/usr/bin/labmine
+
+$ cat > labmine/DEBIAN/control <<'END'
+> Package: labmine
+> Version: 1.0
+> Architecture: all
+> Maintainer: lab <lab@example.invalid>
+> Depends: liblab
+> Description: my script packaged by hand
+> END
+
+$ dpkg-deb --build --root-owner-group labmine .
+dpkg-deb: building package 'labmine' in './labmine_1.0_all.deb'.
+
+$ sudo apt install liblab
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following NEW packages will be installed:
+  liblab
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/746 B of archives.
+After this operation, 36.9 kB of additional disk space will be used.
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+Selecting previously unselected package liblab.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Setting up liblab (1.0) ...
+
+$ sudo apt install ./labmine_1.0_all.deb
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Note, selecting 'labmine' instead of './labmine_1.0_all.deb'
+The following NEW packages will be installed:
+  labmine
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/724 B of archives.
+After this operation, 0 B of additional disk space will be used.
+Get:1 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [724 B]
+Selecting previously unselected package labmine.
+(Reading database ... 12835 files and directories currently installed.)
+Preparing to unpack .../work/08/labmine_1.0_all.deb ...
+Unpacking labmine (1.0) ...
+Setting up labmine (1.0) ...
+N: Download is performed unsandboxed as root as file '/home/lab/work/08/labmine_1.0_all.deb' couldn't be accessed by user '_apt'. - pkgAcquire::Run (13: Permission denied)
+
+$ lab check 08
+✗ 08 未達
+  判定 : 観測型（labmine と liblab の台帳と、labmine を動かした結果を見た）
+  観測 : labmine の台帳 = ii（版 1.0）
+         labmine の依存関係（Depends）= liblab
+         /usr/bin/labmine を置いたパッケージ = labmine（持ち主 root:root）
+         liblab の台帳 = ii（自動で入った印 なし）
+         labmine の出力 = liblab: 自分で作ったパッケージから入りました（終了コード 0）
+         → liblab が依存関係からではなく、名前を指定して入っている
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 08
+
+$ sudo apt remove liblab
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages will be REMOVED:
+  labmine liblab
+0 upgraded, 0 newly installed, 2 to remove and 0 not upgraded.
+After this operation, 36.9 kB disk space will be freed.
+Do you want to continue? [Y/n] y
+(Reading database ... 12836 files and directories currently installed.)
+Removing labmine (1.0) ...
+Removing liblab (1.0) ...
+
+$ sudo apt install ./labmine_1.0_all.deb
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Note, selecting 'labmine' instead of './labmine_1.0_all.deb'
+The following additional packages will be installed:
+  liblab
+The following NEW packages will be installed:
+  labmine liblab
+0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1470 B of archives.
+After this operation, 36.9 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+Get:2 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [724 B]
+Selecting previously unselected package liblab.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Selecting previously unselected package labmine.
+Preparing to unpack .../work/08/labmine_1.0_all.deb ...
+Unpacking labmine (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labmine (1.0) ...
+N: Download is performed unsandboxed as root as file '/home/lab/work/08/labmine_1.0_all.deb' couldn't be accessed by user '_apt'. - pkgAcquire::Run (13: Permission denied)
+
+$ lab check 08
+✔ 08 達成
+  判定 : 観測型（labmine と liblab の台帳と、labmine を動かした結果を見た）
+  観測 : labmine の台帳 = ii（版 1.0）
+         labmine の依存関係（Depends）= liblab
+         /usr/bin/labmine を置いたパッケージ = labmine（持ち主 root:root）
+         liblab の台帳 = ii（自動で入った印 あり）
+         labmine の出力 = liblab: 自分で作ったパッケージから入りました（終了コード 0）
+         labmine 1.0 が、依存関係で liblab を連れて入り、
+         /usr/bin/labmine（root の持ち物）が動いた
 
 
 ========== 演習02〜04・06〜08 のヒントと解答に出てくる調べ方 ==========
@@ -940,9 +1274,9 @@ Ign:2 file:/srv/lab-tools tools InRelease
 Get:3 file:/srv/lab-repo lab Release [1983 B]
 Get:4 file:/srv/lab-tools tools Release [1991 B]
 Get:3 file:/srv/lab-repo lab Release [1983 B]
-Get:4 file:/srv/lab-tools tools Release [1991 B]
 Get:5 file:/srv/lab-repo lab Release.gpg
 Ign:5 file:/srv/lab-repo lab Release.gpg
+Get:4 file:/srv/lab-tools tools Release [1991 B]
 Get:6 file:/srv/lab-tools tools Release.gpg
 Ign:6 file:/srv/lab-tools tools Release.gpg
 Get:7 file:/srv/lab-tools tools/main amd64 Packages [445 B]
