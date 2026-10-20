@@ -6,7 +6,7 @@
 #   rootless のユーザ名前空間・/etc/subuid・pasta と slirp4netns・systemd との統合を、本物のカーネルで確かめる。
 #   読者に渡してもらう権限は無い。
 #
-#   build: docker build --build-context labcmd=containers/base -t lab-podman:1.0.1 containers/podman
+#   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-podman:1.0.1 containers/podman
 FROM lab-ctr-machine:1.0.0
 USER root
 COPY --chown=root:root --chmod=0555 lab/ /lab/
@@ -18,8 +18,11 @@ LABEL org.opencontainers.image.licenses=MIT
 # ---- lab コマンドを最新にする（1.0.1、2026-10-20）--------------------
 #   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
 #   本文の記録とずれうるので、最新の lab をここで重ねる。これより前の層は 1.0.0 とキャッシュで同一。
-#   build: docker build --build-context labcmd=containers/base -t lab-podman:<版> containers/podman
+#   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-podman:<版> containers/podman
 COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
+#   練習機の中の lab が外の lab に頼む中継（lab-remote）も最新にする（lab show を通すため）。
+#   build には --build-context labvm=containers/linuc-machine/host も付ける。
+COPY --from=labvm --chown=root:root --chmod=0755 libexec/lab-remote /usr/local/libexec/lab-remote
 ENV LAB_THEME=podman LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
     LAB_IMAGE=ghcr.io/chai0204/lab:podman-1.0.1 LAB_VM_AUTOSTART=1
 ENV LAB_RESET_HINT="元に戻すには、練習機の外で vm reset --yes（練習機ごと最初の状態に戻ります）"

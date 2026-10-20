@@ -4,7 +4,7 @@
 #   この主題は「練習機を壊して自分を締め出す」操作（/etc/nologin・ファイアウォール）を扱う。
 #   壊しても、判定は qemu-guest-agent 経由の lab-guest で動き、vm reset --yes で工場出荷時に戻せる。
 #
-#   build: docker build --build-context labcmd=containers/base -t lab-linuc-security:1.0.2 containers/linuc-security
+#   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-linuc-security:1.0.2 containers/linuc-security
 FROM lab-linuc-machine:1.0.0
 USER root
 
@@ -23,8 +23,11 @@ LABEL org.opencontainers.image.licenses=MIT
 # ---- lab コマンドを最新にする（1.0.2、2026-10-20）--------------------
 #   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
 #   本文の記録とずれうるので、最新の lab をここで重ねる。これより前の層は 1.0.1 とキャッシュで同一。
-#   build: docker build --build-context labcmd=containers/base -t lab-linuc-security:<版> containers/linuc-security
+#   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-linuc-security:<版> containers/linuc-security
 COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
+#   練習機の中の lab が外の lab に頼む中継（lab-remote）も最新にする（lab show を通すため）。
+#   build には --build-context labvm=containers/linuc-machine/host も付ける。
+COPY --from=labvm --chown=root:root --chmod=0755 libexec/lab-remote /usr/local/libexec/lab-remote
 ENV LAB_THEME=linuc-security LAB_VERSION=1.0.2 LAB_APT_SNAPSHOT=20260929T000000Z \
     LAB_IMAGE=ghcr.io/chai0204/lab-linuc:security-1.0.2 LAB_VM_AUTOSTART=1
 ENV LAB_RESET_HINT="元に戻すには、練習機の外で vm reset --yes（練習機ごと最初の状態に戻ります）"

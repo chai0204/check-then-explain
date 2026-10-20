@@ -5,7 +5,7 @@
 #   KVM を使うには、読者が起動時に --device /dev/kvm と --group-add "$(stat -c %g /dev/kvm)" を渡す（ケーパビリティは渡さない）。
 #   渡さなくても檻は起動し、KVM が要る演習は lab check が前提不足（exit 2）として理由を出す。
 #
-#   build: docker build --build-context labcmd=containers/base -t lab-kvm:1.0.1 containers/kvm
+#   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-kvm:1.0.1 containers/kvm
 #
 # 起動はコンテナ型（docker run --rm -it。PID 1 は tini、その子が読者の bash -l）。土台の lab-vm-init（libvirt の練習機を
 # 定義・自動起動する）は使わない。練習機の差分ディスクは ~/vm（ボリューム）に置き、コンテナを起動し直しても続きから使える。
@@ -31,8 +31,11 @@ LABEL org.opencontainers.image.licenses=MIT
 # ---- lab コマンドを最新にする（1.0.1、2026-10-20）--------------------
 #   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
 #   本文の記録とずれうるので、最新の lab をここで重ねる。これより前の層は 1.0.0 とキャッシュで同一。
-#   build: docker build --build-context labcmd=containers/base -t lab-kvm:<版> containers/kvm
+#   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-kvm:<版> containers/kvm
 COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
+#   練習機の中の lab が外の lab に頼む中継（lab-remote）も最新にする（lab show を通すため）。
+#   build には --build-context labvm=containers/linuc-machine/host も付ける。
+COPY --from=labvm --chown=root:root --chmod=0755 libexec/lab-remote /usr/local/libexec/lab-remote
 ENV LAB_THEME=kvm LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
     LAB_IMAGE=ghcr.io/chai0204/lab:kvm-1.0.1
 ENV LAB_RESET_HINT="元に戻すには qemu-linuc reset --yes（練習機のディスクが最初の状態に戻ります）"
