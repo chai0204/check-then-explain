@@ -44,13 +44,14 @@ rpm -K の出力を読み、署名が確かめられたかを判断できる');
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-packages', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-disks', 'ハードウェアとディスク', 'ドラフト', 'LinuC レベル1', '101', '1.05', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-14',
-  'LinuC レベル1 101 試験の主題1.05（ハードウェア、パーティション、ファイルシステム）を、コンテナの中で動く仮想マシン（練習機）で確かめる8章。ディスクを分割し、フォーマットし、マウントし、ドライバを外し、USB メモリを抜き差しする。ディスクは装置・パーティション表・LVM・ファイルシステム・マウントの層が重なってできていて、各層は自分の印だけを読む。',
+  'linuc-disks', 'ハードウェアとディスク', 'ドラフト', 'LinuC レベル1', '101', '1.05', '初級', '演習あり（仮想マシン）', '2026-10-13', '2026-10-20',
+  'LinuC レベル1 101 試験の主題1.05（ハードウェア、パーティション、ファイルシステム）を、コンテナの中で動く仮想マシン（練習機）で確かめる11章。空のディスクを区切り、ファイルシステムを作り、マウントして使うところから始め、表の形式、ファイルシステムの種類、起動のたびのマウント、スワップ、LVM、部品の情報とドライバへと順に進む。ディスクは装置・パーティションの表・LVM・ファイルシステム・マウントの段が重なってできていて、各段は自分の印だけを読む。',
   'LinuC レベル1（101）の受験者で、fdisk も mount も本物のディスクで試したことが無い人。端末でコマンドを打てて、docker を動かせることが前提。',
-  'USB メモリを挿したとき、カーネル・udev・modprobe が何をするかを順に言える
+  '空のディスクを区切り、ファイルシステムを作り、マウントして使い、外せる
 消してしまったパーティションを、表の行を書き戻して取り戻せる
+/etc/fstab の6列を書き、UUID やラベルで指し、再起動の前に確かめられる
 論理ボリュームを広げるとき、ファイルシステムの側に要る操作を言える
-/etc/fstab の6列を書き、装置名ではなく UUID やラベルで指せる');
+USB メモリを挿したとき、カーネル・udev・modprobe が何をするかを順に言える');
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-disks', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
