@@ -32,6 +32,39 @@ $ ls /var/lib/dpkg/info/bc.*
 $ sudo apt purge bc
 Do you want to continue? [Y/n] y
 $ dpkg -l bc
+========== 第5章のたとえ: apt は Depends のほか、既定では Recommends に書かれたものも入れる（練習用のパッケージには Depends しか無い） ==========
+$ apt-config dump | grep -i -E 'Install-(Recommends|Suggests)'
+$ apt-cache show labapp labweb labsvc | grep -E '^(Package|Depends|Recommends):'
+$ apt-cache show git | grep -E '^(Depends|Recommends):'
+$ apt-get -s install git | grep -c '^Inst'
+$ apt-get -s install --no-install-recommends git | grep -c '^Inst'
+========== 実践編: 80 桁の端末で dpkg -l 名前 が less で止まるのは、説明の長い labsvc・labapp・liblab（ほかはすぐ戻る） ==========
+$ sudo apt install labhello labapp labnote-data
+Do you want to continue? [Y/n] y
+$ dpkg -l labhello
+（打鍵: q）
+$ dpkg -l labapp
+（打鍵: q）
+$ dpkg -l liblab
+（打鍵: q）
+$ dpkg -l labbackup
+（打鍵: q）
+$ dpkg -l labfortune
+（打鍵: q）
+$ dpkg -l labsvc
+（打鍵: q）
+$ dpkg -l labsvc-common
+（打鍵: q）
+$ dpkg -l labweb
+（打鍵: q）
+$ dpkg -l labweb-data
+（打鍵: q）
+$ dpkg -l labnote-data
+（打鍵: q）
+========== 演習03 の判定: 台帳のファイルが消えていると「消えている」と出る（設定ファイルにもそう添える） ==========
+$ lab start 03
+$ sudo rm /usr/bin/labsvc /etc/labsvc.conf
+$ lab check 03
 ========== 第3章: man labhello で説明書が開く（パイプに渡すとページャを使わずに出る） ==========
 $ sudo apt install labhello
 $ man labhello | head -12
@@ -214,6 +247,17 @@ $ sudo apt remove liblab
 Do you want to continue? [Y/n] y
 $ sudo apt install ./labmine_1.0_all.deb
 Do you want to continue? [Y/n] y
+$ lab check 08
+========== 演習08 の判定: dpkg -i で liblab と labmine を一緒に入れても「自動で入った」印は付かず、通らない ==========
+$ lab start 08
+$ cd ~/work/08
+$ mkdir -p labmine/usr/bin labmine/DEBIAN
+$ cp labmine.sh labmine/usr/bin/labmine
+$ chmod 755 labmine/usr/bin/labmine
+$ printf '%s\n' 'Package: labmine' 'Version: 1.0' 'Architecture: all' 'Maintainer: lab <lab@example.invalid>' 'Depends: liblab' 'Description: my script packaged by hand' > labmine/DEBIAN/control
+$ dpkg-deb --build --root-owner-group labmine .
+$ apt download liblab
+$ sudo dpkg -i liblab_1.0_all.deb labmine_1.0_all.deb
 $ lab check 08
 ========== 演習02〜04・06〜08 のヒントと解答に出てくる調べ方 ==========
 $ dpkg -s labbackup | grep Section

@@ -12,6 +12,8 @@
 #   bash probe/linuc-packages-run.sh exam    → 本文の表と説明が拠っている man・--help の記述 → logs/linuc-packages-{deb,rpm}-exam.log
 #   bash probe/linuc-packages-run.sh offline → ネットにつながっていないときに本文と違って出るところを、名前を引けない檻で打つ
 #                                              → logs/linuc-packages-{deb,rpm}-offline.log
+#   bash probe/linuc-packages-run.sh paste   → ヒントと模範解答のヒアドキュメントを、画面から写して打っても通るか
+#                                              → logs/linuc-packages-{deb,rpm}-paste.log（probe/linuc-packages-paste.py）
 #   bash probe/linuc-packages-run.sh solve   → 演習を模範解答どおりに通す（未達で ✗、解答どおりで ✔）
 #                                              → logs/linuc-packages-{deb,rpm}-solve-all.log
 #   bash probe/linuc-packages-run.sh one deb|rpm 入力.txt   → 入力ファイルを1回打って標準出力へ（作業中の確認用）
@@ -48,6 +50,9 @@ case "${1:-}" in
       bash "probe/linuc-packages-${cage}-$1.sh"
     done
     ;;
+  paste)
+    python3 -I probe/linuc-packages-paste.py
+    ;;
   solve)
     one_exec "$DEB" probe/linuc-packages-deb-solve-all.sh deb > logs/linuc-packages-deb-solve-all.log 2>&1
     one_exec "$RPM" probe/linuc-packages-rpm-solve-all.sh rpm > logs/linuc-packages-rpm-solve-all.log 2>&1
@@ -58,5 +63,5 @@ case "${1:-}" in
       *) echo "使い方: bash probe/linuc-packages-run.sh one deb|rpm 入力.txt" >&2; exit 2 ;;
     esac
     ;;
-  *) echo "使い方: bash probe/linuc-packages-run.sh tty|probe|extra|exam|offline|solve|one" >&2; exit 2 ;;
+  *) echo "使い方: bash probe/linuc-packages-run.sh tty|probe|extra|exam|offline|paste|solve|one" >&2; exit 2 ;;
 esac

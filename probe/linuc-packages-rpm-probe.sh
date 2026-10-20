@@ -170,7 +170,7 @@ $ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rp
 > 'gpgcheck=1' 'gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools' \
 > | sudo tee /etc/yum.repos.d/lab-tools.repo
 $ cat /etc/yum.repos.d/lab-tools.repo
-========== 演習10 の判定と解答: gpgcheck=0 で入れたあとに鍵だけ取り込んでも通らない。gpgcheck=1 に直して入れ直すと通る ==========
+========== 演習10 の判定と解答: gpgcheck=0 で入れたあとに鍵だけ取り込んでも通らない。gpgcheck=1 に直し、消して入れ直すと通る ==========
 $ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' 'gpgcheck=0' | sudo tee /etc/yum.repos.d/lab-tools.repo
 $ sudo yum install lab-mathtools
 Is this ok [y/N]: y
@@ -185,10 +185,29 @@ $ sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
 > gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
 > END
 $ lab check 10
-$ sudo yum reinstall lab-mathtools
+$ sudo yum remove lab-mathtools
+Is this ok [y/N]: y
+$ sudo yum install lab-mathtools
 Is this ok [y/N]: y
 $ lab check 10
-========== 演習10 の解答: gpgcheck=0 で入れたものを、gpgcheck=1 に直して入れ直すと、鍵を取り込んでよいかを尋ねられる ==========
+========== 演習10 の解答: gpgcheck=0 で入れたものを、gpgcheck=1 に直して消して入れ直すと、入れるときに鍵を取り込んでよいかを尋ねられる ==========
+$ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' 'gpgcheck=0' | sudo tee /etc/yum.repos.d/lab-tools.repo
+$ sudo yum install lab-mathtools
+Is this ok [y/N]: y
+$ sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+> [lab-tools]
+> name=lab tools
+> baseurl=file:///srv/lab-tools-rpm
+> gpgcheck=1
+> gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+> END
+$ sudo yum remove lab-mathtools
+Is this ok [y/N]: y
+$ sudo yum install lab-mathtools
+Is this ok [y/N]: y
+Is this ok [y/N]: y
+$ lab check 10
+========== 演習10 の解答の別解: 消さずに yum reinstall で入れ直しても、鍵を取り込んでよいかを尋ねられて通る ==========
 $ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' 'gpgcheck=0' | sudo tee /etc/yum.repos.d/lab-tools.repo
 $ sudo yum install lab-mathtools
 Is this ok [y/N]: y
@@ -202,6 +221,19 @@ $ sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
 $ sudo yum reinstall lab-mathtools
 Is this ok [y/N]: y
 Is this ok [y/N]: y
+$ lab check 10
+========== 演習10 の解答: 鍵を先に取り込んだ檻（第10章を打ったまま）では、gpgcheck=0 で入れてから 1 に戻すと、判定は見分けられない（課題文で起動し直してと書く理由） ==========
+$ sudo rpm --import /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+$ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' 'gpgcheck=0' | sudo tee /etc/yum.repos.d/lab-tools.repo
+$ sudo yum install lab-mathtools
+Is this ok [y/N]: y
+$ sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+> [lab-tools]
+> name=lab tools
+> baseurl=file:///srv/lab-tools-rpm
+> gpgcheck=1
+> gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+> END
 $ lab check 10
 ========== 演習10 の課題文: 第10章を打った檻のままでも始まりの画面は同じだが、lab tools の鍵が台帳に残っているので、入れるときに鍵を取り込む問いが出ない ==========
 $ sudo yum install labhello
@@ -233,13 +265,91 @@ Is this ok [y/N]: y
 $ lab check 10
 ========== 演習10 の解答: 台帳に取り込んだ鍵の一覧 ==========
 $ rpm -q gpg-pubkey --qf '%{SUMMARY}\n'
-========== 演習12 の判定: yum に手元のファイルを渡して入れると @@commandline と記録され、rpm で入れたことにならない ==========
+========== 演習12 の判定: 何もしなければ ✗ ==========
+$ lab check 12
+========== 演習12 の判定: yum だけで入れると ✗（yum がリポジトリ lab から入れた） ==========
+$ sudo yum install labtool
+Is this ok [y/N]: y
+$ lab check 12
+========== 演習12 の判定: yum に手元のファイルを渡して入れると ✗（yum が手元のファイルから入れた。yum list installed の右端は @@commandline） ==========
 $ lab start 12
 $ cd ~/work/12
 $ yumdownloader --resolve labtool
 $ sudo yum install ./labtool-1.0-1.noarch.rpm ./labtool-data-1.0-1.noarch.rpm
 Is this ok [y/N]: y
+$ yum list installed labtool labtool-data
 $ lab check 12
+========== 演習12 の判定: rpm で入れたあと yum reinstall すると ✗（いまの labtool は yum が入れたもの） ==========
+$ lab start 12
+$ cd ~/work/12
+$ yumdownloader --resolve labtool
+$ sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
+$ sudo yum reinstall labtool
+Is this ok [y/N]: y
+$ lab check 12
+========== 演習12 の判定: yum で入れて yum で消したあと、rpm で入れると ✔（右端は @@System のまま） ==========
+$ sudo yum install labtool
+Is this ok [y/N]: y
+$ sudo yum remove labtool labtool-data
+Is this ok [y/N]: y
+$ lab start 12
+$ cd ~/work/12
+$ yumdownloader --resolve labtool
+$ sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
+$ yum list installed labtool labtool-data
+$ lab check 12
+========== 演習12 の判定: rpm で入れて yum で消し、もう一度 rpm で入れると ✔（右端は @@System のまま） ==========
+$ lab start 12
+$ cd ~/work/12
+$ yumdownloader --resolve labtool
+$ sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
+$ sudo yum remove labtool labtool-data
+Is this ok [y/N]: y
+$ sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
+$ yum list installed labtool labtool-data
+$ lab check 12
+========== 演習12 の判定: yum に手元のファイルを渡して入れ、rpm -e で消してから rpm で入れると ✔（右端は @@commandline のまま） ==========
+$ lab start 12
+$ cd ~/work/12
+$ yumdownloader --resolve labtool
+$ sudo yum install ./labtool-1.0-1.noarch.rpm ./labtool-data-1.0-1.noarch.rpm
+Is this ok [y/N]: y
+$ yum list installed labtool labtool-data
+$ sudo rpm -e labtool labtool-data
+$ sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
+$ yum list installed labtool labtool-data
+$ lab check 12
+========== 演習12 の判定: yum で入れて rpm -e で消し、rpm で入れると ✔（右端は @lab のまま） ==========
+$ sudo yum install labtool
+Is this ok [y/N]: y
+$ yum list installed labtool labtool-data
+$ sudo rpm -e labtool labtool-data
+$ lab start 12
+$ cd ~/work/12
+$ yumdownloader --resolve labtool
+$ sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
+$ yum list installed labtool labtool-data
+$ lab check 12
+========== 演習12 の判定: 第11章を打った檻（rpm で入れて消し、labapp を yum で入れ直した）のままでも、rpm で入れれば ✔ ==========
+$ yumdownloader --resolve labtool
+$ sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
+$ sudo rpm -e labtool labtool-data
+$ sudo yum install labapp
+Is this ok [y/N]: y
+$ sudo rpm -e --nodeps liblab
+$ sudo yum reinstall labapp
+Is this ok [y/N]: y
+$ lab start 12
+$ cd ~/work/12
+$ yumdownloader --resolve labtool
+$ sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
+$ yum list installed labtool labtool-data
+$ lab check 12
+========== 演習09 の判定: 台帳のファイルが消えていると「消えている」と出る（設定ファイルにもそう添える） ==========
+$ sudo yum install labapp
+Is this ok [y/N]: y
+$ sudo rm /usr/bin/labapp /etc/labapp.conf
+$ lab check 09
 ========== 演習12 の解答: yumdownloader の --destdir と --resolve ==========
 $ yumdownloader --destdir /tmp/dl labtool
 $ ls /tmp/dl

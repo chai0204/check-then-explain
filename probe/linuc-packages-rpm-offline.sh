@@ -18,8 +18,15 @@ $ labhello
 ========== 第10章の表: yum makecache は AlmaLinux 本体の分を確かめに行くので、ネットが無いと失敗する ==========
 $ sudo yum makecache
 $ echo $?
-========== 第10章の表: ネットが無いときに yum clean all を打つと、lab から入れる操作も止まる ==========
-$ sudo yum clean all
+========== 第10章の表: ネットが無いときに yum clean all を打つと、目録の要る操作（lab から入れる install や provides）が止まる。入っているものを並べる・消す操作は動く ==========
 $ sudo yum install labhello
+Is this ok [y/N]: y
+$ sudo yum clean all
+$ sudo yum install labapp
 $ echo $?
+$ yum provides /usr/bin/labhello
+$ yum list installed labhello
+$ yum repolist
+$ sudo yum remove labhello
+Is this ok [y/N]: y
 INPUT
