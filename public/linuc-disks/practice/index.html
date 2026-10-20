@@ -10,8 +10,11 @@
 
 <div class="draftbar">
 <p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
-<p>本文の出力はすべて実機の記録で、演習10本は模範解答どおりに通ること・未達のときに判定が鳴ることを
-   両方確認してあります。それでも<b>導線の不備</b>は残っている可能性があります。
+<p>本文の出力はすべて実機の記録です。演習10本は、模範解答どおりに通ること・始まりの状態で判定が鳴ることを確かめ、
+   読者がやりがちな途中の状態・模範解答と違う正しいやり方・判定の境目でも、判定が正しく出て、判定のあとに練習機の状態が
+   変わっていないことを確かめてあります。ただし確かめたのは記録に残した範囲だけです
+   （<code>logs/linuc-disks-solve-all.log</code>・<code>logs/linuc-disks-alt.log</code>・<code>logs/linuc-disks-edge.log</code>）。
+   それでも<b>導線の不備</b>は残っている可能性があります。
    先に公開した SQLite 編では、読者として通した段階で4回に分けて不備が出ました。
    詰まったら <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    ページ下のコメントへ。それが直す順番になります。</p>
@@ -60,7 +63,7 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 QEMU が CPU を丸ごとソフトウェアで真似する（完全エミュレーション）ので、あなたの PC のカーネルの特権を1つも借りないためです。</p>
 
 <h2 id="start">はじめる</h2>
-<p><b>前の版（1.0.x）を使ったことがある人は、先に下の「前の版（1.0.x）で進めた人へ」の箱を読んでください</b>（前の版の檻が残っていると、次の2行は名前がぶつかって止まります）。</p>
+<p><b>前の版（1.0.x）を使ったことがある人は、先に下の「前の版（1.0.x）で進めた人へ」の箱を読んでください</b>（前の版の檻が残っていると、1行目の <code>docker run</code> は名前がぶつかって止まり（<code>Conflict</code>）、2行目の <code>docker exec</code> は前の版の檻の中に入ってしまいます）。</p>
 <p>Docker の場合。2行です。</p>
 <pre><code>docker run -d --name lab-linuc-disks --hostname host --stop-timeout 30 \
   -v lab-linuc-disks-vm:/home/lab/vm \
@@ -80,7 +83,7 @@ rm -f ~/.lab/progress.json ~/.lab/current ~/.lab/finale
 vm start</code></pre>
 （<code>~/.lab/finale</code> は「全問を終えた」印です。前の版で全問を終えた人は、これを消さないと、新しい版の全問を終えたときの締めくくりの表示が出ません。）</div>
 <ul>
-<li>コンテナを起動すると、中で練習機も起動します。KVM（Linux が CPU の仮想化の機能を使って、仮想マシンを速く動かす仕組み）を使わない完全エミュレーション（CPU の命令を1つずつソフトウェアで真似する。QEMU では TCG と呼ぶ）なので、<b>起動に 40〜90 秒</b>かかります（<a href="/linuc-disks/theory/01-look">第1章</a>の最初の <code>vm start</code> で、起動し終わるのを待てます）。</li>
+<li>コンテナを起動すると、中で練習機も起動します。KVM（Linux が CPU の仮想化の機能を使って、仮想マシンを速く動かす仕組み）を使わない完全エミュレーション（練習機の CPU の命令をひと塊ずつ読んで、手元の CPU の命令に翻訳してから実行する。QEMU では TCG と呼ぶ。<a href="/qemu/theory/04-tcg">QEMU の記事の第4章</a>）なので、<b>起動に 40〜90 秒</b>かかります（<a href="/linuc-disks/theory/01-look">第1章</a>の最初の <code>vm start</code> で、起動し終わるのを待てます）。</li>
 <li><code>--stop-timeout 30</code> は必須です（権限ではありません）。<code>docker stop</code> したとき、練習機を正常に止める（中で shutdown する）のを待つ猶予です。docker の既定の猶予は 10 秒で、過ぎると練習機は電源を抜かれたのと同じ止まり方になります。記録では止まるまで 4〜7 秒で（<code>logs/linuc-machine-stop-autostart.log</code>）、既定の 10 秒との差が小さいので、余裕を持たせて 30 秒にしています。</li>
 <li><code>--device /dev/kvm</code> を足しても速くはなりません。練習機の定義が <code>type='qemu'</code>（KVM を使わない完全エミュレーション）に固定されているので、<code>/dev/kvm</code> を渡しても TCG のまま動きます（<a href="/kvm/theory/06-site">KVM の記事の6章</a>で測っています）。</li>
 <li>podman でも、同じオプションのまま <code>docker</code> を <code>podman</code> に替えて起動できるはずです。同じ土台（仮想マシン型の檻の共通部分）を使う別のコースの檻は、podman 5.8.6（rootless）で起動・練習機への ssh・<code>podman stop</code> まで確かめてあります（<code>logs/linuc-machine-podman.log</code>）。<b>このコースの檻そのものは、podman ではまだ確かめていません</b>。</li>

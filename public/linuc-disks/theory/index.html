@@ -14,7 +14,7 @@
    1つの練習機に順に打った記録と突き合わせてあります。演習10本は、模範解答どおりに通ること・始まりの状態で判定が鳴ることを
    すべて確かめてあります。読者がやりがちな途中の状態（演習ごとに1〜4通り）でも鳴ること、模範解答と違う正しいやり方
    （別の担当が用意した8通り）でも通ることも確かめましたが、確かめたのは記録に残した範囲だけです
-   （<code>logs/linuc-disks-solve-all.log</code>・<code>logs/linuc-disks-alt.log</code>）。
+   （<code>logs/linuc-disks-solve-all.log</code>・<code>logs/linuc-disks-alt.log</code>・<code>logs/linuc-disks-edge.log</code>）。判定のあとに練習機の状態が変わっていないことも、同じ記録で確かめています。
    それでも <b>導線の不備</b>は残っている可能性があります。
    先に公開した SQLite 編では、著者が読者として通した段階で
    <b>4回に分けて不備が出ました</b>（説明の順序・リンク切れ・前提の省略・判定の誤り）。
@@ -189,7 +189,7 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <tr><th>場面</th><th>ここで効く理由</th><th>見落としやすい点</th><th>関連する章</th></tr>
 <tr><td>ディスクを増設して <code>/etc/fstab</code> に足す</td>
     <td>名前・UUID・ラベルのどれで指すかで、次の起動の結果が変わる</td>
-    <td>ラベルの重なり（クラウドのイメージは BOOT・UEFI のような一般的なラベルを使う）は <code>findmnt --verify</code> では出ないことがある。<code>blkid -t LABEL=…</code> で確かめ、書いたら再起動の前に <code>mount -a</code> と <code>findmnt --verify</code></td><td>2・6・7</td></tr>
+    <td>ラベルの重なり（この練習機の元になった Ubuntu のクラウド用イメージも、BOOT・UEFI のような一般的なラベルを使っている）は <code>findmnt --verify</code> では出ないことがある。<code>blkid -t LABEL=…</code> で確かめ、書いたら再起動の前に <code>mount -a</code> と <code>findmnt --verify</code></td><td>2・6・7</td></tr>
 <tr><td>容量が足りなくなった</td>
     <td>LVM なら止めずに広げられる</td>
     <td>箱（LV）と中身（ファイルシステム）の両方を広げる。XFS はふつう縮められない。ext4 の予約 5% も効いている</td><td>5・9</td></tr>

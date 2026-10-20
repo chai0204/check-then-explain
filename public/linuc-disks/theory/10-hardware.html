@@ -29,15 +29,15 @@ CPU(s):                                  2
 On-line CPU(s) list:                     0,1
 Vendor ID:                               AuthenticAMD
 Model name:                              QEMU TCG CPU version 2.5+</code></pre>
-<p>CPU(s) の 2 は、練習機が使える CPU の数（正確には、命令を同時に実行できる部分の数）である。Model name の <code>QEMU TCG CPU</code> は、QEMU（仮想マシンを動かすプログラム）が CPU の命令をソフトウェアで真似している（TCG。完全エミュレーション）という意味で、この檻は KVM を使わないので、どの PC で動かしてもここは同じ表示になる（Vendor ID が AuthenticAMD なのも、QEMU が真似している CPU の種類で、あなたの PC の CPU とは関係ない）。<code>lscpu</code> は、カーネルが <code>/proc/cpuinfo</code>（と、この章で見る <code>/sys</code>）に出している情報を読んで整えている。</p>
+<p>CPU(s) の 2 は、練習機が使える CPU の数（正確には、命令を同時に実行できる部分の数）である。Model name の <code>QEMU TCG CPU</code> は、QEMU（仮想マシンを動かすプログラム）が練習機の CPU の命令をひと塊ずつ、手元の CPU の命令に翻訳して動かしている（TCG。完全エミュレーション）という意味で、この檻は KVM を使わないので、どの PC で動かしてもここは同じ表示になる（Vendor ID が AuthenticAMD なのも、QEMU が真似している CPU の種類で、あなたの PC の CPU とは関係ない）。<code>lscpu</code> は、カーネルが <code>/proc/cpuinfo</code>（と、この章で見る <code>/sys</code>）に出している情報を読んで整えている。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ grep -m1 "model name" /proc/cpuinfo
 model name	: QEMU TCG CPU version 2.5+
 $ ls -l /proc/cpuinfo
--r--r--r-- 1 root root 0 Oct 20 22:36 /proc/cpuinfo
+-r--r--r-- 1 root root 0 Oct 20 23:45 /proc/cpuinfo
 $ head -3 /proc/meminfo
-MemTotal:        1459128 kB
-MemFree:         1134508 kB
-MemAvailable:    1188384 kB</code></pre>
+MemTotal:        1459120 kB
+MemFree:         1113224 kB
+MemAvailable:    1168080 kB</code></pre>
 <p><code>grep</code> の <code>-m1</code> は、最初に見つかった1行だけを出すオプションである（CPU が2つあるので、同じ行が2回ある）。<code>/proc/cpuinfo</code> は、中身があるのに大きさが 0 である。ディスクの上のファイルではなく、読んだ瞬間にカーネルが答えを作るからである。<code>/proc/meminfo</code> も同じで、<code>free</code>（第8章）はここを読んでいる。MemTotal 以外の数は、人と時刻によって違う。</p>
 
 <h2 id="windows">カーネルが情報を見せる3つの窓</h2>
@@ -70,9 +70,9 @@ TARGET
 </table></div>
 <pre data-where="練習機の中（student@linuc）"><code>$ head -4 /proc/interrupts
            CPU0       CPU1
-  0:        302          0   IO-APIC   2-edge      timer
+  0:        283          0   IO-APIC   2-edge      timer
   1:          9          0   IO-APIC   1-edge      i8042
-  4:        565          0   IO-APIC   4-edge      ttyS0
+  4:        625          0   IO-APIC   4-edge      ttyS0
 $ head -5 /proc/ioports
 0000-0000 : PCI Bus 0000:00
   0000-0000 : dma1
@@ -175,9 +175,9 @@ loop0  loop2  loop4  loop6  sda    vda  vdc  vde
 $ cat /sys/block/vdb/size
 4194304
 $ ls -l /dev/vda /dev/sda /dev/sr0
-brw-rw---- 1 root disk    8, 0 Oct 20 22:38 /dev/sda
-brw-rw---- 1 root cdrom  11, 0 Oct 20 22:36 /dev/sr0
-brw-rw---- 1 root disk  253, 0 Oct 20 22:36 /dev/vda</code></pre>
+brw-rw---- 1 root disk    8, 0 Oct 20 23:47 /dev/sda
+brw-rw---- 1 root cdrom  11, 0 Oct 20 23:45 /dev/sr0
+brw-rw---- 1 root disk  253, 0 Oct 20 23:45 /dev/vda</code></pre>
 <p><code>/proc/partitions</code> は、カーネルが知っているディスクと区画の一覧で、大きさは 1KiB 単位である（<code>dm-0</code> は第9章の論理ボリューム）。<code>/sys/block</code> にはディスクごとのディレクトリがあり、<code>/sys/block/vdb/size</code> は 512 バイトのセクタの数（4194304 × 512 バイト = 2GiB）である。<code>loop0</code>〜<code>loop7</code> は第6章のループデバイスで、いまは何もつながっていない。演習01・02 をやった人には、<code>/proc/partitions</code> に <code>vde1</code>・<code>vdd1</code> の行も出る（演習で作った区画）。<code>/dev</code> の <code>8, 0</code> は「SCSI のディスクのドライバ（8）の0番目」、<code>11, 0</code> は光学ドライブのドライバ、<code>253, 0</code> は virtio のディスクのドライバを指す（virtio の番号は決まっておらず、起動のときに空いている番号が割り当てられる）。</p>
 
 <h2 id="rota">HDD か SSD か</h2>
@@ -241,7 +241,7 @@ $ cat /sys/block/vdb/queue/rotational
 </table></div>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-disks/practice/">演習09</a>は、vdb を「再起動しても SSD として扱われる」状態にする課題である。
-判定は再起動の代わりに、この章と同じく値を 1 に戻して add の知らせを1回送り、0 に書き換わるかを見る。この章のとおりに打った人は、もう達成している。</div>
+判定は、いまの値が 0 かを見たうえで、再起動の代わりに、この章と同じく値を 1 に戻して add の知らせを1回送り、0 に書き換わるかを見る（終わったら値を元に戻す）。この章のとおりに打った人は、もう達成している。</div>
 
 <h2 id="optical">光学ドライブからメディアを抜く</h2>
 <div class="sgoal"><b>この節で分かること</b>: 光学ドライブの RM・RO と、メディアを抜いたときに何が残るか。</div>

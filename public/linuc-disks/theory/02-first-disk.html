@@ -27,7 +27,7 @@ Changes will remain in memory only, until you decide to write them.
 Be careful before using the write command.
 
 Device does not contain a recognized partition table.
-Created a new DOS (MBR) disklabel with disk identifier 0x657c6145.   ← 表が無かったので、空の表をメモリの上に作った
+Created a new DOS (MBR) disklabel with disk identifier 0xc9184d2b.   ← 表が無かったので、空の表をメモリの上に作った
 
 Command (m for help): n   ← n: 新しいパーティション
 Partition type
@@ -46,7 +46,7 @@ Units: sectors of 1 * 512 = 512 bytes
 Sector size (logical/physical): 512 bytes / 512 bytes
 I/O size (minimum/optimal): 512 bytes / 512 bytes
 Disklabel type: dos
-Disk identifier: 0x657c6145
+Disk identifier: 0xc9184d2b
 
 Device     Boot Start    End Sectors  Size Id Type
 /dev/vdb1        2048 411647  409600  200M 83 Linux
@@ -88,7 +88,7 @@ vdb    253:16   0    2G  0 disk
 mke2fs 1.47.0 (5-Feb-2023)
 Discarding device blocks: done
 Creating filesystem with 51200 4k blocks and 51200 inodes
-Filesystem UUID: 80872246-8e56-4ef0-8bd2-7d95103b4803   ← このファイルシステムの番号。作るたびに変わる
+Filesystem UUID: fbf1c74f-06aa-4438-8760-faea24f1a144   ← このファイルシステムの番号。作るたびに変わる
 Superblock backups stored on blocks:
 	32768
 
@@ -115,7 +115,7 @@ Filesystem      Size  Used Avail Use% Mounted on
 /dev/vdb1       172M   24K  158M   1% /mnt
 $ ls -l /mnt
 total 16
-drwx------ 2 root root 16384 Oct 20 22:29 lost+found
+drwx------ 2 root root 16384 Oct 20 23:39 lost+found
 $ lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS /dev/vdb
 NAME    SIZE FSTYPE MOUNTPOINTS
 vdb       2G
@@ -127,18 +127,18 @@ vdb       2G
 -bash: /mnt/memo.txt: Permission denied</code></pre>
 <div class="then"><b>だめな理由</b>: <code>Permission denied</code>（書き込みの許可が無い）で断られた。マウントすると、<code>/mnt</code> は <code>vdb1</code> の ext4 の<b>いちばん上のディレクトリ</b>を見せるようになる。その持ち主と権限は ext4 の中に書かれていて、<code>mkfs</code> が作ったときに root のもの（<code>rwxr-xr-x</code>）になった。student は「その他」なので書けない。</div></div>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls -ld /mnt
-drwxr-xr-x 3 root root 4096 Oct 20 22:29 /mnt</code></pre>
+drwxr-xr-x 3 root root 4096 Oct 20 23:39 /mnt</code></pre>
 <p><code>ls</code> の <code>-d</code> は、ディレクトリの中身ではなく、ディレクトリそのものを1行で出すオプションである。持ち主が root で、その他の人は <code>r-x</code>（読む・中に入るだけ）である。このディスクを student のデータ置き場にするなら、いちばん上のディレクトリの持ち主を student に変える。<code>chown</code> は、ファイルやディレクトリの持ち主を変えるコマンドである（<code>student:student</code> は「持ち主を student、グループを student に」）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo chown student:student /mnt
 $ ls -ld /mnt
-drwxr-xr-x 3 student student 4096 Oct 20 22:29 /mnt
+drwxr-xr-x 3 student student 4096 Oct 20 23:39 /mnt
 $ echo "はじめてのファイル" &gt; /mnt/memo.txt
 $ cat /mnt/memo.txt
 はじめてのファイル
 $ ls -l /mnt
 total 20
-drwx------ 2 root    root    16384 Oct 20 22:29 lost+found
--rw-rw-r-- 1 student student    28 Oct 20 22:30 memo.txt</code></pre>
+drwx------ 2 root    root    16384 Oct 20 23:39 lost+found
+-rw-rw-r-- 1 student student    28 Oct 20 23:39 memo.txt</code></pre>
 <p>持ち主が student になり、書けた。変わったのは <code>vdb1</code> の ext4 の中に書かれた持ち主で、練習機の <code>/</code> にある <code>/mnt</code> というディレクトリそのものではない（次の節で外したときに確かめる）。</p>
 <div class="analogy"><b>たとえ</b>: マウントは、<b>引き出しを机の決まった穴に差し込む</b>ことに近い。差し込むと、その穴（マウントポイント）から引き出し（ファイルシステム）の中が見え、物を出し入れできる。
 <br>ただし<b>崩れる点</b>: 引き出しの鍵（持ち主と権限）は、穴ではなく引き出しの側に付いている。<code>/mnt</code> の持ち主を変えたつもりでも、変わったのは差し込んだ引き出しの鍵である。だから引き出しを抜くと、穴は元の持ち主（root）に戻る。</div>

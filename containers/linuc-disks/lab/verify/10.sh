@@ -13,6 +13,8 @@ lab-guest true >/dev/null 2>&1
 
 # 前回の判定が途中で止まって挿さったままなら、先に抜いておく
 virsh detach-device "$DOM" "$X" --live >/dev/null 2>&1 && sleep 3
+# 判定の前に読み込まれていた USB のドライバを控える（判定で挿したために読み込まれたものは、最後に外す）
+pre_mods=$(lab-guest "lsmod | grep -oE '^(usb_storage|uas) ' | tr -d ' ' | paste -sd ' '" 2>/dev/null)
 if ! virsh attach-device "$DOM" "$X" --live >/dev/null 2>&1; then
   echo "前提不足: 判定用の USB メモリを挿せませんでした（virsh attach-device）"; exit 2
 fi
@@ -41,6 +43,14 @@ EOF
 )
 obs=$(lab-guest "$probe" 2>/dev/null)
 virsh detach-device "$DOM" "$X" --live >/dev/null 2>&1
+# 判定の前に無かったドライバが、判定で挿したために読み込まれていたら外す（判定は練習機の状態を変えない）
+unloaded=""
+if [ -z "$pre_mods" ]; then
+  unloaded=$(lab-guest 'udevadm settle; for i in $(seq 1 20); do
+      grep -qE "^(uas|usb_storage) " /proc/modules || break
+      modprobe -r uas usb_storage 2>/dev/null; sleep 0.5; done
+    grep -qE "^(uas|usb_storage) " /proc/modules && echo 外せなかった || echo 外した' 2>/dev/null)
+fi
 
 usb=$(sed -n 's/^usb=//p' <<<"$obs")
 drv=$(sed -n 's/^driver=//p' <<<"$obs")
@@ -57,6 +67,9 @@ echo "観測 : USB 機器として   = 見えた（/sys/bus/usb/devices/$usb）"
 echo "       付いたドライバ   = ${drv:-なし}"
 echo "       ディスクとして   = ${disk:-現れなかった}"
 echo "       読み込まれていたモジュール = ${mods:-なし}"
+if [ -n "$mods" ] && [ -z "$pre_mods" ]; then
+  echo "       （判定の前は読み込まれていなかったので、判定のあと外した${unloaded:+: $unloaded}）"
+fi
 if [ -n "$drv" ] || [ -n "$disk" ]; then
   echo "       → 挿した USB メモリが、ディスクとして使える状態になった"
   exit 1

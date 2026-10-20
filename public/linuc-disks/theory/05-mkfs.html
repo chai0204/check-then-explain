@@ -11,7 +11,7 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
 </div>
 <h1>5. ファイルシステムの種類と作り方</h1>
-<p class="lead">第4章では、<code>vdb</code> を GPT で6つに区切った（ESP・<code>/boot</code>・スワップ・<code>/</code>・<code>/var</code>・<code>/home</code> のつもり）。この章では、それぞれの区画に用途に合った種類のファイルシステムを作り、作ったファイルシステムが区画より小さく見える理由と、種類ごとの違いを確かめる。</p>
+<p class="lead">第4章では、<code>vdb</code> を GPT で6つに区切った（ESP・<code>/boot</code>・スワップ・<code>/</code>・<code>/var</code>・<code>/home</code> のつもり）。この章では、それぞれの区画に用途に合った種類のファイルシステムを作り、作ったファイルシステムの大きさを区画の大きさと比べて、種類ごとの違いを確かめる。</p>
 <div class="badges"><span>前提: 第4章まで読了</span><span>前提: vdb が第4章の6つの区画になっている</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>mkfs</code> で ext3・ext4・XFS・VFAT・Btrfs を作り分けられ、ラベルを付けられる（<code>mkfs -t 種類</code> と <code>mkfs.種類</code> の関係も言える）</li><li>作ったファイルシステムの大きさを <code>df</code> で読み、区画の大きさと比べて、違いがどこから来るかを確かめ、<code>tune2fs</code> で設定を変えられる</li><li>5つの種類が何に向いているかを言える</li></ul>
@@ -37,20 +37,20 @@
 <p>ESP（<code>vdb1</code>）から始める。第4章で見たとおり、ここには第2章の ext4 の中身が残っている。<code>wipefs</code> は、区画に書かれたファイルシステムの印（signature）を探すコマンドで、装置の名前だけを渡すと、消さずに一覧を出す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo wipefs /dev/vdb1
 DEVICE OFFSET TYPE UUID                                 LABEL
-vdb1   0x438  ext4 80872246-8e56-4ef0-8bd2-7d95103b4803   ← 第2章の ext4 の印（場所 0x438 = 1080 バイト目）
+vdb1   0x438  ext4 fbf1c74f-06aa-4438-8760-faea24f1a144   ← 第2章の ext4 の印（場所 0x438 = 1080 バイト目）
 $ sudo mkfs.vfat -F 32 -n ESP /dev/vdb1
 mkfs.fat 4.2 (2021-01-31)
 $ sudo wipefs /dev/vdb1
 DEVICE OFFSET TYPE UUID      LABEL
-vdb1   0x52   vfat D30F-155E ESP
-vdb1   0x0    vfat D30F-155E ESP
-vdb1   0x1fe  vfat D30F-155E ESP</code></pre>
+vdb1   0x52   vfat D718-5E45 ESP
+vdb1   0x0    vfat D718-5E45 ESP
+vdb1   0x1fe  vfat D718-5E45 ESP</code></pre>
 <p>最初の <code>wipefs</code> の OFFSET の <code>0x438</code>（1080 バイト目）は、ext4 の管理情報の中心である<b>スーパーブロック</b>（大きさ・UUID・ラベル・「これは ext4 だ」という印を持つ）の中の、印の位置である。FAT を作ると、古い ext4 の印は無くなり、vfat の印に置き換わった。<code>-F 32</code> は FAT32 にするオプション、<code>-n</code> は<b>ラベル</b>（人が付ける、ファイルシステムの名前）を付けるオプションである。ラベルを付けるのは VFAT だけが <code>-n</code> で、ほかの種類は <code>-L</code> である。残りの4つを作る。<code>/boot</code> 用の <code>vdb2</code> のラベルは、BOOT ではなく NEWBOOT にする。練習機自身の <code>/boot</code> の区画（<code>vda16</code>）が、もう BOOT というラベルを使っているからである（同じラベルが2つあると何が起きるかは、第7章で確かめる）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mkfs -t ext3 -L NEWBOOT /dev/vdb2
 mke2fs 1.47.0 (5-Feb-2023)
 Discarding device blocks: done
 Creating filesystem with 76800 4k blocks and 76800 inodes
-Filesystem UUID: 7c6ae8ad-a88b-49c7-92ec-5a07238ff01e
+Filesystem UUID: 0912d5f8-b0f2-4a83-9b5b-15a98a92a491
 Superblock backups stored on blocks:
 	32768
 
@@ -82,7 +82,7 @@ NOTE: several default settings have changed in version 5.15, please make sure
       - enabled free-space-tree (-R free-space-tree)
 
 Label:              VAR
-UUID:               04a8522b-b01c-4477-8040-1ba10234ce53
+UUID:               9d98d92c-5e3b-4f62-85c8-810c9c73bdf2
 Node size:          16384
 Sector size:        4096
 Filesystem size:    400.00MiB
@@ -103,7 +103,7 @@ $ sudo mkfs.ext4 -L HOME /dev/vdb6
 mke2fs 1.47.0 (5-Feb-2023)
 Discarding device blocks: done
 Creating filesystem with 99840 4k blocks and 99840 inodes
-Filesystem UUID: 0242a54e-2be6-40d8-bfe2-7d251fd1b7c2
+Filesystem UUID: 9de5d3e5-12a9-4f35-8dec-0637e6918698
 Superblock backups stored on blocks:
 	32720, 98160
 
@@ -114,12 +114,12 @@ Writing superblocks and filesystem accounting information: done
 $ lsblk -o NAME,FSTYPE,LABEL,UUID /dev/vdb
 NAME   FSTYPE LABEL   UUID
 vdb
-├─vdb1 vfat   ESP     D30F-155E
-├─vdb2 ext3   NEWBOOT 7c6ae8ad-a88b-49c7-92ec-5a07238ff01e
+├─vdb1 vfat   ESP     D718-5E45
+├─vdb2 ext3   NEWBOOT 0912d5f8-b0f2-4a83-9b5b-15a98a92a491
 ├─vdb3
-├─vdb4 xfs    ROOT    4436671b-f9a8-419c-852c-de7b5be8e32b
-├─vdb5 btrfs  VAR     04a8522b-b01c-4477-8040-1ba10234ce53
-└─vdb6 ext4   HOME    0242a54e-2be6-40d8-bfe2-7d251fd1b7c2</code></pre>
+├─vdb4 xfs    ROOT    5c4dfc8f-5943-43bd-8cf5-b9a6b2a5d9c6
+├─vdb5 btrfs  VAR     9d98d92c-5e3b-4f62-85c8-810c9c73bdf2
+└─vdb6 ext4   HOME    9de5d3e5-12a9-4f35-8dec-0637e6918698</code></pre>
 <p>どの種類も、作ったときに <b>UUID</b>（このファイルシステムの番号）を決めて中に書き込んでいる。ext3・ext4・XFS・Btrfs の UUID は 128 ビットのでたらめな数（<code>xxxxxxxx-xxxx-…</code> の形）、VFAT は作った時刻から決まる 32 ビットの数（<code>XXXX-XXXX</code> の形）である。どちらも作るたびに変わるので、あなたの画面では違う値になる。<code>vdb3</code> はスワップにする区画なので、ここでは作らない（第8章）。</p>
 <p>出力の読み方を1つずつ。<code>mkfs.xfs</code> の表は XFS の管理情報の作り方で、ここで読むのは <code>log</code> の行の <code>blocks=16384</code>（ジャーナルに 4KiB × 16384 = 64MiB を使う）だけでよい。<code>mkfs.btrfs</code> は、作ったファイルシステムの性質を並べる。<code>Metadata: DUP</code> は管理情報を2重に持つという意味である。</p>
 <p>最初の <code>mkfs.vfat</code> は、<code>vdb1</code> に第2章の ext4 が残っていたのに、何も言わずに上書きした。では、もうファイルシステムがある区画に、ほかの <code>mkfs</code> を打つとどうなるか。いま作った <code>vdb4</code> の XFS の上に、同じコマンドをもう一度打つ。</p>

@@ -104,7 +104,7 @@ $ sudo umount /mnt</code></pre>
 <p>CD の中身を丸ごと1つのファイルに写したものを ISO イメージと呼ぶ（Linux のインストール用の配布物も、ふつうこの形）。第3章の <code>dd</code> で、<code>sr0</code> を最初から最後まで写す（<code>of=</code> は書き出す先のファイル）。最後の行の秒数と速さは、あなたの画面では違う。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo dd if=/dev/sr0 of=media.iso
 $ ls -l media.iso</code></pre>
-<p>ファイルをマウントするときは、<b>ループデバイス</b>（ファイルを、ディスクのような装置に見せかける仮の装置。<code>/dev/loop0</code> など）を間に置く。<code>-o loop</code> は「ループデバイスを用意して、それをマウントせよ」とはっきり頼むオプションである（いまの <code>mount</code> は、付けなくてもファイルを渡されれば自分でループデバイスを用意するが、試験は <code>-o loop</code> の形で問う。ここでも付けて打つ）。</p>
+<p>ファイルをマウントするときは、<b>ループデバイス</b>（ファイルを、ディスクのような装置に見せかける仮の装置。<code>/dev/loop0</code> など）を間に置く。<code>-o loop</code> は「ループデバイスを用意して、それをマウントせよ」とはっきり頼むオプションである（いまの <code>mount</code> は、付けなくてもファイルを渡されれば自分でループデバイスを用意する。ここでは、何をしているかが見えるように付けて打つ）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mount -o loop media.iso /mnt
 $ df -h /mnt
 $ losetup -l
@@ -130,7 +130,7 @@ $ sudo rm media.iso</code></pre>
 <div class="quiz"><b>確認</b>
 <p>ダウンロードした <code>install.iso</code> の中身を、CD に焼かずに見たい。どうするか。</p>
 <details><summary>答え</summary>
-<p><code>sudo mount -o loop install.iso /mnt</code>。<code>mount</code> がループデバイスを用意してファイルを装置に見せかけるので、CD に焼かずにマウントできる（いまの <code>mount</code> は <code>-o loop</code> を省いても同じことをするが、試験では <code>-o loop</code> の形で答える）。どのループデバイスがどのファイルにつながっているかは <code>losetup -l</code> で見る。</p></details></div>
+<p><code>sudo mount -o loop install.iso /mnt</code>。<code>mount</code> がループデバイスを用意してファイルを装置に見せかけるので、CD に焼かずにマウントできる（いまの <code>mount</code> は <code>-o loop</code> を省いても同じことをする）。どのループデバイスがどのファイルにつながっているかは <code>losetup -l</code> で見る。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>練習機に USB メモリを挿す・抜くのは、外で <code>virsh attach-device</code>・<code>detach-device</code>。中では <code>lsblk -d</code> の TRAN・SERIAL でどれかを見分ける</li><li>マウントポイントは前もって作るただのディレクトリ。もとの中身は隠れるだけで、外せばまた見える。中にプロセスがいると <code>umount</code> は <code>target is busy</code> で断る</li><li><code>/dev/sdb</code> は見つかった順に付く名前で、挿す順番で別のディスクを指す。ディスクに付いているのは中のラベルと UUID で、<code>blkid</code>・<code>findfs</code>・<code>/dev/disk/by-label/</code> で引け、<code>mount LABEL=…</code> で指せる</li><li><code>/media</code> は取り外せるメディアのマウント先。CD は iso9660 で、読み取り専用の装置なので <code>mount</code> は読み取り専用にする</li><li>ISO イメージのようなファイルは、ループデバイスを通して <code>mount -o loop</code> でマウントできる（<code>losetup -l</code> で対応を見る）</li></ul></div>

@@ -1,8 +1,8 @@
 # 台本（probe/linuc-disks-solve-all.txt）の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run -d … 名前付きボリューム2つ、
 # docker exec -it … bash -l、umask 022、TERM=xterm）の端末に、最初から順に、本文の順に1行ずつ打った記録。
 # 端末 80 桁 × 24 行。外と練習機の中は data-where で打ち分けた。作り方: python3 -I probe/linuc-disks-seq.py
-# イメージ lab-linuc-disks:1.1.0（sha256:1b7f451f63d30360bb08e149087151d5ec5ddb392bb49cbdc076964bdd33a5c7）
-# 開始 2026-10-20 22:28:50
+# イメージ lab-linuc-disks:1.1.0（sha256:2bc941fabe0adb518f2ea8f340294e7802c182b78ee07a09ff55be48d17686dc）
+# 開始 2026-10-20 23:38:04
 
 # --- 端末1: docker exec -it linuc-disks-r11-solve bash -l で入ったときの表示 ---
 練習機 linuc: running（エージェント 応答なし / ssh まだ）
@@ -46,7 +46,7 @@ $ vm start
 練習機はもう動いています
   起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
   起動中… 20秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
-練習機が起動しました（38秒）
+練習機が起動しました（44秒）
   入るには:  ssh linuc   （抜けるときは exit）
 
 $ lab check
@@ -84,12 +84,11 @@ $ lab check
          論理ボリューム vg0/data が無い
   → この事実から何が欠けているか考えてください。詰まったら lab hint 08
 ✗ 09 未達
-  判定 : 観測型（rotational をいったん 1 に戻し、起動時と同じ add イベントを udev に1回送って、値を読んだ）
-  観測 : 判定の前の値             = 1
+  判定 : 観測型（いまの rotational を読み、次に 1 に戻して起動時と同じ add イベントを udev に1回送り、値を読んだ。最後に判定の前の値に戻した）
+  観測 : いまの値（判定の前）     = 1
          add イベントの後の値     = 1
          rotational を書く udev の規則 = （/etc/udev/rules.d に見当たらない）
-         （判定の後、値は判定の前の 1 に戻した）
-         → 判定の前も後も 1（vdb は回転する装置として扱われている）
+         → いまの値も、起動時と同じイベントの後の値も 1（vdb は回転する装置として扱われている）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 09
 ✗ 10 未達
   判定 : 観測型（判定の中で USB メモリを1本挿し、練習機がそれをどう扱ったかを見て、抜いた）
@@ -97,6 +96,7 @@ $ lab check
          付いたドライバ   = usb-storage
          ディスクとして   = /dev/sdb
          読み込まれていたモジュール = uas usb_storage
+         （判定の前は読み込まれていなかったので、判定のあと外した: 外した）
          → 挿した USB メモリが、ディスクとして使える状態になった
   → この事実から何が欠けているか考えてください。詰まったら lab hint 10
 
@@ -221,7 +221,7 @@ Changes will remain in memory only, until you decide to write them.
 Be careful before using the write command.
 
 Device does not contain a recognized partition table.
-Created a new DOS (MBR) disklabel with disk identifier 0x939eac96.
+Created a new DOS (MBR) disklabel with disk identifier 0x849c14f1.
 
 Command (m for help): n
 Partition type
@@ -508,7 +508,7 @@ Changed type of partition to 'Linux filesystem'
 Command (? for help): p
 Disk /dev/vdb: 4194304 sectors, 2.0 GiB
 Sector size (logical/physical): 512/512 bytes
-Disk identifier (GUID): 8E1CEBFB-D3DF-49E7-B43B-1DC9D3253C2A
+Disk identifier (GUID): 39F3BAEE-F83A-4F25-BB01-0FD2458C783A
 Partition table holds up to 128 entries
 Main partition table begins at sector 2 and ends at sector 33
 First usable sector is 34, last usable sector is 4194270
@@ -613,7 +613,7 @@ Changed type of partition to 'Linux filesystem'
 Command (? for help): p
 Disk /dev/vdb: 4194304 sectors, 2.0 GiB
 Sector size (logical/physical): 512/512 bytes
-Disk identifier (GUID): B55B5EF4-846E-4D75-AD28-FDB4008CD84B
+Disk identifier (GUID): B70805D5-1FB5-4B6B-BB31-BA50222A1C51
 Partition table holds up to 128 entries
 Main partition table begins at sector 2 and ends at sector 33
 First usable sector is 34, last usable sector is 4194270
@@ -698,7 +698,7 @@ $ sudo mkfs -t ext3 -L NEWBOOT /dev/vdb2
 mke2fs 1.47.0 (5-Feb-2023)
 Discarding device blocks: done
 Creating filesystem with 76800 4k blocks and 76800 inodes
-Filesystem UUID: 34ab6a07-573d-4f1c-b180-55f115cc1c55
+Filesystem UUID: 93c10a99-040a-4ab3-8782-c4e13a2c0184
 Superblock backups stored on blocks:
 	32768
 
@@ -732,7 +732,7 @@ NOTE: several default settings have changed in version 5.15, please make sure
       - enabled free-space-tree (-R free-space-tree)
 
 Label:              VAR
-UUID:               bf026134-58ae-40ae-bdf3-38624544f294
+UUID:               5d5eb0c2-1ce9-4f0f-9fb9-a2d57e25f69d
 Node size:          16384
 Sector size:        4096
 Filesystem size:    400.00MiB
@@ -754,7 +754,7 @@ $ sudo mkfs.ext4 -L HOME /dev/vdb6
 mke2fs 1.47.0 (5-Feb-2023)
 Discarding device blocks: done
 Creating filesystem with 99840 4k blocks and 99840 inodes
-Filesystem UUID: 8ae9c059-a54b-4252-8ad5-eca736cde9b2
+Filesystem UUID: 60af633e-7963-4063-897e-28f34d00ebe2
 Superblock backups stored on blocks:
 	32720, 98160
 
@@ -784,12 +784,12 @@ Setting reserved blocks percentage to 1% (998 blocks)
 $ lsblk -o NAME,FSTYPE,LABEL,UUID /dev/vdb
 NAME   FSTYPE LABEL   UUID
 vdb
-├─vdb1 vfat           D490-A3A5
-├─vdb2 ext3   NEWBOOT 34ab6a07-573d-4f1c-b180-55f115cc1c55
+├─vdb1 vfat           D8B1-7B26
+├─vdb2 ext3   NEWBOOT 93c10a99-040a-4ab3-8782-c4e13a2c0184
 ├─vdb3
-├─vdb4 xfs    ROOT    4f745153-d8fa-4a9f-8560-5e4614c9cde9
-├─vdb5 btrfs  VAR     bf026134-58ae-40ae-bdf3-38624544f294
-└─vdb6 ext4   HOME    8ae9c059-a54b-4252-8ad5-eca736cde9b2
+├─vdb4 xfs    ROOT    4360955e-9cd6-43f2-8cb8-f40dbf042646
+├─vdb5 btrfs  VAR     5d5eb0c2-1ce9-4f0f-9fb9-a2d57e25f69d
+└─vdb6 ext4   HOME    60af633e-7963-4063-897e-28f34d00ebe2
 
 $ lab check 04
 ✔ 04 達成
@@ -807,7 +807,7 @@ $ lab check 04
 ========== 5. 演習05 — ディスクのイメージのファイルから、中のファイルを取り出す ==========
 
 $ ls -l ~/old-usb.img
--rw-r--r-- 1 student student 16777216 Oct 20 22:29 /home/student/old-usb.img
+-rw-r--r-- 1 student student 16777216 Oct 20 23:38 /home/student/old-usb.img
 
 $ lab check 05
 ✗ 05 未達
@@ -828,7 +828,7 @@ NAME       SIZELIMIT OFFSET AUTOCLEAR RO BACK-FILE                 DIO LOG-SEC
 
 $ ls -l /mnt
 total 2
--rwxr-xr-x 1 root root 47 Oct 20 22:29 message.txt
+-rwxr-xr-x 1 root root 47 Oct 20 23:38 message.txt
 
 # --- マウントしただけ（まだ取り出していない）---
 
@@ -955,26 +955,25 @@ $ lab check 06
 
 $ free -h
                total        used        free      shared  buff/cache   available
-Mem:           1.4Gi       246Mi       1.1Gi       816Ki       197Mi       1.2Gi
+Mem:           1.4Gi       248Mi       1.1Gi       816Ki       197Mi       1.1Gi
 Swap:             0B          0B          0B
 
 $ swapon --show
 
 $ lab check 07
 ✗ 07 未達
-  判定 : 観測型（vdb3 をいったん swapoff し、起動時と同じ swapon -a を1回実行して、戻るかを見た）
+  判定 : 観測型（いま vdb3 が使われているかを /proc/swaps で、起動のときに使われるかを /etc/fstab の行で見た。状態は変えない）
   観測 : vdb3 の中身              = （印なし）
-         判定の前に使われていたか = いいえ
+         いま使われているか       = いいえ
          /etc/fstab のスワップの行 = （無い）
-         swapon -a の後に使われているか = いいえ
-         （判定の後、vdb3 は判定の前と同じ状態に戻した）
          → vdb3 がスワップ領域として作られていない
-         → /etc/fstab から有効にすると、vdb3 は使われない
+         → vdb3 は、いまスワップとして使われていない
+         → /etc/fstab に、vdb3 を指すスワップの行が無い（起動したときに使われない）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 07
 
 $ sudo mkswap -L SWAP /dev/vdb3
 Setting up swapspace version 1, size = 256 MiB (268431360 bytes)
-LABEL=SWAP, UUID=f5ee32fd-97aa-4680-bdbf-d20ad1d126b1
+LABEL=SWAP, UUID=84afb2e7-7bad-4309-b3da-b9f4fa386d14
 
 $ sudo swapon /dev/vdb3
 
@@ -986,13 +985,11 @@ NAME      TYPE      SIZE USED PRIO
 
 $ lab check 07
 ✗ 07 未達
-  判定 : 観測型（vdb3 をいったん swapoff し、起動時と同じ swapon -a を1回実行して、戻るかを見た）
+  判定 : 観測型（いま vdb3 が使われているかを /proc/swaps で、起動のときに使われるかを /etc/fstab の行で見た。状態は変えない）
   観測 : vdb3 の中身              = swap
-         判定の前に使われていたか = はい
+         いま使われているか       = はい（優先度 -2）
          /etc/fstab のスワップの行 = （無い）
-         swapon -a の後に使われているか = いいえ
-         （判定の後、vdb3 は判定の前と同じ状態に戻した）
-         → /etc/fstab から有効にすると、vdb3 は使われない
+         → /etc/fstab に、vdb3 を指すスワップの行が無い（起動したときに使われない）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 07
 
 # --- 判定の後も、vdb3 は判定の前と同じく使われているか ---
@@ -1008,31 +1005,27 @@ $ echo "/dev/vdb3  none  swap  sw  0  0" | sudo tee -a /etc/fstab
 
 $ lab check 07
 ✗ 07 未達
-  判定 : 観測型（vdb3 をいったん swapoff し、起動時と同じ swapon -a を1回実行して、戻るかを見た）
+  判定 : 観測型（いま vdb3 が使われているかを /proc/swaps で、起動のときに使われるかを /etc/fstab の行で見た。状態は変えない）
   観測 : vdb3 の中身              = swap
-         判定の前に使われていたか = はい
-         /etc/fstab のスワップの行 = /dev/vdb3（実体: /dev/vdb3）
-         swapon -a の後に使われているか = はい
-         （判定の後、vdb3 は判定の前と同じ状態に戻した）
+         いま使われているか       = はい（優先度 -2）
+         /etc/fstab のスワップの行 = /dev/vdb3（実体: /dev/vdb3、オプション sw）
          → /etc/fstab の行がデバイス名（/dev/vd…）で書かれている
   → この事実から何が欠けているか考えてください。詰まったら lab hint 07
 
 $ sudo sed -i '/^\/dev\/vdb3 /d' /etc/fstab
 
 $ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb3)  none  swap  sw  0  0" | sudo tee -a /etc/fstab
-UUID=f5ee32fd-97aa-4680-bdbf-d20ad1d126b1  none  swap  sw  0  0
+UUID=84afb2e7-7bad-4309-b3da-b9f4fa386d14  none  swap  sw  0  0
 
 $ sudo systemctl daemon-reload
 
 $ lab check 07
 ✔ 07 達成
-  判定 : 観測型（vdb3 をいったん swapoff し、起動時と同じ swapon -a を1回実行して、戻るかを見た）
+  判定 : 観測型（いま vdb3 が使われているかを /proc/swaps で、起動のときに使われるかを /etc/fstab の行で見た。状態は変えない）
   観測 : vdb3 の中身              = swap
-         判定の前に使われていたか = はい
-         /etc/fstab のスワップの行 = UUID=f5ee32fd-97aa-4680-bdbf-d20ad1d126b1（実体: /dev/vdb3）
-         swapon -a の後に使われているか = はい
-         （判定の後、vdb3 は判定の前と同じ状態に戻した）
-         /etc/fstab の行から vdb3 が有効になった → 再起動しても、このスワップは使われる
+         いま使われているか       = はい（優先度 -2）
+         /etc/fstab のスワップの行 = UUID=84afb2e7-7bad-4309-b3da-b9f4fa386d14（実体: /dev/vdb3、オプション sw）
+         vdb3 はいま使われていて、/etc/fstab の行も vdb3 を指している → 再起動しても、このスワップは使われる
 
 
 ========== 8. 演習08 — 2台のディスクにまたがる箱を作り、中身ごと広げる ==========
@@ -1132,12 +1125,11 @@ vde virtio    1  512M
 
 $ lab check 09
 ✗ 09 未達
-  判定 : 観測型（rotational をいったん 1 に戻し、起動時と同じ add イベントを udev に1回送って、値を読んだ）
-  観測 : 判定の前の値             = 1
+  判定 : 観測型（いまの rotational を読み、次に 1 に戻して起動時と同じ add イベントを udev に1回送り、値を読んだ。最後に判定の前の値に戻した）
+  観測 : いまの値（判定の前）     = 1
          add イベントの後の値     = 1
          rotational を書く udev の規則 = （/etc/udev/rules.d に見当たらない）
-         （判定の後、値は判定の前の 1 に戻した）
-         → 判定の前も後も 1（vdb は回転する装置として扱われている）
+         → いまの値も、起動時と同じイベントの後の値も 1（vdb は回転する装置として扱われている）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 09
 
 $ echo 0 | sudo tee /sys/block/vdb/queue/rotational
@@ -1147,12 +1139,11 @@ $ echo 0 | sudo tee /sys/block/vdb/queue/rotational
 
 $ lab check 09
 ✗ 09 未達
-  判定 : 観測型（rotational をいったん 1 に戻し、起動時と同じ add イベントを udev に1回送って、値を読んだ）
-  観測 : 判定の前の値             = 0
+  判定 : 観測型（いまの rotational を読み、次に 1 に戻して起動時と同じ add イベントを udev に1回送り、値を読んだ。最後に判定の前の値に戻した）
+  観測 : いまの値（判定の前）     = 0
          add イベントの後の値     = 1
          rotational を書く udev の規則 = （/etc/udev/rules.d に見当たらない）
-         （判定の後、値は判定の前の 0 に戻した）
-         → 判定の前は 0 だったが、起動時と同じイベントの後は 1 に戻った
+         → いまは 0 だが、起動時と同じイベントの後は 1 に戻った（再起動すると HDD 扱いに戻る）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 09
 
 # --- 判定の後、値は判定の前の 0 に戻っているか ---
@@ -1170,12 +1161,11 @@ $ cat /sys/block/vdb/queue/rotational
 
 $ lab check 09
 ✔ 09 達成
-  判定 : 観測型（rotational をいったん 1 に戻し、起動時と同じ add イベントを udev に1回送って、値を読んだ）
-  観測 : 判定の前の値             = 0
+  判定 : 観測型（いまの rotational を読み、次に 1 に戻して起動時と同じ add イベントを udev に1回送り、値を読んだ。最後に判定の前の値に戻した）
+  観測 : いまの値（判定の前）     = 0
          add イベントの後の値     = 0
          rotational を書く udev の規則 = /etc/udev/rules.d/60-lab-ssd.rules
-         （判定の後、値は判定の前の 0 に戻した）
-         起動時と同じイベントを受けて、udev が 0 に書き換えた
+         いまも 0 で、起動時と同じイベントを受けても udev が 0 に書き換えた
          → 再起動しても、カーネルは vdb を回転しない装置（SSD）として扱う
 
 
@@ -1242,6 +1232,7 @@ $ lab check 10
          付いたドライバ   = usb-storage
          ディスクとして   = /dev/sdb
          読み込まれていたモジュール = uas usb_storage
+         （判定の前は読み込まれていなかったので、判定のあと外した: 外した）
          → 挿した USB メモリが、ディスクとして使える状態になった
   → この事実から何が欠けているか考えてください。詰まったら lab hint 10
 
@@ -1260,6 +1251,7 @@ $ lab check 10
          付いたドライバ   = usb-storage
          ディスクとして   = /dev/sdb
          読み込まれていたモジュール = uas usb_storage
+         （判定の前は読み込まれていなかったので、判定のあと外した: 外した）
          → 挿した USB メモリが、ディスクとして使える状態になった
   → この事実から何が欠けているか考えてください。詰まったら lab hint 10
 
@@ -1317,6 +1309,7 @@ $ lab check 10
          付いたドライバ   = usb-storage
          ディスクとして   = /dev/sdb
          読み込まれていたモジュール = uas usb_storage
+         （判定の前は読み込まれていなかったので、判定のあと外した: 外した）
          → 挿した USB メモリが、ディスクとして使える状態になった
   → この事実から何が欠けているか考えてください。詰まったら lab hint 10
 
@@ -1409,13 +1402,11 @@ $ lab check
          一般ユーザが、自分でマウントして読み、自分で外せた
          → 許したのは sudo ではなく、/etc/fstab の行に書いたオプション
 ✔ 07 達成
-  判定 : 観測型（vdb3 をいったん swapoff し、起動時と同じ swapon -a を1回実行して、戻るかを見た）
+  判定 : 観測型（いま vdb3 が使われているかを /proc/swaps で、起動のときに使われるかを /etc/fstab の行で見た。状態は変えない）
   観測 : vdb3 の中身              = swap
-         判定の前に使われていたか = はい
-         /etc/fstab のスワップの行 = UUID=f5ee32fd-97aa-4680-bdbf-d20ad1d126b1（実体: /dev/vdb3）
-         swapon -a の後に使われているか = はい
-         （判定の後、vdb3 は判定の前と同じ状態に戻した）
-         /etc/fstab の行から vdb3 が有効になった → 再起動しても、このスワップは使われる
+         いま使われているか       = はい（優先度 -2）
+         /etc/fstab のスワップの行 = UUID=84afb2e7-7bad-4309-b3da-b9f4fa386d14（実体: /dev/vdb3、オプション sw）
+         vdb3 はいま使われていて、/etc/fstab の行も vdb3 を指している → 再起動しても、このスワップは使われる
 ✔ 08 達成
   判定 : 観測型（LVM の表と、vg0/data の中の ext4 の大きさを別々に読んで比べた）
   観測 : vg0 の物理ボリューム = /dev/sda /dev/vdc
@@ -1424,12 +1415,11 @@ $ lab check
          1台より大きな箱が2台にまたがってでき、中身の ext4 も箱いっぱいに広がっている
          → 箱と中身は別の段。広げるときは両方を広げる（lvextend -r か resize2fs）
 ✔ 09 達成
-  判定 : 観測型（rotational をいったん 1 に戻し、起動時と同じ add イベントを udev に1回送って、値を読んだ）
-  観測 : 判定の前の値             = 0
+  判定 : 観測型（いまの rotational を読み、次に 1 に戻して起動時と同じ add イベントを udev に1回送り、値を読んだ。最後に判定の前の値に戻した）
+  観測 : いまの値（判定の前）     = 0
          add イベントの後の値     = 0
          rotational を書く udev の規則 = /etc/udev/rules.d/60-lab-ssd.rules
-         （判定の後、値は判定の前の 0 に戻した）
-         起動時と同じイベントを受けて、udev が 0 に書き換えた
+         いまも 0 で、起動時と同じイベントを受けても udev が 0 に書き換えた
          → 再起動しても、カーネルは vdb を回転しない装置（SSD）として扱う
 ✔ 10 達成
   判定 : 観測型（判定の中で USB メモリを1本挿し、練習機がそれをどう扱ったかを見て、抜いた）

@@ -21,7 +21,7 @@
 <div class="sgoal"><b>この節で分かること</b>: CPU とメモリの情報の読み方と、その出どころ。</div>
 <p><code>lscpu</code> は CPU の情報を表にするコマンドである。長いので、最初の8行だけを出す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ lscpu | head -8</code></pre>
-<p>CPU(s) の 2 は、練習機が使える CPU の数（正確には、命令を同時に実行できる部分の数）である。Model name の <code>QEMU TCG CPU</code> は、QEMU（仮想マシンを動かすプログラム）が CPU の命令をソフトウェアで真似している（TCG。完全エミュレーション）という意味で、この檻は KVM を使わないので、どの PC で動かしてもここは同じ表示になる（Vendor ID が AuthenticAMD なのも、QEMU が真似している CPU の種類で、あなたの PC の CPU とは関係ない）。<code>lscpu</code> は、カーネルが <code>/proc/cpuinfo</code>（と、この章で見る <code>/sys</code>）に出している情報を読んで整えている。</p>
+<p>CPU(s) の 2 は、練習機が使える CPU の数（正確には、命令を同時に実行できる部分の数）である。Model name の <code>QEMU TCG CPU</code> は、QEMU（仮想マシンを動かすプログラム）が練習機の CPU の命令をひと塊ずつ、手元の CPU の命令に翻訳して動かしている（TCG。完全エミュレーション）という意味で、この檻は KVM を使わないので、どの PC で動かしてもここは同じ表示になる（Vendor ID が AuthenticAMD なのも、QEMU が真似している CPU の種類で、あなたの PC の CPU とは関係ない）。<code>lscpu</code> は、カーネルが <code>/proc/cpuinfo</code>（と、この章で見る <code>/sys</code>）に出している情報を読んで整えている。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ grep -m1 "model name" /proc/cpuinfo
 $ ls -l /proc/cpuinfo
 $ head -3 /proc/meminfo</code></pre>
@@ -121,7 +121,7 @@ $ cat /sys/block/vdb/queue/rotational</code></pre>
 </table></div>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-disks/practice/">演習09</a>は、vdb を「再起動しても SSD として扱われる」状態にする課題である。
-判定は再起動の代わりに、この章と同じく値を 1 に戻して add の知らせを1回送り、0 に書き換わるかを見る。この章のとおりに打った人は、もう達成している。</div>
+判定は、いまの値が 0 かを見たうえで、再起動の代わりに、この章と同じく値を 1 に戻して add の知らせを1回送り、0 に書き換わるかを見る（終わったら値を元に戻す）。この章のとおりに打った人は、もう達成している。</div>
 
 <h2 id="optical">光学ドライブからメディアを抜く</h2>
 <div class="sgoal"><b>この節で分かること</b>: 光学ドライブの RM・RO と、メディアを抜いたときに何が残るか。</div>

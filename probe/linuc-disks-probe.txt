@@ -1,6 +1,7 @@
 # LinuC 主題1.05 の、本文の章以外の表示の出どころ（probe/linuc-disks-probe.sh が probe/linuc-disks-seq.py --steps で打つ）。
 #   0.  入ったときの表示（実践編の「はじめる」）と、検証環境ブロックの版の出どころ
 #   1.  課題文の出し方（lab start・練習機の中からの lab show・lab check）
+#   2.  XFS の末尾の空きを縮める試験的な機能（xfs_growfs -D。第9章の注）
 # 本文の章の記録は probe/linuc-disks-seq.py（ひな形から）、演習の通しは probe/linuc-disks-solve-all.sh。
 
 == 0. 入ったとき・検証環境 ==
@@ -25,3 +26,16 @@ $ ssh linuc
 @中
 $ lab show
 $ lab check 01
+
+== 2. XFS の末尾の空きを縮める試験的な機能（第9章の注の出どころ） ==
+@中
+$ sudo pvcreate -q /dev/vdc
+$ sudo vgcreate -q vgx /dev/vdc
+$ sudo lvcreate -q -L 300M -n xfs vgx
+$ sudo mkfs.xfs -q /dev/vgx/xfs
+$ sudo mkdir /srv/x
+$ sudo mount /dev/vgx/xfs /srv/x
+$ sudo xfs_info /srv/x | grep "^data"
+$ sudo xfs_growfs -D 70000 /srv/x
+$ sudo xfs_info /srv/x | grep "^data"
+$ sudo umount /srv/x

@@ -111,14 +111,14 @@ $ sudo umount /media/stick</code></pre>
 <div class="then"><b>だめな理由</b>: <code>/dev/sdb</code> にいたのは B（ext4、STICK_B）だった。<code>sdb</code> のような名前は、カーネルが装置を<b>見つけた順に</b>、空いている名前から付ける。A を抜いているあいだに B が <code>sdb</code> を取り、あとから来た A は <code>sdc</code> になった。しかも <code>mount</code> はファイルシステムの種類を自分で見分けるので、別のディスクを何も言わずにマウントした。</div></div>
 <p>ディスクにずっと付いているのは、中に書いた印（ラベルと UUID）だけである。第4章の <code>blkid</code> で読む。<code>findfs</code> は、ラベルや UUID から「いまどの装置か」を引くコマンドである。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo blkid /dev/sdb /dev/sdc
-/dev/sdb: LABEL="STICK_B" UUID="4b089dd6-a0d5-4b0c-a78e-bcdfb4e7272a" BLOCK_SIZE="4096" TYPE="ext4"
-/dev/sdc: SEC_TYPE="msdos" LABEL_FATBOOT="STICK_A" LABEL="STICK_A" UUID="D61D-C58F" BLOCK_SIZE="512" TYPE="vfat"
+/dev/sdb: LABEL="STICK_B" UUID="e7ee23f2-9e6b-428f-86d3-56dbfc8628c1" BLOCK_SIZE="4096" TYPE="ext4"
+/dev/sdc: SEC_TYPE="msdos" LABEL_FATBOOT="STICK_A" LABEL="STICK_A" UUID="DA24-6A85" BLOCK_SIZE="512" TYPE="vfat"
 $ sudo findfs LABEL=STICK_A
 /dev/sdc</code></pre>
 <p>カーネルの装置の管理を手伝うプログラム udev が、ラベルや UUID から、いまの装置を指す別名（シンボリックリンク）を <code>/dev/disk/by-label/</code> と <code>/dev/disk/by-uuid/</code> に作っている。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls -l /dev/disk/by-label/ | grep STICK
-lrwxrwxrwx 1 root root  9 Oct 20 22:33 STICK_A -&gt; ../../sdc
-lrwxrwxrwx 1 root root  9 Oct 20 22:32 STICK_B -&gt; ../../sdb</code></pre>
+lrwxrwxrwx 1 root root  9 Oct 20 23:42 STICK_A -&gt; ../../sdc
+lrwxrwxrwx 1 root root  9 Oct 20 23:42 STICK_B -&gt; ../../sdb</code></pre>
 <p><code>mount</code> には、装置の名前の代わりに <code>LABEL=…</code>（や <code>UUID=…</code>）を渡せる。これなら、何番目に挿しても A を指せる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mount LABEL=STICK_A /media/stick
 $ cat /media/stick/who.txt
@@ -159,10 +159,10 @@ $ sudo umount /mnt</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo dd if=/dev/sr0 of=media.iso
 736+0 records in
 736+0 records out
-376832 bytes (377 kB, 368 KiB) copied, 0.0100584 s, 37.5 MB/s
+376832 bytes (377 kB, 368 KiB) copied, 0.0215716 s, 17.5 MB/s
 $ ls -l media.iso
--rw-r--r-- 1 root root 376832 Oct 20 22:33 media.iso</code></pre>
-<p>ファイルをマウントするときは、<b>ループデバイス</b>（ファイルを、ディスクのような装置に見せかける仮の装置。<code>/dev/loop0</code> など）を間に置く。<code>-o loop</code> は「ループデバイスを用意して、それをマウントせよ」とはっきり頼むオプションである（いまの <code>mount</code> は、付けなくてもファイルを渡されれば自分でループデバイスを用意するが、試験は <code>-o loop</code> の形で問う。ここでも付けて打つ）。</p>
+-rw-r--r-- 1 root root 376832 Oct 20 23:43 media.iso</code></pre>
+<p>ファイルをマウントするときは、<b>ループデバイス</b>（ファイルを、ディスクのような装置に見せかける仮の装置。<code>/dev/loop0</code> など）を間に置く。<code>-o loop</code> は「ループデバイスを用意して、それをマウントせよ」とはっきり頼むオプションである（いまの <code>mount</code> は、付けなくてもファイルを渡されれば自分でループデバイスを用意する。ここでは、何をしているかが見えるように付けて打つ）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mount -o loop media.iso /mnt
 mount: /mnt: WARNING: source write-protected, mounted read-only.
 $ df -h /mnt
@@ -194,7 +194,7 @@ $ sudo rm media.iso</code></pre>
 <div class="quiz"><b>確認</b>
 <p>ダウンロードした <code>install.iso</code> の中身を、CD に焼かずに見たい。どうするか。</p>
 <details><summary>答え</summary>
-<p><code>sudo mount -o loop install.iso /mnt</code>。<code>mount</code> がループデバイスを用意してファイルを装置に見せかけるので、CD に焼かずにマウントできる（いまの <code>mount</code> は <code>-o loop</code> を省いても同じことをするが、試験では <code>-o loop</code> の形で答える）。どのループデバイスがどのファイルにつながっているかは <code>losetup -l</code> で見る。</p></details></div>
+<p><code>sudo mount -o loop install.iso /mnt</code>。<code>mount</code> がループデバイスを用意してファイルを装置に見せかけるので、CD に焼かずにマウントできる（いまの <code>mount</code> は <code>-o loop</code> を省いても同じことをする）。どのループデバイスがどのファイルにつながっているかは <code>losetup -l</code> で見る。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>練習機に USB メモリを挿す・抜くのは、外で <code>virsh attach-device</code>・<code>detach-device</code>。中では <code>lsblk -d</code> の TRAN・SERIAL でどれかを見分ける</li><li>マウントポイントは前もって作るただのディレクトリ。もとの中身は隠れるだけで、外せばまた見える。中にプロセスがいると <code>umount</code> は <code>target is busy</code> で断る</li><li><code>/dev/sdb</code> は見つかった順に付く名前で、挿す順番で別のディスクを指す。ディスクに付いているのは中のラベルと UUID で、<code>blkid</code>・<code>findfs</code>・<code>/dev/disk/by-label/</code> で引け、<code>mount LABEL=…</code> で指せる</li><li><code>/media</code> は取り外せるメディアのマウント先。CD は iso9660 で、読み取り専用の装置なので <code>mount</code> は読み取り専用にする</li><li>ISO イメージのようなファイルは、ループデバイスを通して <code>mount -o loop</code> でマウントできる（<code>losetup -l</code> で対応を見る）</li></ul></div>

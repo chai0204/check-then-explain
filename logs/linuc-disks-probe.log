@@ -1,8 +1,8 @@
 # 台本（probe/linuc-disks-probe.txt）の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run -d … 名前付きボリューム2つ、
 # docker exec -it … bash -l、umask 022、TERM=xterm）の端末に、最初から順に、本文の順に1行ずつ打った記録。
 # 端末 80 桁 × 24 行。外と練習機の中は data-where で打ち分けた。作り方: python3 -I probe/linuc-disks-seq.py
-# イメージ lab-linuc-disks:1.1.0（sha256:1b7f451f63d30360bb08e149087151d5ec5ddb392bb49cbdc076964bdd33a5c7）
-# 開始 2026-10-20 22:28:51
+# イメージ lab-linuc-disks:1.1.0（sha256:2bc941fabe0adb518f2ea8f340294e7802c182b78ee07a09ff55be48d17686dc）
+# 開始 2026-10-20 23:45:30
 
 # --- 端末1: docker exec -it linuc-disks-r11-probe bash -l で入ったときの表示 ---
 練習機 linuc: running（エージェント 応答なし / ssh まだ）
@@ -25,6 +25,8 @@ lab-linuc-disks  進捗 0/10
 
 #   1.  課題文の出し方（lab start・練習機の中からの lab show・lab check）
 
+#   2.  XFS の末尾の空きを縮める試験的な機能（xfs_growfs -D。第9章の注）
+
 # 本文の章の記録は probe/linuc-disks-seq.py（ひな形から）、演習の通しは probe/linuc-disks-solve-all.sh。
 
 
@@ -46,7 +48,7 @@ ssh        : まだ（127.0.0.1:2222 → 練習機の 22）
 $ vm start
 練習機はもう動いています
   起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
-練習機が起動しました（32秒）
+練習機が起動しました（22秒）
   入るには:  ssh linuc   （抜けるときは exit）
 
 $ lab env
@@ -168,7 +170,7 @@ $ ssh linuc
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 20 22:29:41 2026 from 10.0.2.2
+Last login: Tue Oct 20 23:46:09 2026 from 10.0.2.2
 
 $ lab show
 
@@ -222,3 +224,43 @@ $ lab check 01
   観測 : vde の区画       = 0 個
          → vde にパーティションが無い
   → この事実から何が欠けているか考えてください。詰まったら lab hint 01
+
+
+========== 2. XFS の末尾の空きを縮める試験的な機能（第9章の注の出どころ） ==========
+
+$ sudo pvcreate -q /dev/vdc
+  Physical volume "/dev/vdc" successfully created.
+
+$ sudo vgcreate -q vgx /dev/vdc
+  Volume group "vgx" successfully created
+
+$ sudo lvcreate -q -L 300M -n xfs vgx
+  Logical volume "xfs" created.
+
+$ sudo mkfs.xfs -q /dev/vgx/xfs
+
+$ sudo mkdir /srv/x
+
+$ sudo mount /dev/vgx/xfs /srv/x
+
+$ sudo xfs_info /srv/x | grep "^data"
+data     =                       bsize=4096   blocks=76800, imaxpct=25
+
+$ sudo xfs_growfs -D 70000 /srv/x
+meta-data=/dev/mapper/vgx-xfs    isize=512    agcount=4, agsize=19200 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=1
+         =                       reflink=1    bigtime=1 inobtcount=1 nrext64=0
+data     =                       bsize=4096   blocks=76800, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=16384, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+[EXPERIMENTAL] try to shrink unused space 70000, old size is 76800
+data blocks changed from 76800 to 70000
+
+$ sudo xfs_info /srv/x | grep "^data"
+data     =                       bsize=4096   blocks=70000, imaxpct=25
+
+$ sudo umount /srv/x

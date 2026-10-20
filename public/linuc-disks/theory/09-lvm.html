@@ -58,7 +58,7 @@ $ sudo vgdisplay vg0
   Total PE              510   ← 区切りの数
   Alloc PE / Size       0 / 0
   Free  PE / Size       510 / 1.99 GiB
-  VG UUID               FDx0Te-oGEZ-w1SO-lII0-gRNr-nKCB-ugYPK1   ← 作るたびに変わる番号（あなたの画面では違う）</code></pre>
+  VG UUID               1VgJqT-PLPY-mGIY-ChVW-00wM-Nx2D-kD5BWp   ← 作るたびに変わる番号（あなたの画面では違う）</code></pre>
 <p><code>vgcreate</code> は、物理ボリュームをまとめて<b>ボリュームグループ</b>（VG）にするコマンドで、ここでは <code>vg0</code> という名前にした。1G の2台で 1.99GiB の池ができている（2GiB より少し小さい理由は、すぐ下で）。<code>vgdisplay</code> は詳しい表示で、池の中は 4MiB ごとの区切り（物理エクステント、PE）で管理されていると分かる。Total PE の 510 個は 510 × 4MiB = 2040MiB、1台あたり 1020MiB である。1台 1024MiB のうち、先頭の 1MiB を LVM が自分の管理情報に使い、残りの 1023MiB を 4MiB ずつ区切った端数の 3MiB も使えないので、1020MiB になる（章の最後の <code>pvs</code> の PSize に、この 1020.00m が出る）。池から<b>論理ボリューム</b>（LV）を切り出す。論理ボリュームは、パーティションの代わりに使う箱である。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo lvcreate -L 600M -n data vg0
   Logical volume "data" created.
@@ -66,8 +66,8 @@ $ sudo lvs
   LV   VG  Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
   data vg0 -wi-a----- 600.00m
 $ ls -l /dev/vg0/data /dev/mapper/vg0-data
-lrwxrwxrwx 1 root root 7 Oct 20 22:37 /dev/mapper/vg0-data -&gt; ../dm-0
-lrwxrwxrwx 1 root root 7 Oct 20 22:37 /dev/vg0/data -&gt; ../dm-0</code></pre>
+lrwxrwxrwx 1 root root 7 Oct 20 23:46 /dev/mapper/vg0-data -&gt; ../dm-0
+lrwxrwxrwx 1 root root 7 Oct 20 23:46 /dev/vg0/data -&gt; ../dm-0</code></pre>
 <p><code>lvcreate</code> の <code>-L</code> は大きさ、<code>-n</code> は名前である。<code>lvs</code> は論理ボリュームの一覧で、LSize が大きさ。<code>/dev/vg0/data</code> と <code>/dev/mapper/vg0-data</code> は、どちらも <code>/dev/dm-0</code> という同じ装置を指す別名（シンボリックリンク）である（<code>dm</code> は device mapper。LVM が論理ボリュームのために作る仮の装置）。論理ボリュームは、区画と同じように <code>mkfs</code> してマウントできる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mkfs.ext4 -q /dev/vg0/data
 $ sudo mkdir /srv/data

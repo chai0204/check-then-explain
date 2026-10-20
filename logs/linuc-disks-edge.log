@@ -1,0 +1,921 @@
+# 台本（probe/linuc-disks-edge.txt）の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run -d … 名前付きボリューム2つ、
+# docker exec -it … bash -l、umask 022、TERM=xterm）の端末に、最初から順に、本文の順に1行ずつ打った記録。
+# 端末 80 桁 × 24 行。外と練習機の中は data-where で打ち分けた。作り方: python3 -I probe/linuc-disks-seq.py
+# イメージ lab-linuc-disks:1.1.0（sha256:2bc941fabe0adb518f2ea8f340294e7802c182b78ee07a09ff55be48d17686dc）
+# 開始 2026-10-20 23:46:11
+
+# --- 端末1: docker exec -it linuc-disks-r11-edge bash -l で入ったときの表示 ---
+練習機 linuc: running（エージェント 応答なし / ssh まだ）
+  vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
+
+
+── lab-linuc-disks 1.1.0 ────────────────────────────────────────
+lab-linuc-disks  進捗 0/10
+  次 → 01 「空のディスク vde を使えるようにする」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-disks-state）
+  lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
+────────────────────────────────────────────────────────────
+
+# --- ここまで ---
+
+# LinuC 主題1.05 の判定（verify）の境目を確かめる台本。2回目の独立確認の担当が作った台本（2026-10-20）を写した。
+
+# 判定は読者の状態を変えない（変えたら元どおりに戻す）こと、「いまの状態」と「起動し直しても残る設定」の両方を見ることを、
+
+# 境目の状態で確かめる（probe/linuc-disks-seq.py --steps で打つ。記録は logs/linuc-disks-edge.log）。
+
+
+========== 0. 入ったとき ==========
+
+$ vm start
+練習機はもう動いています
+  起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+練習機が起動しました（30秒）
+  入るには:  ssh linuc   （抜けるときは exit）
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+
+
+========== 3. 演習03 の境目 ==========
+
+# --- 始まりの状態（表が無い）---
+
+$ lab check 03
+✗ 03 未達
+  判定 : 観測型（/dev/vdb の表を読み、課題の6行と1行ずつ比べた）
+  観測 : /dev/vdb に表が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+
+# --- GPT でなく MBR の表 ---
+
+$ printf 'label: dos\n,100M\n' | sudo sfdisk -q /dev/vdb
+
+$ lab check 03
+✗ 03 未達
+  判定 : 観測型（/dev/vdb の表を読み、課題の6行と1行ずつ比べた）
+  観測 : 表の形式 = dos（パーティション 1 個）
+         vdb1         100 MiB  83
+         → 表の形式が gpt ではない
+         → vdb1 の種類が 83（課題の表では EFI System）
+         → vdb2 が無い
+         → vdb3 が無い
+         → vdb4 が無い
+         → vdb5 が無い
+         → vdb6 が無い
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+
+# --- GPT・vdb2 だけ 301M（±1MiB の内）---
+
+$ sudo sgdisk -Z /dev/vdb
+
+***************************************************************
+Found invalid GPT and valid MBR; converting MBR to GPT format
+in memory.
+***************************************************************
+
+GPT data structures destroyed! You may now partition the disk using fdisk or
+other utilities.
+
+$ sudo sgdisk -o -n 1:0:+100M -t 1:ef00 -n 2:0:+301M -t 2:8300 -n 3:0:+256M -t 3:8200 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+Creating new GPT entries in memory.
+The operation has completed successfully.
+
+$ lab check 03
+✔ 03 達成
+  判定 : 観測型（/dev/vdb の表を読み、課題の6行と1行ずつ比べた）
+  観測 : 表の形式 = gpt（パーティション 6 個）
+         vdb1         100 MiB  EFI System
+         vdb2         301 MiB  Linux filesystem
+         vdb3         256 MiB  Linux swap
+         vdb4         600 MiB  Linux filesystem
+         vdb5         400 MiB  Linux filesystem
+         vdb6         389 MiB  Linux filesystem
+         GPT に6つ、種類と大きさが課題の表どおりに並んでいる
+         → ESP の印（EF00）を付けた区画ができた。中身（FAT）は演習04 で作る
+
+# --- GPT・vdb2 だけ 303M（±1MiB の外）---
+
+$ sudo sgdisk -o -n 1:0:+100M -t 1:ef00 -n 2:0:+303M -t 2:8300 -n 3:0:+256M -t 3:8200 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+The operation has completed successfully.
+
+$ lab check 03
+✗ 03 未達
+  判定 : 観測型（/dev/vdb の表を読み、課題の6行と1行ずつ比べた）
+  観測 : 表の形式 = gpt（パーティション 6 個）
+         vdb1         100 MiB  EFI System
+         vdb2         303 MiB  Linux filesystem
+         vdb3         256 MiB  Linux swap
+         vdb4         600 MiB  Linux filesystem
+         vdb5         400 MiB  Linux filesystem
+         vdb6         387 MiB  Linux filesystem
+         → vdb2 が 303MiB（課題の表では 300MiB）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+
+# --- GPT・1番の種類を 8300 にした（ESP の印を付け忘れた）---
+
+$ sudo sgdisk -o -n 1:0:+100M -t 1:8300 -n 2:0:+300M -t 2:8300 -n 3:0:+256M -t 3:8200 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+The operation has completed successfully.
+
+$ lab check 03
+✗ 03 未達
+  判定 : 観測型（/dev/vdb の表を読み、課題の6行と1行ずつ比べた）
+  観測 : 表の形式 = gpt（パーティション 6 個）
+         vdb1         100 MiB  Linux filesystem
+         vdb2         300 MiB  Linux filesystem
+         vdb3         256 MiB  Linux swap
+         vdb4         600 MiB  Linux filesystem
+         vdb5         400 MiB  Linux filesystem
+         vdb6         390 MiB  Linux filesystem
+         → vdb1 の種類が Linux filesystem（課題の表では EFI System）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+
+# --- sgdisk の1行（範囲の外の近道。最後の区画が 391M になるので、ヒントと模範解答からは外した）---
+
+$ sudo sgdisk -o -n 1:0:+100M -t 1:ef00 -n 2:0:+300M -t 2:8300 -n 3:0:+256M -t 3:8200 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+The operation has completed successfully.
+
+$ lsblk -o NAME,SIZE,PARTTYPENAME /dev/vdb
+NAME    SIZE PARTTYPENAME
+vdb       2G
+├─vdb1  100M EFI System
+├─vdb2  300M Linux filesystem
+├─vdb3  256M Linux swap
+├─vdb4  600M Linux filesystem
+├─vdb5  400M Linux filesystem
+└─vdb6  391M Linux filesystem
+
+$ lab check 03
+✔ 03 達成
+  判定 : 観測型（/dev/vdb の表を読み、課題の6行と1行ずつ比べた）
+  観測 : 表の形式 = gpt（パーティション 6 個）
+         vdb1         100 MiB  EFI System
+         vdb2         300 MiB  Linux filesystem
+         vdb3         256 MiB  Linux swap
+         vdb4         600 MiB  Linux filesystem
+         vdb5         400 MiB  Linux filesystem
+         vdb6         390 MiB  Linux filesystem
+         GPT に6つ、種類と大きさが課題の表どおりに並んでいる
+         → ESP の印（EF00）を付けた区画ができた。中身（FAT）は演習04 で作る
+
+
+========== 4. 演習04 の境目 ==========
+
+# --- vdb1 を -F 32 なしで作った（100MiB なので FAT16 になる）。ほかは課題どおり ---
+
+$ sudo mkfs.vfat /dev/vdb1
+mkfs.fat 4.2 (2021-01-31)
+
+$ sudo mkfs -t ext3 -L NEWBOOT /dev/vdb2
+mke2fs 1.47.0 (5-Feb-2023)
+Discarding device blocks: done
+Creating filesystem with 76800 4k blocks and 76800 inodes
+Filesystem UUID: c5330b34-5faa-4f70-9f9c-398b60174f6e
+Superblock backups stored on blocks:
+	32768
+
+Allocating group tables: done
+Writing inode tables: done
+Creating journal (4096 blocks): done
+Writing superblocks and filesystem accounting information: done
+
+$ sudo mkfs.xfs -L ROOT /dev/vdb4
+meta-data=/dev/vdb4              isize=512    agcount=4, agsize=38400 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=1
+         =                       reflink=1    bigtime=1 inobtcount=1 nrext64=0
+data     =                       bsize=4096   blocks=153600, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=16384, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+Discarding blocks...Done.
+
+$ sudo mkfs.btrfs -L VAR /dev/vdb5
+btrfs-progs v6.6.3
+See https://btrfs.readthedocs.io for more information.
+
+Performing full device TRIM /dev/vdb5 (400.00MiB) ...
+NOTE: several default settings have changed in version 5.15, please make sure
+      this does not affect your deployments:
+      - DUP for metadata (-m dup)
+      - enabled no-holes (-O no-holes)
+      - enabled free-space-tree (-R free-space-tree)
+
+Label:              VAR
+UUID:               2836a742-1766-4303-82bf-86fa0ba3d8f3
+Node size:          16384
+Sector size:        4096
+Filesystem size:    400.00MiB
+Block group profiles:
+  Data:             single            8.00MiB
+  Metadata:         DUP              32.00MiB
+  System:           DUP               8.00MiB
+SSD detected:       no
+Zoned device:       no
+Incompat features:  extref, skinny-metadata, no-holes, free-space-tree
+Runtime features:   free-space-tree
+Checksum:           crc32c
+Number of devices:  1
+Devices:
+   ID        SIZE  PATH
+    1   400.00MiB  /dev/vdb5
+
+$ sudo mkfs.ext4 -L HOME /dev/vdb6
+mke2fs 1.47.0 (5-Feb-2023)
+Discarding device blocks: done
+Creating filesystem with 100091 4k blocks and 100096 inodes
+Filesystem UUID: b95b2a30-66e9-43d6-8923-e325ba2e206a
+Superblock backups stored on blocks:
+	32768, 98304
+
+Allocating group tables: done
+Writing inode tables: done
+Creating journal (4096 blocks): done
+Writing superblocks and filesystem accounting information: done
+
+$ sudo tune2fs -m 1 /dev/vdb6
+tune2fs 1.47.0 (5-Feb-2023)
+Setting reserved blocks percentage to 1% (1000 blocks)
+
+$ sudo blkid -p -o export /dev/vdb1
+DEVNAME=/dev/vdb1
+SEC_TYPE=msdos
+UUID=F080-9883
+VERSION=FAT16
+FSBLOCKSIZE=2048
+BLOCK_SIZE=512
+FSSIZE=104832000
+TYPE=vfat
+USAGE=filesystem
+PART_ENTRY_SCHEME=gpt
+PART_ENTRY_UUID=a715ae47-82cf-47c4-b9a6-de15ebf1235d
+PART_ENTRY_TYPE=c12a7328-f81f-11d2-ba4b-00a0c93ec93b
+PART_ENTRY_NUMBER=1
+PART_ENTRY_OFFSET=2048
+PART_ENTRY_SIZE=204800
+PART_ENTRY_DISK=253:16
+
+$ lab check 04
+✗ 04 未達
+  判定 : 観測型（各パーティションのファイルシステムの印を直接読んだ）
+  観測 : vdb1 = vfat（FAT16）
+         → vdb1 が FAT32 ではない（FAT16）
+         vdb2 = ext3 ラベル NEWBOOT
+         vdb4 = xfs ラベル ROOT
+         vdb5 = btrfs ラベル VAR
+         vdb6 = ext4 ラベル HOME
+         vdb6 の予約ブロック = 1000 / 100091 ブロック（1.0%）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+
+# --- vdb1 を -F 32 で作り直した（ほかは課題どおり）---
+
+$ sudo mkfs.vfat -F 32 /dev/vdb1
+mkfs.fat 4.2 (2021-01-31)
+
+$ lab check 04
+✔ 04 達成
+  判定 : 観測型（各パーティションのファイルシステムの印を直接読んだ）
+  観測 : vdb1 = vfat（FAT32）
+         vdb2 = ext3 ラベル NEWBOOT
+         vdb4 = xfs ラベル ROOT
+         vdb5 = btrfs ラベル VAR
+         vdb6 = ext4 ラベル HOME
+         vdb6 の予約ブロック = 1000 / 100091 ブロック（1.0%）
+         5つの種類のファイルシステムができ、vdb6 は root 用の予約が 1% になっている
+         → df の Avail が Size − Used より小さかった分の大半は、この予約（残りは ext4 が自分用に取る reserved_clusters）
+
+# --- vdb2 のラベルを BOOT にした ---
+
+$ sudo e2label /dev/vdb2 BOOT
+
+$ lab check 04
+✗ 04 未達
+  判定 : 観測型（各パーティションのファイルシステムの印を直接読んだ）
+  観測 : vdb1 = vfat（FAT32）
+         vdb2 = ext3 ラベル BOOT
+         → vdb2 のラベルが BOOT（練習機自身の /boot の区画 vda16 と同じラベル）
+         vdb4 = xfs ラベル ROOT
+         vdb5 = btrfs ラベル VAR
+         vdb6 = ext4 ラベル HOME
+         vdb6 の予約ブロック = 1000 / 100091 ブロック（1.0%）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+
+# --- vdb2 のラベルを BOOT 以外（MYBOOT）にした ---
+
+$ sudo e2label /dev/vdb2 MYBOOT
+
+$ lab check 04
+✔ 04 達成
+  判定 : 観測型（各パーティションのファイルシステムの印を直接読んだ）
+  観測 : vdb1 = vfat（FAT32）
+         vdb2 = ext3 ラベル MYBOOT
+         vdb4 = xfs ラベル ROOT
+         vdb5 = btrfs ラベル VAR
+         vdb6 = ext4 ラベル HOME
+         vdb6 の予約ブロック = 1000 / 100091 ブロック（1.0%）
+         5つの種類のファイルシステムができ、vdb6 は root 用の予約が 1% になっている
+         → df の Avail が Size − Used より小さかった分の大半は、この予約（残りは ext4 が自分用に取る reserved_clusters）
+
+# --- vdb2 のラベルを消した ---
+
+$ sudo e2label /dev/vdb2 ""
+
+$ lab check 04
+✔ 04 達成
+  判定 : 観測型（各パーティションのファイルシステムの印を直接読んだ）
+  観測 : vdb1 = vfat（FAT32）
+         vdb2 = ext3
+         vdb4 = xfs ラベル ROOT
+         vdb5 = btrfs ラベル VAR
+         vdb6 = ext4 ラベル HOME
+         vdb6 の予約ブロック = 1000 / 100091 ブロック（1.0%）
+         5つの種類のファイルシステムができ、vdb6 は root 用の予約が 1% になっている
+         → df の Avail が Size − Used より小さかった分の大半は、この予約（残りは ext4 が自分用に取る reserved_clusters）
+
+# --- vdb2 を ext3 でなく FAT32（ラベル MYBOOT）にした（課題の種類と違う）---
+
+$ sudo mkfs.vfat -F 32 -n MYBOOT /dev/vdb2
+mkfs.fat 4.2 (2021-01-31)
+
+$ lab check 04
+✗ 04 未達
+  判定 : 観測型（各パーティションのファイルシステムの印を直接読んだ）
+  観測 : vdb1 = vfat（FAT32）
+         vdb2 = vfat（FAT32） ラベル MYBOOT
+         → vdb2 が ext3 ではない
+         vdb4 = xfs ラベル ROOT
+         vdb5 = btrfs ラベル VAR
+         vdb6 = ext4 ラベル HOME
+         vdb6 の予約ブロック = 1000 / 100091 ブロック（1.0%）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 04
+
+# --- 戻す（先に印を消してから ext3）---
+
+$ sudo wipefs -a /dev/vdb2
+/dev/vdb2: 8 bytes were erased at offset 0x00000052 (vfat): 46 41 54 33 32 20 20 20
+/dev/vdb2: 1 byte was erased at offset 0x00000000 (vfat): eb
+/dev/vdb2: 2 bytes were erased at offset 0x000001fe (vfat): 55 aa
+
+$ sudo mkfs -t ext3 -q -L NEWBOOT /dev/vdb2
+
+$ lab check 04
+✔ 04 達成
+  判定 : 観測型（各パーティションのファイルシステムの印を直接読んだ）
+  観測 : vdb1 = vfat（FAT32）
+         vdb2 = ext3 ラベル NEWBOOT
+         vdb4 = xfs ラベル ROOT
+         vdb5 = btrfs ラベル VAR
+         vdb6 = ext4 ラベル HOME
+         vdb6 の予約ブロック = 1000 / 100091 ブロック（1.0%）
+         5つの種類のファイルシステムができ、vdb6 は root 用の予約が 1% になっている
+         → df の Avail が Size − Used より小さかった分の大半は、この予約（残りは ext4 が自分用に取る reserved_clusters）
+
+
+========== 5. 演習05 の境目 ==========
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べ、イメージがマウントされたままかを見た）
+  観測 : ~/message.txt  = （無い）
+         イメージのマウント先 = （どこにもマウントされていない）
+         → ホームに message.txt が無い（イメージの中から取り出す）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+# --- -o loop を付けずにマウントし、取り出したが、まだマウントしたまま ---
+
+$ sudo mount ~/old-usb.img /mnt
+
+$ cp /mnt/message.txt ~/
+
+$ losetup -l
+NAME       SIZELIMIT OFFSET AUTOCLEAR RO BACK-FILE                 DIO LOG-SEC
+/dev/loop0         0      0         1  0 /home/student/old-usb.img   0     512
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べ、イメージがマウントされたままかを見た）
+  観測 : ~/message.txt  = 伝言: 3 番の棚の鍵は、青い箱の中
+         old-usb.img につながったループデバイス = /dev/loop0 /home/student/old-usb.img
+         イメージのマウント先 = /mnt
+         → イメージがまだマウントされている（/mnt）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+# --- 判定のあとも、マウントはそのまま（判定は読むだけ）---
+
+$ findmnt /mnt
+TARGET SOURCE  FSTYPE OPTIONS
+/mnt   /dev/loop0
+               vfat   rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=i
+
+$ sudo umount /mnt
+
+$ lab check 05
+✔ 05 達成
+  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べ、イメージがマウントされたままかを見た）
+  観測 : ~/message.txt  = 伝言: 3 番の棚の鍵は、青い箱の中
+         イメージのマウント先 = （どこにもマウントされていない）
+         ファイルのままのディスクのイメージをマウントして、中のファイルを取り出せた
+         → ループデバイスを通すと、ファイルも装置と同じようにマウントできる
+
+# --- losetup でつないだだけ（マウントはしていない）---
+
+$ sudo losetup -f --show ~/old-usb.img
+/dev/loop0
+
+$ lab check 05
+✔ 05 達成
+  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べ、イメージがマウントされたままかを見た）
+  観測 : ~/message.txt  = 伝言: 3 番の棚の鍵は、青い箱の中
+         old-usb.img につながったループデバイス = /dev/loop0 /home/student/old-usb.img
+         イメージのマウント先 = （どこにもマウントされていない）
+         ファイルのままのディスクのイメージをマウントして、中のファイルを取り出せた
+         → ループデバイスを通すと、ファイルも装置と同じようにマウントできる
+
+# --- そのループデバイスを、/mnt でない別の場所にマウントした ---
+
+$ sudo mkdir /media/old
+
+$ sudo mount /dev/loop0 /media/old
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べ、イメージがマウントされたままかを見た）
+  観測 : ~/message.txt  = 伝言: 3 番の棚の鍵は、青い箱の中
+         old-usb.img につながったループデバイス = /dev/loop0 /home/student/old-usb.img
+         イメージのマウント先 = /media/old
+         → イメージがまだマウントされている（/media/old）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
+
+$ sudo umount /media/old
+
+$ sudo losetup -d /dev/loop0
+
+$ losetup -l
+
+$ lab check 05
+✔ 05 達成
+  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べ、イメージがマウントされたままかを見た）
+  観測 : ~/message.txt  = 伝言: 3 番の棚の鍵は、青い箱の中
+         イメージのマウント先 = （どこにもマウントされていない）
+         ファイルのままのディスクのイメージをマウントして、中のファイルを取り出せた
+         → ループデバイスを通すと、ファイルも装置と同じようにマウントできる
+
+
+========== 6. 演習06（判定の前に root がマウントしていたら、判定のあとはどうなっているか） ==========
+
+$ sudo mkdir -p /media/cdrom
+
+$ echo "/dev/sr0  /media/cdrom  iso9660  ro,user,noauto  0  0" | sudo tee -a /etc/fstab
+/dev/sr0  /media/cdrom  iso9660  ro,user,noauto  0  0
+
+$ sudo systemctl daemon-reload
+
+$ sudo mount /media/cdrom
+
+$ findmnt /media/cdrom
+TARGET   SOURCE FSTYPE OPTIONS
+/media/cdrom
+         /dev/sr0
+                iso966 ro,nosuid,nodev,noexec,relatime,nojoliet,check=s,map=n,bl
+
+$ lab check 06
+✔ 06 達成
+  判定 : 観測型（student として mount /media/cdrom と umount /media/cdrom を実際に打った）
+         （判定の前にマウントされていたので、いったん外して確かめ、終わったあとマウントし直した）
+  観測 : /etc/fstab の行       = /dev/sr0 iso9660 ro,user,noauto
+         student の mount      = 成功
+         マウントのオプション  = ro,nosuid,nodev,noexec,relatime,nojoliet,check=s,map=n,blocksize=2048,iocharset=utf8
+         README.TXT の1行目    = LinuC 練習用の光学メディア（CD-ROM のイメージ）
+         student の umount     = 成功
+         一般ユーザが、自分でマウントして読み、自分で外せた
+         → 許したのは sudo ではなく、/etc/fstab の行に書いたオプション
+
+$ findmnt /media/cdrom
+TARGET   SOURCE FSTYPE OPTIONS
+/media/cdrom
+         /dev/sr0
+                iso966 ro,nosuid,nodev,noexec,relatime,nojoliet,check=s,map=n,bl
+
+
+========== 7. 演習07 の境目 ==========
+
+$ sudo mkswap -L SWAP /dev/vdb3
+Setting up swapspace version 1, size = 256 MiB (268431360 bytes)
+LABEL=SWAP, UUID=13d034f1-43d0-45d7-97da-c116b9d28f7f
+
+# --- /etc/fstab に UUID で書いたが、swapon していない ---
+
+$ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb3)  none  swap  sw  0  0" | sudo tee -a /etc/fstab
+UUID=13d034f1-43d0-45d7-97da-c116b9d28f7f  none  swap  sw  0  0
+
+$ sudo systemctl daemon-reload
+
+$ swapon --show
+
+$ lab check 07
+✗ 07 未達
+  判定 : 観測型（いま vdb3 が使われているかを /proc/swaps で、起動のときに使われるかを /etc/fstab の行で見た。状態は変えない）
+  観測 : vdb3 の中身              = swap
+         いま使われているか       = いいえ
+         /etc/fstab のスワップの行 = UUID=13d034f1-43d0-45d7-97da-c116b9d28f7f（実体: /dev/vdb3、オプション sw）
+         → vdb3 は、いまスワップとして使われていない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+
+# --- 判定のあと、vdb3 は判定の前と同じく使われていないか ---
+
+$ swapon --show
+
+# --- 優先度 5 で使い始めた ---
+
+$ sudo swapon -p 5 /dev/vdb3
+
+$ swapon --show
+NAME      TYPE      SIZE USED PRIO
+/dev/vdb3 partition 256M   0B    5
+
+$ lab check 07
+✔ 07 達成
+  判定 : 観測型（いま vdb3 が使われているかを /proc/swaps で、起動のときに使われるかを /etc/fstab の行で見た。状態は変えない）
+  観測 : vdb3 の中身              = swap
+         いま使われているか       = はい（優先度 5）
+         /etc/fstab のスワップの行 = UUID=13d034f1-43d0-45d7-97da-c116b9d28f7f（実体: /dev/vdb3、オプション sw）
+         vdb3 はいま使われていて、/etc/fstab の行も vdb3 を指している → 再起動しても、このスワップは使われる
+
+$ swapon --show
+NAME      TYPE      SIZE USED PRIO
+/dev/vdb3 partition 256M   0B    5
+
+# --- /etc/fstab から行を消した（使ってはいる）---
+
+$ sudo sed -i '/ swap /d' /etc/fstab
+
+$ sudo systemctl daemon-reload
+
+$ lab check 07
+✗ 07 未達
+  判定 : 観測型（いま vdb3 が使われているかを /proc/swaps で、起動のときに使われるかを /etc/fstab の行で見た。状態は変えない）
+  観測 : vdb3 の中身              = swap
+         いま使われているか       = はい（優先度 5）
+         /etc/fstab のスワップの行 = （無い）
+         → /etc/fstab に、vdb3 を指すスワップの行が無い（起動したときに使われない）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+
+# --- 判定のあと、vdb3 はまた使われているか（優先度は 5 のままか）---
+
+$ swapon --show
+NAME      TYPE      SIZE USED PRIO
+/dev/vdb3 partition 256M   0B    5
+
+
+========== 8. 演習08 の境目（vdc は区画・sda はディスク全体） ==========
+
+$ sudo fdisk /dev/vdc
+
+Welcome to fdisk (util-linux 2.39.3).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS (MBR) disklabel with disk identifier 0x1035b659.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 1
+First sector (2048-2097151, default 2048):
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (2048-2097151, default 2097151):
+
+Created a new partition 1 of type 'Linux' and of size 1023 MiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code or alias (type L to list all): 8e
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+$ lsblk /dev/vdc /dev/sda
+NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+sda      8:0    0    1G  0 disk
+vdc    253:32   0    1G  0 disk
+└─vdc1 253:33   0 1023M  0 part
+
+$ sudo pvcreate /dev/vdc1 /dev/sda
+  Physical volume "/dev/vdc1" successfully created.
+  Physical volume "/dev/sda" successfully created.
+
+$ sudo vgcreate vg0 /dev/vdc1 /dev/sda
+  Volume group "vg0" successfully created
+
+$ sudo lvcreate -L 1.2G -n data vg0
+  Rounding up size to full physical extent 1.20 GiB
+  Logical volume "data" created.
+
+$ sudo mkfs.ext4 -q /dev/vg0/data
+
+$ sudo lvs -o lv_name,lv_size,devices vg0
+  LV   LSize Devices
+  data 1.20g /dev/vdc1(0)
+  data 1.20g /dev/sda(0)
+
+$ lab check 08
+✔ 08 達成
+  判定 : 観測型（LVM の表と、vg0/data の中の ext4 の大きさを別々に読んで比べた）
+  観測 : vg0 の物理ボリューム = /dev/sda /dev/vdc1
+         vg0/data の大きさ     = 1232 MiB（使っている物理ボリューム: /dev/vdc1(0),/dev/sda(0)）
+         中の ext4 の大きさ    = 1232 MiB
+         1台より大きな箱が2台にまたがってでき、中身の ext4 も箱いっぱいに広がっている
+         → 箱と中身は別の段。広げるときは両方を広げる（lvextend -r か resize2fs）
+
+# --- 箱だけ広げた ---
+
+$ sudo lvextend -L +200M vg0/data
+  Size of logical volume vg0/data changed from 1.20 GiB (308 extents) to <1.40 GiB (358 extents).
+  Logical volume vg0/data successfully resized.
+
+$ lab check 08
+✗ 08 未達
+  判定 : 観測型（LVM の表と、vg0/data の中の ext4 の大きさを別々に読んで比べた）
+  観測 : vg0 の物理ボリューム = /dev/sda /dev/vdc1
+         vg0/data の大きさ     = 1432 MiB（使っている物理ボリューム: /dev/vdc1(0),/dev/sda(0)）
+         中の ext4 の大きさ    = 1232 MiB
+         → 箱（LV）は 1432 MiB なのに、中身（ext4）は 1232 MiB のまま
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 08
+
+$ sudo resize2fs /dev/vg0/data
+resize2fs 1.47.0 (5-Feb-2023)
+Resizing the filesystem on /dev/vg0/data to 366592 (4k) blocks.
+The filesystem on /dev/vg0/data is now 366592 (4k) blocks long.
+
+$ lab check 08
+✔ 08 達成
+  判定 : 観測型（LVM の表と、vg0/data の中の ext4 の大きさを別々に読んで比べた）
+  観測 : vg0 の物理ボリューム = /dev/sda /dev/vdc1
+         vg0/data の大きさ     = 1432 MiB（使っている物理ボリューム: /dev/vdc1(0),/dev/sda(0)）
+         中の ext4 の大きさ    = 1432 MiB
+         1台より大きな箱が2台にまたがってでき、中身の ext4 も箱いっぱいに広がっている
+         → 箱と中身は別の段。広げるときは両方を広げる（lvextend -r か resize2fs）
+
+# --- 止めた（非活性にした）vg0 を、判定のあとどうしているか ---
+
+$ sudo vgchange -an vg0
+  0 logical volume(s) in volume group "vg0" now active
+
+$ sudo lvs -o lv_name,lv_attr vg0
+  LV   Attr
+  data -wi-------
+
+$ lab check 08
+✔ 08 達成
+  判定 : 観測型（LVM の表と、vg0/data の中の ext4 の大きさを別々に読んで比べた）
+  観測 : vg0 の物理ボリューム = /dev/sda /dev/vdc1
+         vg0/data の大きさ     = 1432 MiB（使っている物理ボリューム: /dev/vdc1(0),/dev/sda(0)）
+         中の ext4 の大きさ    = 1432 MiB
+         1台より大きな箱が2台にまたがってでき、中身の ext4 も箱いっぱいに広がっている
+         → 箱と中身は別の段。広げるときは両方を広げる（lvextend -r か resize2fs）
+
+$ sudo lvs -o lv_name,lv_attr vg0
+  LV   Attr
+  data -wi-------
+
+
+========== 9. 演習09 の境目 ==========
+
+$ cat /sys/block/vdb/queue/rotational
+1
+
+# --- 手で 0 を書いただけ ---
+
+$ echo 0 | sudo tee /sys/block/vdb/queue/rotational
+0
+
+$ lab check 09
+✗ 09 未達
+  判定 : 観測型（いまの rotational を読み、次に 1 に戻して起動時と同じ add イベントを udev に1回送り、値を読んだ。最後に判定の前の値に戻した）
+  観測 : いまの値（判定の前）     = 0
+         add イベントの後の値     = 1
+         rotational を書く udev の規則 = （/etc/udev/rules.d に見当たらない）
+         → いまは 0 だが、起動時と同じイベントの後は 1 に戻った（再起動すると HDD 扱いに戻る）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 09
+
+$ cat /sys/block/vdb/queue/rotational
+0
+
+# --- udev の規則を書いたが、値はまだ 1（規則はまだ効いていない）---
+
+$ echo 1 | sudo tee /sys/block/vdb/queue/rotational
+1
+
+$ echo 'ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"' | sudo tee /etc/udev/rules.d/60-lab-ssd.rules
+ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"
+
+$ cat /sys/block/vdb/queue/rotational
+1
+
+$ lab check 09
+✗ 09 未達
+  判定 : 観測型（いまの rotational を読み、次に 1 に戻して起動時と同じ add イベントを udev に1回送り、値を読んだ。最後に判定の前の値に戻した）
+  観測 : いまの値（判定の前）     = 1
+         add イベントの後の値     = 0
+         rotational を書く udev の規則 = /etc/udev/rules.d/60-lab-ssd.rules
+         → 起動時と同じイベントでは 0 になるが、いまの値は 1（いまはまだ SSD として扱われていない）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 09
+
+$ cat /sys/block/vdb/queue/rotational
+1
+
+# --- 規則を change だけにした ---
+
+$ echo 'ACTION=="change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"' | sudo tee /etc/udev/rules.d/60-lab-ssd.rules
+ACTION=="change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"
+
+$ lab check 09
+✗ 09 未達
+  判定 : 観測型（いまの rotational を読み、次に 1 に戻して起動時と同じ add イベントを udev に1回送り、値を読んだ。最後に判定の前の値に戻した）
+  観測 : いまの値（判定の前）     = 1
+         add イベントの後の値     = 1
+         rotational を書く udev の規則 = /etc/udev/rules.d/60-lab-ssd.rules
+         → いまの値も、起動時と同じイベントの後の値も 1（vdb は回転する装置として扱われている）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 09
+
+# --- 模範解答の規則に戻して、trigger で効かせた ---
+
+$ echo 'ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"' | sudo tee /etc/udev/rules.d/60-lab-ssd.rules
+ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"
+
+$ sudo udevadm trigger --action=add --subsystem-match=block --sysname-match=vdb --settle
+
+$ cat /sys/block/vdb/queue/rotational
+0
+
+$ lab check 09
+✔ 09 達成
+  判定 : 観測型（いまの rotational を読み、次に 1 に戻して起動時と同じ add イベントを udev に1回送り、値を読んだ。最後に判定の前の値に戻した）
+  観測 : いまの値（判定の前）     = 0
+         add イベントの後の値     = 0
+         rotational を書く udev の規則 = /etc/udev/rules.d/60-lab-ssd.rules
+         いまも 0 で、起動時と同じイベントを受けても udev が 0 に書き換えた
+         → 再起動しても、カーネルは vdb を回転しない装置（SSD）として扱う
+
+$ cat /sys/block/vdb/queue/rotational
+0
+
+
+========== 10. 演習10（何も止めていないとき、判定のあとに読み込まれたままのものがあるか） ==========
+
+$ lsmod | grep -E "usb_storage|uas"
+
+$ lab check 10
+✗ 10 未達
+  判定 : 観測型（判定の中で USB メモリを1本挿し、練習機がそれをどう扱ったかを見て、抜いた）
+  観測 : USB 機器として   = 見えた（/sys/bus/usb/devices/2-1）
+         付いたドライバ   = usb-storage
+         ディスクとして   = /dev/sdb
+         読み込まれていたモジュール = uas usb_storage
+         （判定の前は読み込まれていなかったので、判定のあと外した: 外した）
+         → 挿した USB メモリが、ディスクとして使える状態になった
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 10
+
+$ lsmod | grep -E "usb_storage|uas"
+
+
+========== 2. 演習02（Y と答えてしまったら → vm reset --yes でやり直す） ==========
+
+$ cat ~/vdd-before.txt
+label: dos
+label-id: 0x4c696e75
+device: /dev/vdd
+unit: sectors
+sector-size: 512
+
+/dev/vdd1 : start=        2048, size=      204800, type=83
+/dev/vdd2 : start=      206848, size=      204800, type=83
+
+$ sudo fdisk /dev/vdd
+
+Welcome to fdisk (util-linux 2.39.3).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+Partition type
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1,3,4, default 1): 1
+First sector (2048-524287, default 2048):
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (2048-206847, default 206847):
+
+Created a new partition 1 of type 'Linux' and of size 100 MiB.
+Partition #1 contains a ext4 signature.
+
+Do you want to remove the signature? [Y]es/[N]o: Y
+
+The signature will be removed by a write command.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+$ sudo mount /dev/vdd1 /mnt
+mount: /mnt: wrong fs type, bad option, bad superblock on /dev/vdd1, missing codepage or helper program, or other error.
+       dmesg(1) may have more information after failed mount system call.
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（/dev/vdd の表と、vdd1 の中身を直接読んだ。マウントはしていない）
+  観測 : 表の vdd1 の行 = /dev/vdd1 : start=        2048, size=      204800, type=83
+         vdd1 の中身    = （ファイルシステムの印が見つからない）
+         /aikotoba.txt  = （読めない）
+         → 表の行はあるが、消す前の ext4（UUID 7a1e0c5e-0105-4d15-a5e5-0123456789ab）として読めない
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ lab
+lab-linuc-disks  進捗 7/10
+  次 → 01 「空のディスク vde を使えるようにする」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-disks-state）
+
+$ vm reset --yes
+▶ virsh destroy linuc
+戻しました。vm start で起動します
+
+$ vm start
+▶ virsh start linuc
+  起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+  起動中… 20秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+練習機が起動しました（32秒）
+  入るには:  ssh linuc   （抜けるときは exit）
+
+$ ssh linuc
+
+  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
+  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
+  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
+
+
+$ sudo fdisk -l /dev/vdd
+Disk /dev/vdd: 256 MiB, 268435456 bytes, 524288 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x4c696e75
+
+Device     Boot  Start    End Sectors  Size Id Type
+/dev/vdd2       206848 411647  204800  100M 83 Linux
+
+$ cat ~/vdd-before.txt
+label: dos
+label-id: 0x4c696e75
+device: /dev/vdd
+unit: sectors
+sector-size: 512
+
+/dev/vdd1 : start=        2048, size=      204800, type=83
+/dev/vdd2 : start=      206848, size=      204800, type=83
+
+$ lab check 02
+✗ 02 未達
+  判定 : 観測型（/dev/vdd の表と、vdd1 の中身を直接読んだ。マウントはしていない）
+  観測 : 表の vdd1 の行 = （表に vdd1 が無い）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 02
+
+$ lsblk -o NAME,FSTYPE /dev/vdb /dev/vdc
+NAME
+    FSTYPE
+vdb
+vdc
+
+$ swapon --show
+
+$ cat /sys/block/vdb/queue/rotational
+1
+
+$ exit
+logout
+Connection to 127.0.0.1 closed.
+
+$ lab
+lab-linuc-disks  進捗 7/10
+  次 → 01 「空のディスク vde を使えるようにする」 (目安 10分 / 影響度 B)
+  lab start 01 で課題を開く
+  進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-disks-state）

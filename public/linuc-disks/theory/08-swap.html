@@ -22,7 +22,7 @@
 <p><b>メモリ</b>は、いま動いているプログラムとそのデータを置く場所で、速いが量が限られ、電源を切ると消える。<b>スワップ</b>は、メモリが足りなくなったときに、しばらく使われていない中身をディスクに書き出しておく領域である。<code>free</code> はメモリとスワップの使い方を出すコマンドで、<code>-h</code> は読みやすい単位にする。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ free -h
                total        used        free      shared  buff/cache   available
-Mem:           1.4Gi       275Mi       1.1Gi       824Ki       188Mi       1.1Gi
+Mem:           1.4Gi       263Mi       1.1Gi       820Ki       189Mi       1.1Gi
 Swap:             0B          0B          0B</code></pre>
 <div class="scroll"><table>
 <tr><th>列</th><th>意味</th></tr>
@@ -35,10 +35,10 @@ Swap:             0B          0B          0B</code></pre>
 <p>Swap の行が 0B で、練習機にはまだスワップが無い（第4章で見たとおり、練習機のディスクにはスワップの区画が無い）。数は人によって少し違う。<code>vdb3</code> をスワップにする。<code>mkswap</code> は、区画をスワップの形にするコマンドである（ファイルシステムの <code>mkfs</code> に当たる）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mkswap -L SWAP /dev/vdb3
 Setting up swapspace version 1, size = 256 MiB (268431360 bytes)
-LABEL=SWAP, UUID=c30ad4a2-5877-4ff8-b242-5f5dac9f7f3a
+LABEL=SWAP, UUID=438878c8-57e9-4c1c-8d55-d3a8e26f6587
 $ free -h
                total        used        free      shared  buff/cache   available
-Mem:           1.4Gi       277Mi       1.1Gi       820Ki       189Mi       1.1Gi
+Mem:           1.4Gi       263Mi       1.1Gi       820Ki       190Mi       1.1Gi
 Swap:             0B          0B          0B   ← mkswap しても 0B のまま</code></pre>
 <p><code>mkswap</code> は UUID を決めて書き（<code>-L</code> でラベルも付けた）、大きさを出した。それでも Swap は 0B のままである。<code>mkswap</code> はスワップの<b>形</b>を作るだけで、使い始めるのは <code>swapon</code> である。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo swapon /dev/vdb3
@@ -53,17 +53,17 @@ Filename				Type		Size		Used		Priority
 /dev/vdb3                               partition	262140		0		-2
 $ free -h
                total        used        free      shared  buff/cache   available
-Mem:           1.4Gi       277Mi       1.1Gi       820Ki       189Mi       1.1Gi
+Mem:           1.4Gi       263Mi       1.1Gi       816Ki       190Mi       1.1Gi
 Swap:          255Mi          0B       255Mi</code></pre>
 <p>使っているスワップは、<code>swapon --show</code>・<code>/proc/swaps</code>（カーネルが今のスワップの一覧を見せているファイル）・<code>swapon -s</code>（<code>/proc/swaps</code> と同じ形）で見られる。<code>free</code> の Swap の行も 255Mi になった。PRIO は優先度で、指定しなければカーネルが負の数を付ける（後から使い始めたものほど小さい）。</p>
 <p>スワップは区画でなくても、ファイルでも作れる。<code>dd</code> で 128MiB のファイルを作る（<code>/dev/zero</code> は読むたびに 0 を返す装置のファイル）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo dd if=/dev/zero of=/swapfile bs=1M count=128 status=none
 $ ls -l /swapfile
--rw-r--r-- 1 root root 134217728 Oct 20 22:36 /swapfile
+-rw-r--r-- 1 root root 134217728 Oct 20 23:45 /swapfile
 $ sudo mkswap /swapfile
 mkswap: /swapfile: insecure permissions 0644, fix with: chmod 0600 /swapfile
 Setting up swapspace version 1, size = 128 MiB (134213632 bytes)
-no label, UUID=abec8c4c-0515-43f7-ac17-86093072a2b6</code></pre>
+no label, UUID=8fad4615-8af2-4d14-8473-1635d09b7df9</code></pre>
 <p><code>mkswap</code> が <code>insecure permissions 0644, fix with: chmod 0600 /swapfile</code>（パーミッションが危ない。600 にせよ）と注意した。スワップにはメモリの中身（パスワードを含むかもしれない）が書き出されるので、root 以外に読めてはいけない。直してから使い始める。<code>-p 10</code> は優先度を 10 にするオプションである。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo chmod 600 /swapfile
 $ sudo swapon -p 10 /swapfile
@@ -91,7 +91,7 @@ $ sudo rm /swapfile</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: スワップの <code>/etc/fstab</code> の行の書き方と、再起動せずに確かめる方法。</div>
 <p>起動のたびに使うスワップも、<code>/etc/fstab</code> に書く（第7章）。マウントポイントの列は <code>none</code>、種類は <code>swap</code>、オプションは慣習で <code>sw</code> と書く。装置の名前ではなく、<code>mkswap</code> が書き込んだ UUID で指す（スワップは中身を上書きして使うので、取り違えると、そこにあったデータが壊れる）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb3)  none  swap  sw  0  0" | sudo tee -a /etc/fstab
-UUID=c30ad4a2-5877-4ff8-b242-5f5dac9f7f3a  none  swap  sw  0  0
+UUID=438878c8-57e9-4c1c-8d55-d3a8e26f6587  none  swap  sw  0  0
 $ sudo systemctl daemon-reload
 $ sudo swapoff /dev/vdb3
 $ swapon --show
@@ -102,7 +102,7 @@ NAME      TYPE      SIZE USED PRIO
 <p>いったん <code>swapoff</code> で外すと <code>swapon --show</code> は何も出さず、<code>swapon -a</code>（<code>/etc/fstab</code> のスワップを全部使い始める）で戻った。起動のときにも、これと同じことが起きる。外してから <code>-a</code> で戻ってくれば、書いた行が効いていると、再起動せずに確かめられる。</p>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-disks/practice/">演習07</a>は、vdb3 をスワップにして、起動のたびに使われるように <code>/etc/fstab</code> に UUID で書く課題である。
-判定は vdb3 をいったん外し、起動のときと同じ <code>swapon -a</code> で戻るかを見る。この章のとおりに打った人は、もう達成している。</div>
+判定は、いま vdb3 が使われているか（<code>swapon --show</code> と同じもの）と、<code>/etc/fstab</code> の行が vdb3 を指しているかを見る（状態は変えない）。この章のとおりに打った人は、もう達成している。</div>
 
 <h2 id="naive">tmpfs — メモリの上のファイルシステム</h2>
 <div class="sgoal"><b>この節で分かること</b>: tmpfs の <code>size=</code> が何を意味するか。</div>
@@ -115,7 +115,7 @@ TARGET           FSTYPE   SIZE
 └─/run/user/1000 tmpfs  142.5M
 $ free -m
                total        used        free      shared  buff/cache   available
-Mem:            1424         259        1123           0         190        1165
+Mem:            1424         252        1129           0         191        1172
 Swap:            255           0         255</code></pre>
 <p>メモリは全部で 1424MiB しかない（<code>free -m</code> は MiB の整数で出す）。ここに 4GiB の tmpfs を作る。<code>mount</code> の <code>-t</code> は種類を指定するオプションで、<code>-o size=4G</code> は大きさである。tmpfs には装置が無いので、装置の名前の欄には何を書いてもよく、ふつうは <code>tmpfs</code> と書く。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
@@ -127,7 +127,7 @@ Filesystem      Size  Used Avail Use% Mounted on
 tmpfs           4.0G     0  4.0G   0% /mnt/ram
 $ free -m
                total        used        free      shared  buff/cache   available
-Mem:            1424         259        1123           0         190        1165
+Mem:            1424         252        1129           0         191        1172
 Swap:            255           0         255</code></pre>
 <div class="then"><b>だめな理由</b>: マウントでき、<code>df</code> には 4.0G と出て、<code>free</code> の数字はほとんど動かない。
 <b>tmpfs の size は上限</b>で、作った時点ではメモリを1バイトも取らない。書いた分だけ、その場でメモリを使う。
@@ -136,7 +136,7 @@ Swap:            255           0         255</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo dd if=/dev/zero of=/mnt/ram/fill bs=1M count=300 status=none
 $ free -m
                total        used        free      shared  buff/cache   available
-Mem:            1424         558         823         300         491         866   ← shared が 300 増え、available が減った
+Mem:            1424         558         822         300         492         866   ← shared が 300 増え、available が減った
 Swap:            255           0         255
 $ df -h /mnt/ram
 Filesystem      Size  Used Avail Use% Mounted on
@@ -144,7 +144,7 @@ tmpfs           4.0G  300M  3.8G   8% /mnt/ram
 $ sudo umount /mnt/ram
 $ free -m
                total        used        free      shared  buff/cache   available
-Mem:            1424         267        1115           0         190        1157
+Mem:            1424         255        1125           0         191        1169
 Swap:            255           0         255
 $ sudo rmdir /mnt/ram</code></pre>
 <p>書いた 300MiB は <code>free</code> の shared に出て、available がその分減った。外すと、中身ごと消えてメモリが戻る。メモリが足りなくなれば、tmpfs の中身もスワップに書き出される。</p>

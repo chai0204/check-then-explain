@@ -8,7 +8,10 @@ lab-guest true >/dev/null 2>&1
 pvs=$(lab-guest 'pvs --noheadings -o pv_name,vg_name 2>/dev/null' 2>/dev/null)
 lv=$(lab-guest 'lvs --noheadings --units b --nosuffix -o lv_size vg0/data 2>/dev/null' 2>/dev/null | tr -d ' ')
 devs=$(lab-guest 'lvs --noheadings -o devices vg0/data 2>/dev/null' 2>/dev/null | tr -d ' ' | tr '\n' ',')
-fsinfo=$(lab-guest 'vgchange -ay vg0 >/dev/null 2>&1; tune2fs -l /dev/vg0/data 2>/dev/null' 2>/dev/null)
+# 中の ext4 を読むには、論理ボリュームが動いて（活性になって）いる必要がある。止まっていたら、読んだあと止め直す
+act=$(lab-guest 'lvs --noheadings -o lv_active vg0/data 2>/dev/null' 2>/dev/null | tr -d ' ')
+fsinfo=$(lab-guest 'lvchange -ay vg0/data >/dev/null 2>&1; tune2fs -l /dev/vg0/data 2>/dev/null' 2>/dev/null)
+[ -n "$lv" ] && [ "$act" != active ] && lab-guest 'lvchange -an vg0/data' >/dev/null 2>&1
 bc=$(sed -nE 's/^Block count: *([0-9]+)$/\1/p' <<<"$fsinfo")
 bs=$(sed -nE 's/^Block size: *([0-9]+)$/\1/p' <<<"$fsinfo")
 fsb=$(( ${bc:-0} * ${bs:-0} ))

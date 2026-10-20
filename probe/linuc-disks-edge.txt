@@ -1,0 +1,192 @@
+# LinuC 主題1.05 の判定（verify）の境目を確かめる台本。2回目の独立確認の担当が作った台本（2026-10-20）を写した。
+# 判定は読者の状態を変えない（変えたら元どおりに戻す）こと、「いまの状態」と「起動し直しても残る設定」の両方を見ることを、
+# 境目の状態で確かめる（probe/linuc-disks-seq.py --steps で打つ。記録は logs/linuc-disks-edge.log）。
+== 0. 入ったとき ==
+@外
+$ vm start
+$ ssh linuc
+
+== 3. 演習03 の境目 ==
+@中
+# --- 始まりの状態（表が無い）---
+$ lab check 03
+# --- GPT でなく MBR の表 ---
+$ printf 'label: dos\n,100M\n' | sudo sfdisk -q /dev/vdb
+@sleep 3
+$ lab check 03
+# --- GPT・vdb2 だけ 301M（±1MiB の内）---
+$ sudo sgdisk -Z /dev/vdb
+$ sudo sgdisk -o -n 1:0:+100M -t 1:ef00 -n 2:0:+301M -t 2:8300 -n 3:0:+256M -t 3:8200 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+$ lab check 03
+# --- GPT・vdb2 だけ 303M（±1MiB の外）---
+$ sudo sgdisk -o -n 1:0:+100M -t 1:ef00 -n 2:0:+303M -t 2:8300 -n 3:0:+256M -t 3:8200 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+$ lab check 03
+# --- GPT・1番の種類を 8300 にした（ESP の印を付け忘れた）---
+$ sudo sgdisk -o -n 1:0:+100M -t 1:8300 -n 2:0:+300M -t 2:8300 -n 3:0:+256M -t 3:8200 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+$ lab check 03
+# --- sgdisk の1行（範囲の外の近道。最後の区画が 391M になるので、ヒントと模範解答からは外した）---
+$ sudo sgdisk -o -n 1:0:+100M -t 1:ef00 -n 2:0:+300M -t 2:8300 -n 3:0:+256M -t 3:8200 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+$ lsblk -o NAME,SIZE,PARTTYPENAME /dev/vdb
+$ lab check 03
+
+== 4. 演習04 の境目 ==
+@中
+# --- vdb1 を -F 32 なしで作った（100MiB なので FAT16 になる）。ほかは課題どおり ---
+$ sudo mkfs.vfat /dev/vdb1
+$ sudo mkfs -t ext3 -L NEWBOOT /dev/vdb2
+$ sudo mkfs.xfs -L ROOT /dev/vdb4
+$ sudo mkfs.btrfs -L VAR /dev/vdb5
+$ sudo mkfs.ext4 -L HOME /dev/vdb6
+$ sudo tune2fs -m 1 /dev/vdb6
+$ sudo blkid -p -o export /dev/vdb1
+$ lab check 04
+# --- vdb1 を -F 32 で作り直した（ほかは課題どおり）---
+$ sudo mkfs.vfat -F 32 /dev/vdb1
+$ lab check 04
+# --- vdb2 のラベルを BOOT にした ---
+$ sudo e2label /dev/vdb2 BOOT
+$ lab check 04
+# --- vdb2 のラベルを BOOT 以外（MYBOOT）にした ---
+$ sudo e2label /dev/vdb2 MYBOOT
+$ lab check 04
+# --- vdb2 のラベルを消した ---
+$ sudo e2label /dev/vdb2 ""
+$ lab check 04
+# --- vdb2 を ext3 でなく FAT32（ラベル MYBOOT）にした（課題の種類と違う）---
+$ sudo mkfs.vfat -F 32 -n MYBOOT /dev/vdb2
+$ lab check 04
+# --- 戻す（先に印を消してから ext3）---
+$ sudo wipefs -a /dev/vdb2
+$ sudo mkfs -t ext3 -q -L NEWBOOT /dev/vdb2
+$ lab check 04
+
+== 5. 演習05 の境目 ==
+@中
+$ lab check 05
+# --- -o loop を付けずにマウントし、取り出したが、まだマウントしたまま ---
+$ sudo mount ~/old-usb.img /mnt
+$ cp /mnt/message.txt ~/
+$ losetup -l
+$ lab check 05
+# --- 判定のあとも、マウントはそのまま（判定は読むだけ）---
+$ findmnt /mnt
+$ sudo umount /mnt
+$ lab check 05
+# --- losetup でつないだだけ（マウントはしていない）---
+$ sudo losetup -f --show ~/old-usb.img
+$ lab check 05
+# --- そのループデバイスを、/mnt でない別の場所にマウントした ---
+$ sudo mkdir /media/old
+$ sudo mount /dev/loop0 /media/old
+$ lab check 05
+$ sudo umount /media/old
+$ sudo losetup -d /dev/loop0
+$ losetup -l
+$ lab check 05
+
+== 6. 演習06（判定の前に root がマウントしていたら、判定のあとはどうなっているか） ==
+@中
+$ sudo mkdir -p /media/cdrom
+$ echo "/dev/sr0  /media/cdrom  iso9660  ro,user,noauto  0  0" | sudo tee -a /etc/fstab
+$ sudo systemctl daemon-reload
+$ sudo mount /media/cdrom
+$ findmnt /media/cdrom
+$ lab check 06
+$ findmnt /media/cdrom
+
+== 7. 演習07 の境目 ==
+@中
+$ sudo mkswap -L SWAP /dev/vdb3
+# --- /etc/fstab に UUID で書いたが、swapon していない ---
+$ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb3)  none  swap  sw  0  0" | sudo tee -a /etc/fstab
+$ sudo systemctl daemon-reload
+$ swapon --show
+$ lab check 07
+# --- 判定のあと、vdb3 は判定の前と同じく使われていないか ---
+$ swapon --show
+# --- 優先度 5 で使い始めた ---
+$ sudo swapon -p 5 /dev/vdb3
+$ swapon --show
+$ lab check 07
+$ swapon --show
+# --- /etc/fstab から行を消した（使ってはいる）---
+$ sudo sed -i '/ swap /d' /etc/fstab
+$ sudo systemctl daemon-reload
+$ lab check 07
+# --- 判定のあと、vdb3 はまた使われているか（優先度は 5 のままか）---
+$ swapon --show
+
+== 8. 演習08 の境目（vdc は区画・sda はディスク全体） ==
+@中
+$ sudo fdisk /dev/vdc
+@keys n|p|1|||t|8e|w
+$ lsblk /dev/vdc /dev/sda
+$ sudo pvcreate /dev/vdc1 /dev/sda
+$ sudo vgcreate vg0 /dev/vdc1 /dev/sda
+$ sudo lvcreate -L 1.2G -n data vg0
+$ sudo mkfs.ext4 -q /dev/vg0/data
+$ sudo lvs -o lv_name,lv_size,devices vg0
+$ lab check 08
+# --- 箱だけ広げた ---
+$ sudo lvextend -L +200M vg0/data
+$ lab check 08
+$ sudo resize2fs /dev/vg0/data
+$ lab check 08
+# --- 止めた（非活性にした）vg0 を、判定のあとどうしているか ---
+$ sudo vgchange -an vg0
+$ sudo lvs -o lv_name,lv_attr vg0
+$ lab check 08
+$ sudo lvs -o lv_name,lv_attr vg0
+
+== 9. 演習09 の境目 ==
+@中
+$ cat /sys/block/vdb/queue/rotational
+# --- 手で 0 を書いただけ ---
+$ echo 0 | sudo tee /sys/block/vdb/queue/rotational
+$ lab check 09
+$ cat /sys/block/vdb/queue/rotational
+# --- udev の規則を書いたが、値はまだ 1（規則はまだ効いていない）---
+$ echo 1 | sudo tee /sys/block/vdb/queue/rotational
+$ echo 'ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"' | sudo tee /etc/udev/rules.d/60-lab-ssd.rules
+$ cat /sys/block/vdb/queue/rotational
+$ lab check 09
+$ cat /sys/block/vdb/queue/rotational
+# --- 規則を change だけにした ---
+$ echo 'ACTION=="change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"' | sudo tee /etc/udev/rules.d/60-lab-ssd.rules
+$ lab check 09
+# --- 模範解答の規則に戻して、trigger で効かせた ---
+$ echo 'ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"' | sudo tee /etc/udev/rules.d/60-lab-ssd.rules
+$ sudo udevadm trigger --action=add --subsystem-match=block --sysname-match=vdb --settle
+$ cat /sys/block/vdb/queue/rotational
+$ lab check 09
+$ cat /sys/block/vdb/queue/rotational
+
+== 10. 演習10（何も止めていないとき、判定のあとに読み込まれたままのものがあるか） ==
+@中
+$ lsmod | grep -E "usb_storage|uas"
+$ lab check 10
+$ lsmod | grep -E "usb_storage|uas"
+
+== 2. 演習02（Y と答えてしまったら → vm reset --yes でやり直す） ==
+@中
+$ cat ~/vdd-before.txt
+$ sudo fdisk /dev/vdd
+@keys n|p|1|||Y|w
+$ sudo mount /dev/vdd1 /mnt
+$ lab check 02
+$ exit
+@外
+$ lab
+$ vm reset --yes
+$ vm start
+$ ssh linuc
+@中
+$ sudo fdisk -l /dev/vdd
+$ cat ~/vdd-before.txt
+$ lab check 02
+$ lsblk -o NAME,FSTYPE /dev/vdb /dev/vdc
+$ swapon --show
+$ cat /sys/block/vdb/queue/rotational
+$ exit
+@外
+$ lab

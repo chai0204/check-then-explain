@@ -112,11 +112,11 @@ window.TERM_GROUPS = [
     { t:"/etc/fstab", alt:["fstab"], id:"fstab",
       hint:"起動時にマウントするもの（とスワップ）の一覧。1行6列",
       body:"起動時にマウントするファイルシステムとスワップの一覧。1行が6列で、<b>何を</b>（デバイス・<code>UUID=</code>・<code>LABEL=</code>）・<b>どこに</b>（マウントポイント）・<b>種類</b>・<b>オプション</b>・<b>dump</b>（0 か 1）・<b>fsck の順番</b>（fstab(5) の勧めは / が 1、ほかは 2。調べないなら 0）。<code>mount /media/cdrom</code> のように片方だけ書いたとき、残りはこの表から補われる。起動のたびに systemd（systemd-fstab-generator）がこの表からマウントの単位を作り直すので、次の起動には書いただけで効く。動いている systemd は書き換えを知らないので、すぐ使うなら <code>systemctl daemon-reload</code> で読み直させる（しないと mount が「fstab が変わった」と注意を出す）。書いたあと再起動の前に <code>findmnt --verify</code> と <code>mount -a</code> で確かめる。<b>たとえ</b>: 店の<b>開店準備の手順書</b>。毎朝この順に棚を出す。<b>崩れる点</b>: 手順書なら書き間違いに人が気づくが、fstab の間違い（存在しない UUID など）は起動を止める。止めたくない行には <code>nofail</code> を付ける。",
-      misread:"書いた瞬間にマウントされると思われがちだが、使われるのは次の起動か mount -a のときである。", ch:7 },
+      misread:"書いた瞬間にマウントされると思われがちだが、使われるのは次の起動と mount -a のとき、それに mount にマウント先か装置の片方だけを渡したとき（足りない分をこの表から補う）である。", ch:7 },
 
     { t:"ループデバイス", alt:["loop デバイス"], id:"loop-device",
       hint:"ファイルをディスクのような装置に見せかける仮の装置。/dev/loop0 など",
-      body:"ファイルを、ディスクのようなブロックデバイスに見せかける仮の装置（<code>/dev/loop0</code> など）。ISO イメージや、ディスクを丸ごと写したファイルを <code>mount -o loop ファイル マウントポイント</code> でマウントすると、<code>mount</code> がループデバイスを1つ用意してファイルにつなぎ、それをマウントする（いまの <code>mount</code> は <code>-o loop</code> を付けなくても、ファイルを渡されれば同じことをする。試験は <code>-o loop</code> の形で問う）。どのループデバイスがどのファイルにつながっているかは <code>losetup -l</code> で見る。<code>mount</code> が用意したものは、外すと一緒に片づく（AUTOCLEAR）。<b>たとえ</b>: 写しを読み取り機にかけるための<b>台紙</b>。台紙に貼ると、読み取り機は本物と区別しない。<b>崩れる点</b>: 本物の CD は書き込めないが、台紙（ループデバイス）は書き込める装置になる。中のファイルシステムが書き込みを受け付ければ、ファイルの中身が書き換わる。",
+      body:"ファイルを、ディスクのようなブロックデバイスに見せかける仮の装置（<code>/dev/loop0</code> など）。ISO イメージや、ディスクを丸ごと写したファイルを <code>mount -o loop ファイル マウントポイント</code> でマウントすると、<code>mount</code> がループデバイスを1つ用意してファイルにつなぎ、それをマウントする（いまの <code>mount</code> は <code>-o loop</code> を付けなくても、ファイルを渡されれば同じことをする）。どのループデバイスがどのファイルにつながっているかは <code>losetup -l</code> で見る。<code>mount</code> が用意したものは、外すと一緒に片づく（AUTOCLEAR）。<b>たとえ</b>: 写しを読み取り機にかけるための<b>台紙</b>。台紙に貼ると、読み取り機は本物と区別しない。<b>崩れる点</b>: 本物の CD は書き込めないが、台紙（ループデバイス）は書き込める装置になる。中のファイルシステムが書き込みを受け付ければ、ファイルの中身が書き換わる。",
       misread:"ISO のファイルは CD に焼かないと中を見られないと思われがちだが、ループデバイスを通せばファイルのままマウントできる。", ch:6 }
   ]},
 
@@ -177,7 +177,7 @@ window.TERM_GROUPS = [
 
     { t:"udev", alt:["systemd-udevd"], id:"udev",
       hint:"カーネルから装置の出入りの知らせを受け、規則に従って処理するデーモン",
-      body:"カーネルが出す「装置が来た・去った」の知らせ（uevent）を受け取り、規則（<code>/usr/lib/udev/rules.d/</code> と <code>/etc/udev/rules.d/</code>）に従って処理するデーモン。<code>/dev/disk/by-id/</code> や <code>by-uuid/</code>・<code>by-label/</code> の名前を作り、装置の別名（modalias）を見てドライバを読み込ませる。<code>udevadm monitor</code> で知らせを、<code>udevadm info</code> で装置の属性を見られる。<b>たとえ</b>: 荷物の<b>受付係</b>。届いた荷物の伝票を読み、規則表どおりに担当へ回し、棚に名札を付ける。<b>崩れる点</b>: 受付係は貼り紙が書き直されれば気づくが、udev はドライバの設定（/etc/modprobe.d）にファイルが増えた・消えたことには気づく一方、すでにあるファイルの中身を書き換えたことには気づかない。書き換えたら systemd-udevd を再起動する。",
+      body:"カーネルが出す「装置が来た・去った」の知らせ（uevent）を受け取り、規則（<code>/usr/lib/udev/rules.d/</code> と <code>/etc/udev/rules.d/</code>）に従って処理するデーモン。<code>/dev/disk/by-id/</code> や <code>by-uuid/</code>・<code>by-label/</code> の名前を作り、装置の別名（modalias）を見てドライバを読み込ませる。<code>udevadm monitor</code> で知らせを、<code>udevadm info</code> で装置の属性を見られる。<b>たとえ</b>: 荷物の<b>受付係</b>。届いた荷物の伝票を読み、規則表どおりに担当へ回し、棚に名札を付ける。<b>崩れる点</b>: 受付係は貼り紙が書き直されれば気づくが、udev はドライバの設定（/etc/modprobe.d）にファイルが増えた・消えた（sed -i のように置き換えた）ことには気づく一方、tee や &gt; ですでにあるファイルの中身だけを書き換えたことには気づかない。書き換えたら systemd-udevd を再起動する。",
       misread:"/dev のファイルを全部 udev が作っていると思われがちだが、装置のファイル自体はカーネル（devtmpfs）が作り、udev は権限と別名（by-id など）を整える。", ch:6 },
 
     { t:"modalias", alt:[], id:"modalias",

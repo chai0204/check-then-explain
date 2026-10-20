@@ -7,7 +7,7 @@
 $ vm start
 $ ssh linuc
 
-== 1. 演習01（不完全: 区画を作らずディスク全体に ext4 → 別の道具 parted と別のマウントポイント）==
+== 1. 演習01（不完全: 区画を作らずディスク全体に ext4 → 別の道具 parted と別のマウントポイント） ==
 @中
 $ sudo mkfs.ext4 -q /dev/vde
 $ sudo mount /dev/vde /mnt
@@ -28,7 +28,7 @@ $ sudo umount /srv/x
 # --- 別解: parted で GPT に1区画・/srv/x にマウント・chown して student が書く ---
 $ lab check 01
 
-== 2. 演習02（不完全: 始まりは 2048 だが大きさが足りない → 別解: sfdisk で流し込む）==
+== 2. 演習02（不完全: 始まりは 2048 だが大きさが足りない → 別解: sfdisk で流し込む） ==
 @中
 $ sudo fdisk /dev/vdd
 @keys n|p|1||+50M|N|w
@@ -44,7 +44,7 @@ $ sudo umount /mnt
 # --- 別解: sfdisk で控えの表を流し込んだ ---
 $ lab check 02
 
-== 3. 演習03（別解: parted で切る。先に esp の旗を付け忘れる）==
+== 3. 演習03（別解: parted で切る。先に esp の旗を付け忘れる） ==
 @中
 $ sudo parted -s /dev/vdb mklabel gpt
 $ sudo parted -s /dev/vdb mkpart ESP fat32 1MiB 101MiB
@@ -62,7 +62,7 @@ $ sudo parted /dev/vdb print
 # --- 別解: parted で6つ・1番に esp ---
 $ lab check 03
 
-== 4. 演習04（vdb2 に禁止の BOOT ラベル・VFAT は -F 32 なし・予約は -r で）==
+== 4. 演習04（vdb2 に禁止の BOOT ラベル・VFAT は -F 32 なし・予約は -r で） ==
 @中
 $ sudo mkfs.vfat /dev/vdb1
 $ sudo mkfs -t ext3 -L BOOT /dev/vdb2
@@ -82,7 +82,7 @@ $ ls -l /dev/disk/by-label/BOOT
 $ sudo mkfs.xfs -L ROOT /dev/vdb4
 $ sudo mkfs.btrfs -L VAR /dev/vdb5
 
-== 5. 演習05（別解: losetup で先につなぐ・外さずに check）==
+== 5. 演習05（別解: losetup で先につなぐ・外さずに check） ==
 @中
 $ sudo losetup -f --show ~/old-usb.img
 $ sudo mount /dev/loop0 /mnt
@@ -93,7 +93,7 @@ $ sudo umount /mnt
 $ sudo losetup -d /dev/loop0
 $ losetup -l
 
-== 6. 演習06（別解: LABEL と users）==
+== 6. 演習06（別解: LABEL と users） ==
 @中
 $ sudo blkid /dev/sr0
 $ sudo mkdir -p /media/cdrom
@@ -102,7 +102,7 @@ $ sudo systemctl daemon-reload
 # --- 別解: LABEL で指し、users にした ---
 $ lab check 06
 
-== 7. 演習07（不完全: swapon だけ → 判定の後の状態 → 別解: LABEL）==
+== 7. 演習07（不完全: swapon だけ → 判定の後の状態 → 別解: LABEL） ==
 @中
 $ sudo mkswap -L SWAP /dev/vdb3
 $ sudo swapon /dev/vdb3
@@ -117,7 +117,7 @@ $ sudo swapon -a
 # --- 別解: LABEL で書き、オプションは defaults ---
 $ lab check 07
 
-== 8. 演習08（別解: 区画（種類 8e）を物理ボリュームにする）==
+== 8. 演習08（別解: 区画（種類 8e）を物理ボリュームにする） ==
 @中
 $ sudo fdisk /dev/vdc
 @keys n|p|1|||t|8e|w
@@ -137,7 +137,7 @@ $ sudo mount /dev/vg0/data /srv/data
 $ cat /sys/module/ahci/refcnt
 $ lsmod | grep -E "^ahci "
 
-== 9. 演習09（別解1: tmpfiles.d で起動のたびに書く → 再起動して確かめる。別解2: 製造番号で当てる udev の規則）==
+== 9. 演習09（別解1: tmpfiles.d で起動のたびに書く → 再起動して確かめる。別解2: 製造番号で当てる udev の規則） ==
 @中
 $ echo "w /sys/block/vdb/queue/rotational - - - - 0" | sudo tee /etc/tmpfiles.d/fc-ssd.conf
 $ sudo reboot
@@ -156,7 +156,7 @@ $ cat /sys/block/vdb/queue/rotational
 # --- 別解2: 製造番号（LAB-VDB）で当てる udev の規則 ---
 $ lab check 09
 
-== 10. 演習10（不完全: 外すだけ → 別解: install を2行）==
+== 10. 演習10（不完全: 外すだけ → 別解: install を2行） ==
 @外
 $ virsh attach-device linuc ~/vm/extra/usb-a.xml
 @中
