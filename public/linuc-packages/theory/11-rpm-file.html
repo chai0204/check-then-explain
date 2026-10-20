@@ -21,10 +21,10 @@
 <div class="sgoal"><b>この節で分かること</b>: .rpm ファイルを手に入れて、入れる前に中を見る方法。</div>
 <p>Debian 系の <code>apt download</code>（第3章）にあたるのが <code>yumdownloader</code> である。目録を見て .rpm ファイルを取ってくるだけで、入れない。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ yumdownloader labtool
-Last metadata expiration check: 3:35:27 ago on Tue Oct 20 19:34:06 2026.
+Last metadata expiration check: 4:50:59 ago on Tue Oct 20 19:34:06 2026.
 $ ls -l
 total 12
--rw-r--r-- 1 lab lab 6859 Oct 20 23:09 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6859 Oct 21 00:25 labtool-1.0-1.noarch.rpm
 drwxr-xr-x 2 lab lab 4096 Oct 20 19:34 work
 $ rpm -q labtool
 package labtool is not installed</code></pre>
@@ -82,11 +82,11 @@ ls: cannot access '/usr/bin/labtool': No such file or directory</code></pre>
 rpm も dpkg と同じく、依存関係を読めるが、取りに行かない。違うのは止まり方で、<b>足りないと分かった時点で、1つも入れずに止まる</b>。dpkg は展開まで進めて <code>iU</code> を残したが、rpm は台帳にもディスクにも何も残さない。</div></div>
 <p>足りない labtool-data も取ってきて、2つ並べて渡す。<code>yumdownloader</code> の <code>--resolve</code> は、依存関係のパッケージも一緒に取ってくる。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ yumdownloader --resolve labtool
-Last metadata expiration check: 3:35:32 ago on Tue Oct 20 19:34:06 2026.
+Last metadata expiration check: 4:51:04 ago on Tue Oct 20 19:34:06 2026.
 $ ls -l
 total 20
--rw-r--r-- 1 lab lab 6859 Oct 20 23:09 labtool-1.0-1.noarch.rpm
--rw-r--r-- 1 lab lab 6729 Oct 20 23:09 labtool-data-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6859 Oct 21 00:25 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6729 Oct 21 00:25 labtool-data-1.0-1.noarch.rpm
 drwxr-xr-x 2 lab lab 4096 Oct 20 19:34 work
 $ sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
 Verifying...                          ################################# [100%]
@@ -120,7 +120,7 @@ package labtool-data is not installed</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: 新しい版のファイルを入れるときの3つのオプションの違い。</div>
 <p>labhello の 1.0 を <code>yumdownloader</code> で取り、1.1 は第10章で足したリポジトリの置き場から写す（この檻では、まだそのリポジトリを足していない）。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ yumdownloader labhello
-Last metadata expiration check: 3:35:36 ago on Tue Oct 20 19:34:06 2026.
+Last metadata expiration check: 4:51:09 ago on Tue Oct 20 19:34:06 2026.
 $ cp /srv/lab-updates-rpm/labhello-1.1-1.noarch.rpm .
 $ ls
 labhello-1.0-1.noarch.rpm  labtool-1.0-1.noarch.rpm       work

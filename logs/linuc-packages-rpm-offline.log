@@ -8,7 +8,7 @@
 ========== 第9章・第10章: 練習用のリポジトリからは、ネットが無くても入る・上げられる ==========
 
 $ sudo yum install labhello
-Last metadata expiration check: 3:47:07 ago on Tue Oct 20 19:34:06 2026.
+Last metadata expiration check: 5:05:51 ago on Tue Oct 20 19:34:06 2026.
 Dependencies resolved.
 ================================================================================
  Package             Architecture      Version             Repository      Size
@@ -47,7 +47,7 @@ gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lab-updates
 
 $ sudo yum update labhello
-lab updates (LinuC 1.04)                         65 kB/s | 960  B     00:00
+lab updates (LinuC 1.04)                        117 kB/s | 960  B     00:00
 Dependencies resolved.
 ================================================================================
  Package           Architecture    Version           Repository            Size
@@ -102,12 +102,44 @@ $ echo $?
 1
 
 
-========== 第10章の表: ネットが無いときに yum clean all を打つと、lab から入れる操作も止まる ==========
+========== 第10章の表: ネットが無いときに yum clean all を打つと、目録の要る操作（lab から入れる install や provides）が止まる。入っているものを並べる・消す操作は動く ==========
+
+$ sudo yum install labhello
+Last metadata expiration check: 5:06:03 ago on Tue Oct 20 19:34:06 2026.
+Dependencies resolved.
+================================================================================
+ Package             Architecture      Version             Repository      Size
+================================================================================
+Installing:
+ labhello            noarch            1.0-1               lab            7.4 k
+
+Transaction Summary
+================================================================================
+Install  1 Package
+
+Total size: 7.4 k
+Installed size: 382
+Is this ok [y/N]: y
+Downloading Packages:
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1
+  Installing       : labhello-1.0-1.noarch                                  1/1
+  Running scriptlet: labhello-1.0-1.noarch                                  1/1
+  Verifying        : labhello-1.0-1.noarch                                  1/1
+
+Installed:
+  labhello-1.0-1.noarch
+
+Complete!
 
 $ sudo yum clean all
 28 files removed
 
-$ sudo yum install labhello
+$ sudo yum install labapp
 AlmaLinux 9 - AppStream                         0.0  B/s |   0  B     00:00
 Errors during downloading metadata for repository 'appstream':
   - Curl error (6): Couldn't resolve host name for https://vault.almalinux.org/9.7/AppStream/x86_64/os/repodata/repomd.xml [Could not resolve host: vault.almalinux.org]
@@ -115,3 +147,49 @@ Error: Failed to download metadata for repo 'appstream': Cannot download repomd.
 
 $ echo $?
 1
+
+$ yum provides /usr/bin/labhello
+AlmaLinux 9 - AppStream                         0.0  B/s |   0  B     00:00
+Errors during downloading metadata for repository 'appstream':
+  - Curl error (6): Couldn't resolve host name for https://vault.almalinux.org/9.7/AppStream/x86_64/os/repodata/repomd.xml [Could not resolve host: vault.almalinux.org]
+Error: Failed to download metadata for repo 'appstream': Cannot download repomd.xml: Cannot download repodata/repomd.xml: All mirrors were tried
+
+$ yum list installed labhello
+Installed Packages
+labhello.noarch                            1.0-1                            @lab
+
+$ yum repolist
+repo id                         repo name
+appstream                       AlmaLinux 9 - AppStream
+baseos                          AlmaLinux 9 - BaseOS
+extras                          AlmaLinux 9 - Extras
+lab                             lab packages (LinuC 1.04)
+
+$ sudo yum remove labhello
+Dependencies resolved.
+================================================================================
+ Package             Architecture      Version            Repository       Size
+================================================================================
+Removing:
+ labhello            noarch            1.0-1              @lab            382
+
+Transaction Summary
+================================================================================
+Remove  1 Package
+
+Freed space: 382
+Is this ok [y/N]: y
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1
+  Erasing          : labhello-1.0-1.noarch                                  1/1
+  Running scriptlet: labhello-1.0-1.noarch                                  1/1
+  Verifying        : labhello-1.0-1.noarch                                  1/1
+
+Removed:
+  labhello-1.0-1.noarch
+
+Complete!

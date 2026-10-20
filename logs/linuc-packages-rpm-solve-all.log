@@ -118,7 +118,7 @@ $ lab start 09
 
 
 $ sudo yum install -y labapp
-Last metadata expiration check: 3:32:42 ago on Tue Oct 20 19:34:06 2026.
+Last metadata expiration check: 4:48:12 ago on Tue Oct 20 19:34:06 2026.
 Dependencies resolved.
 ================================================================================
  Package            Architecture       Version            Repository       Size
@@ -187,7 +187,7 @@ $ lab check 09; echo "exit=$?"
 exit=1
 
 $ sudo yum reinstall -y labapp
-Last metadata expiration check: 3:32:43 ago on Tue Oct 20 19:34:06 2026.
+Last metadata expiration check: 4:48:14 ago on Tue Oct 20 19:34:06 2026.
 Dependencies resolved.
 ================================================================================
  Package            Architecture       Version            Repository       Size
@@ -314,7 +314,7 @@ lab                             lab packages (LinuC 1.04)
 lab-tools                       lab tools
 
 $ yum provides '*/labcalc'
-lab tools                                        63 kB/s | 941  B     00:00    
+lab tools                                        62 kB/s | 941  B     00:00    
 lab-mathtools-1.0-1.noarch : small number utilities for the lab
 Repo        : lab-tools
 Matched from:
@@ -363,6 +363,7 @@ gpgcheck=1
 gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
 
 $ sudo yum install -y lab-mathtools
+Last metadata expiration check: 0:00:01 ago on Wed Oct 21 00:22:21 2026.
 Dependencies resolved.
 ================================================================================
  Package                Architecture    Version        Repository          Size
@@ -485,7 +486,7 @@ $ echo "--- 権限だけ戻した（中身は違うまま） ---"; lab check 11;
 exit=1
 
 $ sudo yum reinstall -y labmotd
-Last metadata expiration check: 0:00:01 ago on Tue Oct 20 23:06:51 2026.
+Last metadata expiration check: 0:00:02 ago on Wed Oct 21 00:22:21 2026.
 Dependencies resolved.
 ================================================================================
  Package             Architecture       Version           Repository       Size
@@ -570,7 +571,8 @@ $ lab start 12
       ~/work/12 に labtool と、labtool が必要とするパッケージの .rpm がある
       （ファイルの中身を rpm -qp で確かめます）
       labtool と、labtool が必要とするパッケージが、rpm の台帳にある
-      どちらも yum のリポジトリからではなく、rpm で入っている（@System）
+      どちらも yum ではなく、rpm で入っている
+      （rpm の台帳の「入れた時刻」を、yum の取引の記録と比べて見分けます）
 
 【できたら】
 
@@ -583,9 +585,9 @@ $ lab start 12
 
 
 $ cd ~/work/12 && ls && yumdownloader labtool && ls -l
-Last metadata expiration check: 0:00:02 ago on Tue Oct 20 23:06:51 2026.
+Last metadata expiration check: 0:00:02 ago on Wed Oct 21 00:22:21 2026.
 total 8
--rw-r--r-- 1 lab lab 6859 Oct 20 23:06 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6859 Oct 21 00:22 labtool-1.0-1.noarch.rpm
 
 $ cd ~/work/12 && sudo rpm -ivh labtool-1.0-1.noarch.rpm; echo "exit=$?"
 error: Failed dependencies:
@@ -608,10 +610,10 @@ $ echo "--- labtool だけ取って rpm -ivh した（依存で止まった） -
 exit=1
 
 $ cd ~/work/12 && yumdownloader --resolve labtool && ls -l
-Last metadata expiration check: 0:00:02 ago on Tue Oct 20 23:06:51 2026.
+Last metadata expiration check: 0:00:02 ago on Wed Oct 21 00:22:21 2026.
 total 16
--rw-r--r-- 1 lab lab 6859 Oct 20 23:06 labtool-1.0-1.noarch.rpm
--rw-r--r-- 1 lab lab 6729 Oct 20 23:06 labtool-data-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6859 Oct 21 00:22 labtool-1.0-1.noarch.rpm
+-rw-r--r-- 1 lab lab 6729 Oct 21 00:22 labtool-data-1.0-1.noarch.rpm
 
 $ cd ~/work/12 && sudo rpm -ivh labtool-1.0-1.noarch.rpm labtool-data-1.0-1.noarch.rpm
 Verifying...                          ########################################
@@ -632,10 +634,10 @@ $ lab check 12; echo "exit=$?"
 ✔ 12 達成
   判定 : 観測型（~/work/12 の .rpm の中身と、rpm の台帳と、dnf の記録を見た）
   観測 : ~/work/12 の .rpm = labtool labtool-data
-         labtool = labtool-1.0-1.noarch（経路 @System）
-         labtool-data = labtool-data-1.0-1.noarch（経路 @System）
+         labtool = labtool-1.0-1.noarch（rpm で入った）
+         labtool-data = labtool-data-1.0-1.noarch（rpm で入った）
          labtool = labtool: labtool-data から読んだ1行です（終了コード 0）
-         取ってきた2つの .rpm から rpm で入り（@System）、labtool が動いた
+         取ってきた2つの .rpm から rpm で入り、labtool が動いた
 
   ════════════════════════════════════════
    確かめて説明する LinuC 主題1.04（RPM 系） — 全4演習クリア
@@ -690,10 +692,10 @@ $ lab check; echo "exit=$?"
 ✔ 12 達成
   判定 : 観測型（~/work/12 の .rpm の中身と、rpm の台帳と、dnf の記録を見た）
   観測 : ~/work/12 の .rpm = labtool labtool-data
-         labtool = labtool-1.0-1.noarch（経路 @System）
-         labtool-data = labtool-data-1.0-1.noarch（経路 @System）
+         labtool = labtool-1.0-1.noarch（rpm で入った）
+         labtool-data = labtool-data-1.0-1.noarch（rpm で入った）
          labtool = labtool: labtool-data から読んだ1行です（終了コード 0）
-         取ってきた2つの .rpm から rpm で入り（@System）、labtool が動いた
+         取ってきた2つの .rpm から rpm で入り、labtool が動いた
 exit=0
 
 $ lab ls
@@ -758,7 +760,7 @@ $ lab solve 10 | head -6
 
 リポジトリの登録 → ファイル名から探す → 署名を確かめて入れる、の3段です。
 
-    sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+（下の塊は、画面から写して貼り付けられるように、行頭に空白を入れていません）
 
 $ lab reset 12
 演習 12 を初期状態に戻しました（~/work/12）
@@ -776,8 +778,8 @@ $ lab check 12; echo "exit=$?"
 ✗ 12 未達
   判定 : 観測型（~/work/12 の .rpm の中身と、rpm の台帳と、dnf の記録を見た）
   観測 : ~/work/12 の .rpm = 無い
-         labtool = labtool-1.0-1.noarch（経路 @System）
-         labtool-data = labtool-data-1.0-1.noarch（経路 @System）
+         labtool = labtool-1.0-1.noarch（rpm で入った）
+         labtool-data = labtool-data-1.0-1.noarch（rpm で入った）
          labtool = labtool: labtool-data から読んだ1行です（終了コード 0）
          → ~/work/12 に labtool の .rpm が無い
          → ~/work/12 に labtool-data の .rpm が無い

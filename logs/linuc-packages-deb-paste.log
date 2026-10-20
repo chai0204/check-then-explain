@@ -1,0 +1,390 @@
+# 本文の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run --rm -it --hostname linuc、
+# 名前の無いボリューム2つ、PID 1 の bash -l、umask 022、TERM=xterm）の檻に、章ごとに起動し直して打った記録。
+# 端末 80 桁 × 24 行（tmux）。画面に最後に残ったものを書く。作り方: python3 -I probe/linuc-packages-seq.py（イメージ lab-linuc-packages-deb:1.1.0）
+# ↑ の作り方の代わりに: python3 -I probe/linuc-packages-paste.py
+# ヒントと模範解答のヒアドキュメントを、画面から写して打った記録（節ごとに檻を起動し直した）
+
+
+========== 演習08 のヒント3段目: 画面に出た塊（cat > labmine/DEBIAN/control <<'END' 〜 END）を写して打つ ==========
+
+$ lab start 08
+作業ファイルを ~/work/08 に展開しました（labmine.sh ）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 08   配られたスクリプトを、自分でパッケージにして入れる
+          影響度 B / 目安 15分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  作業ファイルは ~/work/08 にあります。
+
+【いまの状態】
+
+    $ cd ~/work/08
+    $ ls
+    labmine.sh
+    $ cat labmine.sh
+    #!/bin/sh
+    # labmine - liblab の lab_greet を使って1行出す（演習08 で、あなたがパッケージにするスクリプト）
+    . /usr/lib/liblab/liblab.sh
+    lab_greet "自分で作ったパッケージから入りました"
+    $ sh labmine.sh
+    labmine.sh: 3: .: cannot open /usr/lib/liblab/liblab.sh: No such file
+
+  sh labmine.sh は、ファイルを sh（シェル）に読ませて動かす打ち方です。
+  1行目の #!/bin/sh は、第8章で見た「sh に読ませて動かす」という印です。
+  labmine.sh は、パッケージ liblab が置くファイル /usr/lib/liblab/liblab.sh を読み込みます。
+  liblab はまだ入っていないので、このエラーが出るのが始まりの正しい状態です。
+
+【やること】
+
+  labmine.sh を /usr/bin/labmine として置くパッケージを作り、入れてください。
+
+      パッケージの名前   labmine
+      版                 1.0
+      依存関係           liblab（labmine は liblab が無いと動かないので、パッケージの情報に書く）
+
+  liblab を apt install liblab で先に入れるのではなく、labmine を入れるときに
+  依存関係から一緒に入るようにしてください。
+
+      labmine   →   liblab: 自分で作ったパッケージから入りました   と出れば完成
+
+【判定のしかた】
+
+  dpkg の台帳で、labmine が版 1.0 で ii になっていること、依存関係に liblab が書かれていること、
+  /usr/bin/labmine が labmine のファイルとして載っていて、持ち主が root であることを見ます。
+  liblab には、依存関係から一緒に入ったときにだけ付く「自動で入った」印（第5章の
+  apt-mark showauto）が付いているかを見ます。
+  そして labmine を実際に動かし、上の1行が出るかを見ます。
+
+【できたら】
+
+    lab check 08
+
+──────────────────────────────────────
+▶ 次はこれを打ってください
+    cd ~/work/08
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 08）
+
+
+$ cd ~/work/08
+
+$ mkdir -p labmine/usr/bin labmine/DEBIAN
+
+$ cp labmine.sh labmine/usr/bin/labmine
+
+$ chmod 755 labmine/usr/bin/labmine
+
+$ lab hint 08
+
+ヒント 1 段目
+
+パッケージは「中身のファイルの木」と「情報（DEBIAN/control）」でできています（第8章）。
+まず、入れたあとの置き場所と同じ形の木を作ります。
+
+    mkdir -p labmine/usr/bin
+    cp labmine.sh labmine/usr/bin/labmine
+    chmod 755 labmine/usr/bin/labmine
+
+次に labmine/DEBIAN/control を書きます。第8章で書いた5つの欄に、依存関係の1行を足します。
+依存関係の書き方は、dpkg -I で見た labapp の control が手本です（Depends: の行）。
+
+まだ足りなければ lab hint 08（次の段）
+
+$ lab hint 08
+
+ヒント 2 段目
+
+control に必要なのは次の欄です（1行に1つ、「欄の名前: 値」）。
+
+    Package:       パッケージの名前
+    Version:       版
+    Architecture:  all（どの CPU でも動くスクリプトなので）
+    Maintainer:    作った人（名前 <メール>）
+    Depends:       依存するパッケージ
+    Description:   説明（1行）
+
+作ったら dpkg-deb --build --root-owner-group で .deb にします。
+入れるとき、dpkg -i は依存するパッケージを取りに行きません。apt にファイルを渡すと（./ を付ける）、
+足りない依存関係を目録から取って一緒に入れます。
+
+まだ足りなければ lab hint 08（次の段）
+
+$ lab hint 08
+
+ヒント 3 段目
+
+ほぼ答えです。
+
+    cd ~/work/08
+    mkdir -p labmine/usr/bin labmine/DEBIAN
+    cp labmine.sh labmine/usr/bin/labmine
+    chmod 755 labmine/usr/bin/labmine
+
+（下の塊は、画面から写して貼り付けられるように、行頭に空白を入れていません）
+
+cat > labmine/DEBIAN/control <<'END'
+Package: labmine
+Version: 1.0
+Architecture: all
+Maintainer: lab <lab@example.invalid>
+Depends: liblab
+Description: my script packaged by hand
+END
+
+    dpkg-deb --build --root-owner-group labmine .
+    sudo apt install ./labmine_1.0_all.deb
+    labmine
+
+これが最後のヒントです。次は lab solve 08
+
+$ cat > labmine/DEBIAN/control <<'END'
+> Package: labmine
+> Version: 1.0
+> Architecture: all
+> Maintainer: lab <lab@example.invalid>
+> Depends: liblab
+> Description: my script packaged by hand
+> END
+
+$ cat -A labmine/DEBIAN/control
+Package: labmine$
+Version: 1.0$
+Architecture: all$
+Maintainer: lab <lab@example.invalid>$
+Depends: liblab$
+Description: my script packaged by hand$
+
+$ dpkg-deb --build --root-owner-group labmine .
+dpkg-deb: building package 'labmine' in './labmine_1.0_all.deb'.
+
+$ sudo apt install ./labmine_1.0_all.deb
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Note, selecting 'labmine' instead of './labmine_1.0_all.deb'
+The following additional packages will be installed:
+  liblab
+The following NEW packages will be installed:
+  labmine liblab
+0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1470 B of archives.
+After this operation, 36.9 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+Get:2 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [724 B]
+Selecting previously unselected package liblab.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Selecting previously unselected package labmine.
+Preparing to unpack .../work/08/labmine_1.0_all.deb ...
+Unpacking labmine (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labmine (1.0) ...
+N: Download is performed unsandboxed as root as file '/home/lab/work/08/labmine_1.0_all.deb' couldn't be accessed by user '_apt'. - pkgAcquire::Run (13: Permission denied)
+
+$ labmine
+liblab: 自分で作ったパッケージから入りました
+
+$ lab check 08
+✔ 08 達成
+  判定 : 観測型（labmine と liblab の台帳と、labmine を動かした結果を見た）
+  観測 : labmine の台帳 = ii（版 1.0）
+         labmine の依存関係（Depends）= liblab
+         /usr/bin/labmine を置いたパッケージ = labmine（持ち主 root:root）
+         liblab の台帳 = ii（自動で入った印 あり）
+         labmine の出力 = liblab: 自分で作ったパッケージから入りました（終了コード 0）
+         labmine 1.0 が、依存関係で liblab を連れて入り、
+         /usr/bin/labmine（root の持ち物）が動いた
+
+
+========== 演習08 の模範解答: 画面に出た塊（cat > labmine/DEBIAN/control <<'END' 〜 END）を写して打つ ==========
+
+$ lab start 08
+作業ファイルを ~/work/08 に展開しました（labmine.sh ）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 08   配られたスクリプトを、自分でパッケージにして入れる
+          影響度 B / 目安 15分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  作業ファイルは ~/work/08 にあります。
+
+【いまの状態】
+
+    $ cd ~/work/08
+    $ ls
+    labmine.sh
+    $ cat labmine.sh
+    #!/bin/sh
+    # labmine - liblab の lab_greet を使って1行出す（演習08 で、あなたがパッケージにするスクリプト）
+    . /usr/lib/liblab/liblab.sh
+    lab_greet "自分で作ったパッケージから入りました"
+    $ sh labmine.sh
+    labmine.sh: 3: .: cannot open /usr/lib/liblab/liblab.sh: No such file
+
+  sh labmine.sh は、ファイルを sh（シェル）に読ませて動かす打ち方です。
+  1行目の #!/bin/sh は、第8章で見た「sh に読ませて動かす」という印です。
+  labmine.sh は、パッケージ liblab が置くファイル /usr/lib/liblab/liblab.sh を読み込みます。
+  liblab はまだ入っていないので、このエラーが出るのが始まりの正しい状態です。
+
+【やること】
+
+  labmine.sh を /usr/bin/labmine として置くパッケージを作り、入れてください。
+
+      パッケージの名前   labmine
+      版                 1.0
+      依存関係           liblab（labmine は liblab が無いと動かないので、パッケージの情報に書く）
+
+  liblab を apt install liblab で先に入れるのではなく、labmine を入れるときに
+  依存関係から一緒に入るようにしてください。
+
+      labmine   →   liblab: 自分で作ったパッケージから入りました   と出れば完成
+
+【判定のしかた】
+
+  dpkg の台帳で、labmine が版 1.0 で ii になっていること、依存関係に liblab が書かれていること、
+  /usr/bin/labmine が labmine のファイルとして載っていて、持ち主が root であることを見ます。
+  liblab には、依存関係から一緒に入ったときにだけ付く「自動で入った」印（第5章の
+  apt-mark showauto）が付いているかを見ます。
+  そして labmine を実際に動かし、上の1行が出るかを見ます。
+
+【できたら】
+
+    lab check 08
+
+──────────────────────────────────────
+▶ 次はこれを打ってください
+    cd ~/work/08
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 08）
+
+
+$ cd ~/work/08
+
+$ mkdir -p labmine/usr/bin labmine/DEBIAN
+
+$ cp labmine.sh labmine/usr/bin/labmine
+
+$ chmod 755 labmine/usr/bin/labmine
+
+$ lab solve 08
+
+模範解答 08
+
+中身の木と DEBIAN/control を並べて .deb にし、apt にファイルとして渡します。
+
+    cd ~/work/08
+    mkdir -p labmine/usr/bin labmine/DEBIAN
+    cp labmine.sh labmine/usr/bin/labmine
+    chmod 755 labmine/usr/bin/labmine
+
+（下の塊は、画面から写して貼り付けられるように、行頭に空白を入れていません）
+
+cat > labmine/DEBIAN/control <<'END'
+Package: labmine
+Version: 1.0
+Architecture: all
+Maintainer: lab <lab@example.invalid>
+Depends: liblab
+Description: my script packaged by hand
+END
+
+    dpkg-deb --build --root-owner-group labmine .
+    #=> dpkg-deb: building package 'labmine' in './labmine_1.0_all.deb'.
+    dpkg -I labmine_1.0_all.deb          # 情報（Depends: liblab が入っているか）
+    dpkg -c labmine_1.0_all.deb          # 中身（./usr/bin/labmine が root/root か）
+
+    sudo apt install ./labmine_1.0_all.deb
+    #=> The following additional packages will be installed:
+    #     liblab                         ← 依存関係を読んで、目録から取ってくる
+    labmine
+    #=> liblab: 自分で作ったパッケージから入りました
+
+【--root-owner-group を付ける理由】
+
+  付けないと、パッケージの中のファイルは、作った人（lab）の持ち物として記録されます。
+  それを入れると /usr/bin/labmine の持ち主が lab になり、一般ユーザが
+  システムのコマンドを書き換えられる状態になります。dpkg -c で root/root と出ることを確かめてから入れます。
+
+【dpkg -i で入れた場合】
+
+    sudo dpkg -i labmine_1.0_all.deb     # liblab が無いので iU（展開済み・設定前）で止まる
+    sudo apt --fix-broken install        # 足りない liblab を目録から取ってきて、続きを済ませる
+
+  これでも通ります（第7章と同じ流れ）。
+
+【liblab に「自動で入った」印が付かなかったら】
+
+  liblab を先に sudo apt install liblab で入れたり、dpkg -i で labmine と一緒に入れたりすると、
+  liblab には「自動で入った」印が付かないので、判定は通りません。
+  liblab を消すと、liblab に依存する labmine も一緒に消えます。そのあと入れ直します。
+
+    sudo apt remove liblab                  # labmine も一緒に消えると出る → y
+    sudo apt install ./labmine_1.0_all.deb  # liblab が依存関係から一緒に入る → y
+
+【名前・版・アーキテクチャ】
+
+  dpkg-deb --build の2つ目にディレクトリ（ここでは .）を渡すと、control の
+  Package・Version・Architecture から「名前_版_アーキテクチャ.deb」という名前で作ります。
+
+この演習は「solve を見た」として記録しました（lab ls で ◍ 表示）
+
+$ cat > labmine/DEBIAN/control <<'END'
+> Package: labmine
+> Version: 1.0
+> Architecture: all
+> Maintainer: lab <lab@example.invalid>
+> Depends: liblab
+> Description: my script packaged by hand
+> END
+
+$ cat -A labmine/DEBIAN/control
+Package: labmine$
+Version: 1.0$
+Architecture: all$
+Maintainer: lab <lab@example.invalid>$
+Depends: liblab$
+Description: my script packaged by hand$
+
+$ dpkg-deb --build --root-owner-group labmine .
+dpkg-deb: building package 'labmine' in './labmine_1.0_all.deb'.
+
+$ sudo apt install ./labmine_1.0_all.deb
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+Note, selecting 'labmine' instead of './labmine_1.0_all.deb'
+The following additional packages will be installed:
+  liblab
+The following NEW packages will be installed:
+  labmine liblab
+0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/1468 B of archives.
+After this operation, 36.9 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+Get:2 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [722 B]
+Selecting previously unselected package liblab.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Selecting previously unselected package labmine.
+Preparing to unpack .../work/08/labmine_1.0_all.deb ...
+Unpacking labmine (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labmine (1.0) ...
+N: Download is performed unsandboxed as root as file '/home/lab/work/08/labmine_1.0_all.deb' couldn't be accessed by user '_apt'. - pkgAcquire::Run (13: Permission denied)
+
+$ labmine
+liblab: 自分で作ったパッケージから入りました
+
+$ lab check 08
+✔ 08 達成
+  判定 : 観測型（labmine と liblab の台帳と、labmine を動かした結果を見た）
+  観測 : labmine の台帳 = ii（版 1.0）
+         labmine の依存関係（Depends）= liblab
+         /usr/bin/labmine を置いたパッケージ = labmine（持ち主 root:root）
+         liblab の台帳 = ii（自動で入った印 あり）
+         labmine の出力 = liblab: 自分で作ったパッケージから入りました（終了コード 0）
+         labmine 1.0 が、依存関係で liblab を連れて入り、
+         /usr/bin/labmine（root の持ち物）が動いた

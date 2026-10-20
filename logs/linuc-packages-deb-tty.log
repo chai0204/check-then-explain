@@ -287,7 +287,7 @@ Get:1 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
 
 $ ls -l
 total 8
--rw-r--r-- 1 lab lab 1076 Oct 20 23:07 labapp_1.0_all.deb
+-rw-r--r-- 1 lab lab 1076 Oct 21 00:22 labapp_1.0_all.deb
 drwxr-xr-x 2 lab lab 4096 Sep 30 19:32 work
 
 $ dpkg -c labapp_1.0_all.deb
@@ -725,11 +725,11 @@ Ign:1 file:/srv/lab-repo lab InRelease
 Get:2 file:/srv/lab-repo lab-updates InRelease
 Ign:2 file:/srv/lab-repo lab-updates InRelease
 Get:3 file:/srv/lab-repo lab Release [1983 B]
-Get:4 file:/srv/lab-repo lab-updates Release [2015 B]
 Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-repo lab-updates Release [2015 B]
+Get:4 file:/srv/lab-repo lab-updates Release [2015 B]
 Get:5 file:/srv/lab-repo lab Release.gpg
 Ign:5 file:/srv/lab-repo lab Release.gpg
-Get:4 file:/srv/lab-repo lab-updates Release [2015 B]
 Get:6 file:/srv/lab-repo lab-updates Release.gpg
 Ign:6 file:/srv/lab-repo lab-updates Release.gpg
 Get:7 file:/srv/lab-repo lab-updates/main amd64 Packages [431 B]
@@ -1041,15 +1041,15 @@ Time zone: 78
 
 
 Current default time zone: 'Asia/Tokyo'
-Local time is now:      Tue Oct 20 23:08:29 JST 2026.
-Universal Time is now:  Tue Oct 20 14:08:29 UTC 2026.
+Local time is now:      Wed Oct 21 00:24:01 JST 2026.
+Universal Time is now:  Tue Oct 20 15:24:01 UTC 2026.
 
 
 $ cat /etc/timezone
 Asia/Tokyo
 
 $ ls -l /etc/localtime
-lrwxrwxrwx 1 root root 30 Oct 20 23:08 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
+lrwxrwxrwx 1 root root 30 Oct 21 00:24 /etc/localtime -> /usr/share/zoneinfo/Asia/Tokyo
 
 $ sudo debconf-show tzdata | sort
   tzdata/Zones/Africa:
@@ -1095,23 +1095,23 @@ $ dpkg-deb --build myhello .
 dpkg-deb: building package 'myhello' in './myhello_1.0_all.deb'.
 
 $ dpkg -c myhello_1.0_all.deb
-drwxr-xr-x lab/lab           0 2026-10-20 23:08 ./
-drwxr-xr-x lab/lab           0 2026-10-20 23:08 ./usr/
-drwxr-xr-x lab/lab           0 2026-10-20 23:08 ./usr/bin/
--rwxr-xr-x lab/lab          85 2026-10-20 23:08 ./usr/bin/myhello
+drwxr-xr-x lab/lab           0 2026-10-21 00:24 ./
+drwxr-xr-x lab/lab           0 2026-10-21 00:24 ./usr/
+drwxr-xr-x lab/lab           0 2026-10-21 00:24 ./usr/bin/
+-rwxr-xr-x lab/lab          85 2026-10-21 00:24 ./usr/bin/myhello
 
 $ dpkg-deb --build --root-owner-group myhello .
 dpkg-deb: building package 'myhello' in './myhello_1.0_all.deb'.
 
 $ dpkg -c myhello_1.0_all.deb
-drwxr-xr-x root/root         0 2026-10-20 23:08 ./
-drwxr-xr-x root/root         0 2026-10-20 23:08 ./usr/
-drwxr-xr-x root/root         0 2026-10-20 23:08 ./usr/bin/
--rwxr-xr-x root/root        85 2026-10-20 23:08 ./usr/bin/myhello
+drwxr-xr-x root/root         0 2026-10-21 00:24 ./
+drwxr-xr-x root/root         0 2026-10-21 00:24 ./usr/
+drwxr-xr-x root/root         0 2026-10-21 00:24 ./usr/bin/
+-rwxr-xr-x root/root        85 2026-10-21 00:24 ./usr/bin/myhello
 
 $ dpkg -I myhello_1.0_all.deb
  new Debian package, version 2.0.
- size 604 bytes: control archive=201 bytes.
+ size 608 bytes: control archive=201 bytes.
      116 bytes,     5 lines      control
  Package: myhello
  Version: 1.0
@@ -1127,9 +1127,9 @@ Note, selecting 'myhello' instead of './myhello_1.0_all.deb'
 The following NEW packages will be installed:
   myhello
 0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
-Need to get 0 B/604 B of archives.
+Need to get 0 B/608 B of archives.
 After this operation, 0 B of additional disk space will be used.
-Get:1 /home/lab/myhello_1.0_all.deb myhello all 1.0 [604 B]
+Get:1 /home/lab/myhello_1.0_all.deb myhello all 1.0 [608 B]
 Selecting previously unselected package myhello.
 (Reading database ... 12833 files and directories currently installed.)
 Preparing to unpack /home/lab/myhello_1.0_all.deb ...
@@ -1153,7 +1153,7 @@ $ dpkg -S /usr/bin/myhello
 myhello: /usr/bin/myhello
 
 $ ls -l /usr/bin/myhello
--rwxr-xr-x 1 root root 85 Oct 20 23:08 /usr/bin/myhello
+-rwxr-xr-x 1 root root 85 Oct 21 00:24 /usr/bin/myhello
 
 $ sudo apt remove myhello
 Reading package lists... Done

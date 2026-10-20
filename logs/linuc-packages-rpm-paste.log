@@ -1,0 +1,449 @@
+# 本文の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run --rm -it --hostname linuc、
+# 名前の無いボリューム2つ、PID 1 の bash -l、umask 022、TERM=xterm）の檻に、章ごとに起動し直して打った記録。
+# 端末 80 桁 × 24 行（tmux）。画面に最後に残ったものを書く。作り方: python3 -I probe/linuc-packages-seq.py（イメージ lab-linuc-packages-rpm:1.1.0）
+# ↑ の作り方の代わりに: python3 -I probe/linuc-packages-paste.py
+# ヒントと模範解答のヒアドキュメントを、画面から写して打った記録（節ごとに檻を起動し直した）
+
+
+========== 演習10 のヒント3段目: 画面に出た塊（sudo tee /etc/yum.repos.d/lab-tools.repo <<'END' 〜 END）を写して打つ ==========
+
+$ lab start 10
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 10   labcalc を、署名の確認を切らずに入れる
+          影響度 B / 目安 15分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  この演習はシステム全体を触ります（/etc/yum.repos.d と rpm の台帳）。作業ディレクトリは使いません。
+
+【いまの状態】
+
+    $ labcalc 2 3
+    bash: labcalc: command not found
+    $ ls /srv/lab-tools-rpm
+    RPM-GPG-KEY-lab-tools  lab-mathtools-1.0-1.noarch.rpm  repodata
+
+  labcalc はまだ入っていないので、command not found が出るのが始まりの正しい状態です。
+  第10章を読んだ檻のままなら、檻を起動し直してから始めてください。第10章で取り込んだ
+  「lab tools」の鍵が台帳に残っていると、この演習の要（鍵を取り込んでよいかの問い）が出ません。
+
+  /srv/lab-tools-rpm に、yum のリポジトリが1つ置いてあります。
+  まだ /etc/yum.repos.d/ には登録されていません。
+
+  この中のパッケージに、labcalc というコマンドが入っています。
+  パッケージの名前には labcalc という語が入っていないので、名前からは分かりません。
+  中のファイルを目録で確かめてから入れてください。
+
+  パッケージには「lab tools」という鍵で署名がしてあり、
+  その公開鍵もリポジトリの中に置いてあります（RPM-GPG-KEY-lab-tools）。
+
+【やること】
+
+  labcalc コマンドを使えるようにしてください。
+
+      labcalc 2 3     →   5 と出れば使えている
+
+  条件が1つあります。署名の確認（gpgcheck=1）は切らないでください。
+
+【判定のしかた】
+
+  次の4つを確かめます。
+
+      labcalc が動き、rpm の台帳にあるパッケージから入っている
+      そのパッケージが、/srv/lab-tools-rpm を指すリポジトリから yum で入っている
+      そのリポジトリの設定が gpgcheck=1 のまま（署名の確認を切っていない）
+      lab tools の公開鍵が、そのパッケージより先に rpm の台帳に入っている
+      （= 入れるときに、署名を確かめた）
+
+【できたら】
+
+    lab check 10
+
+──────────────────────────────────────
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 10）
+
+
+$ lab hint 10
+
+ヒント 1 段目
+
+リポジトリの登録は、/etc/yum.repos.d/ に .repo で終わるファイルを1つ置くことです。
+すでにある lab.repo が手本になります。
+
+    cat /etc/yum.repos.d/lab.repo
+
+[ ] の中がリポジトリの名前（repo id）で、自由に付けられます。
+baseurl= にリポジトリの場所を書きます（file:// で始めると檻の中のディレクトリ）。
+
+置いたら、yum が新しいリポジトリを読めているかを確かめます。
+
+    yum repolist
+
+まだ足りなければ lab hint 10（次の段）
+
+$ lab hint 10
+
+ヒント 2 段目
+
+パッケージの名前が分からないときは、ファイル名から探します。
+yum はまだ入っていないパッケージのファイル一覧も目録に持っています。
+
+    yum provides '*/labcalc'
+
+（逆向きに、名前の分かったパッケージの中身を入れる前に見るなら yum repoquery -l 名前）
+
+名前が分かったら入れます。gpgcheck=1 のまま、鍵の場所を書いていないと
+「Public key for … is not installed」で止まるはずです。
+gpgkey= に鍵の場所を書くと、yum は入れる前に鍵を取り込んでよいかを尋ねます。
+
+まだ足りなければ lab hint 10（次の段）
+
+$ lab hint 10
+
+ヒント 3 段目
+
+ほぼ答えです。
+
+（下の塊は、画面から写して貼り付けられるように、行頭に空白を入れていません）
+
+sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+[lab-tools]
+name=lab tools
+baseurl=file:///srv/lab-tools-rpm
+gpgcheck=1
+gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+END
+
+    yum provides '*/labcalc'
+    #=> lab-mathtools-1.0-1.noarch : small number utilities for the lab
+    sudo yum install lab-mathtools
+    #=> Importing GPG key 0x…:  Userid : "lab tools <tools@example.invalid>"
+    #   Is this ok [y/N]: y
+    labcalc 2 3
+
+これが最後のヒントです。次は lab solve 10
+
+$ sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+> [lab-tools]
+> name=lab tools
+> baseurl=file:///srv/lab-tools-rpm
+> gpgcheck=1
+> gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+> END
+[lab-tools]
+name=lab tools
+baseurl=file:///srv/lab-tools-rpm
+gpgcheck=1
+gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+
+$ cat -A /etc/yum.repos.d/lab-tools.repo
+[lab-tools]$
+name=lab tools$
+baseurl=file:///srv/lab-tools-rpm$
+gpgcheck=1$
+gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools$
+
+$ yum repolist
+repo id                         repo name
+appstream                       AlmaLinux 9 - AppStream
+baseos                          AlmaLinux 9 - BaseOS
+extras                          AlmaLinux 9 - Extras
+lab                             lab packages (LinuC 1.04)
+lab-tools                       lab tools
+
+$ sudo yum install lab-mathtools
+lab tools                                       161 kB/s | 941  B     00:00
+Dependencies resolved.
+================================================================================
+ Package                Architecture    Version        Repository          Size
+================================================================================
+Installing:
+ lab-mathtools          noarch          1.0-1          lab-tools          6.8 k
+
+Transaction Summary
+================================================================================
+Install  1 Package
+
+Total size: 6.8 k
+Installed size: 217
+Is this ok [y/N]: y
+Downloading Packages:
+lab tools                                       1.2 MB/s | 1.3 kB     00:00
+Importing GPG key 0xB0F3D614:
+ Userid     : "lab tools <tools@example.invalid>"
+ Fingerprint: B3BB 7D68 C213 9F51 F368 ED7C 85FC 51C4 B0F3 D614
+ From       : /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+Is this ok [y/N]: y
+Key imported successfully
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1
+  Installing       : lab-mathtools-1.0-1.noarch                             1/1
+  Verifying        : lab-mathtools-1.0-1.noarch                             1/1
+
+Installed:
+  lab-mathtools-1.0-1.noarch
+
+Complete!
+
+$ labcalc 2 3
+5
+
+$ lab check 10
+✔ 10 達成
+  判定 : 観測型（labcalc を動かし、rpm と dnf の記録と .repo の設定を見た）
+  観測 : labcalc = /usr/bin/labcalc
+         labcalc 2 3 の出力 = 5
+         rpm の台帳 = lab-mathtools-1.0-1.noarch
+         入った経路 = @lab-tools（file:///srv/lab-tools-rpm）
+         lab-tools の署名の確認 = gpgcheck=1
+         lab tools の鍵 = gpg-pubkey-b0f3d614-6ad74395
+         台帳に入った順 = lab tools の鍵 → lab-mathtools
+         lab-mathtools が @lab-tools から、署名を確かめて入っている
+
+
+========== 演習10 の模範解答: 画面に出た塊（sudo tee /etc/yum.repos.d/lab-tools.repo <<'END' 〜 END）を写して打つ ==========
+
+$ lab start 10
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 10   labcalc を、署名の確認を切らずに入れる
+          影響度 B / 目安 15分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  この演習はシステム全体を触ります（/etc/yum.repos.d と rpm の台帳）。作業ディレクトリは使いません。
+
+【いまの状態】
+
+    $ labcalc 2 3
+    bash: labcalc: command not found
+    $ ls /srv/lab-tools-rpm
+    RPM-GPG-KEY-lab-tools  lab-mathtools-1.0-1.noarch.rpm  repodata
+
+  labcalc はまだ入っていないので、command not found が出るのが始まりの正しい状態です。
+  第10章を読んだ檻のままなら、檻を起動し直してから始めてください。第10章で取り込んだ
+  「lab tools」の鍵が台帳に残っていると、この演習の要（鍵を取り込んでよいかの問い）が出ません。
+
+  /srv/lab-tools-rpm に、yum のリポジトリが1つ置いてあります。
+  まだ /etc/yum.repos.d/ には登録されていません。
+
+  この中のパッケージに、labcalc というコマンドが入っています。
+  パッケージの名前には labcalc という語が入っていないので、名前からは分かりません。
+  中のファイルを目録で確かめてから入れてください。
+
+  パッケージには「lab tools」という鍵で署名がしてあり、
+  その公開鍵もリポジトリの中に置いてあります（RPM-GPG-KEY-lab-tools）。
+
+【やること】
+
+  labcalc コマンドを使えるようにしてください。
+
+      labcalc 2 3     →   5 と出れば使えている
+
+  条件が1つあります。署名の確認（gpgcheck=1）は切らないでください。
+
+【判定のしかた】
+
+  次の4つを確かめます。
+
+      labcalc が動き、rpm の台帳にあるパッケージから入っている
+      そのパッケージが、/srv/lab-tools-rpm を指すリポジトリから yum で入っている
+      そのリポジトリの設定が gpgcheck=1 のまま（署名の確認を切っていない）
+      lab tools の公開鍵が、そのパッケージより先に rpm の台帳に入っている
+      （= 入れるときに、署名を確かめた）
+
+【できたら】
+
+    lab check 10
+
+──────────────────────────────────────
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 10）
+
+
+$ lab solve 10
+
+模範解答 10
+
+リポジトリの登録 → ファイル名から探す → 署名を確かめて入れる、の3段です。
+
+（下の塊は、画面から写して貼り付けられるように、行頭に空白を入れていません）
+
+sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+[lab-tools]
+name=lab tools
+baseurl=file:///srv/lab-tools-rpm
+gpgcheck=1
+gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+END
+
+    yum repolist                     # lab-tools が並べば読めている
+
+    yum provides '*/labcalc'         # ファイル名からパッケージを探す（入っていなくてよい）
+    #=> lab-mathtools-1.0-1.noarch : small number utilities for the lab
+    #   Repo        : lab-tools
+
+    sudo yum install lab-mathtools
+    #=> Importing GPG key 0x…:
+    #    Userid     : "lab tools <tools@example.invalid>"
+    #    From       : /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+    #   Is this ok [y/N]: y
+    #   Key imported successfully
+
+    labcalc 2 3
+    #=> 5
+    yum list installed lab-mathtools
+    #=> lab-mathtools.noarch   1.0-1   @lab-tools    ← どのリポジトリから入ったか
+    rpm -q gpg-pubkey --qf '%{SUMMARY}\n'
+    #=> … lab tools <tools@example.invalid> public key
+
+【目録を取り直すコマンドを打たなくてよかった理由】
+
+  yum（dnf）は、目録を持っていないリポジトリや、目録の期限（metadata_expire）が
+  切れたリポジトリがあると、コマンドを打った時点で自分で目録を取りに行きます。
+  apt は apt update を打つまで取りに行きません。
+
+  名前が似ていますが、yum update は apt update にあたりません。
+  yum update は入っているパッケージを上げるもので、apt upgrade にあたります。
+
+    yum makecache       目録を取り直す（apt update にあたる）
+    yum check-update    更新できるものがあるかを確かめる（あれば終了コード 100）
+    yum update          入っているパッケージを上げる（apt upgrade にあたる）
+
+【gpgkey を書かずに gpgcheck=1 だと】
+
+  Public key for lab-mathtools-1.0-1.noarch.rpm is not installed
+  … Error: GPG check FAILED
+
+  yum は署名を確かめるための鍵を持っていないので、入れるのを断ります。
+  gpgcheck=0 にすれば入りますが、それは「誰が作ったか確かめずに入れる」ことです。
+  演習の判定は、リポジトリの設定が gpgcheck=1 のままかと、lab tools の鍵が
+  lab-mathtools より先に rpm の台帳に入ったかで、それを見分けています。
+
+【gpgcheck=0 で入れてしまったら】
+
+  あとから sudo rpm --import で鍵だけ取り込んでも、判定は通りません。
+  入れたときに署名を確かめていないことは、変わらないからです。
+  .repo を gpgcheck=1 と gpgkey= の形に直してから、消して入れ直します。
+
+    sudo yum remove lab-mathtools         # → y
+    sudo yum install lab-mathtools        # 鍵がまだなら、取り込んでよいかも尋ねられる → y
+
+  （別解: 第11章の sudo yum reinstall lab-mathtools なら、1回で入れ直せます）
+
+【第10章を打った檻のままだと】
+
+  第10章で lab tools の鍵を取り込んであるので、鍵は lab-mathtools より先に台帳にあります。
+  この檻では、gpgcheck=0 で入れたあとで .repo を gpgcheck=1 に戻しても、判定はそれを
+  見分けられません（入れたときに確かめたかどうかの跡が、どこにも残らないからです）。
+  課題文のとおり、檻を起動し直してから始めてください。
+
+【.repo の主な項目】
+
+    [repo id]          リポジトリの名前（yum repolist に出る。@ 付きで yum list installed にも出る）
+    name=              説明
+    baseurl=           場所（http:// https:// file://）
+    mirrorlist=        場所の一覧を返す URL（baseurl の代わり）
+    enabled=1|0        使うかどうか
+    gpgcheck=1|0       パッケージの署名を確かめるか
+    gpgkey=            署名を確かめる公開鍵の場所
+    metadata_expire=   目録をいつ取り直すか（秒。-1 なら取り直さない）
+
+【別解: ファイルを1行で書く】
+
+  第10章のヒアドキュメントの代わりに、printf で行を並べて tee に渡しても、同じファイルができます。
+  printf '%s\n' は、続く引数を1つずつ1行にして出します（%s が引数、\n が改行）。
+
+    printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' \
+      'gpgcheck=1' 'gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools' \
+      | sudo tee /etc/yum.repos.d/lab-tools.repo
+
+
+この演習は「solve を見た」として記録しました（lab ls で ◍ 表示）
+
+$ sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+> [lab-tools]
+> name=lab tools
+> baseurl=file:///srv/lab-tools-rpm
+> gpgcheck=1
+> gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+> END
+[lab-tools]
+name=lab tools
+baseurl=file:///srv/lab-tools-rpm
+gpgcheck=1
+gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+
+$ cat -A /etc/yum.repos.d/lab-tools.repo
+[lab-tools]$
+name=lab tools$
+baseurl=file:///srv/lab-tools-rpm$
+gpgcheck=1$
+gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools$
+
+$ yum repolist
+repo id                         repo name
+appstream                       AlmaLinux 9 - AppStream
+baseos                          AlmaLinux 9 - BaseOS
+extras                          AlmaLinux 9 - Extras
+lab                             lab packages (LinuC 1.04)
+lab-tools                       lab tools
+
+$ sudo yum install lab-mathtools
+lab tools                                       145 kB/s | 941  B     00:00
+Dependencies resolved.
+================================================================================
+ Package                Architecture    Version        Repository          Size
+================================================================================
+Installing:
+ lab-mathtools          noarch          1.0-1          lab-tools          6.8 k
+
+Transaction Summary
+================================================================================
+Install  1 Package
+
+Total size: 6.8 k
+Installed size: 217
+Is this ok [y/N]: y
+Downloading Packages:
+lab tools                                       1.2 MB/s | 1.3 kB     00:00
+Importing GPG key 0xB0F3D614:
+ Userid     : "lab tools <tools@example.invalid>"
+ Fingerprint: B3BB 7D68 C213 9F51 F368 ED7C 85FC 51C4 B0F3 D614
+ From       : /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+Is this ok [y/N]: y
+Key imported successfully
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1
+  Installing       : lab-mathtools-1.0-1.noarch                             1/1
+  Verifying        : lab-mathtools-1.0-1.noarch                             1/1
+
+Installed:
+  lab-mathtools-1.0-1.noarch
+
+Complete!
+
+$ labcalc 2 3
+5
+
+$ lab check 10
+✔ 10 達成
+  判定 : 観測型（labcalc を動かし、rpm と dnf の記録と .repo の設定を見た）
+  観測 : labcalc = /usr/bin/labcalc
+         labcalc 2 3 の出力 = 5
+         rpm の台帳 = lab-mathtools-1.0-1.noarch
+         入った経路 = @lab-tools（file:///srv/lab-tools-rpm）
+         lab-tools の署名の確認 = gpgcheck=1
+         lab tools の鍵 = gpg-pubkey-b0f3d614-6ad74395
+         台帳に入った順 = lab tools の鍵 → lab-mathtools
+         lab-mathtools が @lab-tools から、署名を確かめて入っている

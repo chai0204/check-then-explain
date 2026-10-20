@@ -136,6 +136,230 @@ $ dpkg -l bc
 dpkg-query: no packages found matching bc
 
 
+========== 第5章のたとえ: apt は Depends のほか、既定では Recommends に書かれたものも入れる（練習用のパッケージには Depends しか無い） ==========
+
+$ apt-config dump | grep -i -E 'Install-(Recommends|Suggests)'
+APT::Install-Recommends "1";
+APT::Install-Suggests "0";
+
+$ apt-cache show labapp labweb labsvc | grep -E '^(Package|Depends|Recommends):'
+Package: labapp
+Depends: liblab (>= 1.0)
+Package: labweb
+Depends: labweb-data (>= 1.0)
+Package: labsvc
+Depends: labsvc-common (>= 1.0)
+
+$ apt-cache show git | grep -E '^(Depends|Recommends):'
+Recommends: ca-certificates, patch, less, ssh-client
+Depends: libc6 (>= 2.38), libcurl3t64-gnutls (>= 7.56.1), libexpat1 (>= 2.0.1), libpcre2-8-0 (>= 10.34), zlib1g (>= 1:1.2.2), perl, liberror-perl, git-man (>> 1:2.43.0), git-man (<< 1:2.43.0-.)
+Depends: libc6 (>= 2.38), libcurl3t64-gnutls (>= 7.56.1), libexpat1 (>= 2.0.1), libpcre2-8-0 (>= 10.34), zlib1g (>= 1:1.2.2), perl, liberror-perl, git-man (>> 1:2.43.0), git-man (<< 1:2.43.0-.)
+Recommends: ca-certificates, patch, less, ssh-client
+
+$ apt-get -s install git | grep -c '^Inst'
+19
+
+$ apt-get -s install --no-install-recommends git | grep -c '^Inst'
+4
+
+
+========== 実践編: 80 桁の端末で dpkg -l 名前 が less で止まるのは、説明の長い labsvc・labapp・liblab（ほかはすぐ戻る） ==========
+
+$ sudo apt install labhello labapp labnote-data
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following additional packages will be installed:
+  liblab
+The following NEW packages will be installed:
+  labapp labhello labnote-data liblab
+0 upgraded, 4 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/3582 B of archives.
+After this operation, 221 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+Get:2 file:/srv/lab-repo lab/main amd64 labapp all 1.0 [1076 B]
+Get:3 file:/srv/lab-repo lab/main amd64 labhello all 1.0 [1120 B]
+Get:4 file:/srv/lab-repo lab/main amd64 labnote-data all 1.0 [640 B]
+Selecting previously unselected package liblab.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Selecting previously unselected package labapp.
+Preparing to unpack .../l/labapp/labapp_1.0_all.deb ...
+Unpacking labapp (1.0) ...
+Selecting previously unselected package labhello.
+Preparing to unpack .../labhello/labhello_1.0_all.deb ...
+Unpacking labhello (1.0) ...
+Selecting previously unselected package labnote-data.
+Preparing to unpack .../labnote-data_1.0_all.deb ...
+Unpacking labnote-data (1.0) ...
+Setting up labhello (1.0) ...
+Setting up labnote-data (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labapp (1.0) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+$ dpkg -l labhello
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-=================================
+ii  labhello       1.0          all          prints its own version
+（打鍵は要らなかった。コマンドはすぐプロンプトに戻った）
+
+$ dpkg -l labapp
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-==================================>
+ii  labapp         1.0          all          sample application that needs libl>
+
+$ dpkg -l liblab
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-==================================>
+ii  liblab         1.0          all          small shell library for lab progra>
+
+$ dpkg -l labbackup
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-=================================
+ii  labbackup      1.0          all          practice backup command
+（打鍵は要らなかった。コマンドはすぐプロンプトに戻った）
+
+$ dpkg -l labfortune
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-=================================
+ii  labfortune     1.0          all          prints a fortune for the day
+（打鍵は要らなかった。コマンドはすぐプロンプトに戻った）
+
+$ dpkg -l labsvc
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-==================================>
+ii  labsvc         1.0          all          sample service tool with a config >
+
+$ dpkg -l labsvc-common
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-=================================
+ii  labsvc-common  1.0          all          data files for labsvc
+（打鍵は要らなかった。コマンドはすぐプロンプトに戻った）
+
+$ dpkg -l labweb
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-===================================
+ii  labweb         1.0          all          sample web board with a config file
+（打鍵は要らなかった。コマンドはすぐプロンプトに戻った）
+
+$ dpkg -l labweb-data
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-=================================
+ii  labweb-data    1.0          all          data files for labweb
+（打鍵は要らなかった。コマンドはすぐプロンプトに戻った）
+
+$ dpkg -l labnote-data
+（打鍵: q）
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version      Architecture Description
++++-==============-============-============-=================================
+ii  labnote-data   1.0          all          data file for labnote
+（打鍵は要らなかった。コマンドはすぐプロンプトに戻った）
+
+
+========== 演習03 の判定: 台帳のファイルが消えていると「消えている」と出る（設定ファイルにもそう添える） ==========
+
+$ lab start 03
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 03   labsvc の設定ファイルを探して、ポートを 9090 に変える
+          影響度 B / 目安 10分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  この演習はシステム全体を触ります（/etc の設定ファイルを書き換えます）。作業ディレクトリは使いません。
+
+【いまの状態】
+
+    $ labsvc
+    labsvc: 動いています
+    port=8080
+
+  labsvc は、設定ファイルに書かれたポート番号を読んで表示する練習用の道具です
+  （ポート番号は、通信の相手のプログラムを見分けるための番号。
+   labsvc は表示するだけで、本当には待ち受けません）。
+
+【やること】
+
+  labsvc が port=9090 と表示するように、labsvc の設定ファイルを書き換えてください。
+
+  設定ファイルの場所は教えません。labsvc というコマンドがどのパッケージから来たのか、
+  そのパッケージがどこにファイルを置いたのかを調べて、見つけてください。
+  書き換えるのは設定ファイルだけです。/usr/bin/labsvc は書き換えないでください。
+
+  設定ファイルは root しか書けません。主題1.03 で使った vi か sed に sudo を付けて
+  書き換えてください（sudo vi ファイル、または sudo sed -i 's/前/後/' ファイル）。
+
+【判定のしかた】
+
+  labsvc を動かして、port=9090 と出るかを見ます。
+  あわせて、パッケージの台帳に記録された「入れたときの中身」と比べて、
+  設定ファイル以外のファイルが入れたときのままかを見ます。
+
+【できたら】
+
+    lab check 03
+
+──────────────────────────────────────
+この演習はシステム全体を触ります（作業ディレクトリは使いません）
+元に戻すには起動し直してください
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 03）
+
+
+$ sudo rm /usr/bin/labsvc /etc/labsvc.conf
+
+$ lab check 03
+✗ 03 未達
+  判定 : 観測型（labsvc の出力と、台帳の「入れたときの中身」との違いを見た）
+  観測 : /usr/bin/labsvc = 実行できない
+         入れたときの中身と違うファイル:
+         │ /etc/labsvc.conf（消えている。設定ファイル）
+         │ /usr/bin/labsvc（消えている）
+         → labsvc が port=9090 と表示しない
+         → 設定ファイル以外のファイルが、台帳の記録と違う
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 03
+
+
 ========== 第3章: man labhello で説明書が開く（パイプに渡すとページャを使わずに出る） ==========
 
 $ sudo apt install labhello
@@ -635,8 +859,8 @@ Ign:1 file:/srv/lab-repo lab InRelease
 Get:2 file:/srv/lab-repo lab-updates InRelease
 Ign:2 file:/srv/lab-repo lab-updates InRelease
 Get:3 file:/srv/lab-repo lab Release [1983 B]
-Get:4 file:/srv/lab-repo lab-updates Release [2015 B]
 Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-repo lab-updates Release [2015 B]
 Get:4 file:/srv/lab-repo lab-updates Release [2015 B]
 Get:5 file:/srv/lab-repo lab Release.gpg
 Ign:5 file:/srv/lab-repo lab Release.gpg
@@ -743,19 +967,19 @@ ii  labhello       1.0          all          prints its own version
 ========== 第7章: debconf-show の行の順番は打つたびに変わる ==========
 
 $ sudo debconf-show tzdata | head -3
-  tzdata/Zones/Asia:
-  tzdata/Zones/Arctic:
-  tzdata/Zones/America:
-
-$ sudo debconf-show tzdata | head -3
+  tzdata/Zones/Africa:
   tzdata/Zones/Antarctica:
-  tzdata/Zones/Pacific:
-  tzdata/Zones/Atlantic:
+  tzdata/Zones/Indian:
 
 $ sudo debconf-show tzdata | head -3
-  tzdata/Zones/Etc: UTC
   tzdata/Zones/Pacific:
+  tzdata/Zones/Asia:
   tzdata/Zones/America:
+
+$ sudo debconf-show tzdata | head -3
+  tzdata/Zones/Legacy:
+  tzdata/Zones/Africa:
+  tzdata/Zones/Pacific:
 
 
 ========== 第7章: dpkg-reconfigure をそのまま打つと、矢印キーで選ぶ画面が出る（Enter で今の答えのまま進める） ==========
@@ -788,8 +1012,8 @@ Package configuration
 （打鍵: <Enter> <Enter>）
 
 Current default time zone: 'Etc/UTC'
-Local time is now:      Tue Oct 20 14:25:59 UTC 2026.
-Universal Time is now:  Tue Oct 20 14:25:59 UTC 2026.
+Local time is now:      Tue Oct 20 15:30:18 UTC 2026.
+Universal Time is now:  Tue Oct 20 15:30:18 UTC 2026.
 
 
 
@@ -996,7 +1220,7 @@ dpkg-deb: building package 'labmine' in './labmine_1.0_all.deb'.
 
 $ dpkg -I labmine_1.0_all.deb
  new Debian package, version 2.0.
- size 724 bytes: control archive=215 bytes.
+ size 720 bytes: control archive=215 bytes.
      142 bytes,     6 lines      control
  Package: labmine
  Version: 1.0
@@ -1006,10 +1230,10 @@ $ dpkg -I labmine_1.0_all.deb
  Description: my script packaged by hand
 
 $ dpkg -c labmine_1.0_all.deb
-drwxr-xr-x root/root         0 2026-10-20 23:26 ./
-drwxr-xr-x root/root         0 2026-10-20 23:26 ./usr/
-drwxr-xr-x root/root         0 2026-10-20 23:26 ./usr/bin/
--rwxr-xr-x root/root       233 2026-10-20 23:26 ./usr/bin/labmine
+drwxr-xr-x root/root         0 2026-10-21 00:30 ./
+drwxr-xr-x root/root         0 2026-10-21 00:30 ./usr/
+drwxr-xr-x root/root         0 2026-10-21 00:30 ./usr/bin/
+-rwxr-xr-x root/root       233 2026-10-21 00:30 ./usr/bin/labmine
 
 $ sudo apt install ./labmine_1.0_all.deb
 Reading package lists... Done
@@ -1021,11 +1245,11 @@ The following additional packages will be installed:
 The following NEW packages will be installed:
   labmine liblab
 0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
-Need to get 0 B/1470 B of archives.
+Need to get 0 B/1466 B of archives.
 After this operation, 36.9 kB of additional disk space will be used.
 Do you want to continue? [Y/n] y
 Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
-Get:2 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [724 B]
+Get:2 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [720 B]
 Selecting previously unselected package liblab.
 (Reading database ... 12833 files and directories currently installed.)
 Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
@@ -1152,9 +1376,9 @@ Note, selecting 'labmine' instead of './labmine_1.0_all.deb'
 The following NEW packages will be installed:
   labmine
 0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
-Need to get 0 B/724 B of archives.
+Need to get 0 B/722 B of archives.
 After this operation, 0 B of additional disk space will be used.
-Get:1 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [724 B]
+Get:1 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [722 B]
 Selecting previously unselected package labmine.
 (Reading database ... 12835 files and directories currently installed.)
 Preparing to unpack .../work/08/labmine_1.0_all.deb ...
@@ -1170,7 +1394,7 @@ $ lab check 08
          /usr/bin/labmine を置いたパッケージ = labmine（持ち主 root:root）
          liblab の台帳 = ii（自動で入った印 なし）
          labmine の出力 = liblab: 自分で作ったパッケージから入りました（終了コード 0）
-         → liblab が依存関係からではなく、名前を指定して入っている
+         → liblab に「自動で入った」印が無い（依存関係から入ると付く）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 08
 
 $ sudo apt remove liblab
@@ -1196,11 +1420,11 @@ The following additional packages will be installed:
 The following NEW packages will be installed:
   labmine liblab
 0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
-Need to get 0 B/1470 B of archives.
+Need to get 0 B/1468 B of archives.
 After this operation, 36.9 kB of additional disk space will be used.
 Do you want to continue? [Y/n] y
 Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
-Get:2 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [724 B]
+Get:2 /home/lab/work/08/labmine_1.0_all.deb labmine all 1.0 [722 B]
 Selecting previously unselected package liblab.
 (Reading database ... 12833 files and directories currently installed.)
 Preparing to unpack .../libl/liblab/liblab_1.0_all.deb ...
@@ -1222,6 +1446,106 @@ $ lab check 08
          labmine の出力 = liblab: 自分で作ったパッケージから入りました（終了コード 0）
          labmine 1.0 が、依存関係で liblab を連れて入り、
          /usr/bin/labmine（root の持ち物）が動いた
+
+
+========== 演習08 の判定: dpkg -i で liblab と labmine を一緒に入れても「自動で入った」印は付かず、通らない ==========
+
+$ lab start 08
+作業ファイルを ~/work/08 に展開しました（labmine.sh ）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  演習 08   配られたスクリプトを、自分でパッケージにして入れる
+          影響度 B / 目安 15分
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  作業ファイルは ~/work/08 にあります。
+
+【いまの状態】
+
+    $ cd ~/work/08
+    $ ls
+    labmine.sh
+    $ cat labmine.sh
+    #!/bin/sh
+    # labmine - liblab の lab_greet を使って1行出す（演習08 で、あなたがパッケージにするスクリプト）
+    . /usr/lib/liblab/liblab.sh
+    lab_greet "自分で作ったパッケージから入りました"
+    $ sh labmine.sh
+    labmine.sh: 3: .: cannot open /usr/lib/liblab/liblab.sh: No such file
+
+  sh labmine.sh は、ファイルを sh（シェル）に読ませて動かす打ち方です。
+  1行目の #!/bin/sh は、第8章で見た「sh に読ませて動かす」という印です。
+  labmine.sh は、パッケージ liblab が置くファイル /usr/lib/liblab/liblab.sh を読み込みます。
+  liblab はまだ入っていないので、このエラーが出るのが始まりの正しい状態です。
+
+【やること】
+
+  labmine.sh を /usr/bin/labmine として置くパッケージを作り、入れてください。
+
+      パッケージの名前   labmine
+      版                 1.0
+      依存関係           liblab（labmine は liblab が無いと動かないので、パッケージの情報に書く）
+
+  liblab を apt install liblab で先に入れるのではなく、labmine を入れるときに
+  依存関係から一緒に入るようにしてください。
+
+      labmine   →   liblab: 自分で作ったパッケージから入りました   と出れば完成
+
+【判定のしかた】
+
+  dpkg の台帳で、labmine が版 1.0 で ii になっていること、依存関係に liblab が書かれていること、
+  /usr/bin/labmine が labmine のファイルとして載っていて、持ち主が root であることを見ます。
+  liblab には、依存関係から一緒に入ったときにだけ付く「自動で入った」印（第5章の
+  apt-mark showauto）が付いているかを見ます。
+  そして labmine を実際に動かし、上の1行が出るかを見ます。
+
+【できたら】
+
+    lab check 08
+
+──────────────────────────────────────
+▶ 次はこれを打ってください
+    cd ~/work/08
+この課題文は lab show でいつでももう一度出せます（答え合わせは lab check 08）
+
+
+$ cd ~/work/08
+
+$ mkdir -p labmine/usr/bin labmine/DEBIAN
+
+$ cp labmine.sh labmine/usr/bin/labmine
+
+$ chmod 755 labmine/usr/bin/labmine
+
+$ printf '%s\n' 'Package: labmine' 'Version: 1.0' 'Architecture: all' 'Maintainer: lab <lab@example.invalid>' 'Depends: liblab' 'Description: my script packaged by hand' > labmine/DEBIAN/control
+
+$ dpkg-deb --build --root-owner-group labmine .
+dpkg-deb: building package 'labmine' in './labmine_1.0_all.deb'.
+
+$ apt download liblab
+Get:1 file:/srv/lab-repo lab/main amd64 liblab all 1.0 [746 B]
+
+$ sudo dpkg -i liblab_1.0_all.deb labmine_1.0_all.deb
+Selecting previously unselected package liblab.
+(Reading database ... 12833 files and directories currently installed.)
+Preparing to unpack liblab_1.0_all.deb ...
+Unpacking liblab (1.0) ...
+Selecting previously unselected package labmine.
+Preparing to unpack labmine_1.0_all.deb ...
+Unpacking labmine (1.0) ...
+Setting up liblab (1.0) ...
+Setting up labmine (1.0) ...
+
+$ lab check 08
+✗ 08 未達
+  判定 : 観測型（labmine と liblab の台帳と、labmine を動かした結果を見た）
+  観測 : labmine の台帳 = ii（版 1.0）
+         labmine の依存関係（Depends）= liblab
+         /usr/bin/labmine を置いたパッケージ = labmine（持ち主 root:root）
+         liblab の台帳 = ii（自動で入った印 なし）
+         labmine の出力 = liblab: 自分で作ったパッケージから入りました（終了コード 0）
+         → liblab に「自動で入った」印が無い（依存関係から入ると付く）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 08
 
 
 ========== 演習02〜04・06〜08 のヒントと解答に出てくる調べ方 ==========
@@ -1274,9 +1598,9 @@ Ign:2 file:/srv/lab-tools tools InRelease
 Get:3 file:/srv/lab-repo lab Release [1983 B]
 Get:4 file:/srv/lab-tools tools Release [1991 B]
 Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-tools tools Release [1991 B]
 Get:5 file:/srv/lab-repo lab Release.gpg
 Ign:5 file:/srv/lab-repo lab Release.gpg
-Get:4 file:/srv/lab-tools tools Release [1991 B]
 Get:6 file:/srv/lab-tools tools Release.gpg
 Ign:6 file:/srv/lab-tools tools Release.gpg
 Get:7 file:/srv/lab-tools tools/main amd64 Packages [445 B]
@@ -1338,9 +1662,9 @@ Ign:2 file:/srv/lab-tools tools InRelease
 Get:3 file:/srv/lab-repo lab Release [1983 B]
 Get:4 file:/srv/lab-tools tools Release [1991 B]
 Get:3 file:/srv/lab-repo lab Release [1983 B]
+Get:4 file:/srv/lab-tools tools Release [1991 B]
 Get:5 file:/srv/lab-repo lab Release.gpg
 Ign:5 file:/srv/lab-repo lab Release.gpg
-Get:4 file:/srv/lab-tools tools Release [1991 B]
 Get:6 file:/srv/lab-tools tools Release.gpg
 Ign:6 file:/srv/lab-tools tools Release.gpg
 Hit:7 https://snapshot.ubuntu.com/ubuntu/20260929T000000Z noble InRelease
