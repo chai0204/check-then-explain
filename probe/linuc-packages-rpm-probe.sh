@@ -77,6 +77,10 @@ $ rpm2cpio labtool-1.0-1.noarch.rpm | cpio -t
 $ rpm -qpl labtool-1.0-1.noarch.rpm
 ========== 第11章: rpm -Va の行の中身（設定ファイルの c と、コンテナで省かれたもの。31 行） ==========
 $ rpm -Va
+========== 演習11 のヒント: which は実行できないファイルを探さないので、いまの labmotd は見つからない。台帳にはパスをそのまま渡す ==========
+$ labmotd
+$ which labmotd
+$ rpm -qf /usr/bin/labmotd
 ========== 演習11 の解答: --setperms は権限だけを戻し、--replacepkgs で入れ直すと全部戻る ==========
 $ rpm -V labmotd; echo $?
 $ sudo rpm --setperms labmotd

@@ -14,7 +14,7 @@
   3. 記録で「プロンプトに戻らなかった」組（読者の端末では止まって見える）や、問いが出なかった組は、それだけで違い。
 
 毎回変わる値は伏せて比べる: 日時（ls -l・dpkg -c・date の形）、dnf の「Last metadata expiration check」の
-経過時間、ダウンロードの速さ、apt の「Fetched … (速さ)」、rpm の Install Date。
+経過時間、ダウンロードの速さ、apt の「Fetched … (速さ)」、rpm の Install Date、第8章で作る myhello の .deb の大きさ。
 dnf がそのコマンドの中で目録を取ってきた（速さの行がある）ときは、「Last metadata expiration check」の行は
 出たり出なかったりする（取ってきてから 1 秒たったかどうかで決まる。dnf/base.py の age != 0 の条件。
 2026-10-20 に同じ手順で両方を実測）。そのときに限り、この行は本文・記録のどちらにあっても違いに数えない。
@@ -37,6 +37,9 @@ HEAD = re.compile(r"^(=|#){10} .* (=|#){10}$")
 
 
 def mask(cmd, line):
+    if "myhello" in cmd:   # 第8章で読者が作る .deb は、作った時刻が中に入るので、縮めた大きさが打つたびに数バイト変わる
+        line = re.sub(r"size \d+ bytes: control archive=\d+ bytes\.", "size N bytes: control archive=N bytes.", line)
+        line = re.sub(r"\b\d+ B\b", "N B", line)
     line = re.sub(r"Last metadata expiration check: .*$", "Last metadata expiration check: TIME", line)
     line = re.sub(r"\s+\d+(?:\.\d+)?\s*[kMG]?B/s\s*\|\s*\d+(?:\.\d+)?\s*[kMG]?B\s+\d\d:\d\d\s*$", " SPEED", line)
     line = re.sub(r"(Fetched .* in )\S+ \(.*B/s\)", r"\1TIME", line)
