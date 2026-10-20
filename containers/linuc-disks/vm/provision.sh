@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 初回の起動で1回だけ、練習機の中で root として走る（vm が qemu-guest-agent 経由で流す）。
-# 演習03 の「パーティションを1つ消してしまったディスク」（/dev/vdd）を作る。
+# 演習02 の「パーティションを1つ消してしまったディスク」（/dev/vdd。第3章の終わりで読者が見る）と、
+# 演習05 の「ディスクのイメージのファイル」（/home/student/old-usb.img）を作る。
 #
 #   消す前:  vdd1  2048〜206847（100MiB） ext4 ラベル OLDDATA … 取り戻したいファイルがある
 #            vdd2  206848〜411647（100MiB） ext4 ラベル KEEP
@@ -48,3 +49,18 @@ chmod 644 /home/student/vdd-before.txt
 sfdisk -q --delete "$D" 1
 udevadm settle
 echo "provision: $D を準備しました"
+
+# 演習05 の「昔の USB メモリを丸ごと写したファイル」（/home/student/old-usb.img。16MiB の FAT、ラベル OLDUSB）。
+# 中の message.txt は、マウントしないと読めない（第6章のループデバイスを使う）。
+# ボリューム ID は固定値にする（読者全員の画面と、判定が見る値を揃えるため）。
+img=/home/student/old-usb.img
+truncate -s 16M "$img"
+mkfs.vfat -n OLDUSB -i 4c696e75 "$img" >/dev/null
+m=$(mktemp -d)
+mount -o loop "$img" "$m"
+printf '%s\n' '伝言: 3 番の棚の鍵は、青い箱の中' > "$m/message.txt"
+umount "$m"
+rmdir "$m"
+chown student:student "$img"
+chmod 644 "$img"
+echo "provision: $img を準備しました"

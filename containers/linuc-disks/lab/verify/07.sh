@@ -6,7 +6,7 @@ set -uo pipefail
 lab-guest true >/dev/null 2>&1
 [ $? -eq 125 ] && { echo "前提不足: 練習機が起動していません（外で vm start）"; exit 2; }
 lab-guest 'test -b /dev/vdb3' >/dev/null 2>&1 || {
-  echo "前提不足: /dev/vdb3 がありません（先に演習04 の切り方にしてください）"; exit 2; }
+  echo "前提不足: /dev/vdb3 がありません（先に演習03 の切り方にしてください）"; exit 2; }
 
 type=$(lab-guest 'blkid -p -o value -s TYPE /dev/vdb3 2>/dev/null' 2>/dev/null)
 before=$(lab-guest 'grep -c "^/dev/vdb3 " /proc/swaps' 2>/dev/null)

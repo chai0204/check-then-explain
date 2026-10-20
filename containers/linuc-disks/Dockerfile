@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1.9
 # LinuC 主題1.05（ハードウェア・ディスク・パーティション・ファイルシステム）の檻。
 # 仮想マシン型（lab-linuc-machine）の練習機に、分割・フォーマット・マウントしてよいディスクを足す。
-#   virtio のディスク3本（vdb 2G / vdc 1G / vdd 256M）、SATA の SSD 1本（sda 1G）、光学ドライブ（sr0）、
+#   virtio のディスク4本（vdb 2G / vdc 1G / vdd 256M / vde 512M）、SATA の SSD 1本（sda 1G）、光学ドライブ（sr0）、
 #   USB の口（USB メモリは起動後に virsh attach-device で挿す）。定義は vm/domain.xml.in。
 # 本物のカーネルの上で fdisk / gdisk / parted / LVM / mkfs / mount を打つので、読者に権限を1つも渡さずに済む。
-#   build: docker build -t lab-linuc-disks:1.0.1 containers/linuc-disks
+#   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-linuc-disks:1.1.0 containers/linuc-disks
 
 # ---- 光学ドライブに入れる CD のイメージ ----------------------------------------
 #   作る道具（xorriso）は最終イメージに入れない。この段で作って、ISO だけを下の段へ渡す。
@@ -32,7 +32,7 @@ COPY --chown=root:root --chmod=0555 lab/ /lab/
 COPY --chown=root:root --chmod=0644 vm/domain.xml.in /etc/lab-vm/domain.xml.in
 # 起動前に外側で追加ディスクと USB メモリの定義を作る
 COPY --chown=root:root --chmod=0644 vm/pre-start.sh  /etc/lab-vm/pre-start.sh
-# 初回の起動で1回だけ練習機の中で走る（演習03 のディスクを用意する）
+# 初回の起動で1回だけ練習機の中で走る（演習02 のディスクと、演習05 のイメージのファイルを用意する）
 COPY --chown=root:root --chmod=0644 vm/provision.sh  /etc/lab-vm/provision.sh
 COPY --from=media --chown=root:root --chmod=0444 /linuc-media.iso /usr/share/lab-disks/linuc-media.iso
 LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-explain
@@ -46,7 +46,7 @@ COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
 #   練習機の中の lab が外の lab に頼む中継（lab-remote）も最新にする（lab show を通すため）。
 #   build には --build-context labvm=containers/linuc-machine/host も付ける。
 COPY --from=labvm --chown=root:root --chmod=0755 libexec/lab-remote /usr/local/libexec/lab-remote
-ENV LAB_THEME=linuc-disks LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:disks-1.0.1 LAB_VM_AUTOSTART=1
+ENV LAB_THEME=linuc-disks LAB_VERSION=1.1.0 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:disks-1.1.0 LAB_VM_AUTOSTART=1
 ENV LAB_RESET_HINT="元に戻すには、練習機の外で vm reset --yes（練習機ごと最初の状態に戻ります）"
 USER lab

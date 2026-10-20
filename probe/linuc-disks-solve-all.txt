@@ -1,0 +1,209 @@
+# LinuC 主題1.05 の全演習を、模範解答どおりに通す台本（probe/linuc-disks-solve-all.sh が probe/linuc-disks-seq.py --steps で打つ）。
+# 目的は3つ。
+#   1) 未達のとき判定が ✗ を出すこと（鳴らない検査は無いより悪い）。読者がやりがちな途中の状態でも ✗ になること
+#   2) 模範解答どおりにやれば ✔ になること
+#   3) 課題文の「いまの状態」に載せる画面を、読者と同じ打ち方で取ること
+# 練習機は工場出荷時の状態から始め、演習だけを 01 から順にやる人の道筋をたどる（理論編の章は打たない）。
+# 書式は probe/linuc-disks-seq.py の steps_from_file を見る。
+
+== 0. 入ったとき ==
+@外
+$ lab
+$ vm start
+$ lab check
+
+== 1. 演習01 — 空のディスク vde を使えるようにする ==
+@外
+$ lab start 01
+$ ssh linuc
+@中
+$ lab show
+$ lsblk /dev/vde
+$ lab check 01
+$ sudo fdisk /dev/vde
+@keys n|p|1|||w
+# --- 区画を作っただけ（ファイルシステムが無い）---
+$ lab check 01
+$ sudo mkfs.ext4 -q /dev/vde1
+# --- マウントする前の /mnt に書いてしまった（hello.txt は vda1 の /mnt に入る）---
+$ echo "こんにちは" | sudo tee /mnt/hello.txt
+$ lab check 01
+$ sudo rm /mnt/hello.txt
+$ sudo mount /dev/vde1 /mnt
+$ echo "こんにちは" | sudo tee /mnt/hello.txt
+# --- 書いたが、まだ外していない ---
+$ lab check 01
+$ sudo umount /mnt
+$ lab check 01
+
+== 2. 演習02 — 消してしまったパーティションを取り戻す ==
+@中
+$ sudo fdisk -l /dev/vdd
+$ cat ~/vdd-before.txt
+$ lab check 02
+# --- 始まりの位置をずらして作った（4096 から）---
+$ sudo fdisk /dev/vdd
+@keys n|p|1|4096|+50M|w
+$ lab check 02
+$ sudo fdisk /dev/vdd
+@keys d|1|w
+$ sudo fdisk /dev/vdd
+@keys n|p|1|||N|w
+$ sudo mount -o ro /dev/vdd1 /mnt
+$ cat /mnt/aikotoba.txt
+$ sudo umount /mnt
+$ lab check 02
+
+== 3. 演習03 — 新しいサーバのディスクを GPT で切る ==
+@中
+$ sudo parted /dev/vdb print
+$ lab check 03
+# --- 3番の種類を 8300 のまま作った ---
+$ sudo sgdisk -o -n 1:0:+100M -t 1:ef00 -n 2:0:+300M -t 2:8300 -n 3:0:+256M -t 3:8300 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+$ lab check 03
+$ sudo sgdisk -o -n 1:0:+100M -t 1:ef00 -n 2:0:+300M -t 2:8300 -n 3:0:+256M -t 3:8200 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+$ lsblk -o NAME,SIZE,PARTTYPENAME /dev/vdb
+$ lab check 03
+
+== 4. 演習04 — 5種類のファイルシステムを作り、ext4 の予約を減らす ==
+@中
+$ lsblk -o NAME,SIZE,FSTYPE,LABEL /dev/vdb
+$ lab check 04
+$ sudo mkfs.vfat -F 32 /dev/vdb1
+$ sudo mkfs -t ext3 -L NEWBOOT /dev/vdb2
+$ sudo mkfs.xfs -L ROOT /dev/vdb4
+$ sudo mkfs.btrfs -L VAR /dev/vdb5
+$ sudo mkfs.ext4 -L HOME /dev/vdb6
+# --- 予約は既定の 5% のまま ---
+$ lab check 04
+$ sudo tune2fs -m 1 /dev/vdb6
+$ lsblk -o NAME,FSTYPE,LABEL,UUID /dev/vdb
+$ lab check 04
+
+== 5. 演習05 — ディスクのイメージのファイルから、中のファイルを取り出す ==
+@中
+$ ls -l ~/old-usb.img
+$ lab check 05
+$ sudo blkid ~/old-usb.img
+$ sudo mount -o loop ~/old-usb.img /mnt
+$ losetup -l
+$ ls -l /mnt
+# --- マウントしただけ（まだ取り出していない）---
+$ lab check 05
+$ cp /mnt/message.txt ~/
+$ sudo umount /mnt
+$ cat ~/message.txt
+$ lab check 05
+# 模範解答の「-o loop を付けずに mount したら」の確かめ
+$ sudo mount ~/old-usb.img /mnt
+$ losetup -l
+$ sudo umount /mnt
+
+== 6. 演習06 — 一般ユーザが光学メディアをマウントできるようにする ==
+@中
+$ mount /media/cdrom
+$ lab check 06
+$ sudo mkdir /media/cdrom
+$ echo "/dev/sr0  /media/cdrom  iso9660  ro,noauto  0  0" | sudo tee -a /etc/fstab
+$ sudo systemctl daemon-reload
+# --- user を書き忘れた ---
+$ lab check 06
+$ sudo sed -i 's|ro,noauto|ro,user|' /etc/fstab
+$ sudo systemctl daemon-reload
+# --- noauto を書き忘れた ---
+$ lab check 06
+$ sudo sed -i 's|ro,user|ro,user,noauto|' /etc/fstab
+$ grep cdrom /etc/fstab
+$ sudo systemctl daemon-reload
+$ mount /media/cdrom
+$ mount | grep /media/cdrom
+$ umount /media/cdrom
+$ lab check 06
+
+== 7. 演習07 — スワップを作り、起動しても有効にする ==
+@中
+$ free -h
+$ swapon --show
+$ lab check 07
+$ sudo mkswap -L SWAP /dev/vdb3
+$ sudo swapon /dev/vdb3
+$ swapon --show
+# --- swapon しただけ（/etc/fstab に無い）---
+$ lab check 07
+# --- /etc/fstab にデバイス名で書いた ---
+$ echo "/dev/vdb3  none  swap  sw  0  0" | sudo tee -a /etc/fstab
+$ lab check 07
+$ sudo sed -i '/^\/dev\/vdb3 /d' /etc/fstab
+$ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb3)  none  swap  sw  0  0" | sudo tee -a /etc/fstab
+$ sudo systemctl daemon-reload
+$ lab check 07
+
+== 8. 演習08 — 2台のディスクにまたがる箱を作り、中身ごと広げる ==
+@中
+$ lsblk /dev/vdc /dev/sda
+$ lab check 08
+$ sudo pvcreate /dev/vdc /dev/sda
+$ sudo vgcreate vg0 /dev/vdc /dev/sda
+$ sudo lvcreate -L 600M -n data vg0
+$ sudo mkfs.ext4 -q /dev/vg0/data
+$ sudo mkdir /srv/data
+$ sudo mount /dev/vg0/data /srv/data
+# --- 1台に収まる大きさのまま ---
+$ lab check 08
+$ sudo lvextend -L 1.2G vg0/data
+$ df -h /srv/data
+# --- 箱（LV）だけ広げた ---
+$ lab check 08
+$ sudo resize2fs /dev/vg0/data
+$ df -h /srv/data
+$ lab check 08
+
+== 9. 演習09 — vdb を SSD として扱わせる（再起動しても） ==
+@中
+$ lsblk -d -o NAME,TRAN,ROTA,SIZE,MODEL
+$ lab check 09
+$ echo 0 | sudo tee /sys/block/vdb/queue/rotational
+# --- 手で 0 を書いただけ（再起動すると戻る状態）---
+$ lab check 09
+$ echo 'ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"' | sudo tee /etc/udev/rules.d/60-lab-ssd.rules
+$ sudo udevadm trigger --action=add --subsystem-match=block --sysname-match=vdb --settle
+$ cat /sys/block/vdb/queue/rotational
+$ lab check 09
+
+== 10. 演習10 — USB メモリを挿し直しても使えなくする ==
+@外
+$ virsh attach-device linuc ~/vm/extra/usb-a.xml
+@中
+$ lsblk -d -o NAME,TRAN,SIZE,SERIAL
+$ lsmod | grep -E "usb_storage|uas"
+@外
+$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+@中
+$ lab check 10
+$ echo "blacklist usb_storage" | sudo tee /etc/modprobe.d/lab-usb.conf
+$ sudo modprobe -r uas
+# --- blacklist usb_storage だけ（uas の依存で読み込まれるはず）---
+$ lab check 10
+$ printf "blacklist usb_storage\nblacklist uas\n" | sudo tee /etc/modprobe.d/lab-usb.conf
+$ sudo modprobe -r uas
+# --- 同じファイルを書き換えて uas も足しただけ（udev が書き換えに気づかないはず）---
+$ lab check 10
+$ sudo systemctl restart systemd-udevd
+$ sudo modprobe -r uas
+# --- ヒント3のとおり udev を再起動した ---
+$ lab check 10
+# --- ファイルを消しただけ（udev が気づいて、また使えるようになるはず）---
+$ sudo rm /etc/modprobe.d/lab-usb.conf
+$ lab check 10
+# --- 模範解答: 新しいファイルに2行（udev の再起動なし）---
+$ printf "blacklist usb_storage\nblacklist uas\n" | sudo tee /etc/modprobe.d/lab-usb.conf
+$ sudo modprobe -r uas
+$ lab check 10
+
+== 11. 全問を通した状態 ==
+@外
+$ lab check
+$ lab ls
+$ lab show 03
+@中
+$ lab check 06

@@ -14,6 +14,7 @@ disk() {  # disk 名前 大きさ
 disk vdb 2G
 disk vdc 1G
 disk vdd 256M
+disk vde 512M
 disk sda 1G
 disk usb-a 64M
 disk usb-b 64M
@@ -36,5 +37,5 @@ EOF
 }
 usb usb-a sdc LAB-USB-A
 usb usb-b sdd LAB-USB-B
-# 演習02 の判定が使う。判定の中で一度だけ挿して、すぐ抜く
+# 演習10 の判定が使う。判定の中で一度だけ挿して、すぐ抜く
 usb usb-check sde LAB-USB-CHECK

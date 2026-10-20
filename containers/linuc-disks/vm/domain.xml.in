@@ -4,9 +4,10 @@
   USB の口を足したもの。@VMDIR@ は vm が置き換える。追加ディスクのファイルは pre-start.sh が外側で作る。
 
   足したもの（練習機の中での名前）:
-    vdb  virtio 2G    … 本文で「新しいサーバのディスク」として、表 → ファイルシステム → マウントと積み上げる
-    vdc  virtio 1G    … LVM の物理ボリューム（sda と組んで1つのボリュームグループにする）
-    vdd  virtio 256M  … 演習03 の「パーティションを消してしまったディスク」（provision.sh が用意する）
+    vdb  virtio 2G    … 本文で「新しいサーバのディスク」として、表 → ファイルシステム → マウントと積み上げる（第2〜7章）
+    vdc  virtio 1G    … LVM の物理ボリューム（sda と組んで1つのボリュームグループにする。第8章）
+    vdd  virtio 256M  … 演習02 の「パーティションを消してしまったディスク」（provision.sh が用意する）
+    vde  virtio 512M  … 演習01 の「空のディスク」（第2章の流れを、読者が自分でなぞる）。本文の章では使わない
     sda  SATA   1G    … rotation_rate='1' で「回転しない装置（SSD）」と名乗らせる。中身は vdc と同じ種類のファイル
     sr0  SATA 光学    … 読み取り専用の CD（イメージに同梱した ISO）
     USB の口（qemu-xhci）… USB メモリは起動後に virsh attach-device で挿す（~/vm/extra/usb-*.xml）
@@ -53,6 +54,12 @@
       <source file='@VMDIR@/extra/vdd.qcow2'/>
       <target dev='vdd' bus='virtio'/>
       <serial>LAB-VDD</serial>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' discard='unmap'/>
+      <source file='@VMDIR@/extra/vde.qcow2'/>
+      <target dev='vde' bus='virtio'/>
+      <serial>LAB-VDE</serial>
     </disk>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2' discard='unmap'/>
