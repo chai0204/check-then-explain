@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2. 空のディスクを使えるようにする — 確かめて説明する LinuC 主題1.05</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="2" data-theme="linuc-disks">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第2章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+</div>
+<h1>2. 空のディスクを使えるようにする</h1>
+<p class="lead">第1章では、練習機に入り、<code>lsblk</code> と <code>df</code> で、<code>vdb</code>（2G）が区画もファイルシステムも持たない空のディスクだと確かめた。この章では、その <code>vdb</code> を区切る → ファイルシステムを作る → マウントする → ファイルを書く → 外す、と一通り使ってみる。</p>
+<div class="badges"><span>前提: 第1章まで読了</span><span>前提: 練習機の中にいる</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>fdisk</code> で、空のディスクにパーティションを1つ作れる（<code>n</code> で作り、<code>p</code> で確かめ、<code>w</code> で書く）</li><li><code>mkfs.ext4</code> でファイルシステムを作り、<code>mount</code> でつないで読み書きし、<code>umount</code> で外せる</li><li>マウントしたディレクトリに書けないとき、何を確かめてどう直すかを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>fdisk</code> が出す表の形式の名前（DOS・MBR）と Disk identifier は、この章では読まない。<code>mkfs.ext4</code> の出力の途中の行（<code>Allocating group tables</code> など）の意味も、この章では読まない。区画の大きさの決め方（何 MB にするか）は扱わず、ここでは 200M にする。</div></div>
+
+<h2 id="fdisk">区切る — fdisk でパーティションを1つ作る</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>fdisk</code> の問いに順に答えて、区画を1つ作るまでの流れ。</div>
+<p>ディスクを書き換えるコマンドには、root（管理者）の権限が要る。練習機の root は直接ログインできないようにしてあり、student が <code>sudo</code> を付けて打つ（パスワードは聞かれない）。</p>
+<p><code>fdisk</code> は、ディスクの<b>パーティションの表</b>（どこからどこまでを区画にするかを書いた表。ディスクの先頭に置かれる）を作るコマンドである。ディスクの名前を渡すと、1文字のコマンドを受け付ける対話の画面になる。<code>n</code>（新しい区画）で作り、<code>p</code>（表示）で確かめ、<code>w</code>（書き込み）で終える。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk /dev/vdb
+Welcome to fdisk (util-linux 2.39.3).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS (MBR) disklabel with disk identifier 0x0d03b95b.   ← 表が無かったので、空の表をメモリの上に作った
+
+Command (m for help): n   ← n: 新しいパーティション
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p   ← p: 基本パーティション
+Partition number (1-4, default 1): 1   ← 1 番にする
+First sector (2048-4194303, default 2048):   ← Enter だけ: 始まりは 2048 番目のセクタ
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (2048-4194303, default 4194303): +200M   ← +200M: 大きさで答える
+
+Created a new partition 1 of type 'Linux' and of size 200 MiB.
+
+Command (m for help): p   ← p: いまの表を見る（まだ書いていない）
+Disk /dev/vdb: 2 GiB, 2147483648 bytes, 4194304 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x0d03b95b
+
+Device     Boot Start    End Sectors  Size Id Type
+/dev/vdb1        2048 411647  409600  200M 83 Linux
+
+Command (m for help): w   ← w: ここで初めてディスクに書く
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.</code></pre>
+<p>上から順に読む。</p>
+<ul>
+<li>最初の3行は「変更は、書き込みを指示するまでメモリの上だけにある」という注意である。</li>
+<li><code>Device does not contain a recognized partition table.</code> は「このディスクには表が無い」。<code>fdisk</code> は空の表をメモリの上に作った（<code>0x</code> で始まる番号は表ごとに違い、あなたの画面では別の値になる。<code>0x</code> は16進数（0〜9 と a〜f の16文字で書く数）の印）。</li>
+<li><code>n</code> の後、区画の種類を聞かれる。<code>p</code>（primary、基本パーティション）を選ぶ。もう1つの <code>e</code> は、区画を5つ以上に分けたいときに使う種類である。番号は <code>1</code> にした。</li>
+<li><code>First sector</code> は区画の始まりの位置である。<b>セクタ</b>はディスクを読み書きする最小の単位で、ここでは 512 バイト。Enter だけを押すと、括弧の中の default（2048）になる。表そのものはディスクの先頭の1セクタに入り、残りの 2047 セクタは、区画の始まりを 1MiB（1024×1024 バイト = 2048 セクタ）の切れ目にそろえるために空けておく（いまの道具の決まりごと）。</li>
+<li><code>Last sector</code> は終わりの位置で、<code>+200M</code> のように大きさで答えられる（M は MiB のこと）。</li>
+<li><code>p</code> で、メモリの上の表を出した。<code>/dev/vdb1</code> が 2048 番目のセクタから 411647 番目まで、200M ある。</li>
+<li><code>w</code> で表をディスクに書き、カーネルに読み直させて（<code>Calling ioctl() to re-read partition table.</code>）終わった。</li>
+</ul>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk /dev/vdb
+NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+vdb    253:16   0    2G  0 disk
+└─vdb1 253:17   0  200M  0 part</code></pre>
+<p><code>vdb</code> の中に <code>vdb1</code>（200M、TYPE は <code>part</code>）ができた。</p>
+<div class="scroll"><table>
+<tr><th>キー</th><th>すること</th><th>何のためにあるか</th></tr>
+<tr><td><code>m</code></td><td>キーの一覧を出す（menu）</td><td>キーを忘れたとき</td></tr>
+<tr><td><code>n</code></td><td>区画を作る（new）</td><td>区画を足す</td></tr>
+<tr><td><code>p</code></td><td>いまの表を出す（print）</td><td>書く前に確かめる</td></tr>
+<tr><td><code>w</code></td><td>ディスクに書いて終わる（write）</td><td>変更を本物にする</td></tr>
+<tr><td><code>q</code></td><td>書かずに終わる（quit）</td><td>間違えたときに、何も変えずに抜ける</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: <code>fdisk</code> は<b>下書きしてから清書する</b>書き方に近い。<code>n</code> で下書きし、<code>p</code> で見直し、<code>w</code> で清書する。気に入らなければ <code>q</code> で下書きを捨てる。
+<br>ただし<b>崩れる点</b>: <code>p</code> の表示は、まだ書いていない下書きも、書き終えた表と同じ形で見せる。<code>p</code> で <code>vdb1</code> が見えても、<code>w</code> を打つまではディスクに何も書かれておらず、その時点で別の端末から <code>lsblk</code> を打っても <code>vdb1</code> は出ない。</div>
+
+<h2 id="mkfs">作る — ファイルシステムを作る</h2>
+<div class="sgoal"><b>この節で分かること</b>: 区画にファイルシステムを作ると何ができるか。</div>
+<p>区画ができただけでは、まだファイルを置けない。区画の中に、ファイルを名前で整理するための管理情報（ファイルシステム）を書く。<code>mkfs.ext4</code> は ext4（Linux でいちばんよく使われるファイルシステムの種類）を作るコマンドである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mkfs.ext4 /dev/vdb1
+mke2fs 1.47.0 (5-Feb-2023)
+Discarding device blocks: done
+Creating filesystem with 51200 4k blocks and 51200 inodes
+Filesystem UUID: 113bd007-0f7d-403b-b48e-93a096eb0fc1   ← このファイルシステムの番号。作るたびに変わる
+Superblock backups stored on blocks:
+	32768
+
+Allocating group tables: done
+Writing inode tables: done
+Creating journal (4096 blocks): done
+Writing superblocks and filesystem accounting information: done</code></pre>
+<p><code>Creating filesystem with 51200 4k blocks</code> は「4KiB の塊を 51200 個並べた ext4 を作る」（4KiB × 51200 = 200MiB）。<code>Filesystem UUID</code> は、作ったときに決まるこのファイルシステムの番号（UUID）で、作るたびに違う値になる（あなたの画面では別の値）。最後の <code>done</code> まで出れば、管理情報が書けている。<code>mkfs</code> はその区画に前に何があっても、聞かずに管理情報で上書きする。中身を消す操作だと覚えておく。</p>
+<p><code>lsblk</code> に、ファイルシステムの種類（FSTYPE）とマウント先の列を足して見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS /dev/vdb
+NAME    SIZE FSTYPE MOUNTPOINTS
+vdb       2G
+└─vdb1  200M ext4</code></pre>
+<p><code>vdb1</code> の FSTYPE が <code>ext4</code> になった。MOUNTPOINTS はまだ空で、どこからも使えない。</p>
+<div class="analogy"><b>たとえ</b>: 第1章の<b>土地と倉庫</b>で言えば、<code>fdisk</code> で区画を切り、<code>mkfs</code> でそこに倉庫を建てた。倉庫には棚の配置図（管理情報）と、倉庫ごとの番号（UUID）がある。
+<br>ただし<b>崩れる点</b>: 本物の倉庫を建て直せば、中の物が壊れることは見れば分かる。<code>mkfs</code> は、前の中身が何であっても確かめずに上書きし、終わっても何も残っていないことを教えない。打つ前に、相手の区画の名前を確かめる。</div>
+
+<h2 id="mount">つなぐ — マウントして読み書きする</h2>
+<div class="sgoal"><b>この節で分かること</b>: マウントすると、どのディレクトリから何が見えるようになるか。</div>
+<p><code>mount</code> は、ファイルシステムをディレクトリにつなぐコマンドである。つなぐ相手の装置と、つなぐ先のディレクトリ（マウントポイント）を順に渡す。<code>/mnt</code> は、一時的に何かをつなぐために最初から用意されている空のディレクトリである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mount /dev/vdb1 /mnt
+$ df -h /mnt
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vdb1       172M   24K  158M   1% /mnt
+$ ls -l /mnt
+total 16
+drwx------ 2 root root 16384 Oct 20 20:55 lost+found
+$ lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS /dev/vdb
+NAME    SIZE FSTYPE MOUNTPOINTS
+vdb       2G
+└─vdb1  200M ext4   /mnt</code></pre>
+<p><code>mount</code> はうまくいくと何も出さない。<code>df -h /mnt</code> の Filesystem が <code>/dev/vdb1</code> になり、<code>/mnt</code> が <code>vdb1</code> の ext4 につながったと分かる（Size が 200M より小さいのは、ext4 が自分の管理情報などに使う分を除いて数えているから）。中には <code>lost+found</code> というディレクトリが1つある。これは ext4 が作るときに用意する、壊れたファイルの断片を置くための場所である。<code>lsblk</code> の MOUNTPOINTS にも <code>/mnt</code> が出た。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>/mnt</code> に新しいディスクがつながった。ここにファイルを書けば、<code>vdb1</code> に保存されるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo "はじめてのファイル" &gt; /mnt/memo.txt
+-bash: /mnt/memo.txt: Permission denied</code></pre>
+<div class="then"><b>だめな理由</b>: <code>Permission denied</code>（書き込みの許可が無い）で断られた。マウントすると、<code>/mnt</code> は <code>vdb1</code> の ext4 の<b>いちばん上のディレクトリ</b>を見せるようになる。その持ち主と権限は ext4 の中に書かれていて、<code>mkfs</code> が作ったときに root のもの（<code>rwxr-xr-x</code>）になった。student は「その他」なので書けない。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>$ ls -ld /mnt
+drwxr-xr-x 3 root root 4096 Oct 20 20:55 /mnt</code></pre>
+<p>持ち主が root で、その他の人は <code>r-x</code>（読む・中に入るだけ）である。このディスクを student のデータ置き場にするなら、いちばん上のディレクトリの持ち主を student に変える。<code>chown</code> は、ファイルやディレクトリの持ち主を変えるコマンドである（<code>student:student</code> は「持ち主を student、グループを student に」）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo chown student:student /mnt
+$ ls -ld /mnt
+drwxr-xr-x 3 student student 4096 Oct 20 20:55 /mnt
+$ echo "はじめてのファイル" &gt; /mnt/memo.txt
+$ cat /mnt/memo.txt
+はじめてのファイル
+$ ls -l /mnt
+total 20
+drwx------ 2 root    root    16384 Oct 20 20:55 lost+found
+-rw-rw-r-- 1 student student    28 Oct 20 20:55 memo.txt</code></pre>
+<p>持ち主が student になり、書けた。変わったのは <code>vdb1</code> の ext4 の中に書かれた持ち主で、練習機の <code>/</code> にある <code>/mnt</code> というディレクトリそのものではない（次の節で外したときに確かめる）。</p>
+<div class="analogy"><b>たとえ</b>: マウントは、<b>引き出しを机の決まった穴に差し込む</b>ことに近い。差し込むと、その穴（マウントポイント）から引き出し（ファイルシステム）の中が見え、物を出し入れできる。
+<br>ただし<b>崩れる点</b>: 引き出しの鍵（持ち主と権限）は、穴ではなく引き出しの側に付いている。<code>/mnt</code> の持ち主を変えたつもりでも、変わったのは差し込んだ引き出しの鍵である。だから引き出しを抜くと、穴は元の持ち主（root）に戻る。</div>
+
+<h2 id="umount">外す — umount</h2>
+<div class="sgoal"><b>この節で分かること</b>: 外したあと、ディレクトリとディスクがそれぞれどうなるか。</div>
+<p>使い終わったら外す。外すコマンドは <code>umount</code> である（<code>unmount</code> ではなく、u の後に n が無い）。マウントポイントか装置の名前を渡す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo umount /mnt
+$ ls /mnt
+$ ls -ld /mnt
+drwxr-xr-x 2 root root 4096 Sep  5 20:14 /mnt
+$ lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS /dev/vdb
+NAME    SIZE FSTYPE MOUNTPOINTS
+vdb       2G
+└─vdb1  200M ext4</code></pre>
+<p><code>/mnt</code> は空に戻り（<code>ls</code> が何も出さない）、持ち主も root に戻った（日付も、練習機の Ubuntu が作られた日のまま）。<code>vdb1</code> の MOUNTPOINTS は空になったが、FSTYPE は <code>ext4</code> のままである。<code>memo.txt</code> は <code>vdb1</code> の ext4 の中に残っていて、もう一度 <code>/dev/vdb1</code> をマウントすれば読める（次の章の最初で使う）。</p>
+<pre><code>区切る         作る            つなぐ                   使う             外す
+fdisk    →   mkfs.ext4   →   mount /dev/vdb1 /mnt  →  /mnt に書く  →  umount /mnt
+（表に1行）  （管理情報を書く）（/mnt から中が見える）                    （中身は vdb1 に残る）</code></pre>
+<div class="analogy"><b>たとえ</b>: 外すのは、<b>引き出しを机から抜いて棚にしまう</b>ことに近い。抜いても中の物は引き出しに入ったままで、次に差し込めばまた取り出せる。
+<br>ただし<b>崩れる点</b>: 机なら引き出しを抜いても机の穴はそこにあるが、マウントポイントを消してしまう（<code>/mnt</code> を <code>rmdir</code> する）と、次にマウントするときに穴が無くて断られる。マウントポイントは、前もって用意しておくただのディレクトリである。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-disks/practice/">演習01</a>は、この章の流れを、空のディスク <code>vde</code>（512M）で自分でなぞる課題である。
+判定は <code>vde</code> の表と、その中のファイルシステムを直接読んで確かめる。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>sudo fdisk /dev/vdb</code> で <code>n</code> を打って区画を作り、<code>p</code> で表示を確かめてから <code>q</code> で抜けた。<code>lsblk /dev/vdb</code> に新しい区画は出るか。</p>
+<details><summary>答え</summary>
+<p>出ない。<code>fdisk</code> の変更は <code>w</code> を打つまでメモリの上にしかなく、<code>q</code> は書かずに終わる。<code>p</code> はまだ書いていない表も同じ形で見せる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>新しい ext4 を <code>/srv/data</code> にマウントしたら、一般ユーザでファイルを作れなかった（<code>Permission denied</code>）。何を確かめ、どう直すか。</p>
+<details><summary>答え</summary>
+<p><code>ls -ld /srv/data</code> で、マウントしているファイルシステムのいちばん上のディレクトリの持ち主と権限を確かめる。<code>mkfs</code> で作ったばかりなら root のもので、その他の人は書けない。使う人を持ち主にする（<code>sudo chown ユーザ:グループ /srv/data</code>）。この変更はファイルシステムの中に書かれるので、外してもう一度マウントしても残る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>空のディスク <code>/dev/sdb</code> を使えるようにして <code>/mnt</code> から使い、最後に外したい。打つコマンドを順に並べよ（区画は1つでよい）。</p>
+<details><summary>答え</summary>
+<p><code>sudo fdisk /dev/sdb</code>（<code>n</code>・<code>p</code>・<code>w</code> で <code>sdb1</code> を作る）→ <code>sudo mkfs.ext4 /dev/sdb1</code> → <code>sudo mount /dev/sdb1 /mnt</code> → （使う）→ <code>sudo umount /mnt</code>。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>空のディスクを使えるようにするのは、区切る（<code>fdisk</code>）→ 作る（<code>mkfs.ext4</code>）→ つなぐ（<code>mount</code>）の3段。使い終わったら <code>umount</code> で外す</li><li><code>fdisk</code> は <code>w</code> を打つまでディスクに書かない。<code>q</code> で抜ければ何も変わらない</li><li><code>+200M</code> のように大きさで区画の終わりを指定できる。セクタは読み書きの最小の単位（ここでは 512 バイト）</li><li><code>mkfs</code> は区画の中身を確かめずに上書きする。作るたびに UUID が決まる</li><li>マウントすると、マウントポイントはファイルシステムのいちばん上のディレクトリを見せる。その持ち主と権限はファイルシステムの中にあり、作ったばかりなら root のもの。外すと元のディレクトリに戻る</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.1.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・fdisk（util-linux）2.39.3・e2fsprogs 1.47.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁 × 24 行で、第1章から順に1つの練習機で打って検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-disks/theory/01-look">← 1. 練習機に入り、つながっているディスクを眺める</a><a href="/linuc-disks/theory/03-partition">次: 3. パーティションの表を読む・直す →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-disks/">ハードウェアとディスク</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/practice/">実践編</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-disks/chapters.js"></script>
+<script src="/linuc-disks/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

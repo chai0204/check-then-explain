@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>8. スワップと tmpfs — 確かめて説明する LinuC 主題1.05</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="8" data-theme="linuc-disks">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第8章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+</div>
+<h1>8. スワップと tmpfs</h1>
+<p class="lead">第7章では、<code>/etc/fstab</code> に書いて起動のたびにマウントし、再起動して確かめた。この章では、第4章で切った <code>vdb3</code>（種類 Linux swap）をメモリの逃げ場（スワップ）にして起動のたびに使われるようにし、逆にメモリの上に置くファイルシステム（tmpfs）を作ってみる。</p>
+<div class="badges"><span>前提: 第7章まで読了</span><span>前提: 練習機の中にいる</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li><code>mkswap</code>・<code>swapon</code>・<code>swapoff</code> の役割を言い分けられ、スワップを区画でもファイルでも作れる</li><li>起動のたびに使うスワップを <code>/etc/fstab</code> に書き、再起動せずに確かめられる</li><li>tmpfs がメモリの上のファイルシステムで、<code>size=</code> が上限であることを説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: スワップの使われやすさの調整（<code>vm.swappiness</code>）は扱わない。メモリを圧縮して使う仕組み（zram・zswap）と、休止（ハイバネート）の設定も扱わない。スワップをどれくらいの大きさにするかは、本文の1行の目安だけでよい。</div></div>
+
+<h2 id="swap">スワップは、作る・使い始める・外すが別のコマンド</h2>
+<div class="sgoal"><b>この節で分かること</b>: スワップを使えるようになるまでの段階と、それぞれのコマンド。</div>
+<p><b>メモリ</b>は、いま動いているプログラムとそのデータを置く場所で、速いが量が限られ、電源を切ると消える。<b>スワップ</b>は、メモリが足りなくなったときに、しばらく使われていない中身をディスクに書き出しておく領域である。<code>free</code> はメモリとスワップの使い方を出すコマンドで、<code>-h</code> は読みやすい単位にする。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ free -h</code></pre>
+<div class="scroll"><table>
+<tr><th>列</th><th>意味</th></tr>
+<tr><td>total</td><td>全部の量</td></tr>
+<tr><td>used・free</td><td>使っている量・まったく使っていない量</td></tr>
+<tr><td>shared</td><td>複数のプログラムで共有している量（tmpfs の中身もここに入る。この章の後半）</td></tr>
+<tr><td>buff/cache</td><td>ディスクの読み書きを速くするために、メモリに置いてある写し（必要になれば手放す）</td></tr>
+<tr><td>available</td><td>新しいプログラムが使える量の見積もり（free に、手放せる buff/cache を足したもの）</td></tr>
+</table></div>
+<p>Swap の行が 0B で、練習機にはまだスワップが無い（第4章で見たとおり、練習機のディスクにはスワップの区画が無い）。数は人によって少し違う。<code>vdb3</code> をスワップにする。<code>mkswap</code> は、区画をスワップの形にするコマンドである（ファイルシステムの <code>mkfs</code> に当たる）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mkswap -L SWAP /dev/vdb3
+$ free -h<!--o note="Swap::mkswap しても 0B のまま"--></code></pre>
+<p><code>mkswap</code> は UUID を決めて書き（<code>-L</code> でラベルも付けた）、大きさを出した。それでも Swap は 0B のままである。<code>mkswap</code> はスワップの<b>形</b>を作るだけで、使い始めるのは <code>swapon</code> である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo swapon /dev/vdb3
+$ swapon --show
+$ cat /proc/swaps
+$ swapon -s
+$ free -h</code></pre>
+<p>使っているスワップは、<code>swapon --show</code>・<code>/proc/swaps</code>（カーネルが今のスワップの一覧を見せているファイル）・<code>swapon -s</code>（<code>/proc/swaps</code> と同じ形）で見られる。<code>free</code> の Swap の行も 255Mi になった。PRIO は優先度で、指定しなければカーネルが負の数を付ける（後から使い始めたものほど小さい）。</p>
+<p>スワップは区画でなくても、ファイルでも作れる。<code>dd</code> で 128MiB のファイルを作る（<code>/dev/zero</code> は読むたびに 0 を返す装置のファイル）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo dd if=/dev/zero of=/swapfile bs=1M count=128 status=none
+$ ls -l /swapfile
+$ sudo mkswap /swapfile</code></pre>
+<p><code>mkswap</code> が <code>insecure permissions 0644, fix with: chmod 0600 /swapfile</code>（パーミッションが危ない。600 にせよ）と注意した。スワップにはメモリの中身（パスワードを含むかもしれない）が書き出されるので、root 以外に読めてはいけない。直してから使い始める。<code>-p 10</code> は優先度を 10 にするオプションである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo chmod 600 /swapfile
+$ sudo swapon -p 10 /swapfile
+$ swapon --show
+$ sudo swapoff /swapfile
+$ sudo rm /swapfile</code></pre>
+<p>スワップが2つ並び、PRIO は 10 と -2 になった。カーネルは優先度の数が大きいほうから使う。<code>swapoff</code> は使うのをやめるコマンドで（中に書き出していたものはメモリに戻す）、やめてからファイルを消した。</p>
+<div class="scroll"><table>
+<tr><th>コマンド</th><th>すること</th><th>何のためにあるか</th></tr>
+<tr><td><code>mkswap 区画かファイル</code></td><td>スワップの形を作る（<code>-L</code> でラベル）</td><td>区画やファイルを、スワップとして使える形にする</td></tr>
+<tr><td><code>swapon 区画かファイル</code></td><td>使い始める（<code>-p</code> で優先度）</td><td>いまからメモリの逃げ場にする</td></tr>
+<tr><td><code>swapon -a</code></td><td><code>/etc/fstab</code> のスワップを全部使い始める</td><td>起動のときと同じことを、その場で起こす</td></tr>
+<tr><td><code>swapon --show</code>・<code>swapon -s</code></td><td>使っているスワップの一覧（<code>/proc/swaps</code>）</td><td>どれが・どれだけ使われているかを見る</td></tr>
+<tr><td><code>swapoff 区画かファイル</code></td><td>使うのをやめる（<code>-a</code> で全部）</td><td>外す・消す前に、中身をメモリに戻す</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: スワップは、机（メモリ）の横に置く<b>段ボール箱</b>に近い。机に載り切らない書類を、しばらく使わないものから箱に移す。<code>mkswap</code> は箱を組み立てること、<code>swapon</code> は箱を机の横に置くことである。
+<br>ただし<b>崩れる点</b>: 段ボール箱は組み立てた時点で使えるが、スワップは <code>mkswap</code> だけでは1バイトも使われない（<code>free</code> が 0B のままだった）。<code>swapon</code> で置いて初めて、机の延長になる。</div>
+<div class="analogy"><b>たとえ</b>: 箱が2つあるときは、<b>手の届く近い箱</b>（優先度の高いほう）から詰めていくのに近い。近い箱がいっぱいになってから、遠い箱を使う。
+<br>ただし<b>崩れる点</b>: 人なら同じ距離の箱が2つあればどちらか一方から詰めるが、カーネルは優先度が同じスワップには<b>交互に</b>書く。速さの同じディスクを同じ優先度にすると、両方へ分けて書ける。</div>
+
+<h2 id="fstab">起動のたびに使う</h2>
+<div class="sgoal"><b>この節で分かること</b>: スワップの <code>/etc/fstab</code> の行の書き方と、再起動せずに確かめる方法。</div>
+<p>起動のたびに使うスワップも、<code>/etc/fstab</code> に書く（第7章）。マウントポイントの列は <code>none</code>、種類は <code>swap</code>、オプションは慣習で <code>sw</code> と書く。装置の名前ではなく、<code>mkswap</code> が書き込んだ UUID で指す（スワップは中身を上書きして使うので、取り違えると、そこにあったデータが壊れる）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb3)  none  swap  sw  0  0" | sudo tee -a /etc/fstab
+$ sudo systemctl daemon-reload
+$ sudo swapoff /dev/vdb3
+$ swapon --show
+$ sudo swapon -a
+$ swapon --show</code></pre>
+<p>いったん <code>swapoff</code> で外すと <code>swapon --show</code> は何も出さず、<code>swapon -a</code>（<code>/etc/fstab</code> のスワップを全部使い始める）で戻った。起動のときにも、これと同じことが起きる。外してから <code>-a</code> で戻ってくれば、書いた行が効いていると、再起動せずに確かめられる。</p>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-disks/practice/">演習07</a>は、vdb3 をスワップにして、起動のたびに使われるように <code>/etc/fstab</code> に UUID で書く課題である。
+判定は vdb3 をいったん外し、起動のときと同じ <code>swapon -a</code> で戻るかを見る。この章のとおりに打った人は、もう達成している。</div>
+
+<h2 id="naive">tmpfs — メモリの上のファイルシステム</h2>
+<div class="sgoal"><b>この節で分かること</b>: tmpfs の <code>size=</code> が何を意味するか。</div>
+<p><b>tmpfs</b> は、ディスクではなくメモリの上に置くファイルシステムである。速いが、外すか再起動すると中身は消える。第1章の <code>df -h</code> に出ていた <code>tmpfs</code> の行がこれで、練習機でもすでにいくつか使われている。<code>findmnt</code> の <code>-t</code> は、種類で絞るオプションである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ findmnt -t tmpfs -o TARGET,FSTYPE,SIZE
+$ free -m</code></pre>
+<p>メモリは全部で 1424MiB しかない（<code>free -m</code> は MiB の整数で出す）。ここに 4GiB の tmpfs を作る。<code>mount</code> の <code>-t</code> は種類を指定するオプションで、<code>-o size=4G</code> は大きさである。tmpfs には装置が無いので、装置の名前の欄には何を書いてもよく、ふつうは <code>tmpfs</code> と書く。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>tmpfs はメモリの上に置くのだから、<code>size=4G</code> と書けばメモリを 4GiB 取るはずだ。メモリが 1.4GiB しかないこの練習機では、マウントできないか、できてもメモリが足りなくなるだろう。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mkdir /mnt/ram
+$ sudo mount -t tmpfs -o size=4G tmpfs /mnt/ram
+$ df -h /mnt/ram
+$ free -m</code></pre>
+<div class="then"><b>だめな理由</b>: マウントでき、<code>df</code> には 4.0G と出て、<code>free</code> の数字はほとんど動かない。
+<b>tmpfs の size は上限</b>で、作った時点ではメモリを1バイトも取らない。書いた分だけ、その場でメモリを使う。
+だから実際のメモリより大きな size も書けてしまう。</div></div>
+<p>300MiB 書いてみる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo dd if=/dev/zero of=/mnt/ram/fill bs=1M count=300 status=none
+$ free -m<!--o note="Mem::shared が 300 増え、available が減った"-->
+$ df -h /mnt/ram
+$ sudo umount /mnt/ram
+$ free -m
+$ sudo rmdir /mnt/ram</code></pre>
+<p>書いた 300MiB は <code>free</code> の shared に出て、available がその分減った。外すと、中身ごと消えてメモリが戻る。メモリが足りなくなれば、tmpfs の中身もスワップに書き出される。</p>
+<div class="scroll"><table>
+<tr><th></th><th>tmpfs</th><th>スワップ</th></tr>
+<tr><td>置き場所</td><td>メモリ（足りなければスワップへ）</td><td>ディスク</td></tr>
+<tr><td>作り方</td><td><code>mount -t tmpfs -o size=… tmpfs 場所</code></td><td><code>mkswap</code> → <code>swapon</code></td></tr>
+<tr><td>大きさの意味</td><td>上限。書いた分だけメモリを使う</td><td>ディスクの上に取った大きさ</td></tr>
+<tr><td>再起動すると</td><td>中身は消える</td><td>中身は意味を持たない（<code>/etc/fstab</code> にあれば、また使い始める）</td></tr>
+<tr><td>何のためにあるか</td><td>速く読み書きしたい一時的なファイル（<code>/run</code>・<code>/dev/shm</code>）</td><td>メモリが足りないときの逃げ場</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: tmpfs は<b>ホワイトボード</b>に近い。広さの上限は決まっているが、インク（メモリ）は書いた分しか減らず、消せば跡形も無い。
+<br>ただし<b>崩れる点</b>: ホワイトボードは部屋の壁より大きくできないが、tmpfs の size は実際のメモリより大きく書けてしまう。そのまま書き続けると、メモリとスワップを使い切る。size は「確保」ではなく「ここまで」という約束でしかない。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>mkswap /dev/sdb2</code> を実行したが、<code>free</code> の Swap が 0B のまま。何が足りないか。起動のたびにも使うにはどうするか。</p>
+<details><summary>答え</summary>
+<p><code>swapon /dev/sdb2</code> で使い始める（<code>mkswap</code> は形を作るだけ）。起動のたびにも使うには、<code>/etc/fstab</code> に <code>UUID=…  none  swap  sw  0  0</code> の行を書く。<code>swapon -a</code> で、その行が効くかを再起動せずに確かめられる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>スワップが2つあり、<code>swapon --show</code> の PRIO が 10 と -2 だった。どちらから使われるか。</p>
+<details><summary>答え</summary>
+<p>数の大きい 10 のほうから使われる。優先度は <code>swapon -p</code> か、<code>/etc/fstab</code> のオプション <code>pri=10</code> で付ける。付けなければカーネルが負の数を付ける。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>メモリが 2GiB のマシンで <code>mount -t tmpfs -o size=8G tmpfs /mnt/t</code> を実行した。マウントできるか。マウントした直後のメモリの使用量はどうなるか。</p>
+<details><summary>答え</summary>
+<p>マウントできる。size は上限なので、直後のメモリの使用量はほとんど変わらない。書き込んだ分だけメモリを使い、外すか再起動すると中身は消える。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>スワップは、メモリが足りないときに中身を書き出すディスクの領域。<code>mkswap</code>（形を作る）→ <code>swapon</code>（使い始める）→ <code>swapoff</code>（やめる）。<code>mkswap</code> だけでは使われない</li><li>使っているスワップは <code>swapon --show</code>・<code>swapon -s</code>・<code>/proc/swaps</code>・<code>free</code> で見る。優先度は数の大きいほうから使う</li><li>スワップはファイルでも作れる。パーミッションは 600 にする（<code>mkswap</code> が注意する）</li><li>起動のたびに使うものは <code>/etc/fstab</code> に <code>UUID=…  none  swap  sw  0  0</code>。<code>swapoff</code> してから <code>swapon -a</code> で、再起動せずに確かめられる</li><li>tmpfs はメモリの上のファイルシステム。<code>size=</code> は上限で、書いた分だけメモリを使い、外すか再起動すると消える</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.1.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic（メモリ 1536MiB）・util-linux 2.39.3 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁 × 24 行で、第1章から順に1つの練習機で打って検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-disks/theory/07-fstab">← 7. 起動のたびにマウントする</a><a href="/linuc-disks/theory/09-lvm">次: 9. LVM で、2台のディスクを1つにまとめる →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-disks/">ハードウェアとディスク</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/practice/">実践編</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-disks/chapters.js"></script>
+<script src="/linuc-disks/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

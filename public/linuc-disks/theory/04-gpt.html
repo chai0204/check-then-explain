@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4. 新しい形式の表（GPT）と、起動に使う区画 — 確かめて説明する LinuC 主題1.05</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="4" data-theme="linuc-disks">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第4章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+</div>
+<h1>4. 新しい形式の表（GPT）と、起動に使う区画</h1>
+<p class="lead">第3章では、<code>vdb</code> の MBR の表を読み、消した <code>vdb1</code> を取り戻し、拡張・論理パーティションで5つ以上に分けた。この章では、もう1つの表の形式 GPT を練習機自身のディスク <code>vda</code> で読み、起動に使う区画（ESP）の役目を確かめてから、<code>vdb</code> を「UEFI で起動するサーバのディスク」として GPT で切り直す。</p>
+<div class="badges"><span>前提: 第3章まで読了</span><span>前提: 練習機の中にいる</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>MBR と GPT の違い（区画の数・大きさの上限・種類の表し方）を言える</li><li>ESP が何のための区画で、UEFI のファームウェアが起動のときにそれをどう見つけるかを説明できる</li><li><code>/</code>・<code>/boot</code>・<code>/var</code>・<code>/home</code>・スワップを用途で分ける理由を言え、<code>gdisk</code> で GPT の表を作って種類を付けられる。<code>parted</code> が打った瞬間に書くことを踏まえて使える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: Secure Boot（起動するプログラムの署名を確かめる仕組み）と shim の役目は扱わない。GRUB の設定ファイルの書き方（主題1.01 のコース）も扱わない。BIOS（古い起動の方式）で GPT のディスクから起動するしくみの細部も扱わない。</div></div>
+
+<h2 id="gpt">練習機自身のディスクは GPT</h2>
+<div class="sgoal"><b>この節で分かること</b>: GPT の表を <code>fdisk -l</code> で読むと、MBR と何が違って見えるか。</div>
+<p>第3章と同じ <code>fdisk -l</code> で、練習機の Linux が入っている <code>vda</code> を読む。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk -l /dev/vda
+Disk /dev/vda: 20 GiB, 21474836480 bytes, 41943040 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: gpt
+Disk identifier: D6802C58-E607-4421-9940-13246D0847AC
+
+Device       Start      End  Sectors  Size Type
+/dev/vda1  2099200 41943006 39843807   19G Linux filesystem
+/dev/vda14    2048    10239     8192    4M BIOS boot
+/dev/vda15   10240   227327   217088  106M EFI System
+/dev/vda16  227328  2097152  1869825  913M Linux extended boot
+
+Partition table entries are not in disk order.</code></pre>
+<p><code>Disklabel type: gpt</code> である。<b>GPT</b>（GUID Partition Table）は、MBR の制限をなくすために作られた新しい表の形式で、いまの PC やサーバはふつうこれを使う。Disk identifier が長いのは、<b>GUID</b>（128 ビットの番号。でたらめに選ぶので、世界中でほぼ重ならない）を使っているからである。表の Type の列には、種類の番号ではなく名前が出ている。最後の <code>Partition table entries are not in disk order.</code> は「表の行の順番が、ディスクの上の並び順と違う」という注意で、1 番の <code>vda1</code> がディスクのいちばん後ろにあるために出る（困ることは無い）。</p>
+<div class="scroll"><table>
+<tr><th></th><th>MBR</th><th>GPT</th><th>違いが何のためにあるか</th></tr>
+<tr><td>区画の数</td><td>基本4つまで（5つ目からは拡張・論理）</td><td>ふつう 128 個まで、全部が同じ扱い</td><td>拡張・論理という回り道をなくす</td></tr>
+<tr><td>ディスクの大きさ</td><td>2TiB まで</td><td>事実上の上限なし（64 ビット）</td><td>2TiB を超える大きなディスクを使う</td></tr>
+<tr><td>表の置き場所</td><td>先頭の1セクタだけ</td><td>先頭と末尾の2か所</td><td>片方が壊れても、もう片方から読み直せる</td></tr>
+<tr><td>種類の表し方</td><td>1バイトの番号（83 など）</td><td>GUID。区画ごとにも固有の GUID（PARTUUID）を持つ</td><td>番号の取り合いをなくし、区画を1つずつ見分けられる</td></tr>
+</table></div>
+
+<h2 id="esp">起動の入口 — ESP</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>vda</code> の4つの区画の役目と、ファームウェアが ESP をどう見つけるか。</div>
+<p><code>lsblk</code> の <code>PARTTYPENAME</code> は、区画の種類の名前を出す列である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -o NAME,SIZE,FSTYPE,PARTTYPENAME,MOUNTPOINTS /dev/vda
+NAME     SIZE FSTYPE PARTTYPENAME        MOUNTPOINTS
+vda       20G
+├─vda1    19G ext4   Linux filesystem    /
+├─vda14    4M        BIOS boot
+├─vda15  106M vfat   EFI System          /boot/efi
+└─vda16  913M ext4   Linux extended boot /boot</code></pre>
+<p>表を読む前に、起動の順番を押さえる。電源を入れると、OS より先に<b>ファームウェア</b>（第1章で見た、機械に組み込まれたプログラム。PC ではマザーボード（CPU・メモリ・装置をつなぐ大きな基板）に入っている）が動く。いまの PC のファームウェアは <b>UEFI</b> という決まりに沿って作られていて、ディスクの中の決まった区画から<b>ブートローダ</b>（カーネルを読み込んで起動するプログラム）を読む。ブートローダがカーネルを動かし、カーネルが <code>/</code> をマウントして、OS が動き出す。</p>
+<div class="scroll"><table>
+<tr><th>区画</th><th>種類（PARTTYPENAME）</th><th>中身・マウント先</th><th>何のためにあるか</th></tr>
+<tr><td>vda15</td><td>EFI System</td><td>vfat → <code>/boot/efi</code></td><td><b>ESP</b>（EFI System Partition）。電源を入れたとき最初に読まれる、ブートローダの置き場所</td></tr>
+<tr><td>vda16</td><td>Linux extended boot</td><td>ext4 → <code>/boot</code></td><td>カーネル（Linux の本体）と、起動の途中で使うファイルの置き場所</td></tr>
+<tr><td>vda1</td><td>Linux filesystem</td><td>ext4 → <code>/</code></td><td>それ以外の全部（OS・プログラム・設定・利用者のファイル）</td></tr>
+<tr><td>vda14</td><td>BIOS boot</td><td>（ファイルシステム無し）</td><td>BIOS（古い起動の方式）で GPT のディスクから起動するときに使う。この練習機では使われていない</td></tr>
+</table></div>
+<p>ファームウェアがブートローダを読みに行く「決まった区画」が ESP である。ESP は FAT（Windows でも使われる、単純なファイルシステム。Linux では vfat と表示する）で作る。中を見る。<code>/boot/efi</code> は root にしか読めないようにマウントされているので、<code>sudo</code> を付ける。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo ls /boot/efi/EFI/ubuntu
+BOOTX64.CSV  grub.cfg  grubx64.efi  mmx64.efi  shimx64.efi</code></pre>
+<p><code>.efi</code> は UEFI が実行できるプログラムの形である。ファームウェアが最初に動かすのは <code>shimx64.efi</code> で、それが <code>grubx64.efi</code>（GRUB というブートローダ）を呼び出す。では、ファームウェアはどうやってこの区画とファイルを見つけるのか。ファームウェアは、起動の候補を<b>NVRAM</b>（マザーボードの、電源を切っても消えないメモリ）に覚えている。<code>efibootmgr</code> は、その候補を読むコマンドである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo efibootmgr | grep Ubuntu
+Boot0002* Ubuntu	HD(15,GPT,9606bc98-2904-4577-9584-a8310313a04c,0x2800,0x35000)/File(\EFI\ubuntu\shimx64.efi)</code></pre>
+<p><code>HD(15,GPT,9606bc98-…,…)/File(\EFI\ubuntu\shimx64.efi)</code> は、「GPT の 15 番目の区画で、区画の番号（PARTUUID）が <code>9606bc98-…</code> のものの中の、このファイル」と読む。<code>blkid</code>（区画やファイルシステムに書かれた種類・ラベル・番号を読むコマンド）で <code>vda15</code> を読んで比べる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo blkid /dev/vda15
+/dev/vda15: LABEL_FATBOOT="UEFI" LABEL="UEFI" UUID="B792-27AD" BLOCK_SIZE="512" TYPE="vfat" PARTUUID="9606bc98-2904-4577-9584-a8310313a04c"   ← efibootmgr の候補と同じ番号</code></pre>
+<p>最後の <code>PARTUUID</code> が、<code>efibootmgr</code> の候補の番号と一致している。ファームウェアは Linux より先に動くので、<code>/dev/vda15</code> という名前も、<code>/boot/efi</code> というマウント先も知らない。知っているのは、GPT の表の上の番号と PARTUUID と、ファイルのパスだけである。<code>/boot/efi</code> にマウントしてあるのは、Linux がブートローダを更新するとき（パッケージの更新など）に中のファイルを書き換えるためである。</p>
+<p>ESP の種類 <b>EFI System</b> は、UEFI の決まりが定めた「この区画が ESP だ」という印である。OS のインストーラや、ESP を探して更新する道具は、この印で ESP を見分ける。だから ESP を作るときは、必ずこの種類にする。</p>
+<div class="analogy"><b>たとえ</b>: ファームウェアは建物の<b>守衛</b>、NVRAM の候補は守衛の<b>来客名簿</b>に近い。名簿には「15 番の部屋（区画の番号と PARTUUID）の、この人（ファイルのパス）を呼べ」と書いてあり、守衛はそれだけを見て呼び出す。
+<br>ただし<b>崩れる点</b>: 守衛なら建物の中の事情（どの部屋をいま誰が使っているか）も聞けるが、ファームウェアは Linux の設定（どこにマウントしているか）を一切読まない。Linux が動き出す前に仕事を終えるからである。</div>
+
+<h2 id="allocate">用途ごとに区画を分ける</h2>
+<div class="sgoal"><b>この節で分かること</b>: 新しいサーバのディスクを、何のためにどう区切るか。</div>
+<p>練習機の <code>vda</code> は、<code>/</code> と、起動に要る2つ（ESP と <code>/boot</code>）しか分けていない。クラウドのサーバは1台を1つの用途に使い、足りなくなれば作り直すことが多いので、小さく単純にしてある。区画を分けるのは必須ではないが、分けておくと、ある区画が溢れたり壊れたりしたときの被害が、その区画の中で止まる。何を分けるかは「いっぱいになったら何が困るか」「作り直すときに何を残したいか」で決める。</p>
+<div class="scroll"><table>
+<tr><th>区画</th><th>入るもの</th><th>分ける理由</th></tr>
+<tr><td>ESP</td><td>ブートローダ（FAT）</td><td>UEFI で起動するなら必須。種類を EFI System にする</td></tr>
+<tr><td><code>/boot</code></td><td>カーネルと、起動の途中で使うファイル</td><td><code>/</code> を複雑な形（第9章の LVM や暗号化）にしても、ブートローダが読める単純な形で残す</td></tr>
+<tr><td>スワップ</td><td>メモリから書き出した中身</td><td>メモリが足りないときの逃げ場（ファイルシステムではなく、専用の領域にする）</td></tr>
+<tr><td><code>/</code></td><td>OS とプログラム</td><td>ほかが溢れても、これが溢れなければシステムは動く</td></tr>
+<tr><td><code>/var</code></td><td>ログ・メールの待ち行列・データベースなど、増え続けるもの</td><td>ログが溢れても <code>/</code> を道連れにしない</td></tr>
+<tr><td><code>/home</code></td><td>利用者のファイル</td><td>OS を入れ直しても残す。利用者が溢れさせても OS に響かない</td></tr>
+</table></div>
+<p>この割り当てを <code>vdb</code> に作る。大きさは、ESP 100M・<code>/boot</code> 300M・スワップ 256M・<code>/</code> 600M・<code>/var</code> 400M・<code>/home</code> 残り全部とする。</p>
+<div class="analogy"><b>たとえ</b>: 引っ越し先の<b>部屋割り</b>に近い。台所（<code>/var</code>）が散らかっても寝室（<code>/</code>）に物が溢れないよう、壁で仕切っておく。
+<br>ただし<b>崩れる点</b>: 部屋なら隣が空いていれば物を一時的に置けるが、区画は隣の区画に空きがあっても使えない。仕切りを動かす（区画の大きさを変える）のは手間がかかるので、後から広げたい区画は LVM（第9章）に載せておくのが今のふつうのやり方である。</div>
+
+<h2 id="gdisk">gdisk で GPT を作る</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>gdisk</code> で GPT の表を作り直し、種類を4文字のコードで付ける流れ。</div>
+<p><code>gdisk</code> は GPT のための区切る道具で、使い方は <code>fdisk</code> とほぼ同じ（1文字のキーで操作し、<code>w</code> で書く）である。いまの <code>vdb</code> の MBR の表を、<code>o</code>（空の GPT にし直す）で捨ててから、<code>n</code> で6つ作る。<code>n</code> では4つ聞かれる: 番号（Enter で次の番号）・始まり（Enter で空きの先頭）・終わり（<code>+100M</code> のように大きさで）・種類（4文字のコード。<code>ef00</code> = EFI System、<code>8300</code> = Linux filesystem、<code>8200</code> = Linux swap。<code>L</code> で一覧）。最後の区画は、終わりも Enter（残り全部）にする。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo gdisk /dev/vdb
+GPT fdisk (gdisk) version 1.0.10
+
+Partition table scan:
+  MBR: MBR only
+  BSD: not present
+  APM: not present
+  GPT: not present
+
+
+***************************************************************
+Found invalid GPT and valid MBR; converting MBR to GPT format   ← 第3章の MBR を見つけて、メモリの上で GPT に変換した
+in memory. THIS OPERATION IS POTENTIALLY DESTRUCTIVE! Exit by
+typing 'q' if you don't want to convert your MBR partitions
+to GPT format!
+***************************************************************
+
+
+Command (? for help): o   ← o: 空の GPT にし直す
+This option deletes all partitions and creates a new protective MBR.
+Proceed? (Y/N): Y
+
+Command (? for help): n
+Partition number (1-128, default 1):
+First sector (34-4194270, default = 2048) or {+-}size{KMGTP}:
+Last sector (2048-4194270, default = 4192255) or {+-}size{KMGTP}: +100M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): ef00   ← ef00: ESP の印
+Changed type of partition to 'EFI system partition'
+
+Command (? for help): n
+Partition number (2-128, default 2):
+First sector (34-4194270, default = 206848) or {+-}size{KMGTP}:
+Last sector (206848-4194270, default = 4192255) or {+-}size{KMGTP}: +300M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (3-128, default 3):
+First sector (34-4194270, default = 821248) or {+-}size{KMGTP}:
+Last sector (821248-4194270, default = 4192255) or {+-}size{KMGTP}: +256M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8200
+Changed type of partition to 'Linux swap'
+
+Command (? for help): n
+Partition number (4-128, default 4):
+First sector (34-4194270, default = 1345536) or {+-}size{KMGTP}:
+Last sector (1345536-4194270, default = 4192255) or {+-}size{KMGTP}: +600M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (5-128, default 5):
+First sector (34-4194270, default = 2574336) or {+-}size{KMGTP}:
+Last sector (2574336-4194270, default = 4192255) or {+-}size{KMGTP}: +400M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (6-128, default 6):
+First sector (34-4194270, default = 3393536) or {+-}size{KMGTP}:
+Last sector (3393536-4194270, default = 4192255) or {+-}size{KMGTP}:
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300):
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): p
+Disk /dev/vdb: 4194304 sectors, 2.0 GiB
+Sector size (logical/physical): 512/512 bytes
+Disk identifier (GUID): 999FC896-5260-43E8-B409-A6BAD801E9C2
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 4194270
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 4029 sectors (2.0 MiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048          206847   100.0 MiB   EF00  EFI system partition
+   2          206848          821247   300.0 MiB   8300  Linux filesystem
+   3          821248         1345535   256.0 MiB   8200  Linux swap
+   4         1345536         2574335   600.0 MiB   8300  Linux filesystem
+   5         2574336         3393535   400.0 MiB   8300  Linux filesystem
+   6         3393536         4192255   390.0 MiB   8300  Linux filesystem
+
+Command (? for help): w   ← w: ここで初めて書く
+
+Final checks complete. About to write GPT data. THIS WILL OVERWRITE EXISTING
+PARTITIONS!!
+
+Do you want to proceed? (Y/N): Y
+OK; writing new GUID partition table (GPT) to /dev/vdb.
+The operation has completed successfully.</code></pre>
+<p>最初に出た <code>Found invalid GPT and valid MBR; converting MBR to GPT format in memory.</code> は「GPT は無く MBR がある。メモリの上で GPT に変換した」で、<code>w</code> を打たなければディスクは変わらない。<code>o</code> は、すべての区画を消して空の GPT（と、古い道具に「このディスクは使用中」と見せるための保護用の MBR）を作る。<code>p</code> の表の Code の列に、付けた種類のコードが並んでいる。<code>w</code> を打つと、上書きしてよいかをもう一度聞いてくる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -o NAME,SIZE,FSTYPE,PARTTYPENAME /dev/vdb
+NAME    SIZE FSTYPE PARTTYPENAME
+vdb       2G
+├─vdb1  100M ext4   EFI System   ← 種類は EFI System、中身は ext4（第2章の残り）
+├─vdb2  300M        Linux filesystem
+├─vdb3  256M        Linux swap
+├─vdb4  600M        Linux filesystem
+├─vdb5  400M        Linux filesystem
+└─vdb6  390M        Linux filesystem</code></pre>
+<p><code>vdb1</code> の FSTYPE が <code>ext4</code> になっている。種類は EFI System なのに、中身は第2章で作った ext4 のままである。<code>vdb1</code> も第2章の <code>vdb1</code> も 2048 番目のセクタから始まるので、表を作り直しても、そこにある中身はそのまま読めてしまう（第3章と同じ）。ESP の中身（FAT）は次の章で作る。</p>
+<p>もう1つの道具 <code>parted</code> でも読む。<code>parted</code> は MBR と GPT の両方を扱う区切る道具で、<code>print</code> で表を出す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo parted /dev/vdb print
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdb: 2147MB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags:
+
+Number  Start   End     Size   File system  Name                  Flags
+ 1      1049kB  106MB   105MB  ext4         EFI system partition  boot, esp
+ 2      106MB   420MB   315MB               Linux filesystem
+ 3      420MB   689MB   268MB               Linux swap            swap
+ 4      689MB   1318MB  629MB               Linux filesystem
+ 5      1318MB  1737MB  419MB               Linux filesystem
+ 6      1737MB  2146MB  409MB               Linux filesystem</code></pre>
+<p><code>parted</code> は大きさを MB（1000×1000 バイト）で表示する（<code>fdisk</code>・<code>gdisk</code> の MiB とは単位が違うので、数字が少し大きく見える）。Flags の列には、種類が <code>boot, esp</code>（ESP）や <code>swap</code> という旗の形で出る。Name の列は GPT の区画に付けられる名前で、<code>gdisk</code> は種類の名前をそのまま付けた。</p>
+
+<h2 id="parted">parted は、打った瞬間に書く</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>parted</code> が <code>fdisk</code>・<code>gdisk</code> と違い、いつディスクに書くか。</div>
+<p><code>parted</code> はディスクの名前だけを渡すと、<code>(parted)</code> という問いを出す対話の画面になる。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>fdisk</code> も <code>gdisk</code> も、<code>w</code> を打つまではディスクを変えなかった。<code>parted</code> でも、試しに区画を消してから <code>quit</code> で抜ければ、何も変わらないはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo parted /dev/vdb
+GNU Parted 3.6
+Using /dev/vdb
+Welcome to GNU Parted! Type 'help' to view a list of commands.
+(parted) print
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdb: 2147MB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags:
+
+Number  Start   End     Size   File system  Name                  Flags
+ 1      1049kB  106MB   105MB  ext4         EFI system partition  boot, esp
+ 2      106MB   420MB   315MB               Linux filesystem
+ 3      420MB   689MB   268MB               Linux swap            swap
+ 4      689MB   1318MB  629MB               Linux filesystem
+ 5      1318MB  1737MB  419MB               Linux filesystem
+ 6      1737MB  2146MB  409MB               Linux filesystem
+
+(parted) rm 6   ← rm 6: 6番を消す（確かめもしない）
+(parted) quit   ← quit: 抜ける
+Information: You may need to update /etc/fstab.
+$ sudo parted /dev/vdb print
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdb: 2147MB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags:
+
+Number  Start   End     Size   File system  Name                  Flags
+ 1      1049kB  106MB   105MB  ext4         EFI system partition  boot, esp
+ 2      106MB   420MB   315MB               Linux filesystem
+ 3      420MB   689MB   268MB               Linux swap            swap
+ 4      689MB   1318MB  629MB               Linux filesystem
+ 5      1318MB  1737MB  419MB               Linux filesystem</code></pre>
+<div class="then"><b>だめな理由</b>: 6番が表から消えている。<code>parted</code> は、<b>コマンドを打った瞬間にディスクに書く</b>。<code>w</code> に当たる「最後にまとめて書く」段階が無く、<code>rm 6</code> と打った時点で消えていた。<code>quit</code> の後に出た <code>Information: You may need to update /etc/fstab.</code> は「区画が変わったので、起動のときにマウントする表（第7章）も直す必要があるかもしれない」という一般的な注意で、変更を取り消したという意味ではない。</div></div>
+<p>消したのは表の1行だけなので、同じ位置に作り直せば元に戻る（第3章と同じ）。<code>parted</code> は引数に続けて書くと、対話の画面にならずに1つのコマンドだけを実行する。<code>mkpart</code> は区画を作るコマンドで、GPT では「区画の名前・ファイルシステムの種類（種類の印を選ぶための手がかり）・始まり・終わり」を渡す。始まりは、消す前の <code>print</code> に出ていた 1737MB、終わりの <code>100%</code> はディスクの最後までである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo parted /dev/vdb mkpart home ext4 1737MB 100%
+Information: You may need to update /etc/fstab.
+$ sudo parted /dev/vdb print
+Model: Virtio Block Device (virtblk)
+Disk /dev/vdb: 2147MB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags:
+
+Number  Start   End     Size   File system  Name                  Flags
+ 1      1049kB  106MB   105MB  ext4         EFI system partition  boot, esp
+ 2      106MB   420MB   315MB               Linux filesystem
+ 3      420MB   689MB   268MB               Linux swap            swap
+ 4      689MB   1318MB  629MB               Linux filesystem
+ 5      1318MB  1737MB  419MB               Linux filesystem
+ 6      1737MB  2146MB  409MB               home</code></pre>
+<p>6番が同じ 1737MB〜2146MB に戻った。Name は今度付けた <code>home</code> になっている。<code>parted</code> は始まりと終わりを 1MiB の切れ目に合わせて丸めるので、MB で渡しても <code>gdisk</code> で作ったときと同じセクタになる。</p>
+<div class="scroll"><table>
+<tr><th></th><th>fdisk</th><th>gdisk</th><th>parted</th></tr>
+<tr><td>扱える表（いまの版）</td><td>MBR と GPT（<code>o</code> で空の MBR、<code>g</code> で空の GPT を作る）</td><td>GPT（MBR は変換して読む）</td><td>MBR（msdos と表示）と GPT（gpt）</td></tr>
+<tr><td>試験の例題での扱い</td><td><b>MBR 用（GPT 非対応）</b></td><td>GPT 用</td><td>MBR と GPT の両方</td></tr>
+<tr><td>ディスクに書くとき</td><td><code>w</code> を打ったとき</td><td><code>w</code> を打ったとき</td><td><b>コマンドを打った瞬間</b></td></tr>
+<tr><td>使い方</td><td>対話（1文字のキー）。<code>-l</code> で表示だけ</td><td>対話（1文字のキー）。<code>-l</code> で表示だけ。<code>sgdisk</code> は一括版</td><td>対話でも、引数に続けて書いても使える（<code>print</code>・<code>mkpart</code>・<code>rm</code>）。<code>-l</code> で全部のディスクの表を出す</td></tr>
+<tr><td>大きさの単位</td><td>セクタ。<code>+200M</code> で MiB</td><td>セクタ。<code>+100M</code> で MiB</td><td>MB・GB（<code>unit</code> で変えられる）</td></tr>
+</table></div>
+<div class="note"><b>試験では</b>: LinuC の例題は、fdisk＝MBR 用（GPT 非対応）、gdisk＝GPT 用、parted＝MBR と GPT の両方、という組で出る。fdisk が GPT を扱えるようになった util-linux 2.23（2013年）より前の姿である。組み合わせを選ぶ問題では、fdisk を MBR 専用として答える。</div>
+<div class="analogy"><b>たとえ</b>: <code>fdisk</code> と <code>gdisk</code> は第2章の<b>下書きと清書</b>、<code>parted</code> は<b>ペンで直接書く</b>書き方に近い。ペンは書いた瞬間に残る。
+<br>ただし<b>崩れる点</b>: ペンで書いた字は消せないが、<code>parted</code> で消した区画も、中身はディスクに残っている。消えたのは表の1行だけで、同じ位置に作り直せば元に戻る（いま戻したとおり）。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-disks/practice/">演習03</a>は、この章で作った6つの区画を GPT に作る課題である（道具は gdisk・parted・fdisk のどれでもよい）。
+判定は表を読み、種類と大きさを1行ずつ比べる。この章のとおりに打った人は、もう達成している。</div>
+
+<div class="quiz"><b>確認</b>
+<p>UEFI のファームウェアが起動のときに ESP を見つける手がかりは何か。<code>/boot/efi</code> というマウント先は手がかりになるか。</p>
+<details><summary>答え</summary>
+<p>NVRAM に覚えている起動の候補（<code>efibootmgr</code> で見られる）に書かれた、GPT の区画の番号と PARTUUID と、ファイルのパス（<code>\EFI\ubuntu\shimx64.efi</code>）。マウント先は手がかりにならない。ファームウェアは Linux より先に動くので、Linux の設定を読めない。ESP の中は FAT で、種類は EFI System にする。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>/var</code> を <code>/</code> と別のパーティションにすると、どんな事故を防げるか。</p>
+<details><summary>答え</summary>
+<p>ログやメールの待ち行列などが増え続けて区画がいっぱいになっても、<code>/</code> まではいっぱいにならない。<code>/</code> が溢れると、ほかのプログラムが一時ファイルを書けなくなるなど、システム全体が困る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>parted</code> の対話の画面で <code>rm 3</code> と打ってから <code>quit</code> で抜けた。3番の区画はどうなっているか。<code>fdisk</code> で <code>d</code> を打ってから <code>q</code> で抜けた場合はどうか。</p>
+<details><summary>答え</summary>
+<p><code>parted</code> は打った瞬間に書くので、3番はもう表から消えている（中身はディスクに残っている）。<code>fdisk</code> は <code>w</code> を打つまで書かないので、<code>q</code> で抜ければ何も変わっていない。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>GPT は MBR の後の表の形式。区画はふつう 128 個まで同じ扱いで、2TiB の制限が無く、表を先頭と末尾の2か所に持ち、種類を GUID で表す</li><li>ESP は UEFI のファームウェアがブートローダを読む FAT の区画で、種類は EFI System（gdisk のコード EF00）。ファームウェアは NVRAM の候補（区画の番号・PARTUUID・ファイルのパス）で読みに行き、マウント先は知らない。<code>/boot/efi</code> のマウントは、Linux がブートローダを更新するため</li><li>区画は「溢れたら困るもの」「残したいもの」で分ける: ESP・<code>/boot</code>・スワップ・<code>/</code>・<code>/var</code>・<code>/home</code>。分けるのは必須ではない</li><li><code>gdisk</code> は GPT 用の fdisk（<code>o</code> で空の GPT、種類は4文字のコード、<code>w</code> で書く）。表を作り直しても中身は残る</li><li><code>parted</code> は MBR と GPT の両方を扱い、<b>打った瞬間に書く</b>（<code>print</code>・<code>rm</code>・<code>mkpart</code>）。試験の例題では fdisk＝MBR 用・gdisk＝GPT 用・parted＝両方として答える</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.1.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション、UEFI は OVMF）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・fdisk（util-linux）2.39.3・gdisk 1.0.10・parted 3.6・efibootmgr 18 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁 × 24 行で、第1章から順に1つの練習機で打って検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-disks/theory/03-partition">← 3. パーティションの表を読む・直す</a><a href="/linuc-disks/theory/05-mkfs">次: 5. ファイルシステムの種類と作り方 →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-disks/">ハードウェアとディスク</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/practice/">実践編</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-disks/chapters.js"></script>
+<script src="/linuc-disks/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

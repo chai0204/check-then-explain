@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6. USB メモリと CD をマウントする — 確かめて説明する LinuC 主題1.05</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="6" data-theme="linuc-disks">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第6章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+</div>
+<h1>6. USB メモリと CD をマウントする</h1>
+<p class="lead">第5章では、<code>vdb</code> の区画に5種類のファイルシステムを作り、ラベルを付けた。この章では、抜き差しするメディア（USB メモリと CD）を手でマウントして使い、挿す順番で <code>/dev/sdb</code> のような名前が変わること、だからラベルや UUID で指すことを確かめる。</p>
+<div class="badges"><span>前提: 第5章まで読了</span><span>前提: 練習機の中にいる</span><span>所要 24分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>外で USB メモリを挿し・抜きし、練習機の中でどの名前のディスクになったかを確かめられる</li><li>マウントポイントを用意してマウントでき、外せないとき（<code>target is busy</code>）の理由と対処を言える</li><li>装置の名前ではなく、ラベル・UUID で目当てのファイルシステムを指せる。CD の写しのファイル（ISO イメージ）をそのままマウントできる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: デスクトップの Linux が、挿しただけで自動でマウントするしくみは扱わない（練習機は画面を持たない）。USB の規格の違い（2.0 と 3.0 の速さなど）も扱わない。CD・DVD に書き込む方法も扱わない。</div></div>
+
+<h2 id="terminal">外の端末をもう1つ開く</h2>
+<div class="sgoal"><b>この節で分かること</b>: 外で打つコマンドと、練習機の中で打つコマンドを、2つの端末で打ち分ける方法。</div>
+<p>練習機に USB メモリを挿すのは、外（<code>lab@host</code>）で打つコマンドである。練習機の中にいる今の端末はそのままにして、あなたの PC で端末の窓をもう1つ開き、檻に入る（実践編の「はじめる」で打った2つ目のコマンドと同じ）。</p>
+<pre><code>docker exec -it lab-linuc-disks bash -l</code></pre>
+<p>新しい端末は外（プロンプト <code>lab@host</code>）にいる（入ったときに、実践編の「はじめる」で見たのと同じ、練習機の状態と演習の進み具合の案内が出る）。この章から先、見出しが「外（lab@host）」のブロックはこの新しい端末で、「練習機の中（student@linuc）」のブロックは今までの端末で打つ。</p>
+
+<h2 id="usb">USB メモリを挿して使う</h2>
+<div class="sgoal"><b>この節で分かること</b>: USB メモリを挿してからマウントするまでの流れと、マウントポイントの性質。</div>
+<p><code>virsh</code> は仮想マシンを操作するコマンドで、<code>attach-device</code> は動いている仮想マシンに装置をつなぐ。<code>~/vm/extra/usb-a.xml</code> は、64M の USB メモリ（ここでは「A」と呼ぶ）を表す設定のファイルで、檻に用意してある。これを打つのが、本物の PC で USB メモリを挿すことに当たる。</p>
+<pre data-where="外（lab@host）"><code>$ virsh attach-device linuc ~/vm/extra/usb-a.xml</code></pre>
+<p>練習機の中で、どの名前のディスクになったかを見る。<code>lsblk</code> の <code>-d</code> はディスクだけを出す（中の区画は出さない）オプションで、<code>TRAN</code> はつながり方（<code>usb</code>・<code>sata</code>・<code>virtio</code>）、<code>SERIAL</code> は装置の製造番号の列である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -d -o NAME,SIZE,TRAN,SERIAL<!--o note="sdb::USB でつながった 64M。製造番号 LAB-USB-A"--></code></pre>
+<p>USB メモリは <code>sdb</code> になった。<code>sda</code>（SATA のディスク）が先にあるので、次の名前の <code>sdb</code> が付いた。USB メモリは区切らずに、ディスク全体に FAT を作ることが多い（ほかの OS のパソコンでもそのまま読めるように）。第1章のたとえで「区画を作らずにディスク全体に倉庫を建てる」と書いた使い方である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mkfs.vfat -n STICK_A /dev/sdb
+$ sudo mount /dev/sdb /media/stick</code></pre>
+<p><code>mount point does not exist</code>（マウントポイントが無い）で断られた。<b>マウントポイントは、前もって作っておくただのディレクトリ</b>である。<code>/media</code> は、取り外せるメディアをマウントする場所として決められたディレクトリで（<code>/mnt</code> は一時的に手でつなぐ場所）、その下に作る。マウントポイントの中にもともとあったものがどうなるかも見たいので、目印のファイルを1つ置いてからマウントする。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mkdir /media/stick
+$ sudo touch /media/stick/HIDDEN
+$ ls /media/stick
+$ sudo mount /dev/sdb /media/stick
+$ ls /media/stick</code></pre>
+<p>マウントすると、<code>HIDDEN</code> は見えなくなった（作ったばかりの FAT には何も無いので、<code>ls</code> は何も出さない）。消えたのではなく、上にかぶさっただけで、外せばまた見える（すぐ下で確かめる）。目印のファイルを書いて、外す。作ったばかりの FAT のいちばん上は root のものなので、<code>sudo tee</code> で書く（<code>tee</code> は受け取った文字をファイルに書き、画面にも出すコマンド。<code>sudo</code> を付けると root の権限で書く）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo "これは A" | sudo tee /media/stick/who.txt
+$ cd /media/stick
+$ sudo umount /media/stick</code></pre>
+<p><code>target is busy</code>（使用中）で断られた。中でファイルを開いているプロセス（動いているプログラム）か、カレントディレクトリ（いま居るディレクトリ）がその中にあるプロセスがいると、<code>umount</code> は外さない。ここでは自分のシェルが <code>cd</code> で中に入っていた。<code>cd</code> を引数なしで打つとホームに戻るので、外に出てから外す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ cd
+$ sudo umount /media/stick
+$ ls /media/stick
+$ sudo rm /media/stick/HIDDEN</code></pre>
+<p>外すと <code>HIDDEN</code> がまた見えた。目印は消しておく。</p>
+<div class="analogy"><b>たとえ</b>: マウントは、壁の釘に<b>額縁を掛ける</b>ことに近い。額縁（ファイルシステム）を掛けると、後ろの壁（もとのディレクトリの中身）は見えなくなるが、壁が消えたわけではなく、額縁を外せばまた見える。
+<br>ただし<b>崩れる点</b>: 額縁は誰かが見ていても外せるが、マウントは誰かが中にいる（カレントディレクトリにしている・ファイルを開いている）と外せない。</div>
+
+<h2 id="names">/dev/sdb は、いつも同じ USB メモリ？</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/dev/sdb</code> のような名前が何で決まるか。</div>
+<p>A を抜いて、もう1本の USB メモリ（B）を挿す。<code>detach-device</code> は装置を外す（USB メモリを抜くことに当たる）。</p>
+<pre data-where="外（lab@host）"><code>$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+$ virsh attach-device linuc ~/vm/extra/usb-b.xml</code></pre>
+<p>B は ext4 にしてラベル STICK_B を付ける。<code>-q</code> は途中経過を出さない（quiet）オプションである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -d -o NAME,SIZE,TRAN,SERIAL
+$ sudo mkfs.ext4 -q -L STICK_B /dev/sdb</code></pre>
+<p>B を挿したまま、A を挿し直す。</p>
+<pre data-where="外（lab@host）"><code>$ virsh attach-device linuc ~/vm/extra/usb-a.xml</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -o NAME,FSTYPE,LABEL,SERIAL /dev/sdb /dev/sdc</code></pre>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>A に FAT を作ったときの名前は <code>/dev/sdb</code> だった。<code>/dev/sdb</code> は A の名前なのだから、<code>mount /dev/sdb</code> と打てば A が出てきて、<code>who.txt</code> が読めるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mount /dev/sdb /media/stick
+$ cat /media/stick/who.txt
+$ lsblk -o NAME,FSTYPE,LABEL,MOUNTPOINTS /dev/sdb /dev/sdc
+$ sudo umount /media/stick</code></pre>
+<div class="then"><b>だめな理由</b>: <code>/dev/sdb</code> にいたのは B（ext4、STICK_B）だった。<code>sdb</code> のような名前は、カーネルが装置を<b>見つけた順に</b>、空いている名前から付ける。A を抜いているあいだに B が <code>sdb</code> を取り、あとから来た A は <code>sdc</code> になった。しかも <code>mount</code> はファイルシステムの種類を自分で見分けるので、別のディスクを何も言わずにマウントした。</div></div>
+<p>ディスクにずっと付いているのは、中に書いた印（ラベルと UUID）だけである。第4章の <code>blkid</code> で読む。<code>findfs</code> は、ラベルや UUID から「いまどの装置か」を引くコマンドである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo blkid /dev/sdb /dev/sdc
+$ sudo findfs LABEL=STICK_A</code></pre>
+<p>カーネルの装置の管理を手伝うプログラム udev が、ラベルや UUID から、いまの装置を指す別名（シンボリックリンク）を <code>/dev/disk/by-label/</code> と <code>/dev/disk/by-uuid/</code> に作っている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ls -l /dev/disk/by-label/ | grep STICK</code></pre>
+<p><code>mount</code> には、装置の名前の代わりに <code>LABEL=…</code>（や <code>UUID=…</code>）を渡せる。これなら、何番目に挿しても A を指せる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mount LABEL=STICK_A /media/stick
+$ cat /media/stick/who.txt
+$ sudo umount /media/stick</code></pre>
+<div class="scroll"><table>
+<tr><th>指し方</th><th>例</th><th>変わるとき</th><th>何のためにあるか</th></tr>
+<tr><td>装置の名前</td><td><code>/dev/sdb</code></td><td>挿す順番・ディスクの増減で変わる</td><td>いまつながっている装置を、その場で操作する（<code>fdisk</code>・<code>mkfs</code>）</td></tr>
+<tr><td>ラベル</td><td><code>LABEL=STICK_A</code></td><td>人が付け替えたとき</td><td>人が覚えやすい名前で指す</td></tr>
+<tr><td>UUID</td><td><code>UUID=…</code></td><td>作り直した（<code>mkfs</code> した）とき</td><td>重ならない番号で、確実に1つを指す</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 駐車場の<b>何番目に停めたか</b>と、車の<b>ナンバープレート</b>に近い。「2番目の車」は来た順で変わるが、ナンバーは車に付いている。
+<br>ただし<b>崩れる点</b>: ナンバーは役所が重ならないように配るが、ラベルは人が付ける名前なので<b>重なりうる</b>。重なったときに何が起きるかは、第7章で確かめる。</div>
+<p>USB メモリは2本とも抜いておく。</p>
+<pre data-where="外（lab@host）"><code>$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+$ virsh detach-device linuc ~/vm/extra/usb-b.xml</code></pre>
+
+<h2 id="cd">CD を読む</h2>
+<div class="sgoal"><b>この節で分かること</b>: 読み取り専用の装置をマウントすると何が起きるか。</div>
+<p>練習機の光学ドライブ <code>sr0</code> には、CD が1枚入っている。CD のファイルシステムは <b>iso9660</b> である（DVD や BD のデータは、UDF という別のファイルシステムで書かれることが多い）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mount /dev/sr0 /mnt
+$ cat /mnt/README.TXT
+$ touch /mnt/test.txt
+$ sudo umount /mnt</code></pre>
+<p>読み取り専用を頼んでいないのに、<code>mount</code> は <code>WARNING: source write-protected, mounted read-only.</code>（書き込みが禁止された装置なので、読み取り専用でマウントした）と言った。この光学ドライブは書き込む機能の無い DVD-ROM として練習機につながっていて、カーネルは読み取り専用の装置として扱う（第1章の <code>lsblk</code> で、<code>sr0</code> の RO が 1 だった）。<code>touch</code> の <code>Read-only file system</code> は、ファイルの権限ではなく、読み取り専用でマウントされていることが理由である。</p>
+
+<h2 id="loop">CD の写しを、ファイルのままマウントする</h2>
+<div class="sgoal"><b>この節で分かること</b>: ディスクの中身を写したファイル（イメージ）を、装置と同じようにマウントする方法。</div>
+<p>CD の中身を丸ごと1つのファイルに写したものを ISO イメージと呼ぶ（Linux のインストール用の配布物も、ふつうこの形）。第3章の <code>dd</code> で、<code>sr0</code> を最初から最後まで写す（<code>of=</code> は書き出す先のファイル）。最後の行の秒数と速さは、あなたの画面では違う。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo dd if=/dev/sr0 of=media.iso
+$ ls -l media.iso</code></pre>
+<p>ファイルは装置ではないので、そのままでは <code>mount</code> に渡す相手にならない。<b>ループデバイス</b>（ファイルを、ディスクのような装置に見せかける仮の装置。<code>/dev/loop0</code> など）を通すと、マウントできる。<code>-o loop</code> は「ループデバイスを用意して、それをマウントせよ」というオプションである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mount -o loop media.iso /mnt
+$ df -h /mnt
+$ losetup -l
+$ ls /mnt
+$ sudo umount /mnt
+$ losetup -l
+$ sudo rm media.iso</code></pre>
+<p><code>df</code> の Filesystem が <code>/dev/loop0</code> になっている。<code>losetup -l</code> は、どのループデバイスがどのファイルにつながっているかの一覧で、<code>loop0</code> の後ろに <code>media.iso</code> があると分かる。外すと、ループデバイスも一緒に片づいた（AUTOCLEAR が 1。外したあとの <code>losetup -l</code> は何も出さない）。今度も <code>WARNING</code> が出たのは、中の iso9660 が書き込みのマウントを受け付けないからである（ループデバイスそのものは書き込める。<code>losetup -l</code> の RO が 0）。</p>
+<div class="analogy"><b>たとえ</b>: ISO イメージは CD の<b>写し</b>で、ループデバイスはその写しを読み取り機にかけるための<b>台紙</b>に近い。台紙に貼ると、読み取り機（<code>mount</code>）は本物の CD と区別せずに読む。
+<br>ただし<b>崩れる点</b>: 本物の CD は書き込めない装置だが、写しの台紙（ループデバイス）は書き込める装置になる。中のファイルシステムが書き込みを受け付ける種類（ext4 や FAT）なら、ファイルの中身を書き換えられる。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-disks/practice/">演習05</a>は、練習機のホームに置いてある、昔の USB メモリを丸ごと写したファイル（<code>old-usb.img</code>）をマウントし、中のファイルを取り出す課題である。
+判定は、取り出したファイルの中身を読んで確かめる。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>umount /data</code> が <code>target is busy</code> で失敗した。何が考えられるか。</p>
+<details><summary>答え</summary>
+<p>そのファイルシステムの中で、ファイルを開いているプロセスか、カレントディレクトリがその中にあるプロセス（自分のシェルを含む）がいる。自分のシェルなら <code>cd</code> で外に出てから外す。ほかのプロセスなら、そのプログラムを終わらせてから外す。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>USB メモリを2本挿しているとき、ラベルが BACKUP のほうをマウントしたい。装置の名前を調べずにマウントするには、どう打つか。</p>
+<details><summary>答え</summary>
+<p><code>sudo mount LABEL=BACKUP /mnt</code>。装置の名前（<code>/dev/sdb</code> など）は挿した順番で変わるので、中に書いたラベルで指す。どの装置かを知りたいだけなら <code>findfs LABEL=BACKUP</code> か <code>ls -l /dev/disk/by-label/</code>。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>ダウンロードした <code>install.iso</code> の中身を、CD に焼かずに見たい。どうするか。</p>
+<details><summary>答え</summary>
+<p><code>sudo mount -o loop install.iso /mnt</code>。ループデバイスがファイルを装置に見せかけるので、そのままマウントできる。どのループデバイスがどのファイルにつながっているかは <code>losetup -l</code> で見る。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>練習機に USB メモリを挿す・抜くのは、外で <code>virsh attach-device</code>・<code>detach-device</code>。中では <code>lsblk -d</code> の TRAN・SERIAL でどれかを見分ける</li><li>マウントポイントは前もって作るただのディレクトリ。もとの中身は隠れるだけで、外せばまた見える。中にプロセスがいると <code>umount</code> は <code>target is busy</code> で断る</li><li><code>/dev/sdb</code> は見つかった順に付く名前で、挿す順番で別のディスクを指す。ディスクに付いているのは中のラベルと UUID で、<code>blkid</code>・<code>findfs</code>・<code>/dev/disk/by-label/</code> で引け、<code>mount LABEL=…</code> で指せる</li><li><code>/media</code> は取り外せるメディアのマウント先。CD は iso9660 で、読み取り専用の装置なので <code>mount</code> は読み取り専用にする</li><li>ISO イメージのようなファイルは、ループデバイスを通して <code>mount -o loop</code> でマウントできる（<code>losetup -l</code> で対応を見る）</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.1.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・util-linux 2.39.3・e2fsprogs 1.47.0・dosfstools 4.2 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁 × 24 行で、第1章から順に1つの練習機で打って検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-disks/theory/05-mkfs">← 5. ファイルシステムの種類と作り方</a><a href="/linuc-disks/theory/07-fstab">次: 7. 起動のたびにマウントする →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-disks/">ハードウェアとディスク</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/practice/">実践編</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-disks/chapters.js"></script>
+<script src="/linuc-disks/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

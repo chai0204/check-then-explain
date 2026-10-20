@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>10. 部品の情報を読む — 確かめて説明する LinuC 主題1.05</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="10" data-theme="linuc-disks">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第10章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+</div>
+<h1>10. 部品の情報を読む</h1>
+<p class="lead">第9章までは、ディスクを区切り、ファイルシステムを作り、マウントし、LVM でまとめる、という「使う側」の話だった。この章では、練習機にどんな部品がつながっているかを CPU・メモリ・バス（装置をつなぐ通り道）・ディスクの順に読み、カーネルがその情報をどこに見せているか（<code>/proc</code>・<code>/sys</code>・<code>/dev</code>）を確かめる。最後に、HDD か SSD かの扱いを、起動のたびに変える設定をする。</p>
+<div class="badges"><span>前提: 第9章まで読了</span><span>前提: 練習機の中にいる・外の端末もある</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>CPU・メモリ・バスにつながる装置の情報を、<code>lscpu</code>・<code>/proc</code>・<code>lspci</code>・<code>lsusb</code> で読める。<code>/proc</code>・<code>/sys</code>・<code>/dev</code> がそれぞれ何を見せる窓かを言い分けられる</li><li>割り込み（IRQ）・I/O ポート・DMA が何のためのものかを言え、<code>/proc</code> のどこで見られるかを知っている</li><li>HDD・SSD・光学ドライブの違いを、<code>lsblk</code> の ROTA・RM・RO 列で説明でき、HDD か SSD かの扱いを udev の規則で変えられる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: PCI の装置の番号の細かい意味と、ベンダ・製品の ID の一覧は扱わない。<code>lscpu</code> の CPU の機能の旗（Flags）の1つ1つの意味も扱わない。udev の規則の書き方の全体は扱わず、この章で書く1行だけを読めればよい。</div></div>
+
+<h2 id="cpu">CPU とメモリ</h2>
+<div class="sgoal"><b>この節で分かること</b>: CPU とメモリの情報の読み方と、その出どころ。</div>
+<p><code>lscpu</code> は CPU の情報を表にするコマンドである。長いので、最初の8行だけを出す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lscpu | head -8</code></pre>
+<p>CPU(s) の 2 は、練習機が使える CPU の数（正確には、命令を同時に実行できる部分の数）である。Model name の <code>QEMU TCG CPU</code> は、QEMU（仮想マシンを動かすプログラム）が CPU の命令をソフトウェアで真似している（TCG。完全エミュレーション）という意味で、この檻は KVM を使わないので、どの PC で動かしてもここは同じ表示になる（Vendor ID が AuthenticAMD なのも、QEMU が真似している CPU の種類で、あなたの PC の CPU とは関係ない）。<code>lscpu</code> は、カーネルが <code>/proc/cpuinfo</code>（と、この章で見る <code>/sys</code>）に出している情報を読んで整えている。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ grep -m1 "model name" /proc/cpuinfo
+$ ls -l /proc/cpuinfo
+$ head -3 /proc/meminfo</code></pre>
+<p><code>grep</code> の <code>-m1</code> は、最初に見つかった1行だけを出すオプションである（CPU が2つあるので、同じ行が2回ある）。<code>/proc/cpuinfo</code> は、中身があるのに大きさが 0 である。ディスクの上のファイルではなく、読んだ瞬間にカーネルが答えを作るからである。<code>/proc/meminfo</code> も同じで、<code>free</code>（第8章）はここを読んでいる。MemTotal 以外の数は、人と時刻によって違う。</p>
+
+<h2 id="windows">カーネルが情報を見せる3つの窓</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>/proc</code>・<code>/sys</code>・<code>/dev</code> が何で、それぞれ何を見せるか。</div>
+<p>カーネルは、自分が知っている装置やプロセスの情報を、ファイルの形で3つの場所に出している。どれもディスクの上には無い。マウントの一覧で、種類を見る（<code>findmnt</code> の <code>-t</code> は第8章と同じく、種類で絞る）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ findmnt -t proc,sysfs,devtmpfs -o TARGET,SOURCE,FSTYPE</code></pre>
+<p>見出しの TARGET だけが1行目に出て、残りが2行目に回っているのは、第3章の <code>lsblk</code> と同じ util-linux の癖である（いちばん左の列の中身が見出しより短い）。<code>proc</code>（procfs とも呼ぶ）・<code>sysfs</code>・<code>devtmpfs</code> は、どれもカーネルがメモリの上に作るファイルシステムである。</p>
+<div class="scroll"><table>
+<tr><th>窓</th><th>見せ方</th><th>何のためにあるか</th></tr>
+<tr><td><code>/proc</code>（proc）</td><td>カーネルとプロセスの状態を表にしたファイル（<code>cpuinfo</code>・<code>meminfo</code>・<code>partitions</code>・<code>swaps</code> など）</td><td>状態を人やコマンドが読む。<code>lscpu</code>・<code>free</code>・<code>swapon -s</code> はここを読む</td></tr>
+<tr><td><code>/sys</code>（<b>sysfs</b>）</td><td>装置ごとのディレクトリと、属性ごとのファイル</td><td>装置1つ1つの性質を読む。いくつかは root が書き換えられ、書くとその場で扱いが変わる</td></tr>
+<tr><td><code>/dev</code>（devtmpfs）</td><td>装置への入口になるデバイスファイル</td><td>プログラムが装置を開いて読み書きする（第1章の <code>/dev/vdb</code>）</td></tr>
+</table></div>
+<div class="analogy"><b>たとえ</b>: 工場の<b>計器盤</b>に近い。<code>/proc</code> は全体の表示板、<code>/sys</code> は機械ごとの計器、<code>/dev</code> は機械を動かすレバーである。計器は読めばいまの値を示すが、紙に記録されているわけではない。
+<br>ただし<b>崩れる点</b>: 計器は読むだけのものだが、<code>/sys</code> のいくつかのファイルは root が書き込める。書くとカーネルの扱いがその場で変わり、電源を切ると元に戻る（この章の後半）。</div>
+
+<h2 id="irq">割り込み・I/O ポート・DMA</h2>
+<div class="sgoal"><b>この節で分かること</b>: 装置と CPU のやりとりに使う3つの資源と、その見方。</div>
+<p>装置と CPU がやりとりするために、装置ごとに3つの資源が割り当てられる。</p>
+<div class="scroll"><table>
+<tr><th>資源</th><th>何のためにあるか</th><th>見る場所</th></tr>
+<tr><td><b>割り込み</b>（IRQ）</td><td>装置が CPU に「用がある」と知らせる（キーが押された・読み込みが終わった など）。番号で装置を見分ける</td><td><code>/proc/interrupts</code></td></tr>
+<tr><td><b>I/O ポート</b></td><td>CPU が装置に命令を出したり、装置の状態を読んだりするための番地</td><td><code>/proc/ioports</code></td></tr>
+<tr><td><b>DMA</b></td><td>装置が CPU を通さずに、メモリへ直接読み書きする通り道（CPU の手間を減らす）</td><td><code>/proc/dma</code></td></tr>
+</table></div>
+<pre data-where="練習機の中（student@linuc）"><code>$ head -4 /proc/interrupts
+$ head -5 /proc/ioports
+$ sudo head -5 /proc/ioports
+$ cat /proc/dma</code></pre>
+<p>割り込みは、番号ごとに各 CPU が何回受けたか（数は人と時刻によって違う）と、誰の割り込みか（<code>timer</code>・キーボードのコントローラ（キーボードとのやりとりを受け持つ部品）<code>i8042</code>・シリアルポート（古い形式の通信の口）<code>ttyS0</code>）が並ぶ。I/O ポートは、一般ユーザが読むと番地が全部 <code>0000-0000</code> に伏せられ、<code>sudo</code> で読むと本当の番地が出た。同じファイルでも、読む人によってカーネルが答えを変えている。DMA の 4 番（<code>cascade</code>）は、2つの DMA の部品をつなぐための予約で、いまの PC ではほぼこれしか出ない。</p>
+
+<h2 id="bus">バスにつながる装置 — lspci と lsusb</h2>
+<div class="sgoal"><b>この節で分かること</b>: どの装置がどのバスにつながり、どのドライバが動かしているかの調べ方。</div>
+<p><b>PCI</b> は、マザーボードの上で装置（ディスクのコントローラ・ネットワーク・USB のコントローラなど）をつなぐ通り道（バス）である。<code>lspci</code> は、PCI につながった装置を一覧にする。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lspci<!--o note="Ethernet controller::ネットワークの装置;;SATA controller::SATA のコントローラ（sda と sr0 がつながる）;;USB controller::USB のコントローラ;;03:00.0::virtio のディスク（03〜07 の5つが vda〜vde）"--></code></pre>
+<p>行の頭の <code>00:1f.2</code> は装置の番地（バス番号:装置番号.機能番号）で、<code>-s</code> で1つに絞れる。<code>-k</code> を付けると、その装置をいま動かしているドライバと、動かせるドライバが出る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lspci -k -s 00:1f.2</code></pre>
+<p><code>Kernel driver in use: ahci</code> は「いまこの装置を動かしているのは ahci というドライバ」、<code>Kernel modules: ahci</code> は「この装置を動かせるカーネルモジュール（ドライバを、後から読み込める部品にしたもの）は ahci」という意味である。USB は別のバスなので、別のコマンドで見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsusb
+$ lsusb -t</code></pre>
+<p>いまは USB のコントローラの根元（root hub）が2つあるだけで、何も挿さっていない。USB 2.0 の口（480M）と USB 3.0 の口（5000M）である。<code>-t</code> はつながりを木の形で出し、<code>Driver=xhci_hcd</code> が USB のコントローラを動かしているドライバである。この名簿は読者全員で同じになる。仮想マシンのハードウェアは、外にある定義で決まっているからである。外の端末で、練習機のディスクの一覧を見る。</p>
+<pre data-where="外（lab@host）"><code>$ virsh domblklist linuc</code></pre>
+<p>練習機の中の名前（Target）と、外のファイル（Source）の対応が出る。練習機のディスクは、どれも外のコンテナの中にある qcow2（QEMU のディスクのファイルの形式）のファイルで、光学ドライブ（<code>sdb</code> の名前で定義されたもの。練習機の中では <code>sr0</code>）だけが ISO イメージを指している。</p>
+<div class="analogy"><b>たとえ</b>: <code>lspci</code> は建物の<b>入居者名簿</b>に近い。何階の何号室（番地）に誰（装置）が入っていて、担当の管理人（ドライバ）が誰かが分かる。
+<br>ただし<b>崩れる点</b>: 本物の建物なら名簿と部屋が食い違うことはあるが、仮想マシンでは名簿（外の定義）がそのまま建物になる。だから全員の練習機で同じ <code>lspci</code> が出る。実機では、マザーボードと挿したカードの数だけ違う。</div>
+
+<h2 id="disks">ディスクは3つの窓でどう見えるか</h2>
+<div class="sgoal"><b>この節で分かること</b>: 同じディスクが、<code>/proc</code>・<code>/sys</code>・<code>/dev</code> でそれぞれどう見えるか。</div>
+<pre data-where="練習機の中（student@linuc）"><code>$ cat /proc/partitions
+$ ls /sys/block
+$ cat /sys/block/vdb/size
+$ ls -l /dev/vda /dev/sda /dev/sr0</code></pre>
+<p><code>/proc/partitions</code> は、カーネルが知っているディスクと区画の一覧で、大きさは 1KiB 単位である（<code>dm-0</code> は第9章の論理ボリューム）。<code>/sys/block</code> にはディスクごとのディレクトリがあり、<code>/sys/block/vdb/size</code> は 512 バイトのセクタの数（4194304 × 512 バイト = 2GiB）である。<code>loop0</code>〜<code>loop7</code> は第6章のループデバイスで、いまは何もつながっていない。演習01・02 をやった人には、<code>/proc/partitions</code> に <code>vde1</code>・<code>vdd1</code> の行も出る（演習で作った区画）。<code>/dev</code> の <code>8, 0</code> は「SCSI のディスクのドライバ（8）の0番目」、<code>11, 0</code> は光学ドライブのドライバ、<code>253, 0</code> は virtio のディスクのドライバを指す（virtio の番号は決まっておらず、起動のときに空いている番号が割り当てられる）。</p>
+
+<h2 id="rota">HDD か SSD か</h2>
+<div class="sgoal"><b>この節で分かること</b>: カーネルが「回転するディスクかどうか」を何で決めているか。</div>
+<p><b>HDD</b> は円盤を回して磁気ヘッドを動かすので、離れた場所を続けて読むと遅い。<b>SSD</b> は半導体のメモリなので、どこを読んでも速さがほぼ同じである。カーネルは装置ごとに「回転するかどうか」の印を持っていて、読み書きの順番の工夫などに使う。その印が <code>lsblk</code> の <b>ROTA</b>（rotational = 回転する）列に出る。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>練習機のディスクは、どれも外のコンテナの中の、同じ種類（qcow2）のファイルである（さっきの <code>virsh domblklist</code>）。カーネルが実際の速さを測って判断するのなら、全部同じ答えになるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -d -o NAME,TRAN,ROTA,RM,RO,SIZE,MODEL<!--o note="sda::ROTA 0（回転しない = SSD 扱い）。型番は HARDDISK;;vda::ROTA 1（回転する = HDD 扱い）。virtio の5本とも"--></code></pre>
+<div class="then"><b>だめな理由</b>: 答えが割れた。SATA の <code>sda</code> だけが回転しない装置（SSD）で、virtio の5本は回転する装置（HDD）として扱われている。
+しかも <code>sda</code> の型番は <code>QEMU HARDDISK</code> のままである。<b>カーネルは測っていない</b>。
+SATA の装置は、自分の回転数を答える欄を持っていて、カーネルはその答えをそのまま信じる。
+virtio のディスクにはその欄が無いので、既定の「回転する」になる。</div></div>
+<p>外の定義で確かめる。違いは、定義の中の1語だけである。</p>
+<pre data-where="外（lab@host）"><code>$ virsh dumpxml linuc | grep rotation_rate</code></pre>
+<p><code>rotation_rate='1'</code> は「回転数 1」という特別な値で、SATA の決まりでは「回転しない装置」を意味する。QEMU はそう答え、カーネルはそれを <code>/sys</code> に書いた。<code>lsblk</code> はそのファイルを読んでいるだけである。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ cat /sys/block/sda/queue/rotational /sys/block/vdb/queue/rotational</code></pre>
+<p>このファイルは root が書き換えられ、書けばその場で扱いが変わる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo 0 | sudo tee /sys/block/vdb/queue/rotational
+$ lsblk -d -o NAME,ROTA /dev/vdb</code></pre>
+<p>ただし <code>/sys</code> はメモリの上の窓なので、再起動すると装置が名乗った値（1）に戻る。起動のたびに書き直す仕組みが要る。それが <b>udev</b> である。udev は、装置が見つかるたびに（起動のときは全部の装置について）カーネルから知らせを受け、<b>規則</b>（rules）のファイルに従って処理をするプログラムで、第6章の <code>/dev/disk/by-label/</code> の別名もこれが作っている。規則の置き場所は2つある。</p>
+<div class="scroll"><table>
+<tr><th>場所</th><th>何のためにあるか</th></tr>
+<tr><td><code>/usr/lib/udev/rules.d/</code></td><td>パッケージが置く規則。書き換えない（更新で上書きされる）</td></tr>
+<tr><td><code>/etc/udev/rules.d/</code></td><td>管理者が置く規則。同じ名前のファイルがあれば、こちらが優先される</td></tr>
+</table></div>
+<p>1行の規則を書く。<code>==</code> は「一致したら」（条件）、<code>=</code> は「こう書く」（動作）で、<code>ATTR{queue/rotational}</code> は <code>/sys/block/vdb/</code> の下のファイルを指す。「装置が加わった（add）か変わった（change）とき、ブロックの装置で、名前が vdb なら、<code>queue/rotational</code> に 0 を書け」と読む。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo 'ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"' | sudo tee /etc/udev/rules.d/60-lab-ssd.rules</code></pre>
+<p>再起動したのと同じ状況で確かめる。値を装置が名乗った 1 に戻してから、起動のときと同じ知らせ（add）を udev に1回だけ送る。<code>udevadm trigger</code> は udev に知らせを送るコマンドで、<code>--sysname-match=vdb</code> で <code>vdb</code> だけに絞り、<code>--settle</code> で udev が処理し終えるまで待つ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo 1 | sudo tee /sys/block/vdb/queue/rotational
+$ sudo udevadm trigger --action=add --subsystem-match=block --sysname-match=vdb --settle
+$ cat /sys/block/vdb/queue/rotational</code></pre>
+<p>知らせを受けた udev が、規則どおりに 0 を書いた。起動のときも、すべての装置についてこの知らせが出るので、再起動しても <code>vdb</code> は SSD として扱われる。</p>
+<div class="analogy"><b>たとえ</b>: 入館証の<b>自己申告の欄</b>に近い。受付は「技術職」と書かれていれば技術職として案内し、本当かどうかは確かめない。
+<br>ただし<b>崩れる点</b>: 入館証は本人しか書けないが、<code>rotational</code> は後から root が書き換えられ、udev の規則にしておけば来館のたびに書き換えてくれる。申告を上書きする手段が、受け取る側に用意されている。</div>
+<div class="scroll"><table>
+<tr><th></th><th>HDD</th><th>SSD</th><th>光学ドライブ</th></tr>
+<tr><td>しくみ</td><td>回る磁気ディスクとヘッド</td><td>フラッシュメモリ（半導体）</td><td>回る CD・DVD・BD をレーザーで読む</td></tr>
+<tr><td>ROTA</td><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>得意・苦手</td><td>離れた場所を続けて読むと遅い。容量あたりが安い</td><td>どこを読んでも速い。書き換えの回数に寿命がある</td><td>読み取り専用か、書けても遅い。メディアを抜き差しできる</td></tr>
+<tr><td>Linux での名前（例）</td><td><code>/dev/sda</code></td><td><code>/dev/sda</code>（SATA）・<code>/dev/nvme0n1</code>（NVMe。SSD を PCI に直接つなぐ方式）</td><td><code>/dev/sr0</code></td></tr>
+<tr><td>この練習機</td><td>vda〜vde（virtio）。vdb はいま SSD 扱い</td><td>sda（SATA）</td><td>sr0（SATA）</td></tr>
+</table></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-disks/practice/">演習09</a>は、vdb を「再起動しても SSD として扱われる」状態にする課題である。
+判定は再起動の代わりに、この章と同じく値を 1 に戻して add の知らせを1回送り、0 に書き換わるかを見る。この章のとおりに打った人は、もう達成している。</div>
+
+<h2 id="optical">光学ドライブは、取り外せて書けない装置</h2>
+<div class="sgoal"><b>この節で分かること</b>: 光学ドライブの RM・RO と、メディアを抜いたときに何が残るか。</div>
+<p>さっきの表で <code>sr0</code> は RM（取り外せる）が 1、RO（読み取り専用）が 1 だった。外の端末で、光学ドライブからメディアを抜く（<code>change-media … --eject</code> は、ドライブの蓋を開けて CD を取り出すことに当たる）。</p>
+<pre data-where="外（lab@host）"><code>$ virsh change-media linuc sdb --eject</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -d -o NAME,TYPE,RM,RO,SIZE /dev/sr0
+$ sudo mount /dev/sr0 /mnt</code></pre>
+<p>装置（<code>sr0</code>）は消えない。抜けたのはメディアだけである。しかも <code>lsblk</code> はまだ <code>368K</code> と言っている。<b>表示は前に読んだ大きさのままで、実際に読みに行った <code>mount</code> だけが本当の状態（<code>no medium found</code>、メディアが無い）を知った</b>。戻しておく。</p>
+<pre data-where="外（lab@host）"><code>$ virsh change-media linuc sdb /usr/share/lab-disks/linuc-media.iso --insert</code></pre>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -d -o NAME,TYPE,RM,RO,SIZE /dev/sr0</code></pre>
+<div class="analogy"><b>たとえ</b>: <b>レコードプレーヤー</b>に近い。台（ドライブ）は置いたまま、盤（メディア）だけを入れ替える。盤が無くても台はそこにある。
+<br>ただし<b>崩れる点</b>: プレーヤーなら盤が無いことは見れば分かるが、Linux の表示（<code>lsblk</code> の SIZE）は前の盤の大きさを出し続けることがある。確かめるには、実際に読んでみる。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>lsblk -d -o NAME,ROTA</code> で <code>sda</code> の ROTA が 0 だった。この値はどのファイルを読んだもので、何によって決まったか。</p>
+<details><summary>答え</summary>
+<p><code>/sys/block/sda/queue/rotational</code> を読んだもの。値は装置の申告で決まる（SATA の装置が回転数の欄に「回転しない」と答えた）。カーネルが速さを測った結果ではない。root は書き換えられるが、再起動すると申告の値に戻る。起動のたびに変えるには、udev の規則を <code>/etc/udev/rules.d/</code> に置く。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>PCI につながっている装置の一覧と、それぞれを動かしているドライバを表示したい。打つコマンドは何か。USB の装置を、つながり方の木とドライバ付きで表示するコマンドは何か。</p>
+<details><summary>答え</summary>
+<p>PCI は <code>lspci -k</code>（1台に絞るなら <code>-s 00:1f.2</code> のように番地を付ける）。USB は <code>lsusb -t</code>。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>装置が CPU に「用がある」と知らせるための番号の割り当ては、どのファイルで見られるか。</p>
+<details><summary>答え</summary>
+<p><code>/proc/interrupts</code>（割り込み、IRQ）。I/O ポートは <code>/proc/ioports</code>、DMA は <code>/proc/dma</code>。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>CPU は <code>lscpu</code>（元は <code>/proc/cpuinfo</code>）、メモリは <code>free</code>（元は <code>/proc/meminfo</code>）で読む。<code>/proc</code> のファイルは大きさ 0 で、読んだ瞬間に作られる</li><li><code>/proc</code>（カーネルとプロセスの状態）・<code>/sys</code>（sysfs。装置ごとの属性）・<code>/dev</code>（装置の入口）は、どれもカーネルがメモリの上に作る窓</li><li>割り込み（IRQ）は <code>/proc/interrupts</code>、I/O ポートは <code>/proc/ioports</code>、DMA は <code>/proc/dma</code></li><li><code>lspci -k</code> で PCI の装置と動かしているドライバ、<code>lsusb -t</code> で USB のつながりとドライバが分かる</li><li>HDD か SSD か（ROTA）は、カーネルが測ったのではなく装置の申告。<code>/sys/block/&lt;装置&gt;/queue/rotational</code> にあり、root が書き換えられ、udev の規則（<code>/etc/udev/rules.d/</code>）で起動のたびに書き換えられる</li><li>光学ドライブは RM=1・RO=1（書き込めないドライブの場合）。メディアを抜いても装置は残る</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.1.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・util-linux 2.39.3・pciutils 3.10.0・usbutils 017・udev 255.4 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁 × 24 行で、第1章から順に1つの練習機で打って検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-disks/theory/09-lvm">← 9. LVM で、2台のディスクを1つにまとめる</a><a href="/linuc-disks/theory/11-modules">次: 11. ドライバと、USB メモリの抜き差し →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-disks/">ハードウェアとディスク</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/practice/">実践編</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-disks/chapters.js"></script>
+<script src="/linuc-disks/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

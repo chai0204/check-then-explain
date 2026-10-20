@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>9. LVM で、2台のディスクを1つにまとめる — 確かめて説明する LinuC 主題1.05</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="9" data-theme="linuc-disks">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第9章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+</div>
+<h1>9. LVM で、2台のディスクを1つにまとめる</h1>
+<p class="lead">第8章までで、区画を切り（第2〜4章）、ファイルシステムを作り（第5章）、マウントし（第6・7章）、スワップにも使った（第8章）。区画の大きさは、切ったときに決まったままだった。この章では、ディスクとファイルシステムのあいだに LVM という段を1つはさみ、空のディスク <code>vdc</code> と <code>sda</code> をまとめて1台より大きな箱を作り、使いながら広げる。</p>
+<div class="badges"><span>前提: 第8章まで読了</span><span>前提: 練習機の中にいる</span><span>所要 24分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>物理ボリューム・ボリュームグループ・論理ボリュームの関係を、作る順番（<code>pvcreate</code> → <code>vgcreate</code> → <code>lvcreate</code>）と一緒に説明できる</li><li>論理ボリュームを広げる・縮めるときに、ファイルシステムの側に何が要るかを言える（ext4 と XFS の違いも）</li><li>スナップショットが何を残し、なぜ元より小さくてよいかを説明できる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: シンプロビジョニング（使った分だけ割り当てる LVM の使い方）は扱わない。複数のディスクに同じ中身を書いて壊れに備える論理ボリューム（RAID。<code>--type raid1</code> など）と、<code>pvmove</code> によるデータの引っ越しも扱わない。LVM が自分の管理情報をどこにどう書くかも扱わない。</div></div>
+
+<h2 id="layers">材料・池・箱の3段</h2>
+<div class="sgoal"><b>この節で分かること</b>: LVM を作る3つのコマンドと、それぞれが何を作るか。</div>
+<p><b>LVM</b>（Logical Volume Manager）は、ディスクとファイルシステムのあいだに1段はさむ仕組みである。材料にするのは、まだ使っていない <code>vdc</code> と <code>sda</code>（どちらも 1G）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk /dev/vdc /dev/sda
+NAME
+    MAJ:MIN RM SIZE RO TYPE MOUNTPOINTS
+sda   8:0    0   1G  0 disk
+vdc 253:32   0   1G  0 disk
+$ sudo pvcreate /dev/vdc /dev/sda
+  Physical volume "/dev/vdc" successfully created.
+  Physical volume "/dev/sda" successfully created.
+$ sudo pvs
+  PV         VG Fmt  Attr PSize PFree
+  /dev/sda      lvm2 ---  1.00g 1.00g
+  /dev/vdc      lvm2 ---  1.00g 1.00g</code></pre>
+<p><code>pvcreate</code> は、ディスク（や区画）を LVM の材料にするコマンドで、材料になったものを<b>物理ボリューム</b>（PV）と呼ぶ。<code>pvs</code> は物理ボリュームの一覧で、PSize が大きさ、PFree が空きである。区画を切らずに、ディスク全体を材料にした。2つを1つにまとめる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo vgcreate vg0 /dev/vdc /dev/sda
+  Volume group "vg0" successfully created
+$ sudo vgs
+  VG  #PV #LV #SN Attr   VSize VFree
+  vg0   2   0   0 wz--n- 1.99g 1.99g
+$ sudo vgdisplay vg0
+  --- Volume group ---
+  VG Name               vg0
+  System ID
+  Format                lvm2
+  Metadata Areas        2
+  Metadata Sequence No  1
+  VG Access             read/write
+  VG Status             resizable
+  MAX LV                0
+  Cur LV                0
+  Open LV               0
+  Max PV                0
+  Cur PV                2
+  Act PV                2
+  VG Size               1.99 GiB   ← 池の大きさ
+  PE Size               4.00 MiB   ← 区切り1つの大きさ
+  Total PE              510   ← 区切りの数
+  Alloc PE / Size       0 / 0
+  Free  PE / Size       510 / 1.99 GiB
+  VG UUID               d70UwX-3E7x-2y4u-w6wo-pK9n-avfB-ccKd6b   ← 作るたびに変わる番号（あなたの画面では違う）</code></pre>
+<p><code>vgcreate</code> は、物理ボリュームをまとめて<b>ボリュームグループ</b>（VG）にするコマンドで、ここでは <code>vg0</code> という名前にした。1G の2台で 1.99GiB の池ができている（管理情報の分だけ少し小さい）。<code>vgdisplay</code> は詳しい表示で、池の中は 4MiB ごとの区切り（物理エクステント、PE）で管理されていると分かる。池から<b>論理ボリューム</b>（LV）を切り出す。論理ボリュームは、パーティションの代わりに使う箱である。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo lvcreate -L 600M -n data vg0
+  Logical volume "data" created.
+$ sudo lvs
+  LV   VG  Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  data vg0 -wi-a----- 600.00m
+$ ls -l /dev/vg0/data /dev/mapper/vg0-data
+lrwxrwxrwx 1 root root 7 Oct 20 21:02 /dev/mapper/vg0-data -&gt; ../dm-0
+lrwxrwxrwx 1 root root 7 Oct 20 21:02 /dev/vg0/data -&gt; ../dm-0</code></pre>
+<p><code>lvcreate</code> の <code>-L</code> は大きさ、<code>-n</code> は名前である。<code>lvs</code> は論理ボリュームの一覧で、LSize が大きさ。<code>/dev/vg0/data</code> と <code>/dev/mapper/vg0-data</code> は、どちらも <code>/dev/dm-0</code> という同じ装置を指す別名（シンボリックリンク）である（<code>dm</code> は device mapper。LVM が論理ボリュームのために作る仮の装置）。論理ボリュームは、区画と同じように <code>mkfs</code> してマウントできる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mkfs.ext4 -q /dev/vg0/data
+$ sudo mkdir /srv/data
+$ sudo mount /dev/vg0/data /srv/data
+$ df -h /srv/data
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/vg0-data  574M   24K  532M   1% /srv/data</code></pre>
+<pre><code>/dev/vdc（1GiB）─┐                         ┌─ vg0/data（600MiB）─ ext4 ─ /srv/data
+                 ├─ vg0（1.99GiB の池） ──┤
+/dev/sda（1GiB）─┘   4MiB ごとの PE       └─ （空き）
+  pvcreate             vgcreate              lvcreate          mkfs     mount
+  物理ボリューム        ボリュームグループ      論理ボリューム</code></pre>
+<div class="analogy"><b>たとえ</b>: バケツの水を<b>池</b>に空けて、そこから<b>容器</b>に汲み分けるのに近い。バケツ（ディスク）が何杯でも、池（VG）では区別せずに使え、容器（LV）は後から大きいものに替えられる。
+<br>ただし<b>崩れる点</b>: 池の水は混ざれば区別できないが、LVM は「どの LV が、どのディスクのどこを使っているか」を覚えている。だからディスクが1台壊れると、そこを使っていた LV は壊れる。LVM は、壊れに備えて写しを持つ仕組みではない。</div>
+
+<h2 id="naive">箱を広げる</h2>
+<div class="sgoal"><b>この節で分かること</b>: 「論理ボリュームを広げる」と「ファイルシステムを広げる」が別の操作であること。</div>
+<p><code>lvextend</code> は、論理ボリュームを広げるコマンドである。<code>-L +800M</code> は「いまより 800MiB 大きく」。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p>LVM の売りは、使いながら容量を足せることだ。<code>lvextend</code> で 800MiB 足せば、<code>/srv/data</code> で使える量もその分増えるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo lvextend -L +800M vg0/data
+  Size of logical volume vg0/data changed from 600.00 MiB (150 extents) to &lt;1.37 GiB (350 extents).
+  Logical volume vg0/data successfully resized.
+$ sudo lvs vg0/data
+  LV   VG  Attr       LSize  Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  data vg0 -wi-ao---- &lt;1.37g
+$ df -h /srv/data
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/vg0-data  574M   24K  532M   1% /srv/data   ← 574M のまま</code></pre>
+<div class="then"><b>だめな理由</b>: 論理ボリュームは 1.37GiB になったのに、<code>df</code> は 574M のままである。
+<code>lvextend</code> が広げたのは<b>箱</b>（論理ボリューム）だけで、中の ext4 は、作ったときの大きさを自分の管理情報に書いている。
+その数を書き換えるまで、ext4 は外側に空きが増えたことを使わない。ファイルシステムを広げるのは、別の道具である。</div></div>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo resize2fs /dev/vg0/data
+resize2fs 1.47.0 (5-Feb-2023)
+Filesystem at /dev/vg0/data is mounted on /srv/data; on-line resizing required
+old_desc_blocks = 1, new_desc_blocks = 1
+The filesystem on /dev/vg0/data is now 358400 (4k) blocks long.
+$ df -h /srv/data
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/vg0-data  1.4G   24K  1.3G   1% /srv/data</code></pre>
+<p><code>resize2fs</code> は ext2・ext3・ext4 の大きさを変えるコマンドで、広げるだけならマウントしたままでよい（<code>on-line resizing</code>）。XFS では <code>xfs_growfs</code> を使う。<code>lvextend</code> に <code>-r</code>（<code>--resizefs</code>）を付けると、箱と中身を続けて広げる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo lvs -o lv_name,lv_size,devices vg0
+  LV   LSize  Devices
+  data &lt;1.37g /dev/vdc(0)
+  data &lt;1.37g /dev/sda(0)
+$ sudo lvextend -r -L +200M vg0/data
+  Size of logical volume vg0/data changed from &lt;1.37 GiB (350 extents) to 1.56 GiB (400 extents).
+  Logical volume vg0/data successfully resized.
+resize2fs 1.47.0 (5-Feb-2023)
+Filesystem at /dev/mapper/vg0-data is mounted on /srv/data; on-line resizing required
+old_desc_blocks = 1, new_desc_blocks = 1
+The filesystem on /dev/mapper/vg0-data is now 409600 (4k) blocks long.
+$ df -h /srv/data
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/vg0-data  1.6G   24K  1.5G   1% /srv/data</code></pre>
+<p><code>lvs -o</code> で列を選び、<code>devices</code>（使っている物理ボリューム）を出した。<code>data</code> は <code>vdc</code> と <code>sda</code> の2台にまたがっている。1台は 1GiB しかないのに、1.37GiB の箱ができている。<b>ディスク1台より大きな箱を作れる</b>のも LVM の特徴である。</p>
+<div class="analogy"><b>たとえ</b>: <b>本棚を大きいものに買い替えた</b>のに、本の並べ方の目録（ファイルシステム）が前の棚の段数のままになっている状態に近い。棚は広いのに、目録に載っていない段には本を置かない。
+<br>ただし<b>崩れる点</b>: 人なら棚が広がったことに見れば気づくが、ファイルシステムは自分から外側を測り直さない。<code>resize2fs</code> で「棚はここまである」と書き直してもらう必要がある。</div>
+
+<h2 id="shrink">縮めるのは、中身を先に</h2>
+<div class="sgoal"><b>この節で分かること</b>: 縮めるときの順番と、縮められないファイルシステムがあること。</div>
+<p>縮めるときは順番が逆になる。先に中身（ファイルシステム）を縮め、そのあとで箱を縮める。逆にすると、箱からはみ出した中身が壊れる。<code>lvreduce</code>（論理ボリュームを縮めるコマンド）に <code>-r</code> を付けると、この順番でやる。ext4 はマウントしたままでは縮められないので、先に外す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo umount /srv/data
+$ sudo lvreduce -r -L 1.2G vg0/data
+  Rounding size to boundary between physical extents: 1.20 GiB.
+fsck from util-linux 2.39.3
+/dev/mapper/vg0-data: 11/99840 files (0.0% non-contiguous), 10824/409600 blocks
+resize2fs 1.47.0 (5-Feb-2023)
+Resizing the filesystem on /dev/mapper/vg0-data to 315392 (4k) blocks.
+The filesystem on /dev/mapper/vg0-data is now 315392 (4k) blocks long.
+
+  Size of logical volume vg0/data changed from 1.56 GiB (400 extents) to 1.20 GiB (308 extents).
+  Logical volume vg0/data successfully resized.
+$ sudo mount /dev/vg0/data /srv/data
+$ df -h /srv/data
+Filesystem            Size  Used Avail Use% Mounted on
+/dev/mapper/vg0-data  1.2G   24K  1.2G   1% /srv/data</code></pre>
+<p>出力の順に、<code>fsck</code>（第7章。ここでは ext4 の検査をする <code>e2fsck</code> が走った）→ <code>resize2fs</code>（中身を縮める）→ 箱を縮める、と動いている。XFS で同じことをしてみる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo lvcreate -L 300M -n logs vg0
+  Logical volume "logs" created.
+$ sudo mkfs.xfs -q /dev/vg0/logs
+$ sudo mkdir /srv/logs
+$ sudo mount /dev/vg0/logs /srv/logs
+$ sudo lvreduce -r -L 200M vg0/logs
+fsadm: Xfs filesystem shrinking is unsupported.
+  /usr/sbin/fsadm failed: 1
+  Filesystem resize failed.
+$ sudo umount /srv/logs
+$ sudo lvremove -y vg0/logs
+  Logical volume "logs" successfully removed.
+$ sudo rmdir /srv/logs</code></pre>
+<p><b>XFS は縮められない</b>（<code>Xfs filesystem shrinking is unsupported</code>）。箱を縮める前に止まったので、データは無事である。XFS を小さくしたいときは、別の場所に退避して作り直すしかない。<code>lvremove</code> は論理ボリュームを消すコマンドで、<code>-y</code> は確認の問いに「はい」と答えておくオプションである。</p>
+<div class="scroll"><table>
+<tr><th>ファイルシステム</th><th>広げる</th><th>縮める</th><th>この章の記録</th></tr>
+<tr><td>ext4</td><td>マウントしたまま（<code>resize2fs</code>）</td><td>外してから（<code>resize2fs</code>）</td><td>マウントしたまま広げ、外して 1.2G に縮めた</td></tr>
+<tr><td>XFS</td><td>マウントしたまま（<code>xfs_growfs</code>）</td><td><b>できない</b></td><td><code>lvreduce -r</code> が止めた</td></tr>
+</table></div>
+
+<h2 id="snapshot">スナップショットは、変わる前の分だけを取っておく</h2>
+<div class="sgoal"><b>この節で分かること</b>: スナップショットの大きさが何で決まるか。</div>
+<p><b>スナップショット</b>は、論理ボリュームのある瞬間の姿を残したものである。ファイルを1つ置いてから、<code>data</code> のスナップショットを 100MiB で作る（<code>lvcreate</code> の <code>-s</code>）。元は 1.2GiB あるが、それより小さくてよい。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ echo "スナップショットの前" | sudo tee /srv/data/note.txt
+スナップショットの前
+$ sudo lvcreate -s -L 100M -n snap vg0/data
+  Logical volume "snap" created.
+$ sudo lvs vg0
+  LV   VG  Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  data vg0 owi-aos---   1.20g
+  snap vg0 swi-a-s--- 100.00m      data   0.01</code></pre>
+<p>元の側でファイルを消し、40MiB 書き込む（<code>/dev/urandom</code> はでたらめなバイトを返す装置のファイル。<code>sync</code> は、メモリに溜めた書き込みをディスクに書き出させるコマンド）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo rm /srv/data/note.txt
+$ sudo dd if=/dev/urandom of=/srv/data/big bs=1M count=40 status=none; sync
+$ sudo lvs vg0
+  LV   VG  Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  data vg0 owi-aos---   1.20g
+  snap vg0 swi-a-s--- 100.00m      data   40.22   ← 100MiB のうち 40% を使った</code></pre>
+<p>スナップショットの <code>Data%</code> が 0.01 から 40 に増えた。スナップショットは中身を丸ごと写すのではなく、元が書き換えられる<b>直前に、書き換えられる前のブロックだけ</b>を自分の領域に退避する（コピーオンライト）。40MiB 書いたので 40MiB 分を退避した。だから大きさは「この先どれだけ変わるか」で決めればよく、100% に達するとスナップショットは使えなくなる。</p>
+<p>スナップショットは、作った瞬間の姿のまま読める。消したファイルを取り戻す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo mkdir /mnt/snap
+$ sudo mount -o ro /dev/vg0/snap /mnt/snap
+$ ls /srv/data /mnt/snap
+/mnt/snap:
+lost+found  note.txt
+
+/srv/data:
+big  lost+found
+$ cat /mnt/snap/note.txt
+スナップショットの前
+$ sudo cp /mnt/snap/note.txt /srv/data/
+$ sudo umount /mnt/snap
+$ sudo lvremove -y vg0/snap
+  Logical volume "snap" successfully removed.
+$ sudo rm /srv/data/big
+$ sudo rmdir /mnt/snap</code></pre>
+<div class="analogy"><b>たとえ</b>: 書類を直すたびに、<b>直す前のページだけを抜いて保管しておく</b>運用に近い。変更の無いページは元の書類を見ればよいので、保管庫は小さくて済む。
+<br>ただし<b>崩れる点</b>: 保管庫がいっぱいになっても、書類の修正は止まらない。止まるのはスナップショットのほうで、そこで写しとしての価値を失う。大きく変わる作業の前に作るなら、変わる量より大きくしておく。</div>
+<p>最後の状態を見ておく。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo pvs
+  PV         VG  Fmt  Attr PSize    PFree
+  /dev/sda   vg0 lvm2 a--  1020.00m 808.00m
+  /dev/vdc   vg0 lvm2 a--  1020.00m      0
+$ sudo lvs -o lv_name,lv_size,devices vg0
+  LV   LSize Devices
+  data 1.20g /dev/vdc(0)
+  data 1.20g /dev/sda(0)</code></pre>
+<div class="scroll"><table>
+<tr><th>LVM の利点</th><th>LVM の欠点</th></tr>
+<tr><td>使っている途中で箱を広げられる（動的拡張）。ext4 なら縮めることもできる</td><td>ディスクとファイルシステムのあいだに段が1つ増え、壊れたときの調べ方が難しくなる</td></tr>
+<tr><td>複数のディスクをまとめて、1台より大きな箱を作れる</td><td>まとめたディスクの1台が壊れると、そこを使っていた論理ボリュームは壊れる（写しを持つ仕組みではない）</td></tr>
+<tr><td>スナップショットで、ある瞬間の姿を小さな容量で残せる</td><td>スナップショットがある間は、書き込みのたびに退避が起きて遅くなる</td></tr>
+</table></div>
+<div class="note try"><b>手を動かす</b>:
+実践編の<a href="/linuc-disks/practice/">演習08</a>は、vdc と sda をまとめた <code>vg0</code> に、1台より大きな <code>vg0/data</code> を作り、中の ext4 も箱いっぱいに広げる課題である。
+判定は箱の大きさと中身の大きさを別々に読んで比べる。この章のとおりに打った人は、もう達成している。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>lvextend -L +1G vg0/data</code> を実行したが、<code>df -h</code> で見るとファイルシステムの大きさが変わっていない。中身は ext4 である。何をすればよいか。XFS ならどうか。</p>
+<details><summary>答え</summary>
+<p><code>resize2fs /dev/vg0/data</code> でファイルシステムを広げる（マウントしたままでよい）。XFS なら <code>xfs_growfs</code>（マウント先を渡す）。最初から <code>lvextend -r</code> を使えば、箱と中身を続けて広げる。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>LVM で論理ボリュームを作ってマウントするまでのコマンドを、順に並べよ。</p>
+<details><summary>答え</summary>
+<p><code>pvcreate</code>（ディスクを物理ボリュームにする）→ <code>vgcreate</code>（ボリュームグループにまとめる）→ <code>lvcreate</code>（論理ボリュームを切り出す）→ <code>mkfs</code>（ファイルシステムを作る）→ <code>mount</code>。一覧はそれぞれ <code>pvs</code>・<code>vgs</code>・<code>lvs</code>（詳しくは <code>pvdisplay</code>・<code>vgdisplay</code>・<code>lvdisplay</code>）。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>1.2GiB の論理ボリュームに、100MiB のスナップショットを作れたのはなぜか。100MiB を使い切るとどうなるか。</p>
+<details><summary>答え</summary>
+<p>スナップショットは元の中身を丸ごと写さず、元が書き換えられるブロックの「書き換える前」だけを退避するので、要る大きさは作ってから変わる量で決まる。使い切るとスナップショットは使えなくなり、作った時点の姿を読めなくなる（元の論理ボリュームは影響を受けない）。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>LVM は3段: 物理ボリューム（<code>pvcreate</code>）→ ボリュームグループ（<code>vgcreate</code>）→ 論理ボリューム（<code>lvcreate</code>）。ファイルシステムは論理ボリュームの中に作る</li><li>論理ボリュームは複数のディスクにまたがれるので、1台より大きな箱を作れる。ただし1台壊れれば道連れになる</li><li><code>lvextend</code> が広げるのは箱だけ。中身は <code>resize2fs</code>（ext4）・<code>xfs_growfs</code>（XFS）で広げるか、<code>lvextend -r</code> で続けて広げる</li><li>縮めるのは中身が先、箱が後（<code>lvreduce -r</code>）。ext4 は外してから縮められ、XFS は縮められない</li><li>スナップショットは書き換えられる前のブロックだけを退避するので、大きさは「変わる量」で決まる。<code>Data%</code> が 100% になると使えなくなる</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.1.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・lvm2 2.03.16・e2fsprogs 1.47.0・xfsprogs 6.6.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁 × 24 行で、第1章から順に1つの練習機で打って検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-disks/theory/08-swap">← 8. スワップと tmpfs</a><a href="/linuc-disks/theory/10-hardware">次: 10. 部品の情報を読む →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-disks/">ハードウェアとディスク</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/practice/">実践編</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-disks/chapters.js"></script>
+<script src="/linuc-disks/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

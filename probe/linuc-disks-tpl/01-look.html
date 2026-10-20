@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1. 練習機に入り、つながっているディスクを眺める — 確かめて説明する LinuC 主題1.05</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/style.css"></head>
+<body data-draft="1" data-ch="1" data-theme="linuc-disks">
+<div class="wrap">
+<nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第1章</nav>
+<div class="draftbar compact">
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+</div>
+<h1>1. 練習機に入り、つながっているディスクを眺める</h1>
+<p class="lead">このコースでは、練習機（コンテナの中で動く仮想マシン）につながった空のディスクを、区切って・ファイルシステムを作って・マウントして使えるようにするところから始め、表の形式、ファイルシステムの種類、起動のたびのマウント、スワップ、LVM、部品の情報とドライバへと順に進む。始める前に要るのは、<a href="/linuc-disks/practice/">実践編</a>の「はじめる」で起動した檻と、そこに入った端末1つ（<code>docker exec -it lab-linuc-disks bash -l</code> で開いたもの）だけである。この章では、練習機に入り、つながっているディスクを <code>lsblk</code> と <code>df</code> の2つのコマンドで眺める。まだ何も変えない。</p>
+<div class="badges"><span>前提: 実践編の「はじめる」で檻を起動した</span><span>所要 15分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
+<div class="goal"><h4>この章のゴール</h4>
+<ul><li>プロンプトを見て、いま外のコンテナ（<code>lab@host</code>）と練習機の中（<code>student@linuc</code>）のどちらにいるかを言え、<code>ssh linuc</code> と <code>exit</code> で行き来できる</li><li><code>lsblk</code> の出力から、ディスク・パーティション・光学ドライブと、その大きさ・マウント先を読める</li><li><code>df -h</code> の出力から、マウントされているファイルシステムの大きさと空きを読め、<code>lsblk</code> との違いを言える</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: 仮想マシンを作るしくみ（QEMU と libvirt。主題1.01 のコース）は扱わない。<code>lsblk</code> の MAJ:MIN 列と、<code>df</code> のディスクではない行（<code>tmpfs</code>・<code>efivarfs</code>）は、この章では読まない。ディスクの名前の付き方の細かい規則（NVMe の SSD の <code>nvme0n1</code> など）も扱わない。</div></div>
+
+<h2 id="where">外と練習機の中 — 2つの場所</h2>
+<div class="sgoal"><b>この節で分かること</b>: いま打っている端末が外のコンテナか練習機の中かを見分け、行き来する方法。</div>
+<p>ディスクを区切ったりつないだりする操作は、ディスクという装置と、それを管理するカーネル（OS の中心で、装置・メモリ・プロセスを管理している部分）を直接相手にする。ところがコンテナは、あなたの PC のカーネルを借りて動いていて、ディスクの装置は渡されない（主題1.02 のコースの檻には、ディスクの装置が1つも無かった）。そこでこの檻は、コンテナの中で<b>仮想マシン</b>（ソフトウェアが作り出した1台のコンピュータ。自分のカーネルを持つ）を1台動かしている。これを<b>練習機</b>と呼ぶ。</p>
+<pre><code>あなたの PC
+ └─ 檻（コンテナ）           プロンプト lab@host       … 外。vm・virsh・lab を打つ
+     └─ 練習機（仮想マシン）  プロンプト student@linuc  … 中。ディスクを区切る・つなぐ</code></pre>
+<p>実践編の「はじめる」で開いた端末は、外（<code>lab@host</code>）にいる。まず練習機が起動し終わるのを待つ。<code>vm start</code> は練習機を起動し、中に入れるようになるまで待つコマンドである（この檻のために用意したもの）。</p>
+<pre data-where="外（lab@host）"><code>$ vm start</code></pre>
+<p>「練習機はもう動いています」は、檻を起動したときに練習機の電源も入っていた、という意味である。そのあと起動し終わるまで待ち、かかった秒数を出す（秒数と「起動中…」の行の数は、あなたの PC の速さと、檻を起動してからの時間で変わる。初めての起動では「初回の準備」の行が出ることもある）。最後の行のとおりに入る。<code>ssh</code> は別のコンピュータにログインするコマンドで、<code>linuc</code> は練習機の名前である。</p>
+<pre data-where="外（lab@host）"><code>$ ssh linuc</code></pre>
+<p>練習機の案内が出て、プロンプトが <code>student@linuc:~$</code> に変わる。これが練習機の中である（このコースの端末のブロックは、プロンプトを <code>$</code> だけにして載せる。どこで打つかは、ブロックの上の小さな見出しで示す）。案内の2行は、演習の答え合わせ（<code>lab check</code>）が練習機の中でも打てることと、練習機のネットワークの装置（NIC）を止めると ssh が切れるという注意である（このコースではネットワークは触らない）。<code>exit</code> で外に戻り、もう一度入ってみる。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ exit</code></pre>
+<pre data-where="外（lab@host）"><code>$ ssh linuc</code></pre>
+<p><code>exit</code> で <code>logout</code> と出てプロンプトが <code>lab@host</code> に戻り、<code>ssh linuc</code> でまた入った。2回目には、前に入った日時（<code>Last login:</code>）の行が出る。ここから先は、ことわりの無い限り練習機の中で打つ。</p>
+<div class="analogy"><b>たとえ</b>: 練習機は、作業場（コンテナ）の中に置いた<b>練習用のパソコン</b>に近い。ディスクを区切って失敗しても、壊れるのは練習用のパソコンのディスクだけで、作業場の外（あなたの PC）には何も起きない。
+<br>ただし<b>崩れる点</b>: 本物のパソコンのディスクは部品だが、練習機のディスクは外のコンテナに置いたファイルである。だから全員の練習機に同じディスクがつながっていて、本文と同じ画面が出る。また、本物より遅い（KVM という速くする仕組みを使わず、CPU の命令をソフトウェアで真似しているため）。</div>
+
+<h2 id="lsblk">つながっているディスクを一覧する — lsblk</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>lsblk</code> の1行が何を表し、各列をどう読むか。</div>
+<p><code>lsblk</code> は、カーネルが知っているディスクと、その中の区画を木の形で一覧にする。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk</code></pre>
+<p>1行が1つの装置（ディスクか、その中の区画）である。列は次のとおり。</p>
+<div class="scroll"><table>
+<tr><th>列</th><th>意味</th><th>何のためにあるか</th></tr>
+<tr><td>NAME</td><td>装置の名前。<code>/dev/</code> を付けると装置のファイルの名前になる（<code>vdb</code> → <code>/dev/vdb</code>）</td><td>コマンドに渡すときの名前。<code>├─</code>・<code>└─</code> は「上の行のディスクの中にある」という意味</td></tr>
+<tr><td>MAJ:MIN</td><td>装置の番号（主題1.02 で見たメジャー番号とマイナー番号）</td><td>カーネルが装置を見分ける番号。この章では読まない</td></tr>
+<tr><td>RM</td><td>取り外せる装置なら 1（removable）</td><td>USB メモリや CD のように、抜き差しする装置を見分ける</td></tr>
+<tr><td>SIZE</td><td>大きさ（G はギガバイト、M はメガバイト、K はキロバイト）</td><td>どのディスクかを見分ける一番の手がかり</td></tr>
+<tr><td>RO</td><td>読み取り専用なら 1（read only）</td><td>書き込めない装置（CD-ROM など）を見分ける</td></tr>
+<tr><td>TYPE</td><td><code>disk</code>（ディスク）・<code>part</code>（パーティション）・<code>rom</code>（光学ドライブ）</td><td>その行が装置全体か、その中の区画かを見分ける</td></tr>
+<tr><td>MOUNTPOINTS</td><td>マウント先（その区画を、どのディレクトリから使えるようにしてあるか）</td><td>空欄なら、まだどこからも使えない</td></tr>
+</table></div>
+<p><b>ディスク</b>はデータを書いておく記憶装置で、<b>パーティション</b>はディスクを区切った区画である。名前の頭の2文字は、ディスクのつながり方の種類を表す。</p>
+<div class="scroll"><table>
+<tr><th>名前</th><th>つながり方</th><th>この練習機では</th></tr>
+<tr><td><code>vd</code>a・<code>vd</code>b …</td><td>virtio（仮想マシンのために作られた、速く単純なディスクのつなぎ方）</td><td><code>vda</code>（システムの入ったディスク）・<code>vdb</code>・<code>vdc</code>・<code>vdd</code>・<code>vde</code></td></tr>
+<tr><td><code>sd</code>a・<code>sd</code>b …</td><td>SATA（PC の中でディスクをつなぐ線の規格）・USB（外から抜き差しする機器をつなぐ規格）・SCSI（主にサーバのディスクのつなぎ方）。Linux はこの3つのディスクを同じ仕組みで扱うので、名前がどれも <code>sd</code> になる。実機の PC のディスクや USB メモリはふつうこれ</td><td><code>sda</code></td></tr>
+<tr><td><code>sr</code>0</td><td>光学ドライブ（CD・DVD を読む装置）</td><td><code>sr0</code>（CD が1枚入っている）</td></tr>
+</table></div>
+<p>3文字目の a・b・c… は何台目か、後ろの数字はパーティションの番号である。<code>vda1</code> は「<code>vda</code> の1番目のパーティション」と読む。</p>
+<p>この表から読めることを並べる。<code>vda</code>（20G）は4つに区切られていて、3つがマウントされている（<code>/</code>・<code>/boot/efi</code>・<code>/boot</code>）。練習機の Linux そのものが、このディスクに入っている。<code>vdb</code>（2G）・<code>vdc</code>（1G）・<code>vde</code>（512M）・<code>sda</code>（1G）には区画が1つも無く、どこにもマウントされていない。このコースで区切って使うのは、これらの空のディスクである。<code>vdd</code>（256M）には <code>vdd2</code> が1つだけあり、演習で使うので触らない。</p>
+<div class="analogy"><b>たとえ</b>: ディスクは<b>土地</b>、パーティションはそれを区切った<b>区画</b>に近い。区画に倉庫を建てると物（ファイル）を置けるようになり、倉庫の入口を町の道につなぐと、町の人が行けるようになる。この「倉庫」が<b>ファイルシステム</b>、「道につなぐ」が<b>マウント</b>である（どちらも次の節で <code>df</code> の出力と一緒に見る）。
+<br>ただし<b>崩れる点</b>: 土地は区画に分けてから建てるのがふつうだが、ディスクは区切らずに、ディスク全体に倉庫を建てることもできる。区画を作るかどうかは、使い方で決める。</div>
+
+<h2 id="df">マウントされているファイルシステムを見る — df</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>df -h</code> が何を数えていて、<code>lsblk</code> と何が違うか。</div>
+<p><b>ファイルシステム</b>は、区画の中にファイルを名前で整理して置くための決まりと、そのための管理情報である。<b>マウント</b>は、ファイルシステムをディレクトリの木の1か所（<b>マウントポイント</b>）につなぎ、そのディレクトリから中のファイルを読み書きできるようにすることである。<code>df -h</code> は、マウントされているファイルシステムごとに、大きさと空きを出す（<code>-h</code> は大きさを G・M のような読みやすい単位で出すオプション）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ df -h</code></pre>
+<div class="scroll"><table>
+<tr><th>列</th><th>意味</th></tr>
+<tr><td>Filesystem</td><td>どの装置のファイルシステムか。<code>/dev/root</code> は、起動のときに <code>/</code> にした区画（ここでは <code>vda1</code>）をカーネルが呼ぶ名前</td></tr>
+<tr><td>Size・Used・Avail</td><td>大きさ・使っている量・あと使える量</td></tr>
+<tr><td>Use%</td><td>使っている割合</td></tr>
+<tr><td>Mounted on</td><td>マウントポイント</td></tr>
+</table></div>
+<p>ディスクの区画は、<code>/dev/</code> で始まる3行（<code>/dev/root</code>・<code>/dev/vda16</code>・<code>/dev/vda15</code>）だけである。<code>tmpfs</code> と <code>efivarfs</code> の行は、ディスクではなく、メモリや、ファームウェア（電源を入れたときに最初に動く、機械に組み込まれたプログラム）の設定を見せるものなので、ここでは読まない（<code>tmpfs</code> の行の Used は、人と時刻によって少し違う）。<code>lsblk</code> の MOUNTPOINTS に出ていた3つと同じものが、ここにも並んでいる（<code>vda16</code> の Size が <code>lsblk</code> の 913M より小さい 881M なのは、ファイルシステムが自分の管理情報に使う分を除いているからで、第5章で確かめる）。</p>
+<div class="naive"><h4>ふつうこう考える</h4>
+<p><code>lsblk</code> には <code>vdb</code>（2G）が出ていた。<code>df</code> にその装置の名前を渡せば、<code>vdb</code> の大きさと空きが分かるはずだ。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ df -h /dev/vdb</code></pre>
+<div class="then"><b>だめな理由</b>: 出てきたのは <code>vdb</code> ではなく、<code>/dev</code> にマウントされている <code>devtmpfs</code> の行だった。<code>df</code> にファイルの名前を渡すと、「そのファイルが置いてあるファイルシステム」について答える。<code>/dev/vdb</code> は <code>/dev</code> の中のファイルなので、<code>/dev</code> の答えが返ってきた。<code>vdb</code> にはまだファイルシステムが無く、どこにもマウントされていない。<b><code>df</code> が数えられるのは、マウントされているファイルシステムだけ</b>で、<code>vdb</code> の大きさを知りたいなら <code>lsblk</code> を見る。</div></div>
+<p>その <code>/dev/vdb</code> を <code>ls -l</code> で見る。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ ls -l /dev/vdb</code></pre>
+<p>先頭の <code>b</code> はブロックデバイス（決まった大きさの塊の単位で、好きな位置を読み書きする装置。ディスクがこれ）で、大きさの欄の <code>253, 16</code> は装置の番号である。中身を持つファイルではなく、カーネルの中のドライバ（装置の動かし方を知っている、カーネルの部品）への入口になっている（主題1.02 のコースの第1章で見た <code>/dev/null</code> の仲間）。ディスクを区切るコマンドもマウントするコマンドも、この名前で相手のディスクを指す。日時の欄は、あなたの画面では違う（このあとの章の <code>ls -l</code> の日時も同じ）。</p>
+<p>最後に、4つの言葉の関係を1つの表示で確かめる。<code>lsblk</code> の <code>-o</code> は、出す列を選ぶオプションで、<code>FSTYPE</code> はファイルシステムの種類を出す列である。装置の名前を並べると、その装置だけを出す。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS /dev/vda /dev/vdb</code></pre>
+<pre><code>vda（ディスク）
+ └─ vda1（パーティション）── ext4（ファイルシステム）── /（マウントポイント）
+vdb（ディスク）
+ └─ （まだ何も無い）</code></pre>
+<p><code>vda1</code> には ext4 というファイルシステムがあり、<code>/</code> にマウントされている。<code>vda14</code> は区画だが、ファイルシステムが無い（BIOS という古い起動の方式のために取ってある 4M の区画で、この練習機の起動には使われていない）。<code>vdb</code> には区画もファイルシステムも無い。使えるようにするには、区切る → ファイルシステムを作る → マウントする、の3段が要る。次の章で、この <code>vdb</code> を一通り使えるようにする。</p>
+<div class="analogy"><b>たとえ</b>: <code>lsblk</code> は町の<b>土地台帳</b>、<code>df</code> は道につながった倉庫の<b>在庫表</b>に近い。台帳には空き地も載るが、在庫表には開いている倉庫しか載らない。
+<br>ただし<b>崩れる点</b>: 在庫表に無い場所を聞かれたら、ふつうは「載っていない」と答えるが、<code>df</code> はその場所を含む別の倉庫の在庫を答えてしまう（<code>df -h /dev/vdb</code> が <code>/dev</code> の行を返した）。答えの Mounted on の列を見て、聞いたものと合っているかを確かめる。</div>
+<div class="note try"><b>手を動かす</b>:
+実践編の「はじめる」で檻を起動すれば、この章の表示をそのまま自分の練習機で出せる。<a href="/linuc-disks/practice/">演習01</a> は、次の第2章の流れを、この章で見た空のディスク <code>vde</code>（512M）でなぞる課題である。</div>
+
+<div class="quiz"><b>確認</b>
+<p><code>lsblk</code> には <code>vdb</code>（2G）が出ているのに、<code>df -h</code> の一覧には出てこない。なぜか。</p>
+<details><summary>答え</summary>
+<p><code>df</code> はマウントされているファイルシステムしか数えないから。<code>vdb</code> にはまだ区画もファイルシステムも無く、どこにもマウントされていない。<code>lsblk</code> はカーネルが知っている装置を全部出すので、空のディスクも出る。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p><code>lsblk</code> の <code>├─vda15  253:15  0  106M  0 part /boot/efi</code> という行は、何を表しているか。</p>
+<details><summary>答え</summary>
+<p><code>vda</code> というディスクの15番目のパーティション（TYPE が <code>part</code>）で、大きさは 106M。取り外せる装置ではなく（RM 0）、読み書きできて（RO 0）、<code>/boot/efi</code> にマウントされている。</p></details></div>
+<div class="quiz"><b>確認</b>
+<p>端末のプロンプトが <code>lab@host:~$</code> になっている。練習機の中で打つコマンドを打つ前に、何をするか。</p>
+<details><summary>答え</summary>
+<p><code>ssh linuc</code> で練習機に入る（プロンプトが <code>student@linuc:~$</code> に変わる）。外に戻るときは <code>exit</code>。</p></details></div>
+
+<h2 id="wrap">この章で分かったこと</h2>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>この檻は2重になっている。外のコンテナ（<code>lab@host</code>）の中で、練習機（仮想マシン。<code>student@linuc</code>）が動いている。<code>ssh linuc</code> で入り、<code>exit</code> で出る</li><li>ディスク = 記憶装置、パーティション = それを区切った区画、ファイルシステム = 区画の中にファイルを置くための決まりと管理情報、マウント = ファイルシステムをディレクトリ（マウントポイント）につなぐこと</li><li><code>lsblk</code> はカーネルが知っている装置を全部出す（空のディスクも）。TYPE で disk・part・rom を、MOUNTPOINTS でマウント先を読む</li><li><code>df -h</code> はマウントされているファイルシステムの大きさと空きだけを出す。マウントされていない装置の名前を渡すと、<code>/dev</code> の答えが返る</li><li>ディスクは <code>/dev/vdb</code> のようなブロックデバイス（<code>b</code>）のファイルとして見え、コマンドはこの名前で相手を指す</li></ul></div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.1.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・util-linux 2.39.3 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁 × 24 行で、第1章から順に1つの練習機で打って検証 / 検証日 2026-10-20</div>
+<nav class="pager"><a href="/linuc-disks/theory/">← 理論編 目次</a><a href="/linuc-disks/theory/02-first-disk">次: 2. 空のディスクを使えるようにする →</a></nav>
+<section id="comments">
+<h2>コメント</h2>
+<p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>
+<div id="giscus"></div>
+</section>
+<footer><a href="/">トップ</a> · <a href="/linuc-disks/">ハードウェアとディスク</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/practice/">実践編</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
+</div>
+<script src="/linuc-disks/chapters.js"></script>
+<script src="/linuc-disks/theory/terms.js"></script>
+<script src="/shared/theory.js"></script>
+<script src="/shared/comments.js"></script>
+</body></html>

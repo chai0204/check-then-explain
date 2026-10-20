@@ -10,7 +10,7 @@
 
 <div class="draftbar">
 <p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
-<p>本文の出力はすべて実機の記録で、演習8本は模範解答どおりに通ること・未達のときに判定が鳴ることを
+<p>本文の出力はすべて実機の記録で、演習10本は模範解答どおりに通ること・未達のときに判定が鳴ることを
    両方確認してあります。それでも<b>導線の不備</b>は残っている可能性があります。
    先に公開した SQLite 編では、読者として通した段階で4回に分けて不備が出ました。
    詰まったら <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
@@ -21,7 +21,7 @@
 <p class="lead">LinuC レベル1 <strong>101 試験・主題1.05「ハードウェア、ディスク、パーティション、ファイルシステム」</strong>
 （ハードウェアの基礎知識と設定 / ハードディスクのレイアウトとパーティション / ファイルシステムの作成と管理、マウント）を、
 <strong>コンテナの中で動く仮想マシン（練習機）</strong>で確かめます。
-ディスクを分割し、フォーマットし、マウントし、ドライバを外し、USB メモリを抜き差しします。
+空のディスクを区切り、ファイルシステムを作り、マウントし、USB メモリを抜き差しし、ドライバを外します。
 練習機は本物の Linux カーネルで動くので、あなたの PC のディスクには何も起きません。</p>
 
 <div class="promise">
@@ -50,83 +50,101 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
     <td><code>fdisk</code> <code>gdisk</code> <code>parted</code> <code>mkfs</code> <code>mount</code> <code>/etc/fstab</code> LVM <code>modprobe</code> udev <code>lspci</code> <code>lsusb</code> UEFI と ESP</td>
     <td>ファームウェアの設定画面・デスクトップの自動マウント → 理論編で説明</td></tr>
 </table></div></div>
-<p>影響度 <b>B</b>（変更は練習機の中だけ。母艦の設定もファイルも書き換えません）。
-練習機には、分割・フォーマットしてよいディスクが5本（virtio 3本・SATA 1本・光学ドライブ1台）と USB の口がつないであります。
+<pre><code>あなたの PC
+ └─ 檻（コンテナ）           lab@host       … 外。vm・virsh・lab を打つ
+     └─ 練習機（QEMU）        student@linuc  … 仮想マシン。Ubuntu 24.04 が自分のカーネルで動く</code></pre>
+<p>影響度 <b>B</b>（変更は練習機の中だけ。あなたの PC の設定もファイルも書き換えません）。
+練習機には、区切ってフォーマットしてよいディスクが5本（virtio 4本・SATA 1本）と、CD の入った光学ドライブ1台、USB の口がつないであります。
+壊したら外で <code>vm reset --yes</code> を打てば、練習機は工場出荷時に戻ります（演習を始めるときの <code>lab</code> の案内にも、この戻し方が出ます。起動し直すだけでは練習機は戻りません。ディスクはボリュームに残ります）。
 読者に権限を渡してもらう必要はありません（<code>--privileged</code> も <code>--cap-add</code> も <code>/dev/kvm</code> も要りません）。
-QEMU が CPU を丸ごとソフトウェアで真似する（完全エミュレーション）ので、ホストのカーネルの特権を1つも借りないためです。</p>
+QEMU が CPU を丸ごとソフトウェアで真似する（完全エミュレーション）ので、あなたの PC のカーネルの特権を1つも借りないためです。</p>
 
 <h2 id="start">はじめる</h2>
 <p>Docker の場合。2行です。</p>
 <pre><code>docker run -d --name lab-linuc-disks --hostname host --stop-timeout 30 \
   -v lab-linuc-disks-vm:/home/lab/vm \
   -v lab-linuc-disks-state:/home/lab/.lab \
-  ghcr.io/chai0204/lab-linuc:disks-1.0.1@sha256:a618fb0468bb943a3f95467af45d042cd8772c67e1a6b3014414bd066581fcd3
+  ghcr.io/chai0204/lab-linuc:disks-1.1.0@sha256:__DIGEST__
 
 docker exec -it lab-linuc-disks bash -l</code></pre>
+<div class="note warn"><b>前の版（1.0.x）で進めた人へ</b>: 1.1.0 で章と演習の順番と中身が変わりました（演習の番号も変わっています）。
+前の版の練習機のディスクと進捗がボリュームに残っていると、新しい章・演習と混ざって本文と違う画面になります。
+前の版の檻とボリュームを消してから、上の2行で始めてください（練習機のディスクと進捗が消えます）。
+<pre><code>docker rm -f lab-linuc-disks
+docker volume rm lab-linuc-disks-vm lab-linuc-disks-state</code></pre>
+ボリュームを消さずに続けるなら、前の版の檻だけを消して（<code>docker rm -f lab-linuc-disks</code>）上の2行で始め、入ったら外で次の3行を打ちます（練習機を最初の状態に戻し、前の版の進捗を消して、起動し直す）。
+新しい版の檻にボリュームだけを付け替えても、練習機のディスクは前の版のままで、演習05 のファイルも作られないので、この3行は省けません。
+<pre><code>vm reset --yes
+rm -f ~/.lab/progress.json ~/.lab/current
+vm start</code></pre></div>
 <ul>
-<li>コンテナを起動すると、中で練習機も起動します。KVM を使わない完全エミュレーションなので、<b>起動に 40〜90 秒</b>かかります。</li>
-<li><code>--stop-timeout 30</code> は必須です（権限ではありません）。<code>docker stop</code> したとき、練習機を正常に止めるのに約 13 秒かかり、docker の既定の猶予 10 秒では電源を抜かれてしまうためです。</li>
+<li>コンテナを起動すると、中で練習機も起動します。KVM を使わない完全エミュレーションなので、<b>起動に 40〜90 秒</b>かかります（<a href="/linuc-disks/theory/01-look">第1章</a>の最初の <code>vm start</code> で、起動し終わるのを待てます）。</li>
+<li><code>--stop-timeout 30</code> は必須です（権限ではありません）。<code>docker stop</code> したとき、練習機を正常に止める（中で shutdown する）のを待つ猶予です。docker の既定の猶予は 10 秒で、過ぎると練習機は電源を抜かれたのと同じ止まり方になります。記録では止まるまで 4〜7 秒で（<code>logs/linuc-machine-stop-autostart.log</code>）、既定の 10 秒との差が小さいので、余裕を持たせて 30 秒にしています。</li>
 <li><code>--device /dev/kvm</code> を足しても速くはなりません。練習機の定義が <code>type='qemu'</code>（KVM を使わない完全エミュレーション）に固定されているので、<code>/dev/kvm</code> を渡しても TCG のまま動きます（<a href="/kvm/theory/06-site">KVM の記事の6章</a>で測っています）。</li>
 <li>podman でも、同じオプションのまま <code>docker</code> を <code>podman</code> に替えて起動できるはずです。同じ土台（仮想マシン型の檻の共通部分）を使う別のコースの檻は、podman 5.8.6（rootless）で起動・練習機への ssh・<code>podman stop</code> まで確かめてあります（<code>logs/linuc-machine-podman.log</code>）。<b>このコースの檻そのものは、podman ではまだ確かめていません</b>。</li>
 </ul>
-<p>入ると、練習機の状態と現在地が出ます。</p>
-<pre><code>練習機 linuc: running（エージェント 応答あり / ssh 待ち受け中）
+<p>入ると、外のコンテナ（プロンプト <code>lab@host</code>）にいます。練習機の状態と現在地が出ます。</p>
+<pre><code>練習機 linuc: running（エージェント 応答なし / ssh まだ）
   vm start / vm ssh / vm console / vm stop   練習機の操作（中身は virsh と ssh）
 
 
-── lab-linuc-disks 1.0.1 ────────────────────────────────────────
-lab-linuc-disks  進捗 0/8
-  次 → 01 「vdb を SSD として扱わせる（再起動しても）」 (目安 10分 / 影響度 B)
+── lab-linuc-disks 1.1.0 ────────────────────────────────────────
+lab-linuc-disks  進捗 0/10
+  次 → 01 「空のディスク vde を使えるようにする」 (目安 10分 / 影響度 B)
   lab start 01 で課題を開く
   進捗の保存先: /home/lab/.lab/progress.json（消すには docker volume rm lab-linuc-disks-state）
   lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
 ────────────────────────────────────────────────────────────</code></pre>
-<p>ここは外側のコンテナ（<code>lab@host</code>）です。練習機（<code>student@linuc</code>）には <code>ssh linuc</code> で入り、<code>exit</code> で戻ります。</p>
-<pre><code>$ ssh linuc
-  LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
-  - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
-  - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
-
-Last login: Tue Oct 13 19:22:29 2026 from 10.0.2.2
-student@linuc:~$ exit
-logout
-Connection to 127.0.0.1 closed.</code></pre>
+<p>1行目は練習機の状態です。起動してすぐに入ると「エージェント 応答なし / ssh まだ」（まだ起動の途中）と出ます。起動し終わっていれば「応答あり / ssh 待ち受け中」です。
+<code>vm</code> は、練習機を操作する <code>virsh</code> と <code>ssh</code> を包んだ短縮のコマンドです。</p>
+<p>練習機（プロンプト <code>student@linuc</code>）には <code>ssh linuc</code> で入り、<code>exit</code> で外へ戻ります（第1章でやります）。
+第6章からは外で打つコマンド（USB メモリの抜き差し）も出てくるので、そこで端末をもう1つ開きます（<code>docker exec -it lab-linuc-disks bash -l</code> をもう一度）。</p>
 <div class="scroll"><table>
 <tr><th>場所</th><th>プロンプト</th><th>ここで打つもの</th></tr>
-<tr><td>外（コンテナ）</td><td><code>lab@host</code></td><td><code>vm</code>（練習機の電源）・<code>virsh</code>（ディスクや USB の抜き差し）・<code>lab</code>（演習）</td></tr>
-<tr><td>練習機の中</td><td><code>student@linuc</code></td><td><code>fdisk</code>・<code>mkfs</code>・<code>mount</code> など、本文のほとんど。root の操作は <code>sudo</code>（パスワードは聞かれない）。<code>lab check</code> もここで打てる</td></tr>
+<tr><td>外（コンテナ）</td><td><code>lab@host</code></td><td><code>vm</code>（練習機の電源）・<code>virsh</code>（USB メモリや CD の抜き差し）・<code>lab</code>（演習）</td></tr>
+<tr><td>練習機の中</td><td><code>student@linuc</code></td><td><code>fdisk</code>・<code>mkfs</code>・<code>mount</code> など、本文のほとんど。root の操作は <code>sudo</code>（パスワードは聞かれない）。<code>lab</code> もここで打てる（外の <code>lab</code> に頼んで答えを出す）</td></tr>
 </table></div>
 <p>練習機の操作（外で打つ）:</p>
 <div class="scroll"><table>
-<tr><th>コマンド</th><th>すること</th></tr>
-<tr><td><code>vm start</code></td><td>起動して、入れるようになるまで待つ（動いていれば待つだけ）</td></tr>
-<tr><td><code>vm stop</code></td><td>正常に止める</td></tr>
-<tr><td><code>vm status</code></td><td>状態を見る</td></tr>
-<tr><td><code>vm console</code></td><td>シリアルコンソールにつなぐ（ssh が切れたとき。抜けるのは Ctrl+]）</td></tr>
-<tr><td><code>vm reset --yes</code></td><td>練習機を工場出荷時に戻す（ディスクの変更はすべて消える。演習の進捗は消えない）</td></tr>
+<tr><th>コマンド</th><th>すること</th><th>何のためにあるか</th></tr>
+<tr><td><code>vm start</code></td><td>起動して、入れるようになるまで待つ（動いていれば待つだけ）</td><td>練習機に入る前・再起動したあと</td></tr>
+<tr><td><code>vm stop</code></td><td>正常に止める</td><td>コンテナを止める前に、練習機だけを止めたいとき</td></tr>
+<tr><td><code>vm status</code></td><td>状態を見る</td><td>入れないときに、どこまで起動しているかを見る</td></tr>
+<tr><td><code>vm console</code></td><td>シリアルコンソールにつなぐ（抜けるのは Ctrl+]）</td><td>ssh が切れて入れないとき</td></tr>
+<tr><td><code>vm reset --yes</code></td><td>練習機を工場出荷時に戻す（ディスクの変更はすべて消える。演習の進捗は消えない）</td><td>壊したとき・最初からやり直したいとき</td></tr>
 </table></div>
-<p>止めるのは <code>docker stop lab-linuc-disks</code>、再開は <code>docker start lab-linuc-disks</code>。ディスクの中身はボリュームに残ります。</p>
+<p>止めるのは <code>docker stop lab-linuc-disks</code>、再開は <code>docker start lab-linuc-disks</code>。ディスクの中身はボリュームに残ります
+（ただし、USB メモリは練習機を止めると抜けた状態になります。第6章・第7章・第11章の途中で止めたら、本文の <code>virsh attach-device</code> から挿し直してください）。</p>
 
 <h2 id="ex">演習</h2>
-<p>8本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。
-<code>lab start NN</code> で課題を開き、<code>lab check NN</code> で答え合わせ（練習機の中でも外でも打てます）。
+<p>10本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません
+（判定は外のコンテナが qemu-guest-agent 経由で練習機の中を見るので、ssh を壊しても採点は止まりません）。
+課題文は <code>lab start NN</code> で開き、作業の途中でも <code>lab show</code> でもう一度出せます（練習機の中でも外でも打てます）。
+答え合わせは <code>lab check NN</code>（これも練習機の中でも外でも打てます）。
 詰まったら <code>lab hint NN</code> を何度でも。使い切ったら <code>lab solve NN</code> で模範解答に必ず届きます
-（見ても構いません。進捗には「solve を見た」として残ります）。
-章のとおりに打つと、演習02・04〜08 は章の中で達成した状態になります。</p>
+（見ても構いません。進捗には「solve を見た」として残ります）。</p>
 <div class="scroll"><table>
 <tr><th>No</th><th>やること</th><th>副題</th><th>章</th><th>目安</th></tr>
-<tr><td>01</td><td>vdb を SSD として扱わせる（再起動しても）</td><td>1.05.1</td><td>1</td><td>10分</td></tr>
-<tr><td>02</td><td>USB メモリを挿し直しても使えなくする</td><td>1.05.1</td><td>2</td><td>15分</td></tr>
-<tr><td>03</td><td>消してしまったパーティションを取り戻す</td><td>1.05.2</td><td>3</td><td>12分</td></tr>
-<tr><td>04</td><td>新しいサーバのディスクを GPT で切る</td><td>1.05.2</td><td>4</td><td>15分</td></tr>
-<tr><td>05</td><td>2台のディスクにまたがる箱を作り、中身ごと広げる</td><td>1.05.2</td><td>5</td><td>15分</td></tr>
-<tr><td>06</td><td>5種類のファイルシステムを作り、ext4 の予約を減らす</td><td>1.05.3</td><td>6</td><td>12分</td></tr>
-<tr><td>07</td><td>スワップを作り、起動しても有効にする</td><td>1.05.3</td><td>7</td><td>10分</td></tr>
-<tr><td>08</td><td>一般ユーザが光学メディアをマウントできるようにする</td><td>1.05.3</td><td>8</td><td>12分</td></tr>
+<tr><td>01</td><td>空のディスク vde を使えるようにする</td><td>1.05.2・1.05.3</td><td>2</td><td>10分</td></tr>
+<tr><td>02</td><td>消してしまったパーティションを取り戻す</td><td>1.05.2</td><td>3</td><td>12分</td></tr>
+<tr><td>03</td><td>新しいサーバのディスクを GPT で切る</td><td>1.05.2</td><td>4</td><td>15分</td></tr>
+<tr><td>04</td><td>5種類のファイルシステムを作り、ext4 の予約を減らす</td><td>1.05.3</td><td>5</td><td>12分</td></tr>
+<tr><td>05</td><td>ディスクのイメージのファイルから、中のファイルを取り出す</td><td>1.05.3</td><td>6</td><td>10分</td></tr>
+<tr><td>06</td><td>一般ユーザが光学メディアをマウントできるようにする</td><td>1.05.3</td><td>7</td><td>12分</td></tr>
+<tr><td>07</td><td>スワップを作り、起動しても有効にする</td><td>1.05.3</td><td>8</td><td>10分</td></tr>
+<tr><td>08</td><td>2台のディスクにまたがる箱を作り、中身ごと広げる</td><td>1.05.2</td><td>9</td><td>15分</td></tr>
+<tr><td>09</td><td>vdb を SSD として扱わせる（再起動しても）</td><td>1.05.1</td><td>10</td><td>10分</td></tr>
+<tr><td>10</td><td>USB メモリを挿し直しても使えなくする</td><td>1.05.1</td><td>11</td><td>15分</td></tr>
 </table></div>
-<p>やり直したいときは、外で <code>vm reset --yes</code>（練習機ごと最初の状態に戻ります）。
-演習を始めるとき <code>lab</code> は「元に戻すには起動し直してください」と出しますが、この檻では起動し直しても練習機は戻りません（ディスクはボリュームに残ります）。戻すのは <code>vm reset --yes</code> です。
-先に読む場合は <a href="/linuc-disks/theory/">理論編（8章）</a>へ。</p>
+<p>演習は章の順に並んでいます。1本目（01）は第2章の流れを別のディスクでなぞるだけの易しいもので、後ろの演習ほど前の章の操作を組み合わせます。
+理論編の章のとおりに打ってきた人は、演習03・04・06〜10 はもう達成した状態になっています（<code>lab check</code> で確かめられます）。
+01・02・05 は、章では使わないディスクやファイルを使うので、章を読んだあとに自分で手を動かします。
+演習を先にやる人のために、各課題文には「いまの状態」として、演習だけを 01 から順にやってきた練習機での画面を載せてあります。</p>
+<p>やり直したいときは、外で <code>vm reset --yes</code>（練習機ごと最初の状態に戻ります。演習の進捗は消えません）。
+<b>演習を先にやった練習機で理論編を打つと、ディスクの状態が本文と違います</b>（第2章で区切る <code>vdb</code> に、演習03 の GPT が残っている など）。
+理論編を第1章から本文どおりに打つときは、その前に外で <code>vm reset --yes</code> を打って、<code>vm start</code> で起動し直してください。
+章の途中で演習01・02・05 をやるのは構いません（使うのは章で使わない <code>vde</code>・<code>vdd</code>・<code>old-usb.img</code> なので、本文の画面は変わりません。第10章の <code>/proc/partitions</code> にだけ、作った区画の行が増えます）。
+先に読む場合は <a href="/linuc-disks/theory/">理論編（11章）</a>へ。</p>
 
 <h2 id="report">本文と違う出力が出たら</h2>
 <p>教材のバグとして直します。次の4つを貼ってください。</p>
@@ -136,9 +154,9 @@ Connection to 127.0.0.1 closed.</code></pre>
 <li>あなたの画面に出た出力</li>
 <li><code>lab env</code> の全文（外で打つ）</li>
 </ol>
-<pre><code>$ lab env
-テーマ    : lab-linuc-disks 1.0.1
-イメージ  : ghcr.io/chai0204/lab-linuc:disks-1.0.1
+<pre data-where="外（lab@host）"><code>$ lab env
+テーマ    : lab-linuc-disks 1.1.0
+イメージ  : ghcr.io/chai0204/lab-linuc:disks-1.1.0
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -148,17 +166,18 @@ apt 固定  : 20260929T000000Z
 ゲスト    : Ubuntu 24.04.5 LTS / カーネル 6.8.0-142-generic / 仮想化 qemu
 特権      : CapEff=0000000000000000 CapBnd=00000000a80425fb</code></pre>
 <p><a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue を立てる</a>（フォームが3種類あります）。
+<code>カーネル</code> の行は、あなたの PC のカーネル（Docker Desktop なら、その中の仮想マシンのカーネル）なので、本文と違って正常です。練習機のカーネルは <code>ゲスト</code> の行に出ます。
 <code>練習機</code> の行が <code>running</code> 以外のときは、外で <code>vm start</code> を打ってください。
-<code>仮想化</code> は練習機の中から見た仮想化の種類で、この檻ではいつも <code>qemu</code>（KVM を使わない TCG）です。
+<code>ゲスト</code> の行の <code>仮想化</code> は練習機の中から見た仮想化の種類で、この檻ではいつも <code>qemu</code>（KVM を使わない TCG）です。
 記録は端末の幅 80 桁で取りました。<code>ls</code> の段組みは幅で変わります。</p>
 
 <h2 id="end">終わったら</h2>
 <pre><code>docker rm -f lab-linuc-disks
 docker volume rm lab-linuc-disks-vm lab-linuc-disks-state     # 練習機のディスクと進捗も消す場合だけ</code></pre>
 <p>イメージは <code>docker rmi</code> で消せます。
-母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。</p>
+あなたの PC には何も残りません（名前付きボリューム以外のファイルを作っていないため）。</p>
 
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.0.1@sha256:a618fb0468bb943a3f95467af45d042cd8772c67e1a6b3014414bd066581fcd3 / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 で演習8本を完走（podman は未確認）/ 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.1.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁 × 24 行で、理論編の第1章から第11章までを1つの練習機で通し、演習10本を工場出荷時の練習機で 01 から順に完走（podman は未確認）/ 検証日 2026-10-20</div>
 
 <!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
 <nav class="pager"><a href="/linuc-disks/theory/">← 理論編</a><a href="/linuc-shell/">次の記事: 主題1.06 シェルとスクリプト →</a></nav>

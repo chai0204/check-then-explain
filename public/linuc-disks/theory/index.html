@@ -10,8 +10,9 @@
 
 <div class="draftbar">
 <p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
-<p>本文に載せた出力はすべて実機の記録で、演習8本は模範解答どおりに通ることを確認してあります
-   （未達のときに判定が鳴ることも、8本すべてで確認済み。読者がやりがちな途中の状態でも鳴ることを7本で確認）。
+<p>本文に載せた出力はすべて実機の記録で、第1章から第11章まで、読者と同じ打ち方（端末つきの対話シェルに1行ずつ）で
+   1つの練習機に順に打った記録と突き合わせてあります。演習10本は、模範解答どおりに通ること・未達のときに判定が鳴ることを
+   すべて確かめてあります（読者がやりがちな途中の状態でも鳴ることも、10本すべてで確認）。
    それでも <b>導線の不備</b>は残っている可能性があります。
    先に公開した SQLite 編では、著者が読者として通した段階で
    <b>4回に分けて不備が出ました</b>（説明の順序・リンク切れ・前提の省略・判定の誤り）。
@@ -23,9 +24,9 @@
 
 <h1>理論編 — ハードウェア、ディスク、パーティション、ファイルシステム</h1>
 <p class="lead">LinuC レベル1 <strong>101 試験・主題1.05</strong>を、
-コンテナの中で動く仮想マシン（練習機）の<strong>本物のカーネルの上で</strong>確かめる8章。
-ディスクを分割し、フォーマットし、マウントし、ドライバを外し、USB メモリを抜き差しします。
-1章ごとに「実際に打つと何が出るか」を先に置いています。</p>
+コンテナの中で動く仮想マシン（練習機）の<strong>本物のカーネルの上で</strong>確かめる11章。
+まず空のディスクを一通り使えるようにし（第1・2章）、そのあと1段ずつ詳しく見ていきます:
+パーティションの表（第3・4章）→ ファイルシステム（第5章）→ マウント（第6・7章）→ スワップ（第8章）→ LVM（第9章）→ 部品とドライバ（第10・11章）。</p>
 
 <div class="promise">
 <p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
@@ -34,17 +35,24 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 ここにあるのは、誰かが実際に一度通した記録です。</p>
 </div>
 
-<h2 id="spine">この8章を貫いている1つの事実</h2>
+<h2 id="order">読む順番と、前提</h2>
+<p>章は、第1章から順に、同じ1台の練習機で打っていく前提で書いてあります（前の章で作った区画やファイルシステムを、次の章で使います）。
+演習を先にやった練習機では本文と違う画面になるので、その場合は外で <code>vm reset --yes</code> を打ってから第1章を始めてください（<a href="/linuc-disks/practice/#ex">実践編</a>に詳しく書いてあります）。
+各章の冒頭に「前の章までにやったこと」と「この章でやること」を書いてあります。
+前提として要るのは、主題1.01〜1.04 のコースで扱った範囲（端末でコマンドを打つ・ファイルとディレクトリ・パーミッション・<code>sudo</code>・パイプと <code>grep</code>）だけです。
+カーネル・ドライバ・セクタのような語も、使う前にその場で一言で説明しています。</p>
+
+<h2 id="spine">11章を通して確かめること</h2>
 <div class="goal">
-<p><b>ディスクは、装置・パーティション表・LVM・ファイルシステム・マウントの層が重なってできている。
-各層は自分の印（装置の申告・表の行・UUID）だけを読み、隣の層を勝手には書き換えない。</b></p>
-<p>パーティションを消しても中身は残り（第3章）、論理ボリュームを広げてもファイルシステムは広がらず（第5章）、
-<code>/dev/sdb</code> という名前は挿す順番で別のディスクを指す（第8章）。
-どれも「1つの層を変えたら、隣の層も一緒に変わる」と思ったところで予想が外れます。
-主題1.05 の「詳細」にコマンドが層ごとに並んでいるのは、<b>層ごとに別の道具で確かめる</b>必要があるからです。</p>
+<p>ディスクは、<b>装置・パーティションの表・（LVM）・ファイルシステム・マウントの段</b>が重なってできています。
+各段は自分の印（装置の申告・表の行・UUID）だけを読み、隣の段を勝手には書き換えません。</p>
+<p>だから、区画を消しても中身は残り（第3章）、論理ボリュームを広げてもファイルシステムは広がらず（第9章）、
+<code>/dev/sdb</code> という名前は挿す順番で別のディスクを指します（第6章）。
+どの章でも、まず普通に使ってみて、そのあとで「1つの段だけを見て、隣の段も一緒に動くと思った」ところで予想が外れるのを確かめます。
+第11章の最後で、11の外れた予想を1つの表にまとめます。</p>
 <div class="skip"><b>ここで覚えなくていいこと</b>:
 ファイルシステムの内部の形、RAID、iSCSI や NFS のようなネットワーク越しのディスク、
-ディスクの暗号化（LUKS）、systemd の <code>.mount</code> ユニットの書き方。どれも主題1.05 の範囲外で、この8章には出てきません。</div>
+ディスクの暗号化（LUKS）、systemd の <code>.mount</code> ユニットの書き方。どれも主題1.05 の範囲外で、この11章には出てきません。</div>
 </div>
 
 <h2 id="range">LinuC 出題範囲との対応</h2>
@@ -53,39 +61,46 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <div class="scroll"><table>
 <tr><th>副題</th><th>重要度</th><th>章</th><th>この教材で実際に打つもの</th></tr>
 <tr><td rowspan="2">1.05.1 ハードウェアの基礎知識と設定</td><td rowspan="2">3</td>
-    <td><a href="/linuc-disks/theory/01-hardware">1</a></td>
-    <td><code>/proc</code> <code>/sys</code> <code>/dev</code> <code>lspci</code> <code>lsusb</code> <code>lsblk</code>（HDD・SSD・光学の ROTA・RM・RO）</td></tr>
-<tr><td><a href="/linuc-disks/theory/02-modules">2</a></td>
+    <td><a href="/linuc-disks/theory/10-hardware">10</a></td>
+    <td><code>lscpu</code> <code>/proc</code> <code>/sys</code> <code>/dev</code> <code>lspci</code> <code>lsusb</code> <code>lsblk</code>（HDD・SSD・光学の ROTA・RM・RO）・割り込み・I/O ポート・DMA・udev の規則</td></tr>
+<tr><td><a href="/linuc-disks/theory/11-modules">11</a></td>
     <td><code>lsmod</code> <code>modinfo</code> <code>modprobe</code> <code>insmod</code> <code>rmmod</code> <code>udevadm monitor</code> <code>/etc/modprobe.d/</code>（周辺機器の有効/無効・USB の抜き差し・sysfs・udev・dbus）</td></tr>
-<tr><td rowspan="3">1.05.2 ハードディスクのレイアウトとパーティション</td><td rowspan="3">4</td>
-    <td><a href="/linuc-disks/theory/03-partition">3</a></td>
-    <td><code>fdisk</code> <code>gdisk</code> <code>parted</code>（<code>mkpart</code>・<code>-l</code>）（MBR と GPT・基本（プライマリ）・拡張・論理パーティション）</td></tr>
-<tr><td><a href="/linuc-disks/theory/04-esp">4</a></td>
-    <td><code>efibootmgr</code> <code>sgdisk</code> UEFI と ESP（<code>/boot/efi</code>・種類の印）・<code>/</code> <code>/boot</code> <code>/var</code> <code>/home</code> スワップの割り当て・<code>gdisk</code> で GPT を作る</td></tr>
-<tr><td><a href="/linuc-disks/theory/05-lvm">5</a></td>
-    <td><code>pvcreate</code> <code>vgcreate</code> <code>lvcreate</code> <code>lvextend</code> <code>lvreduce</code> <code>resize2fs</code>・スナップショット</td></tr>
-<tr><td rowspan="3">1.05.3 ファイルシステムの作成と管理、マウント</td><td rowspan="3">4</td>
-    <td><a href="/linuc-disks/theory/06-mkfs">6</a></td>
-    <td><code>mkfs</code>（ext3・ext4・XFS・VFAT・Btrfs）<code>tune2fs</code> <code>dumpe2fs</code> <code>df</code>（<code>-i</code>）<code>du</code>・MBR の表（第3章）</td></tr>
-<tr><td><a href="/linuc-disks/theory/07-swap">7</a></td>
+<tr><td rowspan="5">1.05.2 ハードディスクのレイアウトとパーティション</td><td rowspan="5">4</td>
+    <td><a href="/linuc-disks/theory/01-look">1</a>・<a href="/linuc-disks/theory/02-first-disk">2</a></td>
+    <td><code>lsblk</code> <code>df</code>・<code>fdisk</code> で区画を1つ作る（ディスク・パーティション・ファイルシステム・マウントの関係）</td></tr>
+<tr><td><a href="/linuc-disks/theory/03-partition">3</a></td>
+    <td><code>fdisk</code>（<code>-l</code>・<code>n</code>・<code>d</code>・<code>p</code>・<code>w</code>）MBR・プライマリパーティション（基本パーティション）・拡張・論理パーティション</td></tr>
+<tr><td><a href="/linuc-disks/theory/04-gpt">4</a></td>
+    <td>GPT・UEFI と ESP（<code>efibootmgr</code> <code>blkid</code>）・<code>/</code> <code>/boot</code> <code>/var</code> <code>/home</code> スワップの割り当て・<code>gdisk</code> <code>parted</code></td></tr>
+<tr><td><a href="/linuc-disks/theory/08-swap">8</a></td>
+    <td>スワップの区画を使い始める（<code>mkswap</code> <code>swapon</code>）</td></tr>
+<tr><td><a href="/linuc-disks/theory/09-lvm">9</a></td>
+    <td><code>pvcreate</code> <code>vgcreate</code> <code>lvcreate</code> <code>lvextend</code> <code>lvreduce</code> <code>resize2fs</code>・物理ボリューム・論理ボリューム・スナップショット</td></tr>
+<tr><td rowspan="5">1.05.3 ファイルシステムの作成と管理、マウント</td><td rowspan="5">4</td>
+    <td><a href="/linuc-disks/theory/02-first-disk">2</a>・<a href="/linuc-disks/theory/03-partition">3</a></td>
+    <td><code>mkfs.ext4</code> <code>mount</code> <code>umount</code>・MBR の表（先頭の 512 バイト）</td></tr>
+<tr><td><a href="/linuc-disks/theory/05-mkfs">5</a></td>
+    <td><code>mkfs</code>（ext3・ext4・XFS・VFAT・Btrfs）<code>tune2fs</code> <code>dumpe2fs</code> <code>df</code>（<code>-i</code>）<code>du</code></td></tr>
+<tr><td><a href="/linuc-disks/theory/06-media">6</a></td>
+    <td>マウントポイント・<code>/media</code>・USB メモリと CD・UUID とラベル（<code>blkid</code> <code>findfs</code>）・ISO のファイルの <code>-o loop</code></td></tr>
+<tr><td><a href="/linuc-disks/theory/07-fstab">7</a></td>
+    <td><code>/etc/fstab</code> <code>mount -a</code> <code>findmnt --verify</code>・ラベルの重なり（<code>e2label</code> <code>xfs_admin</code>）・一般ユーザのマウント（<code>user</code>・<code>noauto</code>）</td></tr>
+<tr><td><a href="/linuc-disks/theory/08-swap">8</a></td>
     <td><code>mkswap</code> <code>swapon</code> <code>swapoff</code> tmpfs</td></tr>
-<tr><td><a href="/linuc-disks/theory/08-mount">8</a></td>
-    <td><code>mount</code> <code>umount</code> マウントポイント <code>/etc/fstab</code> UUID とラベル（<code>blkid</code> <code>findfs</code> <code>e2label</code> <code>xfs_admin</code>）<code>/media</code> と一般ユーザのマウント・ISO のファイルの <code>-o loop</code></td></tr>
-<tr><td>101 の範囲外（201 の 2.02.2 ファイルシステムの保守）</td><td>—</td>
-    <td><a href="/linuc-disks/theory/06-mkfs#fsck">6</a></td>
-    <td><code>fsck</code> <code>xfs_repair</code>（Version 10.0 で 201 に移った。第6章では、種類ごとに別の道具であることだけを見る）</td></tr>
 </table></div>
 <p class="detail">この檻で<b>再現しなかったもの</b>と、その理由です。<b>黙って飛ばしてはいません</b>。</p>
 <div class="scroll"><table>
 <tr><th>出題範囲の語</th><th>この教材での扱い</th><th>理由</th></tr>
-<tr><td>BIOS / UEFI の設定画面で周辺機器を無効にする</td><td>第2章の表で説明（ドライバで止める方法は実際に打つ）</td><td>ファームウェアの設定画面は対話の GUI で、記録を読者と揃えられない</td></tr>
-<tr><td>HDD と SSD の物理的な違い（速さ・寿命）</td><td>第1章の表で説明。Linux が両者を区別する<b>しくみ</b>（rotational）は実際に打つ</td><td>練習機のディスクは全部同じ種類のファイルで、速さの違いは測っても意味が無い（それ自体が第1章の論点）</td></tr>
+<tr><td>BIOS / UEFI の設定画面で周辺機器を無効にする</td><td>第11章で説明（ドライバで止める方法は実際に打つ）</td><td>ファームウェアの設定画面は対話の GUI で、記録を読者と揃えられない</td></tr>
+<tr><td>HDD と SSD の物理的な違い（速さ・寿命）</td><td>第10章の表で説明。Linux が両者を区別する<b>しくみ</b>（rotational）は実際に打つ</td><td>練習機のディスクは全部同じ種類のファイルで、速さの違いは測っても意味が無い（それ自体が第10章の論点）</td></tr>
 <tr><td>本物の USB メモリ・CD の抜き差し</td><td>外から <code>virsh attach-device</code> / <code>change-media</code> で挿す・抜く</td><td>カーネルから見れば同じ「装置が来た・去った」の知らせになる</td></tr>
-<tr><td>デスクトップでの自動マウント（Ubuntu・Debian は <code>/media/&lt;ユーザ&gt;/</code>、RHEL 系と udisks2 の既定は <code>/run/media/&lt;ユーザ&gt;/</code>）</td><td>第2章・第8章で説明。<code>/etc/fstab</code> の <code>user</code> で一般ユーザに許す方法を実際に打つ</td><td>udisks2 とデスクトップ環境が要る（練習機は GUI を持たない）</td></tr>
+<tr><td>デスクトップでの自動マウント（Ubuntu・Debian は <code>/media/&lt;ユーザ&gt;/</code>、RHEL 系は <code>/run/media/&lt;ユーザ&gt;/</code>）</td><td>第11章で説明。<code>/etc/fstab</code> の <code>user</code> で一般ユーザに許す方法を第7章で実際に打つ</td><td>udisks2 とデスクトップ環境が要る（練習機は画面を持たない）</td></tr>
+<tr><td>ファイルシステムの検査と修復（<code>fsck</code>・<code>xfs_repair</code>）</td><td>第7章で <code>/etc/fstab</code> の6列目の意味として、第9章で <code>lvreduce</code> が呼ぶものとして出る</td><td>Version 10.0 では 101 ではなく 201 試験（2.02.2）の範囲</td></tr>
 </table></div>
-<p class="detail">記録は、読者と同じ条件の端末（対話のシェル・TERM=xterm）で取りました。端末の幅は <b>80 桁</b>です。
-<code>ls</code> の段組みは幅で変わります。<code>lsblk</code> と <code>findmnt</code> は 80 桁に収まる列だけを指定してあるので、幅が広くても同じ表示になります。
-fdisk と gdisk の対話だけは 200 桁で取りました（fdisk の <code>Last sector</code> の問いは 86 文字あり、それより狭い端末では行が横にずれて表示されます）。
+<p class="detail">記録は、読者と同じ条件の端末（<code>docker exec -it</code> で開いた端末・対話のシェル・TERM=xterm）で、<b>80 桁 × 24 行</b>にして、
+本文のコマンドを1行ずつ打って取りました（練習機の中も、同じ端末から <code>ssh linuc</code> で入って打っています。第6章からの外のコマンドは、本文と同じく2つ目の端末で打っています）。
+<code>ls</code> の段組みは端末の幅で変わります。<code>lsblk</code> と <code>findmnt</code> は 80 桁に収まる列だけを指定してあるので、幅が広くても同じ表示になります。
+<code>fdisk</code> の <code>Last sector</code> の問いのように 80 文字を超える行は、あなたの画面では折り返して2行に見えます（文字は同じです）。
 <code>/proc/cpuinfo</code> などは KVM を使わない完全エミュレーションでの表示です。</p>
 <p>他の主題（1.01〜1.04・1.06〜1.11）の対応は
 <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。</p>
@@ -94,77 +109,78 @@ fdisk と gdisk の対話だけは 200 桁で取りました（fdisk の <code>L
 <p>主題1.05 の「詳細」欄に並ぶ語を、1行の意味と、説明している章で引けるようにしました。</p>
 <div class="scroll"><table>
 <tr><th>語</th><th>一行の意味</th><th>章</th></tr>
-<tr><td><code>/proc</code></td><td>カーネルとプロセスの情報を見せる仮想のファイルシステム（cpuinfo・meminfo・partitions・interrupts・swaps）</td><td><a href="/linuc-disks/theory/01-hardware#windows">1</a></td></tr>
-<tr><td><code>/sys</code>（sysfs）</td><td>装置ごとの属性をファイルで見せる。root が書くとその場で変わる（rotational など）</td><td><a href="/linuc-disks/theory/01-hardware#windows">1</a></td></tr>
-<tr><td><code>/dev</code></td><td>装置の入り口（デバイスファイル）。<code>b</code> = ブロック、<code>8, 0</code> = メジャー・マイナー番号</td><td><a href="/linuc-disks/theory/01-hardware#windows">1</a></td></tr>
-<tr><td><code>lspci</code></td><td>PCI の装置の一覧。<code>-k</code> で使っているドライバ、<code>-nn</code> で ID、<code>-s</code> で1台に絞る</td><td><a href="/linuc-disks/theory/01-hardware#bus">1</a></td></tr>
-<tr><td><code>lsusb</code></td><td>USB の装置の一覧。<code>-t</code> でつながりと、付いているドライバの名前（読み込まれているモジュールの一覧は <code>lsmod</code>）</td><td><a href="/linuc-disks/theory/01-hardware#bus">1</a>・<a href="/linuc-disks/theory/02-modules#plug">2</a></td></tr>
-<tr><td>HDD・SSD</td><td><code>lsblk</code> の ROTA が 1 / 0。カーネルは測らず、装置の申告を信じる</td><td><a href="/linuc-disks/theory/01-hardware#rota">1</a></td></tr>
-<tr><td>光学ストレージ</td><td><code>/dev/sr0</code>。RM（取り外せる）= 1。この練習機の DVD-ROM は RO（読み取り専用）= 1（書けるドライブなら 0）。CD は iso9660、DVD・BD は UDF が多い。ISO のファイルは <code>mount -o loop</code></td><td><a href="/linuc-disks/theory/01-hardware#optical">1</a></td></tr>
-<tr><td><code>lsmod</code></td><td>読み込まれているモジュールの一覧（<code>/proc/modules</code>）。Used by は使っている側</td><td><a href="/linuc-disks/theory/02-modules#lsmod">2</a></td></tr>
-<tr><td><code>modprobe</code></td><td>名前でモジュールを読み込む。依存も解決する。<code>-r</code> で外す（使われなくなった依存も）</td><td><a href="/linuc-disks/theory/02-modules#insmod">2</a></td></tr>
-<tr><td><code>insmod</code></td><td>ファイル（パス）を1つ読み込む。依存は解決しない（Unknown symbol）</td><td><a href="/linuc-disks/theory/02-modules#insmod">2</a></td></tr>
-<tr><td><code>rmmod</code></td><td>モジュールを1つ外す。使われていれば断る（in use by）</td><td><a href="/linuc-disks/theory/02-modules#naive">2</a></td></tr>
-<tr><td>周辺機器の有効/無効</td><td>ドライバを外す（<code>modprobe -r</code>）／読み込ませない（<code>/etc/modprobe.d</code> の blacklist・install）／ファームウェアの設定</td><td><a href="/linuc-disks/theory/02-modules#onboard">2</a></td></tr>
-<tr><td>udev</td><td>カーネルの知らせ（uevent）を受け、規則で <code>/dev</code> の別名を作り、ドライバを読み込ませる</td><td><a href="/linuc-disks/theory/02-modules#naive">2</a></td></tr>
-<tr><td>sysfs・udev・dbus</td><td>sysfs = 装置の情報、udev = 装置の出入りの処理、D-Bus = プログラム同士の通り道</td><td><a href="/linuc-disks/theory/02-modules#dbus">2</a></td></tr>
+<tr><td>ディスク・パーティション・ファイルシステム・マウント</td><td>記憶装置・それを区切った区画・区画の中のファイルの置き方・ファイルシステムをディレクトリにつなぐこと</td><td><a href="/linuc-disks/theory/01-look#lsblk">1</a></td></tr>
+<tr><td><code>fdisk</code></td><td>表を対話で作る。n・d・p・w・q。<code>w</code> まで書かない。<code>-l</code> で表示だけ。いまの版は MBR と GPT。<b>試験の例題では MBR 用（GPT 非対応）として答える</b></td><td><a href="/linuc-disks/theory/02-first-disk#fdisk">2</a>・<a href="/linuc-disks/theory/03-partition#read">3</a></td></tr>
+<tr><td><code>mount</code>・<code>umount</code></td><td>つなぐ・外す。<code>-a</code> で fstab の全部（<code>noauto</code> の行は除く）、<code>-o remount,ro</code> でつないだまま変更。中にプロセスがいると busy</td><td><a href="/linuc-disks/theory/02-first-disk#mount">2</a>・<a href="/linuc-disks/theory/06-media#usb">6</a>・<a href="/linuc-disks/theory/07-fstab#remount">7</a></td></tr>
 <tr><td>MBR</td><td>先頭の 512 バイト = 起動のプログラム 446・表 64（16 バイト × 4行）・印 2（<code>55 aa</code>）。2TiB まで</td><td><a href="/linuc-disks/theory/03-partition#bytes">3</a></td></tr>
 <tr><td>プライマリパーティション（基本パーティション）</td><td>MBR の表に直接書く区画。表が4行なので4つまで（番号 1〜4）</td><td><a href="/linuc-disks/theory/03-partition#bytes">3</a></td></tr>
 <tr><td>拡張・論理パーティション</td><td>5つ以上に分けるための入れ物（1つのディスクに1つまで。基本の枠を1つ使う）とその中身。論理は 5 番から</td><td><a href="/linuc-disks/theory/03-partition#extended">3</a></td></tr>
-<tr><td><code>fdisk</code></td><td>表を対話で作る。n・d・p・t・w・q。<code>w</code> まで書かない。いまの版は MBR と GPT。<b>試験の例題では MBR 用（GPT 非対応）として答える</b></td><td><a href="/linuc-disks/theory/03-partition#create">3</a></td></tr>
-<tr><td><code>gdisk</code></td><td>GPT 用の fdisk。種類は4文字（EF00・8200・8300）</td><td><a href="/linuc-disks/theory/03-partition#tools">3</a>・<a href="/linuc-disks/theory/04-esp#allocate">4</a></td></tr>
-<tr><td><code>parted</code></td><td>MBR と GPT。<b>打った瞬間に書く</b>。<code>mkpart</code> で作る・<code>rm</code> で消す・<code>print</code> で表示・<code>-l</code> で全部のディスクの一覧</td><td><a href="/linuc-disks/theory/03-partition#tools">3</a></td></tr>
-<tr><td>GPT</td><td>128 個まで・大きさの上限ほぼ無し・表は先頭と末尾の2か所・種類は GUID</td><td><a href="/linuc-disks/theory/03-partition#tools">3</a>・<a href="/linuc-disks/theory/04-esp#allocate">4</a></td></tr>
-<tr><td>UEFI</td><td>最初に動くファームウェア。NVRAM の候補（<code>efibootmgr</code>。PARTUUID とファイルのパス）で ESP の中のブートローダを起動する。候補が無ければ <code>\EFI\BOOT\BOOTX64.EFI</code></td><td><a href="/linuc-disks/theory/04-esp#esp">4</a></td></tr>
-<tr><td>ESP</td><td>FAT の区画で、種類に EF00（EFI System）の印を付ける。ブートローダの置き場所。マウントは起動に要らない（この練習機は種類を変えても起動した）</td><td><a href="/linuc-disks/theory/04-esp#naive">4</a></td></tr>
-<tr><td><code>/boot</code>・<code>/var</code>・<code>/home</code>・<code>/</code>（root）</td><td>カーネル / 増え続けるもの / 利用者のファイル / それ以外。分けるのは必須ではない（<code>/</code> 1つでも動く）。溢れたら困るもの・残したいもので分け、被害と修復を区画で止める</td><td><a href="/linuc-disks/theory/04-esp#allocate">4</a></td></tr>
-<tr><td>スワップスペース</td><td>メモリから追い出したページを置く領域。パーティションでもファイルでもよい。大きさは任意（休止するならメモリ以上）</td><td><a href="/linuc-disks/theory/04-esp#allocate">4</a>・<a href="/linuc-disks/theory/07-swap#swap">7</a></td></tr>
-<tr><td>LVM</td><td>ディスクとファイルシステムの間の層。後から広げられ、複数のディスクをまとめられる</td><td><a href="/linuc-disks/theory/05-lvm#layers">5</a></td></tr>
-<tr><td>物理ボリューム</td><td>LVM の材料にしたディスク（<code>pvcreate</code>・<code>pvs</code>）</td><td><a href="/linuc-disks/theory/05-lvm#layers">5</a></td></tr>
-<tr><td>論理ボリューム</td><td>ボリュームグループから切り出す箱（<code>lvcreate</code>・<code>lvs</code>）。中に mkfs する</td><td><a href="/linuc-disks/theory/05-lvm#layers">5</a></td></tr>
-<tr><td>動的拡張・縮小</td><td><code>lvextend</code> は箱だけ。中身は <code>resize2fs</code>・<code>xfs_growfs</code> か <code>-r</code>。縮小は中身が先、XFS は不可</td><td><a href="/linuc-disks/theory/05-lvm#naive">5</a></td></tr>
-<tr><td>スナップショット</td><td><code>lvcreate -s</code>。書き換えられる前のブロックだけを退避。大きさは変わる量で決まる</td><td><a href="/linuc-disks/theory/05-lvm#snapshot">5</a></td></tr>
-<tr><td><code>mkfs</code></td><td>入口。<code>mkfs -t 種類</code> = <code>mkfs.種類</code>。作ると UUID が決まる</td><td><a href="/linuc-disks/theory/06-mkfs#mkfs">6</a></td></tr>
-<tr><td>ext3・ext4</td><td>ext3 = ext2 ＋ ジャーナル。ext4 は extent などを足した後継。root 用に 5% を予約（ほかに自分用の取り置き）</td><td><a href="/linuc-disks/theory/06-mkfs#features">6</a></td></tr>
-<tr><td>XFS</td><td>大きなファイルに強い。縮小できない。作った直後から予約の分を Used に数える</td><td><a href="/linuc-disks/theory/06-mkfs#features">6</a></td></tr>
-<tr><td><code>df -i</code>・<code>du</code></td><td><code>df -i</code> は inode（ファイル1つに1つ）の数と残り。<code>du</code> はファイルを1つずつ足した量で、<code>df</code> の Used とは数え方が違う</td><td><a href="/linuc-disks/theory/06-mkfs#naive">6</a></td></tr>
-<tr><td>VFAT</td><td>Windows・ESP・USB メモリと共通。所有者とパーミッションはマウントのときに決まる</td><td><a href="/linuc-disks/theory/06-mkfs#features">6</a>・<a href="/linuc-disks/theory/08-mount#media">8</a></td></tr>
-<tr><td>Btrfs</td><td>コピーオンライト。スナップショット・サブボリューム・検査値を持つ</td><td><a href="/linuc-disks/theory/06-mkfs#features">6</a></td></tr>
-<tr><td>tmpfs</td><td>メモリの上のファイルシステム。size は上限で、書いた分だけ使う。外すと消える</td><td><a href="/linuc-disks/theory/07-swap#naive">7</a></td></tr>
-<tr><td><code>mkswap</code></td><td>スワップの形を作る（使い始めはしない）</td><td><a href="/linuc-disks/theory/07-swap#swap">7</a></td></tr>
-<tr><td><code>swapon</code></td><td>スワップを使い始める。<code>-a</code> で fstab の全部（<code>noauto</code> の行は除く）、<code>-p</code> で優先度、<code>--show</code> / <code>-s</code> で一覧</td><td><a href="/linuc-disks/theory/07-swap#swap">7</a></td></tr>
-<tr><td><code>swapoff</code></td><td>スワップをやめる（中身はメモリに戻す）</td><td><a href="/linuc-disks/theory/07-swap#swap">7</a></td></tr>
-<tr><td><code>mount</code>・<code>umount</code></td><td>つなぐ・外す。<code>-a</code> で fstab の全部（<code>noauto</code> の行は除く）、<code>-o remount,ro</code> でつないだまま変更。中にプロセスがいると busy</td><td><a href="/linuc-disks/theory/08-mount#mountpoint">8</a></td></tr>
-<tr><td>マウントポイント</td><td>前もって作るただのディレクトリ。もとの中身は隠れるだけ</td><td><a href="/linuc-disks/theory/08-mount#mountpoint">8</a></td></tr>
-<tr><td><code>/etc/fstab</code></td><td>6列（何を・どこに・種類・オプション・dump・fsck の順番）。書いたら <code>mount -a</code>・<code>findmnt --verify</code>。次の起動には書いただけで効く（いま動いている systemd には <code>daemon-reload</code>）</td><td><a href="/linuc-disks/theory/08-mount#fstab">8</a></td></tr>
-<tr><td>UUID</td><td>mkfs が決めてファイルシステムに書く番号（ext4 などは 128 ビットの乱数、VFAT は作った時刻からの 32 ビット）。<code>blkid</code>・<code>findfs</code> で引く。<code>UUID=</code> で指す</td><td><a href="/linuc-disks/theory/08-mount#naive">8</a></td></tr>
-<tr><td>ラベル</td><td>人が付ける名前（<code>-L</code>、VFAT は <code>-n</code>・<code>e2label</code>・<code>xfs_admin -L</code>）。<code>LABEL=</code> で指す。重なりうる（<code>findmnt --verify</code> は重なりを言わない。<code>blkid -t LABEL=…</code> で確かめる）</td><td><a href="/linuc-disks/theory/08-mount#label">8</a></td></tr>
-<tr><td><code>/media</code></td><td>取り外せるメディアのマウント先。一般ユーザに許すのは <code>user</code>・<code>users</code>（nosuid・nodev・noexec も付く）。<code>noauto</code> は許可ではなく「起動時と <code>mount -a</code>（スワップなら <code>swapon -a</code>）で飛ばす」</td><td><a href="/linuc-disks/theory/08-mount#media">8</a></td></tr>
+<tr><td>GPT</td><td>MBR の後の形式。ふつう 128 個まで・2TiB の制限なし・表は先頭と末尾の2か所・種類は GUID</td><td><a href="/linuc-disks/theory/04-gpt#gpt">4</a></td></tr>
+<tr><td>UEFI</td><td>いまの PC のファームウェアの決まり。NVRAM の候補（<code>efibootmgr</code>。PARTUUID とファイルのパス）で ESP の中のブートローダを起動する</td><td><a href="/linuc-disks/theory/04-gpt#esp">4</a></td></tr>
+<tr><td>ESP</td><td>FAT の区画で、種類は EFI System（gdisk のコード EF00）。ブートローダの置き場所。<code>/boot/efi</code> のマウントは Linux が更新するためのもの</td><td><a href="/linuc-disks/theory/04-gpt#esp">4</a></td></tr>
+<tr><td><code>/boot</code>・<code>/var</code>・<code>/home</code>・<code>/</code></td><td>カーネル / 増え続けるもの / 利用者のファイル / それ以外。分けるのは必須ではない。溢れたら困るもの・残したいもので分ける</td><td><a href="/linuc-disks/theory/04-gpt#allocate">4</a></td></tr>
+<tr><td><code>gdisk</code></td><td>GPT 用の fdisk。種類は4文字（EF00・8200・8300）。<code>w</code> で書く</td><td><a href="/linuc-disks/theory/04-gpt#gdisk">4</a></td></tr>
+<tr><td><code>parted</code></td><td>MBR と GPT。<b>打った瞬間に書く</b>。<code>mkpart</code> で作る・<code>rm</code> で消す・<code>print</code> で表示・<code>-l</code> で全部のディスク</td><td><a href="/linuc-disks/theory/04-gpt#parted">4</a></td></tr>
+<tr><td><code>mkfs</code></td><td>入口。<code>mkfs -t 種類</code> = <code>mkfs.種類</code>。作ると UUID が決まる。ラベルは <code>-L</code>（VFAT は <code>-n</code>）</td><td><a href="/linuc-disks/theory/05-mkfs#mkfs">5</a></td></tr>
+<tr><td>ext3・ext4</td><td>ext3 = ext2 ＋ ジャーナル。ext4 は extent などを足した後継。root 用に 5% を予約（<code>tune2fs -m</code>）</td><td><a href="/linuc-disks/theory/05-mkfs#features">5</a></td></tr>
+<tr><td>XFS</td><td>大きなファイル・同時の書き込みに強い。縮小できない</td><td><a href="/linuc-disks/theory/05-mkfs#features">5</a>・<a href="/linuc-disks/theory/09-lvm#shrink">9</a></td></tr>
+<tr><td>VFAT</td><td>ほかの OS と共通。持ち主とパーミッションを持たず、マウントしたときに決まる</td><td><a href="/linuc-disks/theory/05-mkfs#features">5</a>・<a href="/linuc-disks/theory/07-fstab#user">7</a></td></tr>
+<tr><td>Btrfs</td><td>コピーオンライト。スナップショット・検査値を持つ</td><td><a href="/linuc-disks/theory/05-mkfs#features">5</a></td></tr>
+<tr><td><code>df -i</code>・<code>du</code></td><td><code>df -i</code> は inode の数と残り。<code>du</code> はファイルを1つずつ足した量で、<code>df</code> の Used とは数え方が違う</td><td><a href="/linuc-disks/theory/05-mkfs#naive">5</a></td></tr>
+<tr><td>マウントポイント</td><td>前もって作るただのディレクトリ。もとの中身は隠れるだけ</td><td><a href="/linuc-disks/theory/06-media#usb">6</a></td></tr>
+<tr><td><code>/media</code></td><td>取り外せるメディアのマウント先（<code>/mnt</code> は一時的に手でつなぐ場所）</td><td><a href="/linuc-disks/theory/06-media#usb">6</a></td></tr>
+<tr><td>UUID</td><td>mkfs が決めてファイルシステムに書く番号（ext4 などは 128 ビットのでたらめな数、VFAT は作った時刻からの 32 ビット）。<code>blkid</code>・<code>findfs</code> で引く。<code>UUID=</code> で指す</td><td><a href="/linuc-disks/theory/06-media#names">6</a></td></tr>
+<tr><td>ラベル</td><td>人が付ける名前（<code>-L</code>・<code>e2label</code>・<code>xfs_admin -L</code>）。<code>LABEL=</code> で指す。重なりうる（<code>blkid -t LABEL=…</code> で確かめる）</td><td><a href="/linuc-disks/theory/06-media#names">6</a>・<a href="/linuc-disks/theory/07-fstab#naive">7</a></td></tr>
+<tr><td><code>/etc/fstab</code></td><td>6列（何を・どこに・種類・オプション・dump・fsck の順番）。書いたら <code>mount -a</code>・<code>findmnt --verify</code>。次の起動には書いただけで効く（いま動いている systemd には <code>daemon-reload</code>）</td><td><a href="/linuc-disks/theory/07-fstab#fstab">7</a></td></tr>
+<tr><td><code>user</code>・<code>users</code>・<code>noauto</code></td><td>一般ユーザがマウントできる（本人だけが外せる / 誰でも外せる。nosuid・nodev・noexec も付く）・起動のときと <code>mount -a</code> で飛ばす</td><td><a href="/linuc-disks/theory/07-fstab#user">7</a></td></tr>
+<tr><td>スワップ</td><td>メモリが足りないときに中身を書き出す領域。区画でもファイルでもよい</td><td><a href="/linuc-disks/theory/08-swap#swap">8</a></td></tr>
+<tr><td><code>mkswap</code>・<code>swapon</code>・<code>swapoff</code></td><td>形を作る（使い始めはしない）・使い始める（<code>-a</code> で fstab の全部、<code>-p</code> で優先度、<code>--show</code>・<code>-s</code> で一覧）・やめる</td><td><a href="/linuc-disks/theory/08-swap#swap">8</a></td></tr>
+<tr><td>tmpfs</td><td>メモリの上のファイルシステム。size は上限で、書いた分だけ使う。外すと消える</td><td><a href="/linuc-disks/theory/08-swap#naive">8</a></td></tr>
+<tr><td>LVM</td><td>ディスクとファイルシステムのあいだの段。後から広げられ、複数のディスクをまとめられる</td><td><a href="/linuc-disks/theory/09-lvm#layers">9</a></td></tr>
+<tr><td>物理ボリューム・論理ボリューム</td><td>LVM の材料にしたディスク（<code>pvcreate</code>）・ボリュームグループから切り出す箱（<code>lvcreate</code>）</td><td><a href="/linuc-disks/theory/09-lvm#layers">9</a></td></tr>
+<tr><td>動的拡張・縮小</td><td><code>lvextend</code> は箱だけ。中身は <code>resize2fs</code>・<code>xfs_growfs</code> か <code>-r</code>。縮小は中身が先、XFS は不可</td><td><a href="/linuc-disks/theory/09-lvm#naive">9</a></td></tr>
+<tr><td>スナップショット</td><td><code>lvcreate -s</code>。書き換えられる前のブロックだけを退避。大きさは変わる量で決まる</td><td><a href="/linuc-disks/theory/09-lvm#snapshot">9</a></td></tr>
+<tr><td><code>/proc</code>・<code>/sys</code>（sysfs）・<code>/dev</code></td><td>カーネルとプロセスの状態 / 装置ごとの属性（root が書くとその場で変わる）/ 装置の入口。どれもメモリの上の窓</td><td><a href="/linuc-disks/theory/10-hardware#windows">10</a></td></tr>
+<tr><td>IRQ・I/O ポート・DMA</td><td>装置が CPU に知らせる番号・CPU が装置とやりとりする番地・CPU を通さずメモリに読み書きする通り道（<code>/proc/interrupts</code>・<code>ioports</code>・<code>dma</code>）</td><td><a href="/linuc-disks/theory/10-hardware#irq">10</a></td></tr>
+<tr><td><code>lspci</code>・<code>lsusb</code></td><td>PCI の装置の一覧（<code>-k</code> でドライバ、<code>-s</code> で1台）・USB の装置の一覧（<code>-t</code> でつながりとドライバ）</td><td><a href="/linuc-disks/theory/10-hardware#bus">10</a></td></tr>
+<tr><td>HDD・SSD</td><td><code>lsblk</code> の ROTA が 1 / 0。カーネルは測らず、装置の申告を信じる（<code>/sys/block/…/queue/rotational</code>）</td><td><a href="/linuc-disks/theory/10-hardware#rota">10</a></td></tr>
+<tr><td>光学ストレージ</td><td><code>/dev/sr0</code>。RM（取り外せる）= 1。書き込めないドライブは RO = 1。CD は iso9660、DVD・BD は UDF が多い</td><td><a href="/linuc-disks/theory/06-media#cd">6</a>・<a href="/linuc-disks/theory/10-hardware#optical">10</a></td></tr>
+<tr><td><code>lsmod</code>・<code>modinfo</code></td><td>読み込まれているモジュールの一覧（Used by は使っている側）・モジュールの説明と依存</td><td><a href="/linuc-disks/theory/11-modules#lsmod">11</a></td></tr>
+<tr><td><code>modprobe</code>・<code>insmod</code>・<code>rmmod</code></td><td>名前で読み込む（依存も解決、<code>-r</code> で外す）・ファイルを1つ読み込む（依存は解決しない）・1つ外す（使われていれば断る）</td><td><a href="/linuc-disks/theory/11-modules#insmod">11</a></td></tr>
+<tr><td>周辺機器の有効/無効</td><td>ドライバを外す（<code>modprobe -r</code>。次に挿せば戻る）／読み込ませない（<code>/etc/modprobe.d</code> の blacklist・install）／ファームウェアの設定</td><td><a href="/linuc-disks/theory/11-modules#blacklist">11</a></td></tr>
+<tr><td>udev</td><td>カーネルの知らせ（uevent）を受け、規則で <code>/dev</code> の別名を作り、ドライバを読み込ませる</td><td><a href="/linuc-disks/theory/10-hardware#rota">10</a>・<a href="/linuc-disks/theory/11-modules#naive">11</a></td></tr>
+<tr><td>sysfs・udev・dbus</td><td>sysfs = 装置の情報、udev = 装置の出入りの処理、D-Bus = プログラムどうしの通り道</td><td><a href="/linuc-disks/theory/11-modules#dbus">11</a></td></tr>
 </table></div>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
 <ol>
-<li><a href="/linuc-disks/theory/01-hardware">HDD か SSD かは、装置の申告で決まる</a> —
-    <span class="detail">同じ種類のファイル5本が、SSD 1本と HDD 4本に分かれる。決めたのは定義の中の1語（18分）</span></li>
-<li><a href="/linuc-disks/theory/02-modules">ドライバは、外しても戻ってくる</a> —
-    <span class="detail">rmmod しても挿し直すと戻る。blacklist は依存に効かず、書き換えたファイルには udev が気づかない（26分）</span></li>
-<li><a href="/linuc-disks/theory/03-partition">パーティションの表は、目次にすぎない</a> —
-    <span class="detail">消して作り直すと、中のファイルが読める。表の実体は 64 バイト（25分）</span></li>
-<li><a href="/linuc-disks/theory/04-esp">起動の入口は、マウントしなくても見つかる</a> —
-    <span class="detail">/boot/efi を外しても、ESP の種類を書き換えても起動する。ファームウェアは NVRAM の候補（PARTUUID とファイルのパス）で読みに行く（24分）</span></li>
-<li><a href="/linuc-disks/theory/05-lvm">LV を広げても、ファイルシステムは広がらない</a> —
-    <span class="detail">lvextend で 1.37GiB になっても df は 574M。XFS は縮められない（22分）</span></li>
-<li><a href="/linuc-disks/theory/06-mkfs">ファイルシステムは、作った大きさより小さく見える</a> —
-    <span class="detail">Size − Used と Avail が合わない。root 用の予約と、ext4 自身の取り置きのぶん。fsck は XFS では何もしない（24分）</span></li>
-<li><a href="/linuc-disks/theory/07-swap">tmpfs は、メモリを先に取らない</a> —
-    <span class="detail">メモリ 1.4GiB の機械に 4GiB の tmpfs が作れる。mkswap だけではスワップは増えない（17分）</span></li>
-<li><a href="/linuc-disks/theory/08-mount">マウントは、名前ではなく中身の印で指す</a> —
-    <span class="detail">/dev/sdb が別の USB メモリになる。ラベルの重なりが /boot を危うくしていた。ここで8章が1本になる（30分）</span></li>
+<li><a href="/linuc-disks/theory/01-look">練習機に入り、つながっているディスクを眺める</a> —
+    <span class="detail">外と練習機の中を行き来し、<code>lsblk</code> と <code>df</code> でディスク・区画・ファイルシステム・マウントの関係を見る（15分）</span></li>
+<li><a href="/linuc-disks/theory/02-first-disk">空のディスクを使えるようにする</a> —
+    <span class="detail">区切る → 作る → つなぐ → 書く → 外す、を一通り。マウントしたのに書けないときの直し方（20分）</span></li>
+<li><a href="/linuc-disks/theory/03-partition">パーティションの表を読む・直す</a> —
+    <span class="detail"><code>fdisk -l</code> の読み方、表の実体（64 バイト）、消した区画の取り戻し方、5つ目からの拡張・論理パーティション（22分）</span></li>
+<li><a href="/linuc-disks/theory/04-gpt">新しい形式の表（GPT）と、起動に使う区画</a> —
+    <span class="detail">練習機自身の GPT と ESP を読み、サーバのディスクを <code>gdisk</code> で切る。<code>parted</code> は打った瞬間に書く（25分）</span></li>
+<li><a href="/linuc-disks/theory/05-mkfs">ファイルシステムの種類と作り方</a> —
+    <span class="detail">5種類を作り分け、作った大きさより小さく見える理由（ext4 の予約）を確かめる（22分）</span></li>
+<li><a href="/linuc-disks/theory/06-media">USB メモリと CD をマウントする</a> —
+    <span class="detail">マウントポイント・<code>target is busy</code>・挿す順番で変わる名前と、ラベル・UUID・ISO のファイルのマウント（24分）</span></li>
+<li><a href="/linuc-disks/theory/07-fstab">起動のたびにマウントする</a> —
+    <span class="detail"><code>/etc/fstab</code> の6列、再起動の前の確かめ方、ラベルの重なり、一般ユーザのマウント、再起動して確かめる（25分）</span></li>
+<li><a href="/linuc-disks/theory/08-swap">スワップと tmpfs</a> —
+    <span class="detail">スワップは作る・使い始める・外すが別のコマンド。tmpfs の size は上限（18分）</span></li>
+<li><a href="/linuc-disks/theory/09-lvm">LVM で、2台のディスクを1つにまとめる</a> —
+    <span class="detail">1台より大きな箱を作って広げる。箱を広げても中身は広がらない。スナップショット（24分）</span></li>
+<li><a href="/linuc-disks/theory/10-hardware">部品の情報を読む</a> —
+    <span class="detail">CPU・メモリ・バス・ディスクを <code>/proc</code>・<code>/sys</code>・<code>/dev</code> で読む。HDD か SSD かは装置の申告（25分）</span></li>
+<li><a href="/linuc-disks/theory/11-modules">ドライバと、USB メモリの抜き差し</a> —
+    <span class="detail">モジュールは誰がいつ読み込むか。外しても戻ってくるドライバの止め方。11章を1つの事実でまとめる（28分）</span></li>
 </ol>
 </div>
 <p><a href="/linuc-disks/theory/glossary">用語辞書</a> —
-   本文の点線付きの語をクリックすると引けます。29語。</p>
+   本文の点線付きの語をクリックすると引けます。</p>
 
 <h2 id="use">実務のどこで効くか</h2>
 <p>資格の勉強として読んでも、使う場面はこの4つに集まります。</p>
@@ -172,29 +188,29 @@ fdisk と gdisk の対話だけは 200 桁で取りました（fdisk の <code>L
 <tr><th>場面</th><th>ここで効く理由</th><th>見落としやすい点</th><th>関連する章</th></tr>
 <tr><td>ディスクを増設して <code>/etc/fstab</code> に足す</td>
     <td>名前・UUID・ラベルのどれで指すかで、次の起動の結果が変わる</td>
-    <td>ラベルの重なり（クラウドのイメージは BOOT・UEFI のような一般的なラベルを使う）は <code>findmnt --verify</code> では出ない。<code>blkid -t LABEL=…</code> で確かめ、書いたら再起動の前に <code>mount -a</code> と <code>findmnt --verify</code></td><td>3・6・8</td></tr>
+    <td>ラベルの重なり（クラウドのイメージは BOOT・UEFI のような一般的なラベルを使う）は <code>findmnt --verify</code> では出ないことがある。<code>blkid -t LABEL=…</code> で確かめ、書いたら再起動の前に <code>mount -a</code> と <code>findmnt --verify</code></td><td>2・6・7</td></tr>
 <tr><td>容量が足りなくなった</td>
     <td>LVM なら止めずに広げられる</td>
-    <td>箱（LV）と中身（ファイルシステム）の両方を広げる。XFS は縮められない。ext4 の予約 5% も効いている</td><td>5・6</td></tr>
+    <td>箱（LV）と中身（ファイルシステム）の両方を広げる。XFS は縮められない。ext4 の予約 5% も効いている</td><td>5・9</td></tr>
 <tr><td>パーティションを消してしまった</td>
     <td>表の行を書き戻せば中身は戻る</td>
     <td>作り直すときに「印を消すか」で Y と答えない。<code>sfdisk -d</code> で表を控えておく</td><td>3</td></tr>
 <tr><td>USB メモリを使わせたくない（情報の持ち出し対策）</td>
     <td>ドライバの読み込みを止められる</td>
-    <td><code>rmmod</code> では次に挿すと戻る。blacklist は依存と名前を指定した <code>modprobe</code> に効かず、<code>install … /bin/false</code> も <code>insmod</code> は止めない。すでにあるファイルを書き換えたら udev を再起動する</td><td>2</td></tr>
+    <td><code>rmmod</code> では次に挿すと戻る。blacklist は依存と名前を指定した <code>modprobe</code> に効かず、<code>install … /bin/false</code> も <code>insmod</code> は止めない。すでにあるファイルを書き換えたら udev を再起動する</td><td>11</td></tr>
 </table></div>
 <p><b>この主題を使わない方がよい場面</b>も1つあります。
 クラウドの仮想マシンで、ディスクの大きさを OS の中から細かく設計し直そうとすることです。
-クラウドではディスク（ボリューム）を管理画面で広げ、OS の中では最後の区画を広げるだけ（<code>growpart</code> と <code>resize2fs</code>）の形に寄せたほうが、手順が少なく事故も少なくなります
+クラウドではディスク（ボリューム）を管理画面で広げ、OS の中では最後の区画を広げるだけの形に寄せたほうが、手順が少なく事故も少なくなります
 （練習機がディスクを4つにしか分けていないのも、そのためです。第4章）。</p>
 
 <h2 id="next">手を動かす</h2>
-<p>読んだあと、同じ操作を自分でやる演習が8本あります。判定は<b>観測できる結果だけ</b>で行い、
+<p>読んだあと、同じ操作を自分でやる演習が10本あります。判定は<b>観測できる結果だけ</b>で行い、
 コマンドの打ち方は見ません。</p>
-<p><a href="/linuc-disks/practice/">実践編（檻の入り方と演習8本）→</a></p>
+<p><a href="/linuc-disks/practice/">実践編（檻の入り方と演習10本）→</a></p>
 
 <!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
-<nav class="pager"><a href="/linuc-disks/">← ハードウェアとディスク（記事のホーム）</a><a href="/linuc-disks/theory/01-hardware">第1章から読む →</a></nav>
+<nav class="pager"><a href="/linuc-disks/">← ハードウェアとディスク（記事のホーム）</a><a href="/linuc-disks/theory/01-look">第1章から読む →</a></nav>
 <!-- /catalog:pager -->
 
 <section id="comments">
