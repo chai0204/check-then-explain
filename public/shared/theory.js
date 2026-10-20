@@ -74,12 +74,25 @@
     }
   }
 
+  // 英数字で始まる・終わる語は、前後も英数字のところでは当てない（PARTUUID の中の UUID、devtmpfs の中の tmpfs）
+  const WORD = /[A-Za-z0-9_]/;
+  function find(text, name) {
+    const head = WORD.test(name[0]), tail = WORD.test(name[name.length - 1]);
+    for (let from = 0; ; ) {
+      const i = text.indexOf(name, from);
+      if (i < 0) return -1;
+      const prev = text[i - 1] || "", next = text[i + name.length] || "";
+      if (!(head && WORD.test(prev)) && !(tail && WORD.test(next))) return i;
+      from = i + 1;
+    }
+  }
+
   function linkText(textNode) {
     const text = textNode.nodeValue;
     if (!text || !text.trim()) return;
     for (const e of entries) {
       if ((used.get(e.id) || 0) >= LIMIT) continue;
-      const i = text.indexOf(e.name);
+      const i = find(text, e.name);
       if (i < 0) continue;
       const before = text.slice(0, i), after = text.slice(i + e.name.length);
       const a = document.createElement("a");
@@ -88,12 +101,14 @@
       a.title = e.hint + "（クリックで辞書。戻るで復帰）";
       a.textContent = e.name;
       const frag = document.createDocumentFragment();
-      if (before) frag.append(document.createTextNode(before));
+      const head = before ? document.createTextNode(before) : null;
+      if (head) frag.append(head);
       frag.append(a);
       const rest = document.createTextNode(after);
       frag.append(rest);
       textNode.replaceWith(frag);
       used.set(e.id, (used.get(e.id) || 0) + 1);
+      if (head) linkText(head);          // 当たった語より前にも、短い語が残っている
       linkText(rest);                    // 残りにも続けて当てる
       return;
     }
