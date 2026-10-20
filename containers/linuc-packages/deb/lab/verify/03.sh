@@ -1,32 +1,36 @@
 #!/usr/bin/env bash
-# 演習 03 の判定。観測型（dpkg の台帳の状態と、labnote を実際に動かした結果を見る）。
+# 演習 03 の判定。観測型（labsvc を動かした出力と、dpkg の台帳との照らし合わせを見る）。
 set -uo pipefail
 command -v dpkg-query >/dev/null || { echo "前提不足: dpkg-query が見つかりません"; exit 2; }
+st=$(dpkg-query -W -f='${db:Status-Abbrev}' labsvc 2>/dev/null | tr -d ' ')
+case "$st" in i?) ;; *)
+  echo "前提不足: labsvc が入っていません（台帳 = ${st:-行が無い}）。檻を起動し直すと、配られた状態に戻ります"
+  exit 2 ;;
+esac
 
-st() { dpkg-query -W -f='${db:Status-Abbrev}' "$1" 2>/dev/null | tr -d ' '; }
-s_note=$(st labnote)
-s_data=$(st labnote-data)
-echo "判定 : 観測型（dpkg の台帳の状態と、labnote を動かした結果を見た）"
-echo "観測 : labnote      の台帳 = ${s_note:-行が無い}"
-echo "       labnote-data の台帳 = ${s_data:-行が無い}"
-if command -v labnote >/dev/null 2>&1; then
-  out=$(labnote 2>&1); rc=$?
-  echo "       labnote の出力 = $out（終了コード $rc）"
+echo "判定 : 観測型（labsvc を動かした出力と、dpkg -V labsvc の結果を見た）"
+if [ -x /usr/bin/labsvc ]; then
+  out=$(/usr/bin/labsvc 2>/dev/null); rc=$?
+  port=$(printf '%s\n' "$out" | sed -n 's/^port=//p' | tail -1)
+  echo "観測 : labsvc が表示したポート = ${port:-（port= の行が無い）}（終了コード $rc）"
 else
-  out=""; rc=127
-  echo "       labnote = コマンドとして見つからない"
+  port=""; rc=127
+  echo "観測 : /usr/bin/labsvc = 実行できない"
+fi
+# 台帳と違うファイル。設定ファイル（c の印）は書き換えてよいので、それ以外を数える
+ver=$(dpkg -V labsvc 2>&1)
+other=$(printf '%s\n' "$ver" | grep -v '^$' | grep -v '^.\{9\} c ' || true)
+if [ -n "$ver" ]; then
+  echo "       dpkg -V labsvc（台帳と違うファイル）:"
+  printf '%s\n' "$ver" | sed 's/^/       │ /'
+else
+  echo "       dpkg -V labsvc = 何も出ない（どのファイルも台帳の記録のまま）"
 fi
 
 ng=0
-case "$s_note" in
-  ii) ;;
-  iU) echo "       → labnote が iU（展開済み・設定前）で止まっている"; ng=1 ;;
-  "") echo "       → labnote が台帳に無い"; ng=1 ;;
-  *)  echo "       → labnote が ii になっていない（$s_note）"; ng=1 ;;
-esac
-[ "$s_data" = ii ] || { echo "       → labnote-data が ii になっていない（${s_data:-台帳に無い}）"; ng=1; }
-[ "$rc" = 0 ] || { echo "       → labnote が終了コード $rc で終わった"; ng=1; }
+[ "$port" = 9090 ] || { echo "       → labsvc が port=9090 と表示しない"; ng=1; }
+[ -z "$other" ] || { echo "       → 設定ファイル以外のファイルが、台帳の記録と違う"; ng=1; }
 [ "$ng" = 0 ] || exit 1
 
-echo "       labnote と labnote-data がどちらも ii で、labnote が動いた"
+echo "       labsvc は port=9090 を表示し、書き換わったのは設定ファイルだけ"
 exit 0

@@ -3,7 +3,7 @@
 # yum（実体は dnf）/ yumdownloader / rpm を、AlmaLinux 9.7 の上で確かめる。
 # AlmaLinux のリポジトリは vault.almalinux.org の 9.7（9.8 が出て凍結済み）に固定し、目録もイメージに入れてある。
 # 演習の対象は自作の署名つき RPM で、檻の中の file:// リポジトリから入れる。ネットが無くても結果は同じ。
-#   build: docker build -t lab-linuc-packages-rpm:1.0.1 -f containers/linuc-packages/rpm/Dockerfile containers
+#   build: docker build -t lab-linuc-packages-rpm:1.1.0 -f containers/linuc-packages/rpm/Dockerfile containers
 #   （ビルドコンテキストを containers/ にするのは、base/bin/lab をそのまま取り込むため）
 
 # ---- build ステージ: 自作 RPM を作って署名し、リポジトリにする ----------------
@@ -33,16 +33,18 @@ COPY --from=build /etc/yum.repos.d/ /etc/yum.repos.d/
 COPY --chown=root:root --chmod=0644 linuc-packages/rpm/etc/lab.repo /etc/yum.repos.d/lab.repo
 COPY --from=build /srv/ /srv/
 COPY --from=build --chown=root:root --chmod=0644 /out/RPM-GPG-KEY-lab /etc/pki/rpm-gpg/RPM-GPG-KEY-lab
+COPY --from=build --chown=root:root --chmod=0644 /out/RPM-GPG-KEY-lab-updates /etc/pki/rpm-gpg/RPM-GPG-KEY-lab-updates
 
-# 1) [lab] の公開鍵を rpm の台帳に入れる（AlmaLinux の鍵はベースイメージで既に入っている）
+# 1) [lab] の公開鍵を rpm の台帳に入れる（AlmaLinux の鍵はベースイメージで既に入っている）。
+#    lab-updates の鍵（RPM-GPG-KEY-lab-updates）は置くだけで、台帳には入れない（第10章で yum が取り込む）
 # 2) 檻で使う道具を入れる
 #      yum-utils … yumdownloader（dnf-plugins-core だけでは入らない。実測 2026-10-13）
 #      man-db man-pages … man を引けること自体が LinuC の出題範囲
 #      jq … lab コマンドが進捗の記録に使う / sudo … 読者ユーザ lab が root になる
 #      which file cpio … 本文で使う（cpio は rpm2cpio の受け手）
 # 3) 演習と本文の初期状態を作る
-#      labhello 1.0 … 1.1 が [lab] にあるので「更新できる」状態になる（第5章・第6章）
-#      labmotd      … 入れたあとで2か所を書き換える（演習05 で rpm -V が見つける対象）
+#      labhello は入れない（第9章で読者が入れる。1.1 は登録されていない lab-updates にだけある。第10章）
+#      labmotd      … 入れたあとで2か所を書き換える（演習11 で rpm -V が見つける対象）
 # 4) 読者ユーザ lab（UID 1000・sudo NOPASSWD）。共通ベースと同じ作り
 # 5) 目録を作る（dnf makecache）。そして一般ユーザと共有する:
 #      dnf は root 以外で動くと /var/cache/dnf を使わず、/var/tmp/dnf-<ユーザ名>-* に
@@ -55,7 +57,7 @@ COPY --from=build --chown=root:root --chmod=0644 /out/RPM-GPG-KEY-lab /etc/pki/r
 #      expired_repos.json を書けずに警告を出した。どちらも実測 2026-10-13）。
 RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-lab \
  && dnf -y install yum-utils man-db man-pages jq sudo which file cpio diffutils procps-ng bash-completion \
- && dnf -y install labhello-1.0 labmotd \
+ && dnf -y install labmotd \
  && printf '%s\n' '今日のひとこと: このファイルは、パッケージから入れたあとで書き換えられた。' > /usr/share/labmotd/motd.txt \
  && chmod 0644 /usr/bin/labmotd \
  && useradd -m -u 1000 -s /bin/bash lab \
@@ -77,9 +79,9 @@ LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-exp
 LABEL org.opencontainers.image.description="LinuC 主題1.04（yum・rpm・yumdownloader）を RPM 系で手で確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
 # LAB_APT_SNAPSHOT は lab env の「apt 固定」の行に出る。この檻に apt は無いので、そう書く。
-ENV LAB_THEME=linuc-packages-rpm LAB_VERSION=1.0.1 LAB_HOME=/lab \
+ENV LAB_THEME=linuc-packages-rpm LAB_VERSION=1.1.0 LAB_HOME=/lab \
     LAB_APT_SNAPSHOT="なし（RPM 系。下の dnf 固定の行を見る）" \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-rpm-1.0.1
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-rpm-1.1.0
 USER lab
 WORKDIR /home/lab
 CMD ["/bin/bash", "-l"]
