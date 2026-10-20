@@ -23,7 +23,7 @@ window.TERM_GROUPS = [
 
     { t:"目録", alt:["目録の写し"], id:"catalog",
       hint:"リポジトリに何があるかの一覧。apt と yum は手元に写しを取ってきて読む",
-      body:"リポジトリにあるパッケージの名前・版・依存関係・置き場所を並べた一覧。Debian 系は <code>dists/区分/main/binary-amd64/Packages</code>、RPM 系は <code>repodata/</code>。apt と yum はこれを手元に写して（<code>/var/lib/apt/lists/</code>・<code>/var/cache/dnf/</code>）、写しのほうを読む。<code>apt show</code> や <code>yum info</code> が入っていないパッケージに答えられるのはこのため。<b>たとえ</b>: 図書館の<b>蔵書目録のコピー</b>。借りられる本は分かるが、コピーした後に入った本は載っていない。<b>崩れる点</b>: 図書館なら行けば最新の目録が見られるが、apt は <code>apt update</code> まで写しを取り直さない（yum は期限が切れていれば自分で取り直す）。",
+      body:"リポジトリにあるパッケージの名前・版・依存関係・置き場所を並べた一覧。Debian 系は <code>dists/区分/main/binary-amd64/Packages</code>、RPM 系は <code>repodata/</code>。apt と yum はこれを手元に写して（<code>/var/lib/apt/lists/</code>・<code>/var/cache/dnf/</code>。yum を一般ユーザで打つと <code>/var/tmp/dnf-ユーザ名-…/</code>）、写しのほうを読む。<code>apt show</code> や <code>yum info</code> が入っていないパッケージに答えられるのはこのため。<b>たとえ</b>: 図書館の<b>蔵書目録のコピー</b>。借りられる本は分かるが、コピーした後に入った本は載っていない。<b>崩れる点</b>: 図書館なら行けば最新の目録が見られるが、apt は <code>apt update</code> まで写しを取り直さない（yum は期限が切れていれば自分で取り直す）。",
       misread:"「リポジトリをその場で見に行っている」と思われがちだが、読んでいるのは手元の写しで、apt では取り直すまで古いまま（第6章で実測）。", ch:6 },
 
     { t:"リポジトリ", alt:["repository"], id:"repository",
@@ -114,7 +114,7 @@ window.TERM_GROUPS = [
   { g: "署名と鍵", terms: [
     { t:"署名", alt:["signature"], id:"signature",
       hint:"作った人の鍵で付ける印。公開鍵で確かめると、作った人と無改ざんが分かる",
-      body:"パッケージや目録を作った人が、自分だけが持つ鍵（秘密鍵）で付ける印。受け取った側は、対になる公開鍵で確かめると「その人が作ったもので、あとから書き換えられていない」ことが分かる。<code>rpm -K</code>（<code>--checksig</code>）で確かめると、署名が無ければ <code>digests OK</code>、鍵が無ければ <code>digests SIGNATURES NOT OK</code>（<code>-Kv</code> で <code>NOKEY</code>）、確かめられれば <code>digests signatures OK</code>、書き換えられていれば <code>DIGESTS SIGNATURES NOT OK</code> と出る。署名の語（<code>signatures</code>）が小文字で OK のときだけ確かめられている。yum は <code>gpgcheck=1</code> で、確かめられないものをリポジトリから入れない。<b>たとえ</b>: 書類の<b>印鑑</b>と、役所の<b>印影の登録簿</b>。<b>崩れる点</b>: 役所は印鑑の無い書類を受け付けないが、<code>rpm -K</code> は「署名が無い」を失敗として扱わない。断るのは yum の規則である。",
+      body:"パッケージや目録を作った人が、自分だけが持つ鍵（秘密鍵）で付ける印。受け取った側は、対になる公開鍵で確かめると「その人が作ったもので、あとから書き換えられていない」ことが分かる。<code>rpm -K</code>（<code>--checksig</code>）で確かめると、署名が無ければ <code>digests OK</code>、鍵が無ければ <code>digests SIGNATURES NOT OK</code>（<code>-Kv</code> で <code>NOKEY</code>）、確かめられれば <code>digests signatures OK</code>、書き換えられていれば <code>DIGESTS SIGNATURES NOT OK</code>（署名がファイルの見出しの部分だけに付いた .rpm なら <code>DIGESTS signatures NOT OK</code>）と出る。署名の語（<code>signatures</code>）が小文字で OK のときだけ確かめられている。yum は <code>gpgcheck=1</code> で、確かめられないものをリポジトリから入れない。<b>たとえ</b>: 書類の<b>印鑑</b>と、役所の<b>印影の登録簿</b>。<b>崩れる点</b>: 役所は印鑑の無い書類を受け付けないが、<code>rpm -K</code> は「署名が無い」を失敗として扱わない。断るのは yum の規則である。",
       misread:"<code>rpm -K</code> で OK なら署名を確かめたと思われがちだが、署名の無いパッケージも <code>digests OK</code> と出る（第10章で実測）。", ch:10 },
 
     { t:"公開鍵", alt:["GPG 鍵","GPG公開鍵"], id:"public-key",

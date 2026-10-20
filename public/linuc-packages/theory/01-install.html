@@ -21,7 +21,7 @@
 <div class="scroll"><table>
 <tr><th>もの</th><th>何のためにあるか（一言）</th><th>出たところ</th></tr>
 <tr><td>シェル・プロンプト・オプション・<code>echo</code>・<code>printf</code></td><td>打ったコマンドを読んで動かすプログラム・打ってよい合図（<code>$</code>）・<code>-l</code> のようにコマンドの動きを変える指定・受け取った文字をそのまま出す（<code>printf</code> は書式を決めて出す）</td><td><a href="/linuc-text/theory/01-quote">主題1.03 第1章</a></td></tr>
-<tr><td><code>cd</code>・ホーム（<code>~</code>）・<code>PATH</code></td><td>いるディレクトリを移る・ログインしたときに最初にいる自分のディレクトリ・コマンドを探すディレクトリの並び（環境変数）</td><td><a href="/linuc-text/theory/02-path">主題1.03 第2章</a></td></tr>
+<tr><td>ディレクトリ・<code>cd</code>・ホーム（<code>~</code>）・<code>PATH</code></td><td>ファイルをまとめて入れておく入れ物（フォルダ）・いるディレクトリを移る・ログインしたときに最初にいる自分のディレクトリ・コマンドを探すディレクトリの並び（環境変数）</td><td><a href="/linuc-text/theory/02-path">主題1.03 第2章</a></td></tr>
 <tr><td><code>man</code>・<code>less</code></td><td>説明書を引く・長い出力を1画面ずつ見せる（<code>q</code> で抜ける）</td><td><a href="/linuc-text/theory/03-man">主題1.03 第3章</a></td></tr>
 <tr><td><code>cat</code>・<code>head</code>・<code>tail</code>・<code>wc</code></td><td>ファイルの中身を出す・先頭や末尾の数行だけ出す・行の数を数える</td><td><a href="/linuc-text/theory/04-lines">主題1.03 第4章</a></td></tr>
 <tr><td><code>sort</code>・<code>cut</code></td><td>行を並べ替える・決まった列だけを出す</td><td><a href="/linuc-text/theory/05-columns">主題1.03 第5章</a></td></tr>
@@ -47,7 +47,7 @@
   -v lab-linuc-packages-deb-work:/home/lab/work \
   -v lab-linuc-packages-deb-state:/home/lab/.lab \
   ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__</code></pre>
-<p>初めて打つときは、檻の元になるイメージ（檻の中身をまとめたファイル。約 800MB）を取ってくるので、少し待つ。起動すると案内が数行出て、<code>lab@linuc:~$</code> というプロンプトが出る。ここからが檻の中で、あなたは一般ユーザ <code>lab</code> として動いている。<b>この教材では、檻の中のプロンプトを <code>$</code> と短く書く</b>。</p>
+<p>初めて打つときは、檻の元になるイメージ（檻の中身をまとめたファイル。約 800MB）を取ってくるので、少し待つ。起動すると案内が数行出て、<code>lab@linuc:~$</code> というプロンプトが出る。ここからが檻の中で、あなたは一般ユーザ（root のような管理者ではない、ふつうの利用者）<code>lab</code> として動いている。<b>この教材では、檻の中のプロンプトを <code>$</code> と短く書く</b>。</p>
 <div class="scroll"><table>
 <tr><th>起動の1行の部品</th><th>何のためにあるか</th></tr>
 <tr><td><code>--rm</code></td><td>檻を抜けたら、檻を消す。次に起動すると最初の状態から始まる</td></tr>
@@ -58,14 +58,14 @@
 </table></div>
 <p><b>章ごとに起動し直す</b>。この教材に載せた出力は、章ごとに檻を起動し直した直後から、本文の順に打った記録である。前の章で入れたものが残っていると出力が変わるので、章が変わったら <code>exit</code> で檻を抜け、もう一度上の1行を打つ。檻の中で打つコマンドの枠には「Debian 系の檻」と書いてある。</p>
 <div class="analogy"><b>たとえ</b>: ホテルの部屋に近い。チェックアウト（<code>exit</code>）すると部屋は片付けられ、次に泊まると最初の状態に戻っている。ただ、フロントに預けた荷物（ボリュームの中身）だけは、次に泊まったときも受け取れる。
-<br>ただし<b>崩れる点</b>: ホテルの部屋は1つの建物に並んでいるが、檻はあなたの PC の中に作られ、PC の力（CPU やメモリ）をそのまま分けて使う。檻の中で重い作業をすると、PC 全体が重くなる。</div>
+<br>ただし<b>崩れる点</b>: ホテルの部屋は1つの建物に並んでいるが、檻はあなたの PC の中に作られ、PC の力（計算をする部品の CPU や、作業中のものを置いておくメモリ）をそのまま分けて使う。檻の中で重い作業をすると、PC 全体が重くなる。</div>
 
 <h2 id="missing">まだ入っていないコマンド</h2>
 <div class="sgoal"><b>この節で分かること</b>: パッケージ・パッケージ管理・apt が、それぞれ何か。</div>
 <p><code>labhello</code> というコマンドを打ってみる。この教材のために作った、自分の版（バージョン）を1行出すだけのコマンドである。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ labhello
 bash: labhello: command not found</code></pre>
-<p><code>command not found</code>（コマンドが見つからない）と言われた。この檻には、まだ入っていないからである。</p>
+<p><code>command not found</code>（コマンドが見つからない）と言われた。この檻には、まだ入っていないからである。行の頭の <code>bash:</code> は、そう言ったのが bash（このプロンプトを出して、打ったコマンドを読んで動かすシェル）だという印である。</p>
 <p>Linux では、コマンドやアプリは<b>パッケージ</b>の形で配られる。パッケージは、プログラムと、それが使うファイル（説明書や設定ファイル）を1つにまとめて、名前と版を付けたものである。パッケージを入れる・消す・何を入れたかを覚えておく、という仕事を<b>パッケージ管理</b>と呼び、それをするコマンドがある。Ubuntu のような Debian 系の Linux では <code>apt</code> を使う。</p>
 <div class="analogy"><b>たとえ</b>: スマートフォンのアプリストアに近い。名前を指定して「入手」すれば、どこから取ってくるかを自分で探さなくても入り、要らなくなれば消せる。
 <br>ただし<b>崩れる点</b>: スマートフォンのアプリはあなた専用だが、<code>apt</code> で入れたものは、その機械を使う全員が使う場所に置かれる。だから、次の節で見るとおり、入れるには特別な権限が要る。</div>
@@ -108,7 +108,7 @@ Processing triggers for man-db (2.12.0-4build2) ...</code></pre>
 <tr><td><code>Processing triggers for man-db …</code></td><td>labhello が説明書（man のページ）も一緒に置いたので、man の索引を作り直した</td></tr>
 </table></div>
 <p><code>Get:1</code> の行の <code>file:/srv/lab-repo</code> が、パッケージを取ってきた場所である。パッケージを配っている置き場を<b>リポジトリ</b>と呼ぶ。この檻では、練習用のリポジトリを檻の中の <code>/srv/lab-repo</code> に置いてある。本物の Ubuntu では、インターネットの向こうのサーバ（ほかの機械からの求めに応えて、ファイルなどを渡すコンピュータ）がリポジトリになる。同じ行の <code>amd64</code> はこの機械の CPU の種類（アーキテクチャ）、<code>all</code> は「どの種類の CPU でも動くパッケージ」という印である。</p>
-<p>途中で <code>Do you want to continue? [Y/n]</code> と尋ねられることはなかった。頼んだ1つだけを入れるときは、apt は尋ねずに進める。使ってみる。</p>
+<p>使ってみる。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ labhello
 labhello 1.0</code></pre>
 <div class="analogy"><b>たとえ</b>: 引っ越しの荷物の搬入に近い。荷物を部屋に運び込む（<code>Unpacking</code>）だけでは暮らせず、電気やガスをつないで初めて使える（<code>Setting up</code>）。apt は両方をまとめてやる。
@@ -129,13 +129,13 @@ Do you want to continue? [Y/n] y
 (Reading database ... 12837 files and directories currently installed.)
 Removing labhello (1.0) ...
 Processing triggers for man-db (2.12.0-4build2) ...</code></pre>
-<p><code>The following packages will be REMOVED:</code> が「これから消すもの」で、消す前に <code>Do you want to continue? [Y/n]</code>（続けますか？）と尋ねてきた。<code>y</code> と打って Enter を押す。<code>Y</code> だけが大文字なのは、何も打たずに Enter だけを押しても <code>Y</code>（はい）になるという印である。<code>Removing labhello (1.0) ...</code> がファイルを外した行で、<code>Processing triggers for man-db</code> は、説明書が無くなったので man の索引をまた作り直した行である。</p>
+<p><code>The following packages will be REMOVED:</code> が「これから消すもの」で、消す前に <code>Do you want to continue? [Y/n]</code>（続けますか？）と尋ねてきた。<code>y</code> と打って Enter を押す。<code>Y</code> だけが大文字なのは、何も打たずに Enter だけを押しても <code>Y</code>（はい）になるという印である。入れたときには、この問いは出なかった。頼んだものだけを入れるときは、apt は尋ねずに進め、消すときや、頼んでいないものも一緒に入れるときに尋ねる。<code>Removing labhello (1.0) ...</code> がファイルを外した行で、<code>Processing triggers for man-db</code> は、説明書が外れたことを、man の索引を受け持つ man-db に知らせた行である（この知らせで索引に足されるのは新しい説明書だけで、外れた説明書の行は索引に残る。残っていても、<code>man labhello</code> は説明書が無いと答える）。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>消したのだから、もう一度 labhello と打てば、入れる前と同じ <code>command not found</code> に戻るはずだ。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ labhello
 bash: /usr/bin/labhello: No such file or directory</code></pre>
 <div class="then"><b>だめな理由</b>: 入れる前の <code>command not found</code> とは違う言い方になった。<code>No such file or directory</code> は「そのファイルが無い」という意味である。
-bash（このプロンプトを出しているシェル）は、一度見つけたコマンドの場所（<code>/usr/bin/labhello</code>）を覚えていて、2回目からは探さずにその場所を直接開く。
+bash は、一度見つけたコマンドの場所（<code>/usr/bin/labhello</code>）を覚えていて、2回目からは探さずにその場所を直接開く。
 ファイルは消えたので、その場所を開けなかった、と言っている。パッケージは消えている。違うのは bash の覚え方のほうである。</div></div>
 <p>覚えている場所を忘れさせるのが <code>hash -r</code> である。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ hash -r

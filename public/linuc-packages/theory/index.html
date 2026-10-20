@@ -93,12 +93,6 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <tr><td><a href="/linuc-packages/theory/11-rpm-file">11</a></td>
     <td><code>rpm -qp…</code>、<code>rpm -i -U -F -e</code> <code>--nodeps</code> <code>--replacepkgs</code>、<code>rpm -V</code> <code>-Va</code>、<code>rpm2cpio</code></td></tr>
 </table></div>
-<p class="detail">檻で<b>そのままでは再現できないもの</b>が3つあり、本文にその理由ごと書いてあります。
-(1) 本物の Ubuntu のパッケージに対する <code>apt-file search</code>: Ubuntu の Contents の目録は3つの区分で約 195MB あり、
-<code>apt update</code> のたびに読者に取らせるのは重すぎるので、この檻では取らない設定にした（設定を消せば同じように引ける。第6章）。
-(2) <code>dpkg-reconfigure</code> の矢印キーで選ぶ画面: 画面いっぱいに描く画面は、本文に写せる文字の並びにならないので、同じ質問を文字だけの形（<code>-f teletype</code>）で出して打った（第7章）。矢印キーの画面そのものは、探る記録に画面ごと残してある。
-(3) 本物のリポジトリの「今の最新」: 出力が日ごとに変わるので、Ubuntu は snapshot（2026-09-29 で固定）、AlmaLinux は更新の止まった 9.7 の保存庫（vault）に向けた。
-<b>打てないことを黙って飛ばしてはいません。</b></p>
 <p>他の主題の対応は <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。</p>
 
 <h2 id="chapters">章</h2>
@@ -134,8 +128,8 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <h2 id="cages">檻が2つある理由</h2>
 <p>主題1.04 は Debian 系（apt・dpkg）と RPM 系（yum・rpm）の両方を問います。1つの Linux には片方しか無いので、
 <b>Debian 系の檻（Ubuntu 24.04）</b>で第1〜8章を、<b>RPM 系の檻（AlmaLinux 9.7）</b>で第9〜11章を確かめます（起動のしかたは第1章と第9章の最初にあります）。
-どちらの檻にも、練習用の小さなパッケージ（依存関係つき・設定ファイルつき・署名つき・署名なし）とリポジトリが入っていて、<b>ネットにつながっていなくても本文と同じ結果になります</b>
-（ネットが無いと、第6章の <code>apt update</code> の Ubuntu 本体の3行だけが違って出ます）。</p>
+どちらの檻にも、練習用の小さなパッケージと、その配り元が入っていて、<b>ネットにつながっていなくても本文と同じ結果になります</b>
+（違って出るのは、Ubuntu と AlmaLinux 本体の配り元に取りに行くところだけで、どう違って出るかは、その章に書いてあります）。</p>
 
 <h2 id="crib">試験の直前に見る表</h2>
 <p>出題範囲の「詳細」欄に並ぶ語を、一行の意味と、説明している章に並べました。章を読み終えてから使う表なので、各章で確かめる答えも書いてあります。</p>
@@ -161,14 +155,14 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <p>取り違えやすい組み合わせも並べておきます。どれも本文で両方を実際に打っています。</p>
 <div class="scroll"><table>
 <tr><th>組み合わせ</th><th>違い</th><th>章</th></tr>
-<tr><td><code>apt remove</code> と <code>apt purge</code></td><td>remove は設定ファイル（conffile）を残して台帳に <code>rc</code>（conffile の無いパッケージは行ごと消える）、purge は全部消す</td><td><a href="/linuc-packages/theory/05-depends#remove">5</a></td></tr>
+<tr><td><code>apt remove</code> と <code>apt purge</code></td><td>remove は設定ファイル（conffile）を残して台帳に <code>rc</code>（conffile も、消すときの手順 <code>postrm</code> も無いパッケージは行ごと消える）、purge は全部消す</td><td><a href="/linuc-packages/theory/05-depends#remove">5</a></td></tr>
 <tr><td><code>apt update</code> と <code>apt upgrade</code></td><td>update は目録を取り直すだけ、upgrade は入っているものを上げる</td><td><a href="/linuc-packages/theory/06-repository#update">6</a></td></tr>
 <tr><td><code>dpkg -S</code> と <code>apt-file search</code></td><td>どちらもファイル→パッケージ。<code>-S</code> は入っているものだけ、apt-file は入っていなくてよい</td><td><a href="/linuc-packages/theory/06-repository#search">6</a></td></tr>
 <tr><td><code>dpkg -l</code> と <code>dpkg -L</code></td><td>小文字は台帳の一覧、大文字は1つのパッケージのファイルの一覧</td><td><a href="/linuc-packages/theory/02-list#list">2</a>・<a href="/linuc-packages/theory/03-files#listfiles">3</a></td></tr>
 <tr><td><code>dpkg -i</code> と <code>apt install ./ファイル</code></td><td>dpkg は依存関係が足りないと <code>iU</code> で止まる。apt はファイルを渡されても目録から依存関係を入れる</td><td><a href="/linuc-packages/theory/07-deb-file#aptfile">7</a></td></tr>
 <tr><td><code>rpm -qf</code> と <code>rpm -ql</code></td><td>-qf はファイル→パッケージ、-ql はパッケージ→ファイル</td><td><a href="/linuc-packages/theory/09-rpm#query">9</a></td></tr>
 <tr><td><code>rpm -qf</code> と <code>yum provides</code></td><td>rpm は入っているものだけ、yum は入っていなくてよい</td><td><a href="/linuc-packages/theory/10-yum-repo#query">10</a></td></tr>
-<tr><td><code>rpm -i</code> と <code>-U</code> と <code>-F</code></td><td>-i は新しく入れる（古い版があるとぶつかる）、-U は上げるか入れる、-F は入っているものだけ上げる</td><td><a href="/linuc-packages/theory/11-rpm-file#upgrade">11</a></td></tr>
+<tr><td><code>rpm -i</code> と <code>-U</code> と <code>-F</code></td><td>-i は新しく入れる（古い版があるとぶつかる）、-U は上げるか入れる（入っているのと同じ版・古い版は断る）、-F は入っているものだけ上げる</td><td><a href="/linuc-packages/theory/11-rpm-file#upgrade">11</a></td></tr>
 <tr><td><code>dpkg -V</code> と <code>rpm -V</code></td><td>どちらも違うファイルだけを出す。dpkg は中身の要約しか持たず、違っても終了コード 0。rpm は欄が埋まり、終了コードも 0 以外</td><td><a href="/linuc-packages/theory/04-ledger#verify">4</a>・<a href="/linuc-packages/theory/11-rpm-file#verify">11</a></td></tr>
 <tr><td><code>dpkg -i</code> と <code>rpm -i</code></td><td>どちらも依存関係を取りに行かない。dpkg は展開まで進めて止まり、rpm は1つも入れずに止まる</td><td><a href="/linuc-packages/theory/07-deb-file#broken">7</a>・<a href="/linuc-packages/theory/11-rpm-file#install">11</a></td></tr>
 </table></div>
@@ -185,7 +179,7 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
     <td><code>dpkg -i</code> は依存関係が足りないと <code>iU</code> で止まり、ほかの操作まで止める。<code>apt install ./x.deb</code> や <code>yum install ./x.rpm</code> なら1回で済む</td><td>7・11</td></tr>
 <tr><td>サーバのファイルが勝手に変わっていないか確かめる</td>
     <td>台帳は入れたときのファイルの姿を持っている</td>
-    <td><code>rpm -Va</code> は何十行も出ることがある（この檻でも31行）。設定ファイル（<code>c</code>）以外の 5 と M から見る。<code>dpkg -V</code> は終了コードで判定できない</td><td>4・11</td></tr>
+    <td><code>rpm -Va</code> は何十行も出ることがある（この檻でも、一般ユーザで31行、<code>sudo</code> を付けて21行）。設定ファイル（<code>c</code>）以外の 5 と M から見る。<code>dpkg -V</code> は終了コードで判定できない</td><td>4・11</td></tr>
 <tr><td>新しいリポジトリを足す</td>
     <td>足しただけでは目録は変わらない（apt）／自分で取りに行く（yum）</td>
     <td>署名の確認を外す（<code>[trusted=yes]</code>・<code>gpgcheck=0</code>）のは最後の手段。鍵の出どころを確かめて <code>Signed-By</code> / <code>gpgkey=</code> で指定する</td><td>6・10</td></tr>
@@ -196,6 +190,12 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 
 <h2 id="end">読み終えたら</h2>
 <p>11章を通すと、パッケージ管理のコマンドが多いのに整理できる理由が見えてきます。パッケージを入れると、<b>ファイルが置かれ、入れたという記録（台帳）が書かれる</b>。apt と yum はリポジトリの<b>目録</b>を読んで取ってきて、dpkg と rpm がファイルを置き、台帳に書く。答えが食い違ったら、いま見ているのが「ファイル」「台帳」「目録」のどれかを確かめる、という1つの見方で、どの章のコマンドも並べられます（第8章と第11章の最後にまとめてあります）。</p>
+<p class="detail">檻で<b>そのままでは再現できないもの</b>が3つあり、本文にその理由ごと書いてあります。
+(1) 本物の Ubuntu のパッケージに対する <code>apt-file search</code>: Ubuntu の Contents の目録は3つの区分で約 195MB あり、
+<code>apt update</code> のたびに読者に取らせるのは重すぎるので、この檻では取らない設定にした（設定を消せば同じように引ける。第6章）。
+(2) <code>dpkg-reconfigure</code> の矢印キーで選ぶ画面: 画面いっぱいに描く画面は、本文に写せる文字の並びにならないので、同じ質問を文字だけの形（<code>-f teletype</code>）で出して打った（第7章）。矢印キーの画面そのものは、探る記録に画面ごと残してある。
+(3) 本物のリポジトリの「今の最新」: 出力が日ごとに変わるので、Ubuntu は snapshot（2026-09-29 で固定）、AlmaLinux は更新の止まった 9.7 の保存庫（vault）に向けた。
+<b>打てないことを黙って飛ばしてはいません。</b></p>
 
 <h2 id="next">手を動かす</h2>
 <p>読んだあと、同じ操作を自分でやる演習が12本あります（Debian 系の檻で8本、RPM 系の檻で4本）。1本目は第1章をなぞれば通り、後ろほど前の章の操作を組み合わせます。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。</p>

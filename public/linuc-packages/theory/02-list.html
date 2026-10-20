@@ -31,7 +31,7 @@ ii  apt                         2.8.3                             amd64        &
 ii  apt-file                    3.3                               all          &gt;
 ii  apt-utils                   2.8.3                             amd64        &gt;
 ...</code></pre>
-<p>行が端末の幅（80 桁）に収まらないので、<code>dpkg</code> はこの一覧を <code>less</code>（長い出力を1画面ずつ見せる道具）で開く。右端は <code>&gt;</code> で切られ、画面の一番下で止まる。矢印キーやスペースで先を見られ、<code>q</code> で抜ける（抜けると上の画面がそのまま残る）。</p>
+<p><code>dpkg</code> は、一覧を端末に出すとき、いつも <code>less</code>（長い出力を1画面ずつ見せる道具）に渡す。<code>less</code> は、全部が1画面に収まればそのまま閉じるが、この一覧は行が端末の幅（80 桁）に収まらず、行の数も画面の高さを超えるので、右端を <code>&gt;</code> で切り、画面の一番下で止まる。矢印キーやスペースで先を見られ、<code>q</code> で抜ける（抜けると上の画面がそのまま残る）。</p>
 <p>上の5行は見出しで、6行目から1行に1つのパッケージが並ぶ。</p>
 <div class="scroll"><table>
 <tr><th>欄</th><th>何を表すか</th></tr>
@@ -59,7 +59,7 @@ ii  labsvc         1.0          all          sample service tool with a config &
 ii  labsvc-common  1.0          all          data files for labsvc
 ii  labweb         1.0          all          sample web board with a config file
 ii  labweb-data    1.0          all          data files for labweb</code></pre>
-<p>練習用のパッケージが並んだ。これも1行が端末の幅を超えるので、<code>less</code> で開いて右端を切っている。出力をパイプ（<code>|</code>）でほかのコマンドに渡すと、<code>dpkg</code> は <code>less</code> を使わず、右端も切らない。<code>cat</code> は受け取ったものをそのまま出すだけのコマンドで、ここではパイプの受け手としてだけ使う。</p>
+<p>練習用のパッケージが並んだ。行の数は画面に収まるが、1行が端末の幅を超えるので、<code>less</code> が右端を切って止まった。出力をパイプ（<code>|</code>）でほかのコマンドに渡すと、<code>dpkg</code> は <code>less</code> を使わず、右端も切らない。<code>cat</code> は受け取ったものをそのまま出すだけのコマンドで、ここではパイプの受け手としてだけ使う。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -l 'lab*' | cat
 Desired=Unknown/Install/Remove/Purge/Hold
 | Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
@@ -129,7 +129,7 @@ Description: sample service tool with a config file
 <tr><td><code>Status</code></td><td><code>install ok installed</code> ＝ 入れたい・問題なし・入っている</td><td>いま入っているかを確かめる</td></tr>
 <tr><td><code>Priority</code></td><td><code>optional</code> ＝ 無くてもシステムは動く</td><td>システムに欠かせないもの（<code>required</code> など）と見分ける</td></tr>
 <tr><td><code>Section</code></td><td><code>admin</code> ＝ 管理用の道具の分類</td><td>パッケージを種類で分ける（<code>utils</code> 便利な道具・<code>games</code> 遊び・<code>libs</code> ほかから使われる部品 など）</td></tr>
-<tr><td><code>Installed-Size</code></td><td>入れたときに使うディスクの量（KiB）</td><td>入れる前に、どれだけ場所を取るかを知る</td></tr>
+<tr><td><code>Installed-Size</code></td><td>入れたときに使うディスクの量（KiB。1 KiB は 1024 バイト）</td><td>入れる前に、どれだけ場所を取るかを知る</td></tr>
 <tr><td><code>Maintainer</code></td><td>パッケージを作って面倒を見ている人</td><td>不具合を誰に知らせるかを知る</td></tr>
 <tr><td><code>Version</code></td><td>入っている版</td><td>新しい版があるか・どの版の説明書を読むかを決める</td></tr>
 <tr><td><code>Depends</code></td><td><code>labsvc-common (&gt;= 1.0)</code> ＝ labsvc-common の 1.0 以上が要る</td><td>このパッケージが動くのに、先に入っていなければならない別のパッケージ（<b>依存関係</b>）を示す</td></tr>
@@ -150,7 +150,7 @@ APT-Manual-Installed: yes
 APT-Sources: file:/srv/lab-repo lab/main amd64 Packages
 Description: sample service tool with a config file
  Used to practice remove, purge and autoremove.</code></pre>
-<p>ほとんど同じだが、dpkg に無い欄が3つある。<code>Download-Size</code> は取ってくるパッケージのファイルの大きさ、<code>APT-Manual-Installed: yes</code> は「利用者が名前を指定して入れた」（<code>automatic</code> の反対）、<code>APT-Sources</code> は「どのリポジトリから入ったか」である。<code>Installed-Size</code> が <code>41.0 kB</code> と、dpkg の <code>40</code>（KiB。1 KiB は 1024 バイト）と違うのは、単位を 1000 バイトの kB に直して見せているからである。</p>
+<p>ほとんど同じだが、dpkg に無い欄が3つある。<code>Download-Size</code> は取ってくるパッケージのファイルの大きさ、<code>APT-Manual-Installed: yes</code> は「利用者が名前を指定して入れた」（<code>automatic</code> の反対）、<code>APT-Sources</code> は「どのリポジトリから入ったか」である。<code>Installed-Size</code> が <code>41.0 kB</code> と、dpkg の <code>40</code>（KiB）と違うのは、単位を 1000 バイトの kB に直して見せているからである。</p>
 <p>入っていないパッケージに聞くと、2つの答え方が分かれる。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -s labhello
 dpkg-query: package 'labhello' is not installed and no information is available

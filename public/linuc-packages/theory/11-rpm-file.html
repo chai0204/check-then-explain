@@ -15,7 +15,7 @@
 <div class="badges"><span>前提: 第10章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 28分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.4（重要度1）</span><span>出題範囲 1.04.3（重要度3）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>yumdownloader</code> で .rpm ファイルを取り、<code>rpm -qp…</code> で入れる前に中を見る</li><li><code>rpm -ivh</code> で入れ、依存関係が足りないとどうなるかを確かめる。<code>-U</code>・<code>-F</code>・<code>-e</code> の違いを確かめる</li><li><code>rpm -V</code> の出力の9文字を読み、何が変わったかを確かめる</li><li><code>rpm2cpio</code> で、入れずに中身を取り出す</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: <code>rpm</code> のこの章に出てこないオプション（<code>--force</code> など）、<code>rpm -V</code> の <code>D</code>・<code>L</code>・<code>P</code> の欄が出る場面、設定ファイルを書き換えたまま消したときの扱い（<code>.rpmsave</code>）、台帳の作り直し。この章は「ファイルから入れる・上げる・照らし合わせる・取り出す」が1回できれば足りる。</div></div>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>rpm</code> のこの章に出てこないオプション（<code>--force</code> など）、<code>rpm -V</code> の文字のうち、この章で実際には出てこないもの（表の <code>D</code>・<code>L</code>・<code>P</code>）が出る場面、設定ファイルを書き換えたまま消したときの扱い（<code>.rpmsave</code>）、台帳の作り直し。この章は「ファイルから入れる・上げる・照らし合わせる・取り出す」が1回できれば足りる。</div></div>
 
 <h2 id="download">入れずに取ってくる — yumdownloader</h2>
 <div class="sgoal"><b>この節で分かること</b>: .rpm ファイルを手に入れて、入れる前に中を見る方法。</div>
@@ -159,7 +159,7 @@ labhello 1.1</code></pre>
 <div class="scroll"><table>
 <tr><th>オプション</th><th>入っていないとき</th><th>古い版が入っているとき</th><th>何のためにあるか</th></tr>
 <tr><td><code>-i</code>（install）</td><td>入れる</td><td><b>止まる</b>（ファイルがぶつかる）</td><td>新しく入れる。カーネルのように、古い版を残して並べて入れたいものにも使う</td></tr>
-<tr><td><code>-U</code>（upgrade）</td><td>入れる</td><td>上げる（古い版を消す）</td><td>入っていてもいなくても、この版にする</td></tr>
+<tr><td><code>-U</code>（upgrade）</td><td>入れる</td><td>上げる（古い版を消す）</td><td>入っていてもいなくても、この版にする。ただし、入っているのと同じ版や、それより古い版を渡すと <code>is already installed</code> と断る（終了コード 2。同じ版を入れ直すのは、次の節の <code>--replacepkgs</code>）</td></tr>
 <tr><td><code>-F</code>（freshen）</td><td><b>何もしない</b></td><td>上げる（古い版を消す）</td><td>入っているものだけを新しくする（入っていないものを増やさない）</td></tr>
 </table></div>
 <div class="analogy"><b>たとえ</b>: 名簿を更新するときの3通りの指示に近い。<code>-i</code> は「新しく名前を書け」、<code>-U</code> は「名前があれば書き換え、無ければ足せ」、<code>-F</code> は「名前があるときだけ書き換えよ」である。
@@ -187,11 +187,12 @@ bash: /usr/bin/labhello: Permission denied</code></pre>
 <tr><td><code>S</code></td><td>大きさ（Size）</td><td>書き足し・切り詰めを見つける</td></tr>
 <tr><td><code>M</code></td><td>権限と種類（Mode）</td><td>実行の許可や書き込みの許可の変化を見つける（いまの <code>chmod 644</code>）</td></tr>
 <tr><td><code>5</code></td><td>中身の要約（ダイジェスト）</td><td>中身が1バイトでも変わったかを見つける</td></tr>
-<tr><td><code>D</code></td><td>デバイスの番号</td><td>装置ファイルのすり替えを見つける</td></tr>
+<tr><td><code>D</code></td><td>デバイスの番号</td><td>装置ファイル（ディスクや端末などの装置を、ファイルとして扱えるようにしたもの）のすり替えを見つける</td></tr>
 <tr><td><code>L</code></td><td>シンボリックリンクの行き先</td><td>リンクの付け替えを見つける</td></tr>
 <tr><td><code>U</code> / <code>G</code></td><td>持ち主 / グループ</td><td>持ち主の変化を見つける</td></tr>
 <tr><td><code>T</code></td><td>更新時刻（mTime）</td><td>いつか書き換えられたことを見つける</td></tr>
 <tr><td><code>P</code></td><td>ケーパビリティ（root の力の一部を分けて与える印）</td><td>与えられた力の変化を見つける</td></tr>
+<tr><td><code>?</code>（どの欄にも出る）</td><td>確かめられなかった</td><td>読む許可の無いファイルなど。一般ユーザでは読めないファイルの中身（<code>5</code>）は、<code>sudo</code> を付けて打つと確かめられる</td></tr>
 </table></div>
 <p><code>SM5....T.</code> は「大きさ・権限・中身・時刻が違う」と読む。ファイル名の前に <code>c</code> があれば設定ファイル、<code>d</code> なら説明書である（ここは空白なのでふつうのファイル）。<code>dpkg -V</code> と違い、台帳に大きさや権限も記録されているので欄が埋まり、違いがあれば<b>終了コードも 0 以外</b>（ここでは 1）になる。台帳どおりに戻すには、同じ版をもう一度入れる。<code>--replacepkgs</code> は「同じ版が入っていても入れ直す」の印である。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo rpm -Uvh --replacepkgs labhello-1.1-1.noarch.rpm
@@ -245,13 +246,13 @@ liblab: hello from labapp 1.0</code></pre>
 <p>全部のパッケージをまとめて照らし合わせるのは <code>rpm -Va</code>（all）である。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm -Va | wc -l
 31</code></pre>
-<p>31 は、台帳と違うところのあった行の数である（<code>wc -l</code> は第9章で使った、行を数えるコマンド）。このように何十行も出ることがあり、全部が異常ではない。設定ファイル（<code>c</code>）は書き換えて使うものであり（この檻では、AlmaLinux のリポジトリの向き先を書き換えてある）、コンテナには省かれたディレクトリもある。読むときは、<b>設定ファイルでないのに <code>5</code> や <code>M</code> が付いた行</b>から先に疑う。</p>
+<p>31 は、出てきた行の数である（<code>wc -l</code> は第9章で使った、行を数えるコマンド）。このように何十行も出ることがあり、全部が異常ではない。一般ユーザのまま打ったので、読む許可の無いもの（<code>/etc/sudoers</code> など）は確かめられず、<code>?</code> の付いた行や <code>Permission denied</code> の付いた行になって数に入っている（この檻では10行。<code>sudo rpm -Va</code> と打てば確かめられるので、21行になる）。設定ファイル（<code>c</code>）は書き換えて使うものであり（この檻では、AlmaLinux のリポジトリの向き先を書き換えてある）、コンテナには省かれたディレクトリもある（<code>missing</code> の行）。この檻では、yum の目録の写しの置き場を付け替えてある分（<code>/var/cache/dnf</code> の2行）と、演習11 のために書き換えてある labmotd の2行も出る。読むときは、<b>設定ファイルでないのに <code>5</code> や <code>M</code> が付いた行</b>から先に疑う。</p>
 <div class="analogy"><b>たとえ</b>: 賃貸の退去点検で、入居したときの写真と、いまの部屋を比べる作業に近い。点検表には違う項目だけが書かれ、何も書かれていなければ元どおりということである。
 <br>ただし<b>崩れる点</b>: 写真で比べられるのは見た目だけだが、<code>rpm -V</code> は中身の要約（<code>5</code>）まで比べる。見た目（大きさや時刻）をそろえても、中身が1文字違えば見つかる。</div>
 
 <h2 id="rpm2cpio">入れずに中身を取り出す — rpm2cpio</h2>
 <div class="sgoal"><b>この節で分かること</b>: .rpm の中のファイルを、台帳に触らずに取り出す方法。</div>
-<p><code>rpm2cpio</code> は、.rpm ファイルの中身を cpio という形式のひとかたまりにして出す。受け取った <code>cpio</code> の <code>-t</code> は一覧を出し、<code>-i</code> は取り出す（<code>-d</code> は途中のディレクトリを作る、<code>-m</code> は時刻を保つ、<code>-v</code> は取り出したものを表示する）。</p>
+<p><code>rpm2cpio</code> は、.rpm ファイルの中身を cpio という形式のひとかたまりにして出す。受け取った <code>cpio</code> の <code>-t</code> は一覧を出し、<code>-i</code> は取り出す（<code>-d</code> は途中のディレクトリを作る、<code>-m</code> は時刻を保つ、<code>-v</code> は取り出したものを表示する）。取り出すときは、<code>mkdir</code> で作ったディレクトリ <code>ext</code> に <code>cd</code> で移ってから打つ。<code>../labtool-…</code> の <code>..</code> は「1つ上のディレクトリ」で、移る前の場所にある .rpm を指す。最後の <code>cd</code> は、行き先を書かないとホーム（<code>~</code>）に戻る。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm2cpio labtool-1.0-1.noarch.rpm | cpio -t
 ./usr/bin/labtool
 1 block

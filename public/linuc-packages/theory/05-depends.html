@@ -15,7 +15,7 @@
 <div class="badges"><span>前提: 第4章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>依存関係のあるパッケージを <code>apt install</code> で入れると、何が入るかを出力から確かめる</li><li>依存関係を <code>apt-cache depends</code>（必要とするもの）と <code>apt-cache rdepends</code>（必要とされているもの）で調べる</li><li><code>remove</code>・<code>purge</code>・<code>autoremove</code> で、それぞれ何が消えて何が残るかを、台帳の記号と <code>/etc</code> の設定ファイルで確かめる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: <code>Depends</code> 以外の関係（<code>Recommends</code>・<code>Conflicts</code> など）、「自動で入った」という印を手で付け替える方法（<code>apt-mark auto</code> / <code>manual</code>）、設定ファイルが書き換えられていたときの細かい扱い。この章は、入れて、消して、片付けるところまでが1回できれば足りる。</div></div>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>Depends</code> 以外の関係（<code>Recommends</code>・<code>Conflicts</code> など）、apt が依存関係で入れたものに付ける「自動で入った」という印を、手で付け替える方法（<code>apt-mark auto</code> / <code>manual</code>）、設定ファイルが書き換えられていたときの細かい扱い。この章は、入れて、消して、片付けるところまでが1回できれば足りる。</div></div>
 
 <h2 id="depends">依存関係のあるパッケージを入れる — apt install</h2>
 <div class="sgoal"><b>この節で分かること</b>: 依存関係のあるパッケージを入れると、apt が何をするか。</div>
@@ -71,7 +71,7 @@ Dependencies:
 Provides:
 1.0 -
 Reverse Provides:</code></pre>
-<p>行が多いが、見るのは2か所である。<code>Dependencies:</code> の <code>1.0 - liblab (2 1.0)</code> が「版 1.0 は liblab を必要とする」で、括弧の中の <code>2 1.0</code> は「1.0 以上」を番号で書いたもの（<code>2</code> が「以上」）。<code>Reverse Depends:</code> の下が空なのは、labapp を必要としているパッケージが無いからである。<code>Versions:</code> の行は、この版がどの一覧（リポジトリの一覧と台帳）に載っているかを示している。</p>
+<p>行が多いが、見るのは2か所である。<code>Dependencies:</code> の <code>1.0 - liblab (2 1.0)</code> が「版 1.0 は liblab を必要とする」で、括弧の中の <code>2 1.0</code> は「1.0 以上」を番号で書いたもの（<code>2</code> が「以上」）。<code>Reverse Depends:</code> の下が空なのは、labapp を必要としているパッケージが無いからである。<code>Versions:</code> の行の括弧の中は、この版が載っている一覧のファイルである。<code>/var/lib/apt/lists/</code> の下のものは、apt がリポジトリから取ってきて手元に置いた「入れられるパッケージの一覧」（<code>.lz4</code> は縮めた形）、<code>/var/lib/dpkg/status</code> は台帳（第4章）である。</p>
 <div class="analogy"><b>たとえ</b>: テレビを注文したら、配達の人がアンテナ線も一緒に持ってきて、先に線をつないでからテレビを置いてくれるのに近い。頼んだのはテレビだけでも、使うのに要るものは一緒に来る。
 <br>ただし<b>崩れる点</b>: 人の配達なら、要りそうな物を配達の人が見て判断するが、apt が見るのは、パッケージに書かれた依存関係（<code>Depends:</code>）だけである。書かれていない物は、要りそうでも持ってこない。</div>
 
@@ -169,10 +169,10 @@ Do you want to continue? [Y/n] y
 Removing liblab (1.0) ...
 $ dpkg -l liblab
 dpkg-query: no packages found matching liblab</code></pre>
-<p>名前を渡さない <code>autoremove</code> は、「自動で入った印があり、もう誰にも必要とされていないもの」を apt が自分で探して消す。前の節の印が、ここで使われた。liblab には設定ファイルが無いので、<code>rc</code> も残さず台帳から行ごと消えた。<b><code>remove</code> で <code>rc</code> が残るのは、設定ファイル（conffile）を持つパッケージだけ</b>である。</p>
+<p>名前を渡さない <code>autoremove</code> は、「自動で入った印があり、もう誰にも必要とされていないもの」を apt が自分で探して消す。前の節の印が、ここで使われた。liblab には設定ファイルが無いので、<code>rc</code> も残さず台帳から行ごと消えた。<b><code>remove</code> で <code>rc</code> が残るのは、<code>purge</code> のときにまだすることが残っているパッケージ</b>である。練習用のパッケージでは、設定ファイル（conffile）を持つもの（labapp など）がそれにあたる。練習用でないパッケージには、消すときに動かす手順（<code>postrm</code> というスクリプト。スクリプトは、コマンドを並べて自動で動かすファイル）を持つものも多く、それらは conffile が無くても、<code>purge</code> でその手順をもう一度動かすために <code>rc</code> で残る（この檻に入っている計算のコマンド bc のパッケージがそうである）。</p>
 <div class="scroll"><table>
 <tr><th>コマンド</th><th>何のためにあるか</th><th>中身</th><th>設定ファイル（conffile）</th><th>台帳の行</th><th>自動で入った依存</th></tr>
-<tr><td><code>apt remove 名前</code></td><td>設定は残して、また入れたときに戻したい</td><td>消える</td><td><b>残る</b></td><td><code>rc</code> で残る（conffile が無ければ行ごと消える）</td><td>残る</td></tr>
+<tr><td><code>apt remove 名前</code></td><td>設定は残して、また入れたときに戻したい</td><td>消える</td><td><b>残る</b></td><td><code>rc</code> で残る（conffile も、消すときの手順 <code>postrm</code> も無ければ、行ごと消える）</td><td>残る</td></tr>
 <tr><td><code>apt purge 名前</code>（= <code>apt remove --purge 名前</code>）</td><td>設定も含めて、跡形なく消したい</td><td>消える</td><td>消える</td><td>消える</td><td>残る</td></tr>
 <tr><td><code>apt autoremove</code></td><td>もう誰にも要らなくなった依存を片付けたい</td><td colspan="4">自動で入った印があって、誰にも必要とされていないものを消す</td></tr>
 </table></div>

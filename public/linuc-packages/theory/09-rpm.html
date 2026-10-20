@@ -15,7 +15,7 @@
 <div class="badges"><span>前提: 第8章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 24分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.3（重要度3）</span><span>出題範囲 1.04.4（重要度1）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>sudo yum install</code>・<code>sudo yum remove</code> でパッケージを入れて消し、出力の表と <code>[y/N]</code> の問いを読む</li><li>入っているものと置かれたファイルを、<code>rpm -qa</code>・<code>-q</code>・<code>-qi</code>・<code>-ql</code>・<code>-qf</code>・<code>-qd</code>・<code>-qc</code> と <code>yum list installed</code> で調べる</li><li>RPM 系の台帳がどこにあり、どう読むのかを確かめる</li><li>依存関係のあるパッケージを <code>yum remove</code> で消すと、一緒に入ったものがどうなるかを確かめる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: yum の設定ファイルとリポジトリの書き方、署名、rpm でファイルから直接入れる方法、<code>rpm -qR</code> に出る <code>rpmlib(…)</code> の行の細部、台帳のデータベースの形式。この章は「Debian 系でやったことを、RPM 系の名前で1回やる」ができれば足りる。</div></div>
+<div class="skip"><b>ここで覚えなくていいこと</b>: yum の設定ファイルとリポジトリの書き方、署名、rpm でファイルから直接入れる方法、<code>rpm -qR</code> に出る <code>rpmlib(…)</code> の行の細部、台帳を収めたファイルの形式の細部。この章は「Debian 系でやったことを、RPM 系の名前で1回やる」ができれば足りる。</div></div>
 
 <h2 id="cage">RPM 系の檻を起動する</h2>
 <div class="sgoal"><b>この節で分かること</b>: 第9〜11章で使う檻の起動のしかた。</div>
@@ -71,9 +71,10 @@ Complete!</code></pre>
 <tr><td>表の <code>Installing:</code> の行</td><td>これから入れるもの。名前・アーキテクチャ・版・どのリポジトリから（<code>lab</code>）・大きさ</td></tr>
 <tr><td><code>Transaction Summary</code> の下</td><td>まとめ（入れる 1）。ひとまとまりの作業をトランザクションと呼んでいる</td></tr>
 <tr><td><code>Is this ok [y/N]:</code></td><td>続けてよいか。<b>大文字の <code>N</code> が既定</b>で、何も打たずに Enter を押すと「いいえ」になり、入れずに終わる。apt の <code>[Y/n]</code> と逆なので、<code>y</code> を打ってから Enter</td></tr>
-<tr><td><code>Running transaction</code> の下</td><td>実際に置いている（<code>Installing</code>）・確かめている（<code>Verifying</code>）。<code>Running scriptlet</code> はパッケージの中の手順（ここでは説明書の索引の作り直し）を動かした行</td></tr>
+<tr><td><code>Running transaction</code> の下</td><td>実際に置いている（<code>Installing</code>）・確かめている（<code>Verifying</code>）。<code>Running scriptlet</code> は、入れたときに動く手順（scriptlet）を動かした行（表の下で説明する）</td></tr>
 <tr><td><code>Installed:</code> と <code>Complete!</code></td><td>入れたものと、全部終わったという知らせ</td></tr>
 </table></div>
+<p><code>Running scriptlet</code> の行には labhello の名前が付いているが、labhello 自身は手順を持っていない。ここで動いたのは、man-db（説明書の索引を受け持つパッケージ）が「説明書の置き場にファイルが置かれたら動く」と登録しておいた手順で、名前の欄には、そのとき入れたパッケージが出る。この檻では、その手順は索引を作り直さない（作り直しを、檻では動いていない別のしくみに頼むため）。</p>
 <p>RPM 系では、パッケージの版を「版-リリース」で書く。<code>1.0-1</code> は、版 1.0 を作った1回目という意味である。<code>noarch</code> は Debian 系の <code>all</code> にあたり、どの CPU でも動くという印である。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ labhello
 labhello 1.0
@@ -110,7 +111,7 @@ bash: /usr/bin/labhello: No such file or directory
 $ hash -r
 $ labhello
 bash: labhello: command not found</code></pre>
-<p>消すのは <code>yum remove</code> である（<code>Removing:</code> の表が出て、<code>Erasing</code> の行で外している）。消したあとの bash の言い方も、<code>hash -r</code> で戻るのも第1章と同じである。</p>
+<p>消すのは <code>yum remove</code> である（<code>Removing:</code> の表が出て、<code>Erasing</code> の行で外している。表の <code>Repository</code> の欄の <code>@lab</code> は「リポジトリ lab から入ったもの」という印）。消したあとの bash の言い方も、<code>hash -r</code> で戻るのも第1章と同じである。</p>
 <div class="analogy"><b>たとえ</b>: 同じ仕事を、別の会社の書式でやるのに近い。「入れる・使う・消す」の流れも、root の権限が要ることも同じで、伝票（出力）の見た目が違う。
 <br>ただし<b>崩れる点</b>: 書式の違いなら読み替えれば済むが、確認の問いは既定が逆である。apt の <code>[Y/n]</code> は Enter だけで「はい」になり、yum の <code>[y/N]</code> は Enter だけで「いいえ」になる。</div>
 
@@ -198,7 +199,7 @@ $ rpm -qc sudo
 /etc/sudo-ldap.conf
 /etc/sudo.conf
 /etc/sudoers</code></pre>
-<p><code>-qd</code>（docs）は説明書だけ、<code>-qc</code>（configs）は設定ファイルだけを出す。どれも台帳に書いてある印で分けている。</p>
+<p><code>-qd</code>（docs）は説明書だけ、<code>-qc</code>（configs）は設定ファイルだけを出す。どれも台帳に書いてある印で分けている。<code>/etc/dnf/protected.d/sudo.conf</code> は、yum に sudo を消させないための設定である（yum の実体は dnf というプログラムで、<code>/etc/dnf/</code> はその設定の置き場）。</p>
 <div class="scroll"><table>
 <tr><th>聞きたいこと</th><th>Debian 系</th><th>RPM 系</th></tr>
 <tr><td>入っているもの全部</td><td><code>dpkg -l</code></td><td><code>rpm -qa</code>・<code>yum list installed</code></td></tr>
@@ -264,7 +265,7 @@ rpmlib(PayloadFilesHavePrefix) &lt;= 4.0-1
 rpmlib(PayloadIsZstd) &lt;= 5.4.18-1
 $ rpm -q --whatrequires liblab
 labapp-1.0-1.noarch</code></pre>
-<p>表の <code>Installing dependencies:</code>（依存関係のために入れる）に liblab が出て、一緒に入った。<code>rpm -qR</code>（requires）は「これが必要とするもの」で、<code>liblab &gt;= 1.0</code> のほかに、中の手順を動かすシェル（<code>/usr/bin/sh</code>）や、rpm 自身が持っていなければならない機能（<code>rpmlib(…)</code>）も並ぶ。<code>--whatrequires</code> は逆向きで、「これを必要としている、入っているもの」を出す（第5章の <code>apt-cache rdepends</code> にあたる）。</p>
+<p>表の <code>Installing dependencies:</code>（依存関係のために入れる）に liblab が出て、一緒に入った（ここの <code>Running scriptlet</code> も、liblab が <code>/usr/lib</code> に置いたファイルに反応した、別のパッケージの手順である）。<code>rpm -qR</code>（requires）は「これが必要とするもの」で、パッケージを作った人が書いた <code>liblab &gt;= 1.0</code> のほかに、rpm がパッケージを作るときに自動で足したものも並ぶ。<code>/usr/bin/sh</code> は、labapp のコマンドが1行目に <code>#!/usr/bin/sh</code> と書いたシェルのスクリプト（第8章で見た「sh に読ませて動かす」印）なので足された。<code>config(labapp)</code> は、設定ファイル（<code>/etc/labapp.conf</code>）を持つパッケージに付く印で、labapp 自身がそれを満たしている。<code>rpmlib(…)</code> は、rpm 自身が持っていなければならない機能である。<code>--whatrequires</code> は逆向きで、「これを必要としている、入っているもの」を出す（第5章の <code>apt-cache rdepends</code> にあたる）。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>第5章の apt と同じで、labapp を消しても、一緒に入った liblab は残るはずだ。片付けるには autoremove のような別の手順が要るだろう。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo yum remove labapp

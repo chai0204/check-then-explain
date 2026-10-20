@@ -15,7 +15,7 @@
 <div class="badges"><span>前提: 第3章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.2（重要度1）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>台帳が <code>/var/lib/dpkg/</code> の下のどのファイルで、<code>dpkg -s</code>・<code>dpkg -L</code> がどれを読んでいるかを確かめる</li><li>パッケージ管理を通さずにファイルだけを消すと、台帳がどう答えるかを確かめ、<code>dpkg -V</code> で台帳とファイルを照らし合わせる</li><li>台帳どおりに戻す方法（<code>apt reinstall</code>）を確かめる</li><li>中身だけを置くと（<code>dpkg-deb -x</code>）、台帳がどう答えるかを確かめる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: <code>/var/lib/dpkg/</code> のほかのファイル（<code>available</code>・<code>triggers</code> など）、台帳を手で書き換える方法（書き換えてはいけない）、ファイルの中身から計算する値（ダイジェスト）の計算のしくみ、<code>dpkg -V</code> の9文字の欄のうち <code>5</code> 以外。この章では、台帳とファイルを見比べることが1回できれば足りる。</div></div>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>/var/lib/dpkg/</code> のほかのファイル（<code>available</code>・<code>triggers</code> など）、台帳を手で書き換える方法（書き換えてはいけない）、ファイルの中身から計算する値（ダイジェスト）の計算のしくみ、<code>dpkg -V</code> が行の頭に並べる記号のうち <code>5</code> 以外の意味。この章では、台帳とファイルを見比べることが1回できれば足りる。</div></div>
 
 <h2 id="files">台帳の実物</h2>
 <div class="sgoal"><b>この節で分かること</b>: 台帳がどのファイルで、何が書いてあるか。</div>
@@ -131,7 +131,7 @@ $ dpkg -V labhello
 ??5??????   /usr/bin/labhello</code></pre>
 <p>左の9文字は、台帳と比べた項目の結果を並べたものである。3文字目の <code>5</code> が「ダイジェスト（MD5）が違う」で、<code>?</code> は「確かめていない」である。dpkg の台帳にはダイジェストしか書いていないので、ほかの項目は確かめようがない。</p>
 <div class="analogy"><b>たとえ</b>: 納品書の控えと、倉庫の現物を突き合わせる棚卸しに近い。控え（<code>.md5sums</code>）に書いてある要約と、いまの現物の要約が違うものだけを報告する。
-<br>ただし<b>崩れる点</b>: 棚卸しなら数も色も傷も見るが、dpkg の控えには中身の要約しか無い。ファイルの権限や持ち主が変わっても、<code>dpkg -V</code> は何も言わない（中身が同じなら黙っている）。</div>
+<br>ただし<b>崩れる点</b>: 棚卸しなら数も色も傷も見るが、dpkg の控えには中身の要約しか無い。ファイルの権限や持ち主が変わっても、中身が同じで読めるなら、<code>dpkg -V</code> は何も言わない。権限を変えたせいで一般ユーザが読めなくなったときだけ、要約を作れないので、9文字が全部 <code>?</code> の行を出す（終了コードは 0 のまま）。</div>
 
 <h2 id="extract">中身だけを置くと</h2>
 <div class="sgoal"><b>この節で分かること</b>: ファイルがあることと、パッケージが入っていることの違い。</div>

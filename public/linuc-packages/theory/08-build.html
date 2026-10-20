@@ -28,7 +28,7 @@
 &gt; END</code></pre>
 <p><code>cat &gt; ファイル &lt;&lt;'END'</code> は、次の行から <code>END</code> だけの行までを、そのままファイルに書く書き方（ヒアドキュメント）である。2行目からは、続きの入力を待つ <code>&gt;</code> というプロンプトが出る。書いた中身の1行目 <code>#!/bin/sh</code> は「このファイルは sh（シェル）に読ませて動かす」という印で、2行目が実際に動く1行である。最後に、実行できるようにする。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ chmod 755 myhello/usr/bin/myhello</code></pre>
-<p><code>chmod 755</code> で、誰でも実行できるようにした（持ち主は読み書きと実行、ほかの人は読みと実行）。</p>
+<p><code>chmod 755</code> で、誰でも実行できるようにした。3つの数字は、左から持ち主・グループ（持ち主と同じ組に入れてある利用者）・ほかの人の許可で、それぞれ読み（4）・書き（2）・実行（1）を足した数である。<code>7</code>（4+2+1）は読み書きと実行、<code>5</code>（4+1）は読みと実行になる。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>置きたいファイルを置き場所どおりに並べたのだから、あとはこの木を1つのファイルに固めれば .deb ファイルになるはずだ。固めるのは <code>dpkg-deb</code>（第4章で中身を取り出すのに使った、.deb ファイルを扱う道具）の <code>--build</code> である。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg-deb --build myhello
@@ -148,7 +148,7 @@ dpkg         … .deb を展開・設定し、台帳（/var/lib/dpkg/）に書�
 <p>答えが食い違ったら、いま見ているのが「ファイル」「台帳」「目録」のどれかを確かめる。第9章からは、RPM 系の Linux で同じことをする。道具の名前は変わるが、この形は変わらない。</p>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-packages/practice/">演習08</a>は、配られたスクリプトを、依存関係（liblab）つきのパッケージ labmine に作って入れる課題である。
-判定は台帳で labmine の版・依存関係・ファイルの持ち主を見て、labmine を実際に動かす。</div>
+判定は台帳で labmine の版・依存関係・ファイルの持ち主を見て、liblab が依存関係から一緒に入った（第5章の「自動で入った」印がある）かを見て、labmine を実際に動かす。</div>
 <div class="quiz"><b>確認</b>
 <p>ディレクトリ pkg を <code>dpkg-deb --build pkg</code> で .deb ファイルにしようとしたところ、<code>pkg/DEBIAN/control</code> が開けないと言われた。何が足りないか。</p>
 <details><summary>答え</summary>

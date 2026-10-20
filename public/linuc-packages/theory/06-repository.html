@@ -14,8 +14,8 @@
 <p class="lead"><b>前の章までにやったこと</b>: パッケージを入れる・調べる・消すを一通りやり、台帳とファイルの関係（第4章）と、依存関係で一緒に入るもの・消しても残るもの（第5章）を確かめた。そのたびに apt は <code>file:/srv/lab-repo</code> というリポジトリから取ってきていた（<code>Get:</code> の行）。<b>この章でやること</b>: apt がどのリポジトリへ、何を見て取りに行くのかを確かめる。新しい版の置き場を足して、labhello を新しい版に上げる。最後に、名前やファイルからパッケージを探す。</p>
 <div class="badges"><span>前提: 第5章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>/etc/apt/sources.list</code> の1行（種類・URI・ディストリビューション・コンポーネント）を読み、行を足す</li><li>リポジトリの区分を足してから、新しい版に上がるまでに何が要るかを、実際に上げて確かめる</li><li>入っていないパッケージを、名前と説明（<code>apt search</code>）やファイル名（<code>apt-file search</code>）から探す</li><li><code>apt</code> と <code>apt-get</code>・<code>apt-cache</code> の使い分けを確かめる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: リポジトリに署名する手順と鍵の配り方、署名を確かめるしくみの細部、ミラー（同じ中身を配る別のサーバ）の選び方、ソースパッケージ（<code>deb-src</code>）、優先度の数字（<code>500</code>・<code>100</code>）の決め方の細部。<code>apt-cache policy</code> の数字は「どこから来た版か」の印として読めれば足りる。</div></div>
+<ul><li>apt がパッケージを取りに行く先を書いた表（<code>/etc/apt/sources.list</code>）の1行を読み、行を足す</li><li>取りに行く先を1つ足してから、新しい版に上がるまでに何が要るかを、実際に上げて確かめる</li><li>入っていないパッケージを、名前と説明（<code>apt search</code>）やファイル名（<code>apt-file search</code>）から探す</li><li><code>apt</code> と <code>apt-get</code>・<code>apt-cache</code> の使い分けを確かめる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: リポジトリに署名（作り手が付ける、本物だと確かめるための印）をする手順と、それを確かめるための鍵の配り方、署名を確かめるしくみの細部、ミラー（同じ中身を配る別のサーバ）の選び方、ソースパッケージ（<code>deb-src</code>）、<code>apt-cache policy</code> に出る数字（<code>500</code>・<code>100</code>。どの版を選ぶかの優先度）の決め方の細部。その数字は「どこから来た版か」の印として読めれば足りる。</div></div>
 
 <h2 id="policy">どこから来た版か — apt-cache policy</h2>
 <div class="sgoal"><b>この節で分かること</b>: 入っている版と、入れられる版が、それぞれどこに載っているか。</div>
@@ -123,7 +123,7 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg</code></pre>
 
 <h2 id="update">新しい版の置き場を足して、上げる</h2>
 <div class="sgoal"><b>この節で分かること</b>: リポジトリの区分を足したあと、新しい版を入れるまでに要ること。</div>
-<p>labhello 1.1 が載っている区分 <code>lab-updates</code> を、apt の表に足す。<code>/etc/apt/sources.list.d/</code> に1行のファイルを置く。</p>
+<p>labhello 1.1 が載っている区分 <code>lab-updates</code> を、apt の表に足す。<code>/etc/apt/sources.list.d/</code> に1行のファイルを置く。<code>echo</code> の1行をパイプで <code>sudo tee ファイル</code> に渡すと、root の権限でその1行をファイルに書く（ファイルがすでにあれば、中身を置き換える）。<code>/etc</code> の下は root しか書けないので、<code>&gt;</code> ではなくこの形にする。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>どこにあるかを表に書いたのだから、apt はもう 1.1 を知っているはずだ。Candidate が 1.1 になり、上げられるものの一覧（<code>apt list --upgradable</code>）に labhello が出るだろう。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ echo 'deb [trusted=yes] file:/srv/lab-repo lab-updates main' | sudo tee /etc/apt/sources.list.d/lab-updates.list
@@ -157,7 +157,7 @@ snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble-updates_universe_binary-
 snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_InRelease
 snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_main_binary-amd64_Packages.lz4
 snapshot.ubuntu.com_ubuntu_20260929T000000Z_dists_noble_universe_binary-amd64_Packages.lz4</code></pre>
-<p>ファイルの名前は、取りに行った場所のパスの <code>/</code> を <code>_</code> に置き換えたものである（<code>snapshot.ubuntu.com_…</code> は Ubuntu 本体の分。<code>lock</code>・<code>partial</code>・<code>auxfiles</code> は作業用）。写しを作り直すのが <code>apt update</code> である。目録の写しを書き換えるので、root が要る。</p>
+<p>ファイルの名前は、取りに行った場所のパスの <code>/</code> を <code>_</code> に置き換えたものである（<code>snapshot.ubuntu.com_…</code> は Ubuntu 本体の分で、<code>…_InRelease</code> は区分ごとの <code>Release</code> に署名を付けて1つにしたもの。<code>lock</code>・<code>partial</code>・<code>auxfiles</code> は作業用）。写しを作り直すのが <code>apt update</code> である。目録の写しを書き換えるので、root が要る。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt update
 ...
 Get:7 file:/srv/lab-repo lab-updates/main amd64 Packages [431 B]
@@ -177,7 +177,7 @@ Reading state information... Done
 <tr><td><code>Hit</code></td><td>前に取ったものから変わっていなかったので、取り直さなかった</td></tr>
 <tr><td><code>Err</code></td><td>取れなかった（ネットにつながっていない など）</td></tr>
 </table></div>
-<p><code>file:</code> の2つの区分の行は入り混じって出て、並びは打つたびに少し入れ替わる（同じ番号の <code>Get</code> が2回出ることもある）ので、途中を略した。<code>Hit</code> の3行は Ubuntu 本体の分で、この檻は Ubuntu の写しを最初から持っている。<b>ネットにつながっていないと、この3行が <code>Err</code> や <code>Ign</code> になり、警告が出る</b>。それでも練習用のリポジトリは檻の中にあるので、この先の結果は同じになる。最後の行は「上げられるパッケージが1つある」という知らせである。</p>
+<p><code>file:</code> の2つの区分の行は入り混じって出て、並びは打つたびに少し入れ替わる（同じ番号の <code>Get</code> が2回出ることもある）ので、途中を略した。<code>Hit</code> の3行は Ubuntu 本体の分で、この檻は Ubuntu の写しを最初から持っている。<b>ネットにつながっていないと、この3行の代わりに Ubuntu 本体の <code>Ign</code> と <code>Err</code> の行が並び、最後に <code>W:</code>（警告）の行が出る</b>（<code>Get</code> の番号もずれる）。それでも練習用のリポジトリは檻の中にあるので、この先の結果は同じになる。最後の行は「上げられるパッケージが1つある」という知らせである。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ apt-cache policy labhello
 labhello:
   Installed: 1.0
@@ -255,7 +255,7 @@ Sorting... Done
 Full Text Search... Done
 labhello/lab-updates,now 1.1 all [installed]
   prints its own version</code></pre>
-<p>見つかったパッケージが「名前/区分,now 版 アーキテクチャ [印]」と、その下の説明の2行で出る（<code>now</code> と <code>[installed]</code> は入っているものだけに付く）。名前も説明も分からず、「このファイルを入れるパッケージ」だけが分かっていることもある。第3章の <code>dpkg -S</code> は台帳を引くので、入っていないパッケージのファイルは知らない。</p>
+<p>最初の2行（<code>Sorting... Done</code>・<code>Full Text Search... Done</code>）は、目録を並べ替え、名前と説明から探し終えたという経過の知らせである。見つかったパッケージが「名前/区分,now 版 アーキテクチャ [印]」と、その下の説明の2行で出る（<code>now</code> と <code>[installed]</code> は入っているものだけに付く）。名前も説明も分からず、「このファイルを入れるパッケージ」だけが分かっていることもある。第3章の <code>dpkg -S</code> は台帳を引くので、入っていないパッケージのファイルは知らない。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -S liblab.sh
 dpkg-query: no path found matching pattern *liblab.sh*
 $ apt-file search liblab.sh
@@ -269,7 +269,7 @@ labapp: /usr/share/doc/labapp/README</code></pre>
 _srv_lab-repo_dists_lab-updates_main_Contents-amd64.lz4
 _srv_lab-repo_dists_lab_main_Contents-amd64.lz4
 $ apt-file search bin/dig</code></pre>
-<p><code>bin/dig</code>（dig は、DNS ＝ ホスト名から IP アドレスなどを引くしくみ、を調べるコマンド）では何も出なかった。<b>この檻では、apt-file が引く Contents を練習用のリポジトリの分だけに絞ってある</b>。Ubuntu 本体の Contents は3つの区分で合わせて約 195MB あり、<code>apt update</code> のたびに取りに行くと重すぎるからである（設定は <code>/etc/apt/apt.conf.d/60lab-apt-file</code>。消して <code>apt update</code> すれば Ubuntu の分も引ける）。ふつうの Ubuntu で <code>apt-file search bin/dig</code> と打てば、dig を入れるパッケージの名前が出る。</p>
+<p><code>bin/dig</code>（dig は、DNS ＝ 機械の名前（ホスト名）から、ネットの上の住所（IP アドレス）などを引くしくみ、を調べるコマンド）では何も出なかった。<b>この檻では、apt-file が引く Contents を練習用のリポジトリの分だけに絞ってある</b>。Ubuntu 本体の Contents は3つの区分で合わせて約 195MB あり、<code>apt update</code> のたびに取りに行くと重すぎるからである（設定は <code>/etc/apt/apt.conf.d/60lab-apt-file</code>。消して <code>apt update</code> すれば Ubuntu の分も引ける）。ふつうの Ubuntu で <code>apt-file search bin/dig</code> と打てば、dig を入れるパッケージの名前が出る。</p>
 <div class="scroll"><table>
 <tr><th>聞きたいこと</th><th>入っているものだけ（台帳）</th><th>入っていなくてよい（目録）</th></tr>
 <tr><td>名前や説明に語を含むパッケージ</td><td>—</td><td><code>apt search 語</code>（<code>apt-cache search</code>）</td></tr>
