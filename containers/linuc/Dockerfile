@@ -98,8 +98,13 @@ LABEL org.opencontainers.image.licenses=MIT
 # 1.0.2（2026-10-13）: 事実確認に合わせて演習の文面（lab/）だけを直した。
 #   chronyd が時計を動かさないのは -x のため / rsyslog は journald から回された分を受け取る /
 #   .forward が拒否されるのは world writable のときだけ / journald の上限の行の実物、など。
-ENV LAB_THEME=linuc-services LAB_VERSION=1.0.2 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc-services:1.0.2
+# ---- lab コマンドを最新にする（1.0.3、2026-10-20）--------------------
+#   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
+#   本文の記録とずれうるので、最新の lab をここで重ねる。これより前の層は 1.0.2 とキャッシュで同一。
+#   build: docker build --build-context labcmd=containers/base -t lab-linuc-services:<版> containers/linuc
+COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
+ENV LAB_THEME=linuc-services LAB_VERSION=1.0.3 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc-services:1.0.3
 WORKDIR /root
 # systemd の停止は SIGRTMIN+3。SIGTERM だと 10 秒待たされて強制 kill になる。
 STOPSIGNAL SIGRTMIN+3

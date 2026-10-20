@@ -32,6 +32,11 @@ COPY --from=wasmtime-src --chmod=0755 \
      /tmp/wasmtime-v49.0.1-x86_64-linux/wasmtime /usr/local/bin/wasmtime
 
 COPY --chown=root:root --chmod=0555 lab/ /lab/
-ENV LAB_THEME=wasm LAB_VERSION=1.0.0 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-wasm:1.0.0
+# ---- lab コマンドを最新にする（1.0.1、2026-10-20）--------------------
+#   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
+#   本文の記録とずれうるので、最新の lab をここで重ねる。これより前の層は 1.0.0 とキャッシュで同一。
+#   build: docker build --build-context labcmd=containers/base -t lab-wasm:<版> containers/wasm
+COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
+ENV LAB_THEME=wasm LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-wasm:1.0.1
 USER lab

@@ -34,6 +34,11 @@ USER lab
 LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-explain
 LABEL org.opencontainers.image.description="LinuC 主題1.03（GNU と Unix のコマンド）を手で確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
-ENV LAB_THEME=linuc-text LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:text-1.0.1
+# ---- lab コマンドを最新にする（1.0.2、2026-10-20）--------------------
+#   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
+#   本文の記録とずれうるので、最新の lab をここで重ねる。これより前の層は 1.0.1 とキャッシュで同一。
+#   build: docker build --build-context labcmd=containers/base -t lab-linuc-text:<版> containers/linuc-text
+COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
+ENV LAB_THEME=linuc-text LAB_VERSION=1.0.2 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:text-1.0.2
 CMD ["/bin/bash", "-l"]

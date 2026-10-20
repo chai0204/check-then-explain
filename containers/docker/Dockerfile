@@ -5,7 +5,7 @@
 #   コンテナの中で dockerd を動かすには特権が要るが、仮想マシンの中なら要らない。読者に渡してもらう権限は無い。
 #   名前空間・cgroup・overlay・iptables を、本物のカーネルで、全員に同じ画面で確かめる。
 #
-#   build: docker build -t lab-docker:1.0.0 containers/docker
+#   build: docker build --build-context labcmd=containers/base -t lab-docker:1.0.1 containers/docker
 FROM lab-ctr-machine:1.0.0
 USER root
 COPY --chown=root:root --chmod=0555 lab/ /lab/
@@ -15,6 +15,12 @@ LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-exp
 LABEL org.opencontainers.image.description="Docker を仮想マシン（練習機）の中で確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
 # LAB_VM_AUTOSTART=1: コンテナを起動すると練習機も起動する（この記事は練習機の中の docker が題材で、起動そのものは扱わない）
-ENV LAB_THEME=docker LAB_VERSION=1.0.0 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab:docker-1.0.0 LAB_VM_AUTOSTART=1
+# ---- lab コマンドを最新にする（1.0.1、2026-10-20）--------------------
+#   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
+#   本文の記録とずれうるので、最新の lab をここで重ねる。これより前の層は 1.0.0 とキャッシュで同一。
+#   build: docker build --build-context labcmd=containers/base -t lab-docker:<版> containers/docker
+COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
+ENV LAB_THEME=docker LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab:docker-1.0.1 LAB_VM_AUTOSTART=1
+ENV LAB_RESET_HINT="元に戻すには、練習機の外で vm reset --yes（練習機ごと最初の状態に戻ります）"
 USER lab
