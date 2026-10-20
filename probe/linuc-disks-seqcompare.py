@@ -39,7 +39,8 @@ UUID = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4
 def mask(cmd, line):
     line = re.sub(r"(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) +\d+ \d\d:\d\d:\d\d \d{4}", "CTIME", line)
     line = re.sub(r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) +\d+ +(\d\d:\d\d|\d{4})", "DATE", line)
-    line = re.sub(r"\d{4}-\d\d-\d\d \d\d:\d\d(:\d\d(\.\d+)?)?( [A-Z]{3,4}| [+-]\d{4})?", "DATETIME", line)
+    # 曜日も日時の一部（reboot の Broadcast message の「(Tue 2026-10-20 23:44:39 JST)」。打った日で変わる）
+    line = re.sub(r"((Mon|Tue|Wed|Thu|Fri|Sat|Sun) )?\d{4}-\d\d-\d\d \d\d:\d\d(:\d\d(\.\d+)?)?( [A-Z]{3,4}| [+-]\d{4})?", "DATETIME", line)
     line = UUID.sub("UUID", line)
     line = re.sub(r"\b[0-9A-F]{4}-[0-9A-F]{4}\b", "VOLID", line)               # FAT のボリューム ID
     line = re.sub(r"disk identifier 0x[0-9a-f]{8}", "disk identifier 0xID", line)
