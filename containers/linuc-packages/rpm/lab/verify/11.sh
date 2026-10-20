@@ -3,7 +3,8 @@
 set -uo pipefail
 command -v rpm >/dev/null || { echo "前提不足: rpm が見つかりません"; exit 2; }
 rpm -q labmotd >/dev/null 2>&1 || {
-  echo "前提不足: labmotd が rpm の台帳にありません（消した場合は sudo yum install labmotd で戻せます）"
+  echo "前提不足: labmotd が rpm の台帳にありません"
+  echo "          （消した場合は sudo yum install labmotd で戻せます）"
   exit 2; }
 
 want='今日のひとこと: 台帳と照らし合わせれば、変わったファイルが分かる。'

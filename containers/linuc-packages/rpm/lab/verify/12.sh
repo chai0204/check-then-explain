@@ -11,17 +11,23 @@ for f in "$dir"/*.rpm; do
   n=$(rpm -qp --qf '%{NAME}' "$f" 2>/dev/null) && names="$names $n"
 done
 has() { case " $names " in *" $1 "*) return 0 ;; esac; return 1; }
-# dnf が記録している「どこから入ったか」。rpm で直接入れたものは @System
+# dnf が記録している「どこから入ったか」。rpm で直接入れたものは @System、
+# yum に手元のファイルを渡して入れたものは @@commandline、yum がリポジトリから入れたものは @リポジトリ名
 from() { dnf -q list installed "$1" 2>/dev/null | awk -v n="$1" '$1 ~ "^"n"\\." {print $3}' | head -1; }
 
-echo "判定 : 観測型（~/work/12 の .rpm の中身、rpm の台帳、dnf が記録した経路を見た）"
+echo "判定 : 観測型（~/work/12 の .rpm の中身と、rpm の台帳と、dnf の記録を見た）"
 echo "観測 : ~/work/12 の .rpm =${names:- 無い}"
 issues=()
 for p in labtool labtool-data; do
   if rpm -q "$p" >/dev/null 2>&1; then
     f=$(from "$p")
     echo "       $p = $(rpm -q "$p")（経路 ${f:-不明}）"
-    [ "$f" = "@System" ] || issues+=("$p が rpm ではなく yum のリポジトリ（${f:-不明}）から入っている")
+    case "$f" in
+      @System) ;;
+      @@commandline) issues+=("$p は yum が手元のファイルから入れた（@@commandline）") ;;
+      "") issues+=("$p がどこから入ったかを dnf が記録していない") ;;
+      *) issues+=("$p は yum がリポジトリ（$f）から入れた") ;;
+    esac
   else
     echo "       $p = rpm の台帳に無い"
     issues+=("$p が rpm の台帳に無い")

@@ -5,11 +5,12 @@ set -uo pipefail
 command -v dpkg-query >/dev/null || { echo "前提不足: dpkg-query が見つかりません"; exit 2; }
 st=$(dpkg-query -W -f='${db:Status-Abbrev}' labsvc 2>/dev/null | tr -d ' ')
 case "$st" in i?) ;; *)
-  echo "前提不足: labsvc が入っていません（台帳 = ${st:-行が無い}）。檻を起動し直すと、配られた状態に戻ります"
+  echo "前提不足: labsvc が入っていません（台帳 = ${st:-行が無い}）。"
+  echo "          檻を起動し直すと、配られた状態に戻ります"
   exit 2 ;;
 esac
 
-echo "判定 : 観測型（labsvc を動かした出力と、台帳に記録された「入れたときの中身」との違いを見た）"
+echo "判定 : 観測型（labsvc の出力と、台帳の「入れたときの中身」との違いを見た）"
 if [ -x /usr/bin/labsvc ]; then
   out=$(/usr/bin/labsvc 2>/dev/null); rc=$?
   port=$(printf '%s\n' "$out" | sed -n 's/^port=//p' | tail -1)
@@ -32,7 +33,7 @@ if [ -n "$ver" ]; then
     esac
   done
 else
-  echo "       入れたときの中身と違うファイル = 無い（どのファイルも入れたときのまま）"
+  echo "       入れたときの中身と違うファイル = 無い（どれも入れたときのまま）"
 fi
 
 ng=0

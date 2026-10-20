@@ -9,7 +9,7 @@ want='liblab: こんにちは from labapp 1.0'
 # dnf が記録している「どこから入ったか」。yum でリポジトリ lab から入れると @lab、rpm で直接入れると @System
 from() { dnf -q list installed "$1" 2>/dev/null | awk -v n="$1" '$1 ~ "^"n"\\." {print $3}' | head -1; }
 
-echo "判定 : 観測型（labapp を動かし、rpm の台帳・入った経路・台帳に記録された「入れたときの中身」との違いを見た）"
+echo "判定 : 観測型（labapp の出力・入った経路・入れたときの中身との違いを見た）"
 lead="観測 :"
 for p in labapp liblab; do
   if rpm -q "$p" >/dev/null 2>&1; then
@@ -42,7 +42,7 @@ if rpm -q labapp >/dev/null 2>&1; then
       esac
     done
   else
-    echo "       入れたときの中身と違うファイル = 無い（どのファイルも入れたときのまま）"
+    echo "       入れたときの中身と違うファイル = 無い（どれも入れたときのまま）"
   fi
 fi
 
@@ -56,5 +56,6 @@ done
 [ -z "$other" ] || { echo "       → 設定ファイル以外のファイルが、台帳の記録と違う"; ng=1; }
 [ "$ng" = 0 ] || exit 1
 
-echo "       labapp と liblab は yum で lab から入り、書き換わったのは設定ファイルだけで、挨拶はこんにちは"
+echo "       labapp と liblab は yum で lab から入っている"
+echo "       書き換わったのは設定ファイルだけで、挨拶はこんにちは"
 exit 0

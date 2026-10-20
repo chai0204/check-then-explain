@@ -27,5 +27,5 @@ case "$s_com" in
 esac
 [ "$ng" = 0 ] || exit 1
 
-echo "       labweb は台帳にも /etc にも残っておらず、一緒に入った labweb-data も消えている"
+echo "       labweb は台帳にも /etc にも残らず、labweb-data も消えている"
 exit 0

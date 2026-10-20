@@ -40,5 +40,5 @@ ng=0
 [ "$pol" -ge 1 ] || { echo "       → apt の目録に、/srv/lab-tools から取れる $owner が載っていない"; ng=1; }
 [ "$ng" = 0 ] || exit 1
 
-echo "       labcalc は $owner が入れたもので、apt はそれを /srv/lab-tools から取れる"
+echo "       labcalc は $owner のもので、apt は /srv/lab-tools から取れる"
 exit 0
