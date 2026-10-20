@@ -94,6 +94,8 @@ $ ls -l /mnt
 # --- マウントしただけ（まだ取り出していない）---
 $ lab check 05
 $ cp /mnt/message.txt ~/
+# --- 取り出したが、まだマウントしたまま ---
+$ lab check 05
 $ sudo umount /mnt
 $ cat ~/message.txt
 $ lab check 05
@@ -133,6 +135,8 @@ $ sudo swapon /dev/vdb3
 $ swapon --show
 # --- swapon しただけ（/etc/fstab に無い）---
 $ lab check 07
+# --- 判定の後も、vdb3 は判定の前と同じく使われているか ---
+$ swapon --show
 # --- /etc/fstab にデバイス名で書いた ---
 $ echo "/dev/vdb3  none  swap  sw  0  0" | sudo tee -a /etc/fstab
 $ lab check 07
@@ -168,6 +172,8 @@ $ lab check 09
 $ echo 0 | sudo tee /sys/block/vdb/queue/rotational
 # --- 手で 0 を書いただけ（再起動すると戻る状態）---
 $ lab check 09
+# --- 判定の後、値は判定の前の 0 に戻っているか ---
+$ cat /sys/block/vdb/queue/rotational
 $ echo 'ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"' | sudo tee /etc/udev/rules.d/60-lab-ssd.rules
 $ sudo udevadm trigger --action=add --subsystem-match=block --sysname-match=vdb --settle
 $ cat /sys/block/vdb/queue/rotational
@@ -202,6 +208,15 @@ $ lab check 10
 $ printf "blacklist usb_storage\nblacklist uas\n" | sudo tee /etc/modprobe.d/lab-usb.conf
 $ sudo modprobe -r uas
 $ lab check 10
+# --- 模範解答の確かめ方: 外で挿して、中で見て、外で抜く ---
+@外
+$ virsh attach-device linuc ~/vm/extra/usb-a.xml
+@中
+$ lsusb -t
+$ lsmod | grep -E "usb_storage|uas"
+@外
+$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+@中
 
 == 11. 全問を通した状態 ==
 @外

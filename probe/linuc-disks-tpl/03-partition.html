@@ -72,7 +72,7 @@ $ cat vdb-table.txt<!--o note="label-id::表の番号（第2章の Disk identifi
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk /dev/vdb<!--o keys="d|w" note="Command (m for help): d::d: 区画を消す;;Command (m for help): w::w: ディスクに書く"-->
 $ lsblk /dev/vdb
 $ sudo mount /dev/vdb1 /mnt</code></pre>
-<p><code>vdb1</code> という装置そのものが無くなり、<code>mount</code> も <code>/dev/vdb1</code> が無いと断った（エラーの2行目の <code>dmesg</code> は、カーネルが出したメッセージを見るコマンドで、第11章で使う）。なお、<code>lsblk</code> の見出しのうち NAME だけが1行目に出て、残りが2行目に回っている。これは util-linux 2.39 の <code>lsblk</code> が<b>端末に</b>表を出すときの癖で、いちばん左の列の中身がすべて見出しより短いと（<code>vdb</code> は3文字、<code>NAME</code> は4文字）、その見出しだけを折り返す。表の中身は同じである。</p>
+<p><code>vdb1</code> という装置そのものが無くなり、<code>mount</code> も <code>/dev/vdb1</code> が無いと断った（エラーの2行目の <code>dmesg</code> は、カーネルが出したメッセージを見るコマンドで、第11章で使う）。なお、<code>lsblk</code> の見出しのうち NAME だけが1行目に出て、残りが2行目に回っている。これは <code>lsblk</code> が<b>端末に</b>表を出すときの癖で、NAME の列の中身がすべて見出しより短いと（<code>vdb</code> は3文字、<code>NAME</code> は4文字）、NAME より後ろの見出しを次の行に回す。表の中身は同じである（ファイルやパイプに出すときは、折り返さない）。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>パーティションを消したのだから、中の <code>memo.txt</code> も消えた。同じ大きさで作り直しても、空の区画ができるだけのはずだ。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk /dev/vdb<!--o keys="n|p|1||+200M|N|w" note="Partition #1 contains a ext4 signature::中に ext4 の印（signature）がある;;Do you want to remove the signature::印を消すか、と聞いてくる。N と答える"-->
@@ -89,7 +89,7 @@ $ sudo umount /mnt</code></pre>
 <p>基本パーティションを1つ足し（<code>vdb2</code>）、3つ目を拡張パーティション（<code>e</code>）にして、その中に2つ作る。区画を作る問いは第2章と同じで、拡張パーティションの大きさは Enter（残り全部）にする。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk /dev/vdb<!--o keys="n|p|2||+100M|n|e|3|||n||+100M|n||+100M|p|w" note="Select (default p): e::e: 拡張パーティション;;All space for primary partitions is in use.::基本の枠が埋まったので、自動で論理パーティションになる;;Adding logical partition 5::番号は 5 から"-->
 $ sudo fdisk -l /dev/vdb</code></pre>
-<p><b>拡張パーティション</b>（<code>vdb3</code>、種類 5 の Extended）は、残りの空きを全部抱える<b>入れ物</b>で、それ自体にはファイルシステムを作らない。拡張パーティションは1つのディスクに<b>1つまで</b>で、基本パーティションの4つの枠のうち1つを使う。だから MBR で区画をいちばん多く作れる形は「基本3つ＋拡張1つ（中に論理パーティションをいくつでも）」になる。</p>
+<p><b>拡張パーティション</b>（<code>vdb3</code>、種類 5 の Extended）は、残りの空きを全部抱える<b>入れ物</b>で、それ自体にはファイルシステムを作らない。拡張パーティションは1つのディスクに<b>1つまで</b>で、基本パーティションの4つの枠のうち1つを使う。だから MBR で区画をいちばん多く作れる形は「基本3つ＋拡張1つ（中に論理パーティションをたくさん。この練習機の <code>fdisk</code> では 5〜60 番の 56 個まで作れた）」になる。</p>
 <p>拡張パーティションの中に作った<b>論理パーティション</b>は、4 が空いていても <b>5 から</b>番号が付く（1〜4 は基本パーティションのために取ってある）。論理パーティションの位置は、拡張パーティションの中に置かれた小さな表（EBR）を順にたどって決まる。<code>vdb5</code> の始まりが <code>vdb3</code> の始まり（616448）ではなく 618496 なのは、その小さな表の置き場所を空けたからである。</p>
 <div class="analogy"><b>たとえ</b>: 棚板が4枚しかない<b>本棚</b>に近い。5種類目の本を置きたければ、棚板の1枚を<b>引き出し</b>に替えて、その中を仕切って並べる。
 <br>ただし<b>崩れる点</b>: 本棚の引き出しは開ければ中が全部見えるが、論理パーティションの位置は、引き出しの中に順につないだ小さな表（EBR）を先頭からたどらないと分からない。だから途中の1つが壊れると、その先の論理パーティションも見失う。</div>

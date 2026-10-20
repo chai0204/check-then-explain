@@ -11,8 +11,10 @@
 <div class="draftbar">
 <p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
 <p>本文に載せた出力はすべて実機の記録で、第1章から第11章まで、読者と同じ打ち方（端末つきの対話シェルに1行ずつ）で
-   1つの練習機に順に打った記録と突き合わせてあります。演習10本は、模範解答どおりに通ること・未達のときに判定が鳴ることを
-   すべて確かめてあります（読者がやりがちな途中の状態でも鳴ることも、10本すべてで確認）。
+   1つの練習機に順に打った記録と突き合わせてあります。演習10本は、模範解答どおりに通ること・始まりの状態で判定が鳴ることを
+   すべて確かめてあります。読者がやりがちな途中の状態（演習ごとに1〜4通り）でも鳴ること、模範解答と違う正しいやり方
+   （別の担当が用意した8通り）でも通ることも確かめましたが、確かめたのは記録に残した範囲だけです
+   （<code>logs/linuc-disks-solve-all.log</code>・<code>logs/linuc-disks-alt.log</code>）。
    それでも <b>導線の不備</b>は残っている可能性があります。
    先に公開した SQLite 編では、著者が読者として通した段階で
    <b>4回に分けて不備が出ました</b>（説明の順序・リンク切れ・前提の省略・判定の誤り）。
@@ -139,7 +141,7 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <div class="scroll"><table>
 <tr><th>語</th><th>一行の意味</th><th>章</th></tr>
 <tr><td>ディスク・パーティション・ファイルシステム・マウント</td><td>記憶装置・それを区切った区画・区画の中のファイルの置き方・ファイルシステムをディレクトリにつなぐこと</td><td><a href="/linuc-disks/theory/01-look#lsblk">1</a></td></tr>
-<tr><td><code>fdisk</code></td><td>表を対話で作る。n・d・p・w・q。<code>w</code> まで書かない。<code>-l</code> で表示だけ。いまの版は MBR と GPT。<b>試験の例題では MBR 用（GPT 非対応）として答える</b></td><td><a href="/linuc-disks/theory/02-first-disk#fdisk">2</a>・<a href="/linuc-disks/theory/03-partition#read">3</a></td></tr>
+<tr><td><code>fdisk</code></td><td>表を対話で作る。n・d・p・w・q。<code>w</code> まで書かない。<code>-l</code> で表示だけ。いまの版は MBR と GPT（GPT は util-linux 2.23 から）</td><td><a href="/linuc-disks/theory/02-first-disk#fdisk">2</a>・<a href="/linuc-disks/theory/03-partition#read">3</a></td></tr>
 <tr><td><code>mount</code>・<code>umount</code></td><td>つなぐ・外す。<code>-a</code> で fstab の全部（<code>noauto</code> の行は除く）、<code>-o remount,ro</code> でつないだまま変更。中にプロセスがいると busy</td><td><a href="/linuc-disks/theory/02-first-disk#mount">2</a>・<a href="/linuc-disks/theory/06-media#usb">6</a>・<a href="/linuc-disks/theory/07-fstab#remount">7</a></td></tr>
 <tr><td>MBR</td><td>先頭の 512 バイト = 起動のプログラム 446・表 64（16 バイト × 4行）・印 2（<code>55 aa</code>）。2TiB まで</td><td><a href="/linuc-disks/theory/03-partition#bytes">3</a></td></tr>
 <tr><td>プライマリパーティション（基本パーティション）</td><td>MBR の表に直接書く区画。表が4行なので4つまで（番号 1〜4）</td><td><a href="/linuc-disks/theory/03-partition#bytes">3</a></td></tr>
@@ -152,7 +154,7 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <tr><td><code>parted</code></td><td>MBR と GPT。<b>打った瞬間に書く</b>。<code>mkpart</code> で作る・<code>rm</code> で消す・<code>print</code> で表示・<code>-l</code> で全部のディスク</td><td><a href="/linuc-disks/theory/04-gpt#parted">4</a></td></tr>
 <tr><td><code>mkfs</code></td><td>入口。<code>mkfs -t 種類</code> = <code>mkfs.種類</code>。作ると UUID が決まる。ラベルは <code>-L</code>（VFAT は <code>-n</code>）</td><td><a href="/linuc-disks/theory/05-mkfs#mkfs">5</a></td></tr>
 <tr><td>ext3・ext4</td><td>ext3 = ext2 ＋ ジャーナル。ext4 は extent などを足した後継。root 用に 5% を予約（<code>tune2fs -m</code>）</td><td><a href="/linuc-disks/theory/05-mkfs#features">5</a></td></tr>
-<tr><td>XFS</td><td>大きなファイル・同時の書き込みに強い。縮小できない</td><td><a href="/linuc-disks/theory/05-mkfs#features">5</a>・<a href="/linuc-disks/theory/09-lvm#shrink">9</a></td></tr>
+<tr><td>XFS</td><td>大きなファイル・同時の書き込みに強い。縮めるしくみがほぼ無い（試験では縮小できないと答える）</td><td><a href="/linuc-disks/theory/05-mkfs#features">5</a>・<a href="/linuc-disks/theory/09-lvm#shrink">9</a></td></tr>
 <tr><td>VFAT</td><td>ほかの OS と共通。持ち主とパーミッションを持たず、マウントしたときに決まる</td><td><a href="/linuc-disks/theory/05-mkfs#features">5</a>・<a href="/linuc-disks/theory/07-fstab#user">7</a></td></tr>
 <tr><td>Btrfs</td><td>コピーオンライト。スナップショット・検査値を持つ</td><td><a href="/linuc-disks/theory/05-mkfs#features">5</a></td></tr>
 <tr><td><code>df -i</code>・<code>du</code></td><td><code>df -i</code> は inode の数と残り。<code>du</code> はファイルを1つずつ足した量で、<code>df</code> の Used とは数え方が違う</td><td><a href="/linuc-disks/theory/05-mkfs#naive">5</a></td></tr>
@@ -161,13 +163,13 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <tr><td>UUID</td><td>mkfs が決めてファイルシステムに書く番号（ext4 などは 128 ビットのでたらめな数、VFAT は作った時刻からの 32 ビット）。<code>blkid</code>・<code>findfs</code> で引く。<code>UUID=</code> で指す</td><td><a href="/linuc-disks/theory/06-media#names">6</a></td></tr>
 <tr><td>ラベル</td><td>人が付ける名前（<code>-L</code>・<code>e2label</code>・<code>xfs_admin -L</code>）。<code>LABEL=</code> で指す。重なりうる（<code>blkid -t LABEL=…</code> で確かめる）</td><td><a href="/linuc-disks/theory/06-media#names">6</a>・<a href="/linuc-disks/theory/07-fstab#naive">7</a></td></tr>
 <tr><td><code>/etc/fstab</code></td><td>6列（何を・どこに・種類・オプション・dump・fsck の順番）。書いたら <code>mount -a</code>・<code>findmnt --verify</code>。次の起動には書いただけで効く（いま動いている systemd には <code>daemon-reload</code>）</td><td><a href="/linuc-disks/theory/07-fstab#fstab">7</a></td></tr>
-<tr><td><code>user</code>・<code>users</code>・<code>noauto</code></td><td>一般ユーザがマウントできる（本人だけが外せる / 誰でも外せる。nosuid・nodev・noexec も付く）・起動のときと <code>mount -a</code> で飛ばす</td><td><a href="/linuc-disks/theory/07-fstab#user">7</a></td></tr>
+<tr><td><code>user</code>・<code>users</code>・<code>noauto</code></td><td>一般ユーザがマウントできる（外せるのはマウントした本人と root / 誰でも外せる。nosuid・nodev・noexec も付く）・起動のときと <code>mount -a</code> で飛ばす</td><td><a href="/linuc-disks/theory/07-fstab#user">7</a></td></tr>
 <tr><td>スワップ</td><td>メモリが足りないときに中身を書き出す領域。区画でもファイルでもよい</td><td><a href="/linuc-disks/theory/08-swap#swap">8</a></td></tr>
 <tr><td><code>mkswap</code>・<code>swapon</code>・<code>swapoff</code></td><td>形を作る（使い始めはしない）・使い始める（<code>-a</code> で fstab の全部、<code>-p</code> で優先度、<code>--show</code>・<code>-s</code> で一覧）・やめる</td><td><a href="/linuc-disks/theory/08-swap#swap">8</a></td></tr>
 <tr><td>tmpfs</td><td>メモリの上のファイルシステム。size は上限で、書いた分だけ使う。外すと消える</td><td><a href="/linuc-disks/theory/08-swap#naive">8</a></td></tr>
 <tr><td>LVM</td><td>ディスクとファイルシステムのあいだの段。後から広げられ、複数のディスクをまとめられる</td><td><a href="/linuc-disks/theory/09-lvm#layers">9</a></td></tr>
 <tr><td>物理ボリューム・論理ボリューム</td><td>LVM の材料にしたディスク（<code>pvcreate</code>）・ボリュームグループから切り出す箱（<code>lvcreate</code>）</td><td><a href="/linuc-disks/theory/09-lvm#layers">9</a></td></tr>
-<tr><td>動的拡張・縮小</td><td><code>lvextend</code> は箱だけ。中身は <code>resize2fs</code>・<code>xfs_growfs</code> か <code>-r</code>。縮小は中身が先、XFS は不可</td><td><a href="/linuc-disks/theory/09-lvm#naive">9</a></td></tr>
+<tr><td>動的拡張・縮小</td><td><code>lvextend</code> は箱だけ。中身は <code>resize2fs</code>・<code>xfs_growfs</code> か <code>-r</code>。縮小は中身が先。XFS は <code>lvreduce -r</code> が断る</td><td><a href="/linuc-disks/theory/09-lvm#naive">9</a></td></tr>
 <tr><td>スナップショット</td><td><code>lvcreate -s</code>。書き換えられる前のブロックだけを退避。大きさは変わる量で決まる</td><td><a href="/linuc-disks/theory/09-lvm#snapshot">9</a></td></tr>
 <tr><td><code>/proc</code>・<code>/sys</code>（sysfs）・<code>/dev</code></td><td>カーネルとプロセスの状態 / 装置ごとの属性（root が書くとその場で変わる）/ 装置の入口。どれもメモリの上の窓</td><td><a href="/linuc-disks/theory/10-hardware#windows">10</a></td></tr>
 <tr><td>IRQ・I/O ポート・DMA</td><td>装置が CPU に知らせる番号・CPU が装置とやりとりする番地・CPU を通さずメモリに読み書きする通り道（<code>/proc/interrupts</code>・<code>ioports</code>・<code>dma</code>）</td><td><a href="/linuc-disks/theory/10-hardware#irq">10</a></td></tr>
@@ -190,13 +192,13 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
     <td>ラベルの重なり（クラウドのイメージは BOOT・UEFI のような一般的なラベルを使う）は <code>findmnt --verify</code> では出ないことがある。<code>blkid -t LABEL=…</code> で確かめ、書いたら再起動の前に <code>mount -a</code> と <code>findmnt --verify</code></td><td>2・6・7</td></tr>
 <tr><td>容量が足りなくなった</td>
     <td>LVM なら止めずに広げられる</td>
-    <td>箱（LV）と中身（ファイルシステム）の両方を広げる。XFS は縮められない。ext4 の予約 5% も効いている</td><td>5・9</td></tr>
+    <td>箱（LV）と中身（ファイルシステム）の両方を広げる。XFS はふつう縮められない。ext4 の予約 5% も効いている</td><td>5・9</td></tr>
 <tr><td>パーティションを消してしまった</td>
     <td>表の行を書き戻せば中身は戻る</td>
     <td>作り直すときに「印を消すか」で Y と答えない。<code>sfdisk -d</code> で表を控えておく</td><td>3</td></tr>
 <tr><td>USB メモリを使わせたくない（情報の持ち出し対策）</td>
     <td>ドライバの読み込みを止められる</td>
-    <td><code>rmmod</code> では次に挿すと戻る。blacklist は依存と名前を指定した <code>modprobe</code> に効かず、<code>install … /bin/false</code> も <code>insmod</code> は止めない。すでにあるファイルを書き換えたら udev を再起動する</td><td>11</td></tr>
+    <td><code>rmmod</code> では次に挿すと戻る。blacklist は依存と名前を指定した <code>modprobe</code> に効かず、<code>install … /bin/false</code> も <code>insmod</code> は止めない。すでにあるファイルの中身だけを書き換えたら udev を再起動する</td><td>11</td></tr>
 </table></div>
 <p><b>この主題を使わない方がよい場面</b>も1つあります。
 クラウドの仮想マシンで、ディスクの大きさを OS の中から細かく設計し直そうとすることです。

@@ -27,7 +27,7 @@ Changes will remain in memory only, until you decide to write them.
 Be careful before using the write command.
 
 Device does not contain a recognized partition table.
-Created a new DOS (MBR) disklabel with disk identifier 0x0d03b95b.   ← 表が無かったので、空の表をメモリの上に作った
+Created a new DOS (MBR) disklabel with disk identifier 0x657c6145.   ← 表が無かったので、空の表をメモリの上に作った
 
 Command (m for help): n   ← n: 新しいパーティション
 Partition type
@@ -46,7 +46,7 @@ Units: sectors of 1 * 512 = 512 bytes
 Sector size (logical/physical): 512 bytes / 512 bytes
 I/O size (minimum/optimal): 512 bytes / 512 bytes
 Disklabel type: dos
-Disk identifier: 0x0d03b95b
+Disk identifier: 0x657c6145
 
 Device     Boot Start    End Sectors  Size Id Type
 /dev/vdb1        2048 411647  409600  200M 83 Linux
@@ -88,7 +88,7 @@ vdb    253:16   0    2G  0 disk
 mke2fs 1.47.0 (5-Feb-2023)
 Discarding device blocks: done
 Creating filesystem with 51200 4k blocks and 51200 inodes
-Filesystem UUID: 113bd007-0f7d-403b-b48e-93a096eb0fc1   ← このファイルシステムの番号。作るたびに変わる
+Filesystem UUID: 80872246-8e56-4ef0-8bd2-7d95103b4803   ← このファイルシステムの番号。作るたびに変わる
 Superblock backups stored on blocks:
 	32768
 
@@ -96,7 +96,7 @@ Allocating group tables: done
 Writing inode tables: done
 Creating journal (4096 blocks): done
 Writing superblocks and filesystem accounting information: done</code></pre>
-<p><code>Creating filesystem with 51200 4k blocks</code> は「4KiB の塊を 51200 個並べた ext4 を作る」（4KiB × 51200 = 200MiB）。<code>Filesystem UUID</code> は、作ったときに決まるこのファイルシステムの番号（UUID）で、作るたびに違う値になる（あなたの画面では別の値）。最後の <code>done</code> まで出れば、管理情報が書けている。<code>mkfs</code> はその区画に前に何があっても、聞かずに管理情報で上書きする。中身を消す操作だと覚えておく。</p>
+<p><code>Creating filesystem with 51200 4k blocks</code> は「4KiB の塊を 51200 個並べた ext4 を作る」（4KiB × 51200 = 200MiB）。<code>Filesystem UUID</code> は、作ったときに決まるこのファイルシステムの番号（UUID）で、作るたびに違う値になる（あなたの画面では別の値）。最後の <code>done</code> まで出れば、管理情報が書けている。<code>mkfs</code> は区画の中に管理情報を書いて、ファイルシステムを新しく作る。前にファイルシステムがあれば、それを上書きして消す操作だと覚えておく（前のファイルシステムに気づいて確かめてくる道具もあるが、何も言わずに上書きする道具もある。第5章で比べる）。</p>
 <p><code>lsblk</code> に、ファイルシステムの種類（FSTYPE）とマウント先の列を足して見る。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS /dev/vdb
 NAME    SIZE FSTYPE MOUNTPOINTS
@@ -104,7 +104,7 @@ vdb       2G
 └─vdb1  200M ext4</code></pre>
 <p><code>vdb1</code> の FSTYPE が <code>ext4</code> になった。MOUNTPOINTS はまだ空で、どこからも使えない。</p>
 <div class="analogy"><b>たとえ</b>: 第1章の<b>土地と倉庫</b>で言えば、<code>fdisk</code> で区画を切り、<code>mkfs</code> でそこに倉庫を建てた。倉庫には棚の配置図（管理情報）と、倉庫ごとの番号（UUID）がある。
-<br>ただし<b>崩れる点</b>: 本物の倉庫を建て直せば、中の物が壊れることは見れば分かる。<code>mkfs</code> は、前の中身が何であっても確かめずに上書きし、終わっても何も残っていないことを教えない。打つ前に、相手の区画の名前を確かめる。</div>
+<br>ただし<b>崩れる点</b>: 本物の倉庫を建て直せば、中の物が壊れることは見れば分かる。<code>mkfs</code> は作り終えても、前に何があって何が消えたかを教えない。打つ前に、相手の区画の名前を確かめる。</div>
 
 <h2 id="mount">つなぐ — マウントして読み書きする</h2>
 <div class="sgoal"><b>この節で分かること</b>: マウントすると、どのディレクトリから何が見えるようになるか。</div>
@@ -115,7 +115,7 @@ Filesystem      Size  Used Avail Use% Mounted on
 /dev/vdb1       172M   24K  158M   1% /mnt
 $ ls -l /mnt
 total 16
-drwx------ 2 root root 16384 Oct 20 20:55 lost+found
+drwx------ 2 root root 16384 Oct 20 22:29 lost+found
 $ lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS /dev/vdb
 NAME    SIZE FSTYPE MOUNTPOINTS
 vdb       2G
@@ -127,18 +127,18 @@ vdb       2G
 -bash: /mnt/memo.txt: Permission denied</code></pre>
 <div class="then"><b>だめな理由</b>: <code>Permission denied</code>（書き込みの許可が無い）で断られた。マウントすると、<code>/mnt</code> は <code>vdb1</code> の ext4 の<b>いちばん上のディレクトリ</b>を見せるようになる。その持ち主と権限は ext4 の中に書かれていて、<code>mkfs</code> が作ったときに root のもの（<code>rwxr-xr-x</code>）になった。student は「その他」なので書けない。</div></div>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls -ld /mnt
-drwxr-xr-x 3 root root 4096 Oct 20 20:55 /mnt</code></pre>
-<p>持ち主が root で、その他の人は <code>r-x</code>（読む・中に入るだけ）である。このディスクを student のデータ置き場にするなら、いちばん上のディレクトリの持ち主を student に変える。<code>chown</code> は、ファイルやディレクトリの持ち主を変えるコマンドである（<code>student:student</code> は「持ち主を student、グループを student に」）。</p>
+drwxr-xr-x 3 root root 4096 Oct 20 22:29 /mnt</code></pre>
+<p><code>ls</code> の <code>-d</code> は、ディレクトリの中身ではなく、ディレクトリそのものを1行で出すオプションである。持ち主が root で、その他の人は <code>r-x</code>（読む・中に入るだけ）である。このディスクを student のデータ置き場にするなら、いちばん上のディレクトリの持ち主を student に変える。<code>chown</code> は、ファイルやディレクトリの持ち主を変えるコマンドである（<code>student:student</code> は「持ち主を student、グループを student に」）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo chown student:student /mnt
 $ ls -ld /mnt
-drwxr-xr-x 3 student student 4096 Oct 20 20:55 /mnt
+drwxr-xr-x 3 student student 4096 Oct 20 22:29 /mnt
 $ echo "はじめてのファイル" &gt; /mnt/memo.txt
 $ cat /mnt/memo.txt
 はじめてのファイル
 $ ls -l /mnt
 total 20
-drwx------ 2 root    root    16384 Oct 20 20:55 lost+found
--rw-rw-r-- 1 student student    28 Oct 20 20:55 memo.txt</code></pre>
+drwx------ 2 root    root    16384 Oct 20 22:29 lost+found
+-rw-rw-r-- 1 student student    28 Oct 20 22:30 memo.txt</code></pre>
 <p>持ち主が student になり、書けた。変わったのは <code>vdb1</code> の ext4 の中に書かれた持ち主で、練習機の <code>/</code> にある <code>/mnt</code> というディレクトリそのものではない（次の節で外したときに確かめる）。</p>
 <div class="analogy"><b>たとえ</b>: マウントは、<b>引き出しを机の決まった穴に差し込む</b>ことに近い。差し込むと、その穴（マウントポイント）から引き出し（ファイルシステム）の中が見え、物を出し入れできる。
 <br>ただし<b>崩れる点</b>: 引き出しの鍵（持ち主と権限）は、穴ではなく引き出しの側に付いている。<code>/mnt</code> の持ち主を変えたつもりでも、変わったのは差し込んだ引き出しの鍵である。だから引き出しを抜くと、穴は元の持ち主（root）に戻る。</div>
@@ -178,7 +178,7 @@ fdisk    →   mkfs.ext4   →   mount /dev/vdb1 /mnt  →  /mnt に書く  → 
 <p><code>sudo fdisk /dev/sdb</code>（<code>n</code>・<code>p</code>・<code>w</code> で <code>sdb1</code> を作る）→ <code>sudo mkfs.ext4 /dev/sdb1</code> → <code>sudo mount /dev/sdb1 /mnt</code> → （使う）→ <code>sudo umount /mnt</code>。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>空のディスクを使えるようにするのは、区切る（<code>fdisk</code>）→ 作る（<code>mkfs.ext4</code>）→ つなぐ（<code>mount</code>）の3段。使い終わったら <code>umount</code> で外す</li><li><code>fdisk</code> は <code>w</code> を打つまでディスクに書かない。<code>q</code> で抜ければ何も変わらない</li><li><code>+200M</code> のように大きさで区画の終わりを指定できる。セクタは読み書きの最小の単位（ここでは 512 バイト）</li><li><code>mkfs</code> は区画の中身を確かめずに上書きする。作るたびに UUID が決まる</li><li>マウントすると、マウントポイントはファイルシステムのいちばん上のディレクトリを見せる。その持ち主と権限はファイルシステムの中にあり、作ったばかりなら root のもの。外すと元のディレクトリに戻る</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>空のディスクを使えるようにするのは、区切る（<code>fdisk</code>）→ 作る（<code>mkfs.ext4</code>）→ つなぐ（<code>mount</code>）の3段。使い終わったら <code>umount</code> で外す</li><li><code>fdisk</code> は <code>w</code> を打つまでディスクに書かない。<code>q</code> で抜ければ何も変わらない</li><li><code>+200M</code> のように大きさで区画の終わりを指定できる。セクタは読み書きの最小の単位（ここでは 512 バイト）</li><li><code>mkfs</code> は区画の中にファイルシステムを作り直す（前の中身は消える）。作るたびに UUID が決まる</li><li>マウントすると、マウントポイントはファイルシステムのいちばん上のディレクトリを見せる。その持ち主と権限はファイルシステムの中にあり、作ったばかりなら root のもの。外すと元のディレクトリに戻る</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.1.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・fdisk（util-linux）2.39.3・e2fsprogs 1.47.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁 × 24 行で、第1章から順に1つの練習機で打って検証 / 検証日 2026-10-20</div>
 <nav class="pager"><a href="/linuc-disks/theory/01-look">← 1. 練習機に入り、つながっているディスクを眺める</a><a href="/linuc-disks/theory/03-partition">次: 3. パーティションの表を読む・直す →</a></nav>
 <section id="comments">

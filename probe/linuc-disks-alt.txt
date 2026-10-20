@@ -1,0 +1,178 @@
+# LinuC 主題1.05 の演習の、模範解答と違う正しいやり方と、読者がやりがちな不完全な状態の台本。
+# 独立した技術の事実確認の担当が作った台本（2026-10-20）を写した。判定（verify）を直したあと、
+# この台本で ✔・✗ が正しく出るかを確かめる（probe/linuc-disks-seq.py --steps で打つ。記録は logs/linuc-disks-alt.log）。
+# 演習09 の別解1（tmpfiles.d）は、課題文で「udev の規則で」と決めたので ✗ が正しい。
+== 0. 入ったとき ==
+@外
+$ vm start
+$ ssh linuc
+
+== 1. 演習01（不完全: 区画を作らずディスク全体に ext4 → 別の道具 parted と別のマウントポイント）==
+@中
+$ sudo mkfs.ext4 -q /dev/vde
+$ sudo mount /dev/vde /mnt
+$ echo hi | sudo tee /mnt/hello.txt
+$ sudo umount /mnt
+# --- 区画を作らずに、ディスク全体に ext4 を作って書いた ---
+$ lab check 01
+$ sudo wipefs -a /dev/vde
+$ sudo parted -s /dev/vde mklabel gpt mkpart data ext4 1MiB 100%
+@sleep 3
+$ lsblk -o NAME,SIZE,PARTTYPENAME /dev/vde
+$ sudo mkfs.ext4 -q /dev/vde1
+$ sudo mkdir /srv/x
+$ sudo mount /dev/vde1 /srv/x
+$ sudo chown student:student /srv/x
+$ echo hi > /srv/x/hello.txt
+$ sudo umount /srv/x
+# --- 別解: parted で GPT に1区画・/srv/x にマウント・chown して student が書く ---
+$ lab check 01
+
+== 2. 演習02（不完全: 始まりは 2048 だが大きさが足りない → 別解: sfdisk で流し込む）==
+@中
+$ sudo fdisk /dev/vdd
+@keys n|p|1||+50M|N|w
+$ sudo fdisk -l /dev/vdd
+# --- 始まりは 2048 で同じだが、大きさが 50MiB しかない ---
+$ lab check 02
+$ sudo mount -o ro /dev/vdd1 /mnt
+$ sudo sfdisk /dev/vdd < ~/vdd-before.txt
+@sleep 3
+$ sudo mount -o ro /dev/vdd1 /mnt
+$ cat /mnt/aikotoba.txt
+$ sudo umount /mnt
+# --- 別解: sfdisk で控えの表を流し込んだ ---
+$ lab check 02
+
+== 3. 演習03（別解: parted で切る。先に esp の旗を付け忘れる）==
+@中
+$ sudo parted -s /dev/vdb mklabel gpt
+$ sudo parted -s /dev/vdb mkpart ESP fat32 1MiB 101MiB
+$ sudo parted -s /dev/vdb mkpart boot ext4 101MiB 401MiB
+$ sudo parted -s /dev/vdb mkpart swap linux-swap 401MiB 657MiB
+$ sudo parted -s /dev/vdb mkpart root ext4 657MiB 1257MiB
+$ sudo parted -s /dev/vdb mkpart var ext4 1257MiB 1657MiB
+$ sudo parted -s /dev/vdb mkpart home ext4 1657MiB 100%
+@sleep 3
+# --- parted で6つ作ったが、1番に esp の旗を付けていない ---
+$ lab check 03
+$ sudo parted -s /dev/vdb set 1 esp on
+@sleep 3
+$ sudo parted /dev/vdb print
+# --- 別解: parted で6つ・1番に esp ---
+$ lab check 03
+
+== 4. 演習04（vdb2 に禁止の BOOT ラベル・VFAT は -F 32 なし・予約は -r で）==
+@中
+$ sudo mkfs.vfat /dev/vdb1
+$ sudo mkfs -t ext3 -L BOOT /dev/vdb2
+$ sudo mkfs.xfs -L ROOT /dev/vdb4
+$ sudo mkfs.btrfs -L VAR /dev/vdb5
+$ sudo mkfs.ext4 -L HOME /dev/vdb6
+$ sudo tune2fs -l /dev/vdb6 | grep -E "^(Block count|Reserved block count)"
+$ sudo tune2fs -m 1 /dev/vdb6
+# --- vdb2 に課題文が禁じた BOOT を付け、vdb1 は FAT32 でない ---
+$ lab check 04
+$ sudo blkid -t LABEL=BOOT
+$ ls -l /dev/disk/by-label/BOOT
+$ sudo blkid -p -o export /dev/vdb1
+$ sudo e2label /dev/vdb2 NEWBOOT
+$ ls -l /dev/disk/by-label/BOOT
+# --- mkfs を重ねると（XFS・Btrfs は -f が無いと断るか）---
+$ sudo mkfs.xfs -L ROOT /dev/vdb4
+$ sudo mkfs.btrfs -L VAR /dev/vdb5
+
+== 5. 演習05（別解: losetup で先につなぐ・外さずに check）==
+@中
+$ sudo losetup -f --show ~/old-usb.img
+$ sudo mount /dev/loop0 /mnt
+$ cp /mnt/message.txt ~/
+# --- 取り出したが、まだマウントしたまま ---
+$ lab check 05
+$ sudo umount /mnt
+$ sudo losetup -d /dev/loop0
+$ losetup -l
+
+== 6. 演習06（別解: LABEL と users）==
+@中
+$ sudo blkid /dev/sr0
+$ sudo mkdir -p /media/cdrom
+$ echo "LABEL=LINUC_MEDIA  /media/cdrom  iso9660  ro,users,noauto  0  0" | sudo tee -a /etc/fstab
+$ sudo systemctl daemon-reload
+# --- 別解: LABEL で指し、users にした ---
+$ lab check 06
+
+== 7. 演習07（不完全: swapon だけ → 判定の後の状態 → 別解: LABEL）==
+@中
+$ sudo mkswap -L SWAP /dev/vdb3
+$ sudo swapon /dev/vdb3
+$ swapon --show
+# --- swapon しただけ（/etc/fstab に無い）---
+$ lab check 07
+# --- 判定の後、スワップは使われているか ---
+$ swapon --show
+$ echo "LABEL=SWAP  none  swap  defaults  0  0" | sudo tee -a /etc/fstab
+$ sudo systemctl daemon-reload
+$ sudo swapon -a
+# --- 別解: LABEL で書き、オプションは defaults ---
+$ lab check 07
+
+== 8. 演習08（別解: 区画（種類 8e）を物理ボリュームにする）==
+@中
+$ sudo fdisk /dev/vdc
+@keys n|p|1|||t|8e|w
+$ sudo fdisk /dev/sda
+@keys n|p|1|||t|8e|w
+$ lsblk /dev/vdc /dev/sda
+$ sudo pvcreate /dev/vdc1 /dev/sda1
+$ sudo vgcreate vg0 /dev/vdc1 /dev/sda1
+$ sudo lvcreate -l 100%FREE -n data vg0
+$ sudo mkfs.ext4 -q /dev/vg0/data
+$ sudo lvs -o lv_name,lv_size,devices vg0
+# --- 別解: vdc1・sda1（種類 8e Linux LVM）を物理ボリュームにして、1台より大きな LV に ext4 ---
+$ lab check 08
+$ cat /sys/module/ahci/refcnt
+$ sudo mkdir -p /srv/data
+$ sudo mount /dev/vg0/data /srv/data
+$ cat /sys/module/ahci/refcnt
+$ lsmod | grep -E "^ahci "
+
+== 9. 演習09（別解1: tmpfiles.d で起動のたびに書く → 再起動して確かめる。別解2: 製造番号で当てる udev の規則）==
+@中
+$ echo "w /sys/block/vdb/queue/rotational - - - - 0" | sudo tee /etc/tmpfiles.d/fc-ssd.conf
+$ sudo reboot
+@外
+$ vm start
+$ ssh linuc
+@中
+$ cat /sys/block/vdb/queue/rotational
+$ lsblk -d -o NAME,ROTA /dev/vdb
+# --- 別解1: 再起動したら SSD のまま（tmpfiles.d）---
+$ lab check 09
+$ sudo rm /etc/tmpfiles.d/fc-ssd.conf
+$ echo 'ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ATTRS{serial}=="LAB-VDB", ATTR{queue/rotational}="0"' | sudo tee /etc/udev/rules.d/61-fc-ssd.rules
+$ sudo udevadm trigger --action=add --subsystem-match=block --sysname-match=vdb --settle
+$ cat /sys/block/vdb/queue/rotational
+# --- 別解2: 製造番号（LAB-VDB）で当てる udev の規則 ---
+$ lab check 09
+
+== 10. 演習10（不完全: 外すだけ → 別解: install を2行）==
+@外
+$ virsh attach-device linuc ~/vm/extra/usb-a.xml
+@中
+$ lsmod | grep -E "usb_storage|uas"
+$ sudo modprobe -r uas
+@外
+$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+@中
+# --- ドライバを外しただけ ---
+$ lab check 10
+$ lsmod | grep -E "usb_storage|uas"
+$ printf "install usb_storage /bin/false\ninstall uas /bin/false\n" | sudo tee /etc/modprobe.d/fc-usb.conf
+$ sudo modprobe -r uas
+# --- 別解: install を2行（新しいファイル）---
+$ lab check 10
+
+== 11. 全問 ==
+@中
+$ lab check

@@ -14,6 +14,12 @@ fst=$(lab-guest 'findmnt --fstab -t swap -n -o SOURCE 2>/dev/null | paste -sd " 
 fste=$(lab-guest 'findmnt --fstab -t swap -n --evaluate -o SOURCE 2>/dev/null | paste -sd " "' 2>/dev/null)
 after=$(lab-guest 'swapoff /dev/vdb3 2>/dev/null; swapon -a 2>&1 >/dev/null | head -2; grep -c "^/dev/vdb3 " /proc/swaps' 2>/dev/null)
 after_n=$(tail -1 <<<"$after"); after_msg=$(sed '$d' <<<"$after")
+# 判定のために外した（または足した）スワップを、判定の前の状態に戻す（読者の練習機を判定で変えたままにしない）
+if [ "${before:-0}" -ge 1 ] && [ "${after_n:-0}" -lt 1 ]; then
+  lab-guest 'swapon /dev/vdb3' >/dev/null 2>&1
+elif [ "${before:-0}" -lt 1 ] && [ "${after_n:-0}" -ge 1 ]; then
+  lab-guest 'swapoff /dev/vdb3' >/dev/null 2>&1
+fi
 
 echo "判定 : 観測型（vdb3 をいったん swapoff し、起動時と同じ swapon -a を1回実行して、戻るかを見た）"
 echo "観測 : vdb3 の中身              = ${type:-（印なし）}"
@@ -21,6 +27,7 @@ echo "       判定の前に使われていたか = $([ "${before:-0}" -ge 1 ] &
 echo "       /etc/fstab のスワップの行 = ${fst:-（無い）}${fste:+（実体: $fste）}"
 echo "       swapon -a の後に使われているか = $([ "${after_n:-0}" -ge 1 ] && echo はい || echo いいえ)"
 [ -n "$after_msg" ] && echo "       swapon -a の出力: $after_msg"
+echo "       （判定の後、vdb3 は判定の前と同じ状態に戻した）"
 ng=0
 [ "$type" = swap ] || { echo "       → vdb3 がスワップ領域として作られていない"; ng=1; }
 [ "${after_n:-0}" -ge 1 ] || { echo "       → /etc/fstab から有効にすると、vdb3 は使われない"; ng=1; }

@@ -17,7 +17,7 @@ probe/linuc-files-seqcompare.py を写して作った（2026-10-20）。違い�
 
 毎回変わる値（本文にも「あなたの画面では違う」と書いてあるもの）は伏せて比べる:
   ls -l の日時・「Tue Oct 20 19:33:45 2026」の形の日時・YYYY-MM-DD HH:MM:SS・UUID（8-4-4-4-12）・FAT のボリューム ID・
-  MBR の表の番号（0x…）・dmesg と udevadm monitor の秒数・dd のかかった秒数と速さ・vm start の秒数と「起動中…」の行・
+  MBR の表の番号（0x…。fdisk の Disk identifier と sfdisk -d の label-id）・dmesg と udevadm monitor の秒数・dd のかかった秒数と速さ・vm start の秒数と「起動中…」の行・
   「初回の準備」の行・free と /proc/meminfo・/proc/interrupts の数・busctl の PID と接続の番号（:1.N）・Last login の行・
   mke2fs の進み（Discarding … done の空白）・df の tmpfs の行の数（/run の Used が人と時刻で変わる）・
   vgdisplay の VG UUID（LVM の番号は 6-4-4-4-4-4-6 の形で、上の UUID の形と違う）
@@ -44,6 +44,7 @@ def mask(cmd, line):
     line = re.sub(r"\b[0-9A-F]{4}-[0-9A-F]{4}\b", "VOLID", line)               # FAT のボリューム ID
     line = re.sub(r"disk identifier 0x[0-9a-f]{8}", "disk identifier 0xID", line)
     line = re.sub(r"^Disk identifier: 0x[0-9a-f]{8}$", "Disk identifier: 0xID", line)
+    line = re.sub(r"^label-id: 0x[0-9a-f]{8}$", "label-id: 0xID", line)          # sfdisk -d の表の番号
     line = re.sub(r"^\[ *\d+\.\d+\]", "[TS]", line)                              # dmesg
     line = re.sub(r"^(KERNEL|UDEV  )\[\d+\.\d+\]", r"\1[TS]", line)             # udevadm monitor
     line = re.sub(r"copied, [0-9.e+-]+ s, [0-9.]+ [kMGT]?B/s$", "copied, TIME", line)

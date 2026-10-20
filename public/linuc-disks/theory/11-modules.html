@@ -44,7 +44,7 @@ crc-itu-t</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo insmod /lib/modules/$(uname -r)/kernel/fs/udf/udf.ko.zst
 insmod: ERROR: could not insert module /lib/modules/6.8.0-142-generic/kernel/fs/udf/udf.ko.zst: Unknown symbol in module
 $ sudo dmesg | grep "Unknown symbol"
-[  207.541847] udf: Unknown symbol crc_itu_t (err -2)</code></pre>
+[  204.207790] udf: Unknown symbol crc_itu_t (err -2)</code></pre>
 <p><code>Unknown symbol in module</code>（知らない名前がある）で失敗した。<code>dmesg</code>（カーネルが出したメッセージを読むコマンド）から、その知らせの行を探すと、<code>udf</code> が使う関数（プログラムの中の、名前の付いた部品）<code>crc_itu_t</code> を持つモジュールが、まだ読み込まれていなかったと分かる（左の数字は起動からの秒数で、人によって違う）。<code>insmod</code> は、渡されたファイルを1つ読み込むだけで、依存を解決しない。<code>modprobe</code> は、名前でモジュールを探し、依存を先に読み込む。<code>-v</code> で何をしたかが出る。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo modprobe -v udf
 insmod /lib/modules/6.8.0-142-generic/kernel/lib/crc-itu-t.ko.zst
@@ -88,18 +88,18 @@ monitor will print the received events for:
 UDEV - the event which udev sends out after rule processing
 KERNEL - the kernel uevent
 
-KERNEL[227.010187] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1 (usb)
-KERNEL[227.013010] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0 (usb)
-KERNEL[227.013485] bind     /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1 (usb)
-UDEV  [227.028061] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1 (usb)
-KERNEL[227.092924] bind     /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0 (usb)
-UDEV  [227.111567] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0 (usb)
-UDEV  [227.125637] bind     /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1 (usb)
-UDEV  [227.144938] bind     /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0 (usb)
-KERNEL[228.171441] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb (block)
-KERNEL[228.186082] change   /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb (block)
-UDEV  [228.223519] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb (block)
-UDEV  [228.318237] change   /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb (block)</code></pre>
+KERNEL[223.482609] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1 (usb)
+KERNEL[223.489538] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0 (usb)
+KERNEL[223.504732] bind     /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1 (usb)
+UDEV  [223.549182] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1 (usb)
+KERNEL[223.590296] bind     /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0 (usb)
+UDEV  [223.605777] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0 (usb)
+UDEV  [223.633705] bind     /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1 (usb)
+UDEV  [223.652678] bind     /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0 (usb)
+KERNEL[224.664289] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb (block)
+KERNEL[224.682924] change   /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb (block)
+UDEV  [224.738806] add      /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb (block)
+UDEV  [224.826934] change   /devices/pci0000:00/0000:00:01.0/0000:01:00.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb (block)</code></pre>
 <p>見張っているあいだに（30 秒以内に）、外の端末で A を挿す。</p>
 <pre data-where="外（lab@host）"><code>$ virsh attach-device linuc ~/vm/extra/usb-a.xml
 Device attached successfully</code></pre>
@@ -127,12 +127,12 @@ $ lsmod | grep -E "usb_storage|uas"
 uas                    28672  0
 usb_storage            86016  1 uas
 $ sudo dmesg | grep -E "usb-storage|registered new interface"
-[    1.150813] usbcore: registered new interface driver usbfs
-[    1.151068] usbcore: registered new interface driver hub
-[  227.101596] usb-storage 2-1:1.0: USB Mass Storage device detected
-[  227.108615] scsi host6: usb-storage 2-1:1.0
-[  227.119167] usbcore: registered new interface driver usb-storage
-[  227.135329] usbcore: registered new interface driver uas</code></pre>
+[    1.010898] usbcore: registered new interface driver usbfs
+[    1.011110] usbcore: registered new interface driver hub
+[  223.610595] usb-storage 2-1:1.0: USB Mass Storage device detected
+[  223.615573] scsi host6: usb-storage 2-1:1.0
+[  223.618795] usbcore: registered new interface driver usb-storage
+[  223.630738] usbcore: registered new interface driver uas</code></pre>
 <p><code>lsusb</code> に USB メモリ（<code>QEMU USB HARDDRIVE</code>）が出て、<code>lsusb -t</code> では <code>Driver=usb-storage</code> が付いている（Device の番号は、それまでに挿した回数で変わる）。ディスク <code>sdb</code> は、USB でつながり（TRAN が <code>usb</code>）、取り外せる（RM が 1）。そして、あなたは何も読み込んでいないのに、<code>usb_storage</code> と <code>uas</code>（USB Attached SCSI。対応した USB の記憶装置を、<code>usb_storage</code> より新しく速い送り方で動かすドライバ）の2つが読み込まれた。<code>dmesg</code> の <code>usbcore: registered new interface driver usb-storage</code> がその瞬間である（上の2行の <code>usbfs</code>・<code>hub</code> は、起動したときに組み込みの部品が名乗った行。第7章の再起動の後に <code>lab check 10</code> か、引数なしの <code>lab check</code> を打った人は、判定が USB メモリを1本挿したので、そのときの行も出る）。</p>
 
 <h2 id="naive">ドライバを外した USB メモリを、挿し直すと？</h2>
@@ -227,7 +227,7 @@ usb_storage            86016  1 uas
 $ modprobe --show-depends uas
 insmod /lib/modules/6.8.0-142-generic/kernel/drivers/usb/storage/usb-storage.ko.zst
 insmod /lib/modules/6.8.0-142-generic/kernel/drivers/usb/storage/uas.ko.zst</code></pre>
-<p>止まらない。<code>blacklist</code> で外れたのは <code>usb_storage</code> だけで、<code>uas</code> は候補に残って読み込まれた。<code>modprobe --show-depends</code>（読み込むときに何をするかを、読み込まずに出す）で分かるとおり、<code>uas</code> は <code>usb_storage</code> に依存しているので、<code>usb_storage</code> は<b>依存として</b>読み込まれた。依存には <code>blacklist</code> が効かない。では <code>uas</code> も書けばよい。同じファイルを書き換えて、挿し直す（<code>printf</code> の <code>\n</code> は改行）。</p>
+<p>止まらない。<code>blacklist</code> で外れたのは <code>usb_storage</code> だけで、<code>uas</code> は候補に残って読み込まれた。<code>modprobe --show-depends</code>（読み込むときに何をするかを、読み込まずに出す）で分かるとおり、<code>uas</code> は <code>usb_storage</code> に依存しているので、<code>usb_storage</code> は<b>依存として</b>読み込まれた。依存には <code>blacklist</code> が効かない。では <code>uas</code> も書けばよい。同じファイルを書き換えて、挿し直す（<code>printf</code> は <code>echo</code> のように文字を出すコマンドで、<code>\n</code> と書いたところで改行する）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ printf "blacklist usb_storage\nblacklist uas\n" | sudo tee /etc/modprobe.d/lab-usb.conf
 blacklist usb_storage
 blacklist uas
@@ -239,7 +239,7 @@ Device attached successfully</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ lsmod | grep -E "usb_storage|uas"
 uas                    28672  0
 usb_storage            86016  1 uas</code></pre>
-<p>まだ止まらない。今度の理由は書き方ではなく、<b>読む側が書き換えに気づいていない</b>ことである。udev（systemd-udevd というプログラムとして動いている）は、<code>/etc/modprobe.d</code> に<b>ファイルが増えた・消えた</b>ことには自分で気づいて設定を読み直す。ところが<b>すでにあるファイルの中身を書き換えた</b>ことには気づかず、前の中身のまま動く。読み直させる（練習機ごと再起動しても同じ）。</p>
+<p>まだ止まらない。今度の理由は書き方ではなく、<b>読む側が書き換えに気づいていない</b>ことである。udev（systemd-udevd というプログラムとして動いている）は、<code>/etc/modprobe.d</code> に<b>ファイルが増えた・消えた</b>ことには自分で気づいて設定を読み直す。ところが、いまのように <code>tee</code>（や <code>&gt;</code>）で<b>すでにあるファイルの中身だけを書き換えた</b>ときは気づかず、前の中身のまま動く（<code>sed -i</code> のように、ファイルを新しいものに置き換える書き換え方なら気づく）。読み直させる（練習機ごと再起動しても同じ）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo systemctl restart systemd-udevd
 $ sudo modprobe -r uas</code></pre>
 <pre data-where="外（lab@host）"><code>$ virsh detach-device linuc ~/vm/extra/usb-a.xml
@@ -285,8 +285,8 @@ $ sudo rmmod usb_storage</code></pre>
 <tr><td><code>blacklist 名前</code></td><td>別名（modalias）で探したときの候補から外す。名前を指定した <code>modprobe</code> と、依存としての読み込みは止まらない</td><td>装置が来たときに自動で読み込まれないようにする</td></tr>
 <tr><td><code>install 名前 /bin/false</code></td><td><code>modprobe</code> での読み込みは、udev からでも、手でも、依存としてでも失敗する。<code>insmod</code> は止まらない</td><td>名前を指定した読み込みまで含めて止める</td></tr>
 </table></div>
-<p>効き始めるときにも気を付ける。udev は <code>/etc/modprobe.d</code> に<b>ファイルを足した・消した</b>ことには気づくが、<b>すでにあるファイルを書き換えた</b>ことには気づかない。書き換えたら <code>systemctl restart systemd-udevd</code>（か再起動）で読み直させる。このほか、ファームウェア（BIOS・UEFI）の設定画面で装置そのものを無効にする方法もあり、そのときは装置が <code>lspci</code> にも出なくなる（ファームウェアが Linux に装置を見せない）。</p>
-<div class="analogy"><b>たとえ</b>: 受付係の<b>呼び出し禁止リスト</b>に近い。新しい紙を掲示板に足せば受付係は気づくが、貼ってある紙を書き直しても気づかない。しかも「usb_storage さんは呼ばない」と書いても、「uas さんを呼んだら、uas さんが usb_storage さんを連れてきた」なら止まらない。
+<p>効き始めるときにも気を付ける。udev は <code>/etc/modprobe.d</code> に<b>ファイルを足した・消した</b>（置き換えた）ことには気づくが、<code>tee</code> や <code>&gt;</code> で<b>すでにあるファイルの中身だけを書き換えた</b>ことには気づかない。中身だけを書き換えたら <code>systemctl restart systemd-udevd</code>（か再起動）で読み直させる。このほか、ファームウェア（BIOS・UEFI）の設定画面で装置そのものを無効にする方法もあり、そのときは装置が <code>lspci</code> にも出なくなる（ファームウェアが Linux に装置を見せない）。</p>
+<div class="analogy"><b>たとえ</b>: 受付係の<b>呼び出し禁止リスト</b>に近い。新しい紙を掲示板に足せば受付係は気づくが、貼ってある紙に上から書き込んでも気づかない（紙ごと貼り替えれば気づく）。しかも「usb_storage さんは呼ばない」と書いても、「uas さんを呼んだら、uas さんが usb_storage さんを連れてきた」なら止まらない。
 <br>ただし<b>崩れる点</b>: 人なら事情を話せば連れてこないが、カーネルの依存は機械的で、例外が無い。また、受付を通らずに裏口から入る人（<code>insmod</code>）は、どのリストにも止められない。</div>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-disks/practice/">演習10</a>は、ここまでの状態（挿し直しても使えない）を作る課題である。
@@ -303,8 +303,8 @@ $ sudo rmmod usb_storage</code></pre>
 <p><b>udisks2</b> は、ディスクの情報を集めて、マウントなどの操作をほかのプログラムから頼めるようにするプログラムである。<b>D-Bus</b> は、同じマシンの上のプログラムどうしが、問い合わせと知らせをやりとりする通り道である。udev 自身は D-Bus を使わないが、デスクトップの部品はみなここで話す。練習機でも、systemd やログインの管理が D-Bus の上で待ち受けている。<code>busctl list</code> は、D-Bus の上の名前の一覧を出すコマンドである（<code>--no-pager</code> は、<code>less</code> のような画面送りを使わずに全部を出すオプション。一覧は長いので、<code>grep</code> で5つに絞る）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ busctl list --no-pager | grep -E "^org\.freedesktop\.(systemd1|login1|hostname1|timedate1|network1)"
 org.freedesktop.hostname1         - -               -               (activatable) -                           -       -
-org.freedesktop.login1          463 systemd-logind  root            :1.3          systemd-logind.service      -       -
-org.freedesktop.network1        210 systemd-network systemd-network :1.0          systemd-networkd.service    -       -
+org.freedesktop.login1          459 systemd-logind  root            :1.3          systemd-logind.service      -       -
+org.freedesktop.network1        209 systemd-network systemd-network :1.1          systemd-networkd.service    -       -
 org.freedesktop.systemd1          1 systemd         root            :1.2          init.scope                  -       -
 org.freedesktop.timedate1         - -               -               (activatable) -                           -       -</code></pre>
 <p>2列目はその名前を持つプロセスの番号（PID）、5列目は D-Bus が接続ごとに付ける番号で、どちらも人と起動のたびによって違う。<code>(activatable)</code> は「いまは動いていないが、問い合わせが来たら起動される」という意味である。この練習機には udisks2 が無いので、USB メモリを挿しても誰もマウントしない。だから第6章では手でマウントした。</p>
@@ -342,14 +342,14 @@ org.freedesktop.timedate1         - -               -               (activatable
 <div class="quiz"><b>確認</b>
 <p><code>/etc/modprobe.d/</code> に <code>blacklist usb_storage</code> と書いたのに、USB メモリを挿すと使えた。考えられる理由を2つ挙げよ。</p>
 <details><summary>答え</summary>
-<p>1つ目: <code>blacklist</code> は別名で探すときの候補から外すだけで、別のモジュール（<code>uas</code>）の依存として読み込まれるのは止めない。止めるなら <code>uas</code> も書くか、<code>install usb_storage /bin/false</code> にする。2つ目: <b>すでにあるファイルを書き換えた</b>場合、udev は書き換えに気づかず、前の中身のまま動いている（<code>systemctl restart systemd-udevd</code> か再起動が要る）。新しいファイルを足した・消した場合は、udev は自分で気づく。</p></details></div>
+<p>1つ目: <code>blacklist</code> は別名で探すときの候補から外すだけで、別のモジュール（<code>uas</code>）の依存として読み込まれるのは止めない。止めるなら <code>uas</code> も書くか、<code>install usb_storage /bin/false</code> にする。2つ目: <b>すでにあるファイルの中身だけを</b>（<code>tee</code> や <code>&gt;</code> で）書き換えた場合、udev は書き換えに気づかず、前の中身のまま動いている（<code>systemctl restart systemd-udevd</code> か再起動が要る）。新しいファイルを足した・消した場合は、udev は自分で気づく。</p></details></div>
 <div class="quiz"><b>確認</b>
 <p>起動するたびに読み込みたいモジュールがある。どこに書くか。</p>
 <details><summary>答え</summary>
 <p><code>/etc/modules-load.d/</code> の下の <code>.conf</code> のファイルに書く（練習機の <code>/etc/modules</code> 自身が、そこへ置き換わったと書いている）。古い <code>/etc/modules</code> もまだ読まれるが、同じファイルが「obsolete（廃止）」と書いている。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>ドライバの多くはカーネルモジュールで、<code>lsmod</code> に出る。最初から組み込まれているもの（この練習機では ext4・vfat・sr_mod）は出ず、外せない</li><li>モジュールは、要るときに読み込まれる（CD をマウントすると isofs、USB メモリを挿すと usb_storage と uas）。読み込んだのはカーネルと udev で、あなたではない</li><li><code>insmod</code> は依存を解決せず、<code>modprobe</code> は依存の順に読み込む。<code>modprobe -r</code> は使われなくなった依存も外す。<code>rmmod</code> は使われていれば断る</li><li>ドライバを外しても装置は <code>lsusb</code>・<code>lspci</code> に残る。次に挿せば、udev が装置の種類（modalias）に合うドライバをまた読み込む</li><li>止めるのは <code>/etc/modprobe.d/</code>。<code>blacklist</code> は別名からの読み込みだけを止め、依存と名前を指定した <code>modprobe</code> は止めない。<code>install 名前 /bin/false</code> は <code>modprobe</code> を止めるが <code>insmod</code> は止めない。すでにあるファイルを書き換えたら udev を再起動する</li><li>sysfs は装置の情報、udev は装置の出入りの処理、D-Bus はプログラムどうしの通り道</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>ドライバの多くはカーネルモジュールで、<code>lsmod</code> に出る。最初から組み込まれているもの（この練習機では ext4・vfat・sr_mod）は出ず、外せない</li><li>モジュールは、要るときに読み込まれる（CD をマウントすると isofs、USB メモリを挿すと usb_storage と uas）。読み込んだのはカーネルと udev で、あなたではない</li><li><code>insmod</code> は依存を解決せず、<code>modprobe</code> は依存の順に読み込む。<code>modprobe -r</code> は使われなくなった依存も外す。<code>rmmod</code> は使われていれば断る</li><li>ドライバを外しても装置は <code>lsusb</code>・<code>lspci</code> に残る。次に挿せば、udev が装置の種類（modalias）に合うドライバをまた読み込む</li><li>止めるのは <code>/etc/modprobe.d/</code>。<code>blacklist</code> は別名からの読み込みだけを止め、依存と名前を指定した <code>modprobe</code> は止めない。<code>install 名前 /bin/false</code> は <code>modprobe</code> を止めるが <code>insmod</code> は止めない。すでにあるファイルの中身だけを書き換えたら udev を再起動する</li><li>sysfs は装置の情報、udev は装置の出入りの処理、D-Bus はプログラムどうしの通り道</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.1.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・kmod 31・udev 255.4・usbutils 017 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁 × 24 行で、第1章から順に1つの練習機で打って検証 / 検証日 2026-10-20</div>
 <nav class="pager"><a href="/linuc-disks/theory/10-hardware">← 10. 部品の情報を読む</a><a href="/linuc-disks/practice/">実践編へ →</a></nav>
 <section id="comments">

@@ -48,7 +48,7 @@ $ sudo mkdir /srv/home</code></pre>
 <p><code>nofail</code> は「起動のときにこのディスクが見つからなくても、起動を止めない」オプションである。付けないと、ディスクを外したまま起動したときに、起動が途中で止まる。</p>
 <p>書いただけでは、まだマウントされていない。<code>findmnt</code> はマウントの一覧から表を出すコマンドで、マウントポイントを渡すとその1つだけを出す（<code>-o</code> で列を選ぶのは <code>lsblk</code> と同じ）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ findmnt -o TARGET,SOURCE,FSTYPE /srv/home</code></pre>
-<p>何も出ない。<code>/etc/fstab</code> が読まれるのは、起動のときと、<code>mount -a</code> を打ったときである。<code>mount -a</code> は「<code>/etc/fstab</code> の行のうち、まだマウントされていないものを全部マウントする」で、起動のときと同じことをその場で起こせる。</p>
+<p>何も出ない。<code>/etc/fstab</code> は書いただけではマウントされず、読まれるのは起動のときと、<code>mount -a</code> を打ったときと、<code>mount</code> にマウント先か装置の片方だけを渡したとき（足りない分をこの表から補う。この章の後半で使う）である。<code>mount -a</code> は「<code>/etc/fstab</code> の行のうち、まだマウントされていないものを全部マウントする」で、起動のときと同じことをその場で起こせる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mount -a
 $ findmnt -o TARGET,SOURCE,FSTYPE /srv/home</code></pre>
 <p><code>/srv/home</code> に <code>vdb6</code> がマウントされた。<code>mount</code> が出した <code>(hint)</code> は、「<code>/etc/fstab</code> は書き換えられたが、systemd はまだ古い版を使っている。<code>systemctl daemon-reload</code> で読み直させよ」という意味である。systemd（練習機の起動と常駐のプログラムを管理するプログラム）は、起動のたびに <code>/etc/fstab</code> から「マウントの手順」を作り直し、それに従って起動のときのマウントをする。だから次の起動には、書いただけで効く。困るのは、いま動いている systemd が古い表のままでいることで、systemd を通した操作が書き換える前の表で動く。読み直させておく。</p>

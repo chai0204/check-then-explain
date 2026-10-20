@@ -13,11 +13,14 @@ after=$(lab-guest 'echo 1 > /sys/block/vdb/queue/rotational &&
   udevadm trigger --action=add --subsystem-match=block --sysname-match=vdb --settle &&
   cat /sys/block/vdb/queue/rotational' 2>/dev/null)
 rules=$(lab-guest 'grep -ls rotational /etc/udev/rules.d/*.rules | paste -sd " "' 2>/dev/null)
+# 判定のために書き換えた値を、判定の前の値に戻す（読者の練習機を判定で変えたままにしない）
+case "$before" in 0|1) lab-guest "echo $before > /sys/block/vdb/queue/rotational" >/dev/null 2>&1 ;; esac
 
 echo "判定 : 観測型（rotational をいったん 1 に戻し、起動時と同じ add イベントを udev に1回送って、値を読んだ）"
 echo "観測 : 判定の前の値             = ${before:-?}"
 echo "       add イベントの後の値     = ${after:-?}"
 echo "       rotational を書く udev の規則 = ${rules:-（/etc/udev/rules.d に見当たらない）}"
+echo "       （判定の後、値は判定の前の ${before:-?} に戻した）"
 if [ "$after" != "0" ]; then
   if [ "$before" = "0" ]; then
     echo "       → 判定の前は 0 だったが、起動時と同じイベントの後は 1 に戻った"

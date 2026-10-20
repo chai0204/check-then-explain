@@ -45,15 +45,15 @@ LABEL=UEFI	/boot/efi	vfat	umask=0077	0 1</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: <code>/etc/fstab</code> に行を足してから、効くかを確かめるまでの手順。</div>
 <p>第5章で作った <code>vdb6</code>（ext4、ラベル HOME）を、起動のたびに <code>/srv/home</code> にマウントする。指すのは UUID にする。<code>blkid</code> の <code>-s UUID -o value</code> は、UUID の値だけを出すオプションである。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo blkid -s UUID -o value /dev/vdb6
-ea7d9237-2d62-45be-8abf-bd388c5b7294</code></pre>
+0242a54e-2be6-40d8-bfe2-7d251fd1b7c2</code></pre>
 <p>この長い値を写し間違えないように、コマンドの出力をその場に埋め込む <code>$(コマンド)</code> を使って行を作る。<code>tee -a</code> は、受け取った文字を画面に出しつつ、ファイルの末尾に足す（<code>-a</code> が無いと上書きして、元の3行が消える）。値はあなたの画面では違う。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb6)  /srv/home  ext4  defaults,nofail  0  2" | sudo tee -a /etc/fstab
-UUID=ea7d9237-2d62-45be-8abf-bd388c5b7294  /srv/home  ext4  defaults,nofail  0  2
+UUID=0242a54e-2be6-40d8-bfe2-7d251fd1b7c2  /srv/home  ext4  defaults,nofail  0  2
 $ sudo mkdir /srv/home</code></pre>
 <p><code>nofail</code> は「起動のときにこのディスクが見つからなくても、起動を止めない」オプションである。付けないと、ディスクを外したまま起動したときに、起動が途中で止まる。</p>
 <p>書いただけでは、まだマウントされていない。<code>findmnt</code> はマウントの一覧から表を出すコマンドで、マウントポイントを渡すとその1つだけを出す（<code>-o</code> で列を選ぶのは <code>lsblk</code> と同じ）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ findmnt -o TARGET,SOURCE,FSTYPE /srv/home</code></pre>
-<p>何も出ない。<code>/etc/fstab</code> が読まれるのは、起動のときと、<code>mount -a</code> を打ったときである。<code>mount -a</code> は「<code>/etc/fstab</code> の行のうち、まだマウントされていないものを全部マウントする」で、起動のときと同じことをその場で起こせる。</p>
+<p>何も出ない。<code>/etc/fstab</code> は書いただけではマウントされず、読まれるのは起動のときと、<code>mount -a</code> を打ったときと、<code>mount</code> にマウント先か装置の片方だけを渡したとき（足りない分をこの表から補う。この章の後半で使う）である。<code>mount -a</code> は「<code>/etc/fstab</code> の行のうち、まだマウントされていないものを全部マウントする」で、起動のときと同じことをその場で起こせる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mount -a
 mount: (hint) your fstab has been modified, but systemd still uses
        the old version; use 'systemctl daemon-reload' to reload.
@@ -80,14 +80,14 @@ $ sudo findmnt --verify
 0 parse errors, 0 errors, 1 warning
 $ sudo blkid -t LABEL=BOOT
 /dev/vda16: LABEL="BOOT" UUID="a5eecc38-8587-4601-9295-c92dabc20612" BLOCK_SIZE="4096" TYPE="ext4" PARTUUID="ce13a6f1-b3f2-4c7a-b3db-6d75505ad739"
-/dev/vdb2: LABEL="BOOT" UUID="6fb8caf8-effe-40e5-b191-dbf1cd683abd" SEC_TYPE="ext2" BLOCK_SIZE="4096" TYPE="ext3" PARTLABEL="Linux filesystem" PARTUUID="d1fcda99-bea2-4884-871b-f72af2f02a84"
+/dev/vdb2: LABEL="BOOT" UUID="7c6ae8ad-a88b-49c7-92ec-5a07238ff01e" SEC_TYPE="ext2" BLOCK_SIZE="4096" TYPE="ext3" PARTLABEL="Linux filesystem" PARTUUID="46643181-ace8-4a09-8b2f-8a87a58cc9a0"
 $ ls -l /dev/disk/by-label/BOOT
-lrwxrwxrwx 1 root root 10 Oct 20 20:59 /dev/disk/by-label/BOOT -&gt; ../../vdb2</code></pre>
+lrwxrwxrwx 1 root root 10 Oct 20 22:34 /dev/disk/by-label/BOOT -&gt; ../../vdb2</code></pre>
 <div class="then"><b>だめな理由</b>: BOOT というラベルが2つになった（<code>blkid -t LABEL=BOOT</code> は、そのラベルを持つものを全部出す）。練習機自身の <code>/etc/fstab</code> は、<code>/boot</code> を <code>LABEL=BOOT</code> で探している。その <code>LABEL=BOOT</code> がいま指すのは、新しい <code>vdb2</code>（空の ext3）のほうである（<code>/dev/disk/by-label/BOOT</code> が <code>vdb2</code> を指している）。このまま再起動すると、練習機の <code>/boot</code> に空の ext3 がマウントされかねない。<b>ラベルは人が付ける名前なので、重なりうる</b>。しかも <code>findmnt --verify</code> が知らせたのは「ext4 と書いてあるのに、ディスクの上は ext3」という種類の食い違いで、重なりそのものではない（たまたま種類が違ったので気づけた）。</div></div>
 <p>重なりを確かめるのは <code>blkid -t LABEL=…</code> か <code>/dev/disk/by-label/</code> である。ラベルを元に戻す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo e2label /dev/vdb2 NEWBOOT
 $ ls -l /dev/disk/by-label/BOOT
-lrwxrwxrwx 1 root root 11 Oct 20 20:59 /dev/disk/by-label/BOOT -&gt; ../../vda16
+lrwxrwxrwx 1 root root 11 Oct 20 22:34 /dev/disk/by-label/BOOT -&gt; ../../vda16
 $ sudo findmnt --verify
 Success, no errors or warnings detected</code></pre>
 <p><code>LABEL=BOOT</code> は練習機の <code>vda16</code> に戻った。ラベルを付け替える道具は種類ごとに違い、ext 系は <code>e2label</code>（<code>tune2fs -L</code> でも同じ）、XFS は <code>xfs_admin -L</code>（<code>-l</code> で読む）である。</p>
@@ -134,18 +134,18 @@ $ sudo systemctl daemon-reload
 $ mount /media/stick
 $ ls -l /media/stick
 total 2
--rwxrwxr-x 1 student student 12 Oct 20 20:57 who.txt
+-rwxrwxr-x 1 student student 12 Oct 20 22:32 who.txt
 $ touch /media/stick/mine.txt
 $ umount /media/stick
 $ sudo mount /media/stick
 $ ls -l /media/stick
 total 2
--rwxr-xr-x 1 root root  0 Oct 20 21:00 mine.txt
--rwxr-xr-x 1 root root 12 Oct 20 20:57 who.txt
+-rwxr-xr-x 1 root root  0 Oct 20 22:34 mine.txt
+-rwxr-xr-x 1 root root 12 Oct 20 22:32 who.txt
 $ sudo umount /media/stick
 $ sudo findmnt --verify
 Success, no errors or warnings detected</code></pre>
-<p>student がマウントすると、ファイルはすべて student のものに見え、書き込めた。root がマウントすると、同じファイルが root のものに見える。VFAT は、ファイルごとの持ち主とパーミッションを持たない（第5章）。持ち主は<b>マウントしたときに決まる</b>（マウントした人か、<code>uid=</code>・<code>umask=</code> などのオプションで決める。第4章で <code>/boot/efi</code> が root にしか読めなかったのは、<code>/etc/fstab</code> の <code>umask=0077</code> のためである）。</p>
+<p>student がマウントすると、ファイルはすべて student のものに見え、書き込めた。root がマウントすると、同じファイルが root のものに見える。VFAT は、ファイルごとの持ち主とパーミッションを持たない（第5章）。持ち主は<b>マウントしたときに決まる</b>（マウントした人か、<code>uid=</code>（持ち主にするユーザの番号）・<code>umask=</code>（落とす権限。主題1.02 第2章）などのオプションで決める。第4章で <code>/boot/efi</code> が root にしか読めなかったのは、<code>/etc/fstab</code> の <code>umask=0077</code> のためである）。</p>
 <div class="analogy"><b>たとえ</b>: <code>user</code> は、図書館の<b>貸し出し用の個室の鍵</b>を利用者に渡すことに近い。決められた部屋（<code>/etc/fstab</code> に書いた行）だけは、利用者が自分で開け閉めできる。書いていない部屋の鍵は渡らない。
 <br>ただし<b>崩れる点</b>: 個室なら持ち込める物は限られるが、マウントは持ち込まれたメディアの中身しだいで、危ないプログラムや装置のファイルも入ってくる。だから <code>user</code> を付けると、nosuid・nodev・noexec が自動で付き、中のものに root の権限や装置を渡さない。</div>
 <div class="scroll"><table>
@@ -170,7 +170,7 @@ Device detached successfully</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: 書いた行が、起動のときに本当に効くこと。</div>
 <p>練習機を再起動する。<code>reboot</code> は再起動のコマンドである。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo reboot
-Broadcast message from root@linuc on pts/1 (Tue 2026-10-20 21:00:47 JST):
+Broadcast message from root@linuc on pts/1 (Tue 2026-10-20 22:35:17 JST):
 
 The system will reboot now!
 
@@ -180,14 +180,16 @@ Connection to 127.0.0.1 closed.</code></pre>
 <pre data-where="外（lab@host）"><code>$ vm start
 練習機はもう動いています
   起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
-練習機が起動しました（16秒）
+  起動中… 20秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+  起動中… 30秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+練習機が起動しました（35秒）
   入るには:  ssh linuc   （抜けるときは exit）
 $ ssh linuc
   LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 20 20:55:13 2026 from 10.0.2.2</code></pre>
+Last login: Tue Oct 20 22:29:38 2026 from 10.0.2.2</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ findmnt -o TARGET,SOURCE,FSTYPE /srv/home
 TARGET    SOURCE    FSTYPE
 /srv/home /dev/vdb6 ext4

@@ -37,7 +37,8 @@
 <pre data-where="外（lab@host）"><code>$ vm start
 練習機はもう動いています
   起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
-練習機が起動しました（27秒）
+  起動中… 20秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+練習機が起動しました（37秒）
   入るには:  ssh linuc   （抜けるときは exit）</code></pre>
 <p>「練習機はもう動いています」は、檻を起動したときに練習機の電源も入っていた、という意味である。そのあと起動し終わるまで待ち、かかった秒数を出す（秒数と「起動中…」の行の数は、あなたの PC の速さと、檻を起動してからの時間で変わる。初めての起動では「初回の準備」の行が出ることもある）。最後の行のとおりに入る。<code>ssh</code> は別のコンピュータにログインするコマンドで、<code>linuc</code> は練習機の名前である。</p>
 <pre data-where="外（lab@host）"><code>$ ssh linuc
@@ -53,9 +54,10 @@ Connection to 127.0.0.1 closed.</code></pre>
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console
 
-Last login: Tue Oct 20 20:55:10 2026 from 10.0.2.2</code></pre>
+Last login: Tue Oct 20 22:29:34 2026 from 10.0.2.2</code></pre>
 <p><code>exit</code> で <code>logout</code> と出てプロンプトが <code>lab@host</code> に戻り、<code>ssh linuc</code> でまた入った。2回目には、前に入った日時（<code>Last login:</code>）の行が出る。ここから先は、ことわりの無い限り練習機の中で打つ。</p>
-<p>場所が2つあるのには理由がある。ディスクを区切る操作は、ディスクという装置を、<b>カーネル</b>（OS の中心の部分。OS はコンピュータを動かす土台のソフトウェアで、ここでは Linux。カーネルは装置と、<b>メモリ</b>（動いているプログラムとデータを置く場所）と、<b>プロセス</b>（動いているプログラム）を管理する）を通して直接いじる。ところがコンテナは PC のカーネルを借りて動くので、ディスクの装置を渡してもらえない。そこで檻は、コンテナの中で<b>仮想マシン</b>（ソフトウェアで作った1台のコンピュータ。自分のカーネルを持つ）を1台動かしている。それが練習機である。</p>
+<p>場所が2つあるのには理由がある。先に言葉を3つ決める。<b>OS</b> はコンピュータを動かす土台のソフトウェアで、ここでは Linux である。<b>カーネル</b>は OS の中心の部分で、装置と、<b>メモリ</b>（動いているプログラムとデータを置く場所）と、<b>プロセス</b>（動いているプログラム）を管理する。</p>
+<p>ディスクを区切る操作は、ディスクという装置を、カーネルを通して直接いじる。ところがコンテナは PC のカーネルを借りて動くので、ディスクの装置を渡してもらえない。そこで檻は、コンテナの中で<b>仮想マシン</b>（ソフトウェアで作った1台のコンピュータ。自分のカーネルを持つ）を1台動かしている。それが練習機である。</p>
 <pre><code>あなたの PC
  └─ 檻（コンテナ）           プロンプト lab@host       … 外。vm・virsh・lab を打つ
      └─ 練習機（仮想マシン）  プロンプト student@linuc  … 中。ディスクを区切る・つなぐ</code></pre>
@@ -109,7 +111,7 @@ vde     253:64   0  512M  0 disk</code></pre>
 Filesystem      Size  Used Avail Use% Mounted on
 /dev/root        19G  863M   18G   5% /
 tmpfs           713M     0  713M   0% /dev/shm
-tmpfs           285M  776K  285M   1% /run
+tmpfs           285M  772K  285M   1% /run
 tmpfs           5.0M     0  5.0M   0% /run/lock
 efivarfs        256K   53K  199K  21% /sys/firmware/efi/efivars
 /dev/vda16      881M  181M  639M  23% /boot
@@ -131,7 +133,7 @@ devtmpfs        689M     0  689M   0% /dev</code></pre>
 <div class="then"><b>だめな理由</b>: 出てきたのは <code>vdb</code> ではなく、<code>/dev</code> にマウントされている <code>devtmpfs</code>（カーネルが装置のファイルを置くために、メモリの上に作るファイルシステム。第10章）の行だった。<code>df</code> にファイルの名前を渡すと、「そのファイルが置いてあるファイルシステム」について答える。<code>/dev/vdb</code> は <code>/dev</code> の中のファイルなので、<code>/dev</code> の答えが返ってきた。<code>vdb</code> にはまだファイルシステムが無く、どこにもマウントされていない。<b><code>df</code> が数えられるのは、マウントされているファイルシステムだけ</b>で、<code>vdb</code> の大きさを知りたいなら <code>lsblk</code> を見る。</div></div>
 <p>その <code>/dev/vdb</code> を <code>ls -l</code> で見る。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls -l /dev/vdb
-brw-rw---- 1 root disk 253, 16 Oct 20 20:54 /dev/vdb</code></pre>
+brw-rw---- 1 root disk 253, 16 Oct 20 22:29 /dev/vdb</code></pre>
 <p>先頭の <code>b</code> はブロックデバイス（決まった大きさの塊の単位で、好きな位置を読み書きする装置。ディスクがこれ）で、大きさの欄の <code>253, 16</code> は装置の番号である。中身を持つファイルではなく、カーネルの中のドライバ（装置の動かし方を知っている、カーネルの部品）への入口になっている（主題1.02 のコースの第1章で見た <code>/dev/null</code> の仲間）。ディスクを区切るコマンドもマウントするコマンドも、この名前で相手のディスクを指す。日時の欄は、あなたの画面では違う（このあとの章の <code>ls -l</code> の日時も同じ）。</p>
 <p>最後に、4つの言葉の関係を1つの表示で確かめる。<code>lsblk</code> の <code>-o</code> は、出す列を選ぶオプションで、<code>FSTYPE</code> はファイルシステムの種類を出す列である。装置の名前を並べると、その装置だけを出す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS /dev/vda /dev/vdb

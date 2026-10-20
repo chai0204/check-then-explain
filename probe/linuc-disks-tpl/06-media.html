@@ -29,7 +29,7 @@
 <pre data-where="外（lab@host）"><code>$ virsh attach-device linuc ~/vm/extra/usb-a.xml</code></pre>
 <p>練習機の中で、どの名前のディスクになったかを見る。<code>lsblk</code> の <code>-d</code> はディスクだけを出す（中の区画は出さない）オプションで、<code>TRAN</code> はつながり方（<code>usb</code>・<code>sata</code>・<code>virtio</code>）、<code>SERIAL</code> は装置の製造番号の列である。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ lsblk -d -o NAME,SIZE,TRAN,SERIAL<!--o note="sdb::USB でつながった 64M。製造番号 LAB-USB-A"--></code></pre>
-<p>USB メモリは <code>sdb</code> になった。<code>sda</code>（SATA のディスク）が先にあるので、次の名前の <code>sdb</code> が付いた。USB メモリは区切らずに、ディスク全体に FAT を作ることが多い（ほかの OS のパソコンでもそのまま読めるように）。第1章のたとえで「区画を作らずにディスク全体に倉庫を建てる」と書いた使い方である。</p>
+<p>USB メモリは <code>sdb</code> になった。<code>sda</code>（SATA のディスク）が先にあるので、次の名前の <code>sdb</code> が付いた。この USB メモリは、ここでは区切らずに、ディスク全体に FAT を作る（区画を1つ作ってから、その中に作ってもよい）。第1章のたとえで「区画を作らずにディスク全体に倉庫を建てる」と書いた使い方である。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mkfs.vfat -n STICK_A /dev/sdb
 $ sudo mount /dev/sdb /media/stick</code></pre>
 <p><code>mount point does not exist</code>（マウントポイントが無い）で断られた（2行目は第3章と同じ、<code>dmesg</code> も見よという案内）。<b>マウントポイントは、前もって作っておくただのディレクトリ</b>である。<code>/media</code> は、取り外せるメディアをマウントする場所として決められたディレクトリで（<code>/mnt</code> は一時的に手でつなぐ場所）、その下に作る。マウントポイントの中にもともとあったものがどうなるかも見たいので、目印のファイルを1つ置いてからマウントする。</p>

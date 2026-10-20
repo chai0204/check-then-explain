@@ -31,7 +31,7 @@ $ head -3 /proc/meminfo</code></pre>
 <div class="sgoal"><b>この節で分かること</b>: <code>/proc</code>・<code>/sys</code>・<code>/dev</code> が何で、それぞれ何を見せるか。</div>
 <p>カーネルは、自分が知っている装置やプロセスの情報を、ファイルの形で3つの場所に出している。どれもディスクの上には無い。マウントの一覧で、種類を見る（<code>findmnt</code> の <code>-t</code> は第8章と同じく、種類で絞る）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ findmnt -t proc,sysfs,devtmpfs -o TARGET,SOURCE,FSTYPE</code></pre>
-<p>見出しの TARGET だけが1行目に出て、残りが2行目に回っているのは、第3章の <code>lsblk</code> と同じ util-linux の癖である（いちばん左の列の中身が見出しより短い）。<code>proc</code>（procfs とも呼ぶ）・<code>sysfs</code>・<code>devtmpfs</code> は、どれもカーネルがメモリの上に作るファイルシステムである。</p>
+<p>見出しの TARGET だけが1行目に出て、残りが2行目に回っているのは、第3章の <code>lsblk</code> と同じ癖である（<code>findmnt</code> では、TARGET の列の中身がすべて見出しより短いと、その後ろの見出しを次の行に回す）。<code>proc</code>（procfs とも呼ぶ）・<code>sysfs</code>・<code>devtmpfs</code> は、どれもカーネルがメモリの上に作るファイルシステムである。</p>
 <div class="scroll"><table>
 <tr><th>窓</th><th>見せ方</th><th>何のためにあるか</th></tr>
 <tr><td><code>/proc</code>（proc）</td><td>カーネルとプロセスの状態を表にしたファイル（<code>cpuinfo</code>・<code>meminfo</code>・<code>partitions</code>・<code>swaps</code> など）</td><td>状態を人やコマンドが読む。<code>lscpu</code>・<code>free</code>・<code>swapon -s</code> はここを読む</td></tr>

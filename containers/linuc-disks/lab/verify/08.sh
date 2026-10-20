@@ -14,7 +14,8 @@ bs=$(sed -nE 's/^Block size: *([0-9]+)$/\1/p' <<<"$fsinfo")
 fsb=$(( ${bc:-0} * ${bs:-0} ))
 mib() { echo $(( $1 / 1048576 )); }
 
-in_vg() { awk -v d="$1" '$1==d && $2=="vg0"{f=1} END{exit !f}' <<<"$pvs"; }
+# 物理ボリュームは、ディスクそのもの（/dev/vdc）でも、その区画（/dev/vdc1。第3章の種類 8e）でもよい
+in_vg() { awk -v d="$1" '($1==d || $1 ~ ("^" d "[0-9]+$")) && $2=="vg0"{f=1} END{exit !f}' <<<"$pvs"; }
 echo "判定 : 観測型（LVM の表と、vg0/data の中の ext4 の大きさを別々に読んで比べた）"
 pvlist=$(awk '$2=="vg0"{print $1}' <<<"$pvs" | paste -sd ' ')
 echo "観測 : vg0 の物理ボリューム = ${pvlist:-（無い。ボリュームグループ vg0 がまだ無い）}"
@@ -30,8 +31,8 @@ else
 fi
 
 ng=0
-in_vg /dev/vdc || { echo "       → /dev/vdc が vg0 に入っていない"; ng=1; }
-in_vg /dev/sda || { echo "       → /dev/sda が vg0 に入っていない"; ng=1; }
+in_vg /dev/vdc || { echo "       → /dev/vdc（かその区画）が vg0 に入っていない"; ng=1; }
+in_vg /dev/sda || { echo "       → /dev/sda（かその区画）が vg0 に入っていない"; ng=1; }
 [ "$lv" -gt 1073741824 ] || { echo "       → vg0/data が 1GiB を超えていない（どちらか1台に収まる大きさ）"; ng=1; }
 case "$devs" in *vdc*sda*|*sda*vdc*) ;; *) echo "       → vg0/data が2台にまたがっていない"; ng=1;; esac
 if [ "$fsb" -le 0 ]; then ng=1

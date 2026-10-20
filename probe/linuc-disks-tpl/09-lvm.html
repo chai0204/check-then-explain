@@ -27,7 +27,7 @@ $ sudo pvs</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo vgcreate vg0 /dev/vdc /dev/sda
 $ sudo vgs
 $ sudo vgdisplay vg0<!--o note="VG Size::池の大きさ;;PE Size::区切り1つの大きさ;;Total PE::区切りの数;;VG UUID::作るたびに変わる番号（あなたの画面では違う）"--></code></pre>
-<p><code>vgcreate</code> は、物理ボリュームをまとめて<b>ボリュームグループ</b>（VG）にするコマンドで、ここでは <code>vg0</code> という名前にした。1G の2台で 1.99GiB の池ができている（管理情報の分だけ少し小さい）。<code>vgdisplay</code> は詳しい表示で、池の中は 4MiB ごとの区切り（物理エクステント、PE）で管理されていると分かる。池から<b>論理ボリューム</b>（LV）を切り出す。論理ボリュームは、パーティションの代わりに使う箱である。</p>
+<p><code>vgcreate</code> は、物理ボリュームをまとめて<b>ボリュームグループ</b>（VG）にするコマンドで、ここでは <code>vg0</code> という名前にした。1G の2台で 1.99GiB の池ができている（2GiB より少し小さい理由は、すぐ下で）。<code>vgdisplay</code> は詳しい表示で、池の中は 4MiB ごとの区切り（物理エクステント、PE）で管理されていると分かる。Total PE の 510 個は 510 × 4MiB = 2040MiB、1台あたり 1020MiB である。1台 1024MiB のうち、先頭の 1MiB を LVM が自分の管理情報に使い、残りの 1023MiB を 4MiB ずつ区切った端数の 3MiB も使えないので、1020MiB になる（章の最後の <code>pvs</code> の PSize に、この 1020.00m が出る）。池から<b>論理ボリューム</b>（LV）を切り出す。論理ボリュームは、パーティションの代わりに使う箱である。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo lvcreate -L 600M -n data vg0
 $ sudo lvs
 $ ls -l /dev/vg0/data /dev/mapper/vg0-data</code></pre>
@@ -66,7 +66,7 @@ $ df -h /srv/data</code></pre>
 <br>ただし<b>崩れる点</b>: 人なら棚が広がったことに見れば気づくが、ファイルシステムは自分から外側を測り直さない。<code>resize2fs</code> で「棚はここまである」と書き直してもらう必要がある。</div>
 
 <h2 id="shrink">箱を縮める</h2>
-<div class="sgoal"><b>この節で分かること</b>: 縮めるときの順番と、縮められないファイルシステムがあること。</div>
+<div class="sgoal"><b>この節で分かること</b>: 縮めるときの順番と、XFS を縮めようとしたらどうなるか。</div>
 <p>縮めるときは順番が逆になる。先に中身（ファイルシステム）を縮め、そのあとで箱を縮める。逆にすると、箱からはみ出した中身が壊れる。<code>lvreduce</code>（論理ボリュームを縮めるコマンド）に <code>-r</code> を付けると、この順番でやる。ext4 はマウントしたままでは縮められないので、先に外す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo umount /srv/data
 $ sudo lvreduce -r -L 1.2G vg0/data
@@ -81,11 +81,11 @@ $ sudo lvreduce -r -L 200M vg0/logs
 $ sudo umount /srv/logs
 $ sudo lvremove -y vg0/logs
 $ sudo rmdir /srv/logs</code></pre>
-<p><b>XFS は縮められない</b>（<code>Xfs filesystem shrinking is unsupported</code>）。箱を縮める前に止まったので、データは無事である。XFS を小さくしたいときは、別の場所に退避して作り直すしかない。<code>lvremove</code> は論理ボリュームを消すコマンドで、<code>-y</code> は確認の問いに「はい」と答えておくオプションである。</p>
+<p><code>lvreduce -r</code> は「XFS は縮められない」（<code>Xfs filesystem shrinking is unsupported</code>）と断った。箱を縮める前に止まったので、データは無事である。XFS には縮めるしくみがほぼ無く、試験では「XFS は縮められない」と答える（この練習機の xfsprogs 6.6 にも、末尾の空いている部分だけを縮める試験的な機能（<code>xfs_growfs -D</code>）があるが、ふつう XFS を小さくしたいときは、別の場所に退避して作り直す）。<code>lvremove</code> は論理ボリュームを消すコマンドで、<code>-y</code> は確認の問いに「はい」と答えておくオプションである。</p>
 <div class="scroll"><table>
 <tr><th>ファイルシステム</th><th>広げる</th><th>縮める</th><th>この章の記録</th></tr>
 <tr><td>ext4</td><td>マウントしたまま（<code>resize2fs</code>）</td><td>外してから（<code>resize2fs</code>）</td><td>マウントしたまま広げ、外して 1.2G に縮めた</td></tr>
-<tr><td>XFS</td><td>マウントしたまま（<code>xfs_growfs</code>）</td><td><b>できない</b></td><td><code>lvreduce -r</code> が止めた</td></tr>
+<tr><td>XFS</td><td>マウントしたまま（<code>xfs_growfs</code>）</td><td><b><code>lvreduce -r</code> が断る</b>（試験では「できない」）</td><td><code>lvreduce -r</code> が止めた</td></tr>
 </table></div>
 
 <h2 id="snapshot">スナップショットで、消したファイルを取り戻す</h2>
@@ -138,7 +138,7 @@ $ sudo lvs -o lv_name,lv_size,devices vg0</code></pre>
 <p>スナップショットは元の中身を丸ごと写さず、元が書き換えられるブロックの「書き換える前」だけを退避するので、要る大きさは作ってから変わる量で決まる。使い切るとスナップショットは使えなくなり、作った時点の姿を読めなくなる（元の論理ボリュームは影響を受けない）。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
-<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>LVM は3段: 物理ボリューム（<code>pvcreate</code>）→ ボリュームグループ（<code>vgcreate</code>）→ 論理ボリューム（<code>lvcreate</code>）。ファイルシステムは論理ボリュームの中に作る</li><li>論理ボリュームは複数のディスクにまたがれるので、1台より大きな箱を作れる。ただし1台壊れれば道連れになる</li><li><code>lvextend</code> が広げるのは箱だけ。中身は <code>resize2fs</code>（ext4）・<code>xfs_growfs</code>（XFS）で広げるか、<code>lvextend -r</code> で続けて広げる</li><li>縮めるのは中身が先、箱が後（<code>lvreduce -r</code>）。ext4 は外してから縮められ、XFS は縮められない</li><li>スナップショットは書き換えられる前のブロックだけを退避するので、大きさは「変わる量」で決まる。<code>Data%</code> が 100% になると使えなくなる</li></ul></div>
+<div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>LVM は3段: 物理ボリューム（<code>pvcreate</code>）→ ボリュームグループ（<code>vgcreate</code>）→ 論理ボリューム（<code>lvcreate</code>）。ファイルシステムは論理ボリュームの中に作る</li><li>論理ボリュームは複数のディスクにまたがれるので、1台より大きな箱を作れる。ただし1台壊れれば道連れになる</li><li><code>lvextend</code> が広げるのは箱だけ。中身は <code>resize2fs</code>（ext4）・<code>xfs_growfs</code>（XFS）で広げるか、<code>lvextend -r</code> で続けて広げる</li><li>縮めるのは中身が先、箱が後（<code>lvreduce -r</code>）。ext4 は外してから縮められ、XFS は <code>lvreduce -r</code> が断る（試験では「XFS は縮められない」と答える）</li><li>スナップショットは書き換えられる前のブロックだけを退避するので、大きさは「変わる量」で決まる。<code>Data%</code> が 100% になると使えなくなる</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:disks-1.1.0@sha256:__DIGEST__ / 外側 Ubuntu 24.04.5 LTS・QEMU 8.2.2（KVM なしの完全エミュレーション）・libvirt 10.0.0 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic・lvm2 2.03.16・e2fsprogs 1.47.0・xfsprogs 6.6.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64・端末 80 桁 × 24 行で、第1章から順に1つの練習機で打って検証 / 検証日 2026-10-20</div>
 <nav class="pager"><a href="/linuc-disks/theory/08-swap">← 8. スワップと、メモリの上のファイルシステム（tmpfs）</a><a href="/linuc-disks/theory/10-hardware">次: 10. 部品の情報を読む →</a></nav>
 <section id="comments">

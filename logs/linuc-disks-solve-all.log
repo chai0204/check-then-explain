@@ -1,8 +1,8 @@
 # 台本（probe/linuc-disks-solve-all.txt）の端末ブロックから機械的に作った入力を、読者と同じ起動（docker run -d … 名前付きボリューム2つ、
 # docker exec -it … bash -l、umask 022、TERM=xterm）の端末に、最初から順に、本文の順に1行ずつ打った記録。
 # 端末 80 桁 × 24 行。外と練習機の中は data-where で打ち分けた。作り方: python3 -I probe/linuc-disks-seq.py
-# イメージ lab-linuc-disks:1.1.0（sha256:c3afc890516f15088bffedbe6adc15beb14ec437bf5259570872fc15c16f27ce）
-# 開始 2026-10-20 20:39:03
+# イメージ lab-linuc-disks:1.1.0（sha256:1b7f451f63d30360bb08e149087151d5ec5ddb392bb49cbdc076964bdd33a5c7）
+# 開始 2026-10-20 22:28:50
 
 # --- 端末1: docker exec -it linuc-disks-r11-solve bash -l で入ったときの表示 ---
 練習機 linuc: running（エージェント 応答なし / ssh まだ）
@@ -45,7 +45,8 @@ lab-linuc-disks  進捗 0/10
 $ vm start
 練習機はもう動いています
   起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
-練習機が起動しました（30秒）
+  起動中… 20秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
+練習機が起動しました（38秒）
   入るには:  ssh linuc   （抜けるときは exit）
 
 $ lab check
@@ -65,8 +66,9 @@ $ lab check
 ⚠ 04 この環境では判定できません
   前提不足: /dev/vdb にパーティションが6つありません（先に演習03 の切り方にしてください）
 ✗ 05 未達
-  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べた）
+  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べ、イメージがマウントされたままかを見た）
   観測 : ~/message.txt  = （無い）
+         イメージのマウント先 = （どこにもマウントされていない）
          → ホームに message.txt が無い（イメージの中から取り出す）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 05
 ✗ 06 未達
@@ -86,6 +88,7 @@ $ lab check
   観測 : 判定の前の値             = 1
          add イベントの後の値     = 1
          rotational を書く udev の規則 = （/etc/udev/rules.d に見当たらない）
+         （判定の後、値は判定の前の 1 に戻した）
          → 判定の前も後も 1（vdb は回転する装置として扱われている）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 09
 ✗ 10 未達
@@ -119,7 +122,7 @@ $ lab start 01
 
   vde（512M）は、区画もファイルシステムも無い、空のディスクです。
   見出しの NAME だけが1行目に出て、残りの見出しが2行目に回っているのは、
-  いちばん左の列の中身（vde の3文字）が見出し（NAME の4文字）より短いときの
+  NAME の列の中身（vde の3文字）が見出し（NAME の4文字）より短いときの
   lsblk の表示の癖です。表の中身は同じです。
   第2章で vdb にしたことを、このディスクでやります。
 
@@ -172,7 +175,7 @@ $ lab show
 
   vde（512M）は、区画もファイルシステムも無い、空のディスクです。
   見出しの NAME だけが1行目に出て、残りの見出しが2行目に回っているのは、
-  いちばん左の列の中身（vde の3文字）が見出し（NAME の4文字）より短いときの
+  NAME の列の中身（vde の3文字）が見出し（NAME の4文字）より短いときの
   lsblk の表示の癖です。表の中身は同じです。
   第2章で vdb にしたことを、このディスクでやります。
 
@@ -218,7 +221,7 @@ Changes will remain in memory only, until you decide to write them.
 Be careful before using the write command.
 
 Device does not contain a recognized partition table.
-Created a new DOS (MBR) disklabel with disk identifier 0x5be19f6a.
+Created a new DOS (MBR) disklabel with disk identifier 0x939eac96.
 
 Command (m for help): n
 Partition type
@@ -437,10 +440,96 @@ $ lab check 03
   観測 : /dev/vdb に表が無い
   → この事実から何が欠けているか考えてください。詰まったら lab hint 03
 
-# --- 3番の種類を 8300 のまま作った ---
+# --- 3番の種類を 8300 のまま作った（模範解答と同じ対話の gdisk で）---
 
-$ sudo sgdisk -o -n 1:0:+100M -t 1:ef00 -n 2:0:+300M -t 2:8300 -n 3:0:+256M -t 3:8300 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+$ sudo gdisk /dev/vdb
+GPT fdisk (gdisk) version 1.0.10
+
+Partition table scan:
+  MBR: not present
+  BSD: not present
+  APM: not present
+  GPT: not present
+
 Creating new GPT entries in memory.
+
+Command (? for help): o
+This option deletes all partitions and creates a new protective MBR.
+Proceed? (Y/N): Y
+
+Command (? for help): n
+Partition number (1-128, default 1):
+First sector (34-4194270, default = 2048) or {+-}size{KMGTP}:
+Last sector (2048-4194270, default = 4192255) or {+-}size{KMGTP}: +100M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): ef00
+Changed type of partition to 'EFI system partition'
+
+Command (? for help): n
+Partition number (2-128, default 2):
+First sector (34-4194270, default = 206848) or {+-}size{KMGTP}:
+Last sector (206848-4194270, default = 4192255) or {+-}size{KMGTP}: +300M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (3-128, default 3):
+First sector (34-4194270, default = 821248) or {+-}size{KMGTP}:
+Last sector (821248-4194270, default = 4192255) or {+-}size{KMGTP}: +256M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (4-128, default 4):
+First sector (34-4194270, default = 1345536) or {+-}size{KMGTP}:
+Last sector (1345536-4194270, default = 4192255) or {+-}size{KMGTP}: +600M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (5-128, default 5):
+First sector (34-4194270, default = 2574336) or {+-}size{KMGTP}:
+Last sector (2574336-4194270, default = 4192255) or {+-}size{KMGTP}: +400M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (6-128, default 6):
+First sector (34-4194270, default = 3393536) or {+-}size{KMGTP}:
+Last sector (3393536-4194270, default = 4192255) or {+-}size{KMGTP}:
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300):
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): p
+Disk /dev/vdb: 4194304 sectors, 2.0 GiB
+Sector size (logical/physical): 512/512 bytes
+Disk identifier (GUID): 8E1CEBFB-D3DF-49E7-B43B-1DC9D3253C2A
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 4194270
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 4029 sectors (2.0 MiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048          206847   100.0 MiB   EF00  EFI system partition
+   2          206848          821247   300.0 MiB   8300  Linux filesystem
+   3          821248         1345535   256.0 MiB   8300  Linux filesystem
+   4         1345536         2574335   600.0 MiB   8300  Linux filesystem
+   5         2574336         3393535   400.0 MiB   8300  Linux filesystem
+   6         3393536         4192255   390.0 MiB   8300  Linux filesystem
+
+Command (? for help): w
+
+Final checks complete. About to write GPT data. THIS WILL OVERWRITE EXISTING
+PARTITIONS!!
+
+Do you want to proceed? (Y/N): Y
+OK; writing new GUID partition table (GPT) to /dev/vdb.
 The operation has completed successfully.
 
 $ lab check 03
@@ -456,7 +545,96 @@ $ lab check 03
          → vdb3 の種類が Linux filesystem（課題の表では Linux swap）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 03
 
-$ sudo sgdisk -o -n 1:0:+100M -t 1:ef00 -n 2:0:+300M -t 2:8300 -n 3:0:+256M -t 3:8200 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+# --- 模範解答: 対話の gdisk で、3番を 8200 にして作り直す ---
+
+$ sudo gdisk /dev/vdb
+GPT fdisk (gdisk) version 1.0.10
+
+Partition table scan:
+  MBR: protective
+  BSD: not present
+  APM: not present
+  GPT: present
+
+Found valid GPT with protective MBR; using GPT.
+
+Command (? for help): o
+This option deletes all partitions and creates a new protective MBR.
+Proceed? (Y/N): Y
+
+Command (? for help): n
+Partition number (1-128, default 1):
+First sector (34-4194270, default = 2048) or {+-}size{KMGTP}:
+Last sector (2048-4194270, default = 4192255) or {+-}size{KMGTP}: +100M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): ef00
+Changed type of partition to 'EFI system partition'
+
+Command (? for help): n
+Partition number (2-128, default 2):
+First sector (34-4194270, default = 206848) or {+-}size{KMGTP}:
+Last sector (206848-4194270, default = 4192255) or {+-}size{KMGTP}: +300M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (3-128, default 3):
+First sector (34-4194270, default = 821248) or {+-}size{KMGTP}:
+Last sector (821248-4194270, default = 4192255) or {+-}size{KMGTP}: +256M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8200
+Changed type of partition to 'Linux swap'
+
+Command (? for help): n
+Partition number (4-128, default 4):
+First sector (34-4194270, default = 1345536) or {+-}size{KMGTP}:
+Last sector (1345536-4194270, default = 4192255) or {+-}size{KMGTP}: +600M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (5-128, default 5):
+First sector (34-4194270, default = 2574336) or {+-}size{KMGTP}:
+Last sector (2574336-4194270, default = 4192255) or {+-}size{KMGTP}: +400M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (6-128, default 6):
+First sector (34-4194270, default = 3393536) or {+-}size{KMGTP}:
+Last sector (3393536-4194270, default = 4192255) or {+-}size{KMGTP}:
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300):
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): p
+Disk /dev/vdb: 4194304 sectors, 2.0 GiB
+Sector size (logical/physical): 512/512 bytes
+Disk identifier (GUID): B55B5EF4-846E-4D75-AD28-FDB4008CD84B
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 4194270
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 4029 sectors (2.0 MiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048          206847   100.0 MiB   EF00  EFI system partition
+   2          206848          821247   300.0 MiB   8300  Linux filesystem
+   3          821248         1345535   256.0 MiB   8200  Linux swap
+   4         1345536         2574335   600.0 MiB   8300  Linux filesystem
+   5         2574336         3393535   400.0 MiB   8300  Linux filesystem
+   6         3393536         4192255   390.0 MiB   8300  Linux filesystem
+
+Command (? for help): w
+
+Final checks complete. About to write GPT data. THIS WILL OVERWRITE EXISTING
+PARTITIONS!!
+
+Do you want to proceed? (Y/N): Y
+OK; writing new GUID partition table (GPT) to /dev/vdb.
 The operation has completed successfully.
 
 $ lsblk -o NAME,SIZE,PARTTYPENAME /dev/vdb
@@ -467,7 +645,7 @@ vdb       2G
 ├─vdb3  256M Linux swap
 ├─vdb4  600M Linux filesystem
 ├─vdb5  400M Linux filesystem
-└─vdb6  391M Linux filesystem
+└─vdb6  390M Linux filesystem
 
 $ lab check 03
 ✔ 03 達成
@@ -493,7 +671,7 @@ vdb       2G
 ├─vdb3  256M
 ├─vdb4  600M
 ├─vdb5  400M
-└─vdb6  391M
+└─vdb6  390M
 
 $ lab check 04
 ✗ 04 未達
@@ -520,7 +698,7 @@ $ sudo mkfs -t ext3 -L NEWBOOT /dev/vdb2
 mke2fs 1.47.0 (5-Feb-2023)
 Discarding device blocks: done
 Creating filesystem with 76800 4k blocks and 76800 inodes
-Filesystem UUID: 35f5bcfb-3737-43bc-8a47-1ad9394fa143
+Filesystem UUID: 34ab6a07-573d-4f1c-b180-55f115cc1c55
 Superblock backups stored on blocks:
 	32768
 
@@ -554,7 +732,7 @@ NOTE: several default settings have changed in version 5.15, please make sure
       - enabled free-space-tree (-R free-space-tree)
 
 Label:              VAR
-UUID:               2c039a3f-a19e-4a19-93d5-c850962a6ef8
+UUID:               bf026134-58ae-40ae-bdf3-38624544f294
 Node size:          16384
 Sector size:        4096
 Filesystem size:    400.00MiB
@@ -575,10 +753,10 @@ Devices:
 $ sudo mkfs.ext4 -L HOME /dev/vdb6
 mke2fs 1.47.0 (5-Feb-2023)
 Discarding device blocks: done
-Creating filesystem with 100091 4k blocks and 100096 inodes
-Filesystem UUID: e5f61e55-80a8-445a-9a60-c2e8da5fad8c
+Creating filesystem with 99840 4k blocks and 99840 inodes
+Filesystem UUID: 8ae9c059-a54b-4252-8ad5-eca736cde9b2
 Superblock backups stored on blocks:
-	32768, 98304
+	32720, 98160
 
 Allocating group tables: done
 Writing inode tables: done
@@ -590,38 +768,38 @@ Writing superblocks and filesystem accounting information: done
 $ lab check 04
 ✗ 04 未達
   判定 : 観測型（各パーティションのファイルシステムの印を直接読んだ）
-  観測 : vdb1 = vfat
+  観測 : vdb1 = vfat（FAT32）
          vdb2 = ext3 ラベル NEWBOOT
          vdb4 = xfs ラベル ROOT
          vdb5 = btrfs ラベル VAR
          vdb6 = ext4 ラベル HOME
-         vdb6 の予約ブロック = 5004 / 100091 ブロック（5.0%）
+         vdb6 の予約ブロック = 4909 / 99840 ブロック（4.9%）
          → 予約が 1% ではない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 04
 
 $ sudo tune2fs -m 1 /dev/vdb6
 tune2fs 1.47.0 (5-Feb-2023)
-Setting reserved blocks percentage to 1% (1000 blocks)
+Setting reserved blocks percentage to 1% (998 blocks)
 
 $ lsblk -o NAME,FSTYPE,LABEL,UUID /dev/vdb
 NAME   FSTYPE LABEL   UUID
 vdb
-├─vdb1 vfat           36F9-AFBF
-├─vdb2 ext3   NEWBOOT 35f5bcfb-3737-43bc-8a47-1ad9394fa143
+├─vdb1 vfat           D490-A3A5
+├─vdb2 ext3   NEWBOOT 34ab6a07-573d-4f1c-b180-55f115cc1c55
 ├─vdb3
-├─vdb4 xfs    ROOT    892db930-c1a8-46a0-85f0-70edc2ee5a27
-├─vdb5 btrfs  VAR     2c039a3f-a19e-4a19-93d5-c850962a6ef8
-└─vdb6 ext4   HOME    e5f61e55-80a8-445a-9a60-c2e8da5fad8c
+├─vdb4 xfs    ROOT    4f745153-d8fa-4a9f-8560-5e4614c9cde9
+├─vdb5 btrfs  VAR     bf026134-58ae-40ae-bdf3-38624544f294
+└─vdb6 ext4   HOME    8ae9c059-a54b-4252-8ad5-eca736cde9b2
 
 $ lab check 04
 ✔ 04 達成
   判定 : 観測型（各パーティションのファイルシステムの印を直接読んだ）
-  観測 : vdb1 = vfat
+  観測 : vdb1 = vfat（FAT32）
          vdb2 = ext3 ラベル NEWBOOT
          vdb4 = xfs ラベル ROOT
          vdb5 = btrfs ラベル VAR
          vdb6 = ext4 ラベル HOME
-         vdb6 の予約ブロック = 1000 / 100091 ブロック（1.0%）
+         vdb6 の予約ブロック = 998 / 99840 ブロック（1.0%）
          5つの種類のファイルシステムができ、vdb6 は root 用の予約が 1% になっている
          → df の Avail が Size − Used より小さかった分の大半は、この予約（残りは ext4 が自分用に取る reserved_clusters）
 
@@ -629,12 +807,13 @@ $ lab check 04
 ========== 5. 演習05 — ディスクのイメージのファイルから、中のファイルを取り出す ==========
 
 $ ls -l ~/old-usb.img
--rw-r--r-- 1 student student 16777216 Oct 20 20:39 /home/student/old-usb.img
+-rw-r--r-- 1 student student 16777216 Oct 20 22:29 /home/student/old-usb.img
 
 $ lab check 05
 ✗ 05 未達
-  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べた）
+  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べ、イメージがマウントされたままかを見た）
   観測 : ~/message.txt  = （無い）
+         イメージのマウント先 = （どこにもマウントされていない）
          → ホームに message.txt が無い（イメージの中から取り出す）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 05
 
@@ -649,19 +828,32 @@ NAME       SIZELIMIT OFFSET AUTOCLEAR RO BACK-FILE                 DIO LOG-SEC
 
 $ ls -l /mnt
 total 2
--rwxr-xr-x 1 root root 47 Oct 20 20:39 message.txt
+-rwxr-xr-x 1 root root 47 Oct 20 22:29 message.txt
 
 # --- マウントしただけ（まだ取り出していない）---
 
 $ lab check 05
 ✗ 05 未達
-  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べた）
+  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べ、イメージがマウントされたままかを見た）
   観測 : ~/message.txt  = （無い）
          old-usb.img につながったループデバイス = /dev/loop0 /home/student/old-usb.img
+         イメージのマウント先 = /mnt
          → ホームに message.txt が無い（イメージの中から取り出す）
+         → イメージがまだマウントされている（/mnt）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 05
 
 $ cp /mnt/message.txt ~/
+
+# --- 取り出したが、まだマウントしたまま ---
+
+$ lab check 05
+✗ 05 未達
+  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べ、イメージがマウントされたままかを見た）
+  観測 : ~/message.txt  = 伝言: 3 番の棚の鍵は、青い箱の中
+         old-usb.img につながったループデバイス = /dev/loop0 /home/student/old-usb.img
+         イメージのマウント先 = /mnt
+         → イメージがまだマウントされている（/mnt）
+  → この事実から何が欠けているか考えてください。詰まったら lab hint 05
 
 $ sudo umount /mnt
 
@@ -670,8 +862,9 @@ $ cat ~/message.txt
 
 $ lab check 05
 ✔ 05 達成
-  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べた）
+  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べ、イメージがマウントされたままかを見た）
   観測 : ~/message.txt  = 伝言: 3 番の棚の鍵は、青い箱の中
+         イメージのマウント先 = （どこにもマウントされていない）
          ファイルのままのディスクのイメージをマウントして、中のファイルを取り出せた
          → ループデバイスを通すと、ファイルも装置と同じようにマウントできる
 
@@ -762,7 +955,7 @@ $ lab check 06
 
 $ free -h
                total        used        free      shared  buff/cache   available
-Mem:           1.4Gi       247Mi       1.1Gi       816Ki       197Mi       1.1Gi
+Mem:           1.4Gi       246Mi       1.1Gi       816Ki       197Mi       1.2Gi
 Swap:             0B          0B          0B
 
 $ swapon --show
@@ -774,13 +967,14 @@ $ lab check 07
          判定の前に使われていたか = いいえ
          /etc/fstab のスワップの行 = （無い）
          swapon -a の後に使われているか = いいえ
+         （判定の後、vdb3 は判定の前と同じ状態に戻した）
          → vdb3 がスワップ領域として作られていない
          → /etc/fstab から有効にすると、vdb3 は使われない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 07
 
 $ sudo mkswap -L SWAP /dev/vdb3
 Setting up swapspace version 1, size = 256 MiB (268431360 bytes)
-LABEL=SWAP, UUID=091089aa-9f9c-4872-8674-8d18f5a11475
+LABEL=SWAP, UUID=f5ee32fd-97aa-4680-bdbf-d20ad1d126b1
 
 $ sudo swapon /dev/vdb3
 
@@ -797,8 +991,15 @@ $ lab check 07
          判定の前に使われていたか = はい
          /etc/fstab のスワップの行 = （無い）
          swapon -a の後に使われているか = いいえ
+         （判定の後、vdb3 は判定の前と同じ状態に戻した）
          → /etc/fstab から有効にすると、vdb3 は使われない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 07
+
+# --- 判定の後も、vdb3 は判定の前と同じく使われているか ---
+
+$ swapon --show
+NAME      TYPE      SIZE USED PRIO
+/dev/vdb3 partition 256M   0B   -2
 
 # --- /etc/fstab にデバイス名で書いた ---
 
@@ -809,16 +1010,17 @@ $ lab check 07
 ✗ 07 未達
   判定 : 観測型（vdb3 をいったん swapoff し、起動時と同じ swapon -a を1回実行して、戻るかを見た）
   観測 : vdb3 の中身              = swap
-         判定の前に使われていたか = いいえ
+         判定の前に使われていたか = はい
          /etc/fstab のスワップの行 = /dev/vdb3（実体: /dev/vdb3）
          swapon -a の後に使われているか = はい
+         （判定の後、vdb3 は判定の前と同じ状態に戻した）
          → /etc/fstab の行がデバイス名（/dev/vd…）で書かれている
   → この事実から何が欠けているか考えてください。詰まったら lab hint 07
 
 $ sudo sed -i '/^\/dev\/vdb3 /d' /etc/fstab
 
 $ echo "UUID=$(sudo blkid -s UUID -o value /dev/vdb3)  none  swap  sw  0  0" | sudo tee -a /etc/fstab
-UUID=091089aa-9f9c-4872-8674-8d18f5a11475  none  swap  sw  0  0
+UUID=f5ee32fd-97aa-4680-bdbf-d20ad1d126b1  none  swap  sw  0  0
 
 $ sudo systemctl daemon-reload
 
@@ -827,8 +1029,9 @@ $ lab check 07
   判定 : 観測型（vdb3 をいったん swapoff し、起動時と同じ swapon -a を1回実行して、戻るかを見た）
   観測 : vdb3 の中身              = swap
          判定の前に使われていたか = はい
-         /etc/fstab のスワップの行 = UUID=091089aa-9f9c-4872-8674-8d18f5a11475（実体: /dev/vdb3）
+         /etc/fstab のスワップの行 = UUID=f5ee32fd-97aa-4680-bdbf-d20ad1d126b1（実体: /dev/vdb3）
          swapon -a の後に使われているか = はい
+         （判定の後、vdb3 は判定の前と同じ状態に戻した）
          /etc/fstab の行から vdb3 が有効になった → 再起動しても、このスワップは使われる
 
 
@@ -875,9 +1078,8 @@ $ lab check 08
          → vg0/data が2台にまたがっていない
   → この事実から何が欠けているか考えてください。詰まったら lab hint 08
 
-$ sudo lvextend -L 1.2G vg0/data
-  Rounding size to boundary between physical extents: 1.20 GiB.
-  Size of logical volume vg0/data changed from 600.00 MiB (150 extents) to 1.20 GiB (308 extents).
+$ sudo lvextend -L +600M vg0/data
+  Size of logical volume vg0/data changed from 600.00 MiB (150 extents) to 1.17 GiB (300 extents).
   Logical volume vg0/data successfully resized.
 
 $ df -h /srv/data
@@ -890,27 +1092,27 @@ $ lab check 08
 ✗ 08 未達
   判定 : 観測型（LVM の表と、vg0/data の中の ext4 の大きさを別々に読んで比べた）
   観測 : vg0 の物理ボリューム = /dev/sda /dev/vdc
-         vg0/data の大きさ     = 1232 MiB（使っている物理ボリューム: /dev/vdc(0),/dev/sda(0)）
+         vg0/data の大きさ     = 1200 MiB（使っている物理ボリューム: /dev/vdc(0),/dev/sda(0)）
          中の ext4 の大きさ    = 600 MiB
-         → 箱（LV）は 1232 MiB なのに、中身（ext4）は 600 MiB のまま
+         → 箱（LV）は 1200 MiB なのに、中身（ext4）は 600 MiB のまま
   → この事実から何が欠けているか考えてください。詰まったら lab hint 08
 
 $ sudo resize2fs /dev/vg0/data
 resize2fs 1.47.0 (5-Feb-2023)
 Filesystem at /dev/vg0/data is mounted on /srv/data; on-line resizing required
 old_desc_blocks = 1, new_desc_blocks = 1
-The filesystem on /dev/vg0/data is now 315392 (4k) blocks long.
+The filesystem on /dev/vg0/data is now 307200 (4k) blocks long.
 
 $ df -h /srv/data
 Filesystem            Size  Used Avail Use% Mounted on
-/dev/mapper/vg0-data  1.2G   24K  1.2G   1% /srv/data
+/dev/mapper/vg0-data  1.2G   24K  1.1G   1% /srv/data
 
 $ lab check 08
 ✔ 08 達成
   判定 : 観測型（LVM の表と、vg0/data の中の ext4 の大きさを別々に読んで比べた）
   観測 : vg0 の物理ボリューム = /dev/sda /dev/vdc
-         vg0/data の大きさ     = 1232 MiB（使っている物理ボリューム: /dev/vdc(0),/dev/sda(0)）
-         中の ext4 の大きさ    = 1232 MiB
+         vg0/data の大きさ     = 1200 MiB（使っている物理ボリューム: /dev/vdc(0),/dev/sda(0)）
+         中の ext4 の大きさ    = 1200 MiB
          1台より大きな箱が2台にまたがってでき、中身の ext4 も箱いっぱいに広がっている
          → 箱と中身は別の段。広げるときは両方を広げる（lvextend -r か resize2fs）
 
@@ -934,6 +1136,7 @@ $ lab check 09
   観測 : 判定の前の値             = 1
          add イベントの後の値     = 1
          rotational を書く udev の規則 = （/etc/udev/rules.d に見当たらない）
+         （判定の後、値は判定の前の 1 に戻した）
          → 判定の前も後も 1（vdb は回転する装置として扱われている）
   → この事実から何が欠けているか考えてください。詰まったら lab hint 09
 
@@ -948,8 +1151,14 @@ $ lab check 09
   観測 : 判定の前の値             = 0
          add イベントの後の値     = 1
          rotational を書く udev の規則 = （/etc/udev/rules.d に見当たらない）
+         （判定の後、値は判定の前の 0 に戻した）
          → 判定の前は 0 だったが、起動時と同じイベントの後は 1 に戻った
   → この事実から何が欠けているか考えてください。詰まったら lab hint 09
+
+# --- 判定の後、値は判定の前の 0 に戻っているか ---
+
+$ cat /sys/block/vdb/queue/rotational
+0
 
 $ echo 'ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"' | sudo tee /etc/udev/rules.d/60-lab-ssd.rules
 ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}="0"
@@ -957,14 +1166,15 @@ ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vdb", ATTR{queue/rotational}=
 $ sudo udevadm trigger --action=add --subsystem-match=block --sysname-match=vdb --settle
 
 $ cat /sys/block/vdb/queue/rotational
-1
+0
 
 $ lab check 09
 ✔ 09 達成
   判定 : 観測型（rotational をいったん 1 に戻し、起動時と同じ add イベントを udev に1回送って、値を読んだ）
-  観測 : 判定の前の値             = 1
+  観測 : 判定の前の値             = 0
          add イベントの後の値     = 0
          rotational を書く udev の規則 = /etc/udev/rules.d/60-lab-ssd.rules
+         （判定の後、値は判定の前の 0 に戻した）
          起動時と同じイベントを受けて、udev が 0 に書き換えた
          → 再起動しても、カーネルは vdb を回転しない装置（SSD）として扱う
 
@@ -1073,7 +1283,7 @@ $ lab check 10
    確かめて説明する LinuC 主題1.05 — 全10演習クリア
   ════════════════════════════════════════
 
-  所要 4分（最初の達成から最後の達成まで）
+  所要 5分（最初の達成から最後の達成まで）
 
   自分の手で確かめたこと
 
@@ -1088,7 +1298,7 @@ $ lab check 10
    ✔ 09  カーネルは HDD か SSD かを測らず、装置の申告をそのまま信じること
    ✔ 10  外したドライバは挿し直すと udev が読み込み直し、止めるには読み込む側の表を書き換えること
 
-  この10つは全部、1つの事実から出ていました。
+  この10個は全部、1つの事実から出ていました。
 
       ディスクは、装置・パーティションの表・（LVM）・ファイルシステム・マウントの段が重なってできている。
       各段は自分の印（装置の申告・表の行・UUID）だけを読み、隣の段を勝手には書き換えない。
@@ -1128,6 +1338,21 @@ $ lab check 10
          USB 機器としては見えるが、ドライバが付かず、ディスクにならなかった
          → 装置はある。使えなくしたのは、カーネルにドライバを読み込ませる側の設定
 
+# --- 模範解答の確かめ方: 外で挿して、中で見て、外で抜く ---
+
+$ virsh attach-device linuc ~/vm/extra/usb-a.xml
+Device attached successfully
+
+$ lsusb -t
+/:  Bus 001.Port 001: Dev 001, Class=root_hub, Driver=xhci_hcd/8p, 480M
+/:  Bus 002.Port 001: Dev 001, Class=root_hub, Driver=xhci_hcd/8p, 5000M
+    |__ Port 001: Dev 010, If 0, Class=Mass Storage, Driver=[none], 5000M
+
+$ lsmod | grep -E "usb_storage|uas"
+
+$ virsh detach-device linuc ~/vm/extra/usb-a.xml
+Device detached successfully
+
 
 ========== 11. 全問を通した状態 ==========
 
@@ -1160,17 +1385,18 @@ $ lab check
          → ESP の印（EF00）を付けた区画ができた。中身（FAT）は演習04 で作る
 ✔ 04 達成
   判定 : 観測型（各パーティションのファイルシステムの印を直接読んだ）
-  観測 : vdb1 = vfat
+  観測 : vdb1 = vfat（FAT32）
          vdb2 = ext3 ラベル NEWBOOT
          vdb4 = xfs ラベル ROOT
          vdb5 = btrfs ラベル VAR
          vdb6 = ext4 ラベル HOME
-         vdb6 の予約ブロック = 1000 / 100091 ブロック（1.0%）
+         vdb6 の予約ブロック = 998 / 99840 ブロック（1.0%）
          5つの種類のファイルシステムができ、vdb6 は root 用の予約が 1% になっている
          → df の Avail が Size − Used より小さかった分の大半は、この予約（残りは ext4 が自分用に取る reserved_clusters）
 ✔ 05 達成
-  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べた）
+  判定 : 観測型（ホームの message.txt を読み、イメージの中の伝言と比べ、イメージがマウントされたままかを見た）
   観測 : ~/message.txt  = 伝言: 3 番の棚の鍵は、青い箱の中
+         イメージのマウント先 = （どこにもマウントされていない）
          ファイルのままのディスクのイメージをマウントして、中のファイルを取り出せた
          → ループデバイスを通すと、ファイルも装置と同じようにマウントできる
 ✔ 06 達成
@@ -1186,14 +1412,15 @@ $ lab check
   判定 : 観測型（vdb3 をいったん swapoff し、起動時と同じ swapon -a を1回実行して、戻るかを見た）
   観測 : vdb3 の中身              = swap
          判定の前に使われていたか = はい
-         /etc/fstab のスワップの行 = UUID=091089aa-9f9c-4872-8674-8d18f5a11475（実体: /dev/vdb3）
+         /etc/fstab のスワップの行 = UUID=f5ee32fd-97aa-4680-bdbf-d20ad1d126b1（実体: /dev/vdb3）
          swapon -a の後に使われているか = はい
+         （判定の後、vdb3 は判定の前と同じ状態に戻した）
          /etc/fstab の行から vdb3 が有効になった → 再起動しても、このスワップは使われる
 ✔ 08 達成
   判定 : 観測型（LVM の表と、vg0/data の中の ext4 の大きさを別々に読んで比べた）
   観測 : vg0 の物理ボリューム = /dev/sda /dev/vdc
-         vg0/data の大きさ     = 1232 MiB（使っている物理ボリューム: /dev/vdc(0),/dev/sda(0)）
-         中の ext4 の大きさ    = 1232 MiB
+         vg0/data の大きさ     = 1200 MiB（使っている物理ボリューム: /dev/vdc(0),/dev/sda(0)）
+         中の ext4 の大きさ    = 1200 MiB
          1台より大きな箱が2台にまたがってでき、中身の ext4 も箱いっぱいに広がっている
          → 箱と中身は別の段。広げるときは両方を広げる（lvextend -r か resize2fs）
 ✔ 09 達成
@@ -1201,6 +1428,7 @@ $ lab check
   観測 : 判定の前の値             = 0
          add イベントの後の値     = 0
          rotational を書く udev の規則 = /etc/udev/rules.d/60-lab-ssd.rules
+         （判定の後、値は判定の前の 0 に戻した）
          起動時と同じイベントを受けて、udev が 0 に書き換えた
          → 再起動しても、カーネルは vdb を回転しない装置（SSD）として扱う
 ✔ 10 達成
