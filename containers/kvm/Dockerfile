@@ -38,7 +38,7 @@ COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
 COPY --from=labvm --chown=root:root --chmod=0755 libexec/lab-remote /usr/local/libexec/lab-remote
 ENV LAB_THEME=kvm LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
     LAB_IMAGE=ghcr.io/chai0204/lab:kvm-1.0.1
-ENV LAB_RESET_HINT="元に戻すには qemu-linuc reset --yes（練習機のディスクが最初の状態に戻ります）"
+ENV LAB_RESET_HINT="元に戻すには qemu-linuc stop の後で qemu-linuc reset --yes（練習機のディスクが最初の状態に戻ります）"
 USER lab
 WORKDIR /home/lab
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/sbin/lab-kvm-init"]
