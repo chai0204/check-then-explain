@@ -39,17 +39,16 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <p>章は、第1章から順に、同じ1台の練習機で打っていく前提で書いてあります（前の章で作った区画やファイルシステムを、次の章で使います）。
 演習を先にやった練習機では本文と違う画面になるので、その場合は外で <code>vm reset --yes</code> を打ってから第1章を始めてください（<a href="/linuc-disks/practice/#ex">実践編</a>に詳しく書いてあります）。
 各章の冒頭に「前の章までにやったこと」と「この章でやること」を書いてあります。
-前提として要るのは、主題1.01〜1.04 のコースで扱った範囲（端末でコマンドを打つ・ファイルとディレクトリ・パーミッション・<code>sudo</code>・パイプと <code>grep</code>）だけです。
-カーネル・ドライバ・セクタのような語も、使う前にその場で一言で説明しています。</p>
+前提として要るのは、主題1.01〜1.04 のコースで扱った範囲（端末でコマンドを打つ・ファイルとディレクトリ・パーミッション・<code>sudo</code>・パイプと <code>grep</code>）です。このコースが説明なしで使うものと、それが出たコースの章は、<a href="/linuc-disks/theory/01-look">第1章</a>の冒頭に一覧にしてあります。
+それ以外の語は、カーネル・ドライバ・セクタのような一般的な語も、使う前にその場で一言で説明しています。</p>
+<p><b>前の版（1.0.x）を使っていた人は</b>、章と演習の順番が変わったので、先に<a href="/linuc-disks/practice/#start">実践編の「はじめる」</a>の「前の版（1.0.x）で進めた人へ」の箱を読んでください。</p>
 
 <h2 id="spine">11章を通して確かめること</h2>
 <div class="goal">
 <p>ディスクは、<b>装置・パーティションの表・（LVM）・ファイルシステム・マウントの段</b>が重なってできています。
-各段は自分の印（装置の申告・表の行・UUID）だけを読み、隣の段を勝手には書き換えません。</p>
-<p>だから、区画を消しても中身は残り（第3章）、論理ボリュームを広げてもファイルシステムは広がらず（第9章）、
-<code>/dev/sdb</code> という名前は挿す順番で別のディスクを指します（第6章）。
-どの章でも、まず普通に使ってみて、そのあとで「1つの段だけを見て、隣の段も一緒に動くと思った」ところで予想が外れるのを確かめます。
-第11章の最後で、11の外れた予想を1つの表にまとめます。</p>
+このコースでは段を1つずつ増やしながら使っていき、どの章でも、まず普通に使ってみてから、「1つの段を変えたら、隣の段はどうなるか」を自分の手で確かめます。
+たとえば、区画を表から消したら中の ext4 はどうなるか（第3章）、USB メモリを挿し直したら <code>/dev/sdb</code> は何を指すか（第6章）、論理ボリュームを広げたら中のファイルシステムで使える量はどうなるか（第9章）。</p>
+<p>答えはそれぞれの章で確かめ、第11章の最後で、11章ぶんを1つの表にまとめます。</p>
 <div class="skip"><b>ここで覚えなくていいこと</b>:
 ファイルシステムの内部の形、RAID、iSCSI や NFS のようなネットワーク越しのディスク、
 ディスクの暗号化（LUKS）、systemd の <code>.mount</code> ユニットの書き方。どれも主題1.05 の範囲外で、この11章には出てきません。</div>
@@ -105,8 +104,38 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <p>他の主題（1.01〜1.04・1.06〜1.11）の対応は
 <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。</p>
 
+<h2 id="chapters">章</h2>
+<div class="toc">
+<ol>
+<li><a href="/linuc-disks/theory/01-look">練習機に入り、つながっているディスクを眺める</a> —
+    <span class="detail">外と練習機の中を行き来し、<code>lsblk</code> と <code>df</code> でディスク・区画・ファイルシステム・マウントの関係を見る（15分）</span></li>
+<li><a href="/linuc-disks/theory/02-first-disk">空のディスクを使えるようにする</a> —
+    <span class="detail">区切る → 作る → つなぐ → 書く → 外す、を一通りやる（20分）</span></li>
+<li><a href="/linuc-disks/theory/03-partition">パーティションの表を読む・直す</a> —
+    <span class="detail"><code>fdisk -l</code> の読み方、表の中身、区画を消して作り直す、5つ目からの拡張・論理パーティション（22分）</span></li>
+<li><a href="/linuc-disks/theory/04-gpt">新しい形式の表（GPT）と、起動に使う区画</a> —
+    <span class="detail">練習機自身の GPT と ESP を読み、サーバのディスクを <code>gdisk</code> と <code>parted</code> で切る（25分）</span></li>
+<li><a href="/linuc-disks/theory/05-mkfs">ファイルシステムの種類と作り方</a> —
+    <span class="detail">5種類を作り分け、区画の大きさと使える量を比べる（22分）</span></li>
+<li><a href="/linuc-disks/theory/06-media">USB メモリと CD をマウントする</a> —
+    <span class="detail">USB メモリと CD を手でマウントし、ラベル・UUID で指す。CD の写しのファイルもマウントする（24分）</span></li>
+<li><a href="/linuc-disks/theory/07-fstab">起動のたびにマウントする</a> —
+    <span class="detail"><code>/etc/fstab</code> の6列を書いて再起動の前に確かめ、一般ユーザにマウントを許し、再起動して確かめる（25分）</span></li>
+<li><a href="/linuc-disks/theory/08-swap">スワップと、メモリの上のファイルシステム（tmpfs）</a> —
+    <span class="detail">スワップを作って起動のたびに使い、メモリの上に tmpfs を作る（18分）</span></li>
+<li><a href="/linuc-disks/theory/09-lvm">LVM で、2台のディスクを1つにまとめる</a> —
+    <span class="detail">1台より大きな箱を作って広げ・縮め、スナップショットで消したファイルを取り戻す（24分）</span></li>
+<li><a href="/linuc-disks/theory/10-hardware">部品の情報を読む</a> —
+    <span class="detail">CPU・メモリ・バス・ディスクを <code>/proc</code>・<code>/sys</code>・<code>/dev</code> で読み、HDD か SSD かの扱いを変える（25分）</span></li>
+<li><a href="/linuc-disks/theory/11-modules">ドライバと、USB メモリの抜き差し</a> —
+    <span class="detail">ドライバがいつ誰に読み込まれるかを確かめ、USB メモリを挿しても使えないようにする。11章を1つの事実でまとめる（28分）</span></li>
+</ol>
+</div>
+<p><a href="/linuc-disks/theory/glossary">用語辞書</a> —
+   本文の点線付きの語をクリックすると引けます。</p>
+
 <h2 id="cram">試験の直前に見る表</h2>
-<p>主題1.05 の「詳細」欄に並ぶ語を、1行の意味と、説明している章で引けるようにしました。</p>
+<p>主題1.05 の「詳細」欄に並ぶ語を、1行の意味と、説明している章で引けるようにしました。章を読み終えてから使う表なので、各章で確かめる答えも書いてあります。</p>
 <div class="scroll"><table>
 <tr><th>語</th><th>一行の意味</th><th>章</th></tr>
 <tr><td>ディスク・パーティション・ファイルシステム・マウント</td><td>記憶装置・それを区切った区画・区画の中のファイルの置き方・ファイルシステムをディレクトリにつなぐこと</td><td><a href="/linuc-disks/theory/01-look#lsblk">1</a></td></tr>
@@ -151,36 +180,6 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <tr><td>udev</td><td>カーネルの知らせ（uevent）を受け、規則で <code>/dev</code> の別名を作り、ドライバを読み込ませる</td><td><a href="/linuc-disks/theory/10-hardware#rota">10</a>・<a href="/linuc-disks/theory/11-modules#naive">11</a></td></tr>
 <tr><td>sysfs・udev・dbus</td><td>sysfs = 装置の情報、udev = 装置の出入りの処理、D-Bus = プログラムどうしの通り道</td><td><a href="/linuc-disks/theory/11-modules#dbus">11</a></td></tr>
 </table></div>
-
-<h2 id="chapters">章</h2>
-<div class="toc">
-<ol>
-<li><a href="/linuc-disks/theory/01-look">練習機に入り、つながっているディスクを眺める</a> —
-    <span class="detail">外と練習機の中を行き来し、<code>lsblk</code> と <code>df</code> でディスク・区画・ファイルシステム・マウントの関係を見る（15分）</span></li>
-<li><a href="/linuc-disks/theory/02-first-disk">空のディスクを使えるようにする</a> —
-    <span class="detail">区切る → 作る → つなぐ → 書く → 外す、を一通りやる（20分）</span></li>
-<li><a href="/linuc-disks/theory/03-partition">パーティションの表を読む・直す</a> —
-    <span class="detail"><code>fdisk -l</code> の読み方、表の中身、区画を消して作り直す、5つ目からの拡張・論理パーティション（22分）</span></li>
-<li><a href="/linuc-disks/theory/04-gpt">新しい形式の表（GPT）と、起動に使う区画</a> —
-    <span class="detail">練習機自身の GPT と ESP を読み、サーバのディスクを <code>gdisk</code> と <code>parted</code> で切る（25分）</span></li>
-<li><a href="/linuc-disks/theory/05-mkfs">ファイルシステムの種類と作り方</a> —
-    <span class="detail">5種類を作り分け、区画の大きさと使える量を比べる（22分）</span></li>
-<li><a href="/linuc-disks/theory/06-media">USB メモリと CD をマウントする</a> —
-    <span class="detail">USB メモリと CD を手でマウントし、ラベル・UUID で指す。CD の写しのファイルもマウントする（24分）</span></li>
-<li><a href="/linuc-disks/theory/07-fstab">起動のたびにマウントする</a> —
-    <span class="detail"><code>/etc/fstab</code> の6列を書いて再起動の前に確かめ、一般ユーザにマウントを許し、再起動して確かめる（25分）</span></li>
-<li><a href="/linuc-disks/theory/08-swap">スワップと tmpfs</a> —
-    <span class="detail">スワップを作って起動のたびに使い、メモリの上に tmpfs を作る（18分）</span></li>
-<li><a href="/linuc-disks/theory/09-lvm">LVM で、2台のディスクを1つにまとめる</a> —
-    <span class="detail">1台より大きな箱を作って広げ・縮め、スナップショットで消したファイルを取り戻す（24分）</span></li>
-<li><a href="/linuc-disks/theory/10-hardware">部品の情報を読む</a> —
-    <span class="detail">CPU・メモリ・バス・ディスクを <code>/proc</code>・<code>/sys</code>・<code>/dev</code> で読み、HDD か SSD かの扱いを変える（25分）</span></li>
-<li><a href="/linuc-disks/theory/11-modules">ドライバと、USB メモリの抜き差し</a> —
-    <span class="detail">ドライバがいつ誰に読み込まれるかを確かめ、USB メモリを挿しても使えないようにする。11章を1つの事実でまとめる（28分）</span></li>
-</ol>
-</div>
-<p><a href="/linuc-disks/theory/glossary">用語辞書</a> —
-   本文の点線付きの語をクリックすると引けます。</p>
 
 <h2 id="use">実務のどこで効くか</h2>
 <p>資格の勉強として読んでも、使う場面はこの4つに集まります。</p>

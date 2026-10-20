@@ -11,10 +11,10 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
 </div>
 <h1>3. パーティションの表を読む・直す</h1>
-<p class="lead">第2章では、<code>vdb</code> を <code>fdisk</code> で区切って <code>vdb1</code>（200M）を作り、ext4 を作ってマウントし、<code>memo.txt</code> を書いてから外した。この章では、<code>fdisk</code> が書いた「表」を読み、消してしまった区画を取り戻し、区画を5つ以上に分ける方法を見る。</p>
+<p class="lead">第2章では、<code>vdb</code> を <code>fdisk</code> で区切って <code>vdb1</code>（200M）を作り、ext4 を作ってマウントし、<code>memo.txt</code> を書いてから外した。この章では、<code>fdisk</code> が書いた「表」を読み、表から区画を1つ消して作り直すと中身がどうなるかを確かめ、区画を5つ以上に分ける方法を見る。</p>
 <div class="badges"><span>前提: 第2章まで読了</span><span>前提: 練習機の中にいる</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>fdisk -l</code> の表示から、表の形式と、区画の位置（始まりと終わりのセクタ）・大きさ・種類を読める</li><li>消してしまったパーティションを、同じ位置に作り直して取り戻せる</li><li>MBR の基本パーティション（プライマリパーティション）が4つまでの理由を説明でき、5つ目からを拡張パーティション・論理パーティションとして作れる</li></ul>
+<ul><li><code>fdisk -l</code> の表示から、表の形式と、区画の位置（始まりと終わりのセクタ）・大きさ・種類を読める</li><li>消す前の表を <code>sfdisk -d</code> で控え、区画を表から消して同じ位置に作り直したら中身がどうなるかを、自分で確かめられる</li><li>MBR の基本パーティション（プライマリパーティション）が4つまでの理由を説明でき、5つ目からを拡張パーティション・論理パーティションとして作れる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: CHS（シリンダ・ヘッド・セクタ）という古い位置の書き方は扱わない。区画の種類の番号は、この章の表の5つ（83・82・8e・5・ef）のほかは覚えなくてよい。論理パーティションをつなぐ小さな表（EBR）の細かい形も扱わない。</div></div>
 
 <h2 id="read">表を読む — fdisk -l</h2>
@@ -36,7 +36,7 @@
 <tr><td><code>82</code></td><td>Linux swap / Solaris</td><td>スワップ（メモリが足りないときに中身を書き出しておく領域）に使う</td></tr>
 <tr><td><code>8e</code></td><td>Linux LVM</td><td>LVM（複数のディスクをまとめる仕組み）の材料に使う</td></tr>
 <tr><td><code>5</code></td><td>Extended</td><td>拡張パーティション。中に区画を入れるための入れ物（この章の後半）</td></tr>
-<tr><td><code>ef</code></td><td>EFI (FAT-12/16/32)</td><td>起動用の区画（ESP）を MBR の表に置くときに使う</td></tr>
+<tr><td><code>ef</code></td><td>EFI (FAT-12/16/32)</td><td>起動用の区画（ESP。中は第1章の <code>vda15</code> と同じ FAT。第4章で扱う）を MBR の表に置くときに使う</td></tr>
 </table></div>
 <p>種類は「使うつもり」を書いた札にすぎず、中身を決めるわけではない。<code>vdb1</code> は種類が 83 で、中身は第2章で作った ext4 である。種類を変えるのは <code>fdisk</code> の <code>t</code>（type）キーで、この章では使わない。</p>
 <div class="analogy"><b>たとえ</b>: パーティションの表は、本の<b>目次</b>に近い。「第1章は2048ページから409600ページぶん」と書いてあり、本文（中身）は別の場所にある。
@@ -63,20 +63,24 @@
 <p>1行が 16 バイトで、64 バイトには<b>4行しか入らない</b>。だから MBR の表に直接書ける区画（<b>基本パーティション</b>。プライマリパーティションとも呼ぶ）は4つまでである。開始位置と大きさは 32 ビット（2進数で 32 桁。4 バイト）のセクタ数なので、扱えるのは 2<sup>32</sup> × 512 バイト = <b>2TiB まで</b>になる。</p>
 
 <h2 id="naive">消すと、中身も消える？</h2>
-<div class="sgoal"><b>この節で分かること</b>: パーティションの表と、区画の中身が別のものであること。</div>
+<div class="sgoal"><b>この節で分かること</b>: 区画を表から消して作り直すと、中身はどうなるか。</div>
+<p>消す前に、いまの表を文字にして控えておく。<code>sfdisk</code> は、表を文字で読み書きする区切る道具で、<code>-d</code>（dump）を付けると表を文字にして書き出す。それを <code>&gt;</code> でホームのファイルに残す（<code>&gt;</code> でファイルに書くのは student のシェルなので、ファイルは student のものになる）。</p>
+<pre data-where="練習機の中（student@linuc）"><code>$ sudo sfdisk -d /dev/vdb &gt; vdb-table.txt
+$ cat vdb-table.txt<!--o note="label-id::表の番号（第2章の Disk identifier と同じ。あなたの画面では違う）;;/dev/vdb1::vdb1 の行。始まりのセクタ・セクタの数・種類"--></code></pre>
+<p><code>label: dos</code> は表の形式（MBR）、<code>label-id</code> は表の番号で、最後の行が <code>vdb1</code> の行である。<code>start=</code> は始まりのセクタ、<code>size=</code> はセクタの数、<code>type=83</code> は種類（Linux）。これがあれば、消したあとでも元の位置が分かる。</p>
 <p><code>fdisk</code> の <code>d</code>（delete）で <code>vdb1</code> を消してみる。区画が1つしか無いので、番号は聞かれない。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk /dev/vdb<!--o keys="d|w" note="Command (m for help): d::d: 区画を消す;;Command (m for help): w::w: ディスクに書く"-->
 $ lsblk /dev/vdb
 $ sudo mount /dev/vdb1 /mnt</code></pre>
-<p><code>vdb1</code> という装置そのものが無くなり、<code>mount</code> も <code>/dev/vdb1</code> が無いと断った。なお、<code>lsblk</code> の見出しのうち NAME だけが1行目に出て、残りが2行目に回っている。これは util-linux 2.39 の <code>lsblk</code> が<b>端末に</b>表を出すときの癖で、いちばん左の列の中身がすべて見出しより短いと（<code>vdb</code> は3文字、<code>NAME</code> は4文字）、その見出しだけを折り返す。表の中身は同じである。</p>
+<p><code>vdb1</code> という装置そのものが無くなり、<code>mount</code> も <code>/dev/vdb1</code> が無いと断った（エラーの2行目の <code>dmesg</code> は、カーネルが出したメッセージを見るコマンドで、第11章で使う）。なお、<code>lsblk</code> の見出しのうち NAME だけが1行目に出て、残りが2行目に回っている。これは util-linux 2.39 の <code>lsblk</code> が<b>端末に</b>表を出すときの癖で、いちばん左の列の中身がすべて見出しより短いと（<code>vdb</code> は3文字、<code>NAME</code> は4文字）、その見出しだけを折り返す。表の中身は同じである。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>パーティションを消したのだから、中の <code>memo.txt</code> も消えた。同じ大きさで作り直しても、空の区画ができるだけのはずだ。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk /dev/vdb<!--o keys="n|p|1||+200M|N|w" note="Partition #1 contains a ext4 signature::中に ext4 の印（signature）がある;;Do you want to remove the signature::印を消すか、と聞いてくる。N と答える"-->
 $ sudo mount /dev/vdb1 /mnt
 $ cat /mnt/memo.txt
 $ sudo umount /mnt</code></pre>
-<div class="then"><b>だめな理由</b>: 第2章で書いた <code>memo.txt</code> が、そのまま読めた。<code>fdisk</code> の <code>d</code> が消したのは<b>表の1行</b>で、区画の中身（ext4 の管理情報とファイル）には1バイトも触れていない。同じ位置（2048 から 200MiB）に行を書き戻したので、カーネルはまた <code>vdb1</code> を作り、その中には前のままの ext4 が残っていた。<code>fdisk</code> 自身もそれに気づいて「中に ext4 の印（signature）がある。消すか」と聞いてきた。ここで Y と答えると、その印（ext4 の数バイト）が消され、ファイルが残っていても ext4 として読めなくなる。</div></div>
-<p>だから、消してしまった区画は、<b>同じ始まりの位置・同じ大きさ</b>で作り直せば取り戻せる。位置が1セクタでもずれると、中身の先頭と合わなくなる。消す前の表を控えておくと確実である（演習02 で使う）。</p>
+<div class="then"><b>だめな理由</b>: 第2章で書いた <code>memo.txt</code> が、そのまま読めた。<code>fdisk</code> の <code>d</code> が消したのは<b>表の1行</b>で、区画の中身（ext4 の管理情報とファイル）には1バイトも触れていない。控えた表と同じ位置（2048 から 409600 セクタ = 200MiB）に行を書き戻したので、カーネルはまた <code>vdb1</code> を作り、その中には前のままの ext4 が残っていた。<code>fdisk</code> 自身もそれに気づいて「中に ext4 の印（signature）がある。消すか」と聞いてきた。ここで Y と答えると、その印（ext4 の数バイト）が消され、ファイルが残っていても ext4 として読めなくなる。</div></div>
+<p>だから、消してしまった区画は、<b>同じ始まりの位置・同じ大きさ</b>で作り直せば取り戻せる。位置が1セクタでもずれると、中身の先頭と合わなくなる。消す前に <code>sfdisk -d</code> で表を控えておけば、元の位置が確実に分かる（演習02 の課題文に出てくるのも、この控えである）。</p>
 <div class="analogy"><b>たとえ</b>: 目次から章を1行消しても、本文のページは破られていない。同じページ番号で目次に書き戻せば、その章はまた引ける。
 <br>ただし<b>崩れる点</b>: 本の目次は書き戻しても何も聞いてこないが、<code>fdisk</code> は中に残っている印に気づいて「消すか」と聞く。目次を直すつもりで、本文の表紙（印）を破り捨てる選択肢が、同じ画面に出てくる。</div>
 

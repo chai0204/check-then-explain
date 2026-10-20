@@ -14,10 +14,10 @@
 <p class="lead">第3章では、<code>vdb</code> の MBR の表を読み、消した <code>vdb1</code> を取り戻し、拡張・論理パーティションで5つ以上に分けた。この章では、もう1つの表の形式 GPT を練習機自身のディスク <code>vda</code> で読み、起動に使う区画（ESP）の役目を確かめてから、<code>vdb</code> を「UEFI で起動するサーバのディスク」として GPT で切り直す。</p>
 <div class="badges"><span>前提: 第3章まで読了</span><span>前提: 練習機の中にいる</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>MBR と GPT の違い（区画の数・大きさの上限・種類の表し方）を言える</li><li>ESP が何のための区画で、UEFI のファームウェアが起動のときにそれをどう見つけるかを説明できる</li><li><code>/</code>・<code>/boot</code>・<code>/var</code>・<code>/home</code>・スワップを用途で分ける理由を言え、<code>gdisk</code> で GPT の表を作って種類を付けられる。<code>parted</code> が打った瞬間に書くことを踏まえて使える</li></ul>
+<ul><li>MBR と GPT の違い（区画の数・大きさの上限・種類の表し方）を言える</li><li>ESP が何のための区画で、UEFI のファームウェアが起動のときにそれをどう見つけるかを説明できる</li><li><code>/</code>・<code>/boot</code>・<code>/var</code>・<code>/home</code>・スワップを用途で分ける理由を言え、<code>gdisk</code> で GPT の表を作って種類を付けられる。<code>parted</code> で区画を消してから <code>quit</code> で抜けたとき、表がどうなっているかを確かめる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: Secure Boot（起動するプログラムの署名を確かめる仕組み）と shim の役目は扱わない。GRUB の設定ファイルの書き方（主題1.01 のコース）も扱わない。BIOS（古い起動の方式）で GPT のディスクから起動するしくみの細部も扱わない。</div></div>
 
-<h2 id="gpt">練習機自身のディスクは GPT</h2>
+<h2 id="gpt">練習機自身のディスクの表を読む</h2>
 <div class="sgoal"><b>この節で分かること</b>: GPT の表を <code>fdisk -l</code> で読むと、MBR と何が違って見えるか。</div>
 <p>第3章と同じ <code>fdisk -l</code> で、練習機の Linux が入っている <code>vda</code> を読む。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo fdisk -l /dev/vda</code></pre>
@@ -46,7 +46,7 @@
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo ls /boot/efi/EFI/ubuntu</code></pre>
 <p><code>.efi</code> は UEFI が実行できるプログラムの形である。ファームウェアが最初に動かすのは <code>shimx64.efi</code> で、それが <code>grubx64.efi</code>（GRUB というブートローダ）を呼び出す。では、ファームウェアはどうやってこの区画とファイルを見つけるのか。ファームウェアは、起動の候補を<b>NVRAM</b>（マザーボードの、電源を切っても消えないメモリ）に覚えている。<code>efibootmgr</code> は、その候補を読むコマンドである。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo efibootmgr | grep Ubuntu</code></pre>
-<p><code>HD(15,GPT,9606bc98-…,…)/File(\EFI\ubuntu\shimx64.efi)</code> は、「GPT の 15 番目の区画で、区画の番号（PARTUUID）が <code>9606bc98-…</code> のものの中の、このファイル」と読む。<code>blkid</code>（区画やファイルシステムに書かれた種類・ラベル・番号を読むコマンド）で <code>vda15</code> を読んで比べる。</p>
+<p><code>HD(15,GPT,9606bc98-…,…)/File(\EFI\ubuntu\shimx64.efi)</code> は、「GPT の 15 番目の区画で、区画の番号（PARTUUID）が <code>9606bc98-…</code> のものの中の、このファイル」と読む。<code>blkid</code>（区画やファイルシステムに書かれた種類・名前（LABEL。付け方は第5章）・番号を読むコマンド）で <code>vda15</code> を読んで比べる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo blkid /dev/vda15<!--o note="PARTUUID::efibootmgr の候補と同じ番号"--></code></pre>
 <p>最後の <code>PARTUUID</code> が、<code>efibootmgr</code> の候補の番号と一致している。ファームウェアは Linux より先に動くので、<code>/dev/vda15</code> という名前も、<code>/boot/efi</code> というマウント先も知らない。知っているのは、GPT の表の上の番号と PARTUUID と、ファイルのパスだけである。<code>/boot/efi</code> にマウントしてあるのは、Linux がブートローダを更新するとき（パッケージの更新など）に中のファイルを書き換えるためである。</p>
 <p>ESP の種類 <b>EFI System</b> は、UEFI の決まりが定めた「この区画が ESP だ」という印である。OS のインストーラや、ESP を探して更新する道具は、この印で ESP を見分ける。だから ESP を作るときは、必ずこの種類にする。</p>
@@ -81,7 +81,7 @@
 <p><code>parted</code> は大きさを MB（1000×1000 バイト）で表示する（<code>fdisk</code>・<code>gdisk</code> の MiB とは単位が違うので、数字が少し大きく見える）。Flags の列には、種類が <code>boot, esp</code>（ESP）や <code>swap</code> という旗の形で出る。Name の列は GPT の区画に付けられる名前で、<code>gdisk</code> は種類の名前をそのまま付けた。</p>
 
 <h2 id="parted">parted で消してから、quit で抜けると？</h2>
-<div class="sgoal"><b>この節で分かること</b>: <code>parted</code> が <code>fdisk</code>・<code>gdisk</code> と違い、いつディスクに書くか。</div>
+<div class="sgoal"><b>この節で分かること</b>: <code>parted</code> で区画を消して <code>quit</code> で抜けると、表はどうなっているか。</div>
 <p><code>parted</code> はディスクの名前だけを渡すと、<code>(parted)</code> という問いを出す対話の画面になる。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p><code>fdisk</code> も <code>gdisk</code> も、<code>w</code> を打つまではディスクを変えなかった。<code>parted</code> でも、試しに区画を消してから <code>quit</code> で抜ければ、何も変わらないはずだ。</p>
@@ -94,12 +94,13 @@ $ sudo parted /dev/vdb print</code></pre>
 <p>6番が同じ 1737MB〜2146MB に戻った。Name は今度付けた <code>home</code> になっている。<code>parted</code> は始まりと終わりを 1MiB の切れ目に合わせて丸めるので、MB で渡しても <code>gdisk</code> で作ったときと同じセクタになる。</p>
 <div class="scroll"><table>
 <tr><th></th><th>fdisk</th><th>gdisk</th><th>parted</th></tr>
-<tr><td>扱える表（いまの版）</td><td>MBR と GPT（<code>o</code> で空の MBR、<code>g</code> で空の GPT を作る）</td><td>GPT（MBR は変換して読む）</td><td>MBR（msdos と表示）と GPT（gpt）</td></tr>
+<tr><td>扱える表（いまの版）</td><td>MBR と GPT（<code>o</code> で空の MBR、<code>g</code> で空の GPT を作る ※）</td><td>GPT（MBR は変換して読む）</td><td>MBR（msdos と表示）と GPT（gpt）</td></tr>
 <tr><td>試験の例題での扱い</td><td><b>MBR 用（GPT 非対応）</b></td><td>GPT 用</td><td>MBR と GPT の両方</td></tr>
 <tr><td>ディスクに書くとき</td><td><code>w</code> を打ったとき</td><td><code>w</code> を打ったとき</td><td><b>コマンドを打った瞬間</b></td></tr>
-<tr><td>使い方</td><td>対話（1文字のキー）。<code>-l</code> で表示だけ</td><td>対話（1文字のキー）。<code>-l</code> で表示だけ。<code>sgdisk</code> は一括版</td><td>対話でも、引数に続けて書いても使える（<code>print</code>・<code>mkpart</code>・<code>rm</code>）。<code>-l</code> で全部のディスクの表を出す</td></tr>
-<tr><td>大きさの単位</td><td>セクタ。<code>+200M</code> で MiB</td><td>セクタ。<code>+100M</code> で MiB</td><td>MB・GB（<code>unit</code> で変えられる）</td></tr>
+<tr><td>使い方</td><td>対話（1文字のキー）。<code>-l</code> で表示だけ</td><td>対話（1文字のキー）。<code>-l</code> で表示だけ ※。<code>sgdisk</code> は一括版 ※</td><td>対話でも、引数に続けて書いても使える（<code>print</code>・<code>mkpart</code>・<code>rm</code>）。<code>-l</code> で全部のディスクの表を出す ※</td></tr>
+<tr><td>大きさの単位</td><td>セクタ。<code>+200M</code> で MiB</td><td>セクタ。<code>+100M</code> で MiB</td><td>MB・GB（<code>unit</code> で変えられる ※）</td></tr>
 </table></div>
+<p class="detail">※ はこの章では打たない（試験で名前が出るので、表にだけ載せた）。</p>
 <div class="note"><b>試験では</b>: LinuC の例題は、fdisk＝MBR 用（GPT 非対応）、gdisk＝GPT 用、parted＝MBR と GPT の両方、という組で出る。fdisk が GPT を扱えるようになった util-linux 2.23（2013年）より前の姿である。組み合わせを選ぶ問題では、fdisk を MBR 専用として答える。</div>
 <div class="analogy"><b>たとえ</b>: <code>fdisk</code> と <code>gdisk</code> は第2章の<b>下書きと清書</b>、<code>parted</code> は<b>ペンで直接書く</b>書き方に近い。ペンは書いた瞬間に残る。
 <br>ただし<b>崩れる点</b>: ペンで書いた字は消せないが、<code>parted</code> で消した区画も、中身はディスクに残っている。消えたのは表の1行だけで、同じ位置に作り直せば元に戻る（いま戻したとおり）。</div>

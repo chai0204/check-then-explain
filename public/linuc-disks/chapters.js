@@ -8,7 +8,7 @@ window.CHAPTERS = [
   { n: 5, url: "/linuc-disks/theory/05-mkfs",       t: "ファイルシステムの種類と作り方" },
   { n: 6, url: "/linuc-disks/theory/06-media",      t: "USB メモリと CD をマウントする" },
   { n: 7, url: "/linuc-disks/theory/07-fstab",      t: "起動のたびにマウントする" },
-  { n: 8, url: "/linuc-disks/theory/08-swap",       t: "スワップと tmpfs" },
+  { n: 8, url: "/linuc-disks/theory/08-swap",       t: "スワップと、メモリの上のファイルシステム（tmpfs）" },
   { n: 9, url: "/linuc-disks/theory/09-lvm",        t: "LVM で、2台のディスクを1つにまとめる" },
   { n: 10, url: "/linuc-disks/theory/10-hardware",  t: "部品の情報を読む" },
   { n: 11, url: "/linuc-disks/theory/11-modules",   t: "ドライバと、USB メモリの抜き差し" },

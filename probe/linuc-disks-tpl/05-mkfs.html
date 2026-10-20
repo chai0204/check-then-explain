@@ -14,7 +14,7 @@
 <p class="lead">第4章では、<code>vdb</code> を GPT で6つに区切った（ESP・<code>/boot</code>・スワップ・<code>/</code>・<code>/var</code>・<code>/home</code> のつもり）。この章では、それぞれの区画に用途に合った種類のファイルシステムを作り、作ったファイルシステムが区画より小さく見える理由と、種類ごとの違いを確かめる。</p>
 <div class="badges"><span>前提: 第4章まで読了</span><span>前提: vdb が第4章の6つの区画になっている</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>mkfs</code> で ext3・ext4・XFS・VFAT・Btrfs を作り分けられ、ラベルを付けられる（<code>mkfs -t 種類</code> と <code>mkfs.種類</code> の関係も言える）</li><li><code>df</code> の Size・Used・Avail の関係を説明でき、ext4 の予約ブロックを <code>tune2fs</code> で読んで変えられる</li><li>5つの種類が何に向いているかを言える</li></ul>
+<ul><li><code>mkfs</code> で ext3・ext4・XFS・VFAT・Btrfs を作り分けられ、ラベルを付けられる（<code>mkfs -t 種類</code> と <code>mkfs.種類</code> の関係も言える）</li><li>作ったファイルシステムの大きさを <code>df</code> で読み、区画の大きさと比べて、違いがどこから来るかを確かめ、<code>tune2fs</code> で設定を変えられる</li><li>5つの種類が何に向いているかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: 管理情報の内部の形は扱わない。<code>mkfs</code> の細かいオプション（ブロックの大きさなど）も扱わない。ファイルシステムの検査と修復（<code>fsck</code>・<code>xfs_repair</code>）は、Version 10.0 の出題範囲では 101 ではなく 201 試験に入っているので扱わない。</div></div>
 
 <h2 id="mkfs">種類ごとに mkfs で作る</h2>
@@ -35,7 +35,7 @@
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo wipefs /dev/vdb1<!--o note="ext4::第2章の ext4 の印（場所 0x438 = 1080 バイト目）"-->
 $ sudo mkfs.vfat -F 32 -n ESP /dev/vdb1
 $ sudo wipefs /dev/vdb1</code></pre>
-<p>最初の <code>wipefs</code> の OFFSET の <code>0x438</code>（1080 バイト目）は、ext4 の管理情報の中心である<b>スーパーブロック</b>（大きさ・UUID・ラベル・「これは ext4 だ」という印を持つ）の中の、印の位置である。FAT を作ると、古い ext4 の印は無くなり、vfat の印に置き換わった。<code>-F 32</code> は FAT32 にするオプション、<code>-n</code> は<b>ラベル</b>（人が付ける、ファイルシステムの名前）を付けるオプションである。ラベルを付けるのは VFAT だけが <code>-n</code> で、ほかの種類は <code>-L</code> である。残りの4つを作る。</p>
+<p>最初の <code>wipefs</code> の OFFSET の <code>0x438</code>（1080 バイト目）は、ext4 の管理情報の中心である<b>スーパーブロック</b>（大きさ・UUID・ラベル・「これは ext4 だ」という印を持つ）の中の、印の位置である。FAT を作ると、古い ext4 の印は無くなり、vfat の印に置き換わった。<code>-F 32</code> は FAT32 にするオプション、<code>-n</code> は<b>ラベル</b>（人が付ける、ファイルシステムの名前）を付けるオプションである。ラベルを付けるのは VFAT だけが <code>-n</code> で、ほかの種類は <code>-L</code> である。残りの4つを作る。<code>/boot</code> 用の <code>vdb2</code> のラベルは、BOOT ではなく NEWBOOT にする。練習機自身の <code>/boot</code> の区画（<code>vda16</code>）が、もう BOOT というラベルを使っているからである（同じラベルが2つあると何が起きるかは、第7章で確かめる）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mkfs -t ext3 -L NEWBOOT /dev/vdb2
 $ sudo mkfs.xfs -L ROOT /dev/vdb4
 $ sudo mkfs.btrfs -L VAR /dev/vdb5
@@ -47,7 +47,7 @@ $ lsblk -o NAME,FSTYPE,LABEL,UUID /dev/vdb</code></pre>
 <br>ただし<b>崩れる点</b>: 本物の倉庫を建て替えれば古い荷物が壊れることは見れば分かるが、<code>mkfs</code> は前に何があっても聞かずに上書きする（<code>mkfs.vfat</code> は ext4 が残っていたのに何も言わなかった）。<code>wipefs</code> で先に印を見れば、何を壊すことになるかが分かる。</div>
 
 <h2 id="naive">作ったファイルシステムの大きさを比べる</h2>
-<div class="sgoal"><b>この節で分かること</b>: <code>df</code> の3つの数の関係と、ext4 の予約。</div>
+<div class="sgoal"><b>この節で分かること</b>: 作った ext4 の <code>df</code> の3つの数（Size・Used・Avail）が、区画の大きさとどう違うか。</div>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p><code>vdb6</code> は 390MiB の区画である。そこに作った ext4 なら、使える量はほぼ 390MiB だろう。少なくとも、<code>df</code> の Size から Used を引いた残りが、Avail（使える量）になるはずだ。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mount /dev/vdb6 /mnt
@@ -58,7 +58,7 @@ Size が小さいのは、ext4 が区画の中に管理情報（ファイルの�
 26MiB 合わない分の大半は、ext4 が<b>root のために 5% を取っておく</b>（予約ブロック）からである。
 ディスクがいっぱいになっても root と常駐のプログラム（デーモン）が書けるように、一般ユーザにはその分を Avail に見せない。
 残りは、ext4 が自分の作業のために取り置く分である（下で確かめる）。</div></div>
-<p>予約の量は ext4 の管理情報に書いてあり、<code>tune2fs -l</code> で読める（<code>tune2fs</code> は ext2・ext3・ext4 の設定を読んだり変えたりするコマンド）。ext4 自身の取り置きは、マウント中なら <code>/sys/fs/ext4/&lt;装置&gt;/reserved_clusters</code> に出ている。</p>
+<p>予約の量は ext4 の管理情報に書いてあり、<code>tune2fs -l</code> で読める（<code>tune2fs</code> は ext2・ext3・ext4 の設定を読んだり変えたりするコマンド）。ext4 自身の取り置きは、マウント中なら <code>/sys/fs/ext4/&lt;装置&gt;/reserved_clusters</code> に出ている（<code>/sys</code> は、カーネルが装置やファイルシステムの情報をファイルの形で見せている場所。詳しくは第10章）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo tune2fs -l /dev/vdb6 | grep -E "^(Block count|Reserved block count|Block size)"
 $ cat /sys/fs/ext4/vdb6/reserved_clusters</code></pre>
 <p>root のための予約は 4909 ブロック × 4KiB ≈ 19MiB。ext4 自身の取り置きは 1996 ブロック × 4KiB ≈ 8MiB で、全体（99840 ブロック）の 2% に当たる（大きなファイルシステムでも 4096 ブロックまで）。2つを足すと、ほぼ 26MiB の差になる（<code>df</code> は MiB に丸めて出すので、1 くらいはずれる）。予約の割合は <code>tune2fs -m</code> で変えられる。作り直す必要は無く、マウントしたままでよい。データだけを置く区画として、1% にする。</p>
@@ -74,7 +74,7 @@ $ sudo umount /mnt</code></pre>
 <br>ただし<b>崩れる点</b>: 扉は目に見えるが、ext4 の予約ブロックは <code>df</code> の Size にも Used にも出ず、Avail が小さいことでしか見えない。しかも乗務員（root）は、隙間が空いていれば乗客と同じ席にも座れる。</div>
 
 <h2 id="compare">種類ごとの使える量を比べる</h2>
-<div class="sgoal"><b>この節で分かること</b>: 同じくらいの大きさの区画でも、種類によって Size・Used・Avail が違うこと。</div>
+<div class="sgoal"><b>この節で分かること</b>: 種類の違うファイルシステムをまとめてマウントし、Size・Used・Avail を比べると、どうなるか。</div>
 <p>VFAT（vdb1、100MiB）・XFS（vdb4、600MiB）・Btrfs（vdb5、400MiB）を、それぞれ別のマウントポイントにつないで、まとめて <code>df</code> で見る。<code>mkdir</code> に複数の名前を渡すと、まとめて作る。<code>umount</code> にも複数を渡せる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mkdir /mnt/esp /mnt/root /mnt/var
 $ sudo mount /dev/vdb1 /mnt/esp

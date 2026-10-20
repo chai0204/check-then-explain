@@ -11,7 +11,7 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
 </div>
 <h1>6. USB メモリと CD をマウントする</h1>
-<p class="lead">第5章では、<code>vdb</code> の区画に5種類のファイルシステムを作り、ラベルを付けた。この章では、抜き差しするメディア（USB メモリと CD）を手でマウントして使い、挿す順番で <code>/dev/sdb</code> のような名前が変わること、だからラベルや UUID で指すことを確かめる。</p>
+<p class="lead">第5章では、<code>vdb</code> の区画に5種類のファイルシステムを作り、ラベルを付けた。この章では、抜き差しするメディア（USB メモリと CD）を手でマウントして使い、USB メモリを挿し直したときに <code>/dev/sdb</code> のような名前がどうなるかを確かめて、ラベルや UUID で指す方法を見る。</p>
 <div class="badges"><span>前提: 第5章まで読了</span><span>前提: 練習機の中にいる</span><span>所要 24分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>外で USB メモリを挿し・抜きし、練習機の中でどの名前のディスクになったかを確かめられる</li><li>マウントポイントを用意してマウントでき、外せないとき（<code>target is busy</code>）の理由と対処を言える</li><li>装置の名前ではなく、ラベル・UUID で目当てのファイルシステムを指せる。CD の写しのファイル（ISO イメージ）をそのままマウントできる</li></ul>
@@ -46,7 +46,7 @@ mkfs.fat 4.2 (2021-01-31)
 $ sudo mount /dev/sdb /media/stick
 mount: /media/stick: mount point does not exist.
        dmesg(1) may have more information after failed mount system call.</code></pre>
-<p><code>mount point does not exist</code>（マウントポイントが無い）で断られた。<b>マウントポイントは、前もって作っておくただのディレクトリ</b>である。<code>/media</code> は、取り外せるメディアをマウントする場所として決められたディレクトリで（<code>/mnt</code> は一時的に手でつなぐ場所）、その下に作る。マウントポイントの中にもともとあったものがどうなるかも見たいので、目印のファイルを1つ置いてからマウントする。</p>
+<p><code>mount point does not exist</code>（マウントポイントが無い）で断られた（2行目は第3章と同じ、<code>dmesg</code> も見よという案内）。<b>マウントポイントは、前もって作っておくただのディレクトリ</b>である。<code>/media</code> は、取り外せるメディアをマウントする場所として決められたディレクトリで（<code>/mnt</code> は一時的に手でつなぐ場所）、その下に作る。マウントポイントの中にもともとあったものがどうなるかも見たいので、目印のファイルを1つ置いてからマウントする。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mkdir /media/stick
 $ sudo touch /media/stick/HIDDEN
 $ ls /media/stick
@@ -131,7 +131,7 @@ $ sudo umount /media/stick</code></pre>
 <tr><td>UUID</td><td><code>UUID=…</code></td><td>作り直した（<code>mkfs</code> した）とき</td><td>重ならない番号で、確実に1つを指す</td></tr>
 </table></div>
 <div class="analogy"><b>たとえ</b>: 駐車場の<b>何番目に停めたか</b>と、車の<b>ナンバープレート</b>に近い。「2番目の車」は来た順で変わるが、ナンバーは車に付いている。
-<br>ただし<b>崩れる点</b>: ナンバーは役所が重ならないように配るが、ラベルは人が付ける名前なので<b>重なりうる</b>。重なったときに何が起きるかは、第7章で確かめる。</div>
+<br>ただし<b>崩れる点</b>: ナンバーは役所が重ならないように配るが、ラベルは人が自由に付ける名前である。2つのディスクに同じラベルを付けたらどうなるかは、第7章で確かめる。</div>
 <p>USB メモリは2本とも抜いておく。</p>
 <pre data-where="外（lab@host）"><code>$ virsh detach-device linuc ~/vm/extra/usb-a.xml
 Device detached successfully
@@ -162,7 +162,7 @@ $ sudo umount /mnt</code></pre>
 376832 bytes (377 kB, 368 KiB) copied, 0.0267052 s, 14.1 MB/s
 $ ls -l media.iso
 -rw-r--r-- 1 root root 376832 Oct 20 20:59 media.iso</code></pre>
-<p>ファイルは装置ではないので、そのままでは <code>mount</code> に渡す相手にならない。<b>ループデバイス</b>（ファイルを、ディスクのような装置に見せかける仮の装置。<code>/dev/loop0</code> など）を通すと、マウントできる。<code>-o loop</code> は「ループデバイスを用意して、それをマウントせよ」というオプションである。</p>
+<p>ファイルをマウントするときは、<b>ループデバイス</b>（ファイルを、ディスクのような装置に見せかける仮の装置。<code>/dev/loop0</code> など）を間に置く。<code>-o loop</code> は「ループデバイスを用意して、それをマウントせよ」とはっきり頼むオプションである（いまの <code>mount</code> は、付けなくてもファイルを渡されれば自分でループデバイスを用意するが、試験は <code>-o loop</code> の形で問う。ここでも付けて打つ）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mount -o loop media.iso /mnt
 mount: /mnt: WARNING: source write-protected, mounted read-only.
 $ df -h /mnt
@@ -194,7 +194,7 @@ $ sudo rm media.iso</code></pre>
 <div class="quiz"><b>確認</b>
 <p>ダウンロードした <code>install.iso</code> の中身を、CD に焼かずに見たい。どうするか。</p>
 <details><summary>答え</summary>
-<p><code>sudo mount -o loop install.iso /mnt</code>。ループデバイスがファイルを装置に見せかけるので、そのままマウントできる。どのループデバイスがどのファイルにつながっているかは <code>losetup -l</code> で見る。</p></details></div>
+<p><code>sudo mount -o loop install.iso /mnt</code>。<code>mount</code> がループデバイスを用意してファイルを装置に見せかけるので、CD に焼かずにマウントできる（いまの <code>mount</code> は <code>-o loop</code> を省いても同じことをするが、試験では <code>-o loop</code> の形で答える）。どのループデバイスがどのファイルにつながっているかは <code>losetup -l</code> で見る。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>練習機に USB メモリを挿す・抜くのは、外で <code>virsh attach-device</code>・<code>detach-device</code>。中では <code>lsblk -d</code> の TRAN・SERIAL でどれかを見分ける</li><li>マウントポイントは前もって作るただのディレクトリ。もとの中身は隠れるだけで、外せばまた見える。中にプロセスがいると <code>umount</code> は <code>target is busy</code> で断る</li><li><code>/dev/sdb</code> は見つかった順に付く名前で、挿す順番で別のディスクを指す。ディスクに付いているのは中のラベルと UUID で、<code>blkid</code>・<code>findfs</code>・<code>/dev/disk/by-label/</code> で引け、<code>mount LABEL=…</code> で指せる</li><li><code>/media</code> は取り外せるメディアのマウント先。CD は iso9660 で、読み取り専用の装置なので <code>mount</code> は読み取り専用にする</li><li>ISO イメージのようなファイルは、ループデバイスを通して <code>mount -o loop</code> でマウントできる（<code>losetup -l</code> で対応を見る）</li></ul></div>

@@ -11,19 +11,29 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
 </div>
 <h1>1. 練習機に入り、つながっているディスクを眺める</h1>
-<p class="lead">このコースでは、練習機（コンテナの中で動く仮想マシン）につながった空のディスクを、区切って・ファイルシステムを作って・マウントして使えるようにするところから始め、表の形式、ファイルシステムの種類、起動のたびのマウント、スワップ、LVM、部品の情報とドライバへと順に進む。始める前に要るのは、<a href="/linuc-disks/practice/">実践編</a>の「はじめる」で起動した檻と、そこに入った端末1つ（<code>docker exec -it lab-linuc-disks bash -l</code> で開いたもの）だけである。この章では、練習機に入り、つながっているディスクを <code>lsblk</code> と <code>df</code> の2つのコマンドで眺める。まだ何も変えない。</p>
+<p class="lead">このコースでは、練習機（このコースの檻の中で動く、練習用の Linux の機械）につながった空のディスクを、区切って・ファイルシステムを作って・マウントして使えるようにするところから始め、表の形式、ファイルシステムの種類、起動のたびのマウント、スワップ、LVM（複数のディスクを1つにまとめる仕組み。第9章）、部品の情報と、部品を動かすプログラム（ドライバ。第11章）へと順に進む。始める前に要るのは、<a href="/linuc-disks/practice/">実践編</a>の「はじめる」で起動した檻と、そこに入った端末1つ（<code>docker exec -it lab-linuc-disks bash -l</code> で開いたもの）と、下の表の「前のコースで出たもの」である。この章では、練習機に入り、つながっているディスクを <code>lsblk</code> と <code>df</code> の2つのコマンドで眺める。まだ何も変えない。</p>
 <div class="badges"><span>前提: 実践編の「はじめる」で檻を起動した</span><span>所要 15分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>プロンプトを見て、いま外のコンテナ（<code>lab@host</code>）と練習機の中（<code>student@linuc</code>）のどちらにいるかを言え、<code>ssh linuc</code> と <code>exit</code> で行き来できる</li><li><code>lsblk</code> の出力から、ディスク・パーティション・光学ドライブと、その大きさ・マウント先を読める</li><li><code>df -h</code> の出力から、マウントされているファイルシステムの大きさと空きを読め、<code>lsblk</code> との違いを言える</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: 仮想マシンを作るしくみ（QEMU と libvirt。主題1.01 のコース）は扱わない。<code>lsblk</code> の MAJ:MIN 列と、<code>df</code> のディスクではない行（<code>tmpfs</code>・<code>efivarfs</code>）は、この章では読まない。ディスクの名前の付き方の細かい規則（NVMe の SSD の <code>nvme0n1</code> など）も扱わない。</div></div>
+<div class="skip"><b>ここで覚えなくていいこと</b>: 仮想マシンを作るしくみ（QEMU と libvirt。主題1.01 のコース）は扱わない。<code>lsblk</code> の MAJ:MIN 列と、<code>df</code> のディスクではない行（<code>tmpfs</code>・<code>efivarfs</code>）は、この章では読まない。ディスクの名前の付き方の細かい規則（この練習機に無い種類のディスクの名前）も扱わない。</div></div>
+<div class="note"><b>前のコースで出たもの</b>: このコースは、次のものを説明なしで使う。忘れていたら、リンク先の章を読み返してから進む。
+<div class="scroll"><table>
+<tr><th>もの</th><th>何のためにあるか（一言）</th><th>出たところ</th></tr>
+<tr><td>シェル・<code>;</code>・<code>echo</code></td><td>打ったコマンドを読んで動かすプログラム・1行に2つのコマンドを続けて書く・受け取った文字をそのまま出す</td><td><a href="/linuc-text/theory/01-quote">主題1.03 第1章</a></td></tr>
+<tr><td><code>cd</code>・ホーム（<code>~</code>）</td><td>いるディレクトリを移る・ログインしたときに最初にいる自分のディレクトリ</td><td><a href="/linuc-text/theory/02-path">主題1.03 第2章</a></td></tr>
+<tr><td><code>cat</code>・<code>head</code></td><td>ファイルの中身を出す・先頭の数行だけ出す</td><td><a href="/linuc-text/theory/04-lines">主題1.03 第4章</a></td></tr>
+<tr><td><code>&gt;</code>（リダイレクト）</td><td>コマンドの出力を、画面ではなくファイルに書く</td><td><a href="/linuc-text/theory/07-redirect">主題1.03 第7章</a></td></tr>
+<tr><td><code>|</code>（パイプ）</td><td>前のコマンドの出力を、次のコマンドに渡す</td><td><a href="/linuc-text/theory/08-pipe">主題1.03 第8章</a></td></tr>
+<tr><td><code>grep</code>（<code>-E</code>・<code>-i</code>）</td><td>当てはまる行だけを出す（<code>-E</code> は <code>a|b</code> のような拡張の書き方を使う、<code>-i</code> は大文字と小文字を区別しない）</td><td><a href="/linuc-text/theory/09-regex">主題1.03 第9章</a></td></tr>
+<tr><td><code>ls -l</code>・<code>/dev/null</code>・<code>chmod</code></td><td>ファイルの種類・権限・持ち主を見る・捨て場の装置・権限を変える</td><td><a href="/linuc-files/theory/01-permissions">主題1.02 第1章</a></td></tr>
+<tr><td><code>mkdir</code>・<code>rmdir</code>・<code>touch</code>・<code>rm</code>・<code>cp</code></td><td>ディレクトリを作る・空のディレクトリを消す・空のファイルを作る（時刻を変える）・消す・写す</td><td><a href="/linuc-files/theory/04-cp-mv-rm">主題1.02 第4章</a></td></tr>
+<tr><td><code>sudo</code>・パッケージ</td><td>root（その機械の管理者）の権限で打つ・ソフトウェアを配るまとまり</td><td><a href="/linuc-packages/theory/01-install">主題1.04 第1章</a></td></tr>
+<tr><td>コンテナ・<code>ssh</code></td><td>PC の中に区切って作った作業場・別のコンピュータにログインする</td><td><a href="/linuc-boot/theory/03-container">主題1.01 第3章</a>・<a href="/linuc-boot/theory/02-ssh">第2章</a></td></tr>
+</table></div></div>
 
 <h2 id="where">外と練習機の中 — 2つの場所</h2>
 <div class="sgoal"><b>この節で分かること</b>: いま打っている端末が外のコンテナか練習機の中かを見分け、行き来する方法。</div>
-<p>ディスクを区切ったりつないだりする操作は、ディスクという装置と、それを管理するカーネル（OS の中心で、装置・メモリ・プロセスを管理している部分）を直接相手にする。ところがコンテナは、あなたの PC のカーネルを借りて動いていて、ディスクの装置は渡されない（主題1.02 のコースの檻には、ディスクの装置が1つも無かった）。そこでこの檻は、コンテナの中で<b>仮想マシン</b>（ソフトウェアが作り出した1台のコンピュータ。自分のカーネルを持つ）を1台動かしている。これを<b>練習機</b>と呼ぶ。</p>
-<pre><code>あなたの PC
- └─ 檻（コンテナ）           プロンプト lab@host       … 外。vm・virsh・lab を打つ
-     └─ 練習機（仮想マシン）  プロンプト student@linuc  … 中。ディスクを区切る・つなぐ</code></pre>
-<p>実践編の「はじめる」で開いた端末は、外（<code>lab@host</code>）にいる。まず練習機が起動し終わるのを待つ。<code>vm start</code> は練習機を起動し、中に入れるようになるまで待つコマンドである（この檻のために用意したもの）。</p>
+<p>実践編の「はじめる」で開いた端末は、プロンプトが <code>lab@host:~$</code> になっている。この場所を<b>外</b>と呼ぶ。このコースのディスクの操作は、外ではなく<b>練習機</b>（ディスクを自由に区切ってよい、練習用の Linux の機械）の中で打つ。まず、練習機が起動し終わるのを待つ。<code>vm start</code> は練習機を起動し、中に入れるようになるまで待つコマンドである（この檻のために用意したもの）。</p>
 <pre data-where="外（lab@host）"><code>$ vm start
 練習機はもう動いています
   起動中… 10秒（KVM なしの完全エミュレーションなので 40〜90 秒かかります）
@@ -34,7 +44,7 @@
   LinuC 練習機（Ubuntu 24.04 / 仮想マシン）
   - 採点は外のコンテナが持っています。この中でも lab check NN で答え合わせできます
   - 管理用の NIC（enp0s16）を止めると ssh が切れます。そのときは外で vm console</code></pre>
-<p>練習機の案内が出て、プロンプトが <code>student@linuc:~$</code> に変わる。これが練習機の中である（このコースの端末のブロックは、プロンプトを <code>$</code> だけにして載せる。どこで打つかは、ブロックの上の小さな見出しで示す）。案内の2行は、演習の答え合わせ（<code>lab check</code>）が練習機の中でも打てることと、練習機のネットワークの装置（NIC）を止めると ssh が切れるという注意である（このコースではネットワークは触らない）。<code>exit</code> で外に戻り、もう一度入ってみる。</p>
+<p>練習機の案内が出て、プロンプトが <code>student@linuc:~$</code> に変わる。これが練習機の中である（このコースの端末のブロックは、プロンプトを <code>$</code> だけにして載せる。どこで打つかは、ブロックの上の小さな見出しで示す）。案内の2行は、演習の答え合わせ（<code>lab check</code>）が練習機の中でも打てることと、練習機のネットワークの装置（NIC）を止めると ssh が切れるので、そのときは外で <code>vm console</code>（練習機の画面に外から直接つなぐコマンド）を使え、という注意である（このコースではネットワークは触らない）。<code>exit</code> で外に戻り、もう一度入ってみる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ exit
 logout
 Connection to 127.0.0.1 closed.</code></pre>
@@ -45,8 +55,12 @@ Connection to 127.0.0.1 closed.</code></pre>
 
 Last login: Tue Oct 20 20:55:10 2026 from 10.0.2.2</code></pre>
 <p><code>exit</code> で <code>logout</code> と出てプロンプトが <code>lab@host</code> に戻り、<code>ssh linuc</code> でまた入った。2回目には、前に入った日時（<code>Last login:</code>）の行が出る。ここから先は、ことわりの無い限り練習機の中で打つ。</p>
+<p>場所が2つあるのには理由がある。ディスクを区切る操作は、ディスクという装置を、<b>カーネル</b>（OS の中心の部分。OS はコンピュータを動かす土台のソフトウェアで、ここでは Linux。カーネルは装置と、<b>メモリ</b>（動いているプログラムとデータを置く場所）と、<b>プロセス</b>（動いているプログラム）を管理する）を通して直接いじる。ところがコンテナは PC のカーネルを借りて動くので、ディスクの装置を渡してもらえない。そこで檻は、コンテナの中で<b>仮想マシン</b>（ソフトウェアで作った1台のコンピュータ。自分のカーネルを持つ）を1台動かしている。それが練習機である。</p>
+<pre><code>あなたの PC
+ └─ 檻（コンテナ）           プロンプト lab@host       … 外。vm・virsh・lab を打つ
+     └─ 練習機（仮想マシン）  プロンプト student@linuc  … 中。ディスクを区切る・つなぐ</code></pre>
 <div class="analogy"><b>たとえ</b>: 練習機は、作業場（コンテナ）の中に置いた<b>練習用のパソコン</b>に近い。ディスクを区切って失敗しても、壊れるのは練習用のパソコンのディスクだけで、作業場の外（あなたの PC）には何も起きない。
-<br>ただし<b>崩れる点</b>: 本物のパソコンのディスクは部品だが、練習機のディスクは外のコンテナに置いたファイルである。だから全員の練習機に同じディスクがつながっていて、本文と同じ画面が出る。また、本物より遅い（KVM という速くする仕組みを使わず、CPU の命令をソフトウェアで真似しているため）。</div>
+<br>ただし<b>崩れる点</b>: 本物のパソコンのディスクは部品だが、練習機のディスクは外のコンテナに置いたファイルである。だから全員の練習機に同じディスクがつながっていて、本文と同じ画面が出る。また、本物より遅い（KVM という速くする仕組みを使わず、CPU（命令を実行する部品）の命令をソフトウェアで真似しているため）。</div>
 
 <h2 id="lsblk">つながっているディスクを一覧する — lsblk</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>lsblk</code> の1行が何を表し、各列をどう読むか。</div>
@@ -71,9 +85,9 @@ vde     253:64   0  512M  0 disk</code></pre>
 <tr><td>NAME</td><td>装置の名前。<code>/dev/</code> を付けると装置のファイルの名前になる（<code>vdb</code> → <code>/dev/vdb</code>）</td><td>コマンドに渡すときの名前。<code>├─</code>・<code>└─</code> は「上の行のディスクの中にある」という意味</td></tr>
 <tr><td>MAJ:MIN</td><td>装置の番号（主題1.02 で見たメジャー番号とマイナー番号）</td><td>カーネルが装置を見分ける番号。この章では読まない</td></tr>
 <tr><td>RM</td><td>取り外せる装置なら 1（removable）</td><td>USB メモリや CD のように、抜き差しする装置を見分ける</td></tr>
-<tr><td>SIZE</td><td>大きさ（G はギガバイト、M はメガバイト、K はキロバイト）</td><td>どのディスクかを見分ける一番の手がかり</td></tr>
+<tr><td>SIZE</td><td>大きさ（K は KiB = 1024 バイト、M は MiB = 1024KiB、G は GiB = 1024MiB）</td><td>どのディスクかを見分ける一番の手がかり</td></tr>
 <tr><td>RO</td><td>読み取り専用なら 1（read only）</td><td>書き込めない装置（CD-ROM など）を見分ける</td></tr>
-<tr><td>TYPE</td><td><code>disk</code>（ディスク）・<code>part</code>（パーティション）・<code>rom</code>（光学ドライブ）</td><td>その行が装置全体か、その中の区画かを見分ける</td></tr>
+<tr><td>TYPE</td><td><code>disk</code>（ディスク）・<code>part</code>（パーティション）・<code>rom</code>（光学ドライブ。CD・DVD を読む装置）</td><td>その行が装置全体か、その中の区画かを見分ける</td></tr>
 <tr><td>MOUNTPOINTS</td><td>マウント先（その区画を、どのディレクトリから使えるようにしてあるか）</td><td>空欄なら、まだどこからも使えない</td></tr>
 </table></div>
 <p><b>ディスク</b>はデータを書いておく記憶装置で、<b>パーティション</b>はディスクを区切った区画である。名前の頭の2文字は、ディスクのつながり方の種類を表す。</p>
@@ -114,7 +128,7 @@ tmpfs           143M  8.0K  143M   1% /run/user/1000</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ df -h /dev/vdb
 Filesystem      Size  Used Avail Use% Mounted on
 devtmpfs        689M     0  689M   0% /dev</code></pre>
-<div class="then"><b>だめな理由</b>: 出てきたのは <code>vdb</code> ではなく、<code>/dev</code> にマウントされている <code>devtmpfs</code> の行だった。<code>df</code> にファイルの名前を渡すと、「そのファイルが置いてあるファイルシステム」について答える。<code>/dev/vdb</code> は <code>/dev</code> の中のファイルなので、<code>/dev</code> の答えが返ってきた。<code>vdb</code> にはまだファイルシステムが無く、どこにもマウントされていない。<b><code>df</code> が数えられるのは、マウントされているファイルシステムだけ</b>で、<code>vdb</code> の大きさを知りたいなら <code>lsblk</code> を見る。</div></div>
+<div class="then"><b>だめな理由</b>: 出てきたのは <code>vdb</code> ではなく、<code>/dev</code> にマウントされている <code>devtmpfs</code>（カーネルが装置のファイルを置くために、メモリの上に作るファイルシステム。第10章）の行だった。<code>df</code> にファイルの名前を渡すと、「そのファイルが置いてあるファイルシステム」について答える。<code>/dev/vdb</code> は <code>/dev</code> の中のファイルなので、<code>/dev</code> の答えが返ってきた。<code>vdb</code> にはまだファイルシステムが無く、どこにもマウントされていない。<b><code>df</code> が数えられるのは、マウントされているファイルシステムだけ</b>で、<code>vdb</code> の大きさを知りたいなら <code>lsblk</code> を見る。</div></div>
 <p>その <code>/dev/vdb</code> を <code>ls -l</code> で見る。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls -l /dev/vdb
 brw-rw---- 1 root disk 253, 16 Oct 20 20:54 /dev/vdb</code></pre>
@@ -132,7 +146,7 @@ vdb        2G disk</code></pre>
  └─ vda1（パーティション）── ext4（ファイルシステム）── /（マウントポイント）
 vdb（ディスク）
  └─ （まだ何も無い）</code></pre>
-<p><code>vda1</code> には ext4 というファイルシステムがあり、<code>/</code> にマウントされている。<code>vda14</code> は区画だが、ファイルシステムが無い（BIOS という古い起動の方式のために取ってある 4M の区画で、この練習機の起動には使われていない）。<code>vdb</code> には区画もファイルシステムも無い。使えるようにするには、区切る → ファイルシステムを作る → マウントする、の3段が要る。次の章で、この <code>vdb</code> を一通り使えるようにする。</p>
+<p><code>vda1</code> には ext4 というファイルシステムがあり、<code>/</code> にマウントされている。<code>vda15</code> の <code>vfat</code> は、FAT（Windows などでも読める単純なファイルシステム）の Linux での呼び名で、この区画は起動に使う（第4章）。<code>vda14</code> は区画だが、ファイルシステムが無い（BIOS（電源を入れたときに最初に動くファームウェアの、古い形）で起動するときのために取ってある 4M の区画で、この練習機の起動には使われていない）。<code>vdb</code> には区画もファイルシステムも無い。使えるようにするには、区切る → ファイルシステムを作る → マウントする、の3段が要る。次の章で、この <code>vdb</code> を一通り使えるようにする。</p>
 <div class="analogy"><b>たとえ</b>: <code>lsblk</code> は町の<b>土地台帳</b>、<code>df</code> は道につながった倉庫の<b>在庫表</b>に近い。台帳には空き地も載るが、在庫表には開いている倉庫しか載らない。
 <br>ただし<b>崩れる点</b>: 在庫表に無い場所を聞かれたら、ふつうは「載っていない」と答えるが、<code>df</code> はその場所を含む別の倉庫の在庫を答えてしまう（<code>df -h /dev/vdb</code> が <code>/dev</code> の行を返した）。答えの Mounted on の列を見て、聞いたものと合っているかを確かめる。</div>
 <div class="note try"><b>手を動かす</b>:

@@ -14,7 +14,7 @@
 <p class="lead">第1章では、練習機に入り、<code>lsblk</code> と <code>df</code> で、<code>vdb</code>（2G）が区画もファイルシステムも持たない空のディスクだと確かめた。この章では、その <code>vdb</code> を区切る → ファイルシステムを作る → マウントする → ファイルを書く → 外す、と一通り使ってみる。</p>
 <div class="badges"><span>前提: 第1章まで読了</span><span>前提: 練習機の中にいる</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>fdisk</code> で、空のディスクにパーティションを1つ作れる（<code>n</code> で作り、<code>p</code> で確かめ、<code>w</code> で書く）</li><li><code>mkfs.ext4</code> でファイルシステムを作り、<code>mount</code> でつないで読み書きし、<code>umount</code> で外せる</li><li>マウントしたディレクトリに書けないとき、何を確かめてどう直すかを言える</li></ul>
+<ul><li><code>fdisk</code> で、空のディスクにパーティションを1つ作れる（<code>n</code> で作り、<code>p</code> で確かめ、<code>w</code> で書く）</li><li><code>mkfs.ext4</code> でファイルシステムを作り、<code>mount</code> でつないで読み書きし、<code>umount</code> で外せる</li><li>マウントしたディスクに student のままファイルを書いてみて、どうなるかを確かめ、書けるようにできる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>fdisk</code> が出す表の形式の名前（DOS・MBR）と Disk identifier は、この章では読まない。<code>mkfs.ext4</code> の出力の途中の行（<code>Allocating group tables</code> など）の意味も、この章では読まない。区画の大きさの決め方（何 MB にするか）は扱わず、ここでは 200M にする。</div></div>
 
 <h2 id="fdisk">区切る — fdisk でパーティションを1つ作る</h2>
@@ -28,7 +28,7 @@
 <li><code>Device does not contain a recognized partition table.</code> は「このディスクには表が無い」。<code>fdisk</code> は空の表をメモリの上に作った（<code>0x</code> で始まる番号は表ごとに違い、あなたの画面では別の値になる。<code>0x</code> は16進数（0〜9 と a〜f の16文字で書く数）の印）。</li>
 <li><code>n</code> の後、区画の種類を聞かれる。<code>p</code>（primary、基本パーティション）を選ぶ。もう1つの <code>e</code> は、区画を5つ以上に分けたいときに使う種類である。番号は <code>1</code> にした。</li>
 <li><code>First sector</code> は区画の始まりの位置である。<b>セクタ</b>はディスクを読み書きする最小の単位で、ここでは 512 バイト。Enter だけを押すと、括弧の中の default（2048）になる。表そのものはディスクの先頭の1セクタに入り、残りの 2047 セクタは、区画の始まりを 1MiB（1024×1024 バイト = 2048 セクタ）の切れ目にそろえるために空けておく（いまの道具の決まりごと）。</li>
-<li><code>Last sector</code> は終わりの位置で、<code>+200M</code> のように大きさで答えられる（M は MiB のこと）。</li>
+<li><code>Last sector</code> は終わりの位置で、<code>+200M</code> のように大きさで答えられる。大きさの単位は 1024 倍ずつで、1KiB = 1024 バイト、1MiB = 1024KiB、1GiB = 1024MiB、1TiB = 1024GiB である。<code>fdisk</code> や <code>lsblk</code> の K・M・G・T はこの意味（1000 倍ずつの KB・MB とは少し違い、第4章の <code>parted</code> は MB で表示する）。</li>
 <li><code>p</code> で、メモリの上の表を出した。<code>/dev/vdb1</code> が 2048 番目のセクタから 411647 番目まで、200M ある。</li>
 <li><code>w</code> で表をディスクに書き、カーネルに読み直させて（<code>Calling ioctl() to re-read partition table.</code>）終わった。</li>
 </ul>
@@ -69,7 +69,7 @@ $ lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS /dev/vdb</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ echo "はじめてのファイル" &gt; /mnt/memo.txt</code></pre>
 <div class="then"><b>だめな理由</b>: <code>Permission denied</code>（書き込みの許可が無い）で断られた。マウントすると、<code>/mnt</code> は <code>vdb1</code> の ext4 の<b>いちばん上のディレクトリ</b>を見せるようになる。その持ち主と権限は ext4 の中に書かれていて、<code>mkfs</code> が作ったときに root のもの（<code>rwxr-xr-x</code>）になった。student は「その他」なので書けない。</div></div>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls -ld /mnt</code></pre>
-<p>持ち主が root で、その他の人は <code>r-x</code>（読む・中に入るだけ）である。このディスクを student のデータ置き場にするなら、いちばん上のディレクトリの持ち主を student に変える。<code>chown</code> は、ファイルやディレクトリの持ち主を変えるコマンドである（<code>student:student</code> は「持ち主を student、グループを student に」）。</p>
+<p><code>ls</code> の <code>-d</code> は、ディレクトリの中身ではなく、ディレクトリそのものを1行で出すオプションである。持ち主が root で、その他の人は <code>r-x</code>（読む・中に入るだけ）である。このディスクを student のデータ置き場にするなら、いちばん上のディレクトリの持ち主を student に変える。<code>chown</code> は、ファイルやディレクトリの持ち主を変えるコマンドである（<code>student:student</code> は「持ち主を student、グループを student に」）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo chown student:student /mnt
 $ ls -ld /mnt
 $ echo "はじめてのファイル" &gt; /mnt/memo.txt

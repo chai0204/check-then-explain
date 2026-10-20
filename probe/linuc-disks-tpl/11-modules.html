@@ -14,7 +14,7 @@
 <p class="lead">第10章では、部品の情報を <code>/proc</code>・<code>/sys</code>・<code>/dev</code> から読み、<code>lspci -k</code> で装置を動かしているドライバの名前を見て、udev の規則を1行書いた。この章では、そのドライバ（カーネルモジュール）が、いつ・誰によって読み込まれるのかを、CD のマウントと USB メモリの抜き差しで確かめ、USB メモリを挿しても使えないようにする設定まで行う。最後に、全11章を1つの事実でまとめる。</p>
 <div class="badges"><span>前提: 第10章まで読了</span><span>前提: 練習機の中にいる・外の端末もある</span><span>所要 28分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>lsmod</code>・<code>modinfo</code>・<code>modprobe</code>・<code>insmod</code>・<code>rmmod</code> の役割を言い分けられる</li><li>USB メモリを挿したとき、カーネル・udev・modprobe の誰が何をするかを順に言える</li><li>ドライバを外すだけでは次に挿したとき戻ることを説明でき、<code>/etc/modprobe.d/</code> で読み込ませないようにできる</li></ul>
+<ul><li><code>lsmod</code>・<code>modinfo</code>・<code>modprobe</code>・<code>insmod</code>・<code>rmmod</code> の役割を言い分けられる</li><li>USB メモリを挿したとき、カーネル・udev・modprobe の誰が何をするかを順に言える</li><li>ドライバを外した USB メモリを挿し直したらどうなるかを確かめ、<code>/etc/modprobe.d/</code> で読み込ませないようにできる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: モジュールに渡すパラメータ（<code>options</code> の行）は扱わない。udev の規則の書き方の全体と、D-Bus のメッセージの形も扱わない。<code>depmod</code> が作る索引のファイルの中身も扱わない。</div></div>
 
 <h2 id="lsmod">読み込まれているドライバを見る</h2>
@@ -51,7 +51,7 @@ $ sudo modprobe -rv udf</code></pre>
 </table></div>
 
 <h2 id="auto">CD をマウントすると、何が読み込まれるか</h2>
-<div class="sgoal"><b>この節で分かること</b>: 誰も <code>modprobe</code> を打たなくても、モジュールが読み込まれる場面。</div>
+<div class="sgoal"><b>この節で分かること</b>: CD をマウントする前と後で、読み込まれているモジュールがどう変わるか。</div>
 <p>CD のファイルシステム（iso9660）を読むドライバ <code>isofs</code> で確かめる。第7章の再起動の後、この章まで CD はマウントしていない。ただ、第7章の後で演習06 の判定（student が CD をマウントする）を打った人は、そのときに読み込まれているので、先に外しておく（読み込まれていなければ、<code>modprobe -r</code> は何も言わずに終わる）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo modprobe -r isofs
 $ lsmod | grep isofs
@@ -73,10 +73,10 @@ $ lsusb -t
 $ lsblk -d -o NAME,TRAN,RM,SIZE,SERIAL
 $ lsmod | grep -E "usb_storage|uas"
 $ sudo dmesg | grep -E "usb-storage|registered new interface"</code></pre>
-<p><code>lsusb</code> に USB メモリ（<code>QEMU USB HARDDRIVE</code>）が出て、<code>lsusb -t</code> では <code>Driver=usb-storage</code> が付いている（Device の番号は、それまでに挿した回数で変わる）。ディスク <code>sdb</code> は、USB でつながり（TRAN が <code>usb</code>）、取り外せる（RM が 1）。そして、あなたは何も読み込んでいないのに、<code>usb_storage</code> と <code>uas</code> の2つが読み込まれた。<code>dmesg</code> の <code>usbcore: registered new interface driver usb-storage</code> がその瞬間である（上の2行の <code>usbfs</code>・<code>hub</code> は、起動したときに組み込みの部品が名乗った行。第7章の再起動の後に <code>lab check 10</code> か、引数なしの <code>lab check</code> を打った人は、判定が USB メモリを1本挿したので、そのときの行も出る）。</p>
+<p><code>lsusb</code> に USB メモリ（<code>QEMU USB HARDDRIVE</code>）が出て、<code>lsusb -t</code> では <code>Driver=usb-storage</code> が付いている（Device の番号は、それまでに挿した回数で変わる）。ディスク <code>sdb</code> は、USB でつながり（TRAN が <code>usb</code>）、取り外せる（RM が 1）。そして、あなたは何も読み込んでいないのに、<code>usb_storage</code> と <code>uas</code>（USB Attached SCSI。対応した USB の記憶装置を、<code>usb_storage</code> より新しく速い送り方で動かすドライバ）の2つが読み込まれた。<code>dmesg</code> の <code>usbcore: registered new interface driver usb-storage</code> がその瞬間である（上の2行の <code>usbfs</code>・<code>hub</code> は、起動したときに組み込みの部品が名乗った行。第7章の再起動の後に <code>lab check 10</code> か、引数なしの <code>lab check</code> を打った人は、判定が USB メモリを1本挿したので、そのときの行も出る）。</p>
 
 <h2 id="naive">ドライバを外した USB メモリを、挿し直すと？</h2>
-<div class="sgoal"><b>この節で分かること</b>: 「ドライバを外す」が「装置を使えなくする」にならない理由。</div>
+<div class="sgoal"><b>この節で分かること</b>: ドライバを外した USB メモリを、抜いて挿し直すとどうなるか。</div>
 <p>USB メモリのドライバを外す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo modprobe -r usb_storage
 $ sudo rmmod usb_storage
@@ -116,7 +116,7 @@ $ sudo modprobe -r uas</code></pre>
 $ virsh attach-device linuc ~/vm/extra/usb-a.xml</code></pre>
 <pre data-where="練習機の中（student@linuc）"><code>$ lsmod | grep -E "usb_storage|uas"
 $ modprobe --show-depends uas</code></pre>
-<p>止まらない。<code>blacklist</code> で外れたのは <code>usb_storage</code> だけで、<code>uas</code> は候補に残って読み込まれた。<code>modprobe --show-depends</code>（読み込むときに何をするかを、読み込まずに出す）で分かるとおり、<code>uas</code> は <code>usb_storage</code> に依存しているので、<code>usb_storage</code> は<b>依存として</b>読み込まれた。依存には <code>blacklist</code> が効かない。では <code>uas</code> も書けばよい。同じファイルを書き換えて、挿し直す（<code>printf</code> の <code>\n</code> は改行）。</p>
+<p>止まらない。<code>blacklist</code> で外れたのは <code>usb_storage</code> だけで、<code>uas</code> は候補に残って読み込まれた。<code>modprobe --show-depends</code>（読み込むときに何をするかを、読み込まずに出す）で分かるとおり、<code>uas</code> は <code>usb_storage</code> に依存しているので、<code>usb_storage</code> は<b>依存として</b>読み込まれた。依存には <code>blacklist</code> が効かない。では <code>uas</code> も書けばよい。同じファイルを書き換えて、挿し直す（<code>printf</code> は <code>echo</code> のように文字を出すコマンドで、<code>\n</code> と書いたところで改行する）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ printf "blacklist usb_storage\nblacklist uas\n" | sudo tee /etc/modprobe.d/lab-usb.conf
 $ sudo modprobe -r uas</code></pre>
 <pre data-where="外（lab@host）"><code>$ virsh detach-device linuc ~/vm/extra/usb-a.xml
@@ -204,7 +204,7 @@ $ sudo rmmod usb_storage</code></pre>
 <div class="quiz"><b>確認</b>
 <p>起動するたびに読み込みたいモジュールがある。どこに書くか。</p>
 <details><summary>答え</summary>
-<p><code>/etc/modules-load.d/</code> の下に <code>.conf</code> のファイルを置き、モジュールの名前を1行ずつ書く。古い <code>/etc/modules</code> もまだ読まれるが、練習機のファイル自身が「obsolete（廃止）」と書いている。</p></details></div>
+<p><code>/etc/modules-load.d/</code> の下の <code>.conf</code> のファイルに書く（練習機の <code>/etc/modules</code> 自身が、そこへ置き換わったと書いている）。古い <code>/etc/modules</code> もまだ読まれるが、同じファイルが「obsolete（廃止）」と書いている。</p></details></div>
 
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>ドライバの多くはカーネルモジュールで、<code>lsmod</code> に出る。最初から組み込まれているもの（この練習機では ext4・vfat・sr_mod）は出ず、外せない</li><li>モジュールは、要るときに読み込まれる（CD をマウントすると isofs、USB メモリを挿すと usb_storage と uas）。読み込んだのはカーネルと udev で、あなたではない</li><li><code>insmod</code> は依存を解決せず、<code>modprobe</code> は依存の順に読み込む。<code>modprobe -r</code> は使われなくなった依存も外す。<code>rmmod</code> は使われていれば断る</li><li>ドライバを外しても装置は <code>lsusb</code>・<code>lspci</code> に残る。次に挿せば、udev が装置の種類（modalias）に合うドライバをまた読み込む</li><li>止めるのは <code>/etc/modprobe.d/</code>。<code>blacklist</code> は別名からの読み込みだけを止め、依存と名前を指定した <code>modprobe</code> は止めない。<code>install 名前 /bin/false</code> は <code>modprobe</code> を止めるが <code>insmod</code> は止めない。すでにあるファイルを書き換えたら udev を再起動する</li><li>sysfs は装置の情報、udev は装置の出入りの処理、D-Bus はプログラムどうしの通り道</li></ul></div>

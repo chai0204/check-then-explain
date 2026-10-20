@@ -58,10 +58,13 @@ $ lab check 02
 @中
 $ sudo parted /dev/vdb print
 $ lab check 03
-# --- 3番の種類を 8300 のまま作った ---
-$ sudo sgdisk -o -n 1:0:+100M -t 1:ef00 -n 2:0:+300M -t 2:8300 -n 3:0:+256M -t 3:8300 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+# --- 3番の種類を 8300 のまま作った（模範解答と同じ対話の gdisk で）---
+$ sudo gdisk /dev/vdb
+@keys o|Y|n|||+100M|ef00|n|||+300M|8300|n|||+256M|8300|n|||+600M|8300|n|||+400M|8300|n|||||p|w|Y
 $ lab check 03
-$ sudo sgdisk -o -n 1:0:+100M -t 1:ef00 -n 2:0:+300M -t 2:8300 -n 3:0:+256M -t 3:8200 -n 4:0:+600M -t 4:8300 -n 5:0:+400M -t 5:8300 -n 6:0:0 -t 6:8300 /dev/vdb
+# --- 模範解答: 対話の gdisk で、3番を 8200 にして作り直す ---
+$ sudo gdisk /dev/vdb
+@keys o|Y|n|||+100M|ef00|n|||+300M|8300|n|||+256M|8200|n|||+600M|8300|n|||+400M|8300|n|||||p|w|Y
 $ lsblk -o NAME,SIZE,PARTTYPENAME /dev/vdb
 $ lab check 03
 
@@ -150,7 +153,7 @@ $ sudo mkdir /srv/data
 $ sudo mount /dev/vg0/data /srv/data
 # --- 1台に収まる大きさのまま ---
 $ lab check 08
-$ sudo lvextend -L 1.2G vg0/data
+$ sudo lvextend -L +600M vg0/data
 $ df -h /srv/data
 # --- 箱（LV）だけ広げた ---
 $ lab check 08
