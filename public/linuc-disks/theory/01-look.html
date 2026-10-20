@@ -12,7 +12,7 @@
 </div>
 <h1>1. 練習機に入り、つながっているディスクを眺める</h1>
 <p class="lead">このコースでは、練習機（このコースの檻の中で動く、練習用の Linux の機械）につながった空のディスクを、区切って・ファイルシステムを作って・マウントして使えるようにするところから始め、表の形式、ファイルシステムの種類、起動のたびのマウント、スワップ、LVM（複数のディスクを1つにまとめる仕組み。第9章）、部品の情報と、部品を動かすプログラム（ドライバ。第11章）へと順に進む。始める前に要るのは、<a href="/linuc-disks/practice/">実践編</a>の「はじめる」で起動した檻と、そこに入った端末1つ（<code>docker exec -it lab-linuc-disks bash -l</code> で開いたもの）と、下の表の「前のコースで出たもの」である。この章では、練習機に入り、つながっているディスクを <code>lsblk</code> と <code>df</code> の2つのコマンドで眺める。まだ何も変えない。</p>
-<div class="badges"><span>前提: 実践編の「はじめる」で檻を起動した</span><span>所要 15分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
+<div class="badges"><span>前提: 実践編の「はじめる」で檻を起動した</span><span>所要 17分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>プロンプトを見て、いま外のコンテナ（<code>lab@host</code>）と練習機の中（<code>student@linuc</code>）のどちらにいるかを言え、<code>ssh linuc</code> と <code>exit</code> で行き来できる</li><li><code>lsblk</code> の出力から、ディスク・パーティション・光学ドライブと、その大きさ・マウント先を読める</li><li><code>df -h</code> の出力から、マウントされているファイルシステムの大きさと空きを読め、<code>lsblk</code> との違いを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: 仮想マシンを作るしくみ（QEMU と libvirt。主題1.01 のコース）は扱わない。<code>lsblk</code> の MAJ:MIN 列と、<code>df</code> のディスクではない行（<code>tmpfs</code>・<code>efivarfs</code>）は、この章では読まない。ディスクの名前の付き方の細かい規則（この練習機に無い種類のディスクの名前）も扱わない。</div></div>
