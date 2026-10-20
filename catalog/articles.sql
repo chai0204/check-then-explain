@@ -34,13 +34,14 @@ vi のモードを行き来して編集し、:w! :q! :e! ZZ の違いを言え�
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-text', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-packages', 'パッケージ管理（apt と yum）', 'ドラフト', 'LinuC レベル1', '101', '1.04', '初級', '演習あり（コンテナ）', '2026-10-13', '2026-10-13',
-  'LinuC レベル1 101 試験の主題1.04（apt・dpkg・yum・rpm）を、Debian 系（Ubuntu 24.04）と RPM 系（AlmaLinux 9.7）の2つの檻で打って確かめる7章。入れる・消す・調べる・照らし合わせる・署名を確かめる、を全部やる。パッケージのコマンドはどれも、手元の台帳（dpkg・rpm）かリポジトリの目録（apt・yum）という帳簿を読んでいるだけだ。',
-  'LinuC レベル1（101）の受験者で、dpkg -S と apt-file search のような似たコマンドの違いで迷う人。端末でコマンドを打てて、docker を動かせることが前提。',
-  'dpkg・rpm・apt・yum のコマンドを、台帳と目録のどちらを読むかで分けられる
-remove・purge・autoremove の違いを、台帳の状態（ii / rc）で言える
-dpkg -i が依存関係で止まったときの台帳の状態と、続きのやり方を言える
-rpm -K の出力を読み、署名が確かめられたかを判断できる');
+  'linuc-packages', 'パッケージ管理（apt と yum）', 'ドラフト', 'LinuC レベル1', '101', '1.04', '初級', '演習あり（コンテナ）', '2026-10-13', '2026-10-20',
+  'LinuC レベル1 101 試験の主題1.04（apt・dpkg・yum・rpm）を、Debian 系（Ubuntu 24.04）と RPM 系（AlmaLinux 9.7）の2つの檻で打って確かめる11章。まだ入っていないコマンドを1つ入れて・使って・消すところから始め、何が入っているか・ファイルがどこに置かれたか・依存関係・リポジトリ・.deb ファイル・パッケージの自作までを Debian 系で順にやり、同じことを RPM 系の yum と rpm でやり直す。途中で、ファイルだけ・台帳だけを変えたときに何が起きるかも確かめる。',
+  'LinuC レベル1（101）の受験者で、パッケージ管理のコマンドをまだ打ったことがない人。端末でコマンドを打てて、sudo・パイプ・grep・less・vi が使え、docker を動かせることが前提（主題1.01〜1.03 を済ませていれば足りる）。',
+  'まだ入っていないコマンドを apt / yum で入れて使い、消せる
+入っているもの・置かれたファイル・ファイルの持ち主のパッケージを、dpkg / rpm の台帳に聞いて調べられる
+remove・purge・autoremove の違いを、台帳の状態（ii / rc）と設定ファイルで示せる
+リポジトリを足して新しい版に上げられ、apt update が要る apt と、自分で取りに行く yum の違いを言える
+.deb / .rpm ファイルを直接入れ、依存関係で止まったときに続きを済ませられる');
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-packages', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
