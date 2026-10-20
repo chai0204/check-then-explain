@@ -11,13 +11,13 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
 </div>
 <h1>10. yum のリポジトリを足して、署名を確かめる</h1>
-<p class="lead"><b>前の章までにやったこと</b>: RPM 系の檻で、yum で入れて消し、rpm に入っているものと置かれたファイルを聞き、yum が要らなくなった依存関係も消すことを確かめた（第9章）。Debian 系では、apt が見に行くリポジトリの表（<code>sources.list</code>）を読み、区分を足して <code>apt update</code> と <code>apt upgrade</code> で新しい版に上げた（第6章）。<b>この章でやること</b>: yum の設定とリポジトリの表を読み、新しい版の置き場を足して labhello を上げる。その途中で「鍵を取り込んでよいか」と聞かれるので、パッケージの署名と鍵を確かめる。最後に、入っていないパッケージを yum で探す。</p>
+<p class="lead"><b>前の章までにやったこと</b>: RPM 系の檻で、yum で入れて消し、rpm に入っているものと置かれたファイルを聞き、yum が要らなくなった依存関係も消すことを確かめた（第9章）。Debian 系では、apt が見に行くリポジトリの表（<code>sources.list</code>）を読み、区分を足して <code>apt update</code> と <code>apt upgrade</code> で新しい版に上げた（第6章）。<b>この章でやること</b>: yum の設定とリポジトリの表を読み、新しい版の置き場を足して labhello を上げる。上げるときに出てくる問いをきっかけに、パッケージの署名と鍵を確かめる。最後に、入っていないパッケージを yum で探す。</p>
 <div class="badges"><span>前提: 第9章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 28分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.3（重要度3）</span><span>出題範囲 1.04.4（重要度1）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>yum</code> と <code>dnf</code>、<code>/etc/yum.conf</code> と <code>/etc/dnf/dnf.conf</code> の関係を <code>ls -l</code> で示せる</li><li><code>/etc/yum.repos.d/</code> の .repo ファイル（<code>[repo id]</code>・<code>name</code>・<code>baseurl</code>・<code>enabled</code>・<code>gpgcheck</code>・<code>gpgkey</code>）を読み書きでき、足したリポジトリから <code>yum update</code> で上げられる</li><li><code>rpm -K</code> の出力（<code>digests</code>・<code>signatures</code>・大文字）を読み、署名が確かめられたかを判断でき、<code>rpm --import</code> で鍵を取り込める</li><li>入っていないパッケージを <code>yum search</code>・<code>info</code>・<code>provides</code>・<code>repoquery -l</code>・<code>deplist</code> で調べられる</li></ul>
+<ul><li><code>yum</code> と <code>dnf</code>、<code>/etc/yum.conf</code> と <code>/etc/dnf/dnf.conf</code> の関係を <code>ls -l</code> で確かめる</li><li><code>/etc/yum.repos.d/</code> の .repo ファイル（<code>[repo id]</code>・<code>name</code>・<code>baseurl</code>・<code>enabled</code>・<code>gpgcheck</code>・<code>gpgkey</code>）を読み、リポジトリを足してから新しい版に上がるまでに何が要るかを確かめる</li><li><code>rpm -K</code> の出力を読んで、署名が確かめられたかを判断し、鍵を台帳に取り込む方法を確かめる</li><li>入っていないパッケージを <code>yum search</code>・<code>info</code>・<code>provides</code>・<code>repoquery -l</code>・<code>deplist</code> で調べる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: パッケージに署名する手順と鍵の作り方、鍵の失効、yum のモジュール（<code>dnf module</code>）とグループ（<code>yum groupinstall</code>）、RHEL のサブスクリプションの登録、<code>yum.conf</code> のこの章に出てこない項目。<code>Last metadata expiration check</code> の行は「目録を最後に確かめた時刻」と読めれば足りる（時刻は読者ごとに違う）。</div></div>
 
-<h2 id="conf">yum の正体と設定ファイル</h2>
+<h2 id="conf">yum と設定ファイル</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>yum</code> と打つと何が動き、どこに設定があるか。</div>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ ls -l /usr/bin/yum /usr/bin/dnf
 lrwxrwxrwx 1 root root 5 Sep 22  2025 /usr/bin/dnf -&gt; dnf-3
@@ -90,7 +90,7 @@ lab                          lab packages (LinuC 1.04)                  enabled
 ...</code></pre>
 <p><code>repolist</code> は使っている（<code>enabled=1</code>）リポジトリだけ、<code>repolist all</code> は <code>enabled=0</code> のものも含めて全部を、<code>status</code> の欄つきで出す。<b>この檻の AlmaLinux 本体のリポジトリは、更新の止まった 9.7 の保存庫に向けてある</b>（日ごとに中身が変わる本来の配り先に向けると、読者ごと・日ごとに出力が変わるため）。</p>
 <div class="analogy"><b>たとえ</b>: 取引先ごとに1枚ずつ作った連絡先カードに近い。カードには、呼び名（repo id）・住所（baseurl）・取引中か（enabled）・印鑑を確かめるか（gpgcheck）・照合用の印影の場所（gpgkey）が書いてあり、カードを足せば取引先が増える。
-<br>ただし<b>崩れる点</b>: 連絡先カードは書いただけでは何も起きないが、yum は次にコマンドを打ったとき、カードに書いた住所へ自分から目録を取りに行く。それを次の節で確かめる。</div>
+<br>ただし<b>崩れる点</b>: 連絡先カードは手元にあれば誰にでも連絡できるが、yum は <code>enabled=0</code> と書いたカードを読まない。<code>yum repolist all</code> で <code>disabled</code> と出たリポジトリがそれである。</div>
 
 <h2 id="add">新しい版の置き場を足す</h2>
 <div class="sgoal"><b>この節で分かること</b>: リポジトリを足したあと、新しい版が見えるまでに要ること。</div>
@@ -156,8 +156,8 @@ extras-6ca639b91115fc97</code></pre>
 <tr><td><code>yum clean all</code></td><td>手元の目録の写しと、取ってきた .rpm を捨てる（写しが壊れたと疑わしいとき）</td><td><code>apt-get clean</code>（取ってきた .deb を捨てる）と <code>apt-get distclean</code>（目録の写しを捨てる）を合わせたもの</td></tr>
 </table></div>
 
-<h2 id="update">上げる — 鍵を取り込んでよいか、と聞かれる</h2>
-<div class="sgoal"><b>この節で分かること</b>: yum で上げるときの出力と、鍵を取り込む問い。</div>
+<h2 id="update">上げる — yum update</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>yum update</code> で上げるときの出力の読み方。</div>
 <p>上げるのは <code>yum update</code> である（名前を付ければそれだけ、付けなければ入っているもの全部。dnf では <code>yum upgrade</code> と同じもの）。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo yum update labhello
 Last metadata expiration check: 0:00:01 ago on Tue Oct 20 21:40:57 2026.
@@ -228,7 +228,7 @@ $ rpm -Kv /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo rpm --import /srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
 $ rpm -K /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm
 /srv/lab-tools-rpm/lab-mathtools-1.0-1.noarch.rpm: digests signatures OK</code></pre>
-<p>パッケージは1バイトも変えていないのに、<code>signatures OK</code> になった。変わったのは台帳（取り込んだ鍵）のほうである。最後に、中身を書き換えたらどう出るかを見る。AlmaLinux が署名した本物のパッケージ（tree）を写し、<code>dd</code> で末尾近くの1バイトを書き換える（<code>dd</code> は、決めた位置のバイトをそのまま書くコマンド。<code>bs=1</code> は1バイトずつ、<code>seek=55888</code> は先頭から 55888 バイト進んだ所、<code>conv=notrunc</code> は残りを切り捨てない、<code>status=none</code> は経過を出さない、という指定である。壊れたファイルを作るためだけの操作なので、覚えなくてよい）。</p>
+<p>パッケージは1バイトも変えていないのに、<code>signatures OK</code> になった。変わったのは台帳（取り込んだ鍵）のほうである。最後に、中身を書き換えたらどう出るかを見る。AlmaLinux が署名した本物のパッケージ（tree）を写し、<code>dd</code> で末尾近くの1バイトを書き換える。<code>dd</code> は、決めた位置のバイトをそのまま書くコマンドである。<code>bs=1</code> は1バイトずつ、<code>seek=55888</code> は先頭から 55888 バイト進んだ所、<code>conv=notrunc</code> は残りを切り捨てない、<code>status=none</code> は経過を出さない、という指定で、壊れたファイルを作るためだけの操作なので、覚えなくてよい。</p>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ rpm -K /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm
 /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm: digests signatures OK
 $ cp /srv/lab-files/tree-1.8.0-10.el9.x86_64.rpm ~/tree-copy.rpm
@@ -323,7 +323,7 @@ Filename    : /usr/bin/dig
 <br>ただし<b>崩れる点</b>: 紙のカタログは届いたときのままだが、yum のカタログ（目録の写し）は、期限が切れたり、リポジトリを足したりすると、次に引くときに yum が自分で取り直す。</div>
 <div class="note try"><b>手を動かす</b>:
 実践編の<a href="/linuc-packages/practice/">演習10</a>は、まだ登録されていない別のリポジトリから、名前の分からないパッケージに入っている <code>labcalc</code> を入れる課題である（<code>.repo</code> を書く・<code>yum provides</code> で探す・署名の確認を切らずに入れる）。
-判定は labcalc を動かし、そのリポジトリから yum で入ったかと、鍵が台帳に入ったかを見る。</div>
+判定は labcalc を動かし、そのリポジトリから yum で入ったかと、鍵が台帳に入ったかを見る。<b>この章を打った檻のままではなく、檻を起動し直してから開く</b>。この章の「署名と鍵」の節で取り込んだ lab tools の鍵が台帳に残っていると、演習の要の問い（鍵を取り込んでよいか）が出ないからである。</div>
 <div class="quiz"><b>確認</b>
 <p>独自のリポジトリを yum に登録したい。どのディレクトリに、どんな名前のファイルを置き、リポジトリの場所はどの項目に書くか。</p>
 <details><summary>答え</summary>

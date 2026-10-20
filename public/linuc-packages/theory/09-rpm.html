@@ -12,14 +12,15 @@
 </div>
 <h1>9. RPM 系で同じことをする</h1>
 <p class="lead"><b>前の章までにやったこと</b>: Debian 系の檻で、パッケージを入れて使って消し、入っているもの・置かれたファイル・台帳・依存関係・リポジトリを調べ、.deb ファイルから入れ、自分で作った（第1〜8章）。<b>この章でやること</b>: RPM 系の Linux に移る。RPM 系は、Red Hat Enterprise Linux（RHEL）と、それと同じ作りの AlmaLinux などで、apt の代わりに <code>yum</code>、dpkg の代わりに <code>rpm</code> を使う。第1〜5章と同じこと ── 入れて・使って・消す、何が入っていてどこに置かれたか、台帳、依存関係 ── を、yum と rpm でやる。</p>
-<div class="badges"><span>前提: 第8章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.3（重要度3）</span><span>出題範囲 1.04.4（重要度1）</span><span>最終検証 2026-10-20</span></div>
+<div class="badges"><span>前提: 第8章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 24分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.3（重要度3）</span><span>出題範囲 1.04.4（重要度1）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>sudo yum install</code>・<code>sudo yum remove</code> でパッケージを入れて消せ、出力の表と <code>[y/N]</code> の問いを読める</li><li>入っているものと置かれたファイルを、<code>rpm -qa</code>・<code>-q</code>・<code>-qi</code>・<code>-ql</code>・<code>-qf</code>・<code>-qd</code>・<code>-qc</code> と <code>yum list installed</code> で調べられる</li><li>RPM 系の台帳が <code>/var/lib/rpm/</code> のデータベースだと言える</li><li><code>yum remove</code> が、要らなくなった依存関係まで消すことを示せる</li></ul>
+<ul><li><code>sudo yum install</code>・<code>sudo yum remove</code> でパッケージを入れて消し、出力の表と <code>[y/N]</code> の問いを読む</li><li>入っているものと置かれたファイルを、<code>rpm -qa</code>・<code>-q</code>・<code>-qi</code>・<code>-ql</code>・<code>-qf</code>・<code>-qd</code>・<code>-qc</code> と <code>yum list installed</code> で調べる</li><li>RPM 系の台帳がどこにあり、どう読むのかを確かめる</li><li>依存関係のあるパッケージを <code>yum remove</code> で消すと、一緒に入ったものがどうなるかを確かめる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: yum の設定ファイルとリポジトリの書き方、署名、rpm でファイルから直接入れる方法、<code>rpm -qR</code> に出る <code>rpmlib(…)</code> の行の細部、台帳のデータベースの形式。この章は「Debian 系でやったことを、RPM 系の名前で1回やる」ができれば足りる。</div></div>
 
 <h2 id="cage">RPM 系の檻を起動する</h2>
 <div class="sgoal"><b>この節で分かること</b>: 第9〜11章で使う檻の起動のしかた。</div>
 <p>Debian 系の檻を <code>exit</code> で抜け、あなたの PC の端末で次の1行を打つ。第9〜11章は、この RPM 系の檻（AlmaLinux 9.7）を使う。起動のしかたの部品は第1章と同じで、名前とイメージだけが違う。</p>
+<p class="detail"><b>前の版（1.0.x）でこの教材の演習を進めたことがある人</b>は、起動する前に、<a href="/linuc-packages/practice/#start">実践編の「はじめる」</a>の「前の版（1.0.x）で進めた人へ」の箱を読む。RPM 系の檻のボリュームにも、前の版の進み具合が残っている。</p>
 <pre data-where="あなたの PC の端末（檻の外）"><code>docker run --rm -it --name lab-linuc-packages-rpm --hostname linuc \
   -v lab-linuc-packages-rpm-work:/home/lab/work \
   -v lab-linuc-packages-rpm-state:/home/lab/.lab \
@@ -110,8 +111,8 @@ $ hash -r
 $ labhello
 bash: labhello: command not found</code></pre>
 <p>消すのは <code>yum remove</code> である（<code>Removing:</code> の表が出て、<code>Erasing</code> の行で外している）。消したあとの bash の言い方も、<code>hash -r</code> で戻るのも第1章と同じである。</p>
-<div class="analogy"><b>たとえ</b>: 同じ仕事を、別の会社の書式でやるのに近い。「入れる・使う・消す」の流れも、root の権限が要ることも同じで、伝票（出力）の見た目と、確認の印鑑の既定（<code>[Y/n]</code> と <code>[y/N]</code>）だけが違う。
-<br>ただし<b>崩れる点</b>: 書式が違うだけでなく、パッケージのファイルの形（.deb と .rpm）も、台帳の作りも違う。Debian 系のパッケージを RPM 系にそのまま入れることはできない。</div>
+<div class="analogy"><b>たとえ</b>: 同じ仕事を、別の会社の書式でやるのに近い。「入れる・使う・消す」の流れも、root の権限が要ることも同じで、伝票（出力）の見た目が違う。
+<br>ただし<b>崩れる点</b>: 書式の違いなら読み替えれば済むが、確認の問いは既定が逆である。apt の <code>[Y/n]</code> は Enter だけで「はい」になり、yum の <code>[y/N]</code> は Enter だけで「いいえ」になる。</div>
 
 <h2 id="query">何が入っていて、どこに置かれたか — rpm -q</h2>
 <div class="sgoal"><b>この節で分かること</b>: 第2・3章で dpkg に聞いたことを、rpm に聞く方法。</div>

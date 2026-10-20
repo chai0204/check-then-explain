@@ -32,14 +32,21 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 ここにあるのは、誰かが実際に一度通した記録です。</p>
 </div>
 
+<h2 id="order">読む順番と、前提</h2>
+<p>第1章から順に読みます。各章の出力は、檻を<b>起動し直した直後</b>から本文の順に打ったものなので、章が変わるたびに檻を起動し直してください（<code>exit</code> して、もう一度 <code>docker run</code>）。
+各章の冒頭に「前の章までにやったこと」と「この章でやること」を書いてあります。
+前提として要るのは、主題1.01〜1.03 のコースで扱った範囲（端末でコマンドを打つ・ファイルとディレクトリ・パーミッション・<code>sudo</code>・パイプと <code>grep</code>・<code>vi</code> か <code>sed</code>）です。このコースが説明なしで使うものと、それが出たコースの章は、<a href="/linuc-packages/theory/01-install">第1章</a>の冒頭に一覧にしてあります。
+それ以外の語は、使う前にその場で一言で説明しています。</p>
+<p><b>前の版（1.0.x）でこの教材の演習を進めたことがある人は</b>、章と演習の番号が変わったので、先に<a href="/linuc-packages/practice/#start">実践編の「はじめる」</a>の「前の版（1.0.x）で進めた人へ」の箱を読んでください。</p>
+
 <h2 id="flow">このコースの流れ</h2>
-<p>前の章でやったことだけを使って、次の章へ進みます。章の冒頭には、いつも「前の章までにやったこと」と「この章でやること」を書いてあります。</p>
+<p>前の章でやったことだけを使って、次の章へ進みます。</p>
 <div class="scroll"><table>
 <tr><th>章</th><th>やること</th><th>檻</th></tr>
 <tr><td>1</td><td>コマンドを1つ、パッケージとして入れて、使って、消す</td><td>Debian 系</td></tr>
 <tr><td>2・3</td><td>いま何が入っているか、入れたファイルがどこに置かれたかを調べる</td><td>Debian 系</td></tr>
 <tr><td>4</td><td>調べた答えの出どころ（台帳）を開き、ファイルと見比べる</td><td>Debian 系</td></tr>
-<tr><td>5</td><td>一緒に入るもの（依存関係）と、消しても残るものを確かめる</td><td>Debian 系</td></tr>
+<tr><td>5</td><td>ほかのパッケージが要るパッケージ（依存関係）を入れて、消す</td><td>Debian 系</td></tr>
 <tr><td>6</td><td>パッケージを取ってくる場所（リポジトリ）を読み、足して、新しい版に上げる</td><td>Debian 系</td></tr>
 <tr><td>7・8</td><td>.deb ファイルを直接入れ、最後に自分で作る</td><td>Debian 系</td></tr>
 <tr><td>9〜11</td><td>同じことを RPM 系の yum と rpm でやり、署名も確かめる</td><td>RPM 系</td></tr>
@@ -89,13 +96,49 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <p class="detail">檻で<b>そのままでは再現できないもの</b>が3つあり、本文にその理由ごと書いてあります。
 (1) 本物の Ubuntu のパッケージに対する <code>apt-file search</code>: Ubuntu の Contents の目録は3つの区分で約 195MB あり、
 <code>apt update</code> のたびに読者に取らせるのは重すぎるので、この檻では取らない設定にした（設定を消せば同じように引ける。第6章）。
-(2) <code>dpkg-reconfigure</code> の矢印キーで選ぶ画面: 記録に残せないので、同じ質問を文字だけの形（<code>-f teletype</code>）で出して打った（第7章）。
+(2) <code>dpkg-reconfigure</code> の矢印キーで選ぶ画面: 画面いっぱいに描く画面は、本文に写せる文字の並びにならないので、同じ質問を文字だけの形（<code>-f teletype</code>）で出して打った（第7章）。矢印キーの画面そのものは、探る記録に画面ごと残してある。
 (3) 本物のリポジトリの「今の最新」: 出力が日ごとに変わるので、Ubuntu は snapshot（2026-09-29 で固定）、AlmaLinux は更新の止まった 9.7 の保存庫（vault）に向けた。
 <b>打てないことを黙って飛ばしてはいません。</b></p>
 <p>他の主題の対応は <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。</p>
 
+<h2 id="chapters">章</h2>
+<div class="toc">
+<ol>
+<li><a href="/linuc-packages/theory/01-install">パッケージを入れて、使って、消す</a> —
+    <span class="detail">まだ無い labhello を <code>apt install</code> で入れ、動かし、<code>apt remove</code> で消す（17分）</span></li>
+<li><a href="/linuc-packages/theory/02-list">いま何が入っているかを調べる</a> —
+    <span class="detail"><code>dpkg -l</code>・<code>apt list --installed</code> で一覧、<code>dpkg -s</code>・<code>apt show</code> で詳しく。その答えがどこから来るか（15分）</span></li>
+<li><a href="/linuc-packages/theory/03-files">入れたファイルがどこに置かれたかを調べる</a> —
+    <span class="detail"><code>which</code>・<code>dpkg -L</code>・<code>dpkg -S</code>、.deb の中身と情報（<code>dpkg -c</code>・<code>-I</code>）（18分）</span></li>
+<li><a href="/linuc-packages/theory/04-ledger">台帳とファイルを見比べる</a> —
+    <span class="detail">台帳の実物を開き、ファイルだけ消す・中身だけ置くとどうなるかを <code>dpkg -V</code> で確かめる（18分）</span></li>
+<li><a href="/linuc-packages/theory/05-depends">依存関係のあるパッケージを入れて、消す</a> —
+    <span class="detail">依存関係で一緒に入る liblab、<code>remove</code>・<code>purge</code>・<code>autoremove</code> で何が消えて何が残るか（18分）</span></li>
+<li><a href="/linuc-packages/theory/06-repository">パッケージはどこから来るか</a> —
+    <span class="detail">リポジトリと <code>sources.list</code>、区分を足して <code>apt update</code> と <code>apt upgrade</code>、<code>apt-file</code>（25分）</span></li>
+<li><a href="/linuc-packages/theory/07-deb-file">.deb ファイルを直接入れる</a> —
+    <span class="detail"><code>dpkg -i</code> で .deb を入れる、依存関係が足りないとき、<code>apt --fix-broken install</code>、<code>dpkg-reconfigure</code>（22分）</span></li>
+<li><a href="/linuc-packages/theory/08-build">パッケージを自分で作る</a> —
+    <span class="detail"><code>DEBIAN/control</code> を書いて <code>dpkg-deb --build</code>。第1〜7章が1本につながる（18分）</span></li>
+<li><a href="/linuc-packages/theory/09-rpm">RPM 系で同じことをする</a> —
+    <span class="detail"><code>yum install</code>・<code>remove</code>、<code>rpm -q</code> の仲間、<code>/var/lib/rpm</code>、yum で消したときの依存関係（24分）</span></li>
+<li><a href="/linuc-packages/theory/10-yum-repo">yum のリポジトリを足して、署名を確かめる</a> —
+    <span class="detail"><code>/etc/yum.repos.d/</code>、リポジトリを足して上げる、鍵の取り込み、<code>rpm -K</code>、<code>yum provides</code>（28分）</span></li>
+<li><a href="/linuc-packages/theory/11-rpm-file">.rpm ファイルを rpm で直接入れて、確かめる</a> —
+    <span class="detail"><code>yumdownloader</code>、<code>rpm -ivh</code>・<code>-U</code>・<code>-F</code>・<code>-e</code>、<code>rpm -V</code>、<code>rpm2cpio</code>（28分）</span></li>
+</ol>
+</div>
+<p><a href="/linuc-packages/theory/glossary">用語辞書</a> —
+   本文の点線付きの語をクリックすると引けます。20語。</p>
+
+<h2 id="cages">檻が2つある理由</h2>
+<p>主題1.04 は Debian 系（apt・dpkg）と RPM 系（yum・rpm）の両方を問います。1つの Linux には片方しか無いので、
+<b>Debian 系の檻（Ubuntu 24.04）</b>で第1〜8章を、<b>RPM 系の檻（AlmaLinux 9.7）</b>で第9〜11章を確かめます（起動のしかたは第1章と第9章の最初にあります）。
+どちらの檻にも、練習用の小さなパッケージ（依存関係つき・設定ファイルつき・署名つき・署名なし）とリポジトリが入っていて、<b>ネットにつながっていなくても本文と同じ結果になります</b>
+（ネットが無いと、第6章の <code>apt update</code> の Ubuntu 本体の3行だけが違って出ます）。</p>
+
 <h2 id="crib">試験の直前に見る表</h2>
-<p>出題範囲の「詳細」欄に並ぶ語を、一行の意味と、説明している章に並べました。</p>
+<p>出題範囲の「詳細」欄に並ぶ語を、一行の意味と、説明している章に並べました。章を読み終えてから使う表なので、各章で確かめる答えも書いてあります。</p>
 <div class="scroll"><table>
 <tr><th>出題範囲の語</th><th>一行の意味</th><th>章</th></tr>
 <tr><td><code>apt</code></td><td>人が画面で打つための入口。<code>install</code> <code>remove</code> <code>purge</code> <code>autoremove</code> <code>update</code> <code>upgrade</code> <code>search</code> <code>show</code> <code>list</code> をまとめて持つ（スクリプトには <code>apt-get</code>・<code>apt-cache</code>）</td><td><a href="/linuc-packages/theory/01-install#install">1</a>・<a href="/linuc-packages/theory/06-repository#family">6</a></td></tr>
@@ -129,43 +172,6 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <tr><td><code>dpkg -V</code> と <code>rpm -V</code></td><td>どちらも違うファイルだけを出す。dpkg は中身の要約しか持たず、違っても終了コード 0。rpm は欄が埋まり、終了コードも 0 以外</td><td><a href="/linuc-packages/theory/04-ledger#verify">4</a>・<a href="/linuc-packages/theory/11-rpm-file#verify">11</a></td></tr>
 <tr><td><code>dpkg -i</code> と <code>rpm -i</code></td><td>どちらも依存関係を取りに行かない。dpkg は展開まで進めて止まり、rpm は1つも入れずに止まる</td><td><a href="/linuc-packages/theory/07-deb-file#broken">7</a>・<a href="/linuc-packages/theory/11-rpm-file#install">11</a></td></tr>
 </table></div>
-
-<h2 id="chapters">章</h2>
-<div class="toc">
-<ol>
-<li><a href="/linuc-packages/theory/01-install">パッケージを入れて、使って、消す</a> —
-    <span class="detail">まだ無い labhello を <code>apt install</code> で入れ、動かし、<code>apt remove</code> で消す（15分）</span></li>
-<li><a href="/linuc-packages/theory/02-list">いま何が入っているかを調べる</a> —
-    <span class="detail"><code>dpkg -l</code>・<code>apt list --installed</code> で一覧、<code>dpkg -s</code>・<code>apt show</code> で詳しく。その答えがどこから来るか（15分）</span></li>
-<li><a href="/linuc-packages/theory/03-files">入れたファイルがどこに置かれたかを調べる</a> —
-    <span class="detail"><code>which</code>・<code>dpkg -L</code>・<code>dpkg -S</code>、.deb の中身と情報（<code>dpkg -c</code>・<code>-I</code>）（18分）</span></li>
-<li><a href="/linuc-packages/theory/04-ledger">台帳とファイルを見比べる</a> —
-    <span class="detail">台帳の実物を開き、ファイルだけ消す・中身だけ置くとどうなるかを <code>dpkg -V</code> で確かめる（18分）</span></li>
-<li><a href="/linuc-packages/theory/05-depends">一緒に入るもの・残るもの</a> —
-    <span class="detail">依存関係で一緒に入る liblab、<code>remove</code>・<code>purge</code>・<code>autoremove</code> で何が消えて何が残るか（18分）</span></li>
-<li><a href="/linuc-packages/theory/06-repository">パッケージはどこから来るか</a> —
-    <span class="detail">リポジトリと <code>sources.list</code>、区分を足して <code>apt update</code> と <code>apt upgrade</code>、<code>apt-file</code>（25分）</span></li>
-<li><a href="/linuc-packages/theory/07-deb-file">.deb ファイルを直接入れる</a> —
-    <span class="detail"><code>dpkg -i</code> で .deb を入れる、依存関係が足りないとき、<code>apt --fix-broken install</code>、<code>dpkg-reconfigure</code>（22分）</span></li>
-<li><a href="/linuc-packages/theory/08-build">パッケージを自分で作る</a> —
-    <span class="detail"><code>DEBIAN/control</code> を書いて <code>dpkg-deb --build</code>。第1〜7章が1本につながる（18分）</span></li>
-<li><a href="/linuc-packages/theory/09-rpm">RPM 系で同じことをする</a> —
-    <span class="detail"><code>yum install</code>・<code>remove</code>、<code>rpm -q</code> の仲間、<code>/var/lib/rpm</code>、yum で消したときの依存関係（22分）</span></li>
-<li><a href="/linuc-packages/theory/10-yum-repo">yum のリポジトリを足して、署名を確かめる</a> —
-    <span class="detail"><code>/etc/yum.repos.d/</code>、リポジトリを足して上げる、鍵の取り込み、<code>rpm -K</code>、<code>yum provides</code>（28分）</span></li>
-<li><a href="/linuc-packages/theory/11-rpm-file">.rpm ファイルを rpm で直接入れて、確かめる</a> —
-    <span class="detail"><code>yumdownloader</code>、<code>rpm -ivh</code>・<code>-U</code>・<code>-F</code>・<code>-e</code>、<code>rpm -V</code>、<code>rpm2cpio</code>（28分）</span></li>
-</ol>
-</div>
-<p><a href="/linuc-packages/theory/glossary">用語辞書</a> —
-   本文の点線付きの語をクリックすると引けます。20語。</p>
-
-<h2 id="cages">檻が2つある理由</h2>
-<p>主題1.04 は Debian 系（apt・dpkg）と RPM 系（yum・rpm）の両方を問います。1つの Linux には片方しか無いので、
-<b>Debian 系の檻（Ubuntu 24.04）</b>で第1〜8章を、<b>RPM 系の檻（AlmaLinux 9.7）</b>で第9〜11章を確かめます（起動のしかたは第1章と第9章の最初にあります）。
-どちらの檻にも、練習用の小さなパッケージ（依存関係つき・設定ファイルつき・署名つき・署名なし）とリポジトリが入っていて、<b>ネットにつながっていなくても本文と同じ結果になります</b>
-（ネットが無いと、第6章の <code>apt update</code> の Ubuntu 本体の3行だけが違って出ます）。</p>
-<p>各章の出力は、檻を<b>起動し直した直後</b>から本文の順に打ったものです。前の章で入れたものが残っていると出力が変わるので、章が変わるたびに檻を起動し直してください（<code>exit</code> して、もう一度 <code>docker run</code>）。</p>
 
 <h2 id="use">実務のどこで効くか</h2>
 <p>資格の勉強として読んでも、使う場面はこの4つに集まります。</p>

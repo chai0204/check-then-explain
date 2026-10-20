@@ -6,7 +6,7 @@ window.CHAPTERS = [
   { n: 2,  url: "/linuc-packages/theory/02-list",       t: "いま何が入っているかを調べる" },
   { n: 3,  url: "/linuc-packages/theory/03-files",      t: "入れたファイルがどこに置かれたかを調べる" },
   { n: 4,  url: "/linuc-packages/theory/04-ledger",     t: "台帳とファイルを見比べる" },
-  { n: 5,  url: "/linuc-packages/theory/05-depends",    t: "一緒に入るもの・残るもの" },
+  { n: 5,  url: "/linuc-packages/theory/05-depends",    t: "依存関係のあるパッケージを入れて、消す" },
   { n: 6,  url: "/linuc-packages/theory/06-repository", t: "パッケージはどこから来るか" },
   { n: 7,  url: "/linuc-packages/theory/07-deb-file",   t: ".deb ファイルを直接入れる" },
   { n: 8,  url: "/linuc-packages/theory/08-build",      t: "パッケージを自分で作る" },

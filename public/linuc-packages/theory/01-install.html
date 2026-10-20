@@ -11,15 +11,37 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
 </div>
 <h1>1. パッケージを入れて、使って、消す</h1>
-<p class="lead"><b>このコースでやること</b>: Linux にソフトウェアを入れる・調べる・消す方法を、2つの系統の Linux で、実際に打って確かめる。Linux には、ソフトウェアの配り方と、それを扱う道具が違う系統がいくつかあり、ここでは代表の2つを使う。Debian 系（Debian と、それをもとに作られた Ubuntu など）と、RPM 系（Red Hat Enterprise Linux と、それと同じ作りの AlmaLinux など）である。第1〜8章は Debian 系で、第9〜11章は RPM 系で同じことをする。<b>この章でやること</b>: いちばん普通の使い方を1回やる。まだ入っていないコマンドを1つ入れて、使って、消す。<b>始める前に要るもの</b>: docker が動く PC と、端末（80 桁 × 24 行の大きさで確かめてある）。</p>
-<div class="badges"><span>前提: docker が動く</span><span>前提: 端末でコマンドを打てる</span><span>前提: sudo の意味が分かる</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
+<p class="lead"><b>このコースでやること</b>: Linux にソフトウェアを入れる・調べる・消す方法を、2つの系統の Linux で、実際に打って確かめる。Linux には、ソフトウェアの配り方と、それを扱う道具が違う系統がいくつかあり、ここでは代表の2つを使う。Debian 系（Debian と、それをもとに作られた Ubuntu など）と、RPM 系（Red Hat Enterprise Linux と、それと同じ作りの AlmaLinux など）である。第1〜8章は Debian 系で、第9〜11章は RPM 系で同じことをする。<b>この章でやること</b>: いちばん普通の使い方を1回やる。まだ入っていないコマンドを1つ入れて、使って、消す。<b>始める前に要るもの</b>: docker が動く PC と、端末（80 桁 × 24 行の大きさで確かめてある）と、下の表の「前のコースで出たもの」。</p>
+<div class="badges"><span>前提: docker が動く</span><span>前提: 端末でコマンドを打てる</span><span>前提: sudo の意味が分かる</span><span>所要 17分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>まだ入っていないコマンドを、パッケージとして <code>sudo apt install</code> で入れて使える</li><li>入れたパッケージを <code>sudo apt remove</code> で消せる</li><li><code>apt install</code> の出力から、何を・どこから取ってきて・何をしたかを読める</li><li>パッケージを入れたり消したりするのに <code>sudo</code> が要る理由を言える</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: <code>apt</code> のほかのサブコマンドとオプション、出力のうち意味をまだ説明していない行（<code>Building dependency tree</code> など）、パッケージのファイルの中身の形、Debian 系と RPM 系の違い。この章は「入れて、使って、消す」が1回できれば足りる。</div></div>
+<ul><li>まだ入っていないコマンドを、<code>sudo apt install</code> でパッケージとして入れて、使えるようになるかを確かめる</li><li>入れたパッケージを <code>sudo apt remove</code> で消すと、コマンドがどうなるかを確かめる</li><li><code>apt install</code> の出力を1行ずつ読み、何を・どこから取ってきて・何をしたかを確かめる</li><li>パッケージを入れたり消したりするのに <code>sudo</code> が要るわけを確かめる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>apt</code> の <code>install</code>・<code>remove</code> 以外の使い方と、オプション、出力のうち意味をまだ説明していない行（<code>Building dependency tree</code> など）、パッケージのファイルの中身の形、Debian 系と RPM 系の違い。この章は「入れて、使って、消す」が1回できれば足りる。</div></div>
+
+<div class="note"><b>前のコースで出たもの</b>: このコースは、次のものを説明なしで使う。忘れていたら、リンク先の章を読み返してから進む。
+<div class="scroll"><table>
+<tr><th>もの</th><th>何のためにあるか（一言）</th><th>出たところ</th></tr>
+<tr><td>シェル・プロンプト・オプション・<code>echo</code>・<code>printf</code></td><td>打ったコマンドを読んで動かすプログラム・打ってよい合図（<code>$</code>）・<code>-l</code> のようにコマンドの動きを変える指定・受け取った文字をそのまま出す（<code>printf</code> は書式を決めて出す）</td><td><a href="/linuc-text/theory/01-quote">主題1.03 第1章</a></td></tr>
+<tr><td><code>cd</code>・ホーム（<code>~</code>）・<code>PATH</code></td><td>いるディレクトリを移る・ログインしたときに最初にいる自分のディレクトリ・コマンドを探すディレクトリの並び（環境変数）</td><td><a href="/linuc-text/theory/02-path">主題1.03 第2章</a></td></tr>
+<tr><td><code>man</code>・<code>less</code></td><td>説明書を引く・長い出力を1画面ずつ見せる（<code>q</code> で抜ける）</td><td><a href="/linuc-text/theory/03-man">主題1.03 第3章</a></td></tr>
+<tr><td><code>cat</code>・<code>head</code>・<code>tail</code>・<code>wc</code></td><td>ファイルの中身を出す・先頭や末尾の数行だけ出す・行の数を数える</td><td><a href="/linuc-text/theory/04-lines">主題1.03 第4章</a></td></tr>
+<tr><td><code>sort</code>・<code>cut</code></td><td>行を並べ替える・決まった列だけを出す</td><td><a href="/linuc-text/theory/05-columns">主題1.03 第5章</a></td></tr>
+<tr><td><code>sed</code>（<code>s/前/後/</code>・<code>-i</code>）</td><td>行の中の文字を置き換える。<code>-i</code> を付けると、ファイルそのものを書き換える</td><td><a href="/linuc-text/theory/06-sed">主題1.03 第6章</a></td></tr>
+<tr><td><code>&gt;</code>（リダイレクト）</td><td>コマンドの出力を、画面ではなくファイルに書く</td><td><a href="/linuc-text/theory/07-redirect">主題1.03 第7章</a></td></tr>
+<tr><td><code>|</code>（パイプ）・<code>tee</code></td><td>前のコマンドの出力を次のコマンドに渡す・受け取ったものをファイルにも画面にも出す</td><td><a href="/linuc-text/theory/08-pipe">主題1.03 第8章</a></td></tr>
+<tr><td><code>grep</code>（<code>-v</code>・<code>-c</code>・<code>-A</code>）・<code>^</code> と <code>$</code></td><td>当てはまる行だけを出す。<code>-v</code> は当てはまらない行、<code>-c</code> は行の数、<code>-A</code> は後ろの行も出す。<code>^</code> は行の頭、<code>$</code> は行の終わり</td><td><a href="/linuc-text/theory/09-regex">主題1.03 第9章</a></td></tr>
+<tr><td><code>vi</code></td><td>ファイルを開いて書き換える</td><td><a href="/linuc-text/theory/10-vi">主題1.03 第10章</a></td></tr>
+<tr><td><code>ls</code>・<code>ls -l</code>・<code>sudo</code></td><td>ファイルを並べる・種類と権限と持ち主を見る・root（その機械の管理者）の権限で打つ</td><td><a href="/linuc-files/theory/01-permissions">主題1.02 第1章</a></td></tr>
+<tr><td><code>chmod</code>・パーミッション</td><td>読み・書き・実行の許可を変える・その許可（<code>755</code> のような数字でも書く）</td><td><a href="/linuc-files/theory/02-umask">主題1.02 第2章</a></td></tr>
+<tr><td><code>mkdir</code>（<code>-p</code>）・<code>cp</code>・<code>rm</code></td><td>ディレクトリを作る（<code>-p</code> は途中もまとめて作る）・写す・消す</td><td><a href="/linuc-files/theory/04-cp-mv-rm">主題1.02 第4章</a></td></tr>
+<tr><td><code>find</code></td><td>ディレクトリの下を順にたどって、ファイルを探す</td><td><a href="/linuc-files/theory/05-find">主題1.02 第5章</a></td></tr>
+<tr><td><code>gzip</code>（<code>.gz</code>）・<code>zcat</code></td><td>ファイルを縮める・縮めたファイルを広げながら中身を出す</td><td><a href="/linuc-files/theory/06-tar">主題1.02 第6章</a></td></tr>
+<tr><td>コンテナ・<code>docker</code></td><td>PC の中に区切って作った作業場・それを作って動かす道具</td><td><a href="/linuc-boot/theory/03-container">主題1.01 第3章</a></td></tr>
+</table></div></div>
 
 <h2 id="cage">檻を起動する</h2>
 <div class="sgoal"><b>この節で分かること</b>: この教材のコマンドを、どこで、どう打つか。</div>
-<p>この教材のコマンドは、あなたの PC の上では打たない。<b>コンテナ</b>（1台の PC の中に、ほかと切り離した小さな Linux の部屋を作るしくみ。docker はそれを作る道具）の中で打つ。この教材では、このコンテナを<b>檻</b>と呼ぶ。パッケージを入れたり消したりすると、その Linux 全体が書き換わる。壊しても困らない部屋でやるためである。</p>
+<p>この教材のコマンドは、あなたの PC の上では打たない。<b>コンテナ</b>の中で打つ。コンテナは、1台の PC の中に、ほかと切り離した小さな Linux の部屋を作るしくみで、docker はそれを作る道具である。この教材では、このコンテナを<b>檻</b>と呼ぶ。パッケージを入れたり消したりすると、その Linux 全体が書き換わる。壊しても困らない部屋でやるためである。</p>
+<p class="detail"><b>前の版（1.0.x）でこの教材の演習を進めたことがある人</b>は、起動する前に、<a href="/linuc-packages/practice/#start">実践編の「はじめる」</a>の「前の版（1.0.x）で進めた人へ」の箱を読む。前の版の進み具合がボリュームに残っていて、新しい演習に混ざるからである。</p>
 <p>あなたの PC の端末で、次の1行（4行に折ってある）をそのまま打つ。この章から第8章までは、この Debian 系の檻を使う。</p>
 <pre data-where="あなたの PC の端末（檻の外）"><code>docker run --rm -it --name lab-linuc-packages-deb --hostname linuc \
   -v lab-linuc-packages-deb-work:/home/lab/work \
@@ -50,7 +72,7 @@ bash: labhello: command not found</code></pre>
 
 <h2 id="install">入れる — apt install</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>apt install</code> の打ち方と、出力の読み方。</div>
-<p>入れるコマンドは <code>apt install パッケージの名前</code> である。このパッケージの名前は、コマンドと同じ <code>labhello</code> である。パッケージを入れると、<code>/usr/bin</code> のような、その機械の全員が使う場所にファイルが置かれ、何を入れたかの記録も書き換わる。どちらも root（その機械の管理者）しか書けない場所にあるので、前に <code>sudo</code> を付けて、root の権限で打つ。この檻の <code>lab</code> は、パスワードを聞かれずに <code>sudo</code> を使えるようにしてある。</p>
+<p>入れるコマンドは <code>apt install パッケージの名前</code> である。<code>apt</code> の後ろの <code>install</code> は、apt に何をさせるかを選ぶ語で、<b>サブコマンド</b>と呼ぶ。このパッケージの名前は、コマンドと同じ <code>labhello</code> である。パッケージを入れると、<code>/usr/bin</code> のような、その機械の全員が使う場所にファイルが置かれ、何を入れたかの記録も書き換わる。どちらも root（その機械の管理者）しか書けない場所にあるので、前に <code>sudo</code> を付けて、root の権限で打つ。この檻の <code>lab</code> は、パスワードを聞かれずに <code>sudo</code> を使えるようにしてある。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install labhello
 Reading package lists... Done
 Building dependency tree... Done
@@ -85,12 +107,12 @@ Processing triggers for man-db (2.12.0-4build2) ...</code></pre>
 <tr><td><code>Setting up labhello (1.0) ...</code></td><td>使える状態に整えた</td></tr>
 <tr><td><code>Processing triggers for man-db …</code></td><td>labhello が説明書（man のページ）も一緒に置いたので、man の索引を作り直した</td></tr>
 </table></div>
-<p><code>Get:1</code> の行の <code>file:/srv/lab-repo</code> が、パッケージを取ってきた場所である。パッケージを配っている置き場を<b>リポジトリ</b>と呼ぶ。この檻では、練習用のリポジトリを檻の中の <code>/srv/lab-repo</code> に置いてある。本物の Ubuntu では、インターネットの向こうのサーバがリポジトリになる。同じ行の <code>amd64</code> はこの機械の CPU の種類（アーキテクチャ）、<code>all</code> は「どの種類の CPU でも動くパッケージ」という印である。</p>
+<p><code>Get:1</code> の行の <code>file:/srv/lab-repo</code> が、パッケージを取ってきた場所である。パッケージを配っている置き場を<b>リポジトリ</b>と呼ぶ。この檻では、練習用のリポジトリを檻の中の <code>/srv/lab-repo</code> に置いてある。本物の Ubuntu では、インターネットの向こうのサーバ（ほかの機械からの求めに応えて、ファイルなどを渡すコンピュータ）がリポジトリになる。同じ行の <code>amd64</code> はこの機械の CPU の種類（アーキテクチャ）、<code>all</code> は「どの種類の CPU でも動くパッケージ」という印である。</p>
 <p>途中で <code>Do you want to continue? [Y/n]</code> と尋ねられることはなかった。頼んだ1つだけを入れるときは、apt は尋ねずに進める。使ってみる。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ labhello
 labhello 1.0</code></pre>
 <div class="analogy"><b>たとえ</b>: 引っ越しの荷物の搬入に近い。荷物を部屋に運び込む（<code>Unpacking</code>）だけでは暮らせず、電気やガスをつないで初めて使える（<code>Setting up</code>）。apt は両方をまとめてやる。
-<br>ただし<b>崩れる点</b>: 引っ越しは何日もかかるが、ここでは一瞬で終わり、途中で止まることはめったにない。止まるのは、運び込んだあとで「つなぐ」ための別のものが足りないときで、そのときは2つ目の手順の手前で止まる。</div>
+<br>ただし<b>崩れる点</b>: 人の引っ越しなら、どの荷物をどこに置いたかは住む人が覚えているだけだが、apt は、何を入れたかを記録に書いておく（この節の初めに書いた「何を入れたかの記録」）。</div>
 
 <h2 id="remove">消す — apt remove</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>apt remove</code> の打ち方と、消したあとの bash の言い方。</div>

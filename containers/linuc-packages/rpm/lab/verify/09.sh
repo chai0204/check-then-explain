@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 演習 09 の判定。観測型（labapp を動かした出力、rpm の台帳、dnf が記録した経路、rpm -V を見る）。
+# 出力には rpm -V の名前を出さない（第11章で出る。順を追う監査 C-7）。
 set -uo pipefail
 command -v rpm >/dev/null || { echo "前提不足: rpm が見つかりません"; exit 2; }
 command -v dnf >/dev/null || { echo "前提不足: dnf が見つかりません"; exit 2; }
@@ -8,7 +9,7 @@ want='liblab: こんにちは from labapp 1.0'
 # dnf が記録している「どこから入ったか」。yum でリポジトリ lab から入れると @lab、rpm で直接入れると @System
 from() { dnf -q list installed "$1" 2>/dev/null | awk -v n="$1" '$1 ~ "^"n"\\." {print $3}' | head -1; }
 
-echo "判定 : 観測型（labapp を動かし、rpm の台帳・入った経路・rpm -V labapp を見た）"
+echo "判定 : 観測型（labapp を動かし、rpm の台帳・入った経路・台帳に記録された「入れたときの中身」との違いを見た）"
 lead="観測 :"
 for p in labapp liblab; do
   if rpm -q "$p" >/dev/null 2>&1; then
@@ -31,10 +32,17 @@ if rpm -q labapp >/dev/null 2>&1; then
   # 設定ファイル（c の印）は書き換えてよいので、それ以外を数える
   other=$(printf '%s\n' "$ver" | grep -v '^$' | grep -v '^.\{9\}  c ' || true)
   if [ -n "$ver" ]; then
-    echo "       rpm -V labapp（台帳と違うファイル）:"
-    printf '%s\n' "$ver" | sed 's/^/       │ /'
+    echo "       入れたときの中身と違うファイル:"
+    # 行は「9文字の欄・空白2つ・印・パス」。パスだけを出し、設定ファイル（印 c）にはそう添える
+    printf '%s\n' "$ver" | grep -v '^$' | while IFS= read -r l; do
+      case "$l" in
+        ?????????"  c "*) echo "       │ ${l:13}（設定ファイル。書き換えてよい）" ;;
+        ?????????"    "*) echo "       │ ${l:13}" ;;
+        *) echo "       │ $l" ;;
+      esac
+    done
   else
-    echo "       rpm -V labapp = 何も出ない（どのファイルも台帳の記録のまま）"
+    echo "       入れたときの中身と違うファイル = 無い（どのファイルも入れたときのまま）"
   fi
 fi
 

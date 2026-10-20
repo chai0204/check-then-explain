@@ -14,7 +14,7 @@
 <p class="lead"><b>前の章までにやったこと</b>: RPM 系で、yum で入れて消し、rpm に台帳を聞き（第9章）、yum のリポジトリを足して上げ、署名を <code>rpm -K</code> で確かめた（第10章）。Debian 系では、.deb ファイルを dpkg で直接入れ（第7章）、台帳とファイルを <code>dpkg -V</code> で見比べた（第4章）。<b>この章でやること</b>: RPM 系で同じことをする。.rpm ファイルを入れずに取ってきて中を見て、<code>rpm</code> で直接入れ、上げて、消す。台帳と照らし合わせる <code>rpm -V</code> と、入れずに中身を取り出す <code>rpm2cpio</code> も使う。最後に、この11章を1つにまとめる。</p>
 <div class="badges"><span>前提: 第10章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 28分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.4（重要度1）</span><span>出題範囲 1.04.3（重要度3）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>yumdownloader</code> で .rpm ファイルを取り、<code>rpm -qp…</code> で入れる前に中を見られる</li><li><code>rpm -ivh</code> で入れ、依存関係が足りないときの止まり方（1つも入れない）を示せる。<code>-U</code>・<code>-F</code>・<code>-e</code> の違いを言える</li><li><code>rpm -V</code> の出力の9文字を読み、何が変わったかを言える</li><li><code>rpm2cpio</code> で、入れずに中身を取り出せる</li></ul>
+<ul><li><code>yumdownloader</code> で .rpm ファイルを取り、<code>rpm -qp…</code> で入れる前に中を見る</li><li><code>rpm -ivh</code> で入れ、依存関係が足りないとどうなるかを確かめる。<code>-U</code>・<code>-F</code>・<code>-e</code> の違いを確かめる</li><li><code>rpm -V</code> の出力の9文字を読み、何が変わったかを確かめる</li><li><code>rpm2cpio</code> で、入れずに中身を取り出す</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>rpm</code> のこの章に出てこないオプション（<code>--force</code> など）、<code>rpm -V</code> の <code>D</code>・<code>L</code>・<code>P</code> の欄が出る場面、設定ファイルを書き換えたまま消したときの扱い（<code>.rpmsave</code>）、台帳の作り直し。この章は「ファイルから入れる・上げる・照らし合わせる・取り出す」が1回できれば足りる。</div></div>
 
 <h2 id="download">入れずに取ってくる — yumdownloader</h2>
@@ -65,7 +65,7 @@ rpmlib(PayloadIsZstd) &lt;= 5.4.18-1</code></pre>
 </table></div>
 
 <h2 id="install">rpm で入れる — rpm -ivh</h2>
-<div class="sgoal"><b>この節で分かること</b>: rpm が依存関係をどう扱い、どこで止まるか。</div>
+<div class="sgoal"><b>この節で分かること</b>: rpm で入れるとき、依存関係がどう扱われるか。</div>
 <p>.rpm ファイルを入れるのは <code>rpm -i</code>（install）である。<code>v</code> は経過を表示し、<code>h</code> は進み具合を <code>#</code> で表示する。たいてい <code>-ivh</code> と3つ並べて使う。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>第7章の <code>dpkg -i</code> と同じで、依存関係が足りなくても、中身を置くところまでは進めて止まるはずだ。</p>
@@ -106,7 +106,7 @@ labtool-data.noarch                        1.0-1                         @System
 <br>ただし<b>崩れる点</b>: 人の検品係なら「急ぎだから部品なしで組んで」と言われても事情を聞き返すが、rpm に依存関係を確かめさせない指示（<code>--nodeps</code>）を付けると、聞き返さずに組めないものを組む。それを「台帳と照らし合わせる」の節で確かめる。</div>
 
 <h2 id="erase">rpm で消す — rpm -e</h2>
-<div class="sgoal"><b>この節で分かること</b>: rpm で消すときに何が拒まれるか。</div>
+<div class="sgoal"><b>この節で分かること</b>: rpm で消すときの打ち方。</div>
 <pre data-where="RPM 系の檻（lab@linuc）"><code>$ sudo rpm -e labtool-data
 error: Failed dependencies:
         labtool-data &gt;= 1.0 is needed by (installed) labtool-1.0-1.noarch

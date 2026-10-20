@@ -41,7 +41,13 @@ R 'yum repolist'
 R "yum provides '*/labcalc'"
 R 'echo "--- gpgkey を書かずに入れようとする ---"; sudo yum install -y lab-mathtools; echo "exit=$?"'
 R 'lab check 10; echo "exit=$?"'
-R "printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' 'gpgcheck=1' 'gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools' | sudo tee /etc/yum.repos.d/lab-tools.repo"
+R "sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+[lab-tools]
+name=lab tools
+baseurl=file:///srv/lab-tools-rpm
+gpgcheck=1
+gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+END"
 R 'sudo yum install -y lab-mathtools'
 R 'labcalc 2 3'
 R 'yum list installed lab-mathtools'

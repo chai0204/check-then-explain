@@ -57,10 +57,7 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <p>どちらの檻にも、練習用の小さなパッケージとリポジトリが入っています。演習は<b>ネットにつながっていなくても同じ結果</b>になります。</p>
 
 <h2 id="start">はじめる</h2>
-<p><b>前の版（1.0.x）で、この教材の演習を進めたことがある人は、先に次の1行で古い記録を消してください</b>。
-2026-10-20 の組み直しで演習の番号と中身が変わったので、古い進み具合（<code>progress.json</code>）と、<code>~/work/</code> に残った古い作業ファイルが新しい演習に混ざります
-（<code>lab start</code> は、すでにあるファイルを上書きしないで配るため）。初めての人は打たなくて構いません（ボリュームが無ければ、無いという趣旨のエラーが出るだけで、何も消えません）。</p>
-<pre data-where="あなたの PC の端末（檻の外）"><code>docker volume rm lab-linuc-packages-deb-work lab-linuc-packages-deb-state lab-linuc-packages-rpm-work lab-linuc-packages-rpm-state</code></pre>
+<p><b>前の版（1.0.x）でこの教材の演習を進めたことがある人は、先に下の「前の版（1.0.x）で進めた人へ」の箱を読んでください</b>。前の版の記録が残ったまま起動すると、新しい演習の進み具合が正しく出ません。</p>
 <p>Debian 系の檻（理論編の第1〜8章・演習01〜08）:</p>
 <pre data-where="あなたの PC の端末（檻の外）"><code>docker run --rm -it --name lab-linuc-packages-deb --hostname linuc \
   -v lab-linuc-packages-deb-work:/home/lab/work \
@@ -71,6 +68,16 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
   -v lab-linuc-packages-rpm-work:/home/lab/work \
   -v lab-linuc-packages-rpm-state:/home/lab/.lab \
   ghcr.io/chai0204/lab-linuc:packages-rpm-1.1.0@sha256:__DIGEST__</code></pre>
+<div class="note warn"><b>前の版（1.0.x）で進めた人へ</b>: 1.1.0 で、演習の番号と中身が変わりました。前の版のボリュームが残っていると、次の3つが新しい演習に混ざります。
+<ul>
+<li>進み具合（<code>~/.lab/progress.json</code>）。前の版で済ませた番号に、新しい演習の ✔ が付きます（前の版の 01〜03 を済ませていると、新しい 01〜03 が ✔ の状態で始まります）。</li>
+<li>全問を終えた印（<code>~/.lab/finale</code>）と、最後に開いた演習の番号（<code>~/.lab/current</code>）。<code>finale</code> が残っていると、新しい版で全問を終えたときの締めくくりの表示が出ません。</li>
+<li><code>~/work/</code> の下の作業ファイル。<code>lab start</code> は、すでにあるファイルを上書きしないで配るので、古いファイルが残ります。</li>
+</ul>
+先に、動いている2つの檻を <code>exit</code> で抜けます。檻が使っているボリュームは消せないからです。そのあとで4つのボリュームを消し、上の起動コマンドで始めます。
+<pre data-where="あなたの PC の端末（檻の外）"><code>docker volume rm lab-linuc-packages-deb-work lab-linuc-packages-deb-state lab-linuc-packages-rpm-work lab-linuc-packages-rpm-state</code></pre>
+podman で起動していた人は、<code>docker</code> を <code>podman</code> に替えて打ちます（<code>podman volume rm</code> …。この檻を podman で動かすことは、まだ確かめていません）。
+ボリュームが無いときは、無いという趣旨のエラーが出るだけで、何も消えません。</div>
 <p>起動の1行の部品の意味は、理論編の<a href="/linuc-packages/theory/01-install#cage">第1章</a>にあります。
 特別な権限は1つも渡しません（<code>--privileged</code> も <code>--cap-add</code> もありません）。
 中では一般ユーザ <code>lab</code> として動き、パッケージを入れるときだけ <code>sudo</code> を付けます（パスワードは聞かれません）。

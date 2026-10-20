@@ -14,7 +14,7 @@
 <p class="lead"><b>前の章までにやったこと</b>: パッケージを入れる・調べる・消すを一通りやり、台帳とファイルの関係（第4章）と、依存関係で一緒に入るもの・消しても残るもの（第5章）を確かめた。そのたびに apt は <code>file:/srv/lab-repo</code> というリポジトリから取ってきていた（<code>Get:</code> の行）。<b>この章でやること</b>: apt がどのリポジトリへ、何を見て取りに行くのかを確かめる。新しい版の置き場を足して、labhello を新しい版に上げる。最後に、名前やファイルからパッケージを探す。</p>
 <div class="badges"><span>前提: 第5章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>/etc/apt/sources.list</code> の1行（種類・URI・ディストリビューション・コンポーネント）を読み書きできる</li><li><code>apt update</code> が目録を取り直し、<code>apt upgrade</code> が入っているものを新しい版に上げる、という違いを、実際に上げて示せる</li><li>入っていないパッケージも、名前と説明（<code>apt search</code>）やファイル名（<code>apt-file search</code>）から探せる</li><li><code>apt</code> と <code>apt-get</code>・<code>apt-cache</code> の使い分けを言える</li></ul>
+<ul><li><code>/etc/apt/sources.list</code> の1行（種類・URI・ディストリビューション・コンポーネント）を読み、行を足す</li><li>リポジトリの区分を足してから、新しい版に上がるまでに何が要るかを、実際に上げて確かめる</li><li>入っていないパッケージを、名前と説明（<code>apt search</code>）やファイル名（<code>apt-file search</code>）から探す</li><li><code>apt</code> と <code>apt-get</code>・<code>apt-cache</code> の使い分けを確かめる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: リポジトリに署名する手順と鍵の配り方、署名を確かめるしくみの細部、ミラー（同じ中身を配る別のサーバ）の選び方、ソースパッケージ（<code>deb-src</code>）、優先度の数字（<code>500</code>・<code>100</code>）の決め方の細部。<code>apt-cache policy</code> の数字は「どこから来た版か」の印として読めれば足りる。</div></div>
 
 <h2 id="policy">どこから来た版か — apt-cache policy</h2>
@@ -309,7 +309,7 @@ $ apt-file search bin/dig</code></pre>
 <h2 id="wrap">この章で分かったこと</h2>
 <div class="goal"><h4>持ち帰ってほしいこと</h4><ul><li>リポジトリは、中身（<code>pool/</code> の .deb）と目録（<code>dists/</code> の一覧）でできている。apt は目録を見て、中身を取ってくる</li><li>どのリポジトリを使うかは <code>/etc/apt/sources.list</code> と <code>/etc/apt/sources.list.d/</code> に「種類・URI・ディストリビューション・コンポーネント」で書く</li><li>apt が読むのは手元の目録の写し（<code>/var/lib/apt/lists/</code>）。表に書いただけでは変わらず、<code>apt update</code> で取り直す。<code>apt upgrade</code> は、その写しと台帳の版を比べて上げる</li><li>入っていないパッケージは、名前と説明なら <code>apt search</code>、ファイル名なら <code>apt-file search</code>（Contents を引く）で探す</li><li><code>apt</code> は人が画面で打つ入口、<code>apt-get</code>・<code>apt-cache</code> はスクリプトに書くもの</li></ul></div>
 <div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0@sha256:__DIGEST__（Ubuntu 24.04.5 LTS / dpkg 1.22.6 / apt 2.8.3 / apt-file 3.3 / apt snapshot 20260929T000000Z）/ docker 29.8.0・amd64・端末 80 桁 × 24 行・ネットにつながった状態で検証 / 検証日 2026-10-20</div>
-<nav class="pager"><a href="/linuc-packages/theory/05-depends">← 5. 一緒に入るもの・残るもの</a><a href="/linuc-packages/theory/07-deb-file">次: 7. .deb ファイルを直接入れる →</a></nav>
+<nav class="pager"><a href="/linuc-packages/theory/05-depends">← 5. 依存関係のあるパッケージを入れて、消す</a><a href="/linuc-packages/theory/07-deb-file">次: 7. .deb ファイルを直接入れる →</a></nav>
 <section id="comments">
 <h2>コメント</h2>
 <p class="detail">不具合でも感想でも、一言で構いません。GitHub アカウントでそのまま書けます。<br>   <b>本文と違う出力が出た場合</b>は <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> のほうが、添える情報が決まっているので速く直せます。</p>

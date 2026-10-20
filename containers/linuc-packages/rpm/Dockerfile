@@ -79,9 +79,11 @@ LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-exp
 LABEL org.opencontainers.image.description="LinuC 主題1.04（yum・rpm・yumdownloader）を RPM 系で手で確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
 # LAB_APT_SNAPSHOT は lab env の「apt 固定」の行に出る。この檻に apt は無いので、そう書く。
+# LAB_ELSEWHERE は、この檻に無い演習の番号（01〜08）を打たれたときに lab が出す、もう一方の檻の案内。
 ENV LAB_THEME=linuc-packages-rpm LAB_VERSION=1.1.0 LAB_HOME=/lab \
     LAB_APT_SNAPSHOT="なし（RPM 系。下の dnf 固定の行を見る）" \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-rpm-1.1.0
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-rpm-1.1.0 \
+    LAB_ELSEWHERE="01〜08 は Debian 系の檻で打ちます（実践編「はじめる」の1つ目の起動コマンド）"
 USER lab
 WORKDIR /home/lab
 CMD ["/bin/bash", "-l"]

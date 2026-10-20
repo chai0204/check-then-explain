@@ -14,7 +14,7 @@
 <p class="lead"><b>前の章までにやったこと</b>: パッケージをリポジトリから apt で入れ（第1・5・6章）、.deb ファイルから dpkg で入れ（第7章）、入っているもの・置かれたファイル・台帳を調べた（第2〜4章）。.deb ファイルが「中身」と「情報」でできていることも見た（第3章）。<b>この章でやること</b>: その .deb ファイルを自分で作る。中身と情報を並べて1つのファイルに固め、これまでの章の道具で中を確かめ、入れて、台帳に載ったことを確かめ、消す。パッケージを作ることは LinuC レベル1 の出題範囲には入っていないが、第1〜7章でやったことが1本につながる。</p>
 <div class="badges"><span>前提: 第7章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲の外（第1〜7章のまとめ）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>中身のファイルの木と <code>DEBIAN/control</code>（情報）を並べて、<code>dpkg-deb --build</code> で .deb ファイルを作れる</li><li>作った .deb ファイルを <code>dpkg -c</code>・<code>dpkg -I</code> で確かめ、<code>apt install ./</code> で入れ、台帳に載ったことを <code>dpkg -l</code>・<code>-L</code>・<code>-S</code> で示せる</li><li><code>--root-owner-group</code> を付ける理由を言える</li></ul>
+<ul><li>中身のファイルの木と <code>DEBIAN/control</code>（情報）を並べて、<code>dpkg-deb --build</code> で .deb ファイルを作る</li><li>作った .deb ファイルを <code>dpkg -c</code>・<code>dpkg -I</code> で確かめてから入れ、台帳にどう載るかを <code>dpkg -l</code>・<code>-L</code>・<code>-S</code> で確かめる</li><li><code>--root-owner-group</code> を付けると何が変わるかを確かめる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: パッケージを作る正式な道具（<code>dpkg-buildpackage</code> など）、<code>control</code> のこの章で使わない欄、設定ファイルの印（<code>conffiles</code>）の書き方、作ったパッケージをリポジトリに載せる方法。どれも LinuC レベル1 の出題範囲の外で、この章も試験には出ない。</div></div>
 
 <h2 id="tree">中身を並べる</h2>
@@ -80,14 +80,14 @@ $ dpkg -I myhello_1.0_all.deb
  Architecture: all
  Maintainer: lab &lt;lab@example.invalid&gt;
  Description: my first package</code></pre>
-<p>持ち主が <code>root/root</code> になった（<code>dpkg -c</code> の日時は、あなたが作った時刻になる。中に時刻が入るので、<code>dpkg -I</code> の先頭の大きさも、あなたの画面では数バイト違うことがある）。<code>dpkg -I</code> には、いま書いた <code>control</code> がそのまま入っている。</p>
+<p>持ち主が <code>root/root</code> になった。<code>dpkg -c</code> の日時は、あなたが作った時刻になる。中に時刻が入るので、<code>dpkg -I</code> の先頭の大きさも、あなたの画面では数バイト違うことがある。<code>dpkg -I</code> には、いま書いた <code>control</code> がそのまま入っている。</p>
 <div class="analogy"><b>たとえ</b>: 引っ越しの荷物を、新居の部屋割りどおりに自分で箱詰めし、送り状を書いて同封するのに近い。業者（dpkg）は、箱の中の並びのとおりに荷物を置き、送り状を台帳に写す。
 <br>ただし<b>崩れる点</b>: 人の業者なら「この荷物は台所ではなく寝室では？」と気づくことがあるが、dpkg は箱の中のパスをそのまま使う。間違った場所に詰めれば、間違った場所に置かれる。</div>
 <div class="analogy"><b>たとえ</b>: <code>--root-owner-group</code> は、荷物に付ける「持ち主」の札を、自分の名前から建物の管理人（root）の名前に書き換えて詰めることに近い。共用の棚（<code>/usr/bin</code>）に置くものは、管理人の物でなければならない。
 <br>ただし<b>崩れる点</b>: 札を書き換えても、荷物の中身や送り状は変わらない。変わるのは、置いたあとに誰が書き換えられるか（ファイルの持ち主とパーミッションの効き方）だけである。</div>
 
 <h2 id="install">入れて、台帳で確かめる</h2>
-<div class="sgoal"><b>この節で分かること</b>: 自分で作ったパッケージも、入れれば台帳に載ること。</div>
+<div class="sgoal"><b>この節で分かること</b>: 自分で作ったパッケージを入れると、台帳にどう載るか。</div>
 <p>第7章のとおり、apt にファイルとして渡す。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install ./myhello_1.0_all.deb
 Reading package lists... Done

@@ -14,7 +14,7 @@
 <p class="lead"><b>前の章までにやったこと</b>: labhello を <code>apt install</code> で入れて、使って、<code>apt remove</code> で消した。<b>この章でやること</b>: いまこの檻にどんなパッケージが入っているかを、一覧と、1つずつの詳しい情報で調べる。そして、その答えがどこから来ているかを確かめる。</p>
 <div class="badges"><span>前提: 第1章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>出題範囲 1.04.2（重要度1）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>入っているパッケージの一覧を <code>dpkg -l</code> と <code>apt list --installed</code> で出し、行頭の <code>ii</code> を読める</li><li>1つのパッケージの版・分類・依存関係などを <code>dpkg -s</code> と <code>apt show</code> で調べられる</li><li>「入っているか」の答えが、入れたときに書かれる記録（台帳）から来ていると言える</li></ul>
+<ul><li>入っているパッケージの一覧を <code>dpkg -l</code> と <code>apt list</code> で出し、行頭の <code>ii</code> が何を表すかを確かめる</li><li>1つのパッケージの版・分類・依存関係などを、<code>dpkg -s</code> と <code>apt show</code> で調べる</li><li>「入っているか」の答えが、いつ書かれ、いつ消えるのかを確かめる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>dpkg -l</code> の行頭に出る <code>ii</code> 以外の記号、<code>dpkg -s</code> の全部の欄、台帳のファイルの中身の形。この章では「一覧で探して、1つを詳しく見る」ができれば足りる。</div></div>
 
 <h2 id="list">入っているものの一覧 — dpkg -l</h2>
@@ -76,10 +76,10 @@ ii  labweb-data    1.0          all          data files for labweb</code></pre>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ dpkg -l labhello
 dpkg-query: no packages found matching labhello</code></pre>
 <div class="analogy"><b>たとえ</b>: 家の持ち物リストに近い。物を買うたびに1行書き足し、捨てるたびに線を引いて消す。「家に何があるか」を聞かれたら、家じゅうを見て回らずに、このリストを読み上げる。
-<br>ただし<b>崩れる点</b>: 家のリストなら、ときどき家じゅうを見回して書き直せるが、dpkg は見回さない。答えるときに読むのはリストだけで、物が本当にそこにあるかは見に行かない。</div>
+<br>ただし<b>崩れる点</b>: 家のリストは住む人が自分で書くが、この一覧は利用者が書くのではない。パッケージを入れる・消すときに、dpkg が書く（この章の最後の節で確かめる）。</div>
 
-<h2 id="aptlist">apt で一覧を出す — apt list --installed</h2>
-<div class="sgoal"><b>この節で分かること</b>: <code>apt list</code> の出力と、入っているものの印。</div>
+<h2 id="aptlist">apt で一覧を出す — apt list</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>apt list</code> の出力の読み方。</div>
 <p><code>apt</code> にも一覧を出すサブコマンド <code>list</code> がある。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p><code>apt list labhello</code> と打って名前が出てくれば、labhello は入っているはずだ。</p>
@@ -166,11 +166,11 @@ Download-Size: 1120 B
 APT-Sources: file:/srv/lab-repo lab/main amd64 Packages
 Description: prints its own version
  A tiny package used to practice upgrades.</code></pre>
-<p><code>dpkg -s</code> は「入っていないので、情報が無い」と答えた（2行目は「.deb ファイルを調べるなら --info を使え」という案内。.deb ファイルは、第1章で apt が取ってきた <code>labhello_1.0_all.deb</code> のような、パッケージのファイルである）。<code>apt show</code> は、入っていない labhello についても答えた。前の節の <code>apt list</code> と同じく、入れられるパッケージの一覧を持っているからである。<code>APT-Manual-Installed</code> の欄が無いのは、入っていないからである。</p>
+<p><code>dpkg -s</code> は「入っていないので、情報が無い」と答えた（2行目は「.deb ファイルを調べるなら --info を使え」という案内）。.deb ファイルは、第1章で apt が取ってきた <code>labhello_1.0_all.deb</code> のような、パッケージのファイルである。<code>apt show</code> は、入っていない labhello についても答えた。前の節の <code>apt list</code> と同じく、入れられるパッケージの一覧を持っているからである。<code>APT-Manual-Installed</code> の欄が無いのは、入っていないからである。</p>
 <div class="analogy"><b>たとえ</b>: 家電の裏に貼ってある銘板に近い。型番・製造元・必要な電源（ここでは依存関係）が書いてあり、本体を分解しなくても読める。
-<br>ただし<b>崩れる点</b>: 銘板は本体に貼ってあるが、<code>dpkg -s</code> が読んでいるのは、入れたときに書き写した控えである。本体（ファイル）がその後どうなっていても、控えの内容は変わらない。</div>
+<br>ただし<b>崩れる点</b>: 銘板は品物が手元にあれば読めるが、<code>dpkg -s</code> は入っているパッケージにしか答えない。入っていない labhello には「情報が無い」と答えた。</div>
 
-<h2 id="ledger">答えはどこから来るか — 台帳</h2>
+<h2 id="ledger">答えはどこから来るか</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>dpkg -l</code> や <code>dpkg -s</code> の答えが、いつ書かれ、いつ消えるか。</div>
 <p><code>dpkg -l</code> も <code>dpkg -s</code> も <code>apt list --installed</code> も、ディスクを探し回って答えているのではない。パッケージを入れたときに dpkg が書いておいた記録を読んでいる。この記録を、この教材では<b>台帳</b>と呼ぶ。入れると台帳に行が増え、消すと減ることを確かめる。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install labhello

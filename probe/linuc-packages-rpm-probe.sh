@@ -102,10 +102,14 @@ Is this ok [y/N]: y
 $ rpm -ql labapp
 $ rpm -qc labapp
 $ yum list installed labapp liblab
-========== 演習10 の解答: lab-tools を足し、鍵を取り込む問いに答えて入れる ==========
-$ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' \
-> 'gpgcheck=1' 'gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools' \
-> | sudo tee /etc/yum.repos.d/lab-tools.repo
+========== 演習10 の解答: lab-tools を足し（第10章と同じヒアドキュメント）、鍵を取り込む問いに答えて入れる ==========
+$ sudo tee /etc/yum.repos.d/lab-tools.repo <<'END'
+> [lab-tools]
+> name=lab tools
+> baseurl=file:///srv/lab-tools-rpm
+> gpgcheck=1
+> gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools
+> END
 $ yum repolist
 $ yum provides '*/labcalc'
 $ sudo yum install lab-mathtools
@@ -114,6 +118,11 @@ Is this ok [y/N]: y
 $ labcalc 2 3
 $ yum list installed lab-mathtools
 $ rpm -q gpg-pubkey --qf '%{SUMMARY}\n'
+========== 演習10 の別解: printf で行を並べて tee に渡しても、同じ .repo ファイルになる ==========
+$ printf '%s\n' '[lab-tools]' 'name=lab tools' 'baseurl=file:///srv/lab-tools-rpm' \
+> 'gpgcheck=1' 'gpgkey=file:///srv/lab-tools-rpm/RPM-GPG-KEY-lab-tools' \
+> | sudo tee /etc/yum.repos.d/lab-tools.repo
+$ cat /etc/yum.repos.d/lab-tools.repo
 ========== 演習10 の解答: 台帳に取り込んだ鍵の一覧 ==========
 $ rpm -q gpg-pubkey --qf '%{SUMMARY}\n'
 ========== 演習12 の解答: yumdownloader の --destdir と --resolve ==========

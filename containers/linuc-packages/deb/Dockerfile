@@ -68,12 +68,14 @@ LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-exp
 LABEL org.opencontainers.image.description="LinuC 主題1.04（apt・dpkg・apt-file）を Debian 系で手で確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
 # ---- lab コマンドを最新にする（次の版、2026-10-20）--------------------
+#   LAB_ELSEWHERE は、この檻に無い演習の番号（09〜12）を打たれたときに lab が出す、もう一方の檻の案内。
 #   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
 #   本文の記録とずれうるので、最新の lab をここで重ねる。
 #   build: docker build --build-context labcmd=containers/base -t lab-linuc-packages-deb:<版> containers/linuc-packages/deb
 COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
 ENV LAB_THEME=linuc-packages-deb LAB_VERSION=1.1.0 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0 \
+    LAB_ELSEWHERE="09〜12 は RPM 系の檻で打ちます（実践編「はじめる」の2つ目の起動コマンド）"
 USER lab
 WORKDIR /home/lab
 CMD ["/bin/bash", "-l"]

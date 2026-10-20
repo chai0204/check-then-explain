@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>5. 一緒に入るもの・残るもの — 確かめて説明する LinuC 主題1.04</title>
+<title>5. 依存関係のあるパッケージを入れて、消す — 確かめて説明する LinuC 主題1.04</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-ch="5" data-theme="linuc-packages">
@@ -10,14 +10,14 @@
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
 </div>
-<h1>5. 一緒に入るもの・残るもの</h1>
-<p class="lead"><b>前の章までにやったこと</b>: 1つだけで動くパッケージ labhello を入れて・使って・消し（第1章）、入っているものとその置き場所を調べ（第2・3章）、台帳とファイルが別々にあることを確かめた（第4章）。<b>この章でやること</b>: ほかのパッケージが無いと動かないパッケージ labapp を入れて、一緒に何が入るかを見る。それから消して、何が消えて何が残るかを確かめ、残ったものを片付ける。</p>
+<h1>5. 依存関係のあるパッケージを入れて、消す</h1>
+<p class="lead"><b>前の章までにやったこと</b>: 1つだけで動くパッケージ labhello を入れて・使って・消し（第1章）、入っているものとその置き場所を調べ（第2・3章）、台帳とファイルが別々にあることを確かめた（第4章）。<b>この章でやること</b>: ほかのパッケージが無いと動かないパッケージ labapp を入れて、一緒に何が入るかを見る。それから消して、台帳と <code>/etc</code> に何が起きるかを確かめる。</p>
 <div class="badges"><span>前提: 第4章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li><code>apt install</code> が依存関係をたどって、頼んでいないパッケージも一緒に入れることを、出力から読める</li><li>依存関係を <code>apt-cache depends</code>（必要とするもの）と <code>apt-cache rdepends</code>（必要とされているもの）で調べられる</li><li><code>remove</code>・<code>purge</code>・<code>autoremove</code> が、それぞれ何を消して何を残すかを、台帳の記号（<code>ii</code>・<code>rc</code>）と <code>/etc</code> の設定ファイルで示せる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: <code>Depends</code> 以外の関係（<code>Recommends</code>・<code>Conflicts</code> など）、印を手で付け替える方法（<code>apt-mark auto</code> / <code>manual</code>）、設定ファイルが書き換えられていたときの細かい扱い。この章は「一緒に入る・消しても残る・残りを片付ける」が1回できれば足りる。</div></div>
+<ul><li>依存関係のあるパッケージを <code>apt install</code> で入れると、何が入るかを出力から確かめる</li><li>依存関係を <code>apt-cache depends</code>（必要とするもの）と <code>apt-cache rdepends</code>（必要とされているもの）で調べる</li><li><code>remove</code>・<code>purge</code>・<code>autoremove</code> で、それぞれ何が消えて何が残るかを、台帳の記号と <code>/etc</code> の設定ファイルで確かめる</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>Depends</code> 以外の関係（<code>Recommends</code>・<code>Conflicts</code> など）、「自動で入った」という印を手で付け替える方法（<code>apt-mark auto</code> / <code>manual</code>）、設定ファイルが書き換えられていたときの細かい扱い。この章は、入れて、消して、片付けるところまでが1回できれば足りる。</div></div>
 
-<h2 id="depends">一緒に入るもの — 依存関係</h2>
+<h2 id="depends">依存関係のあるパッケージを入れる — apt install</h2>
 <div class="sgoal"><b>この節で分かること</b>: 依存関係のあるパッケージを入れると、apt が何をするか。</div>
 <p>第3章で .deb ファイルの情報を見たとき、labapp には <code>Depends: liblab (&gt;= 1.0)</code> と書いてあった。labapp は liblab が無いと動かない、という<b>依存関係</b>である。labapp を入れる。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt install labapp
@@ -73,7 +73,7 @@ Provides:
 Reverse Provides:</code></pre>
 <p>行が多いが、見るのは2か所である。<code>Dependencies:</code> の <code>1.0 - liblab (2 1.0)</code> が「版 1.0 は liblab を必要とする」で、括弧の中の <code>2 1.0</code> は「1.0 以上」を番号で書いたもの（<code>2</code> が「以上」）。<code>Reverse Depends:</code> の下が空なのは、labapp を必要としているパッケージが無いからである。<code>Versions:</code> の行は、この版がどの一覧（リポジトリの一覧と台帳）に載っているかを示している。</p>
 <div class="analogy"><b>たとえ</b>: テレビを注文したら、配達の人がアンテナ線も一緒に持ってきて、先に線をつないでからテレビを置いてくれるのに近い。頼んだのはテレビだけでも、使うのに要るものは一緒に来る。
-<br>ただし<b>崩れる点</b>: 人の配達なら、テレビを引き取るときにアンテナ線も持って帰るか聞いてくれるが、apt はテレビ（labapp）だけを引き取り、線（liblab）は置いていく。それを次の節で確かめる。</div>
+<br>ただし<b>崩れる点</b>: 人の配達なら、要りそうな物を配達の人が見て判断するが、apt が見るのは、パッケージに書かれた依存関係（<code>Depends:</code>）だけである。書かれていない物は、要りそうでも持ってこない。</div>
 
 <h2 id="auto">自動で入った印</h2>
 <div class="sgoal"><b>この節で分かること</b>: apt が、どれを利用者が頼み、どれを自分が足したかを覚えていること。</div>
@@ -97,8 +97,8 @@ Auto-Installed: 1</code></pre>
 <div class="analogy"><b>たとえ</b>: 薬局が、医者の出した薬と、その薬のために一緒に出した胃薬を、分けて控えておくのに近い。控えがあれば、元の薬をやめたときに「この胃薬ももう要らない」と後で判断できる。
 <br>ただし<b>崩れる点</b>: 薬なら、どちらが付き添いかは処方箋そのものに書いてあるが、この印はパッケージにも dpkg の台帳にも書かれていない。apt が別に持っている記録（<code>/var/lib/apt/extended_states</code>）にだけある。</div>
 
-<h2 id="remove">消す — remove のあとに残るもの</h2>
-<div class="sgoal"><b>この節で分かること</b>: <code>apt remove</code> が何を消し、何を残すか。</div>
+<h2 id="remove">消す — apt remove</h2>
+<div class="sgoal"><b>この節で分かること</b>: <code>apt remove</code> で消したあと、台帳と <code>/etc</code> がどうなるか。</div>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p>第1章のとおり <code>apt remove</code> で消せば、labapp は跡形なく消える。設定ファイルも、一緒に入ってきた liblab も、まとめて片付くはずだ。</p>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo apt remove labapp

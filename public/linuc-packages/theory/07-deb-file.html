@@ -11,11 +11,11 @@
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
 </div>
 <h1>7. .deb ファイルを直接入れる</h1>
-<p class="lead"><b>前の章までにやったこと</b>: apt でパッケージを入れる・調べる・消すをやり、apt がリポジトリの目録を見て取ってくること、依存関係があれば一緒に入れることを確かめた（第5・6章）。<b>この章でやること</b>: リポジトリを通さずに、手元にある .deb ファイルを <code>dpkg</code> で直接入れる。依存関係が足りないと何が起きるかを見て、apt に続きをさせる。最後に、パッケージを入れたときの質問をやり直す <code>dpkg-reconfigure</code> を使う。</p>
+<p class="lead"><b>前の章までにやったこと</b>: apt でパッケージを入れる・調べる・消すをやり、apt がリポジトリの目録を見て取ってくること、依存関係があれば一緒に入れることを確かめた（第5・6章）。<b>この章でやること</b>: リポジトリを通さずに、手元にある .deb ファイルを <code>dpkg</code> で直接入れる。依存関係が足りないと何が起きるかを見て、そのあとの片付け方を確かめる。最後に、パッケージを入れたときの質問をやり直す <code>dpkg-reconfigure</code> を使う。</p>
 <div class="badges"><span>前提: 第6章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.2（重要度1）</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
-<ul><li>.deb ファイルを <code>dpkg -i</code> で入れ、<code>dpkg -r</code>・<code>dpkg -P</code> で消せる</li><li><code>dpkg -i</code> が依存関係で止まったときの台帳の状態（<code>iU</code>）を読み、<code>apt --fix-broken install</code> で続きを済ませられる（最初から <code>apt install ./ファイル</code> でもよいと言える）</li><li>「展開」と「設定」の2段を <code>dpkg --unpack</code> と <code>dpkg --configure</code> で分けて示せる</li><li><code>dpkg-reconfigure</code> で、入れたときの質問をもう一度出し、設定し直せる</li></ul>
-<div class="skip"><b>ここで覚えなくていいこと</b>: <code>dpkg</code> のそのほかのオプション（<code>--set-selections</code>・<code>--force-…</code> など）、パッケージの中で動く設定の手順（スクリプト）の書き方、debconf（質問と答えを覚えるしくみ）の記録の形、<code>dpkg-reconfigure</code> の画面の種類の違い。この章は「ファイルから入れる・止まったら apt に続きをさせる・設定をやり直す」が1回できれば足りる。</div></div>
+<ul><li>.deb ファイルを <code>dpkg -i</code> で入れ、<code>dpkg -r</code>・<code>dpkg -P</code> で消す</li><li>依存関係が足りない .deb ファイルを <code>dpkg -i</code> で入れるとどうなるかを確かめ、続きを済ませる方法を確かめる</li><li><code>dpkg -i</code> がしている「展開」と「設定」を、<code>dpkg --unpack</code> と <code>dpkg --configure</code> で分けて打つ</li><li><code>dpkg-reconfigure</code> で、入れたときの質問をもう一度出し、設定し直す</li></ul>
+<div class="skip"><b>ここで覚えなくていいこと</b>: <code>dpkg</code> のそのほかのオプション（<code>--set-selections</code>・<code>--force-…</code> など）、パッケージの中で動く設定の手順（スクリプト）の書き方、debconf（質問と答えを覚えるしくみ）の記録の形、<code>dpkg-reconfigure</code> の画面の種類の違い。この章は、ファイルから入れる・消す・設定をやり直す、が1回できれば足りる。</div></div>
 
 <h2 id="install">.deb ファイルを入れる — dpkg -i</h2>
 <div class="sgoal"><b>この節で分かること</b>: 手元の .deb ファイルを、dpkg で入れて消す方法。</div>
@@ -43,7 +43,7 @@ dpkg-query: no packages found matching labhello</code></pre>
 <p>dpkg は、消してよいかを尋ねない。</p>
 
 <h2 id="broken">依存関係が足りない .deb ファイル</h2>
-<div class="sgoal"><b>この節で分かること</b>: 依存関係が足りないとき、dpkg がどこまで進めて、何を残すか。</div>
+<div class="sgoal"><b>この節で分かること</b>: 依存関係が足りない .deb ファイルを dpkg で入れると、どうなるか。</div>
 <p>第5章で <code>apt install labapp</code> は liblab を一緒に入れた。同じ labapp を、今度は .deb ファイルから dpkg で入れる。</p>
 <div class="naive"><h4>ふつうこう考える</h4>
 <p><code>dpkg -i</code> もパッケージを入れるコマンドなのだから、足りない liblab も一緒に入れてくれるはずだ。少なくとも、入れられないなら何もせずに終わるだろう。</p>
@@ -114,7 +114,7 @@ liblab: hello from labapp 1.0</code></pre>
 <br>ただし<b>崩れる点</b>: 家具なら、部品を床に並べたまま放っておいても困るのはその家具だけだが、依存関係が足りないまま残った <code>iU</code> は、apt のほかの操作まで止める。片付けるか続けるかを、先に決めなければならない。</div>
 
 <h2 id="remove">dpkg で消す — -r と -P</h2>
-<div class="sgoal"><b>この節で分かること</b>: dpkg で消すときに、何が拒まれ、何が残るか。</div>
+<div class="sgoal"><b>この節で分かること</b>: dpkg で消すときの打ち方と、消したあとの台帳。</div>
 <pre data-where="Debian 系の檻（lab@linuc）"><code>$ sudo dpkg -r liblab
 dpkg: dependency problems prevent removal of liblab:
  labapp depends on liblab (&gt;= 1.0).
