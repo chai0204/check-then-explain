@@ -66,6 +66,9 @@ PROMPTS = [
 ]
 PROMPT_END = re.compile("(" + "|".join(PROMPTS) + r")\Z")
 PROMPT_LINE = re.compile("^(" + "|".join(PROMPTS) + ")(.*)$")
+# 本文（--pages）の行は「← 注釈」を前の空白ごと削るので、答えが Enter だけの問いは末尾の空白まで消える
+# （"First sector (…):   ← Enter だけ" → "First sector (…):"）。本文から答えを読むときは末尾の空白を問わない
+PAGE_PROMPT_LINE = re.compile("^(" + "|".join(p[:-1] if p.endswith(" ") else p for p in PROMPTS) + r") ?(.*)$")
 INTERACTIVE = re.compile(r"^sudo (fdisk|gdisk|parted) /dev/[a-z0-9]+$")
 
 
@@ -414,7 +417,7 @@ def steps_from(dir_, chapters, from_pages):
                         cur["keys"] = []
                     steps.append(cur)
                 elif cur is not None and from_pages and cur["keys"] is not None:
-                    pm = PROMPT_LINE.match(text.rstrip("\n"))
+                    pm = PAGE_PROMPT_LINE.match(text.rstrip("\n"))
                     if pm:
                         cur["keys"].append(pm.group(2).strip())
     return steps
