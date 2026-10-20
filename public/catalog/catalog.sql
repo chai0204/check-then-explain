@@ -98,13 +98,14 @@ vi のモードを行き来して編集し、:w! :q! :e! ZZ の違いを言え�
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-text', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
-  'linuc-packages', 'パッケージ管理（apt と yum）', 'ドラフト', 'LinuC レベル1', '101', '1.04', '初級', '演習あり（コンテナ）', '2026-10-13', '2026-10-13',
-  'LinuC レベル1 101 試験の主題1.04（apt・dpkg・yum・rpm）を、Debian 系（Ubuntu 24.04）と RPM 系（AlmaLinux 9.7）の2つの檻で打って確かめる7章。入れる・消す・調べる・照らし合わせる・署名を確かめる、を全部やる。パッケージのコマンドはどれも、手元の台帳（dpkg・rpm）かリポジトリの目録（apt・yum）という帳簿を読んでいるだけだ。',
-  'LinuC レベル1（101）の受験者で、dpkg -S と apt-file search のような似たコマンドの違いで迷う人。端末でコマンドを打てて、docker を動かせることが前提。',
-  'dpkg・rpm・apt・yum のコマンドを、台帳と目録のどちらを読むかで分けられる
-remove・purge・autoremove の違いを、台帳の状態（ii / rc）で言える
-dpkg -i が依存関係で止まったときの台帳の状態と、続きのやり方を言える
-rpm -K の出力を読み、署名が確かめられたかを判断できる');
+  'linuc-packages', 'パッケージ管理（apt と yum）', 'ドラフト', 'LinuC レベル1', '101', '1.04', '初級', '演習あり（コンテナ）', '2026-10-13', '2026-10-20',
+  'LinuC レベル1 101 試験の主題1.04（apt・dpkg・yum・rpm）を、Debian 系（Ubuntu 24.04）と RPM 系（AlmaLinux 9.7）の2つの檻で打って確かめる11章。まだ入っていないコマンドを1つ入れて・使って・消すところから始め、何が入っているか・ファイルがどこに置かれたか・依存関係・リポジトリ・.deb ファイル・パッケージの自作までを Debian 系で順にやり、同じことを RPM 系の yum と rpm でやり直す。途中で、ファイルだけ・台帳だけを変えたときに何が起きるかも確かめる。',
+  'LinuC レベル1（101）の受験者で、パッケージ管理のコマンドをまだ打ったことがない人。端末でコマンドを打てて、sudo・パイプ・grep・less・vi が使え、docker を動かせることが前提（主題1.01〜1.03 を済ませていれば足りる）。',
+  'まだ入っていないコマンドを apt / yum で入れて使い、消せる
+入っているもの・置かれたファイル・ファイルの持ち主のパッケージを、dpkg / rpm の台帳に聞いて調べられる
+remove・purge・autoremove の違いを、台帳の状態（ii / rc）と設定ファイルで示せる
+リポジトリを足して新しい版に上げられ、apt update が要る apt と、自分で取りに行く yum の違いを言える
+.deb / .rpm ファイルを直接入れ、依存関係で止まったときに続きを済ませられる');
 INSERT INTO article_domain (slug, domain) VALUES ('linuc-packages', 'サーバー');
 
 INSERT INTO article (slug, title, status, cert, cert_exam, cert_order, difficulty, method, created, updated, summary, audience, outcomes) VALUES (
@@ -318,13 +319,17 @@ INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-text', 7, 'リ
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-text', 8, 'xargs は空白で区切る', '/linuc-text/theory/08-pipe', 20);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-text', 9, '. は何にでも当たる', '/linuc-text/theory/09-regex', 22);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-text', 10, ':w! は読み取り専用にも書く', '/linuc-text/theory/10-vi', 25);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 1, '入っているかどうかは台帳が決める', '/linuc-packages/theory/01-package', 15);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 2, 'apt は目録を読んで台帳に書く', '/linuc-packages/theory/02-apt', 20);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 3, '目録は取りに行くまで古いまま', '/linuc-packages/theory/03-sources', 20);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 4, 'dpkg は依存を読めるが取りに行かない', '/linuc-packages/theory/04-dpkg', 20);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 5, 'yum は目録を自分で取りに行く', '/linuc-packages/theory/05-yum', 22);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 6, 'rpm -V が黙るのは台帳どおりだから', '/linuc-packages/theory/06-rpm-query', 20);
-INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 7, 'OK は確かめた範囲の OK', '/linuc-packages/theory/07-rpm-install', 22);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 1, 'パッケージを入れて、使って、消す', '/linuc-packages/theory/01-install', 17);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 2, 'いま何が入っているかを調べる', '/linuc-packages/theory/02-list', 15);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 3, '入れたファイルがどこに置かれたかを調べる', '/linuc-packages/theory/03-files', 18);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 4, '台帳とファイルを見比べる', '/linuc-packages/theory/04-ledger', 18);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 5, '依存関係のあるパッケージを入れて、消す', '/linuc-packages/theory/05-depends', 18);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 6, 'パッケージはどこから来るか', '/linuc-packages/theory/06-repository', 25);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 7, '.deb ファイルを直接入れる', '/linuc-packages/theory/07-deb-file', 22);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 8, 'パッケージを自分で作る', '/linuc-packages/theory/08-build', 18);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 9, 'RPM 系で同じことをする', '/linuc-packages/theory/09-rpm', 24);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 10, 'yum のリポジトリを足して、署名を確かめる', '/linuc-packages/theory/10-yum-repo', 28);
+INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-packages', 11, '.rpm ファイルを rpm で直接入れて、確かめる', '/linuc-packages/theory/11-rpm-file', 28);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 1, '練習機に入り、つながっているディスクを眺める', '/linuc-disks/theory/01-look', 17);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 2, '空のディスクを使えるようにする', '/linuc-disks/theory/02-first-disk', 20);
 INSERT INTO chapter (slug, n, title, url, minutes) VALUES ('linuc-disks', 3, 'パーティションの表を読む・直す', '/linuc-disks/theory/03-partition', 24);
@@ -443,12 +448,18 @@ INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-text', 'linu
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-text', 'linuc-text', '06', '名前に空白のあるファイルもまとめて消す', 12);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-text', 'linuc-text', '07', 'レベルが ERROR か WARN の行だけを抜き出す', 12);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-text', 'linuc-text', '08', 'vi で TODO を直す', 12);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'deb', '01', 'labsvc を、跡形なく消す', 10);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'deb', '02', 'labcalc コマンドを使えるようにする', 15);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'deb', '03', '配られた .deb を、動く状態まで入れる', 12);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'rpm', '04', 'labcalc を、署名の確認を切らずに入れる', 15);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'rpm', '05', '書き換えられた labmotd を、入れた直後に戻す', 10);
-INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'rpm', '06', 'labtool を yumdownloader で取り、rpm で入れる', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'deb', '01', 'labhello を入れて、使えるようにする', 5);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'deb', '02', '仕事に要らない遊びのパッケージを、見つけて消す', 8);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'deb', '03', 'labsvc の設定ファイルを探して、ポートを 9090 に変える', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'deb', '04', '見つからなくなった labbackup を、パッケージから戻す', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'deb', '05', 'labweb を、跡形なく消す', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'deb', '06', 'labcalc コマンドを使えるようにする', 15);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'deb', '07', '配られた .deb を、動く状態まで入れる', 12);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'deb', '08', '配られたスクリプトを、自分でパッケージにして入れる', 15);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'rpm', '09', 'labapp を yum で入れ、挨拶を「こんにちは」に変える', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'rpm', '10', 'labcalc を、署名の確認を切らずに入れる', 15);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'rpm', '11', '書き換えられた labmotd を、入れた直後に戻す', 10);
+INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-packages', 'rpm', '12', 'labtool を yumdownloader で取り、rpm で入れる', 12);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '01', '空のディスク vde を使えるようにする', 10);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '02', '消してしまったパーティションを取り戻す', 12);
 INSERT INTO exercise (slug, cage, n, title, minutes) VALUES ('linuc-disks', 'linuc-disks', '03', '新しいサーバのディスクを GPT で切る', 15);

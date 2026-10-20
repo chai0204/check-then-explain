@@ -2,7 +2,7 @@
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>パッケージ管理（apt と yum） — 確かめて説明する</title>
-<meta name="description" content="LinuC レベル1 101 試験の主題1.04（apt・dpkg・yum・rpm）を、Debian 系（Ubuntu 24.04）と RPM 系（AlmaLinux 9.7）の2つの檻で打って確かめる7章。入れる・消す・調べる・照らし合わせる・署名を確かめる、を全部やる。パッケージのコマンドはどれも、手元の台帳（dpkg・rpm）かリポジトリの目録（apt・yum）という帳簿を読んでいるだけだ。">
+<meta name="description" content="LinuC レベル1 101 試験の主題1.04（apt・dpkg・yum・rpm）を、Debian 系（Ubuntu 24.04）と RPM 系（AlmaLinux 9.7）の2つの檻で打って確かめる11章。まだ入っていないコマンドを1つ入れて・使って・消すところから始め、何が入っているか・ファイルがどこに置かれたか・依存関係・リポジトリ・.deb ファイル・パッケージの自作までを Debian 系で順にやり、同じことを RPM 系の yum と rpm でやり直す。途中で、ファイルだけ・台帳だけを変えたときに何が起きるかも確かめる。">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/shared/style.css"></head>
 <body data-draft="1" data-theme="linuc-packages">
@@ -10,35 +10,40 @@
 <nav class="top"><a href="/">トップ</a> › <strong>パッケージ管理（apt と yum）</strong></nav>
 <div class="draftbar compact"><p><b>ドラフト</b>: この記事は<b>著者が読者として通していません</b>。本文の出力はすべて実機の記録で、演習は模範解答で通ること・未達のときに判定が鳴ることを確かめてあります。それでも導線の不備は残っている可能性があります。詰まったら各ページ下のコメントか <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> へ。</p></div>
 <h1>パッケージ管理（apt と yum）</h1>
-<div class="badges"><span>LinuC レベル1 101 主題1.04</span><span>初級</span><span>演習あり（コンテナ）</span><span>約3時間33分</span><span>状態: ドラフト</span></div>
-<p class="lead">LinuC レベル1 101 試験の主題1.04（apt・dpkg・yum・rpm）を、Debian 系（Ubuntu 24.04）と RPM 系（AlmaLinux 9.7）の2つの檻で打って確かめる7章。入れる・消す・調べる・照らし合わせる・署名を確かめる、を全部やる。パッケージのコマンドはどれも、手元の台帳（dpkg・rpm）かリポジトリの目録（apt・yum）という帳簿を読んでいるだけだ。</p>
+<div class="badges"><span>LinuC レベル1 101 主題1.04</span><span>初級</span><span>演習あり（コンテナ）</span><span>約6時間3分</span><span>状態: ドラフト</span></div>
+<p class="lead">LinuC レベル1 101 試験の主題1.04（apt・dpkg・yum・rpm）を、Debian 系（Ubuntu 24.04）と RPM 系（AlmaLinux 9.7）の2つの檻で打って確かめる11章。まだ入っていないコマンドを1つ入れて・使って・消すところから始め、何が入っているか・ファイルがどこに置かれたか・依存関係・リポジトリ・.deb ファイル・パッケージの自作までを Debian 系で順にやり、同じことを RPM 系の yum と rpm でやり直す。途中で、ファイルだけ・台帳だけを変えたときに何が起きるかも確かめる。</p>
 
-<div class="card"><h3>想定読者</h3><p>LinuC レベル1（101）の受験者で、dpkg -S と apt-file search のような似たコマンドの違いで迷う人。端末でコマンドを打てて、docker を動かせることが前提。</p></div>
+<div class="card"><h3>想定読者</h3><p>LinuC レベル1（101）の受験者で、パッケージ管理のコマンドをまだ打ったことがない人。端末でコマンドを打てて、sudo・パイプ・grep・less・vi が使え、docker を動かせることが前提（主題1.01〜1.03 を済ませていれば足りる）。</p></div>
 
 <h2 id="outcomes">得られるもの</h2>
 <ul>
-<li>dpkg・rpm・apt・yum のコマンドを、台帳と目録のどちらを読むかで分けられる</li>
-<li>remove・purge・autoremove の違いを、台帳の状態（ii / rc）で言える</li>
-<li>dpkg -i が依存関係で止まったときの台帳の状態と、続きのやり方を言える</li>
-<li>rpm -K の出力を読み、署名が確かめられたかを判断できる</li>
+<li>まだ入っていないコマンドを apt / yum で入れて使い、消せる</li>
+<li>入っているもの・置かれたファイル・ファイルの持ち主のパッケージを、dpkg / rpm の台帳に聞いて調べられる</li>
+<li>remove・purge・autoremove の違いを、台帳の状態（ii / rc）と設定ファイルで示せる</li>
+<li>リポジトリを足して新しい版に上げられ、apt update が要る apt と、自分で取りに行く yum の違いを言える</li>
+<li>.deb / .rpm ファイルを直接入れ、依存関係で止まったときに続きを済ませられる</li>
 </ul>
 
 <h2 id="start">進め方</h2>
 <div class="toc">
-  <a href="/linuc-packages/theory/"><b>理論編</b><span>全7章・約2時間19分。1章ごとに「実際に打つと何が出るか」を先に置いてある。</span></a>
-  <a href="/linuc-packages/practice/"><b>実践編</b><span>演習6本・約1時間14分。docker か podman で檻（コンテナ）を1つ起動する。特権は渡さない。</span></a>
+  <a href="/linuc-packages/theory/"><b>理論編</b><span>全11章・約3時間51分。1章ごとに「実際に打つと何が出るか」を先に置いてある。</span></a>
+  <a href="/linuc-packages/practice/"><b>実践編</b><span>演習12本・約2時間12分。docker か podman で檻（コンテナ）を1つ起動する。特権は渡さない。</span></a>
 </div>
-<p class="detail">完了推定時間（約3時間33分）は、各章の所要時間と演習の目安の合計です。</p>
+<p class="detail">完了推定時間（約6時間3分）は、各章の所要時間と演習の目安の合計です。</p>
 
 <h2 id="chapters">章</h2>
 <ol class="chlist">
-<li><a href="/linuc-packages/theory/01-package">入っているかどうかは台帳が決める</a></li>
-<li><a href="/linuc-packages/theory/02-apt">apt は目録を読んで台帳に書く</a></li>
-<li><a href="/linuc-packages/theory/03-sources">目録は取りに行くまで古いまま</a></li>
-<li><a href="/linuc-packages/theory/04-dpkg">dpkg は依存を読めるが取りに行かない</a></li>
-<li><a href="/linuc-packages/theory/05-yum">yum は目録を自分で取りに行く</a></li>
-<li><a href="/linuc-packages/theory/06-rpm-query">rpm -V が黙るのは台帳どおりだから</a></li>
-<li><a href="/linuc-packages/theory/07-rpm-install">OK は確かめた範囲の OK</a></li>
+<li><a href="/linuc-packages/theory/01-install">パッケージを入れて、使って、消す</a></li>
+<li><a href="/linuc-packages/theory/02-list">いま何が入っているかを調べる</a></li>
+<li><a href="/linuc-packages/theory/03-files">入れたファイルがどこに置かれたかを調べる</a></li>
+<li><a href="/linuc-packages/theory/04-ledger">台帳とファイルを見比べる</a></li>
+<li><a href="/linuc-packages/theory/05-depends">依存関係のあるパッケージを入れて、消す</a></li>
+<li><a href="/linuc-packages/theory/06-repository">パッケージはどこから来るか</a></li>
+<li><a href="/linuc-packages/theory/07-deb-file">.deb ファイルを直接入れる</a></li>
+<li><a href="/linuc-packages/theory/08-build">パッケージを自分で作る</a></li>
+<li><a href="/linuc-packages/theory/09-rpm">RPM 系で同じことをする</a></li>
+<li><a href="/linuc-packages/theory/10-yum-repo">yum のリポジトリを足して、署名を確かめる</a></li>
+<li><a href="/linuc-packages/theory/11-rpm-file">.rpm ファイルを rpm で直接入れて、確かめる</a></li>
 </ol>
 
 <h2 id="syllabus">出題範囲（LinuC レベル1 101 試験）</h2>
@@ -59,7 +64,7 @@
 <li><a href="/linuc-services/">時刻・ログ・メール</a>（LinuC レベル1 102 主題1.09）</li>
 </ul>
 
-<p class="detail">公開 2026-10-13 ／ 最終更新 2026-10-13 ／ 関連領域: サーバー</p>
+<p class="detail">公開 2026-10-13 ／ 最終更新 2026-10-20 ／ 関連領域: サーバー</p>
 
 <section id="comments">
 <h2>コメント</h2>
