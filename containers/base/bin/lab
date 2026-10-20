@@ -267,7 +267,8 @@ finale_if_complete() {
   printf '\n'
 
   if [ -n "$spine" ]; then
-    printf '  %s\n\n' "この${total}つは全部、1つの事実から出ていました。"
+    local cnt="${total}つ"; [ "$total" -ge 10 ] && cnt="${total}個"   # 「つ」で数えるのは9まで
+    printf '  %s\n\n' "この${cnt}は全部、1つの事実から出ていました。"
     printf '%s\n' "$spine" | sed "s/^/      ${c_b}/; s/$/${c_0}/"
     printf '\n'
   fi
