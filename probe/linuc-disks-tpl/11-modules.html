@@ -50,7 +50,7 @@ $ sudo modprobe -rv udf</code></pre>
 <tr><td><code>rmmod 名前</code></td><td>1つ外す</td><td>使われていれば断る</td><td>1つだけを確実に外す</td></tr>
 </table></div>
 
-<h2 id="auto">モジュールは、要るときに読み込まれる</h2>
+<h2 id="auto">CD をマウントすると、何が読み込まれるか</h2>
 <div class="sgoal"><b>この節で分かること</b>: 誰も <code>modprobe</code> を打たなくても、モジュールが読み込まれる場面。</div>
 <p>CD のファイルシステム（iso9660）を読むドライバ <code>isofs</code> で確かめる。第7章の再起動の後、この章まで CD はマウントしていない。ただ、第7章の後で演習06 の判定（student が CD をマウントする）を打った人は、そのときに読み込まれているので、先に外しておく（読み込まれていなければ、<code>modprobe -r</code> は何も言わずに終わる）。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo modprobe -r isofs
@@ -75,7 +75,7 @@ $ lsmod | grep -E "usb_storage|uas"
 $ sudo dmesg | grep -E "usb-storage|registered new interface"</code></pre>
 <p><code>lsusb</code> に USB メモリ（<code>QEMU USB HARDDRIVE</code>）が出て、<code>lsusb -t</code> では <code>Driver=usb-storage</code> が付いている（Device の番号は、それまでに挿した回数で変わる）。ディスク <code>sdb</code> は、USB でつながり（TRAN が <code>usb</code>）、取り外せる（RM が 1）。そして、あなたは何も読み込んでいないのに、<code>usb_storage</code> と <code>uas</code> の2つが読み込まれた。<code>dmesg</code> の <code>usbcore: registered new interface driver usb-storage</code> がその瞬間である（上の2行の <code>usbfs</code>・<code>hub</code> は、起動したときに組み込みの部品が名乗った行。第7章の再起動の後に <code>lab check 10</code> か、引数なしの <code>lab check</code> を打った人は、判定が USB メモリを1本挿したので、そのときの行も出る）。</p>
 
-<h2 id="naive">外したドライバは、戻ってくる</h2>
+<h2 id="naive">ドライバを外した USB メモリを、挿し直すと？</h2>
 <div class="sgoal"><b>この節で分かること</b>: 「ドライバを外す」が「装置を使えなくする」にならない理由。</div>
 <p>USB メモリのドライバを外す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo modprobe -r usb_storage
@@ -104,7 +104,7 @@ $ grep -n "kmod load" /usr/lib/udev/rules.d/80-drivers.rules | head -1</code></p
 <div class="analogy"><b>たとえ</b>: 荷物の<b>受付係</b>に近い。届いた荷物の伝票（modalias）を読み、規則の表どおりの担当（ドライバ）を呼ぶ。担当を一度帰らせても、次の荷物が来れば受付係がまた呼ぶ。
 <br>ただし<b>崩れる点</b>: 受付係は伝票に合う担当を1人選ぶが、udev は当てはまる担当を全員呼ぶ。だから USB メモリ1本で <code>uas</code> と <code>usb_storage</code> の2つが来た。</div>
 
-<h2 id="blacklist">止めるには、読み込む側の表に書く</h2>
+<h2 id="blacklist">挿しても使えないようにする</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>/etc/modprobe.d/</code> の書き方と、それが効く範囲・効き始めるとき。</div>
 <p>モジュールを読み込むときの設定は、<code>/etc/modprobe.d/</code> の下の <code>.conf</code> のファイルに書く。Ubuntu には最初からいくつかある。起動のたびに読み込むモジュールを書いていた <code>/etc/modules</code> は、いまは <code>/etc/modules-load.d/</code> に置き換わっている。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls /etc/modprobe.d/

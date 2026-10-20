@@ -127,7 +127,7 @@ Filesystem            Size  Used Avail Use% Mounted on
 <div class="analogy"><b>たとえ</b>: <b>本棚を大きいものに買い替えた</b>のに、本の並べ方の目録（ファイルシステム）が前の棚の段数のままになっている状態に近い。棚は広いのに、目録に載っていない段には本を置かない。
 <br>ただし<b>崩れる点</b>: 人なら棚が広がったことに見れば気づくが、ファイルシステムは自分から外側を測り直さない。<code>resize2fs</code> で「棚はここまである」と書き直してもらう必要がある。</div>
 
-<h2 id="shrink">縮めるのは、中身を先に</h2>
+<h2 id="shrink">箱を縮める</h2>
 <div class="sgoal"><b>この節で分かること</b>: 縮めるときの順番と、縮められないファイルシステムがあること。</div>
 <p>縮めるときは順番が逆になる。先に中身（ファイルシステム）を縮め、そのあとで箱を縮める。逆にすると、箱からはみ出した中身が壊れる。<code>lvreduce</code>（論理ボリュームを縮めるコマンド）に <code>-r</code> を付けると、この順番でやる。ext4 はマウントしたままでは縮められないので、先に外す。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo umount /srv/data
@@ -166,7 +166,7 @@ $ sudo rmdir /srv/logs</code></pre>
 <tr><td>XFS</td><td>マウントしたまま（<code>xfs_growfs</code>）</td><td><b>できない</b></td><td><code>lvreduce -r</code> が止めた</td></tr>
 </table></div>
 
-<h2 id="snapshot">スナップショットは、変わる前の分だけを取っておく</h2>
+<h2 id="snapshot">スナップショットで、消したファイルを取り戻す</h2>
 <div class="sgoal"><b>この節で分かること</b>: スナップショットの大きさが何で決まるか。</div>
 <p><b>スナップショット</b>は、論理ボリュームのある瞬間の姿を残したものである。ファイルを1つ置いてから、<code>data</code> のスナップショットを 100MiB で作る（<code>lvcreate</code> の <code>-s</code>）。元は 1.2GiB あるが、それより小さくてよい。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ echo "スナップショットの前" | sudo tee /srv/data/note.txt

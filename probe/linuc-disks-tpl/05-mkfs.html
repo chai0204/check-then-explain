@@ -17,7 +17,7 @@
 <ul><li><code>mkfs</code> で ext3・ext4・XFS・VFAT・Btrfs を作り分けられ、ラベルを付けられる（<code>mkfs -t 種類</code> と <code>mkfs.種類</code> の関係も言える）</li><li><code>df</code> の Size・Used・Avail の関係を説明でき、ext4 の予約ブロックを <code>tune2fs</code> で読んで変えられる</li><li>5つの種類が何に向いているかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: 管理情報の内部の形は扱わない。<code>mkfs</code> の細かいオプション（ブロックの大きさなど）も扱わない。ファイルシステムの検査と修復（<code>fsck</code>・<code>xfs_repair</code>）は、Version 10.0 の出題範囲では 101 ではなく 201 試験に入っているので扱わない。</div></div>
 
-<h2 id="mkfs">mkfs は、種類ごとの道具を呼ぶ入口</h2>
+<h2 id="mkfs">種類ごとに mkfs で作る</h2>
 <div class="sgoal"><b>この節で分かること</b>: 5種類のファイルシステムの作り方と、作ったときに何が決まるか。</div>
 <p>第2章の <code>mkfs.ext4</code> は ext4 を作る道具だった。種類ごとに道具がある。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ ls /sbin/mkfs*</code></pre>
@@ -73,7 +73,7 @@ $ sudo umount /mnt</code></pre>
 <div class="analogy"><b>たとえ</b>: 満員電車の<b>乗務員用の扉</b>に近い。乗客で埋まっても、乗務員が通る隙間だけは空けておく。乗客から見れば、その隙間は「無い」のと同じである。
 <br>ただし<b>崩れる点</b>: 扉は目に見えるが、ext4 の予約ブロックは <code>df</code> の Size にも Used にも出ず、Avail が小さいことでしか見えない。しかも乗務員（root）は、隙間が空いていれば乗客と同じ席にも座れる。</div>
 
-<h2 id="compare">種類によって、使える量が違う</h2>
+<h2 id="compare">種類ごとの使える量を比べる</h2>
 <div class="sgoal"><b>この節で分かること</b>: 同じくらいの大きさの区画でも、種類によって Size・Used・Avail が違うこと。</div>
 <p>VFAT（vdb1、100MiB）・XFS（vdb4、600MiB）・Btrfs（vdb5、400MiB）を、それぞれ別のマウントポイントにつないで、まとめて <code>df</code> で見る。<code>mkdir</code> に複数の名前を渡すと、まとめて作る。<code>umount</code> にも複数を渡せる。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo mkdir /mnt/esp /mnt/root /mnt/var
@@ -94,7 +94,7 @@ $ sudo rmdir /mnt/esp /mnt/root /mnt/var</code></pre>
 <div class="analogy"><b>たとえ</b>: 同じ広さの<b>土地に建てた倉庫</b>でも、壁の厚さ（管理情報）や事務所の広さ（予約）は建て方で違い、荷物を置ける床の広さが変わる。
 <br>ただし<b>崩れる点</b>: 倉庫なら壁の厚さは図面で前もって分かるが、ファイルシステムの差は種類と区画の大きさで変わり、作って <code>df</code> で見るまで正確には分からない。しかも XFS のように、使っていない予約を「使用中」と数える種類もある。</div>
 
-<h2 id="features">ext3 と ext4 の違いは、機能の旗</h2>
+<h2 id="features">ext3 と ext4 の機能を比べる</h2>
 <div class="sgoal"><b>この節で分かること</b>: ext3 と ext4 が、同じ系統の中で何が違うか。</div>
 <p>ext2・ext3・ext4 は同じ系統で、違いは使える機能である。<code>dumpe2fs -h</code>（ext 系の管理情報の見出しを出すコマンド）で、機能の一覧（features）を比べる。<code>2&gt;/dev/null</code> は、エラーの出力（ここでは版の表示）を捨てる書き方である。</p>
 <pre data-where="練習機の中（student@linuc）"><code>$ sudo dumpe2fs -h /dev/vdb2 2&gt;/dev/null | grep -i features
