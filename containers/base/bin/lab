@@ -14,11 +14,46 @@ STATE="${HOME}/.lab"
 PROGRESS="${STATE}/progress.json"
 WORK="${HOME}/work"
 
+# sudo を付けて打たれたら、何もせずに止める。sudo は HOME を /root に替えるので、作業ディレクトリも
+# 進み具合も /root の下にでき、~/work には現れない。/root はボリュームではないので、檻を抜けると消える。
+# それでいて以前は「作業ファイルを ~/work/07 に展開しました」と出ていた（読者フィードバック 2026-10-22、
+# 主題1.04: lab start が Permission denied で失敗し、sudo を付けると通ったので付け続けたら、~/work/07 ができなかった）。
+if [ "$(id -u)" = 0 ] && [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+  printf '%s\n' "lab は sudo を付けずに打ちます（いま打ったのは sudo lab ${*:-}）。" \
+    "  sudo を付けると root として動き、作業ディレクトリと進み具合が root のホーム（$HOME）の下にできます。" \
+    "  ~/work には現れず、$HOME はボリュームではないので檻を抜けると消えます。何もせずに止めました。" \
+    "  lab の操作は全部、sudo なしでできます（判定に root が要るところは、判定が自分で sudo を使います）。" >&2
+  exit 1
+fi
+
+# lab の置き場（~/.lab の全部と、~/work そのもの）の持ち主が、いまの利用者でなくなっていたら戻す。
+# 持ち主が root にずれた檻では、lab start が「Permission denied」で ~/work/NN を作れず、進み具合も
+# 保存できなかった（同じ読者フィードバック。ずれたきっかけは分かっていない。公開中のイメージを docker・
+# podman で本文どおりに使う限り、新しいボリュームも前の版のボリュームも lab の持ち物になることは確かめた）。
+# ~/work/NN の中は演習の中身なので触らない（権限を扱う演習で、読者がわざと変えたものを戻さないため）。
+not_mine() { { find "$STATE" "$WORK" -maxdepth 0 ! -user "$(id -un)"; find "$STATE" -mindepth 1 ! -user "$(id -un)"; } 2>/dev/null; }
+heal_owner() {
+  local me found was
+  me=$(id -un)
+  found=$(not_mine)
+  [ -n "$found" ] || return 0
+  was=$(printf '%s\n' "$found" | while IFS= read -r f; do stat -c '%n（持ち主 %U）' "$f" 2>/dev/null; done)
+  sudo -n chown "$me:$(id -gn)" "$WORK" 2>/dev/null
+  sudo -n chown -R "$me:$(id -gn)" "$STATE" 2>/dev/null
+  # 戻せなかったら（sudo が無い檻・読み取り専用など）黙る。下の ⚠ と lab start の案内が事実を出す
+  [ -z "$(not_mine)" ] || return 0
+  printf '%s\n' "（lab の置き場の持ち主が $me ではなかったので、$me に戻しました。中身は変えていません）" >&2
+  printf '%s\n' "$was" | sed 's/^/    /' >&2
+  printf '\n' >&2
+}
+
 mkdir -p "$STATE" "$WORK" 2>/dev/null
-# 進捗ファイルが書けない環境（ボリュームの所有者がずれている等）でも本体は動かす。
-# 黙って進捗が消えるのが最悪なので、そのときは理由を1行出す。
+heal_owner
+# 進捗ファイルが書けない環境でも本体は動かす。黙って進捗が消えるのが最悪なので、そのときは理由を出す。
+# 書き込みの失敗は { } 2>/dev/null で包む。`> f 2>/dev/null` の順だと、2>/dev/null が効く前に
+# bash の「Permission denied」が画面に出る（2026-10-22 の読者の画面にはこれが出ていた）。
 if [ ! -f "$PROGRESS" ]; then
-  if ! printf '{}\n' > "$PROGRESS" 2>/dev/null; then
+  if ! { printf '{}\n' > "$PROGRESS"; } 2>/dev/null; then
     PROGRESS="$(mktemp)"; printf '{}\n' > "$PROGRESS"
     RO_STATE=1
   fi
@@ -28,7 +63,8 @@ elif [ ! -w "$PROGRESS" ]; then
 fi
 if [ "${RO_STATE:-0}" = 1 ]; then
   printf '⚠ 進捗を保存できません（%s に書けない）。このセッション内だけ記録します。\n' "$STATE" >&2
-  printf '  起動コマンドに -v lab-%s-state:/home/lab/.lab があるか確認してください。\n\n' "${LAB_THEME:-x}" >&2
+  printf '  %s\n' "$(ls -ld "$STATE" 2>&1)" >&2
+  printf '  檻を抜けてから進み具合のボリュームを消し、起動し直すと直ります（docker volume rm lab-%s-state）。\n\n' "${LAB_THEME:-x}" >&2
 fi
 
 c_ok=$'\033[32m'; c_ng=$'\033[31m'; c_wr=$'\033[33m'; c_d=$'\033[2m'; c_b=$'\033[1m'; c_0=$'\033[0m'
@@ -36,6 +72,23 @@ c_hd=$'\033[1;36m'; c_tag=$'\033[1;7m'
 [ -t 1 ] || { c_ok=; c_ng=; c_wr=; c_d=; c_b=; c_0=; c_hd=; c_tag=; }
 
 die() { printf '%s\n' "$*" >&2; exit 1; }
+# 書けなくて止まるときに、事実（ls -ld の行）と、そのまま打てる直し方を出す。
+# 「書けない」とだけ言うと、読者は sudo を付けて打ち直し、/root の下に作業してしまう。
+cannot() {  # cannot 何ができないか 書けなかった場所
+  local me; me=$(id -un)
+  printf '%s\n' "$1。" "  $(ls -ld "$2" 2>&1)" >&2
+  if [ "$(stat -c %U "$2" 2>/dev/null)" = "$me" ]; then
+    printf '%s\n' "  持ち主は $me ですが、書き込みの許可がありません。次の1行で許可を足してから、同じコマンドを打ち直してください:" \
+      "    chmod u+w $2" >&2
+  elif sudo -n true 2>/dev/null; then
+    printf '%s\n' "  持ち主が $me ではないので書けません。次の1行で持ち主を $me に戻してから、同じコマンドを打ち直してください:" \
+      "    sudo chown -R $me: $2" >&2
+  else
+    printf '%s\n' "  持ち主が $me ではないので書けません。この檻では sudo が使えないので、檻を抜けてから" \
+      "  作業のボリュームを消し、起動し直すと直ります（docker volume rm lab-${LAB_THEME:-x}-work。作業ファイルも消えます）。" >&2
+  fi
+  exit 1
+}
 # 演習を2つの檻に分けたコース（主題1.04）は、この檻に無い番号を打たれたとき、もう一方の檻をイメージの LAB_ELSEWHERE で案内する
 elsewhere() { [ -z "${LAB_ELSEWHERE:-}" ] || printf '\n%s' "$LAB_ELSEWHERE"; }
 
@@ -109,7 +162,7 @@ cmd_ls() {
 # 開いている演習（lab show を引数なしで打ったときに出すもの）。進捗とは別のファイルに置く。
 # progress.json に足すと、全演習の .at を集める finale の計算に混ざるため。
 current_get() { cat "$STATE/current" 2>/dev/null | head -1; }
-current_set() { printf '%s\n' "$1" > "$STATE/current" 2>/dev/null || true; }
+current_set() { { printf '%s\n' "$1" > "$STATE/current"; } 2>/dev/null || true; }
 is_cleared() { case "$(prog_get "$1")" in done|solve) return 0 ;; *) return 1 ;; esac; }
 
 # 課題文を見出しつきで出す（副作用なし。lab start と lab show の両方が使う）。
@@ -153,10 +206,16 @@ cmd_start() {
   # 作業ディレクトリは seed の有無に関わらず必ず作る。
   # seed だけを条件にすると、配布ファイルが無い演習で ~/work/NN が生まれず、
   # 読者が「どこで作業するのか」を自分で推測することになる。
-  mkdir -p "$WORK/$n"
-  local seed="$LAB_HOME/seed/$n"
+  # 作れなかったとき・配れなかったときは、そう言って止める。以前は失敗を握りつぶして
+  # 「展開しました」と出しており、読者は ~/work/NN が無い理由を知る手がかりが無かった（2026-10-22）。
+  mkdir -p "$WORK/$n" 2>/dev/null || cannot "作業ディレクトリ ~/work/$n を作れません" "$WORK"
+  local seed="$LAB_HOME/seed/$n" f
   if [ -d "$seed" ] && [ -n "$(ls -A "$seed" 2>/dev/null)" ]; then
-    cp -rn "$seed/." "$WORK/$n/" 2>/dev/null || true
+    # 既にあるファイルは上書きしない（-n）。cp -n の終了コードは coreutils の版で違うので、配れたかは在るかで見る
+    cp -rn "$seed/." "$WORK/$n/" 2>/dev/null
+    while IFS= read -r f; do
+      [ -e "$WORK/$n/$f" ] || cannot "作業ファイル $f を ~/work/$n に配れません" "$WORK/$n"
+    done < <(ls -A "$seed")
     chmod -R u+w "$WORK/$n" 2>/dev/null || true
     printf '%s\n' "${c_d}作業ファイルを ~/work/$n に展開しました（$(ls -A "$seed" | tr '\n' ' ')）${c_0}"
   fi
@@ -228,7 +287,7 @@ finale_if_complete() {
   done
   [ "$total" -gt 0 ] && [ "$cleared" -eq "$total" ] || return 0
   [ -f "$STATE/finale" ] && return 0
-  : > "$STATE/finale" 2>/dev/null || true
+  { : > "$STATE/finale"; } 2>/dev/null || true
 
   local sp="$LAB_HOME/spine.txt" title spine link
   if [ -f "$sp" ]; then
@@ -313,9 +372,20 @@ cmd_solve() {
 
 cmd_reset() {
   local n; n=$(norm "${1:?lab reset NN}")
-  rm -rf "$WORK/$n"
+  [ -f "$LAB_HOME/tasks/$n.md" ] || die "演習 $n は存在しません（lab ls で一覧）$(elsewhere)"
+  rm -rf "$WORK/$n" 2>/dev/null
+  # 演習の中で sudo を付けて作ったファイル（root の持ち物）は、lab のままでは消せない。
+  # 「初期状態に戻す」と頼まれたので、残ったら sudo で消す（それでも残れば、そう言って止める）
+  [ -e "$WORK/$n" ] && sudo -n rm -rf "$WORK/$n" 2>/dev/null
+  [ -e "$WORK/$n" ] && cannot "~/work/$n を消せません（初期状態に戻せません）" "$WORK/$n"
+  # lab start と同じく、配布物が無い演習でも ~/work/NN は作り直す（実践編に「ディレクトリごと作り直されます」
+  # と書いてある。以前は配布物の無い演習で消したままになり、読者が cd ~/work/NN で戻れなかった）
+  mkdir -p "$WORK/$n" 2>/dev/null || cannot "作業ディレクトリ ~/work/$n を作れません" "$WORK"
   local seed="$LAB_HOME/seed/$n"
-  [ -d "$seed" ] && { mkdir -p "$WORK/$n"; cp -r "$seed/." "$WORK/$n/"; }
+  if [ -d "$seed" ]; then
+    cp -r "$seed/." "$WORK/$n/" 2>/dev/null || cannot "作業ファイルを ~/work/$n に配れません" "$WORK/$n"
+    chmod -R u+w "$WORK/$n" 2>/dev/null || true     # lab start と同じく、配ったファイルは書ける状態にする
+  fi
   local tmp; tmp=$(mktemp)
   jq --arg k "$n" 'del(.[$k])' "$PROGRESS" > "$tmp" && mv "$tmp" "$PROGRESS"
   printf '%s\n' "演習 $n を初期状態に戻しました（~/work/$n）"
