@@ -3,7 +3,7 @@
 # yum（実体は dnf）/ yumdownloader / rpm を、AlmaLinux 9.7 の上で確かめる。
 # AlmaLinux のリポジトリは vault.almalinux.org の 9.7（9.8 が出て凍結済み）に固定し、目録もイメージに入れてある。
 # 演習の対象は自作の署名つき RPM で、檻の中の file:// リポジトリから入れる。ネットが無くても結果は同じ。
-#   build: docker build -t lab-linuc-packages-rpm:1.1.0 -f containers/linuc-packages/rpm/Dockerfile containers
+#   build: docker build -t lab-linuc-packages-rpm:1.1.1 -f containers/linuc-packages/rpm/Dockerfile containers
 #   （ビルドコンテキストを containers/ にするのは、base/bin/lab をそのまま取り込むため）
 
 # ---- build ステージ: 自作 RPM を作って署名し、リポジトリにする ----------------
@@ -72,6 +72,9 @@ RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-lab \
  && ln -s /var/tmp/dnf-lab-cache /var/cache/dnf \
  && mandb -q
 
+# 1.1.1（2026-10-22）: sudo lab … を理由つきで止め、~/.lab と ~/work の持ち主のずれを戻し、作業ディレクトリを
+# 作れないときに事実と直し方を出す lab に替えた（Debian 系の檻と同じ。読者フィードバック 2026-10-22）。
+# この檻の sudo は /usr/local/bin を探さない（secure_path）ので、sudo lab はもともと command not found になる。
 COPY --chown=root:root --chmod=0755 base/bin/lab /usr/local/bin/lab
 COPY --chown=root:root --chmod=0644 base/etc/99-lab.sh /etc/profile.d/99-lab.sh
 COPY --chown=root:root --chmod=0555 linuc-packages/rpm/lab/ /lab/
@@ -80,9 +83,9 @@ LABEL org.opencontainers.image.description="LinuC 主題1.04（yum・rpm・yumdo
 LABEL org.opencontainers.image.licenses=MIT
 # LAB_APT_SNAPSHOT は lab env の「apt 固定」の行に出る。この檻に apt は無いので、そう書く。
 # LAB_ELSEWHERE は、この檻に無い演習の番号（01〜08）を打たれたときに lab が出す、もう一方の檻の案内。
-ENV LAB_THEME=linuc-packages-rpm LAB_VERSION=1.1.0 LAB_HOME=/lab \
+ENV LAB_THEME=linuc-packages-rpm LAB_VERSION=1.1.1 LAB_HOME=/lab \
     LAB_APT_SNAPSHOT="なし（RPM 系。下の dnf 固定の行を見る）" \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-rpm-1.1.0 \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-rpm-1.1.1 \
     LAB_ELSEWHERE="01〜08 は Debian 系の檻で打ちます（実践編「はじめる」の1つ目の起動コマンド）"
 USER lab
 WORKDIR /home/lab

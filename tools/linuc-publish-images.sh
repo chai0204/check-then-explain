@@ -73,6 +73,8 @@ PAIRS=(
   # 2026-10-20: 初学者が順を追えるように作り直した 1.04 と 1.05
   "linuc-packages  lab-linuc-packages-deb:1.1.0  $REPO:packages-deb-1.1.0"
   "linuc-packages  lab-linuc-packages-rpm:1.1.0  $REPO:packages-rpm-1.1.0"
+  "linuc-packages  lab-linuc-packages-deb:1.1.1  $REPO:packages-deb-1.1.1"
+  "linuc-packages  lab-linuc-packages-rpm:1.1.1  $REPO:packages-rpm-1.1.1"
   "linuc-disks     lab-linuc-disks:1.1.0         $REPO:disks-1.1.0"
 )
 

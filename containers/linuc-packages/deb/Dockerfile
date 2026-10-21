@@ -2,7 +2,7 @@
 # LinuC 主題1.04（リポジトリとパッケージ管理）の Debian 系の檻。
 # apt / apt-get / apt-cache / apt-file / dpkg / dpkg-deb / dpkg-reconfigure を、本物のパッケージ管理の上で確かめる。
 # 演習の対象は自作の小さな .deb（依存関係つき）で、檻の中の file: リポジトリから入れる。ネットが無くても結果は同じ。
-#   build: docker build --build-context labcmd=containers/base -t lab-linuc-packages-deb:1.1.0 containers/linuc-packages/deb
+#   build: docker build --build-context labcmd=containers/base -t lab-linuc-packages-deb:1.1.1 containers/linuc-packages/deb
 
 # ---- build ステージ: 自作パッケージとリポジトリを作る -----------------------
 #   索引（Packages / Contents / Release）は apt-ftparchive（apt-utils）で作る。作業用のツリーは檻に入れない。
@@ -64,17 +64,25 @@ COPY --chown=root:root --chmod=0555 lab/ /lab/
 # 演習07 の配布物（リポジトリに無い単体の .deb）。lab/ の後に置く。
 # 先に置くと、--chmod=0444 が途中に作られる /lab 自体にも付き、lab ユーザが /lab を読めなくなる（実測）。
 COPY --from=build --chown=root:root --chmod=0444 /out/labnote_1.0_all.deb /lab/seed/07/labnote_1.0_all.deb
+# 上の COPY は、/lab/seed/07 がまだ無いと、途中で作るそのディレクトリにも --chmod=0444 を付ける（実行の許可が無く、
+# lab ユーザが中に入れない。2026-10-22 に busybox で再現）。1.1.0 までは、作業ツリーにある空の lab/seed/07 を
+# COPY lab/ が 0555 で作っていたので壊れていなかった。git は空のディレクトリを持たないので、取り直した作業ツリーから
+# 作ると演習07 の配布物を配れなくなる。作業ツリーに頼らないように、ここで許可を決める（1.1.1 で足した）。
+RUN chmod 0555 /lab/seed/07
 LABEL org.opencontainers.image.source=https://github.com/chai0204/check-then-explain
 LABEL org.opencontainers.image.description="LinuC 主題1.04（apt・dpkg・apt-file）を Debian 系で手で確かめる学習用コンテナ"
 LABEL org.opencontainers.image.licenses=MIT
 # ---- lab コマンドを最新にする（次の版、2026-10-20）--------------------
+#   1.1.1（2026-10-22）: sudo lab … を理由つきで止め、~/.lab と ~/work の持ち主のずれを戻し、作業ディレクトリを
+#   作れない・配れないときに「展開しました」と出さずに事実と直し方を出す lab に替えた（読者フィードバック 2026-10-22:
+#   lab start が Permission denied で失敗し、sudo を付けると通ったが、作業ディレクトリが /root の下にできていた）。
 #   LAB_ELSEWHERE は、この檻に無い演習の番号（09〜12）を打たれたときに lab が出す、もう一方の檻の案内。
 #   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
 #   本文の記録とずれうるので、最新の lab をここで重ねる。
 #   build: docker build --build-context labcmd=containers/base -t lab-linuc-packages-deb:<版> containers/linuc-packages/deb
 COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
-ENV LAB_THEME=linuc-packages-deb LAB_VERSION=1.1.0 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-deb-1.1.0 \
+ENV LAB_THEME=linuc-packages-deb LAB_VERSION=1.1.1 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:packages-deb-1.1.1 \
     LAB_ELSEWHERE="09〜12 は RPM 系の檻で打ちます（実践編「はじめる」の2つ目の起動コマンド）"
 USER lab
 WORKDIR /home/lab
