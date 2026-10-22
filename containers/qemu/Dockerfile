@@ -4,7 +4,7 @@
 #   練習機のディスク（/var/lib/lab-vm/linuc-guest.qcow2）を、読者が libvirt を通さずに直接使う。
 #   KVM は使わない（/dev/kvm を渡さない）。CPU は QEMU の TCG が命令を翻訳して動かすので、読者の PC に特権を1つも求めない。
 #
-#   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-qemu:1.0.1 containers/qemu
+#   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-qemu:1.0.2 containers/qemu
 FROM lab-linuc-machine:1.0.0
 USER root
 ARG APT_SNAPSHOT=20260929T000000Z
@@ -34,12 +34,14 @@ LABEL org.opencontainers.image.licenses=MIT
 #   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
 #   本文の記録とずれうるので、最新の lab をここで重ねる。これより前の層は 1.0.0 とキャッシュで同一。
 #   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-qemu:<版> containers/qemu
+#   1.0.2（2026-10-22）: lab を、sudo を付けて打たれたら止め、~/work と ~/.lab の持ち主のずれを戻し、作業ディレクトリを作れないときに事実と直し方を出すものに替えた（読者フィードバック 2026-10-22、主題1.04:
+#   lab start が Permission denied で失敗し、sudo を付けると通ったが、作業ディレクトリが /root の下にできていた）
 COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
 #   練習機の中の lab が外の lab に頼む中継（lab-remote）も最新にする（lab show を通すため）。
 #   build には --build-context labvm=containers/linuc-machine/host も付ける。
 COPY --from=labvm --chown=root:root --chmod=0755 libexec/lab-remote /usr/local/libexec/lab-remote
-ENV LAB_THEME=qemu LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab:qemu-1.0.1
+ENV LAB_THEME=qemu LAB_VERSION=1.0.2 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab:qemu-1.0.2
 USER lab
 WORKDIR /home/lab
 ENTRYPOINT ["/usr/bin/tini", "--"]

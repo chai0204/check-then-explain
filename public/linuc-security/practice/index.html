@@ -60,7 +60,7 @@ QEMU の完全エミュレーションなら、本物のカーネルの上で全
 <pre><code>docker run -d --name lab-linuc-security --hostname host --stop-timeout 30 \
   -v lab-linuc-security-vm:/home/lab/vm \
   -v lab-linuc-security-state:/home/lab/.lab \
-  ghcr.io/chai0204/lab-linuc:security-1.0.2@sha256:9dc780473d9247b2e43d1e89424d8fed9a54478572bc916179eb48701e372023
+  ghcr.io/chai0204/lab-linuc:security-1.0.3@sha256:__DIGEST__
 
 docker exec -it lab-linuc-security bash -l</code></pre>
 <p><code>--stop-timeout 30</code> を付けてください。練習機の正常停止に十数秒かかるので、既定の猶予（10秒）だと電源断になり、次の起動でディスクの回復が走ります。</p>
@@ -68,7 +68,7 @@ docker exec -it lab-linuc-security bash -l</code></pre>
 <pre><code>podman run -d --name lab-linuc-security --hostname host --stop-timeout 30 \
   -v lab-linuc-security-vm:/home/lab/vm \
   -v lab-linuc-security-state:/home/lab/.lab \
-  ghcr.io/chai0204/lab-linuc:security-1.0.2@sha256:9dc780473d9247b2e43d1e89424d8fed9a54478572bc916179eb48701e372023
+  ghcr.io/chai0204/lab-linuc:security-1.0.3@sha256:__DIGEST__
 
 podman exec -it lab-linuc-security bash -l</code></pre>
 
@@ -83,6 +83,7 @@ vm reset --yes   練習機を工場出荷時に戻す（ディスクの変更が
 （判定は外側のコンテナがゲストエージェント経由で行うので、ネットワークや <code>ssh</code> を壊しても採点できます）。</p>
 </div>
 
+<p class="detail">1.0.2 で始めた人は、「終わったら」の手順で檻を止めてから（ボリュームは消さずに）、上の起動コマンドで起動し直すだけで構いません。1.0.3 で変わったのは <code>lab</code> コマンドだけなので、進み具合と作業ファイルはそのまま使えます。</p>
 <h2 id="recover">締め出されたら</h2>
 <p>この主題は、自分を締め出す操作（<code>/etc/nologin</code>・<code>sshd</code> やファイアウォールの設定）を扱います。<code>ssh</code> で入れなくなっても、外側のコンテナから戻せます。</p>
 <div class="scroll"><table>
@@ -109,6 +110,7 @@ vm reset --yes   練習機を工場出荷時に戻す（ディスクの変更が
 <p>先に読む場合は <a href="/linuc-security/theory/">理論編（9章）</a>へ。
 章と演習は対応しているので、どちらから始めても構いません。</p>
 
+<p class="detail"><code>lab</code> は <code>sudo</code> を付けずに打ちます。付けると root として動き、作業ディレクトリと進み具合が <code>/root</code> の下にできて檻を抜けると消えてしまうので、理由を出して何もせずに止まります。<code>~/work</code> や <code>~/.lab</code> の持ち主が自分でなくなっていたら、<code>lab</code> が見つけて戻し、そのことを画面に出します。</p>
 <h2 id="report">本文と違う出力が出たら</h2>
 <p>教材のバグとして直します。次の4つを貼ってください。</p>
 <ol>
@@ -118,8 +120,8 @@ vm reset --yes   練習機を工場出荷時に戻す（ディスクの変更が
 <li>外側で <code>lab env</code> の全文</li>
 </ol>
 <pre><code>$ lab env
-テーマ    : lab-linuc-security 1.0.2
-イメージ  : ghcr.io/chai0204/lab-linuc:security-1.0.2
+テーマ    : lab-linuc-security 1.0.3
+イメージ  : ghcr.io/chai0204/lab-linuc:security-1.0.3
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -139,7 +141,7 @@ docker volume rm lab-linuc-security-vm lab-linuc-security-state   # 練習機の
 母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。
 <code>docker start lab-linuc-security</code> で、途中から再開できます（練習機の状態はボリュームに残っています）。</p>
 
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.2@sha256:9dc780473d9247b2e43d1e89424d8fed9a54478572bc916179eb48701e372023 / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / OpenSSH 9.6p1 / GnuPG 2.4.4 / sudo 1.9.15p5 / iptables 1.8.10 (nf_tables) / systemd 255.4 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）で演習7本を完走 / 練習機の中の操作は対話のログインシェルで記録 / 1.0.2 は 1.0.1 に lab コマンドの更新だけを重ねた版で、ほかの中身は 1.0.1 と同じ（lab start・show・check を 2026-10-20 に確認） / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc:security-1.0.3@sha256:__DIGEST__ / 練習機 Ubuntu 24.04.5 LTS・カーネル 6.8.0-142-generic / OpenSSH 9.6p1 / GnuPG 2.4.4 / sudo 1.9.15p5 / iptables 1.8.10 (nf_tables) / systemd 255.4 / apt snapshot 20260929T000000Z / 外側 docker 29.8.0・amd64（KVM なしの TCG エミュレーション）で演習7本を完走 / 練習機の中の操作は対話のログインシェルで記録 / 1.0.2 は 1.0.1 に lab コマンドの更新だけを重ねた版で、ほかの中身は 1.0.1 と同じ（lab start・show・check を 2026-10-20 に確認） / 1.0.3 は 1.0.2 の lab コマンドを、sudo を付けて打たれたら止め、~/work と ~/.lab の持ち主のずれを戻し、作業ディレクトリを作れないときに事実と直し方を出すものに替えた版で、ほかの中身は 1.0.2 と同じ（lab start・check・reset と、sudo を付けた lab を 2026-10-22 に確認） / 検証日 2026-10-13</div>
 
 <!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
 <nav class="pager"><a href="/linuc-security/theory/">← 理論編</a><a href="/linuc-oss/">次の記事: 主題1.11 オープンソースの文化 →</a></nav>

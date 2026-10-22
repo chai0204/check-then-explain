@@ -36,7 +36,9 @@ COPY --chown=root:root --chmod=0555 lab/ /lab/
 #   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
 #   本文の記録とずれうるので、最新の lab をここで重ねる。これより前の層は 1.0.0 とキャッシュで同一。
 #   build: docker build --build-context labcmd=containers/base -t lab-wasm:<版> containers/wasm
+#   1.0.2（2026-10-22）: lab を、sudo を付けて打たれたら止め、~/work と ~/.lab の持ち主のずれを戻し、作業ディレクトリを作れないときに事実と直し方を出すものに替えた（読者フィードバック 2026-10-22、主題1.04:
+#   lab start が Permission denied で失敗し、sudo を付けると通ったが、作業ディレクトリが /root の下にできていた）
 COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
-ENV LAB_THEME=wasm LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-wasm:1.0.1
+ENV LAB_THEME=wasm LAB_VERSION=1.0.2 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-wasm:1.0.2
 USER lab

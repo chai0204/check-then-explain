@@ -57,7 +57,7 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <pre><code>docker run -d -t --name lab-linuc --hostname linuc \
   --cap-add SYS_ADMIN \
   -v lab-linuc-services-state:/root/.lab \
-  ghcr.io/chai0204/lab-linuc-services:1.0.3@sha256:fa52aa791a4c80d9bd4384fa1045ab841d23743b1f57b4a6c98b6f32502f53c4
+  ghcr.io/chai0204/lab-linuc-services:1.0.4@sha256:__DIGEST__
 
 docker exec -it lab-linuc bash -l</code></pre>
 
@@ -101,7 +101,7 @@ cgroup を書き込み可でマウントするので、専用のオプション1
 <pre><code>podman run -d -t --name lab-linuc --hostname linuc \
   --systemd=always \
   -v lab-linuc-services-state:/root/.lab \
-  ghcr.io/chai0204/lab-linuc-services:1.0.3@sha256:fa52aa791a4c80d9bd4384fa1045ab841d23743b1f57b4a6c98b6f32502f53c4
+  ghcr.io/chai0204/lab-linuc-services:1.0.4@sha256:__DIGEST__
 
 podman exec -it lab-linuc bash -l</code></pre>
 <p>podman 5.8.6（rootless・uid 1100）で、起動と演習6本の完走を確認しました。
@@ -111,7 +111,7 @@ podman exec -it lab-linuc bash -l</code></pre>
 </div>
 
 <p>入ると現在地が出ます。</p>
-<pre><code>── lab-linuc-services 1.0.3 ────────────────────────────────────────
+<pre><code>── lab-linuc-services 1.0.4 ────────────────────────────────────────
 lab-linuc-services  進捗 0/6
   次 → 01 「時刻の表示を3箇所で揃える」 (目安 10分 / 影響度 B)
   lab start 01 で課題を開く
@@ -119,6 +119,7 @@ lab-linuc-services  進捗 0/6
   lab ls      演習一覧 / lab start NN  課題を開く / lab check  答え合わせ
 ────────────────────────────────────────────────────────────</code></pre>
 
+<p class="detail">1.0.3 で始めた人は、「終わったら」の手順で檻を止めてから（ボリュームは消さずに）、上の起動コマンドで起動し直すだけで構いません。1.0.4 で変わったのは <code>lab</code> コマンドだけなので、進み具合と作業ファイルはそのまま使えます。</p>
 <h2 id="ex">演習</h2>
 <p>6本あります。判定は<b>観測できる結果だけ</b>で行い、コマンドの打ち方は見ません。
 課題文は <code>lab start NN</code> で開き、作業の途中でも <code>lab show</code> でもう一度出せます。
@@ -145,8 +146,8 @@ lab-linuc-services  進捗 0/6
 <li><code>lab env</code> の全文</li>
 </ol>
 <pre><code>$ lab env
-テーマ    : lab-linuc-services 1.0.3
-イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.3
+テーマ    : lab-linuc-services 1.0.4
+イメージ  : ghcr.io/chai0204/lab-linuc-services:1.0.4
 ベース    : Ubuntu 24.04.5 LTS
 apt 固定  : 20260929T000000Z
 カーネル  : 7.2.6
@@ -167,7 +168,7 @@ docker volume rm lab-linuc-services-state     # 進捗も消す場合だけ</cod
 <p>イメージは <code>docker rmi</code> で消せます。
 母艦には何も残りません（名前付きボリューム以外のファイルを作っていないため）。</p>
 
-<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.3@sha256:fa52aa791a4c80d9bd4384fa1045ab841d23743b1f57b4a6c98b6f32502f53c4 / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 と podman 5.8.6 rootless の両方で演習6本を完走 / 1.0.3 は 1.0.2 に lab コマンドの更新だけを重ねた版で、ほかの中身は 1.0.2 と同じ（lab start・show・check を 2026-10-20 に確認） / 検証日 2026-10-13</div>
+<div class="verified"><b>検証環境</b>: イメージ ghcr.io/chai0204/lab-linuc-services:1.0.4@sha256:__DIGEST__ / Ubuntu 24.04.5 LTS / systemd 255.4 / rsyslog 8.2312.0 / chrony 4.5 / postfix 3.8.6 / logrotate 3.21.0 / apt snapshot 20260929T000000Z / docker 29.8.0・amd64 と podman 5.8.6 rootless の両方で演習6本を完走 / 1.0.3 は 1.0.2 に lab コマンドの更新だけを重ねた版で、ほかの中身は 1.0.2 と同じ（lab start・show・check を 2026-10-20 に確認） / 1.0.4 は 1.0.3 の lab コマンドを、sudo を付けて打たれたら止め、~/work と ~/.lab の持ち主のずれを戻し、作業ディレクトリを作れないときに事実と直し方を出すものに替えた版で、ほかの中身は 1.0.3 と同じ（lab start・check・reset と、sudo を付けた lab を 2026-10-22 に確認） / 検証日 2026-10-13</div>
 
 <!-- catalog:pager（tools/catalog.mjs が台帳から作る。手で編集しない） -->
 <nav class="pager"><a href="/linuc-services/theory/">← 理論編</a><a href="/linuc-security/">次の記事: 主題1.10 セキュリティ →</a></nav>

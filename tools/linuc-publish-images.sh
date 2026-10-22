@@ -75,6 +75,22 @@ PAIRS=(
   "linuc-packages  lab-linuc-packages-rpm:1.1.0  $REPO:packages-rpm-1.1.0"
   "linuc-packages  lab-linuc-packages-deb:1.1.1  $REPO:packages-deb-1.1.1"
   "linuc-packages  lab-linuc-packages-rpm:1.1.1  $REPO:packages-rpm-1.1.1"
+  # 2026-10-22: sudo lab を止め、置き場の持ち主のずれを戻す lab を、残りの全イメージに重ねた版
+  "linuc-services  lab-linuc-services:1.0.4  ghcr.io/chai0204/lab-linuc-services:1.0.4"
+  "linuc-files     lab-linuc-files:1.0.3  $REPO:files-1.0.3"
+  "linuc-text      lab-linuc-text:1.0.3  $REPO:text-1.0.3"
+  "linuc-shell     lab-linuc-shell:1.0.5  $REPO:shell-1.0.5"
+  "linuc-boot      lab-linuc-boot:1.0.3  $REPO:boot-1.0.3"
+  "linuc-network   lab-linuc-network:1.0.3  $REPO:network-1.0.3"
+  "linuc-admin     lab-linuc-admin:1.0.3  $REPO:admin-1.0.3"
+  "linuc-security  lab-linuc-security:1.0.3  $REPO:security-1.0.3"
+  "linuc-disks     lab-linuc-disks:1.1.1  $REPO:disks-1.1.1"
+  "kvm             lab-kvm:1.0.2   $TOOLS:kvm-1.0.2"
+  "qemu            lab-qemu:1.0.2  $TOOLS:qemu-1.0.2"
+  "docker          lab-docker:1.0.2  $TOOLS:docker-1.0.2"
+  "podman          lab-podman:1.0.2  $TOOLS:podman-1.0.2"
+  "sqlite          lab-sqlite:1.0.2  ghcr.io/chai0204/lab-sqlite:1.0.2"
+  "wasm            lab-wasm:1.0.2  ghcr.io/chai0204/lab-wasm:1.0.2"
   "linuc-disks     lab-linuc-disks:1.1.0         $REPO:disks-1.1.0"
 )
 

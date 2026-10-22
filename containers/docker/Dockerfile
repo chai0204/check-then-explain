@@ -5,7 +5,7 @@
 #   コンテナの中で dockerd を動かすには特権が要るが、仮想マシンの中なら要らない。読者に渡してもらう権限は無い。
 #   名前空間・cgroup・overlay・iptables を、本物のカーネルで、全員に同じ画面で確かめる。
 #
-#   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-docker:1.0.1 containers/docker
+#   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-docker:1.0.2 containers/docker
 FROM lab-ctr-machine:1.0.0
 USER root
 COPY --chown=root:root --chmod=0555 lab/ /lab/
@@ -19,11 +19,13 @@ LABEL org.opencontainers.image.licenses=MIT
 #   lab の正本は containers/base/bin/lab。土台（lab-base）から作り直すと上の層が全部作り直しになり、
 #   本文の記録とずれうるので、最新の lab をここで重ねる。これより前の層は 1.0.0 とキャッシュで同一。
 #   build: docker build --build-context labcmd=containers/base --build-context labvm=containers/linuc-machine/host -t lab-docker:<版> containers/docker
+#   1.0.2（2026-10-22）: lab を、sudo を付けて打たれたら止め、~/work と ~/.lab の持ち主のずれを戻し、作業ディレクトリを作れないときに事実と直し方を出すものに替えた（読者フィードバック 2026-10-22、主題1.04:
+#   lab start が Permission denied で失敗し、sudo を付けると通ったが、作業ディレクトリが /root の下にできていた）
 COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
 #   練習機の中の lab が外の lab に頼む中継（lab-remote）も最新にする（lab show を通すため）。
 #   build には --build-context labvm=containers/linuc-machine/host も付ける。
 COPY --from=labvm --chown=root:root --chmod=0755 libexec/lab-remote /usr/local/libexec/lab-remote
-ENV LAB_THEME=docker LAB_VERSION=1.0.1 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab:docker-1.0.1 LAB_VM_AUTOSTART=1
+ENV LAB_THEME=docker LAB_VERSION=1.0.2 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab:docker-1.0.2 LAB_VM_AUTOSTART=1
 ENV LAB_RESET_HINT="元に戻すには、練習機の外で vm reset --yes（練習機ごと最初の状態に戻ります）"
 USER lab

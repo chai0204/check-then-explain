@@ -2,7 +2,7 @@
 # LinuC 主題1.06（シェルおよびスクリプト）用の檻。
 # 読者 lab のほかに alice と bob を置く。どの起動ファイルがいつ読まれるかを、
 # 自分以外のユーザで実測するため（自分の ~/.bashrc を壊すと、その端末ごと使えなくなる）。
-#   build: docker build --build-context labcmd=containers/base -t lab-linuc-shell:1.0.4 containers/linuc-shell
+#   build: docker build --build-context labcmd=containers/base -t lab-linuc-shell:1.0.5 containers/linuc-shell
 #   1.0.1（2026-10-13）: 演習のヒントと模範解答の誤り（~/.bashrc を読むシェル・コマンドを探す順・
 #   dash の function の読み方ほか）を直した。lab/ の層だけが 1.0.0 と違う（useradd の層はキャッシュで同一）。
 #   1.0.2（2026-10-13）: 配布ファイル（seed）を 0755 にする層を足した。lab reset の後に演習のスクリプトを
@@ -53,9 +53,11 @@ LABEL org.opencontainers.image.licenses=MIT
 #   そのシェルの中で作って比べる（env -i で TZ が消え、日本時間 0〜9 時に1日ずれていた）。
 #   lab/ を写す層より前は 1.0.3 とキャッシュで同一。
 #   build: docker build --build-context labcmd=containers/base -t lab-linuc-shell:<版> containers/linuc-shell
+#   1.0.5（2026-10-22）: lab を、sudo を付けて打たれたら止め、~/work と ~/.lab の持ち主のずれを戻し、作業ディレクトリを作れないときに事実と直し方を出すものに替えた（読者フィードバック 2026-10-22、主題1.04:
+#   lab start が Permission denied で失敗し、sudo を付けると通ったが、作業ディレクトリが /root の下にできていた）
 COPY --from=labcmd --chown=root:root --chmod=0755 bin/lab /usr/local/bin/lab
-ENV LAB_THEME=linuc-shell LAB_VERSION=1.0.4 LAB_APT_SNAPSHOT=20260929T000000Z \
-    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:shell-1.0.4
+ENV LAB_THEME=linuc-shell LAB_VERSION=1.0.5 LAB_APT_SNAPSHOT=20260929T000000Z \
+    LAB_IMAGE=ghcr.io/chai0204/lab-linuc:shell-1.0.5
 USER lab
 WORKDIR /home/lab
 # ログインシェルで起動する。入口の案内（/etc/profile.d/99-lab.sh）が出るのはこのため。
