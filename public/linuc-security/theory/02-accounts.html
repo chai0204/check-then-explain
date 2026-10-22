@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-security/">セキュリティ</a> › <a href="/linuc-security/theory/">理論編</a> › 第2章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/#draft">詳しく</a></p>
 </div>
 <h1>2. 「ロックした」は「無効化した」ではない</h1>
 <p class="lead">退職者のアカウントを止めるとき、まず思いつくのは <code>passwd -l</code>（ロック）である。ところがロックしても、SSH 鍵を登録している相手はそのまま入れてしまう。パスワードをロックしたのに、である。鍵が効くのは、ロックが止めたのが「パスワードという1つの入口」だけだからだ。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 16分</span></summary>
 <div class="badges"><span>前提: 第1章まで読了</span><span>前提: 練習機が起動している</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.10.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>passwd -S</code> と <code>chage -l</code> が別のものを見ていることを説明できる</li><li>パスワードのロックとアカウントの有効期限の違いを言える</li><li><code>/etc/shadow</code> の主要なフィールド（ロックの <code>!</code>、有効期限の列）を読める</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: PAM モジュール（<code>pam_faillock</code> など）によるログイン失敗ロックや、パスワードの複雑さ要件（<code>pam_pwquality</code>）はレベル1の範囲外である。ここでは <code>passwd</code>・<code>usermod</code>・<code>chage</code> の3つと <code>/etc/shadow</code> だけを扱う。</div></div>
+</details>
 
 <h2 id="two">passwd はパスワード、chage はアカウント</h2>
 <div class="sgoal"><b>この節で分かること</b>: 2つのコマンドが見ている対象の違い。</div>
@@ -162,6 +165,7 @@ root L 2026-09-05 0 99999 7 -1</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-security/">セキュリティ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/practice/">実践編</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-security/chapters.js"></script>
 <script src="/linuc-security/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-shell/">シェルとスクリプト</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>本文に載せた出力はすべて実機の記録で、演習8本は模範解答どおりに通ることを確認してあります
    （未達のときに判定が鳴ることも、8本すべてで確認済み）。
    それでも <b>導線の不備</b>は残っている可能性があります。
@@ -19,7 +19,7 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — シェルおよびスクリプト</h1>
 <p class="lead">LinuC レベル1 <strong>102 試験・主題1.06</strong>（シェル環境のカスタマイズ / シェルスクリプト）を、
@@ -27,14 +27,14 @@
 1.06.2 は重要度 6 で、<strong>LinuC レベル1 の全39副題の中で最も重い</strong>副題です。
 読むだけで終わらせないために、<strong>1章ごとに「実際に打つと何が出るか」を先に置いて</strong>います。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<h2 id="spine">この8章を貫いている1つの事実</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="spine">この8章を貫いている1つの事実</h2></summary>
 <div class="goal">
 <p><b>新しく起動したシェルやスクリプトは、親の環境変数のコピーを受け取って始まる。終わるときに親へ返せるのは、0〜255 の終了ステータス1つだけである。</b></p>
 <p><code>bash ~/.bashrc</code> では alias が残らない。<code>cat f | while</code> で数えた合計は 0 になる。<code>exit 256</code> は「成功」として届く。
@@ -45,8 +45,9 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 zsh・csh などほかのシェル、<code>getopts</code>、配列の操作（要素の取り出し方だけは第5章で扱う）、<code>[[ ]]</code> の詳しい文法、<code>trap</code> とシグナル、<code>set -e</code>、
 プロセス置換、<code>select</code> 文。どれもレベル1の詳細欄に無く、この8章には出てこないか、名前だけです。</div>
 </div>
-
-<h2 id="range">LinuC 出題範囲との対応</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="range">LinuC 出題範囲との対応</h2></summary>
 <p>公式の出題範囲（<a href="https://linuc.org/linuc1/range/102.html">LinuC-1 Version 10.0 / 102 試験</a>）の
 主題1.06 を、章に割り当てたものです。「詳細」欄に挙げられている語が、どの章で実際に手を動かす対象になるかを並べてあります。</p>
 <div class="scroll"><table>
@@ -74,8 +75,9 @@ zsh・csh などほかのシェル、<code>getopts</code>、配列の操作（�
 GUI の端末アプリが開くシェル、cron から起動されたスクリプトの PATH（主題1.08.2）、Red Hat 系の <code>/etc/bashrc</code> です。
 どれも本文では理論として扱い、打てない理由を書いています。<b>打てないことを黙って飛ばしてはいません。</b></p>
 <p>他の主題の対応は <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。</p>
-
-<h2 id="cram">試験の直前に見る表</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="cram">試験の直前に見る表</h2></summary>
 <p>出題範囲の「詳細」欄に並ぶ語を、そのまま上から並べました。一行の意味と、確かめた章です。</p>
 <div class="scroll"><table>
 <tr><th>語</th><th>一行で</th><th>章</th></tr>
@@ -113,7 +115,6 @@ GUI の端末アプリが開くシェル、cron から起動されたスクリ�
 <tr><td><code>bash -v</code></td><td>読み込んだ行をそのまま表示しながら実行する</td><td><a href="/linuc-shell/theory/08-function#debug">8</a></td></tr>
 <tr><td><code>bash -x</code></td><td>展開した後の形に <code>+</code> を付けて表示しながら実行する</td><td><a href="/linuc-shell/theory/08-function#debug">8</a></td></tr>
 </table></div>
-
 <p>LinuC の公式例題には、上の語のほかに次の形も出ている。どれも本文で記録を取ってある。</p>
 <div class="scroll"><table>
 <tr><th>形</th><th>一行で</th><th>章</th></tr>
@@ -125,6 +126,7 @@ GUI の端末アプリが開くシェル、cron から起動されたスクリ�
 <tr><td><code>function 名前() { }</code></td><td>bash では <code>function</code> と <code>()</code> を両方付けても書ける（dash では文法エラー）</td><td><a href="/linuc-shell/theory/08-function#same">8</a></td></tr>
 </table></div>
 <p class="detail">例題の解説が本文と違う言い方をしているところが3つある。先頭行（<code>#!</code>）が無いスクリプトは「ログインシェルで実行される」のではなく起動した側のシェルが読む（<a href="/linuc-shell/theory/04-script#three">第4章</a>）。「<code>$@</code> は引数ごとに <code>""</code> で囲まれる」のは <code>"$@"</code> と書いたときだけ（<a href="/linuc-shell/theory/05-args#params">第5章</a>）。<code>/etc/profile</code> にも alias は書ける（<a href="/linuc-shell/theory/02-source#alias">第2章</a>）。どれも記録で確かめてある。</p>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
@@ -191,5 +193,6 @@ GUI の端末アプリが開くシェル、cron から起動されたスクリ�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-shell/">シェルとスクリプト</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/practice/">実践編</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

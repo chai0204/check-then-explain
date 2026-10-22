@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>2026-10-20 に、初めてパッケージ管理に触る人が順を追って読めるように、全体を組み直しました
    （いちばん普通の使い方を1回やってから、仕組みへ進む順にしてあります）。
    本文に載せた出力はすべて実機の記録で、演習12本は模範解答どおりに通ること・未達のときに判定が鳴ることを確かめてあります。
@@ -17,7 +17,7 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — リポジトリとパッケージ管理</h1>
 <p class="lead">LinuC レベル1 <strong>101 試験・主題1.04</strong>（apt・dpkg・yum・rpm）を、
@@ -25,21 +25,22 @@
 第1章で、まだ入っていないコマンドを1つ入れて、使って、消すところから始めます。
 第1〜8章は Debian 系（Ubuntu）の檻で、第9〜11章は RPM 系（AlmaLinux）の檻で、同じことを順にやります。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<h2 id="order">読む順番と、前提</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="order">読む順番と、前提</h2></summary>
 <p>第1章から順に読みます。各章の出力は、檻を<b>起動し直した直後</b>から本文の順に打ったものなので、章が変わるたびに檻を起動し直してください（<code>exit</code> して、もう一度 <code>docker run</code>）。
 各章の冒頭に「前の章までにやったこと」と「この章でやること」を書いてあります。
 前提として要るのは、主題1.01〜1.03 のコースで扱った範囲（端末でコマンドを打つ・ファイルとディレクトリ・パーミッション・<code>sudo</code>・パイプと <code>grep</code>・<code>vi</code> か <code>sed</code>）です。このコースが説明なしで使うものと、それが出たコースの章は、<a href="/linuc-packages/theory/01-install">第1章</a>の冒頭に一覧にしてあります。
 それ以外の語は、使う前にその場で一言で説明しています。</p>
 <p><b>前の版（1.0.x）でこの教材の演習を進めたことがある人は</b>、章と演習の番号が変わったので、先に<a href="/linuc-packages/practice/#start">実践編の「はじめる」</a>の「前の版（1.0.x）で進めた人へ」の箱を読んでください。</p>
-
-<h2 id="flow">このコースの流れ</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="flow">このコースの流れ</h2></summary>
 <p>前の章でやったことだけを使って、次の章へ進みます。</p>
 <div class="scroll"><table>
 <tr><th>章</th><th>やること</th><th>檻</th></tr>
@@ -62,8 +63,9 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 パッケージに署名する手順、優先度の書き換え（pinning）、yum のモジュールとグループ（<code>dnf module</code>・<code>yum groupinstall</code>）、aptitude、dnf5。
 どれもレベル1の範囲の外で、この11章には出てきません（第8章のパッケージ作りも範囲の外ですが、それまでの章を1つにつなぐために入れてあります）。</div>
 </div>
-
-<h2 id="range">LinuC 出題範囲との対応</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="range">LinuC 出題範囲との対応</h2></summary>
 <p>公式の出題範囲（<a href="https://linuc.org/linuc1/range/101.html">LinuC-1 Version 10.0 / 101 試験</a>）の
 主題1.04 を、章に割り当てたものです。「詳細」欄に挙げられている語が、どの章で実際に手を動かす対象になるかを並べてあります。</p>
 <div class="scroll"><table>
@@ -94,6 +96,7 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
     <td><code>rpm -qp…</code>、<code>rpm -i -U -F -e</code> <code>--nodeps</code> <code>--replacepkgs</code>、<code>rpm -V</code> <code>-Va</code>、<code>rpm2cpio</code></td></tr>
 </table></div>
 <p>他の主題の対応は <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。</p>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
@@ -214,5 +217,6 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-text/">コマンドラインとテキスト処理</a> › <a href="/linuc-text/theory/">理論編</a> › 第8章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/#draft">詳しく</a></p>
 </div>
 <h1>8. xargs は空白で区切って引数にする</h1>
 <p class="lead"><code>find</code> が見つけた3つのファイルを <code>xargs ls -l</code> に渡すと、「見つからない」というエラーが5つ出る。<code>xargs</code> は受け取った文字を<b>空白と改行で区切って</b>引数に並べるので、ファイル名の中の空白も区切りになる。パイプは文字の流れをつなぐだけで、どこが1つの名前なのかという情報は運ばない。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 第7章</span><span>前提: 檻が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.03.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>パイプ <code>|</code> がつなぐのは1番（標準出力）だけで、2番もつなぐには <code>2&gt;&amp;1 |</code> か <code>|&amp;</code> を使うと言える</li><li><code>xargs</code> の区切り方と、<code>-n</code> <code>-I{}</code> <code>-0</code>（と <code>find -print0</code>）の使いどころを言える</li><li><code>tee</code>（<code>-a</code>）と、コマンド置換 <code>$(...)</code> / <code>`...`</code> を使える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>xargs -P</code>（並列実行）、名前付きパイプ（<code>mkfifo</code>）、プロセス置換 <code>&lt;(...)</code>、<code>set -o pipefail</code> の細部。<code>find</code> の条件の書き方は主題1.02 の側で扱う。</div></div>
+</details>
 
 <h2 id="pipe">パイプがつなぐのは1番だけ</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>|</code> が何をどこへつないでいるか。</div>
@@ -246,6 +249,7 @@ wc: 2026.txt: No such file or directory
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-text/">コマンドラインとテキスト処理</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/practice/">実践編</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-text/chapters.js"></script>
 <script src="/linuc-text/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

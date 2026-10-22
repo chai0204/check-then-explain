@@ -118,6 +118,9 @@ const crumbs = (a, type, n) => {
     chapter: `${home} › ${th} › 第${n}章`,
   })[type] + `</nav>`;
 };
+// 受けた印の箱（shared/site.js が、このブラウザの localStorage を見てボタンを出す。JS もストレージも無ければ出ない）
+const mydone = (a) => `<div class="mydone" data-slug="${a.slug}" hidden></div>`;
+const SITE_JS = `<script src="/shared/site.js"></script>`;
 const footer = (a) => `<footer><a href="/">トップ</a> · <a href="/${a.slug}/">${esc(a.title)}</a> · <a href="/${a.slug}/theory/">理論編 目次</a> · <a href="/${a.slug}/practice/">実践編</a> · <a href="/${a.slug}/theory/glossary">用語辞書</a></footer>`;
 const practiceLabel = (a) => a.method === "読むだけ" ? "手元で確かめる（演習なし）" : "実践編";
 const nextOf = (a) => {
@@ -152,7 +155,12 @@ function normalize(html, a, type, n, where) {
   }
   if (type === "practice") {
     const nx = nextOf(a);
-    h = setBlock(h, "pager", `<nav class="pager"><a href="/${a.slug}/theory/">← 理論編</a><a href="${nx.href}">${esc(nx.label)} →</a></nav>`);
+    h = setBlock(h, "pager", `${mydone(a)}\n<nav class="pager"><a href="/${a.slug}/theory/">← 理論編</a><a href="${nx.href}">${esc(nx.label)} →</a></nav>`);
+  }
+  // 全ページ共通の shared/site.js（閉じた箱をリンク先で開く・受けた印）を、本文の後のスクリプトの先頭で読む
+  if (!h.includes(SITE_JS)) {
+    const at = h.search(/<script src=/);
+    h = at >= 0 ? h.slice(0, at) + SITE_JS + "\n" + h.slice(at) : h.replace("</body>", SITE_JS + "\n</body>");
   }
   // 記事の中から記事ホームへのリンクは、道しるべ（パンくず・フッター・目印の中）だけに置く。
   // 本文の「実践編」「演習NN」は /slug/practice/ を指す（入口を practice/ に移したときの取り違えを止める）
@@ -232,6 +240,7 @@ for (const a of arts) {
 ${crumbs(a, "home")}
 ${a.status === "ドラフト" ? draftbar + "\n" : ""}<h1>${esc(a.title)}</h1>
 <div class="badges">${a.cert ? `<span>${esc(certLabel(a))}</span>` : ""}<span>${esc(a.difficulty)}</span><span>${esc(a.method)}</span><span>${hm(a.minutes)}</span><span>状態: ${esc(a.status)}</span></div>
+${mydone(a)}
 <p class="lead">${esc(a.summary)}</p>
 
 <div class="card"><h3>想定読者</h3><p>${esc(a.audience)}</p></div>
@@ -272,6 +281,7 @@ ${a.related.map((s) => bySlug[s]).map((r) => `<li><a href="/${r.slug}/">${esc(r.
 ${comments}
 ${footer(a)}
 </div>
+${SITE_JS}
 <script src="/shared/comments.js"></script>
 </body></html>
 `;
@@ -321,7 +331,8 @@ const top = `${head("確かめて説明する — 出力を根拠に、仕組み
 
 <h2 id="articles">記事の一覧</h2>
 <p>著者が読者として通した<b>確認済み</b>のものを先に、次に<b>公開日の新しい順</b>に並べています。最初は10件で、「さらに表示」で10件ずつ増えます。
-   記事名から、その記事のホーム（概要・想定読者・進め方）へ進みます。</p>
+   記事名から、その記事のホーム（概要・想定読者・進め方）へ進みます。
+   記事のホームか実践編の終わりで「受けた印」を付けると、ここで <span class="tag done">✓ 受けた</span> と出て、絞り込めます（印はこのブラウザにだけ残ります）。</p>
 <form class="catalog-controls" hidden>
   <input type="search" id="cq" placeholder="記事名・概要・章の題・コマンドで探す" aria-label="記事を探す">
   <select id="c-status" aria-label="状態">${opt("", "状態: すべて")}${["確認済み", "ドラフト", "修正中"].map((s) => opt(s)).join("")}</select>
@@ -329,6 +340,7 @@ const top = `${head("確かめて説明する — 出力を根拠に、仕組み
   <select id="c-domain" aria-label="関連領域">${opt("", "領域: すべて")}${DOMAINS.filter((d) => arts.some((a) => a.domains.includes(d))).map((d) => opt(d)).join("")}</select>
   <select id="c-method" aria-label="学習方式">${opt("", "方式: すべて")}${["読むだけ", "演習あり（コンテナ）", "演習あり（仮想マシン）"].map((m) => opt(m)).join("")}</select>
   <select id="c-diff" aria-label="難易度">${opt("", "難易度: すべて")}${["入門", "初級", "中級", "上級"].filter((d) => arts.some((a) => a.difficulty === d)).map((d) => opt(d)).join("")}</select>
+  <select id="c-mine" aria-label="受けた印">${opt("", "受けた印: すべて")}${opt("todo", "まだ受けていない")}${opt("done", "受けた")}</select>
   <select id="c-sort" aria-label="並べ方">${opt("rec", "確認済み→公開日の新しい順")}${opt("created", "公開日の新しい順")}${opt("updated", "最終更新の新しい順")}${opt("cert", "資格の順")}${opt("time", "短い順")}${opt("title", "記事名の順")}</select>
   <label class="sqltoggle"><input type="checkbox" id="c-sqlmode"> SQL で引く</label>
 </form>
@@ -351,6 +363,7 @@ ${rows}
 </tbody>
 </table></div>
 <p class="more"><button type="button" id="c-more" hidden>さらに表示</button></p>
+<details id="c-move" class="fold" hidden><summary>受けた印を別の端末へ写す<span class="hint" id="c-move-n"></span></summary><div id="c-move-body"></div></details>
 
 <h3>状態の意味</h3>
 <ul class="detail">
@@ -363,6 +376,7 @@ ${Object.entries(certMap).filter(([, u]) => u).map(([c, u]) => `<p>資格から�
 ${comments}
 <footer>確かめて説明する ／ 各記事の検証環境とイメージのダイジェストは、それぞれの実践編に書いてあります。 · <a href="https://github.com/chai0204/check-then-explain">ソース（GitHub）</a></footer>
 </div>
+${SITE_JS}
 <script src="/shared/catalog.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

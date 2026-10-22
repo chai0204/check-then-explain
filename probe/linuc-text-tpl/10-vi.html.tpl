@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-text/">コマンドラインとテキスト処理</a> › <a href="/linuc-text/theory/">理論編</a> › 第10章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/#draft">詳しく</a></p>
 </div>
 <h1>10. :w! は、読み取り専用のファイルにも書く</h1>
 <p class="lead"><code>chmod 444</code> で書き込みを禁止したファイルには、シェルから <code>&gt;&gt;</code> で1行足すこともできない。ところが vi で開いて <code>:w!</code> と打つと書き換わり、しかも権限は <code>444</code> のまま残る。vi は、同じキーの意味が<b>モード</b>で変わるエディタで、vi の中で打ったキーはシェルを通らない。そして、どのエディタを開くかは、環境変数 <code>EDITOR</code> で外から伝えるしかない。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 25分</span></summary>
 <div class="badges"><span>前提: 第1章（export）</span><span>前提: 檻が起動している</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.03.5（重要度2）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>vi のノーマルモード・挿入モード・コマンドラインモードを、<code>ESC</code> <code>i</code> <code>a</code> <code>o</code> <code>:</code> で行き来できる</li><li><code>h j k l</code>、<code>dd yy p</code>、<code>c d y</code>、<code>/</code> <code>?</code>、<code>:w!</code> <code>:q!</code> <code>:e!</code> <code>ZZ</code> の意味と結果を言える</li><li><code>EDITOR</code> で標準のエディタを変えられ、Ubuntu の既定が nano になる仕組みを説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>~/.vimrc</code> の設定、ビジュアルモード、名前付きレジスタ（<code>"a</code>）、マクロ、<code>:s</code> による置換（中身は <code>sed</code> と同じ。第6章）、emacs のキー操作。vim のプラグインは試験に出ない。</div></div>
+</details>
 
 <h2 id="record">この章の記録のとり方</h2>
 <div class="sgoal"><b>この節で分かること</b>: 対話的に使う vi を、どうやって記録に残したか。</div>
@@ -343,6 +346,7 @@ B は今の内容を <code>/etc/crontab</code> に書いて終わる。D は <co
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-text/">コマンドラインとテキスト処理</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/practice/">実践編</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-text/chapters.js"></script>
 <script src="/linuc-text/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-security/">セキュリティ</a> › <a href="/linuc-security/theory/">理論編</a> › 第4章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/#draft">詳しく</a></p>
 </div>
 <h1>4. 開いているポートは、数えないと見えない</h1>
 <p class="lead">開いているポートを <code>nmap</code> で調べると、<code>2323/tcp open 3d-nfsd</code> と出る。だが <code>3d-nfsd</code> というサービスは動いていない。そこで実際に動いているのは <code>ncat</code> である。<code>nmap</code> の「サービス名」は、ポート番号から自分の表を引いた<b>当て推量</b>にすぎない。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 15分</span></summary>
 <div class="badges"><span>前提: 第3章まで読了</span><span>前提: 練習機が起動している</span><span>所要 15分</span><span class="impact-c">影響度 C</span><span>出題範囲 1.10.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>ss</code>・<code>netstat</code> で待ち受けポートと、それを出しているプロセスを辿れる</li><li><code>nmap</code> の「SERVICE」列が当て推量であること、既定スキャンの範囲を説明できる</li><li><code>lsof</code>・<code>fuser</code> でポートからプロセスを特定できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>nmap</code> の高度なスキャン（<code>-sS</code> SYN スキャン、OS 判定 <code>-O</code>、NSE スクリプト）はレベル1の範囲外である。ここでは「開いているポートを数え、プロセスまで辿る」ことだけを扱う。</div></div>
+</details>
 
 <h2 id="list">まず待ち受けを並べる</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>ss -ltn</code> の読み方。</div>
@@ -97,6 +100,7 @@ $ systemctl is-active ssh.socket ssh.service
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-security/">セキュリティ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/practice/">実践編</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-security/chapters.js"></script>
 <script src="/linuc-security/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

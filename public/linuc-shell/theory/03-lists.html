@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-shell/">シェルとスクリプト</a> › <a href="/linuc-shell/theory/">理論編</a> › 第3章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/#draft">詳しく</a></p>
 </div>
 <h1>3. &amp;&amp; と || は、直前の数だけを見ている</h1>
 <p class="lead"><code>mkdir newdir &amp;&amp; cp … newdir/ || echo "mkdir に失敗した"</code> と打った。<code>mkdir</code> は成功してディレクトリができているのに、「mkdir に失敗した」と出る。<code>||</code> は <code>mkdir</code> の結果を見ていない。<b>直前のコマンドが返した数（終了ステータス）</b>だけを見ている。コマンド置換 <code>$( )</code> も同じ形をしていて、中のコマンドから受け取れるのは、標準出力の文字とその数だけである。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 15分</span></summary>
 <div class="badges"><span>前提: 第2章まで読了</span><span>所要 15分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.06.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>リストの <code>;</code>・<code>&amp;&amp;</code>・<code>||</code> がそれぞれ何を見て次へ進むかを、終了ステータスで説明できる</li><li><code>A &amp;&amp; B || C</code> が「A が成功なら B、失敗なら C」と同じにならない場合を挙げられる</li><li><code>$( )</code> と <code>` `</code> でコマンドの出力を文字列や変数に入れられ、引用符の有無で改行がどう変わるかを言える</li><li><code>( )</code> と <code>{ }</code> の違いを、カレントディレクトリが残るかで説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: パイプ <code>|</code> とリダイレクトの細部（主題1.03）、<code>&amp;</code> による後回し実行とジョブ制御、プロセス置換 <code>&lt;( )</code>、<code>$(( ))</code> の算術展開（第7章で使う分だけ触れる）。<code>$?</code> の詳しい値は第6章で扱う。ここでは「0 が成功、それ以外が失敗」だけ分かればよい。</div></div>
+</details>
 
 <h2 id="status">どのコマンドも、終わるときに数を1つ返す</h2>
 <div class="sgoal"><b>この節で分かること</b>: リストが判断に使っているもの。</div>
@@ -159,6 +162,7 @@ $ cd ~/try</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-shell/">シェルとスクリプト</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/practice/">実践編</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-shell/chapters.js"></script>
 <script src="/linuc-shell/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

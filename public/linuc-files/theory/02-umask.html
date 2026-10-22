@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-files/">ファイルとパーミッション</a> › <a href="/linuc-files/theory/">理論編</a> › 第2章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/#draft">詳しく</a></p>
 </div>
 <h1>2. umask は引き算ではなく、ビットを落とす印</h1>
 <p class="lead"><code>umask 033</code> のもとで作ったファイルは、666 − 033 = 633 にはならず 644 で作られる。umask は「新しく作るときに落とすビット」の印で、数の引き算ではない。そして作られた後の <code>chmod</code> には、1つの書き方を除いて効かない。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 16分</span></summary>
 <div class="badges"><span>前提: 第1章まで読了</span><span>前提: 檻が起動している</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.02.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>chmod</code> の数値の書き方と記号の書き方を、相互に読み替えられる</li><li>umask の値から、新しいファイルとディレクトリのパーミッションをビットで求められる</li><li>umask がどこで決まり、どこに書けば次のシェルでも効くかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>pam_umask</code> の細かいオプション、ACL の既定値（default ACL）、<code>mount</code> の <code>umask=</code> オプション（FAT など Linux の権限を持たないファイルシステム用）は扱わない。umask の中身を2進数で暗記する必要もない。1桁ずつ rwx に分けて読めれば足りる。</div></div>
+</details>
 
 <h2 id="chmod">chmod の2つの書き方</h2>
 <div class="sgoal"><b>この節で分かること</b>: 数値（640）と記号（u=rw,g=r）が同じものを指す仕組み。</div>
@@ -219,6 +222,7 @@ umask はプロセスごとの値で、ログインし直したシェルは起�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-files/">ファイルとパーミッション</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/practice/">実践編</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-files/chapters.js"></script>
 <script src="/linuc-files/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

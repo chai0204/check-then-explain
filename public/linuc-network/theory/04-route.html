@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-network/">ネットワークの基礎</a> › <a href="/linuc-network/theory/">理論編</a> › 第4章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/#draft">詳しく</a></p>
 </div>
 <h1>4. 返事をしたのは、相手ではなかった</h1>
 <p class="lead">社内のサーバ 172.16.20.10 に <code>ping</code> を打つと、<code>Destination Net Unreachable</code> が返ってくる。サーバが止まっていると考えたくなるが、<code>From</code> に書かれているのは 192.168.10.254 — 撤去予定の旧ルータである。返事をしたのは相手ではなく、こちらの経路表の1行が送りつけた先だった。しかもその1行は、直しても再起動で戻る。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 18分</span></summary>
 <div class="badges"><span>前提: 第3章を終えている</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.2（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>ip route</code>・<code>route -n</code>・<code>netstat -rn</code> で経路表を読み、ある宛先にどの行が使われるかを言える</li><li><code>ping</code> の <code>From</code> と ICMP のエラーの種類から、どこで止まったかを特定できる</li><li>不適切なデフォルトルートを <code>ip route</code> と <code>route</code> で直し、ifupdown の設定にも残せる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: ポリシールーティング（<code>ip rule</code> と複数の経路表）、ルーティングプロトコル（OSPF / BGP）、ルータ側で転送を許す設定（<code>ip_forward</code>）。経路表の行を手で読み書きすることと、デフォルトルートの直し方だけで足りる。</div></div>
+</details>
 
 <h2 id="symptom">サーバに、ping が届かない</h2>
 <div class="sgoal"><b>この節で分かること</b>: ping の From が何を言っているか。</div>
@@ -286,6 +289,7 @@ default via fe80::5054:ff:fe0a:1 dev lab0 proto ra metric 1024 expires 1793sec h
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-network/">ネットワークの基礎</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/practice/">実践編</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-network/chapters.js"></script>
 <script src="/linuc-network/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

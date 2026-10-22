@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-shell/">シェルとスクリプト</a> › <a href="/linuc-shell/theory/">理論編</a> › 第2章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/#draft">詳しく</a></p>
 </div>
 <h1>2. 子のシェルは、親を書き換えられない</h1>
 <p class="lead"><code>~/.bashrc</code> に alias を1行足し、<code>bash ~/.bashrc</code> で読み直そうとした。エラーが出て、alias も増えない。<code>bash ファイル</code> は「新しい bash を起動してファイルを読ませ、終わらせる」コマンドだからである。新しい bash は親の環境変数の<b>コピー</b>を受け取って始まり、終わるときに何も書き戻さない。いまのシェル自身に読ませるのが <code>source</code>（<code>.</code>）である。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 18分</span></summary>
 <div class="badges"><span>前提: 第1章まで読了</span><span>所要 18分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.06.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>source ファイル</code>・<code>. ファイル</code>・<code>bash ファイル</code> の違いを、どのシェルが読むかで説明できる</li><li>シェル変数と環境変数を <code>export</code> で作り分け、どちらが子に渡るかを言える</li><li>PATH の足し方と、足した PATH が効く範囲を言える</li><li>alias が子のシェルに渡らず、bash のスクリプトでは既定で展開されない理由と、だから <code>~/.bashrc</code> に書くことを説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>declare</code> の全オプション、<code>set</code> と <code>env</code> が出す一覧の中身、<code>hash</code>（コマンドの在りかの記憶）、<code>readonly</code>、<code>export -f</code>（関数を子に渡す bash 独自の機能）。覚えるのは <code>source</code>・<code>.</code>・<code>export</code>・<code>alias</code>・<code>unalias</code>・<code>PATH</code> の6つでよい。</div></div>
+</details>
 
 <h2 id="reload">~/.bashrc を直しても、いまのシェルは変わらない</h2>
 <div class="sgoal"><b>この節で分かること</b>: 設定ファイルを書き換えたあと、なぜ読み直しが要り、なぜ <code>bash</code> では読み直せないのか。</div>
@@ -350,6 +353,7 @@ bash: /home/lab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-shell/">シェルとスクリプト</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/practice/">実践編</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-shell/chapters.js"></script>
 <script src="/linuc-shell/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

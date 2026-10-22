@@ -9,15 +9,15 @@
 <nav class="top"><a href="/">トップ</a> › <a href="/wasm/">WebAssembly（WASM）</a> › <a href="/wasm/theory/">理論編</a> › 第4章</nav>
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力は実機の記録ですが、
-   導線の不備が残っている可能性があります。<a href="/wasm/theory/">詳しく</a></p>
+   導線の不備が残っている可能性があります。<a href="/wasm/theory/#draft">詳しく</a></p>
 </div>
 
 <h1>4. 同じ .wasm が、ホストが違うと動かない</h1>
 <p class="lead">1つの .wasm ファイルを2つのホストに渡す。片方は標準出力に文字を出し、もう片方は命令を1つも実行しないまま止まる。
 「どこでも動く」の <em>どこ</em> を決めているのはファイルではない。</p>
-
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 14分</span></summary>
 <div class="badges"><span>前提: 第3章を読んだ</span><span>前提: wasmtime が動く</span><span>前提: node が動く</span><span>所要 14分</span><span class="impact-a">影響度 A</span><span>最終検証 2026-09-30</span></div>
-
 <div class="goal"><h4>この章のゴール</h4>
 <ul>
   <li>WASI を使った .wasm が動くホストと動かないホストを区別できる</li>
@@ -27,6 +27,7 @@
 WASI Preview 2 と Preview 1 の差分は追わない。この章で要るのは「名前にバージョンが埋まっている」という一点だけ。
 iovec のフィールドも、先頭位置と長さの2つ以外は扱わない。残りが要る場面はこの章のゴールの外。
 Node で WASI を動かす experimental フラグの詳細も不要。ここでは素の Node が WASI を持たないことだけを使う。</div></div>
+</details>
 
 <h2 id="two-hosts">同じバイト列を2つのホストに渡す</h2>
 <div class="sgoal"><b>この節で分かること</b>: 同じ .wasm が、片方のホストでは文字を出し、もう片方では命令を1つも実行せずに止まる。</div>
@@ -166,6 +167,7 @@ $ wasmtime run mem.wasm
 </section>
 <footer><a href="/">トップ</a> · <a href="/wasm/">WebAssembly（WASM）</a> · <a href="/wasm/theory/">理論編 目次</a> · <a href="/wasm/practice/">実践編</a> · <a href="/wasm/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/wasm/chapters.js"></script>
 <script src="/wasm/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

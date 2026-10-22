@@ -8,14 +8,18 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-services/">時刻・ログ・メール</a> › <a href="/linuc-services/theory/">理論編</a> › 第1章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/#draft">詳しく</a></p>
 </div>
 <h1>1. 時計は2つある</h1>
 <p class="lead">この檻で <code>hwclock</code> を打つと、時刻は1行も返らない。ところが <code>/proc/driver/rtc</code> には時刻が入っていて、しかも <code>date</code> が返す時刻と33秒ずれている。片方だけ見ていると気づかないが、1台のマシンの中で別々に進む時計が2つある。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 17分</span></summary>
 <div class="badges"><span>前提: コマンドを打てる</span><span>前提: 檻が起動している</span><span>所要 17分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.1（重要度2）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>date</code> と <code>timedatectl</code> と <code>hwclock</code> が、それぞれ何を読んでいるかを区別して言える</li><li>ハードウェアクロック（RTC）とシステムクロックの役割を分けて説明できる</li><li>コンテナで <code>hwclock</code> が失敗する理由を、コマンドの有無ではなくデバイスの有無から説明できる</li><li><code>date</code> で時刻を設定する書式（年は最後）と、<code>touch -t</code> の書式（年が先頭）を取り違えずに書ける</li><li><code>timedatectl</code> のサブコマンドを、無いもの（<code>set-clock</code>）と区別して挙げられる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: NTP による時刻合わせは第3章で扱う。うるう秒、<code>tzdata</code> の更新手順、<code>hwclock --systohc</code> で RTC に書き戻す操作はここでは扱わない（書き戻しには RTC デバイスが要るので、この檻では試せない。出る出力は後で示す）。<code>clock_gettime</code> の精度やクロックソースの選択も、合格に要らないので外す。</div></div>
+</details>
+
 <h2 id="two">時計を2つ見つける</h2>
 <div class="sgoal"><b>この節で分かること</b>: 同じマシンの中に、別々に進む時計が2つあること。</div>
 <p>まず2つ並べて打つ。どちらも時刻を出すコマンドだが、出てくる内容が違う。</p>
@@ -217,6 +221,7 @@ RTC にシステムクロックを書き戻すのは別の操作（<code>hwclock
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-services/">時刻・ログ・メール</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/practice/">実践編</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-services/chapters.js"></script>
 <script src="/linuc-services/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

@@ -8,12 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/docker/">Docker</a> › <a href="/docker/theory/">理論編</a> › 第2章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/#draft">詳しく</a></p>
 </div>
 <h1>2. コンテナの PID 1 は、合図を無視する</h1>
 <p class="lead"><code>sleep</code> は TERM の合図で終わるプログラムである。ところが <code>sleep</code> だけのコンテナに <code>docker stop</code> を打つと、
 止まるまでにきっかり10秒かかる。コンテナの中で最初に起動したプロセスは、その名前空間の PID 1 になり、カーネルは PID 1 を特別に扱う。
 後から <code>docker exec</code> で足したプロセスも、PID 1 の子ではない。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 第1章</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>docker stop</code> が10秒かかって終了コード 137 で終わる理由を、PID 1 とシグナルで説明できる</li>
@@ -21,6 +23,7 @@
 <li><code>docker exec</code> で動かしたプロセスの TERM と umask が、どこから来るかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: シグナルの全種類と番号（使うのは TERM 15・KILL 9 だけ）、
 tini の作りの細部、systemd のドロップインの書式の全項目、Dockerfile の <code>STOPSIGNAL</code>。</div></div>
+</details>
 
 <h2 id="stop">docker stop は、なぜ10秒かかるのか</h2>
 <div class="sgoal"><b>この節で分かること</b>: 同じ <code>sleep</code> が、練習機の上とコンテナの中で、TERM に違う反応をすること。</div>

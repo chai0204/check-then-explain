@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-shell/">シェルとスクリプト</a> › <a href="/linuc-shell/theory/">理論編</a> › 第6章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/#draft">詳しく</a></p>
 </div>
 <h1>6. スクリプトが返せるのは、0〜255 の数1つ</h1>
 <p class="lead">スクリプトの最後に <code>exit 256</code> と書くと、呼んだ側の <code>$?</code> は <code>0</code>、つまり「成功」になる。終了ステータスは 0〜255 の数で、それより大きい値は 256 で割った余りしか残らない。子のプロセスが親に返せるものは、この小さな数1つしかない。だから <code>if</code> も <code>test</code> も、この数だけを見て動く。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 18分</span></summary>
 <div class="badges"><span>前提: 第5章まで読了</span><span>所要 18分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.06.2（重要度6）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>$?</code> が何をいつまで持っているかを説明できる。0・1・2・126・127 の意味を言える</li><li><code>exit</code> の値と、<code>exit</code> を書かないスクリプトの終了ステータスを言える</li><li><code>test</code> と <code>[ ]</code> でファイル・文字列・数を比べられ、よくある書き間違い（空白・引用符）を見分けられる</li><li><code>if</code>・<code>elif</code>・<code>else</code> が、条件の<b>コマンドの終了ステータス</b>で分かれることを説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>[[ ]]</code> の詳しい文法（正規表現の <code>=~</code> など）、<code>(( ))</code> による数の比較、<code>set -e</code>・<code>trap</code>、シグナルで終わったときの 128+n の値。<code>test</code> の演算子は下の表にあるものだけで足りる。</div></div>
+</details>
 
 <h2 id="status">$? は、直前の1つしか覚えていない</h2>
 <div class="sgoal"><b>この節で分かること</b>: 終了ステータスの値の意味と、<code>$?</code> の寿命。</div>
@@ -225,6 +228,7 @@ fi                      ← if を逆から綴って閉じる</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-shell/">シェルとスクリプト</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/practice/">実践編</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-shell/chapters.js"></script>
 <script src="/linuc-shell/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

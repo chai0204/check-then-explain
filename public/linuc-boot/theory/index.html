@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>本文に載せた出力はすべて実機の記録で、演習7本は模範解答どおりに通ることを確認してあります
    （未達のときに判定が鳴ることも、7本すべてで確認済み）。
    それでも <b>導線の不備</b>は残っている可能性があります。
@@ -19,21 +19,21 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — 起動・仮想マシン・プロセス</h1>
 <p class="lead">LinuC レベル1 <strong>101 試験・主題1.01</strong>（インストールと仮想マシン・コンテナ／ブートと systemd／プロセス／デスクトップ）を、
 コンテナの中で動く<strong>本物の仮想マシン（練習機）</strong>で確かめる10章。
 電源を入れるところから、GRUB でカーネルに引数を渡し、プロセスにシグナルを送るところまで、全部あなたの手で打てます。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<h2 id="spine">この10章を貫いている1つの事実</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="spine">この10章を貫いている1つの事実</h2></summary>
 <div class="goal">
 <p><b>停止の頼みも、シグナルも、ログインも、相手に送る「合図」でしかない。どう振る舞うかは、受け取った側が決める。</b></p>
 <p><code>virsh shutdown</code> は中の OS に止まるよう頼むだけで（ゲストエージェントがいればエージェント経由、いなければ ACPI の電源ボタンで）、止まるかどうかは中の OS が決める。
@@ -47,8 +47,9 @@ libvirt の XML の全項目、仮想ネットワークやストレージプー�
 GRUB の設定ファイルの文法（<code>grub.cfg</code> を手で書く）、Secure Boot の署名の仕組み、
 systemd のユニットファイルの書き方、Wayland の詳細。どれもこの主題の出題範囲の外で、本文では名前が出るだけです。</div>
 </div>
-
-<h2 id="range">LinuC 出題範囲との対応</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="range">LinuC 出題範囲との対応</h2></summary>
 <p>公式の出題範囲（<a href="https://linuc.org/linuc1/range/101.html">LinuC-1 Version 10.0 / 101 試験</a>）の
 主題1.01 を、章に割り当てたものです。「詳細」欄に挙げられている語が、どの章で実際に手を動かす対象になるかを並べてあります。</p>
 <div class="scroll"><table>
@@ -88,8 +89,9 @@ DVD や ISO イメージからのインストーラ（練習機はクラウド�
 打てない理由と、代わりに何で確かめたかは、各章と下の「檻で再現できないもの」に書いてあります。<b>打てないことを黙って飛ばしてはいません。</b></p>
 <p>他の主題（1.02〜1.11）の対応は
 <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。</p>
-
-<h2 id="exam">試験の直前に見る表</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="exam">試験の直前に見る表</h2></summary>
 <p>出題範囲が名指ししている語を、一行の意味と、説明している章へのリンクで並べました。</p>
 <div class="scroll"><table>
 <tr><th>語</th><th>一行で言うと</th><th>章</th></tr>
@@ -154,6 +156,7 @@ DVD や ISO イメージからのインストーラ（練習機はクラウド�
 <tr><td><code>startx</code></td><td>ディスプレイマネージャを使わずに X を起動する（<code>~/.xinitrc</code> を読む）</td><td><a href="/linuc-boot/theory/10-x11">10</a></td></tr>
 <tr><td>ターミナル</td><td>X の上で動いてシェルを動かす X クライアント（xterm・gnome-terminal・konsole）</td><td><a href="/linuc-boot/theory/10-x11">10</a></td></tr>
 </table></div>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
@@ -244,5 +247,6 @@ DVD や ISO イメージからのインストーラ（練習機はクラウド�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/practice/">実践編</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

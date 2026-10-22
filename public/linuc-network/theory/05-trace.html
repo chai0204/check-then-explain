@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-network/">ネットワークの基礎</a> › <a href="/linuc-network/theory/">理論編</a> › 第5章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/#draft">詳しく</a></p>
 </div>
 <h1>5. traceroute は、断られた返事で道を知る</h1>
 <p class="lead"><code>traceroute</code> は、ping のように相手に「返事をください」と頼んでいるわけではない。わざと誰も待っていない番号（UDP の 33434 番〜）へ送り、途中のルータの「時間切れです」と、相手の「その番号には誰もいません」という<b>断りの返事（ICMP）</b>を集めて道順を組み立てる。だから、断りを返さない機械は <code>*</code> になる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 16分</span></summary>
 <div class="badges"><span>前提: 第4章を終えている（デフォルトルートが 192.168.10.1）</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>traceroute</code> と <code>tracepath</code> の出力から、何番目の機械まで届いたかを読める</li><li>traceroute が TTL と ICMP（Time Exceeded / Port Unreachable）で道順を知る仕組みを説明できる</li><li><code>*</code> や <code>!N</code> が何を意味し、何を意味しないかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>mtr</code> などの別の道具、tracepath が経路の MTU を探す仕組みの細部（表示される <code>pmtu</code> の値が読めれば足りる）、traceroute の送り元のアドレスやポートを指定するオプション。<code>tcpdump</code> はこの章で中身を見るために使うが、出題範囲の外なので使い方は覚えなくてよい。</div></div>
+</details>
 
 <h2 id="path">道順を出す</h2>
 <div class="sgoal"><b>この節で分かること</b>: traceroute の出力の各列の意味。</div>
@@ -209,6 +212,7 @@ traceroute to 172.16.20.10 (172.16.20.10), 30 hops max, 60 byte packets
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-network/">ネットワークの基礎</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/practice/">実践編</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-network/chapters.js"></script>
 <script src="/linuc-network/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

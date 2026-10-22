@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第7章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/#draft">詳しく</a></p>
 </div>
 <h1>7. 起動のたびにマウントする</h1>
 <p class="lead">第6章では、USB メモリと CD を手でマウントし、装置の名前は挿す順番で変わるので、ラベルや UUID で指すことを確かめた。手でしたマウントは、再起動すると外れる。この章では、起動のたびに自動でマウントされるように <code>/etc/fstab</code> に書き、一般ユーザにマウントを許す書き方と、再起動して効いているかの確かめ方を見る。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 25分</span></summary>
 <div class="badges"><span>前提: 第6章まで読了</span><span>前提: 練習機の中にいる・外の端末もある</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>/etc/fstab</code> の6つの列を読み書きでき、UUID で指す行を書いて、再起動の前に <code>mount -a</code> と <code>findmnt --verify</code> で確かめられる</li><li>2つのディスクに同じラベルを付けたら <code>LABEL=</code> の行がどうなるかを確かめ、重なりを見つけて付け替えられる</li><li><code>user</code>・<code>users</code>・<code>noauto</code>・<code>ro</code> のオプションで、一般ユーザが取り外せるメディアをマウントできるようにできる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: 起動のときのマウントを受け持つプログラム（systemd）の、マウント用の設定ファイル（<code>.mount</code> ユニット）の書き方は扱わない（<code>/etc/fstab</code> を書いたあとの <code>systemctl daemon-reload</code> の1行だけ覚えればよい）。autofs や NFS のような、ネットワーク越しや必要になったときのマウントも扱わない。5列目の dump（古いバックアップの道具）の使い方も扱わない（0 を書けばよい）。</div></div>
+</details>
 
 <h2 id="fstab">/etc/fstab の6つの列</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>/etc/fstab</code> の1行の読み方。</div>
@@ -223,6 +226,7 @@ Filesystem      Size  Used Avail Use% Mounted on
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-disks/">ハードウェアとディスク</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/practice/">実践編</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-disks/chapters.js"></script>
 <script src="/linuc-disks/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

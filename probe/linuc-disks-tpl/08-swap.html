@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第8章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/#draft">詳しく</a></p>
 </div>
 <h1>8. スワップと、メモリの上のファイルシステム（tmpfs）</h1>
 <p class="lead">第7章では、<code>/etc/fstab</code> に書いて起動のたびにマウントし、再起動して確かめた。この章では、第4章で切った <code>vdb3</code>（種類 Linux swap）をメモリの逃げ場（スワップ）にして起動のたびに使われるようにし、逆にメモリの上に置くファイルシステム（tmpfs）を作ってみる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 18分</span></summary>
 <div class="badges"><span>前提: 第7章まで読了</span><span>前提: 練習機の中にいる</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>mkswap</code>・<code>swapon</code>・<code>swapoff</code> の役割を言い分けられ、スワップを区画でもファイルでも作れる</li><li>起動のたびに使うスワップを <code>/etc/fstab</code> に書き、再起動せずに確かめられる</li><li>メモリの上に tmpfs を作り、<code>size=</code> に実際のメモリより大きな値を書いたらどうなるかを確かめ、<code>size=</code> の意味を言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: スワップの使われやすさの調整（<code>vm.swappiness</code>）は扱わない。メモリを圧縮して使う仕組み（zram・zswap）と、休止（ハイバネート）の設定も扱わない。スワップをどれくらいの大きさにするかは、本文の1行の目安だけでよい。</div></div>
+</details>
 
 <h2 id="swap">スワップを作って使い始める</h2>
 <div class="sgoal"><b>この節で分かること</b>: スワップを使えるようになるまでの段階と、それぞれのコマンド。</div>

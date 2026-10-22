@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-text/">コマンドラインとテキスト処理</a> › <a href="/linuc-text/theory/">理論編</a> › 第4章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/#draft">詳しく</a></p>
 </div>
 <h1>4. 1行とは、改行で終わっている範囲のこと</h1>
 <p class="lead">画面では2行に見えるファイルを、<code>wc -l</code> は 1 と数える。<code>wc -l</code> が数えているのは「行」ではなく<b>改行文字の数</b>だからだ。この章のフィルタはどれも、テキストを行の集まりではなく<b>バイトの並び</b>として受け取り、改行文字を区切りとして扱っている。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 16分</span></summary>
 <div class="badges"><span>前提: 第1章</span><span>前提: 檻が起動している</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.03.2（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>cat</code> <code>head</code> <code>tail</code> <code>wc</code> <code>nl</code> <code>od</code> <code>less</code> の役割と、試験に出るオプションを言える</li><li>「行」が改行文字で区切られていることを <code>od -c</code> で確かめられる</li><li>Windows の改行（CRLF）のファイルを、見た目ではなく中身で見分けられる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>od</code> の出力形式の全種類、<code>less</code> の設定（環境変数 <code>LESS</code>）、<code>tail -F</code> と <code>--pid</code>、<code>wc -L</code> の細部。文字コード（UTF-8 のバイト列の読み方）も扱わない。</div></div>
+</details>
 
 <h2 id="peek">先頭と末尾だけを見る</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>cat</code> <code>head</code> <code>tail</code> の行の数え方。</div>
@@ -169,6 +172,7 @@ B は「10行目から最後まで」を出して終わる。</p></details></div
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-text/">コマンドラインとテキスト処理</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/practice/">実践編</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-text/chapters.js"></script>
 <script src="/linuc-text/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

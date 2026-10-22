@@ -8,11 +8,13 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> › <a href="/linuc-boot/theory/">理論編</a> › 第7章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/#draft">詳しく</a></p>
 </div>
 <h1>7. halt では電源は切れない</h1>
 <p class="lead"><code>sudo halt</code> を打つと、練習機は最後に <code>reboot: System halted</code> と書いて止まる。ところが外で <code>virsh domstate</code> を打つと <code>running</code> と出る。
 <code>halt</code> が止めたのは CPU で、電源ではない。電源を切るのは <code>poweroff</code> で、しかもこの2つと <code>shutdown</code> <code>reboot</code> は、同じ1つのプログラムである。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 16分</span></summary>
 <div class="badges"><span>前提: 第6章まで読了</span><span>前提: 端末を2つ開いている</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.01.3（重要度4）</span><span>出題範囲 1.01.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>shutdown</code> に時刻と文を渡して停止を予約し、取り消せる（<code>-h</code> <code>-r</code> <code>-c</code> <code>now</code> <code>+分</code>）</li>
@@ -20,6 +22,7 @@
 <li>電源を抜いて止めた（<code>virsh destroy</code>）次の起動で何が起きるかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: systemd が止まるときのユニットの順番（shutdown.target・final.target）の細部、
 ACPI の仕様、ログイン記録のファイル（wtmp）の形式、<code>/run/systemd/shutdown/scheduled</code> の各行の意味。</div></div>
+</details>
 
 <h2 id="same">4つのコマンドは、同じプログラム</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>shutdown</code> <code>halt</code> <code>poweroff</code> <code>reboot</code> の正体。</div>
@@ -341,6 +344,7 @@ A の <code>-c</code> は予約の取り消し、C の <code>-r</code> は再起
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/practice/">実践編</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-boot/chapters.js"></script>
 <script src="/linuc-boot/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

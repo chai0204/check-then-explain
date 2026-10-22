@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-security/">セキュリティ</a> › <a href="/linuc-security/theory/">理論編</a> › 第5章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/#draft">詳しく</a></p>
 </div>
 <h1>5. sudo は、許したものだけに絞る</h1>
 <p class="lead"><code>/etc/sudoers.d/</code> にルールを書き、<code>visudo -c</code> も通した。その後でファイルの権限を <code>666</code> にしただけで、「許したはずのコマンドが通らない」状態になる。<code>sudo</code> は、他人が書き換えられる指示書を信用せず、<b>そのファイルを丸ごと読まずに飛ばす</b>からだ。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 16分</span></summary>
 <div class="badges"><span>前提: 第4章まで読了</span><span>前提: 練習機が起動している</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.10.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>su</code> と <code>sudo</code> の違い、<code>/etc/sudoers</code> と <code>/etc/sudoers.d/</code> の関係を説明できる</li><li>特定ユーザに特定コマンドだけを許すルールを書ける</li><li><code>sudo</code> がどんな持ち主・権限のファイルを飛ばすか、<code>visudo</code> が何を検査するかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>Cmnd_Alias</code> / <code>Runas_Alias</code> などのエイリアス、<code>Defaults</code> の細かいオプション、LDAP 連携の <code>sudoers</code> はレベル1では深追いしない。ここでは「誰に・何を・パスワードあり/なし」の基本形と、ファイルの置き場所・持ち主と権限・検査だけを扱う。</div></div>
+</details>
 
 <h2 id="suvs">su は別人になる、sudo は一件だけ代理する</h2>
 <div class="sgoal"><b>この節で分かること</b>: 2つの昇格のしかたの違い。</div>
@@ -221,6 +224,7 @@ root がロックされていると戻れなくなるので、壊れた設定を
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-security/">セキュリティ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/practice/">実践編</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-security/chapters.js"></script>
 <script src="/linuc-security/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

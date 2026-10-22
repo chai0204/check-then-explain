@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-shell/">シェルとスクリプト</a> › <a href="/linuc-shell/theory/">理論編</a> › 第5章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/#draft">詳しく</a></p>
 </div>
 <h1>5. 引数は、渡す側のシェルが切ってから渡す</h1>
 <p class="lead">スクリプトが受け取る引数は、あなたが打った1行の文字列ではない。呼んだ側のシェルが空白で切り、引用符を外したあとの「語の並び」である。スクリプトの中でそれを <code>"$@"</code> と書けば区切りが保たれ、<code>$*</code> と書くともう一度切り直される。<code>"my file.txt"</code> が <code>my</code> と <code>file.txt</code> に割れるのは、この切り直しのときである。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 15分</span></summary>
 <div class="badges"><span>前提: 第4章まで読了</span><span>所要 15分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.06.2（重要度6）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>$0</code>・<code>$1</code>〜<code>$n</code>・<code>$#</code>・<code>$@</code>・<code>$*</code> が何を表すかを、実際の出力で説明できる</li><li><code>"$@"</code>・<code>"$*"</code>・<code>$*</code> の違いを言い、受け取った引数を別のコマンドへ渡すときに <code>"$@"</code> を使う理由を言える</li><li><code>shift</code> と <code>$#</code> で引数を1つずつ処理でき、10個目以降の書き方（<code>${10}</code>）と、配列の要素の書き方（<code>${a[1]}</code>）を知っている</li><li>引数の数を確かめて、使い方を標準エラーに出して終われる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>getopts</code> によるオプションの解析、<code>$$</code>・<code>$!</code>・<code>$-</code> など他の特殊パラメータ（<code>$-</code> は第1章で使った）、<code>IFS</code> の細かい規則、配列の操作（足す・消す・切り出す）。配列は、要素の取り出し方だけを第3節で扱う。</div></div>
+</details>
 
 <h2 id="split">my file.txt が、2つに割れる</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>$*</code> で引数を渡すと何が起きるか。</div>
@@ -236,6 +239,7 @@ $ bash need.sh alice bob 2&gt; /dev/null; echo "終了ステータス $?"
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-shell/">シェルとスクリプト</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/practice/">実践編</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-shell/chapters.js"></script>
 <script src="/linuc-shell/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

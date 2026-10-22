@@ -8,12 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <a href="/qemu/theory/">理論編</a> › 第3章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/#draft">詳しく</a></p>
 </div>
 <h1>3. ディスクは、書いたところだけを持つファイル</h1>
 <p class="lead">練習機のディスクは 20GiB と名乗るのに、ファイルは 527MiB しかない。その上に重ねたあなたのディスクは、作った直後は 192KiB で、練習機を1回起動して止めると 18MiB 余りになった。
 QEMU のディスクはただのファイルで、qcow2 という形式は<b>書いたところだけを持ち、持っていないところは下に重ねた土台のファイルに聞きに行く</b>。
 だから土台を1バイトも汚さずに練習機を何台でも作れ、<code>-snapshot</code> は書き込みを捨て、<code>savevm</code> は動いている状態ごとファイルの中にしまう。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 30分</span></summary>
 <div class="badges"><span>前提: 第2章までを同じ端末で終えている（<code>~/work</code> にいる）</span><span>所要 30分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>raw と qcow2 の違いを、<code>ls -l</code> と <code>du</code> と <code>qemu-img info</code> の数字で説明できる</li>
@@ -23,6 +25,7 @@ QEMU のディスクはただのファイルで、qcow2 という形式は<b>書
 <li>練習機の電源の切り方（<code>system_powerdown</code> と <code>quit</code>）の違いを、中の OS がいるときの振る舞いで言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: qcow2 のファイルの中の表（L1・L2・refcount）の形、<code>qemu-img</code> のサブコマンドの全部（<code>convert</code> <code>rebase</code> <code>commit</code> <code>resize</code> は名前だけ）、
 キャッシュの指定（<code>cache=</code>）、外部スナップショット（libvirt の <code>virsh snapshot-create --disk-only</code>）。</div></div>
+</details>
 
 <h2 id="base">練習機のディスクを見る</h2>
 <div class="sgoal"><b>この節で分かること</b>: 練習機のディスクがどこにあり、何と名乗っているか。</div>
@@ -321,6 +324,7 @@ disk size: 379 MiB</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/qemu/chapters.js"></script>
 <script src="/qemu/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

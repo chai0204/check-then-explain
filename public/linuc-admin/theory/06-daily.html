@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-admin/">アカウント・ジョブ・ロケール</a> › <a href="/linuc-admin/theory/">理論編</a> › 第6章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/#draft">詳しく</a></p>
 </div>
 <h1>6. 毎日の仕事は、名前で選ばれる</h1>
 <p class="lead">実行権を付けたスクリプトを <code>/etc/cron.daily</code> に置いても、名前が <code>hello.sh</code> なら毎日の実行に選ばれない。中身を選んでいるのは <code>run-parts</code> で、Debian 系の <code>run-parts</code> は名前に <code>.</code> を含むファイルを黙って飛ばす。そして「いつ走らせるか」を決めているのは、この Ubuntu では cron ではなく anacron である。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 16分</span></summary>
 <div class="badges"><span>前提: 第5章まで読了</span><span>前提: 練習機を起動してから15分以上たっている（理由は本文）</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.08.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>/etc/cron.hourly</code>・<code>/etc/cron.daily</code>・<code>/etc/cron.weekly</code>・<code>/etc/cron.monthly</code> を、誰がいつ走らせるかを説明できる</li><li><code>run-parts</code> がディレクトリの中から何を選ぶか（実行権と名前）を、<code>--test</code> で確かめられる</li><li><code>/etc/anacrontab</code> の4列と、anacron の主なオプション（<code>-f</code> <code>-n</code> <code>-s</code> <code>-d</code> <code>-T</code> <code>-u</code>）を読める</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: systemd のタイマーの書き方（<code>anacron.timer</code> の中身は読むだけ）、電源（AC/バッテリー）による抑止は扱わない。</div></div>
+</details>
 
 <h2 id="who">cron.daily を走らせているのは誰か</h2>
 <div class="sgoal"><b>この節で分かること</b>: 毎時・毎日・毎週・毎月のディレクトリの実行経路。</div>
@@ -247,6 +250,7 @@ C・D は不要で、ディレクトリに置くこと自体が登録になっ�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-admin/">アカウント・ジョブ・ロケール</a> · <a href="/linuc-admin/theory/">理論編 目次</a> · <a href="/linuc-admin/practice/">実践編</a> · <a href="/linuc-admin/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-admin/chapters.js"></script>
 <script src="/linuc-admin/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

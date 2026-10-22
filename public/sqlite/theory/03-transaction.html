@@ -11,9 +11,9 @@
 <h1>3. 書き込みは、まとめると270倍速い</h1>
 <p class="lead">同じ 2000 行の挿入が、12.996 秒と 0.048 秒になる。
 差を作っているのは SQL の書き方ではなく、ディスクの返事を何回待つかであり、その待ちを発生させているのは、いまあなたが起動したプロセス自身である。</p>
-
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 16分</span></summary>
 <div class="badges"><span>前提: 第1章</span><span>前提: 第2章</span><span>前提: sqlite3 が打てる</span><span>所要 16分</span><span class="impact-a">影響度 A</span><span>最終検証 2026-09-30</span></div>
-
 <div class="goal"><h4>この章のゴール</h4><ul>
 <li><code>BEGIN</code> で囲まないと1行ごとにディスク同期が起きることを、実測の秒数で示せる</li>
 <li>なぜ遅いのかを「誰が <code>fsync</code> を呼んでいるか」で説明できる</li>
@@ -22,6 +22,7 @@
   WAL をいつどうやってチェックポイントするかも扱わない。
   OS が「書き終わった」と返した先で、データが物理的にどこまで残る形になっているか（ディスク側のキャッシュ、電源が落ちたときの扱い）も、この章では追わない。
   押さえるのは<b>コミットの回数が待ちの回数を決める</b>という関係ひとつだけで、モードの選択はその関係が分かったあとの話である。</div></div>
+</details>
 
 <h2 id="two-runs">同じ 2000 行が、13 秒と 0.05 秒になる</h2>
 <div class="sgoal"><b>この節で分かること</b>: 実測した2つの秒数と、その差が SQL の書き方から来ていないこと。</div>
@@ -202,6 +203,7 @@ SQLite にはその置き場所がない。束ねるかどうかを決める場�
 </section>
 <footer><a href="/">トップ</a> · <a href="/sqlite/">SQLite</a> · <a href="/sqlite/theory/">理論編 目次</a> · <a href="/sqlite/practice/">実践編</a> · <a href="/sqlite/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/sqlite/chapters.js"></script>
 <script src="/sqlite/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

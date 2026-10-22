@@ -9,14 +9,15 @@
 <nav class="top"><a href="/">トップ</a> › <a href="/wasm/">WebAssembly（WASM）</a> › <a href="/wasm/theory/">理論編</a> › 第2章</nav>
 <div class="draftbar compact">
 <p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力は実機の記録ですが、
-   導線の不備が残っている可能性があります。<a href="/wasm/theory/">詳しく</a></p>
+   導線の不備が残っている可能性があります。<a href="/wasm/theory/#draft">詳しく</a></p>
 </div>
 
 <h1>2. 能力は import でしか増えない</h1>
 <p class="lead">1本の同じ .wasm が、渡す相手と渡すものを変えるだけで3通りに終わる。
 その3つを並べると、できることがモジュールの中ではなく渡す側にあることが見える。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 14分</span></summary>
 <div class="badges"><span>前提: 第1章を読み終えている</span><span>前提: wat2wasm でビルドできる</span><span>前提: node が打てる</span><span>所要 14分</span><span class="impact-a">影響度 A</span><span>lab-wasm:1.0.0</span><span>最終検証 2026-09-30</span></div>
-
 <div class="goal"><h4>この章のゴール</h4><ul>
 <li>import した関数をホストから受け取って呼び出せる</li>
 <li>import が足りないときに何が起きるかを、wasmtime と Node の2つのホストで見分けられる</li>
@@ -24,6 +25,7 @@
   <div class="skip"><b>ここで覚えなくていいこと</b>: WASI にどんな API が並んでいるかは1つも覚えなくていい。この章で扱うホストの能力は、自分で名前を決めた関数1つだけである。
   コンポーネントモデルという上位の仕組みも出てこない。import の型が一致するかどうかの判定規則も、条文として覚える必要はない。
   この章で必要なのは<b>「名前と形が合っていなければ繋がらない」という事実1つ</b>で、規則の全文はここでは使わない。</div></div>
+</details>
 
 <h2 id="decl">注文票だけを持つモジュール</h2>
 <div class="sgoal"><b>この節で分かること</b>: モジュールが自分で「これが無いと動けない」と宣言する書き方と、その宣言が誰にも解決されないまま .wasm になること。</div>
@@ -176,6 +178,7 @@ LinkError: WebAssembly.instantiate(): Import #0 module="env" function="log" erro
 </section>
 <footer><a href="/">トップ</a> · <a href="/wasm/">WebAssembly（WASM）</a> · <a href="/wasm/theory/">理論編 目次</a> · <a href="/wasm/practice/">実践編</a> · <a href="/wasm/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/wasm/chapters.js"></script>
 <script src="/wasm/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

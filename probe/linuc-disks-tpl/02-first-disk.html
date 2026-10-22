@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第2章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/#draft">詳しく</a></p>
 </div>
 <h1>2. 空のディスクを使えるようにする</h1>
 <p class="lead">第1章では、練習機に入り、<code>lsblk</code> と <code>df</code> で、<code>vdb</code>（2G）が区画もファイルシステムも持たない空のディスクだと確かめた。この章では、その <code>vdb</code> を区切る → ファイルシステムを作る → マウントする → ファイルを書く → 外す、と一通り使ってみる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 第1章まで読了</span><span>前提: 練習機の中にいる</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>fdisk</code> で、空のディスクにパーティションを1つ作れる（<code>n</code> で作り、<code>p</code> で確かめ、<code>w</code> で書く）</li><li><code>mkfs.ext4</code> でファイルシステムを作り、<code>mount</code> でつないで読み書きし、<code>umount</code> で外せる</li><li>マウントしたディスクに student のままファイルを書いてみて、どうなるかを確かめ、書けるようにできる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>fdisk</code> が出す表の形式の名前（DOS・MBR）と Disk identifier は、この章では読まない。<code>mkfs.ext4</code> の出力の途中の行（<code>Allocating group tables</code> など）の意味も、この章では読まない。区画の大きさの決め方（何 MB にするか）は扱わず、ここでは 200M にする。</div></div>
+</details>
 
 <h2 id="fdisk">区切る — fdisk でパーティションを1つ作る</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>fdisk</code> の問いに順に答えて、区画を1つ作るまでの流れ。</div>

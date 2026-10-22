@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-files/">ファイルとパーミッション</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>本文に載せた出力はすべて実機の記録で、演習8本は模範解答どおりに通ることを確認してあります
    （未達のときに判定が鳴ることも、8本すべてで確認済み。演習02 では、判定がすり抜けられる穴を1つ見つけて直しました）。
    それでも <b>導線の不備</b>は残っている可能性があります。
@@ -19,21 +19,21 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — ファイル・ディレクトリの操作と管理</h1>
 <p class="lead">LinuC レベル1 <strong>101 試験・主題1.02</strong>（パーミッション・ファイル操作・リンク・検索）を、
 全部コンテナの中で実際に打って確かめる8章。
 読むだけで終わらせないために、<strong>1章ごとに「実際に打つと何が出るか」を先に置いて</strong>います。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<h2 id="spine">この8章を貫いている1つの事実</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="spine">この8章を貫いている1つの事実</h2></summary>
 <div class="goal">
 <p><b>ファイルの名前は、ディレクトリの中に書かれた1行にすぎない。権限・所有者・時刻・中身は、名前ではなく inode の側にある。コマンドがどちらを触るかで、結果が決まる。</b></p>
 <p>ディレクトリに r だけ渡すと名前しか見えない。書き込めないファイルでも、ディレクトリに w があれば消せる。
@@ -44,8 +44,9 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 ACL（<code>getfacl</code> / <code>setfacl</code>）、ファイルシステムの作り方（<code>mkfs</code>、主題1.05 の範囲）、inode の内部構造、
 SELinux。どれも主題1.02 の範囲外で、この8章には出てきません。</div>
 </div>
-
-<h2 id="range">LinuC 出題範囲との対応</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="range">LinuC 出題範囲との対応</h2></summary>
 <p>公式の出題範囲（<a href="https://linuc.org/linuc1/range/101.html">LinuC-1 Version 10.0 / 101 試験</a>）の
 主題1.02 を、章に割り当てたものです。「詳細」欄に挙げられている語が、どの章で実際に手を動かす対象になるかを並べてあります。</p>
 <div class="scroll"><table>
@@ -78,8 +79,9 @@ SELinux。どれも主題1.02 の範囲外で、この8章には出てきませ�
 <b>打てないことを黙って飛ばしてはいません。</b></p>
 <p>他の主題の対応は
 <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。どこがまだ無いかもそこで分かります。</p>
-
-<h2 id="cheat">試験の直前に見る表</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="cheat">試験の直前に見る表</h2></summary>
 <p>出題範囲の語ごとに、一行の意味と、説明している章の場所です。一行で思い出せない語だけ、リンク先を読み返してください。</p>
 <div class="scroll"><table>
 <tr><th>語</th><th>一行で</th><th>章</th></tr>
@@ -118,6 +120,7 @@ SELinux。どれも主題1.02 の範囲外で、この8章には出てきませ�
 <tr><td><code>whereis</code></td><td>実行ファイル（<code>-b</code>）・マニュアル（<code>-m</code>）・ソース（<code>-s</code>）の3種類だけを探す。設定ファイルは探さない（<code>/etc</code> は実行ファイルの検索先に入っているので、<code>/etc/passwd</code> は出る）。<code>-l</code> で検索先の一覧</td><td><a href="/linuc-files/theory/08-locate#which">8</a></td></tr>
 <tr><td>FHS</td><td><code>/etc</code> 設定、<code>/var/log</code> ログ、<code>/tmp</code> と <code>/var/tmp</code> 一時、<code>/usr/local</code> 自分で入れたもの、<code>/opt</code> 追加アプリ。<code>man 7 hier</code></td><td><a href="/linuc-files/theory/08-locate#fhs">8</a></td></tr>
 </table></div>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
@@ -185,5 +188,6 @@ SELinux。どれも主題1.02 の範囲外で、この8章には出てきませ�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-files/">ファイルとパーミッション</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/practice/">実践編</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

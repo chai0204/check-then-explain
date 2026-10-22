@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第7章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/#draft">詳しく</a></p>
 </div>
 <h1>7. .deb ファイルを直接入れる</h1>
 <p class="lead"><b>前の章までにやったこと</b>: apt でパッケージを入れる・調べる・消すをやり、apt がリポジトリの目録を見て取ってくること、依存関係があれば一緒に入れることを確かめた（第5・6章）。<b>この章でやること</b>: リポジトリを通さずに、手元にある .deb ファイルを <code>dpkg</code> で直接入れる。依存関係が足りないと何が起きるかを見て、そのあとの片付け方を確かめる。最後に、パッケージを入れたときの質問をやり直す <code>dpkg-reconfigure</code> を使う。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 22分</span></summary>
 <div class="badges"><span>前提: 第6章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.2（重要度1）</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-21</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>.deb ファイルを <code>dpkg -i</code> で入れ、<code>dpkg -r</code>・<code>dpkg -P</code> で消す</li><li>依存関係が足りない .deb ファイルを <code>dpkg -i</code> で入れるとどうなるかを確かめ、続きを済ませる方法を確かめる</li><li><code>dpkg -i</code> がしている「展開」と「設定」を、<code>dpkg --unpack</code> と <code>dpkg --configure</code> で分けて打つ</li><li><code>dpkg-reconfigure</code> で、入れたときの質問をもう一度出し、設定し直す</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>dpkg</code> のそのほかのオプション（<code>--set-selections</code>・<code>--force-…</code> など）、パッケージの中で動く設定の手順（スクリプト）の書き方、debconf（質問と答えを覚えるしくみ）の記録の形、<code>dpkg-reconfigure</code> の画面の種類の違い。この章は、ファイルから入れる・消す・設定をやり直す、が1回できれば足りる。</div></div>
+</details>
 
 <h2 id="install">.deb ファイルを入れる — dpkg -i</h2>
 <div class="sgoal"><b>この節で分かること</b>: 手元の .deb ファイルを、dpkg で入れて消す方法。</div>
@@ -299,6 +302,7 @@ apt の <code>remove</code> と <code>purge</code> にあたる。</p></details>
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-packages/chapters.js"></script>
 <script src="/linuc-packages/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

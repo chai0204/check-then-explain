@@ -8,13 +8,15 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <a href="/podman/theory/">理論編</a> › 第6章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/#draft">詳しく</a></p>
 </div>
 <h1>6. ログアウトしても動かし続けるのは、systemd の仕事</h1>
 <p class="lead">rootless の podman のコンテナは、student の systemd（user@1000.service）の下で動いている（第1章）。その systemd は、student がログインしている間だけ動く。
 だから <b>ログアウトすると、コンテナも止まる</b>。動かし続けるには、student の systemd をログインと関係なく動かし（linger）、
 コンテナを systemd のサービスとして書く（<b>quadlet</b>）。落ちたコンテナの起動し直し（<code>--restart</code>）は podman にもあるが、
 練習機の起動のときにコンテナを立ち上げ直す常駐の係（docker なら dockerd）が podman にはいないので、その仕事を systemd に任せる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 27分</span></summary>
 <div class="badges"><span>前提: 第1章（conmon と user@1000.service）</span><span>所要 27分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>ログアウトで rootless のコンテナが止まることを、ログインし直して確かめられる</li>
@@ -22,6 +24,7 @@
 <li>quadlet の <code>.container</code> ファイルから、systemd のサービスが作られる仕組みを、作られた unit から読める</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: quadlet の全項目（<code>.volume</code>・<code>.network</code>・<code>.kube</code>）、<code>podman generate systemd</code>（古いやり方）、
 <code>podman auto-update</code>、root の quadlet（<code>/etc/containers/systemd</code>）。</div></div>
+</details>
 
 <h2 id="logout">ログアウトすると、コンテナはどうなるか</h2>
 <div class="sgoal"><b>この節で分かること</b>: student の systemd とコンテナの寿命の関係。</div>

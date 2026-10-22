@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-network/">ネットワークの基礎</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>本文に載せた出力はすべて実機（コンテナの中の仮想マシン）の記録で、演習7本は模範解答どおりに通ることを確認してあります
    （未達のときに判定が鳴ることも、7本すべてで確認済み。直しかけの状態で鳴ることも2本で確認）。
    それでも <b>導線の不備</b>は残っている可能性があります。
@@ -19,21 +19,21 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — ネットワークの基礎</h1>
 <p class="lead">LinuC レベル1 <strong>102 試験・主題1.07</strong>（重要度の合計 14。102 の主題の中で最も重い）を、
 仮想マシンの中に作った「社内 LAN」で実際に打って確かめる9章。
 <strong>1章ごとに「実際に打つと何が出るか」を先に置いて</strong>います。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<h2 id="spine">この9章を貫いている1つの事実</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="spine">この9章を貫いている1つの事実</h2></summary>
 <div class="goal">
 <p><b>ネットワークの「見え方」は、道具が読んだ表で決まる。<br>
 ifconfig と ip、ifup と nmcli、dig と ping は、同じものを別々の表から読んでいる。<br>
@@ -47,8 +47,9 @@ IP ヘッダのフィールドの並び（TTL だけは第5章で使う）、DNS
 ルーティングプロトコル（OSPF / BGP。経路をルータ同士で自動でやり取りする仕組み。主題1.07 が扱うのは、経路表を手で読み、デフォルトルート・ネットワーク宛て・1台宛ての行を足し引きするところまで）、ファイアウォール（主題1.10）。
 この9章には出てきません。</div>
 </div>
-
-<h2 id="lab">練習機の中の「社内 LAN」</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="lab">練習機の中の「社内 LAN」</h2></summary>
 <p>この教材の檻は、コンテナの中で動く仮想マシン（練習機 <code>linuc</code>）です。
 練習機の中に network namespace（名前空間）で<b>ルータ・撤去予定の旧ルータ・サーバ</b>を作り、スイッチでつないであります。
 経路も DNS も相手のサーバも練習機の中にあるので、<b>あなたの家のルータ、会社のプロキシ、オフラインかどうかで画面が変わりません</b>。</p>
@@ -73,8 +74,9 @@ IP ヘッダのフィールドの並び（TTL だけは第5章で使う）、DNS
 </ul>
 <p class="detail">練習機はインターネットに出ません（わざとです）。apt install もできません。この主題で使う道具は全部入っています。
 外へ出られる経路を残すと、読者ごとに ping の結果や名前の引け方が変わってしまうためです（実測した理由は<a href="/linuc-network/practice/">実践編</a>に書いてあります）。</p>
-
-<h2 id="range">LinuC 出題範囲との対応</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="range">LinuC 出題範囲との対応</h2></summary>
 <p>公式の出題範囲（<a href="https://linuc.org/linuc1/range/102.html">LinuC-1 Version 10.0 / 102 試験</a>）の
 主題1.07 を、章に割り当てたものです。「詳細」欄に挙げられている語が、どの章で実際に手を動かす対象になるかを並べてあります。</p>
 <div class="scroll"><table>
@@ -121,8 +123,9 @@ IP ヘッダのフィールドの並び（TTL だけは第5章で使う）、DNS
 打てない理由ごと第6章に書いてあります。<b>打てないことを黙って飛ばしてはいません。</b></p>
 <p>他の主題（1.01〜1.06・1.08〜1.11）の対応は
 <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。どこがまだ無いかもそこで分かります。</p>
-
-<h2 id="cram">試験の直前に見る表</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="cram">試験の直前に見る表</h2></summary>
 <p>出題範囲の「詳細」欄に並ぶ語を、上から順に1行ずつ。意味が出てこない語だけ、右の章に戻ってください。</p>
 <div class="scroll"><table>
 <tr><th>語</th><th>一行の意味</th><th>章</th></tr>
@@ -168,6 +171,7 @@ IP ヘッダのフィールドの並び（TTL だけは第5章で使う）、DNS
 <tr><td>/etc/resolv.conf</td><td>nameserver（問い合わせ先。1行に1つ・3つまで）と search（1行に空白で並べる。2行書くと後の行だけ効く）。Ubuntu では 127.0.0.53 へのリンク</td><td><a href="/linuc-network/theory/08-dns">8</a></td></tr>
 <tr><td>getent</td><td>NSS を通して引く。ping と同じ引き方は getent ahosts（IPv4 だけなら ahostsv4）。getent hosts は IPv6 を先に聞くので、ping と答えが違うことがある</td><td><a href="/linuc-network/theory/09-names">9</a></td></tr>
 </table></div>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
@@ -235,5 +239,6 @@ IP ヘッダのフィールドの並び（TTL だけは第5章で使う）、DNS
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-network/">ネットワークの基礎</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/practice/">実践編</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

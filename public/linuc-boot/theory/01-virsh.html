@@ -8,13 +8,15 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> › <a href="/linuc-boot/theory/">理論編</a> › 第1章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/#draft">詳しく</a></p>
 </div>
 <h1>1. virsh は電源を入れ、止まるよう頼むだけ</h1>
 <p class="lead"><code>virsh start linuc</code> は一瞬で <code>Domain 'linuc' started</code> と返る。その瞬間、練習機の中の OS はまだ1行も動いていない。
 <code>virsh shutdown</code> は「止める」コマンドに見えるが、中の OS に「止まってほしい」と頼むだけで
 （練習機の中のゲストエージェントがつながっていればエージェント経由、いなければ ACPI の電源ボタンを押して）、止まるかどうかは中の OS が決める。
 OS の都合に関係なく virsh ができるのは、電源を入れること、抜くこと、仮想の CPU を一時停止することである。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 25分</span></summary>
 <div class="badges"><span>前提: 檻が起動している</span><span>前提: 端末を2つ開いている</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.01.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>virsh</code> で仮想マシンの一覧・起動・停止・強制停止・一時停止・自動起動を操作できる（<code>list --all</code> <code>start</code> <code>shutdown</code> <code>destroy</code> <code>suspend</code> <code>resume</code> <code>autostart</code> <code>dominfo</code> <code>console</code>）</li>
@@ -23,6 +25,7 @@ OS の都合に関係なく virsh ができるのは、電源を入れること�
 <div class="skip"><b>ここで覚えなくていいこと</b>: libvirt の XML の各項目の意味（<code>&lt;memory&gt;</code> や <code>&lt;vcpu&gt;</code> が何を決めているかだけ分かれば足りる）、
 <code>virsh define</code> / <code>undefine</code> による定義の作り直し、スナップショット（<code>virsh snapshot-*</code>）、仮想ネットワーク（<code>virsh net-*</code>）は扱わない。
 仮想マシンを新しく作る <code>virt-install</code> も出てこない。出題範囲が求めているのは、できあがった仮想マシンの起動と停止とログインである。</div></div>
+</details>
 
 <h2 id="define">定義はあるが、電源が入っていない</h2>
 <div class="sgoal"><b>この節で分かること</b>: 仮想マシンが「どこに・何として」あるか。一覧に出ない仮想マシンがあること。</div>
@@ -342,6 +345,7 @@ Escape character is ^] (Ctrl + ])</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/practice/">実践編</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-boot/chapters.js"></script>
 <script src="/linuc-boot/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

@@ -8,12 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/docker/">Docker</a> › <a href="/docker/theory/">理論編</a> › 第5章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/#draft">詳しく</a></p>
 </div>
 <h1>5. ポートの公開は、宛先の書き換え</h1>
 <p class="lead"><code>-p 10.0.2.15:8080:80</code> でポートを公開すると、練習機の 8080 番に届いたパケットが、コンテナの 80 番へ行く。
 これは docker が中継しているのではなく、練習機のカーネルが<b>パケットの宛先を書き換えている</b>（DNAT）。
 宛先が書き換わったパケットは「練習機あて」ではなくなるので、練習機あての受け付けを決める INPUT の規則では止まらない。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 22分</span></summary>
 <div class="badges"><span>前提: 第1章（net の名前空間）</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>コンテナの NIC が、veth の組と docker0 のブリッジで練習機につながっていることを示せる</li>
@@ -21,6 +23,7 @@
 <li>INPUT で塞いでも公開したポートに外から届く理由を、パケットが通る道で説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: iptables の全部のチェイン（DOCKER-CT・DOCKER-BRIDGE など）の役目、nftables との関係、
 ユーザ定義のネットワーク（<code>docker network create</code>）と名前解決、IPv6、overlay ネットワーク（Swarm）。</div></div>
+</details>
 
 <h2 id="publish">ポートを公開して、届くことを確かめる</h2>
 <div class="sgoal"><b>この節で分かること</b>: 公開したポートが、練習機のどこで待ち受けているように見えるか。</div>

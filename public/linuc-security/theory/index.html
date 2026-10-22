@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-security/">セキュリティ</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>本文に載せた出力はすべて実機（仮想マシンの練習機）の記録で、演習7本は模範解答どおりに通ること
    （未達のときに判定が鳴ることも）を確認してあります。
    1.0.1 では事実確認と公式例題の監査で見つかった誤り・誤解を招く記述を直し、記録を全部取り直しました
@@ -21,21 +21,21 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — セキュリティ</h1>
 <p class="lead">LinuC レベル1 <strong>102 試験・主題1.10</strong>（セキュリティ管理 / ホストの設定 / 暗号化 / クラウド）を、
 <strong>コンテナの中で動く仮想マシンの練習機</strong>で実際に手を動かして確かめる9章。
 練習機を壊して自分を締め出す操作（<code>/etc/nologin</code>・ファイアウォール）も、外から安全に戻せる構えで扱います。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<h2 id="spine">この9章を貫いている1つの事実</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="spine">この9章を貫いている1つの事実</h2></summary>
 <div class="goal">
 <p><b>「止めたつもり」は、たいてい止まっていない。Linux の制限は、正しい対象に・信用できる持ち主の設定で書けたときだけ効く。</b></p>
 <p>パスワードをロックしても鍵では入れる。<code>find -perm 4000</code> では SUID が1つも出ない。
@@ -46,8 +46,9 @@ other に書ける <code>sudoers</code> は丸ごと読まれない。<code>ulim
 強制アクセス制御（SELinux・AppArmor）、PAM モジュールの細部、<code>nftables</code> のネイティブ構文、
 <code>gpg</code> の信頼の輪。どれもレベル1の範囲外で、この9章には深追いしません。</div>
 </div>
-
-<h2 id="range">LinuC 出題範囲との対応</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="range">LinuC 出題範囲との対応</h2></summary>
 <p>公式の出題範囲（<a href="https://linuc.org/linuc1/range/102.html">LinuC-1 Version 10.0 / 102 試験</a>）の
 主題1.10 を、章に割り当てたものです。「詳細」欄に挙げられている語が、どの章で実際に手を動かす対象になるかを並べてあります。</p>
 <div class="scroll"><table>
@@ -80,8 +81,9 @@ other に書ける <code>sudoers</code> は丸ごと読まれない。<code>ulim
 そして <b>1.10.4 クラウドセキュリティ</b>（管理コンソールはアカウント作成と課金が発生するため檻に入りません）です。
 <b>打てない理由も本文に書いてあります。黙って飛ばしてはいません。</b></p>
 <p>他の主題（1.01〜1.09・1.11）の対応は <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。</p>
-
-<h2 id="cram">試験の直前に見る表</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="cram">試験の直前に見る表</h2></summary>
 <p>出題範囲に並ぶ語の「一行の意味」と、説明している章です。詰まったらその章へ。</p>
 <div class="scroll"><table>
 <tr><th>語</th><th>一行の意味</th><th>章</th></tr>
@@ -106,6 +108,7 @@ other に書ける <code>sudoers</code> は丸ごと読まれない。<code>ulim
 <tr><td><code>gpg</code> / <code>gpg-agent</code> / <code>~/.gnupg/</code></td><td><code>-e -r</code> は相手の公開鍵で暗号化、<code>-c</code> はパスフレーズの共通鍵暗号。鍵束は <code>~/.gnupg</code></td><td><a href="/linuc-security/theory/08-crypto">8</a></td></tr>
 <tr><td>クラウド（責任共有・多要素認証）</td><td>届くのはセキュリティグループと OS の両方が通すものだけ。設定は利用者。管理コンソールは多要素認証で</td><td><a href="/linuc-security/theory/09-cloud">9</a></td></tr>
 </table></div>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
@@ -169,5 +172,6 @@ other に書ける <code>sudoers</code> は丸ごと読まれない。<code>ulim
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-security/">セキュリティ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/practice/">実践編</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

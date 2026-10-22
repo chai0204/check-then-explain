@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/docker/">Docker</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>本文に載せた出力はすべて実機の記録で、読者と同じ入り方（端末つき・1つのシェルで第1章から順に）で通しに打った記録と突き合わせてあります。
    演習7本は、模範解答どおりに通ること・未達のときに判定が鳴ることの両方を確認してあります。
    それでも <b>導線の不備</b>は残っている可能性があります。
@@ -19,21 +19,21 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — Docker</h1>
 <p class="lead">このサイトの実践編では、<code>docker run …</code> を打って檻を起動してもらっています。
 その1行が何をしているのかを、<strong>練習機（仮想マシン）の中に入れた本物の docker</strong> で確かめる7章。
 コンテナのプロセスを練習機の <code>ps</code> で見つけ、イメージを tar に書き出して指紋を計算し、公開したポートの宛先の書き換えを iptables の数えで見ます。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<h2 id="spine">この7章を貫いている1つの事実</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="spine">この7章を貫いている1つの事実</h2></summary>
 <div class="goal">
 <p><b>docker は自分では何も閉じ込めない。練習機のカーネルに頼んで、1つのプロセスに「見え方の区切り」（名前空間）・「使える量の区切り」（cgroup）・
 「重ねたファイルの木」（overlay）を付けているだけで、コンテナの中身も力も、起動するときに渡したもの（ダイジェスト・ボリューム・ポート・特権）で決まる。</b></p>
@@ -44,8 +44,9 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 docker の全サブコマンドとオプションの一覧、Compose・Swarm・Kubernetes、イメージのレジストリの運用（push・認証・署名）、
 Docker Desktop の内部（Mac や Windows の上の Linux の仮想マシン）、Windows コンテナ。必要になったら、この7章の仕組みの上に足せます。</div>
 </div>
-
-<h2 id="scope">この記事で扱うこと・扱わないこと</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="scope">この記事で扱うこと・扱わないこと</h2></summary>
 <div class="scroll"><table>
 <tr><th>扱うこと</th><th>章</th><th>実際に打つもの</th></tr>
 <tr><td>コンテナは練習機の上の1つのプロセス（名前空間・cgroup を <code>/proc</code> で見る）</td><td><a href="/docker/theory/01-process">1</a></td><td><code>ps</code> <code>/proc/PID/ns</code> <code>/proc/PID/cgroup</code> <code>--memory</code></td></tr>
@@ -60,8 +61,9 @@ Docker Desktop の内部（Mac や Windows の上の Linux の仮想マシン）
 <tr><td><code>--privileged</code>・<code>--cap-add</code>・<code>--device</code>・<code>--user</code> が何を渡すか、docker グループ</td><td><a href="/docker/theory/07-privileges">7</a></td><td><code>CapEff</code> <code>capsh --decode</code> <code>/dev</code> <code>Seccomp</code> と AppArmor（<code>--privileged</code> は打たず、渡される側の練習機の root と比べる）</td></tr>
 </table></div>
 <p class="detail">扱わないもの: Compose・Swarm・Kubernetes、レジストリへの push と認証、Docker Desktop の中身、Windows コンテナ、rootless の docker（rootless は <a href="/podman/">Podman の記事</a>で扱います）。</p>
-
-<h2 id="site">このサイトの檻は、docker をどう使っているか</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="site">このサイトの檻は、docker をどう使っているか</h2></summary>
 <p>実践編の起動コマンドのオプションを、1つずつこの記事の章で確かめられます。2つの型があります。</p>
 <pre><code>docker run --rm -it --name lab-… --hostname linuc \
   -v lab-…-work:/home/lab/work \
@@ -88,6 +90,7 @@ docker exec -it lab-… bash -l</code></pre>
 </table></div>
 <p>この記事の檻も仮想マシン型で、練習機の中で dockerd を動かしています。コンテナの中で dockerd を動かすには <code>--privileged</code> が要りますが、
 練習機（QEMU の完全エミュレーション）の中なら要りません。檻の作りは <a href="/qemu/">QEMU の記事</a>、KVM を使わない理由は <a href="/kvm/">KVM の記事</a>にあります。</p>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
@@ -151,5 +154,6 @@ docker exec -it lab-… bash -l</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/docker/">Docker</a> · <a href="/docker/theory/">理論編 目次</a> · <a href="/docker/practice/">実践編</a> · <a href="/docker/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

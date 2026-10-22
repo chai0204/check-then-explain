@@ -8,14 +8,18 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-services/">時刻・ログ・メール</a> › <a href="/linuc-services/theory/">理論編</a> › 第6章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/#draft">詳しく</a></p>
 </div>
 <h1>6. 捨てる判断も、受け手側にある</h1>
 <p class="lead">ログを書くプログラムは、自分のログを切らない。切るのは別のプログラムで、いつ切るかは設定ファイルが決める。そして <code>logrotate</code> は、設定ファイルの<b>権限</b>が気に入らないと、エラーを出しながら終了コード 0 で正常終了する。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 21分</span></summary>
 <div class="badges"><span>前提: 第5章まで読了</span><span>前提: 演習03 を終えている</span><span>所要 21分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.2（重要度5）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>/etc/logrotate.conf</code> と <code>/etc/logrotate.d/</code> の関係を説明できる</li><li><code>logrotate</code> が設定を拒否する2つの条件を、出力から特定できる</li><li>ログを切る判断が「いつ」「何世代」「圧縮するか」のどこに書かれているかを言える</li><li><code>dateext</code>・<code>create</code>・<code>missingok</code> がそれぞれいつ働くかを、出力から言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>sharedscripts</code> と <code>prerotate</code> の細かい使い分け、<code>mail</code> ディレクティブ、<code>copytruncate</code> が要る場面の見極めは扱わない。journald の捨て方は第5章で済んでいる（logrotate の対象外）。</div></div>
+</details>
+
 <h2 id="layers">設定は2段ある</h2>
 <div class="sgoal"><b>この節で分かること</b>: 全体の既定と、対象ごとの設定の関係。</div>
 <pre><code>$ grep -vE '^\s*#|^\s*$' /etc/logrotate.conf
@@ -294,6 +298,7 @@ $ echo $?
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-services/">時刻・ログ・メール</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/practice/">実践編</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-services/chapters.js"></script>
 <script src="/linuc-services/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

@@ -8,13 +8,15 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <a href="/kvm/theory/">理論編</a> › 第1章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/#draft">詳しく</a></p>
 </div>
 <h1>1. 仮想化支援機能は、CPU の自己申告</h1>
 <p class="lead">あなたの PC の CPU には、仮想マシンを速く動かすための仕組み（Intel は VT-x、AMD は AMD-V）があり、<code>/proc/cpuinfo</code> に <code>vmx</code> か <code>svm</code> という印で出る。
 QEMU がソフトだけで作った CPU（TCG）で練習機を起動し、中で同じものを見ると、Intel の PC の上で AMD の CPU を名乗り、<code>svm</code> まで出す。
 練習機のカーネルはそれを信じて、KVM まで用意した。CPU の印は、CPU が「持っている」と答えた内容でしかない
 （TCG の QEMU は、その AMD-V もソフトで真似していて、練習機の中の KVM で仮想マシンまで動いた）。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 25分</span></summary>
 <div class="badges"><span>前提: 檻が起動している（<a href="/kvm/practice/">実践編</a>）</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>lscpu</code> と <code>/proc/cpuinfo</code> で、CPU が仮想化支援機能（VT-x / AMD-V）を名乗っているかを確かめられる</li>
@@ -23,6 +25,7 @@ QEMU がソフトだけで作った CPU（TCG）で練習機を起動し、中�
 <li>TCG の練習機の中の KVM で、小さな仮想マシンが動くことを示せる（QEMU が AMD-V もソフトで真似している）</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: CPUID 命令の細かい仕様（何番の問い合わせのどのビットか）、VT-x と AMD-V の命令の違い（VMLAUNCH・VMRUN など）、
 <code>/proc/cpuinfo</code> の <code>vmx flags</code> の各項目の意味、ファームウェア（BIOS / UEFI）の設定画面で仮想化支援を有効にする手順。</div></div>
+</details>
 
 <h2 id="host">あなたの PC の CPU は、仮想化支援を名乗っている</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>vmx</code> と <code>svm</code> が何の印で、どこに出るか。</div>

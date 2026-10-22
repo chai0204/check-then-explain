@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-security/">セキュリティ</a> › <a href="/linuc-security/theory/">理論編</a> › 第7章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/#draft">詳しく</a></p>
 </div>
 <h1>7. ファイアウォールは、自分を締め出せる</h1>
 <p class="lead"><code>iptables -L</code> が空だから無防備だ——とは限らない。この練習機で <code>firewalld</code> を動かすと、<code>iptables -L</code> は空っぽに見えるのに、通信は <code>firewalld</code> のルールで選り分けられている。見る道具を間違えると、守られているのに無防備に見える。そして管理用の <code>ssh</code> を巻き込むと、自分が締め出される。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 18分</span></summary>
 <div class="badges"><span>前提: 第6章まで読了</span><span>前提: 練習機が起動している</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.10.2（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>iptables</code> と <code>firewalld</code> の関係と、状態をどこで見るかを説明できる</li><li><code>iptables</code> でポートを落とし、管理用の <code>ssh</code> を巻き込まない書き方ができる</li><li><code>firewall-cmd</code> の実行時の設定と <code>--permanent</code> の違いを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>nftables</code> のネイティブ構文、<code>iptables</code> の <code>nat</code>/<code>mangle</code> テーブル、<code>firewalld</code> のリッチルールや direct interface はレベル1では深追いしない。ここでは「落とす／通す」の基本と、2つの道具の関係だけを扱う。</div></div>
+</details>
 
 <h2 id="frontends">iptables -L が空でも、守られていることがある</h2>
 <div class="sgoal"><b>この節で分かること</b>: 状態を見る道具を間違えると誤読すること。</div>
@@ -159,6 +162,7 @@ target     prot opt source               destination         </code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-security/">セキュリティ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/practice/">実践編</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-security/chapters.js"></script>
 <script src="/linuc-security/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

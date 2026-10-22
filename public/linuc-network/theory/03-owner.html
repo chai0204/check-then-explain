@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-network/">ネットワークの基礎</a> › <a href="/linuc-network/theory/">理論編</a> › 第3章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/#draft">詳しく</a></p>
 </div>
 <h1>3. ifup は、自分が付けたものしか知らない</h1>
 <p class="lead">第2章で手で付けた 10.0.3.50/24 を、そのまま設定ファイルに書いて <code>ifup</code> する。ファイルの中身と今の状態はまったく同じなのに、<code>ifup</code> は失敗し、<code>ifdown</code> は「設定されていない」と言う。ifupdown が見ているのは NIC ではなく、自分の作業記録だからだ。NIC には「持ち主」がいて、持ち主の道具でしか設定は残らない。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 21分</span></summary>
 <div class="badges"><span>前提: 第2章を終えている（enp0s17 に 10.0.3.50/24 が付いている）</span><span>所要 21分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.2（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>/etc/network/interfaces</code> の書式（<code>auto</code> / <code>iface … inet static</code> / <code>address</code> / <code>gateway</code> / <code>inet dhcp</code>）を読み書きし、<code>ifup</code> / <code>ifdown</code> で反映できる。RHEL 系の <code>ifcfg-名前</code> の書き方と対応させられる</li><li><code>nmcli</code> で接続（プロファイル）を作り、DHCP による自動の設定と固定の設定を切り替えられる</li><li>NIC ごとの持ち主（ifupdown / NetworkManager / systemd-networkd）を見分け、持ち主に合った道具を選べる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: NetworkManager の画面の道具（<code>nmtui</code> や GUI）、Wi-Fi・ボンディング・VLAN の設定、netplan の YAML の細かい書き方。持ち主の見分け方と、ifupdown・nmcli の基本の操作、RHEL 系の ifcfg ファイルとの対応だけで足りる。</div></div>
+</details>
 
 <h2 id="file">ifupdown は、設定ファイルを読んで実行する</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>/etc/network/interfaces</code> の読み方と、<code>ifup</code> が何を読むか。</div>
@@ -372,6 +375,7 @@ network:
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-network/">ネットワークの基礎</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/practice/">実践編</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-network/chapters.js"></script>
 <script src="/linuc-network/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

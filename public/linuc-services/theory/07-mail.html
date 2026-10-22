@@ -8,14 +8,18 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-services/">時刻・ログ・メール</a> › <a href="/linuc-services/theory/">理論編</a> › 第7章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/#draft">詳しく</a></p>
 </div>
 <h1>7. 宛先に書いた名前は、希望にすぎない</h1>
 <p class="lead"><code>alice</code> 宛に送ったメールが <code>root</code> のメールボックスに入る。途中で2回書き換えられている。そして<b>途中の経路（bob を経由したこと）は、届いたメールを見ても分からない</b>。設定とログを読んで追う。この章で、主題1.09 の3つ（時刻・ログ・メール）が1本に繋がる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 25分</span></summary>
 <div class="badges"><span>前提: 第6章まで読了</span><span>前提: 檻が起動している</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.3（重要度2）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>/etc/aliases</code> と <code>~/.forward</code> の役割と優先順を説明できる</li><li><code>newaliases</code> が必要な理由を、ファイルの形から説明できる</li><li>配送の経路を <code>orig_to</code> と <code>to</code> の2つでログから追える</li><li><code>mail</code> のオプション（<code>-s</code>・<code>-c</code>・<code>-b</code>・<code>-r</code>）と、MTA が1台に1つしか入らない理由を言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: SMTP のやりとり、<code>main.cf</code> の各パラメータ、外部へのリレー・認証・TLS・DKIM は扱わない（レベル1の範囲外）。<code>exim</code> の設定方法も外す。試験で問われるのは「MTA が2つあって、どちらも sendmail 互換のコマンドを持つ」ことまでである（章の後半の対応表で扱う）。</div></div>
+</details>
+
 <h2 id="bend">宛先が書き換わる</h2>
 <div class="sgoal"><b>この節で分かること</b>: 送り手が書いた名前と、実際に配送された先が違いうること。</div>
 <p>まず素直に1通送る。</p>
@@ -295,6 +299,7 @@ rsyslog に開き直させるのは HUP シグナル。<code>~/.forward</code> �
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-services/">時刻・ログ・メール</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/practice/">実践編</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-services/chapters.js"></script>
 <script src="/linuc-services/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

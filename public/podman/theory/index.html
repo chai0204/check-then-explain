@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>本文に載せた出力はすべて実機の記録で、読者と同じ入り方（端末つき・1つのシェルで第1章から順に）で通しに打った記録と突き合わせてあります。
    演習7本は、模範解答どおりに通ること・未達のときに判定が鳴ることの両方を確認してあります。
    それでも <b>導線の不備</b>は残っている可能性があります。
@@ -19,21 +19,21 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — Podman</h1>
 <p class="lead">このサイトの実践編の起動コマンドは、<code>docker</code> を <code>podman</code> に読み替えても動きます。
 その podman が docker とどこまで同じで、どこから違うのかを、<strong>練習機（仮想マシン）の中に入れた本物の podman（rootless）</strong>で確かめる7章。
 デーモンのいない作り、一般ユーザのままのコンテナ（rootless）、ユーザの systemd に任せる動かし方を、プロセスと UID の番号で見ます。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<h2 id="spine">この7章を貫いている1つの事実</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="spine">この7章を貫いている1つの事実</h2></summary>
 <div class="goal">
 <p><b>podman には頼む相手のデーモンがいない。打った人の権限のまま、打った人の置き場所に、打った人の systemd の下でコンテナを作る。</b></p>
 <p>だから、コンテナの親は付き添いの conmon で（第1章）、中の root は外では本人で（第2章）、イメージはユーザごとに別の置き場所にあり（第3章）、
@@ -43,8 +43,9 @@ docker と同じコマンドの形は、その上に重ねた互換の層で、�
 podman の全サブコマンド、netavark のブリッジ（root の podman の既定の網。rootless でも <code>podman network create</code> で作った網で使う）、<code>podman kube play</code> と Kubernetes、
 Podman Desktop や macOS・Windows の podman machine、buildah・skopeo。必要になったら、この7章の仕組みの上に足せます。</div>
 </div>
-
-<h2 id="scope">この記事で扱うこと・扱わないこと</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="scope">この記事で扱うこと・扱わないこと</h2></summary>
 <div class="scroll"><table>
 <tr><th>扱うこと</th><th>章</th><th>実際に打つもの</th></tr>
 <tr><td>デーモンが無い（conmon が付き添い、crun が作る）</td><td><a href="/podman/theory/01-daemonless">1</a></td><td><code>ps -C conmon</code> <code>podman info</code> <code>/proc/PID/cgroup</code></td></tr>
@@ -56,8 +57,9 @@ Podman Desktop や macOS・Windows の podman machine、buildah・skopeo。必�
 <tr><td>docker との互換と違い（同じコマンドで動く・<code>podman exec</code> の umask はコンテナの <code>--umask</code>（既定 0022）から・<code>ping_group_range</code>・API の版）</td><td><a href="/podman/theory/07-compat">7</a></td><td><code>CapEff</code> <code>DOCKER_HOST</code> <code>podman.socket</code></td></tr>
 <tr><td>このサイトの檻が podman rootless でも同じオプションで動く理由</td><td><a href="/podman/theory/07-compat">7</a></td><td>（下の表）</td></tr>
 </table></div>
-
-<h2 id="site">このサイトの檻を podman で動かすと</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="site">このサイトの檻を podman で動かすと</h2></summary>
 <p>この記事の檻（lab-podman:1.0.0）は、<code>docker</code> を <code>podman</code> に読み替えた同じオプション（名前付きボリュームも同じ）で、rootless の podman（5.8.6）でも起動することを確かめてあります
 （<code>logs/podman-rootless.log</code>。起動から ssh まで35秒、<code>podman exec</code> の umask は <code>0022</code>、<code>podman stop</code> は5秒で終了コード 0）。
 Docker の記事の檻（lab-docker:1.0.0）も、同じ方法で確かめてあります（<code>logs/docker-rootless.log</code>）。</p>
@@ -75,6 +77,7 @@ podman exec -it lab-… bash -l</code></pre>
 <tr><td>（ログアウトしたら）</td><td>rootless の podman のコンテナは、本人の systemd が止まると一緒に止まる。檻を動かしたままログアウトするなら <code>loginctl enable-linger</code></td><td><a href="/podman/theory/06-systemd">6</a></td></tr>
 </table></div>
 <p>docker の側からの見方（同じ起動コマンドの各オプションの意味）は、<a href="/docker/theory/">Docker の記事の理論編</a>の表にあります。</p>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
@@ -140,5 +143,6 @@ podman exec -it lab-… bash -l</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/podman/">Podman</a> · <a href="/podman/theory/">理論編 目次</a> · <a href="/podman/practice/">実践編</a> · <a href="/podman/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

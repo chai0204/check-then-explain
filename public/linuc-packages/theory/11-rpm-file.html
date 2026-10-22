@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第11章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/#draft">詳しく</a></p>
 </div>
 <h1>11. .rpm ファイルを rpm で直接入れて、確かめる</h1>
 <p class="lead"><b>前の章までにやったこと</b>: RPM 系で、yum で入れて消し、rpm に台帳を聞き（第9章）、yum のリポジトリを足して上げ、署名を <code>rpm -K</code> で確かめた（第10章）。Debian 系では、.deb ファイルを dpkg で直接入れ（第7章）、台帳とファイルを <code>dpkg -V</code> で見比べた（第4章）。<b>この章でやること</b>: RPM 系で同じことをする。.rpm ファイルを入れずに取ってきて中を見て、<code>rpm</code> で直接入れ、上げて、消す。台帳と照らし合わせる <code>rpm -V</code> と、入れずに中身を取り出す <code>rpm2cpio</code> も使う。最後に、この11章を1つにまとめる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 28分</span></summary>
 <div class="badges"><span>前提: 第10章まで読了</span><span>前提: RPM 系の檻を起動し直した直後</span><span>所要 28分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.4（重要度1）</span><span>出題範囲 1.04.3（重要度3）</span><span>最終検証 2026-10-21</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>yumdownloader</code> で .rpm ファイルを取り、<code>rpm -qp…</code> で入れる前に中を見る</li><li><code>rpm -ivh</code> で入れ、依存関係が足りないとどうなるかを確かめる。<code>-U</code>・<code>-F</code>・<code>-e</code> の違いを確かめる</li><li><code>rpm -V</code> の出力の9文字を読み、何が変わったかを確かめる</li><li><code>rpm2cpio</code> で、入れずに中身を取り出す</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>rpm</code> のこの章に出てこないオプション（<code>--force</code> など）、<code>rpm -V</code> の文字のうち、この章で実際には出てこないもの（表の <code>D</code>・<code>L</code>・<code>P</code>）が出る場面、設定ファイルを書き換えたまま消したときの扱い（<code>.rpmsave</code>）、台帳の作り直し。この章は「ファイルから入れる・上げる・照らし合わせる・取り出す」が1回できれば足りる。</div></div>
+</details>
 
 <h2 id="download">入れずに取ってくる — yumdownloader</h2>
 <div class="sgoal"><b>この節で分かること</b>: .rpm ファイルを手に入れて、入れる前に中を見る方法。</div>
@@ -319,6 +322,7 @@ $ cd</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-packages/chapters.js"></script>
 <script src="/linuc-packages/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

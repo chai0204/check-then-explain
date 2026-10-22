@@ -8,15 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> › <a href="/linuc-boot/theory/">理論編</a> › 第6章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/#draft">詳しく</a></p>
 </div>
 <h1>6. Ubuntu では、root にパスワードが無いとシングルユーザモードは何も聞かずに root を渡す</h1>
 <p class="lead">この練習機の root にはパスワードが無い（第4章で <code>L</code>＝ロックと確かめた）。だから root では誰も入れない——はずである。
 ところが GRUB でカーネル引数に <code>single</code> と1語足して起動し、Enter を1回押すと、パスワードを1文字も打たずに root のシェルが出る。
 シングルユーザモードを頼んだのはカーネル引数だが、root を渡すと決めたのは、それを受け取ったプログラムだった。</p>
-<div class="note"><b>試験との関係</b>: root にパスワードを設定してある計算機では、同じプログラム（sulogin）が root のパスワードを聞く。
-試験の「シングルユーザモードでは root のパスワードを求められる」は、その場合の説明で、誤りではない。
-また、root がロックされているときに聞かずに通すのは <b>Ubuntu の改造</b>で、本家の sulogin（RHEL 系など）はシェルを渡さずに止まる（この章の後半で比べる）。この章は、root がロックされている Ubuntu で何が起きるかを確かめる。</div>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 18分</span></summary>
 <div class="badges"><span>前提: 第5章まで読了</span><span>前提: 端末を2つ開いている</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.01.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>ブートターゲットとランレベルの対応を言え、<code>get-default</code> / <code>set-default</code> / <code>isolate</code> を使い分けられる</li>
@@ -24,6 +23,13 @@
 <li>シングルユーザモードで root を渡すかどうかを、誰が決めているかを説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: ユニットファイル（<code>.target</code> や <code>.service</code>）の書き方、ターゲット同士の依存関係の細部（<code>Wants</code> と <code>Requires</code> の違い）、
 <code>systemd.unit=</code> 以外の systemd 向けのカーネル引数、GRUB の設定ファイルの文法。</div></div>
+</details>
+<details class="fold">
+<summary>試験との関係</summary>
+<p>root にパスワードを設定してある計算機では、同じプログラム（sulogin）が root のパスワードを聞く。
+試験の「シングルユーザモードでは root のパスワードを求められる」は、その場合の説明で、誤りではない。
+また、root がロックされているときに聞かずに通すのは <b>Ubuntu の改造</b>で、本家の sulogin（RHEL 系など）はシェルを渡さずに止まる（この章の後半で比べる）。この章は、root がロックされている Ubuntu で何が起きるかを確かめる。</p>
+</details>
 
 <h2 id="targets">ターゲットとランレベル</h2>
 <div class="sgoal"><b>この節で分かること</b>: 昔のランレベルの数字が、いまのどのターゲットに当たるか。</div>
@@ -306,6 +312,7 @@ Ubuntu の sulogin が「root にパスワードが無いなら確かめよう�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/practice/">実践編</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-boot/chapters.js"></script>
 <script src="/linuc-boot/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

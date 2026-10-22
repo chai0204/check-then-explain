@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第9章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/#draft">詳しく</a></p>
 </div>
 <h1>9. LVM で、2台のディスクを1つにまとめる</h1>
 <p class="lead">第8章までで、区画を切り（第2〜4章）、ファイルシステムを作り（第5章）、マウントし（第6・7章）、スワップにも使った（第8章）。区画の大きさは、切ったときに決まったままだった。この章では、ディスクとファイルシステムのあいだに LVM という段を1つはさみ、空のディスク <code>vdc</code> と <code>sda</code> をまとめて1台より大きな箱を作り、使いながら広げる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 24分</span></summary>
 <div class="badges"><span>前提: 第8章まで読了</span><span>前提: 練習機の中にいる</span><span>所要 24分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.2（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>物理ボリューム・ボリュームグループ・論理ボリュームの関係を、作る順番（<code>pvcreate</code> → <code>vgcreate</code> → <code>lvcreate</code>）と一緒に説明できる</li><li>論理ボリュームを広げたり縮めたりしたとき、中のファイルシステムがどうなるかを確かめ、必要な操作を言える（ext4 と XFS の違いも）</li><li>スナップショットを元より小さく作って使い、それが何を残しているのかを確かめる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: シンプロビジョニング（使った分だけ割り当てる LVM の使い方）は扱わない。複数のディスクに同じ中身を書いて壊れに備える論理ボリューム（RAID。<code>--type raid1</code> など）と、<code>pvmove</code> によるデータの引っ越しも扱わない。LVM が自分の管理情報をどこにどう書くかも扱わない。</div></div>
+</details>
 
 <h2 id="layers">材料・池・箱の3段</h2>
 <div class="sgoal"><b>この節で分かること</b>: LVM を作る3つのコマンドと、それぞれが何を作るか。</div>
@@ -247,6 +250,7 @@ $ sudo lvs -o lv_name,lv_size,devices vg0
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-disks/">ハードウェアとディスク</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/practice/">実践編</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-disks/chapters.js"></script>
 <script src="/linuc-disks/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

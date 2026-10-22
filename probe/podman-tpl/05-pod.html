@@ -8,12 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <a href="/podman/theory/">理論編</a> › 第5章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/#draft">詳しく</a></p>
 </div>
 <h1>5. pod は、ネットワークを分け合うコンテナの組</h1>
 <p class="lead">pod は、いくつかのコンテナを1つの組にしたものである。同じ pod のコンテナは、<b>同じ net の名前空間</b>（と uts の名前空間）を使うので、
 互いに <code>127.0.0.1</code> で話せて、ホスト名も同じになる。名前空間を持ち続け、pod の網の寿命の区切りになるのは、何もしない小さなコンテナ（infra。中身は pause）で、
 アプリのコンテナはそこに相乗りしている。Kubernetes の Pod と同じ考え方を、podman は1台の上で真似ている。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 第4章</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>同じ pod のコンテナが、<code>127.0.0.1</code> で互いに届くことを示せる</li>
@@ -21,6 +23,7 @@
 <li>infra のコンテナと pause のイメージが何のためにあるかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>podman kube play</code>（Kubernetes の YAML から pod を作る）、pod の cgroup の上限、
 共有する名前空間の選び方（<code>--share</code>）、Kubernetes の Pod の細部。</div></div>
+</details>
 
 <h2 id="create">pod を作り、2つのコンテナを入れる</h2>
 <div class="sgoal"><b>この節で分かること</b>: 同じ pod のコンテナ同士が、どう話せるか。</div>

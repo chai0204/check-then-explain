@@ -8,13 +8,15 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <a href="/kvm/theory/">理論編</a> › 第5章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/#draft">詳しく</a></p>
 </div>
 <h1>5. 中から見える CPU は、アクセラレータで変わる</h1>
 <p class="lead">TCG の練習機は AMD の CPU を名乗った（第1章）。同じ CPU の型（既定の <code>qemu64</code>）のまま KVM で起動すると、練習機は <code>GenuineIntel</code> を名乗り、<code>svm</code> は消え、
 <code>Hypervisor vendor: KVM</code> が出る。<code>-cpu host</code> にすれば、あなたの PC の CPU の名前と印をそのまま名乗り、練習機の中にも <code>/dev/kvm</code> ができる（入れ子の仮想化）。
 練習機から見える CPU は、QEMU の型と、命令を実行しているもの（QEMU のソフトか、本物の CPU か）の両方で決まる。
 「どのハイパーバイザーか」の名前も QEMU が書いていて、消すこともできる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 25分</span></summary>
 <div class="badges"><span>前提: 第4章まで読了（練習機が KVM で動いている）</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>同じ CPU の型でも、TCG と KVM で練習機の CPU の名乗り（メーカー・印）が変わることを、出力で示せる</li>
@@ -22,6 +24,7 @@
 <li><code>-cpu host</code> と、印を消す書き方（<code>-cpu host,-vmx</code>）で、入れ子の仮想化の入口を出し入れできる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: CPUID の他の番号の中身、kvm-clock などの準仮想化の仕組みの中身、CPU の型の一覧（<code>Skylake-Client</code> など）の各項目、
 入れ子の仮想化の速さと、その中で動く仮想マシンの作り方。</div></div>
+</details>
 
 <h2 id="vendor">同じ型でも、KVM では Intel を名乗る</h2>
 <div class="sgoal"><b>この節で分かること</b>: アクセラレータを変えると、練習機の中の何が変わるか。</div>
@@ -261,6 +264,7 @@ KVM では、QEMU が既定でメーカーの名前を本物の CPU（Intel）�
 </section>
 <footer><a href="/">トップ</a> · <a href="/kvm/">KVM</a> · <a href="/kvm/theory/">理論編 目次</a> · <a href="/kvm/practice/">実践編</a> · <a href="/kvm/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/kvm/chapters.js"></script>
 <script src="/kvm/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

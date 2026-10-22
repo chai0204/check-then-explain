@@ -129,11 +129,31 @@ for (const f of htmls) {
   const quizzes = [...html.matchAll(/class="quiz"[\s\S]*?<\/div>\s*<\/div>|class="quiz"[\s\S]*?<\/div>/g)].map((m) => m[0]);
   const noDetails = quizzes.filter((q) => !/<details/.test(q)).length;
   if (noDetails > 0) warn(f, `確認問題 ${noDetails} 個に details が無い`);
+  // 章の頭の前置き（バッジ・ゴール・注記）は閉じた箱（details.fold）に入れる。題と最初の節の間で見えたままにしてよいのは、
+  // リード文（前の章とのつなぎ）・警告（note warn）・本文の段落だけ（2026-10-22、オーナー:「各章を観たいのに、その前に
+  // チェックリストとかがあって煩わしい」。全章を閉じた箱に直した。新しい章が元の形に戻らないように止める）
+  {
+    const a = html.indexOf("</h1>"), b = html.indexOf("<h2", a);
+    const bare = a < 0 || b < 0 ? "" : html.slice(a, b).replace(/<details class="fold[^"]*"[\s\S]*?<\/details>/g, "");
+    const left = [...bare.matchAll(/class="(badges|goal|skip|scroll|note)"/g)].map((m) => m[1]);
+    if (left.length) err(f, `章の頭に閉じていない前置きがある（${[...new Set(left)].join("・")}）。<details class="fold intro"> に入れる`);
+  }
   // 章ナビが動く前提（chapters.js と theory.js を読んでいるか）
   if (!/chapters\.js/.test(html)) err(f, "chapters.js を読み込んでいない（進捗バーが出ない）");
   if (!/shared\/theory\.js/.test(html)) err(f, "shared/theory.js を読み込んでいない");
   // テーマ名はパスの一部なのでハイフンを含みうる（linuc-services）。
   if (!/data-theme="[a-z0-9-]+"/.test(html)) err(f, "body に data-theme が無い（用語リンク先が解決できない）");
+}
+
+// ---- 2b. 理論編の入口: 章の一覧より前は、リード文のほかは閉じた箱だけ（2026-10-22。章ページと同じ理由） ----
+for (const f of htmls.filter((f) => /\/theory\/index\.html$/.test(f))) {
+  const html = readFileSync(f, "utf8");
+  const a = html.indexOf("</h1>"), toc = html.indexOf('<div class="toc">');
+  if (a < 0 || toc < 0) continue;
+  const b = html.lastIndexOf("<h2", toc);
+  const bare = html.slice(a + 5, b).replace(/<p class="lead">[\s\S]*?<\/p>/, "")
+    .replace(/<details class="fold[^"]*"[\s\S]*?<\/details>/g, "").replace(/<!--[\s\S]*?-->/g, "").trim();
+  if (bare) err(f, `章の一覧より前に、閉じていない前置きがある: ${bare.replace(/\s+/g, " ").slice(0, 60)}…（<details class="fold"> に入れる）`);
 }
 
 // ---- 3. 本文と実物がずれる書き方 ----
@@ -275,6 +295,14 @@ for (const f of htmls) {
   if (slot && !script) err(f, 'id="giscus" があるのに shared/comments.js を読んでいない（コメント欄が空のまま）');
   if (script && !slot) err(f, 'shared/comments.js を読んでいるのに id="giscus" が無い');
 }
+// 記事の中のページは shared/site.js を読む（閉じた箱をリンク先で開く・受けた印。tools/catalog.mjs が入れる）
+for (const f of htmls) {
+  const r = relative(ROOT, f);
+  if (!r.includes("/") || r.startsWith("shared/") || r.startsWith("linuc/")) continue;
+  const h = readFileSync(f, "utf8");
+  if (!/shared\/site\.js/.test(h)) err(f, "shared/site.js を読んでいない（閉じた箱がリンク先で開かない・受けた印が出ない。node tools/catalog.mjs で入る）");
+  if (/class="mydone"/.test(h) && !/shared\/site\.js/.test(h)) err(f, "受けた印の箱があるのに shared/site.js を読んでいない");
+}
 const noComments = htmls.filter((f) => !/id="giscus"/.test(readFileSync(f, "utf8")))
   .map((f) => relative(ROOT, f)).filter((r) => r !== "404.html");
 if (noComments.length) warn(htmls[0], `コメント欄が無いページ: ${noComments.join(", ")}`);
@@ -408,8 +436,10 @@ if (existsSync(containersDir)) {
 // 辞書に登録したのに、本文では常に <code> の中にしか出てこない語はリンクされない。
 // 「辞書に足したのに点線が出ない」を公開前に見つけるための検査。
 const SKIP_TAGS = "pre|code|h1|h2|h3|h4|a|summary|nav|script|style";
+// 閉じた箱のうち no-term のもの（章の頭のゴールと前提など）も走査しない
 const plainText = (h) =>
-  h.replace(new RegExp(`<(${SKIP_TAGS})\\b[^>]*>[\\s\\S]*?</\\1>`, "g"), " ")
+  h.replace(/<details class="[^"]*\bno-term\b[^"]*"[\s\S]*?<\/details>/g, " ")
+   .replace(new RegExp(`<(${SKIP_TAGS})\\b[^>]*>[\\s\\S]*?</\\1>`, "g"), " ")
    .replace(/<[^>]+>/g, " ");
 
 for (const [theme, _ids] of termIds) {

@@ -83,11 +83,11 @@ button.copy:hover{color:var(--fg);border-color:var(--accent)}
 /* ===== 理論編: 進捗表示 ===== */
 .progress{position:fixed;top:0;left:0;right:0;height:3px;background:var(--line);z-index:50}
 .progress > i{display:block;height:100%;width:0;background:var(--accent);transition:width .12s linear}
-.chapnav{margin:0 0 1.5rem;padding:.75rem .9rem;border:1px solid var(--line);border-radius:10px;background:var(--card)}
-.chapnav .meter{display:flex;align-items:center;gap:.6rem;font-size:.8rem;color:var(--muted);margin-bottom:.55rem}
+/* 章の一覧は閉じた箱（details.chapnav）。見出しの行に進み具合だけを出し、開くと全章が並ぶ（2026-10-22） */
+.chapnav .meter{font-size:.8rem;color:var(--muted)}
 .chapnav .meter .track{flex:1;height:6px;border-radius:99px;background:var(--code-bg);overflow:hidden}
 .chapnav .meter .track i{display:block;height:100%;background:var(--accent)}
-.chapnav ol{display:flex;flex-wrap:wrap;gap:.3rem;list-style:none;margin:0;padding:0;font-size:.76rem}
+.chapnav ol{display:flex;flex-wrap:wrap;gap:.3rem;list-style:none;margin:0;padding:.7rem .9rem .8rem;font-size:.76rem}
 .chapnav li a{display:inline-block;padding:.12rem .5rem;border:1px solid var(--line);border-radius:99px;
   text-decoration:none;color:var(--muted);white-space:nowrap}
 .chapnav li.done a{color:var(--ok);border-color:var(--ok)}
@@ -201,3 +201,60 @@ table.sqlres th,table.sqlres td{border:1px solid var(--line);padding:.3rem .5rem
 table.sqlres th{background:var(--card);font-family:var(--mono);font-size:.76rem;color:var(--muted)}
 table.sqlres td.null{color:var(--muted);font-style:italic}
 pre.sqlschema{white-space:pre-wrap}
+
+/* ===== 閉じた箱（2026-10-22、オーナー:「各章を観たいのに、その前にチェックリストとかがあって煩わしい」） =====
+   理論編の章の頭（ゴールと前提・前のコースで出たもの）と、入口ページの章の一覧より前の節は、
+   既定で閉じた <details> に入れ、見出し1行ずつにする。読みたい人だけが開く。JS が無くても開閉できる */
+details.fold,details.chapnav{border:1px solid var(--line);border-radius:10px;background:var(--card);margin:.5rem 0}
+details.fold > summary,details.chapnav > summary{display:flex;align-items:center;gap:.6rem;min-height:2.75rem;
+  padding:.4rem .9rem;cursor:pointer;list-style:none;border-radius:10px;-webkit-tap-highlight-color:transparent}
+details.fold > summary::-webkit-details-marker,details.chapnav > summary::-webkit-details-marker{display:none}
+details.fold > summary::before,details.chapnav > summary::before{content:"";flex:none;width:.42rem;height:.42rem;
+  margin:0 .2rem 0 .1rem;border:solid var(--muted);border-width:0 2px 2px 0;transform:rotate(-45deg);transition:transform .15s}
+details.fold[open] > summary::before,details.chapnav[open] > summary::before{transform:rotate(45deg)}
+details.fold > summary:hover,details.chapnav > summary:hover{color:var(--accent)}
+details.fold > summary:hover::before,details.chapnav > summary:hover::before{border-color:var(--accent)}
+details.fold > summary:focus-visible,details.chapnav > summary:focus-visible,details.draftbar > summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+details.fold[open] > summary,details.chapnav[open] > summary{border-bottom:1px dashed var(--line);border-radius:10px 10px 0 0}
+details.fold > summary{font-size:.92rem;font-weight:600;line-height:1.45}
+details.fold > summary .hint{margin-left:auto;padding-left:.6rem;font-weight:400;font-size:.78rem;color:var(--muted);white-space:nowrap}
+details.fold > :not(summary){margin-left:.95rem;margin-right:.95rem}
+details.fold[open]{padding-bottom:.3rem}
+/* 入口ページの節: 見出しは h2 のまま（#range などのリンク先と見出しの並びを保つ）で、行の大きさにする */
+details.fold > summary h2{display:inline;margin:0;padding:0;border:0;font-size:1rem;line-height:1.45}
+/* 箱の中では、ゴール・向く人の枠を外す（箱が枠の代わり） */
+details.fold .goal,details.fold .notfor{border:0;border-radius:0;background:none;padding:0;margin-top:.8rem;margin-bottom:.8rem}
+details.fold .badges{margin-top:.8rem;margin-bottom:.3rem}
+/* 箱の中の文は、見出しの行より大きくしない */
+details.fold > p,details.fold > div > p{font-size:.92rem}
+#c-move-body p{font-size:.88rem}
+/* 約束: 見出しに1文目を出し、緑の枠で残す（憲章 §1「入口の最上段」） */
+details.fold.pledge{border-color:var(--ok)}
+details.fold.pledge > summary{font-weight:400;font-size:.9rem}
+details.fold .lbl{flex:none;font-size:.72rem;font-weight:600;line-height:1.5;color:var(--ok);border:1px solid var(--ok);border-radius:999px;padding:0 .5rem}
+/* 入口ページのドラフト表示: 1文目だけを見せ、「詳しく」で開く */
+details.draftbar{padding:0;border-width:1px;border-left-width:3px;border-radius:0 8px 8px 0}
+details.draftbar > summary{display:block;padding:.5rem .9rem;cursor:pointer;list-style:none;font-size:.86rem;color:var(--muted)}
+details.draftbar > summary::-webkit-details-marker{display:none}
+details.draftbar > summary b{color:var(--warn)}
+details.draftbar > summary .hint{color:var(--accent);margin-left:.5rem;white-space:nowrap}
+details.draftbar > summary .hint::after{content:" ▾"}
+details.draftbar[open] > summary .hint{display:none}
+details.draftbar > :not(summary){margin:.3rem .9rem .6rem}
+
+/* ===== 受けた印（このブラウザの localStorage にだけ持つ。shared/site.js と shared/catalog.js） ===== */
+.tag.done{color:#fff;background:var(--ok);border-color:var(--ok);font-weight:600}
+:root[data-theme="dark"] .tag.done{color:var(--bg)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .tag.done{color:var(--bg)} }
+.mydone{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem .75rem;margin:1.1rem 0;font-size:.86rem}
+.mydone .detail{flex:1 1 16rem}
+.mydone button,.importbar button,.movelink button{font:inherit;font-size:.86rem;padding:.38rem .95rem;border-radius:999px;cursor:pointer;
+  border:1px solid var(--ok);background:var(--card);color:var(--ok)}
+.mydone button:hover,.importbar button:hover,.movelink button:hover{background:var(--ok);color:var(--card)}
+.mydone button.undo,.importbar button.no{border-color:var(--line);color:var(--muted)}
+.mydone button.undo:hover,.importbar button.no:hover{background:var(--code-bg);color:var(--fg)}
+table.catalog td.ttl .tag.done{margin-left:.45rem;vertical-align:.1em}
+.importbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .7rem;border-left-color:var(--ok)}
+.importbar .msg{flex:1 1 18rem}
+.movelink{display:flex;flex-wrap:wrap;gap:.45rem;margin:.6rem 0}
+.movelink input{flex:1 1 16rem;min-width:0;font-family:var(--mono);font-size:.78rem;padding:.4rem .55rem;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);color:inherit}

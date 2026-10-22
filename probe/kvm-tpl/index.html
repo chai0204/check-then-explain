@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>本文に載せた出力はすべて実機の記録で、本文のコマンドを第1章から同じシェルで通しに打ち直して、本文と同じ画面になることを機械で突き合わせてあります。
    演習5本は、模範解答どおりに通ることと、未達のとき・KVM が使えないときに判定が鳴ることを確認してあります。
    それでも <b>導線の不備</b>は残っている可能性があります。
@@ -19,22 +19,22 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — KVM</h1>
 <p class="lead">このサイトの実践編は、読者に docker で「檻」を起動させ、その中で QEMU の練習機（Ubuntu 24.04 の仮想マシン）を動かしている。
 その練習機は、KVM を使わない完全エミュレーション（TCG）で動く。この記事では、同じ練習機を TCG と KVM の両方で起動して、
 KVM が何で、どこにあり、何を速くし、何を変えるのかを、あなたの PC の上で確かめる。全6章・約2時間。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
 <p class="detail">ただし、この記事は<b>あなたの PC の CPU と KVM そのもの</b>を見るので、CPU の名前・<code>/dev/kvm</code> の権限・時間など、PC ごとに違って当然の行がある。そういう行には、ブロックの直後に注記を置いた。</p>
-
-<h2 id="spine">この6章を貫いている1つの事実</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="spine">この6章を貫いている1つの事実</h2></summary>
 <div class="goal">
 <p><b>KVM の正体は、CPU の仮想化支援機能を使って仮想マシンを動かすカーネルの部品で、使う側には <code>/dev/kvm</code> というファイル1つで配られている。QEMU はそれを開いたときだけ速くなり、練習機の中から見える CPU も変わる。
 開けるかどうかは、CPU の印・カーネル・ファイルの権限・コンテナの許可の4つで決まる。</b></p>
@@ -47,8 +47,9 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 KVM に頼むときの命令（ioctl）の一覧、VT-x と AMD-V の命令の違い、メモリのアドレスの変換を CPU に任せる仕組み（EPT・NPT）の細部、
 入れ子の仮想化の速さ、QEMU の装置・ディスク・ファームウェアの選び方（<a href="/qemu/theory/">QEMU の記事</a>）、libvirt の定義の書き方。</div>
 </div>
-
-<h2 id="scope">この記事で扱うこと・扱わないこと</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="scope">この記事で扱うこと・扱わないこと</h2></summary>
 <div class="scroll"><table>
 <tr><th>扱うこと</th><th>どこで</th></tr>
 <tr><td>CPU の仮想化支援機能（VT-x / AMD-V）と、<code>/proc/cpuinfo</code> の <code>vmx</code> / <code>svm</code>。印が CPUID の答え（自己申告）であること</td><td><a href="/kvm/theory/01-cpu">1</a></td></tr>
@@ -67,8 +68,9 @@ KVM に頼むときの命令（ioctl）の一覧、VT-x と AMD-V の命令の�
 <tr><td>Xen・VMware・Hyper-V などの他のハイパーバイザー、macOS の HVF の使い方</td><td>この記事の檻では動かせない。名前が出るだけ</td></tr>
 <tr><td>KVM の性能の調整（CPU の固定・大きなページ・vhost）</td><td>速さは第4章の起動の時間だけを測る。調整は読者の PC で結果が大きく変わり、同じ画面を約束できない</td></tr>
 </table></div>
-
-<h2 id="cages">このサイトの他の記事の檻は、これをどう使っているか</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="cages">このサイトの他の記事の檻は、これをどう使っているか</h2></summary>
 <p>この記事を読みに来た理由は、たぶん実践編の <code>docker run</code> にある。このサイトの檻は、KVM との関係で3種類に分かれる。</p>
 <div class="scroll"><table>
 <tr><th>檻の種類</th><th>どの記事</th><th>KVM との関係</th></tr>
@@ -79,8 +81,9 @@ KVM に頼むときの命令（ioctl）の一覧、VT-x と AMD-V の命令の�
 <p>仮想マシン型の檻の起動コマンドに <code>--privileged</code> も <code>--cap-add</code> も <code>--device</code> も無いのは、TCG がホストの特権も装置も1つも借りないからである。
 練習機の中の <code>lscpu</code> が全員に同じ <code>QEMU TCG CPU version 2.5+</code> を出すのも、TCG だからである（定義が <code>cpu mode='maximum'</code>、つまり <code>-cpu max</code> なのでこの名前になる。この記事の練習機は既定の <code>qemu64</code> なので <code>QEMU Virtual CPU version 2.5+</code>。<code>max</code> は KVM では読む人の CPU の名前になる。第5章）。
 この記事の檻だけが、比べるために <code>/dev/kvm</code> を受け取る。それでも渡すのはファイル1つとグループ1つで、特権は増えない（持てる特権の上限 <code>CapBnd</code> が docker の既定のまま。第2章）。</p>
-
-<h2 id="vary">読む人の PC で変わるもの</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="vary">読む人の PC で変わるもの</h2></summary>
 <div class="scroll"><table>
 <tr><th>出るもの</th><th>著者の PC</th><th>あなたの PC で</th></tr>
 <tr><td>CPU のメーカー・名前・印（外）</td><td><code>GenuineIntel</code>・<code>Intel(R) Core(TM) Ultra 9 285H</code>・<code>vmx</code></td><td>AMD なら <code>AuthenticAMD</code>・<code>svm</code>・<code>kvm_amd</code></td></tr>
@@ -90,6 +93,7 @@ KVM に頼むときの命令（ioctl）の一覧、VT-x と AMD-V の命令の�
 <tr><td>入れ子の仮想化（<code>nested</code>）</td><td><code>Y</code></td><td><code>N</code> のこともある（AMD は <code>1</code> / <code>0</code>）</td></tr>
 </table></div>
 <p>TCG の練習機の中は、どの PC でも同じ画面になる（第1章の <code>AuthenticAMD</code>・<code>svm</code> など）。</p>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">

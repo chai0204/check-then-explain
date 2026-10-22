@@ -8,14 +8,18 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-services/">時刻・ログ・メール</a> › <a href="/linuc-services/theory/">理論編</a> › 第2章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/#draft">詳しく</a></p>
 </div>
 <h1>2. タイムゾーンは表示の都合だけ</h1>
 <p class="lead"><code>date</code> は JST、<code>timedatectl</code> は UTC、<code>/etc/timezone</code> は <code>Etc/UTC</code>。同じマシンで3つが違うことを言っている。どれも壊れていない。3つは別々の場所を読んでいて、保存されている時刻は1つしかない。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 14分</span></summary>
 <div class="badges"><span>前提: 第1章まで読了</span><span>前提: 檻が起動している</span><span>所要 14分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.1（重要度2）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>/etc/localtime</code>・<code>/etc/timezone</code>・環境変数 <code>TZ</code> の3つを、誰が読むかで区別できる</li><li>タイムゾーンを変えてもエポック秒が動かないことを、自分の手で確かめられる</li><li><code>timedatectl set-timezone</code> が何を書き換えて、何を書き換えないかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: サマータイム（DST）の切り替え規則、<code>tzdata</code> の更新作業、<code>TZ</code> の POSIX 形式（<code>JST-9</code> のような書き方）は扱わない。ゾーン名で指定する形だけ覚えれば合格には足りる。アプリケーション側がゾーンを持つ場合（データベースのセッションタイムゾーン等）もここでは外す。</div></div>
+</details>
+
 <h2 id="three">3つが違うことを言っている</h2>
 <div class="sgoal"><b>この節で分かること</b>: 同じ設定に見えるものが3箇所にあり、更新する仕組みが別々であること。</div>
 <p>3つ並べて打つ。</p>
@@ -158,6 +162,7 @@ $ readlink /etc/localtime
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-services/">時刻・ログ・メール</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/practice/">実践編</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-services/chapters.js"></script>
 <script src="/linuc-services/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

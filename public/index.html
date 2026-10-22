@@ -29,7 +29,8 @@
 
 <h2 id="articles">記事の一覧</h2>
 <p>著者が読者として通した<b>確認済み</b>のものを先に、次に<b>公開日の新しい順</b>に並べています。最初は10件で、「さらに表示」で10件ずつ増えます。
-   記事名から、その記事のホーム（概要・想定読者・進め方）へ進みます。</p>
+   記事名から、その記事のホーム（概要・想定読者・進め方）へ進みます。
+   記事のホームか実践編の終わりで「受けた印」を付けると、ここで <span class="tag done">✓ 受けた</span> と出て、絞り込めます（印はこのブラウザにだけ残ります）。</p>
 <form class="catalog-controls" hidden>
   <input type="search" id="cq" placeholder="記事名・概要・章の題・コマンドで探す" aria-label="記事を探す">
   <select id="c-status" aria-label="状態"><option value="">状態: すべて</option><option value="確認済み">確認済み</option><option value="ドラフト">ドラフト</option><option value="修正中">修正中</option></select>
@@ -37,6 +38,7 @@
   <select id="c-domain" aria-label="関連領域"><option value="">領域: すべて</option><option value="サーバー">サーバー</option><option value="ネットワーク">ネットワーク</option><option value="セキュリティ">セキュリティ</option><option value="DB">DB</option><option value="ウェブ">ウェブ</option><option value="OSS">OSS</option><option value="仮想化">仮想化</option></select>
   <select id="c-method" aria-label="学習方式"><option value="">方式: すべて</option><option value="読むだけ">読むだけ</option><option value="演習あり（コンテナ）">演習あり（コンテナ）</option><option value="演習あり（仮想マシン）">演習あり（仮想マシン）</option></select>
   <select id="c-diff" aria-label="難易度"><option value="">難易度: すべて</option><option value="入門">入門</option><option value="初級">初級</option><option value="中級">中級</option></select>
+  <select id="c-mine" aria-label="受けた印"><option value="">受けた印: すべて</option><option value="todo">まだ受けていない</option><option value="done">受けた</option></select>
   <select id="c-sort" aria-label="並べ方"><option value="rec">確認済み→公開日の新しい順</option><option value="created">公開日の新しい順</option><option value="updated">最終更新の新しい順</option><option value="cert">資格の順</option><option value="time">短い順</option><option value="title">記事名の順</option></select>
   <label class="sqltoggle"><input type="checkbox" id="c-sqlmode"> SQL で引く</label>
 </form>
@@ -245,6 +247,7 @@
 </tbody>
 </table></div>
 <p class="more"><button type="button" id="c-more" hidden>さらに表示</button></p>
+<details id="c-move" class="fold" hidden><summary>受けた印を別の端末へ写す<span class="hint" id="c-move-n"></span></summary><div id="c-move-body"></div></details>
 
 <h3>状態の意味</h3>
 <ul class="detail">
@@ -263,6 +266,7 @@
 </section>
 <footer>確かめて説明する ／ 各記事の検証環境とイメージのダイジェストは、それぞれの実践編に書いてあります。 · <a href="https://github.com/chai0204/check-then-explain">ソース（GitHub）</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/shared/catalog.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

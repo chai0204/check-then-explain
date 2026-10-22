@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-admin/">アカウント・ジョブ・ロケール</a> › <a href="/linuc-admin/theory/">理論編</a> › 第4章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-admin/theory/#draft">詳しく</a></p>
 </div>
 <h1>4. ロックは、扉を1つ閉めるだけ</h1>
 <p class="lead"><code>passwd -l alice</code> は成功し、<code>passwd -S</code> は <code>L</code>（ロック）と答える。それでも alice は ssh の鍵で入れる。ロックが閉めたのは「パスワード」という扉1つで、鍵の扉はその列を読まないからである。アカウントを一時停止するなら、どの扉からも必ず読まれる列を変える。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 18分</span></summary>
 <div class="badges"><span>前提: 第3章まで読了（alice がいる）</span><span>前提: 外の端末と練習機の中の両方を開いておく</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.08.1（重要度5）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>passwd</code> の <code>-l</code> <code>-u</code> <code>-S</code> <code>-d</code> <code>-e</code> が <code>/etc/shadow</code> のどこを変えるかを言える</li><li>アカウントを消さずに一時停止する方法（有効期限・ログインシェル）を選べる</li><li>ロック・期限切れ・シェルの拒否が、ログインのどの段で効くかを説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: PAM の設定ファイルの書き方、<code>sshd_config</code> の <code>DenyUsers</code>、失敗回数によるロック（<code>pam_faillock</code>）、パスワードの強度の検査は扱わない。<code>chage</code> のオプション一式は主題1.10（セキュリティ）の範囲で、ここでは読むのに使うだけ。</div></div>
+</details>
 
 <h2 id="status">作ったばかりのユーザは、最初からロックされている</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>passwd -S</code> の読み方と、パスワードを付けたときの <code>/etc/shadow</code> の変化。</div>
@@ -202,6 +205,7 @@ A はパスワードを空にしてしまい、かえって危険。C と D は�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-admin/">アカウント・ジョブ・ロケール</a> · <a href="/linuc-admin/theory/">理論編 目次</a> · <a href="/linuc-admin/practice/">実践編</a> · <a href="/linuc-admin/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-admin/chapters.js"></script>
 <script src="/linuc-admin/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

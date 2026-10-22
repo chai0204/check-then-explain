@@ -8,12 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <a href="/qemu/theory/">理論編</a> › 第6章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/#draft">詳しく</a></p>
 </div>
 <h1>6. ファームウェアは、差し替えられるファイル</h1>
 <p class="lead">このサイトの練習機は、UEFI で起動するように作ってある。ところが第3章からずっと、QEMU の既定の BIOS（SeaBIOS）で起動していた。
 ディスクに BIOS 用の入口と UEFI 用の入口が両方あるからだ。PC の最初のプログラム（ファームウェア）は、QEMU にとってはファイルの1つで、差し替えれば UEFI（OVMF）で起動する。
 UEFI には2つのファイルが要る。読むだけのプログラムと、設定を書き込む NVRAM で、NVRAM は練習機の最初の起動で書き換わり、次の起動の道を変える。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 25分</span></summary>
 <div class="badges"><span>前提: 第5章までを同じ端末で終えている（<code>~/work/linuc.qcow2</code> がある）</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>練習機が BIOS と UEFI のどちらで起動したかを、<code>/sys/firmware/efi</code> で見分けられる</li>
@@ -23,6 +25,7 @@ UEFI には2つのファイルが要る。読むだけのプログラムと、�
 <li>NVRAM を raw で渡すと <code>savevm</code> が断られる理由を言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: UEFI のブートの項目の書式（<code>HD(15,GPT,…)</code> の読み方）、shim と GRUB の分担、Secure Boot の鍵、
 <code>efibootmgr</code> での項目の作り方・並べ替え、BIOS の MBR の中身。</div></div>
+</details>
 
 <h2 id="bios">UEFI 用の練習機は、BIOS でも起動していた</h2>
 <div class="sgoal"><b>この節で分かること</b>: いまの練習機が、どちらのファームウェアで起動しているか。そう見分ける方法。</div>
@@ -221,6 +224,7 @@ NVRAM を qcow2 にして（<code>qemu-img convert -O qcow2</code>）<code>forma
 </section>
 <footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/qemu/chapters.js"></script>
 <script src="/qemu/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

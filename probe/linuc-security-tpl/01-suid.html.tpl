@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-security/">セキュリティ</a> › <a href="/linuc-security/theory/">理論編</a> › 第1章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-security/theory/#draft">詳しく</a></p>
 </div>
 <h1>1. SUID は、実行する人ではなく持ち主で動く</h1>
 <p class="lead">システムを監査する最初の一歩は、<code>find</code> で特別な権限を持つファイルを洗い出すことである。ところが素朴に <code>find / -perm 4000</code> と打つと、1つも見つからない。SUID ファイルはこの練習機に15個あるのに、である。原因は「ちょうど」と「含む」の違いにある。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 15分</span></summary>
 <div class="badges"><span>前提: なし</span><span>前提: 練習機が起動している</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.10.1（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>find -perm 4000</code> と <code>-perm -4000</code>・<code>-perm /6000</code> の違いを説明できる</li><li>SUID/SGID が「実行する人」ではなく「ファイルの持ち主・グループ」の権限で動くことを言える</li><li><code>s</code> と <code>S</code> の違い、SUID がシェルスクリプトには効かないことを説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: ケーパビリティ（<code>getcap</code>／<code>setcap</code>）による細かい権限分割、AppArmor や SELinux の強制アクセス制御はレベル1の範囲外である。ここでは伝統的な SUID/SGID・スティッキービットの3つだけを扱う。</div></div>
+</details>
 
 <h2 id="count">「ちょうど 4000」では1つも見つからない</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>-perm</code> の数値が「完全一致」か「ビットを含む」かで結果が変わること。</div>
@@ -141,6 +144,7 @@ $ /usr/local/bin/catfile /etc/shadow
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-security/">セキュリティ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/practice/">実践編</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-security/chapters.js"></script>
 <script src="/linuc-security/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

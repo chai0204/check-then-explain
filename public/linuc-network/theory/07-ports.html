@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-network/">ネットワークの基礎</a> › <a href="/linuc-network/theory/">理論編</a> › 第7章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/#draft">詳しく</a></p>
 </div>
 <h1>7. LISTEN していても、外からは入れない</h1>
 <p class="lead"><code>ss</code> で見ると、練習機の 8080 番は <code>LISTEN</code> している。<code>curl http://127.0.0.1:8080/</code> には返事が来る。ところが同じ練習機の中から <code>192.168.10.2:8080</code> に接続すると、<code>Connection refused</code> で断られる。待っているのは「8080 番」ではなく「127.0.0.1 の 8080 番」だった。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 19分</span></summary>
 <div class="badges"><span>前提: 第4章を終えている（サーバ 172.16.20.10 に届く）</span><span>所要 19分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.1（重要度4）</span><span>出題範囲 1.07.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>22・25・53・80・123・443 番が、どのサービスで TCP か UDP かを言える</li><li><code>ss</code> と <code>netstat</code> の待ち受けの表から、どのアドレスの何番で誰が待っているかを読める</li><li><code>nc</code> / <code>ncat</code> で TCP と UDP の待ち受けを確かめ、TCP（コネクション型。RST で断る）と UDP（コネクションレス型。ICMP で断られる）の違いを説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: TCP の状態の移り変わり全体（TIME_WAIT など）、<code>ss</code> の絞り込みの式（<code>sport = :8080</code> など）、ファイアウォールでの遮断（主題1.10）。待ち受けの表の読み方と、つながるかの確かめ方だけで足りる。</div></div>
+</details>
 
 <h2 id="ports">番号の表と、待ち受けの表は別物</h2>
 <div class="sgoal"><b>この節で分かること</b>: よく使うポート番号と、実際に待ち受けているものの見方。</div>
@@ -279,6 +282,7 @@ SSH・SMTP・HTTP は TCP。HTTPS（443）は TCP で、HTTP/3 だけは UDP を
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-network/">ネットワークの基礎</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/practice/">実践編</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-network/chapters.js"></script>
 <script src="/linuc-network/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

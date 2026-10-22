@@ -8,14 +8,18 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-services/">時刻・ログ・メール</a> › <a href="/linuc-services/theory/">理論編</a> › 第3章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/#draft">詳しく</a></p>
 </div>
 <h1>3. 時刻合わせは、基準を渡されるまで始まらない</h1>
 <p class="lead">この檻では時刻合わせのデーモンが動いている。<code>systemctl is-active chrony</code> は <code>active</code> を返す。それでも <code>Reference ID</code> は <code>00000000</code> で、<code>Leap status</code> は <code>Not synchronised</code> のままである。動いていることと、合わせていることは別のことだ。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 15分</span></summary>
 <div class="badges"><span>前提: 第2章まで読了</span><span>前提: 檻が起動している</span><span>所要 15分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.1（重要度2）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>NTP クライアントが「基準」を設定で渡されるまで何もしないことを、出力で示せる</li><li><code>chronyc sources</code> と <code>chronyc tracking</code> の読み分けができる</li><li><code>chronyd</code> と <code>ntpd</code> が同時に入らない理由をパッケージの宣言から言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: NTP のパケット形式、うるう秒の扱い、NTS（暗号化）、<code>stratum</code> の階層をどこまで深く追えるかは扱わない。ハードウェアタイムスタンプや PTP も外す。ここで覚えるのは「どのファイルに何を書くと、どのコマンドの出力がどう変わるか」だけである。</div></div>
+</details>
+
 <h2 id="running">動いているのに、合っていない</h2>
 <div class="sgoal"><b>この節で分かること</b>: デーモンの稼働と、時刻が合っていることが別だという事実。</div>
 <pre><code>$ systemctl is-active chrony
@@ -257,6 +261,7 @@ Conflicts: time-daemon</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-services/">時刻・ログ・メール</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/practice/">実践編</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-services/chapters.js"></script>
 <script src="/linuc-services/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

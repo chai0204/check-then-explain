@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-text/">コマンドラインとテキスト処理</a> › <a href="/linuc-text/theory/">理論編</a> › 第5章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/#draft">詳しく</a></p>
 </div>
 <h1>5. uniq は隣どうししか比べない</h1>
 <p class="lead"><code>fruits.txt</code> には <code>apple</code> が3行あるのに、<code>uniq</code> を通しても <code>apple</code> は2回出てくる。<code>uniq</code> は「直前の行と同じか」しか見ていない。この章のフィルタは、どれも<b>1行ずつ流れてくるものを、決まった規則で処理するだけ</b>で、ファイル全体を見渡してはいない。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 第4章</span><span>前提: 檻が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.03.2（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>cut</code> で欄や文字を切り出し、区切り文字が連続したときに何が起きるかを説明できる</li><li><code>sort</code>（<code>-n -r -t -k -u -f</code>）と <code>uniq</code>（<code>-c -d -u</code>）を組み合わせて集計できる</li><li><code>tr</code> の置換・削除・圧縮と、<code>paste</code>（行で並べる）と <code>join</code>（キーで突き合わせる）の違いを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>sort -k2.3</code> のような文字位置の指定、<code>-s</code> <code>-b</code> <code>-g</code>、<code>join -o</code> による出力欄の指定、<code>tr</code> の文字クラス（<code>[:upper:]</code>）の全種類。<code>awk</code> は主題1.03 の範囲外なので、比べるために1か所だけ名前を出す。</div></div>
+</details>
 
 <h2 id="cut">欄を切り出す — cut</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>cut</code> の区切り方と、区切り文字が続いたときの空の欄。</div>
@@ -177,6 +180,7 @@ D は先に重複を消してしまうので、全部 1 になる。</p></detail
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-text/">コマンドラインとテキスト処理</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/practice/">実践編</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-text/chapters.js"></script>
 <script src="/linuc-text/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

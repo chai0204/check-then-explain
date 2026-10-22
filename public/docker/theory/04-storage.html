@@ -8,12 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/docker/">Docker</a> › <a href="/docker/theory/">理論編</a> › 第4章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/#draft">詳しく</a></p>
 </div>
 <h1>4. コンテナの書き込みは、イメージの上の1枚に入る</h1>
 <p class="lead">コンテナの中でファイルを消しても、同じイメージから起動した次のコンテナには、そのファイルがある。
 コンテナのファイルの木は、読むだけのイメージの層の上に、コンテナ専用の書き込み用の層を1枚重ねたもの（overlay）で、
 消したことも「消した印」として上の1枚に書かれるだけである。上の1枚はコンテナと一緒に消えるので、残したいデータはコンテナの外（ボリューム）に置く。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 27分</span></summary>
 <div class="badges"><span>前提: 第3章（イメージは層でできている）</span><span>所要 27分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>コンテナの変更が overlay の upperdir に書かれ、イメージの層（lowerdir）は変わらないことを示せる</li>
@@ -21,6 +23,7 @@
 <li>名前付きボリュームとバインドマウントの違い（最初の中身・持ち主・置き場所）を、出力で説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: overlay の workdir の役目の細部、opaque ディレクトリ、ストレージドライバの種類（overlay2・btrfs・zfs など）の違い、
 ボリュームのドライバ（NFS など）、<code>docker commit</code>。</div></div>
+</details>
 
 <h2 id="change">コンテナの中で消したファイル</h2>
 <div class="sgoal"><b>この節で分かること</b>: コンテナの中の変更が、イメージに届かないこと。</div>
@@ -209,6 +212,7 @@ $ sudo rmdir ~/apkdir ~/tmpdir</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/docker/">Docker</a> · <a href="/docker/theory/">理論編 目次</a> · <a href="/docker/practice/">実践編</a> · <a href="/docker/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/docker/chapters.js"></script>
 <script src="/docker/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

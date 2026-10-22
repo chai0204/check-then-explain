@@ -8,12 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <a href="/qemu/theory/">理論編</a> › 第5章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/#draft">詳しく</a></p>
 </div>
 <h1>5. ネットワークも、QEMU のプロセスの中にある</h1>
 <p class="lead">練習機に NIC を足して起動しても、<code>ip -br a</code> は「ens3 DOWN」で、IP アドレスが付かない。ネットワークが無いのではなく、練習機の設定が <code>enp0s16</code> という名前の NIC しか知らないからだった。
 NIC の名前は、QEMU がその NIC を<b>差した位置</b>で決まる。位置を合わせると、練習機は DHCP で 10.0.2.15 をもらう。
 そのアドレスを配ったのも、ゲートウェイの 10.0.2.2 を演じているのも、外から <code>ssh linuc</code> で入る入口（127.0.0.1:2222）で待っているのも、QEMU のプロセス自身である。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 25分</span></summary>
 <div class="badges"><span>前提: 第4章までを同じ端末で終えている（<code>~/work/linuc.qcow2</code> がある）</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>練習機の NIC の名前（<code>ens3</code>・<code>enp0s16</code>）が、QEMU が差した位置とマシン型で決まることを説明できる</li>
@@ -22,6 +24,7 @@ NIC の名前は、QEMU がその NIC を<b>差した位置</b>で決まる。�
 <li><code>hostfwd</code> で外の 127.0.0.1:2222 を練習機の 22 番へつなぎ、そこで待っているのが QEMU のプロセスだと <code>ss -tlnp</code> で示せる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: netplan の書き方、systemd-networkd の設定、NIC の名前の規則の細部（<code>enx…</code> や <code>eno1</code> など）、
 <code>-netdev user</code> のほかの指定（<code>guestfwd</code>・<code>smb</code>・<code>tftp</code>）、tap やブリッジのネットワーク。</div></div>
+</details>
 
 <h2 id="name">NIC を足しても、つながらない</h2>
 <div class="sgoal"><b>この節で分かること</b>: NIC を足した練習機の中から、NIC がどう見えるか。練習機の設定が何を待っているか。</div>
@@ -186,6 +189,7 @@ OS がネットワークを上げていて ssh の待ち受けがまだなら、
 </section>
 <footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/qemu/chapters.js"></script>
 <script src="/qemu/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

@@ -8,12 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> › <a href="/linuc-boot/theory/">理論編</a> › 第5章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/#draft">詳しく</a></p>
 </div>
 <h1>5. ファームウェアが必ず読めるのは、FAT の中のファイルだけ</h1>
 <p class="lead">Linux のカーネルは <code>/boot</code> の中にある。ところが電源を入れて最初に動く UEFI ファームウェアは、<code>/boot</code>（ext4）を1バイトも読めない。
 読めるのは ESP という FAT の小さな区画の中のファイルだけで、そこから先は「起動された側が、次に起動するものを自分で探しに行く」リレーになっている。
 ブート順を書き換えても、起動された側がそれを書き戻すことさえある。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 第4章まで読了</span><span>前提: 端末を2つ開いている</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.01.3（重要度4）</span><span>出題範囲 1.01.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>ファームウェア（UEFI / BIOS）→ ブートローダ（GRUB）→ カーネル → initramfs → systemd の順番と、それぞれが何を読むかを言える</li>
@@ -21,6 +23,7 @@
 <li>ブートメディアの優先順位を、ファームウェアの設定画面と <code>efibootmgr</code> で確かめ、変えられる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: Secure Boot の署名を検証する仕組み（shim と MOK）、
 <code>grub.cfg</code> の文法と GRUB のコマンド、カーネルが起動時に出す1行1行の意味、<code>systemd-analyze</code> の細かい使い方。</div></div>
+</details>
 
 <h2 id="relay">電源から login: までを、コンソールで追う</h2>
 <div class="sgoal"><b>この節で分かること</b>: 起動の途中で、誰が誰に仕事を渡しているか。</div>
@@ -336,6 +339,7 @@ UEFI はこれと違い、ESP の中のファイルを名前で読む。</p></de
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/practice/">実践編</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-boot/chapters.js"></script>
 <script src="/linuc-boot/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

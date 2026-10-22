@@ -1,6 +1,7 @@
 /**
  * 理論編の共通スクリプト。
- *  1) 進捗バー（章の位置 + ページ内スクロール）
+ *  1) 進捗バー（章の位置 + ページ内スクロール）。章の一覧は閉じた箱（details.chapnav）に入れ、
+ *     見出しの行には進み具合だけを出す（2026-10-22、章を読む前に一覧が並ぶのが煩わしいとオーナーが指摘）
  *  2) 本文中の用語を辞書へ自動リンク（terms.js のデータを使う）
  * 用語リンクは手で書かずに済ませる。書き漏らしが出ないし、
  * 辞書を足せば全ページに自動で反映される。
@@ -22,16 +23,22 @@
     document.body.prepend(bar);
     const fill = bar.firstChild;
 
-    const nav = document.createElement("div");
+    const nav = document.createElement("details");
     nav.className = "chapnav";
     nav.innerHTML =
-      `<div class="meter"><span>全${CHAPTERS.length}章中 第${cur}章</span>` +
-      `<span class="track"><i style="width:0"></i></span><span class="pct">0%</span></div>` +
+      `<summary class="meter"><span>全${CHAPTERS.length}章中 第${cur}章</span>` +
+      `<span class="track"><i style="width:0"></i></span><span class="pct">0%</span></summary>` +
       "<ol>" + CHAPTERS.map((c) =>
         `<li class="${c.n < cur ? "done" : c.n === cur ? "cur" : ""}">` +
         `<a href="${c.url}">${c.n}. ${c.t}</a></li>`).join("") + "</ol>";
-    const anchor = document.querySelector("h1");
-    if (anchor) anchor.after(nav);
+    // 章の頭の閉じた箱（この章のゴールと前提など）の先頭に並べる。無ければリード文の後、それも無ければ題の後
+    const h1 = document.querySelector("h1");
+    const h2 = document.querySelector(".wrap h2");
+    const fold = document.querySelector(".wrap > details.fold");
+    const lead = h1 && h1.nextElementSibling && h1.nextElementSibling.matches("p.lead") ? h1.nextElementSibling : null;
+    if (fold && (!h2 || fold.compareDocumentPosition(h2) & Node.DOCUMENT_POSITION_FOLLOWING)) fold.before(nav);
+    else if (lead) lead.after(nav);
+    else if (h1) h1.after(nav);
     const track = nav.querySelector(".track i");
     const pct = nav.querySelector(".pct");
 
@@ -114,6 +121,13 @@
     }
   }
 
+  // 本文を先に、章の頭の閉じた箱（この章のゴールと前提など）を後に走査する。
+  // 1語2本までの枠を、目に見える本文で先に使うため（箱を先に走査すると、閉じた箱の中で枠を使い切ることがある）
   const main = document.querySelector(".wrap");
-  if (main && groups.length) walk(main);
+  if (main && groups.length) {
+    const folds = [...main.querySelectorAll(":scope > details.fold")].filter((d) => !d.classList.contains("no-term"));
+    folds.forEach((d) => d.classList.add("no-term"));
+    walk(main);
+    folds.forEach((d) => { d.classList.remove("no-term"); walk(d); });
+  }
 })();

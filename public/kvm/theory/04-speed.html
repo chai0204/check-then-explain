@@ -8,12 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <a href="/kvm/theory/">理論編</a> › 第4章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/#draft">詳しく</a></p>
 </div>
 <h1>4. 速くなるのは、CPU が命令を実行する部分だけ</h1>
 <p class="lead">同じ練習機（同じディスク）を TCG と KVM で起動すると、起動し終わるまで 30.5 秒と 6.6 秒だった。ところが段階ごとに分けると、
 OS が起動していく部分（ユーザ空間）は 13.0 倍速いのに、カーネルの最初の表示まで（おおむねファームウェアと GRUB）は 1.5 倍にしかならない。
 GRUB がメニューを出して待つ 3 秒は、何で動かしても 3 秒である。KVM が速くするのは、CPU が命令を実行している時間だけだ。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 第3章まで読了</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>外（<code>qemu-linuc</code> の時間・<code>ps</code>）と中（<code>systemd-analyze</code>・journal）の両方で、起動の時間を段階に分けて測れる</li>
@@ -21,6 +23,7 @@ GRUB がメニューを出して待つ 3 秒は、何で動かしても 3 秒で
 <li>KVM が速くするもの（CPU が命令を実行する時間）と、速くしないもの（待ち時間・QEMU が真似している装置）を言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: ベンチマークの取り方（何回測って平均するか、ばらつきの扱い）、仮想マシンが KVM に戻る回数や理由の数え方（<code>perf kvm stat</code> など）、
 メモリのアドレスの変換を CPU に任せる仕組み（Intel の EPT・AMD の NPT）の細部、ディスクやネットワークの速さの比べ方。</div></div>
+</details>
 
 <h2 id="measure">同じディスクを、2通りで起動して測る</h2>
 <div class="sgoal"><b>この節で分かること</b>: 起動の時間を、外と中からどう区切って測るか。</div>
@@ -167,6 +170,7 @@ Connection to 127.0.0.1 closed.</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/kvm/">KVM</a> · <a href="/kvm/theory/">理論編 目次</a> · <a href="/kvm/practice/">実践編</a> · <a href="/kvm/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/kvm/chapters.js"></script>
 <script src="/kvm/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

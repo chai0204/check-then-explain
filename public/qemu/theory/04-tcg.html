@@ -8,13 +8,15 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <a href="/qemu/theory/">理論編</a> › 第4章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/#draft">詳しく</a></p>
 </div>
 <h1>4. CPU は、命令を翻訳して動いている</h1>
 <p class="lead">練習機の中で CPU の名前を見ると「QEMU Virtual CPU version 2.5+」と出る。そんな製品は無い。
 同じ 20 万回のループが、外（コンテナ）では 0.3 秒、練習機の中では 6.5 秒かかった。
 KVM を使わない QEMU は、練習機の CPU の命令を<b>ひと塊ずつ読んで、ホストの CPU の命令に翻訳してから実行している</b>（TCG）。
 特権が1つも要らない代わりに、遅い。その翻訳の跡は、QEMU のモニタと記録で見られる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 18分</span></summary>
 <div class="badges"><span>前提: 第3章までを同じ端末で終えている（<code>~/work/linuc.qcow2</code> がある）</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>練習機の CPU が、ホストの CPU ではなく QEMU が作った CPU に見えることを、<code>/proc/cpuinfo</code> で示せる</li>
@@ -23,6 +25,7 @@ KVM を使わない QEMU は、練習機の CPU の命令を<b>ひと塊ずつ�
 <li>翻訳しない方法（KVM）が、この檻では使えない理由を、<code>-accel</code> の出力と <code>/dev/kvm</code> で言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: TCG が使う中間の命令（TCG ops）、<code>info jit</code> の全項目の意味、x86 の機械語の読み方、
 <code>-d</code> の他の項目（<code>out_asm</code> <code>op</code> <code>exec</code>）。KVM の使い方と速さの比べ方は <a href="/kvm/theory/">KVM の記事</a>に任せる。</div></div>
+</details>
 
 <h2 id="speed">同じ計算を、外と中で測る</h2>
 <div class="sgoal"><b>この節で分かること</b>: 練習機の中の CPU が何に見えるか。同じ計算にかかる時間の差。</div>
@@ -191,6 +194,7 @@ KVM で同じ練習機を動かすとどうなるかは、<a href="/kvm/theory/"
 </section>
 <footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/qemu/chapters.js"></script>
 <script src="/qemu/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

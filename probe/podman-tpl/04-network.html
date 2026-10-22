@@ -8,13 +8,15 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <a href="/podman/theory/">理論編</a> › 第4章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/#draft">詳しく</a></p>
 </div>
 <h1>4. rootless のネットワークは、カーネルの外で中継される</h1>
 <p class="lead">docker はポートを公開するとき、練習機の iptables に宛先の書き換え（DNAT）を書き、veth で練習機のブリッジにつないだ。
 rootless の podman は student の権限しか持たないので、練習機のネットワークの設定を1つも変えられない。
 代わりに、<b>ユーザの権限で動くプログラムが、パケットを受け取って中へ運ぶ</b>（slirp4netns と rootlessport、または pasta）。
 だから 1024 番未満のポートは開けず、コンテナは QEMU の練習機と同じ形の網（10.0.2.0/24）に置かれる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 22分</span></summary>
 <div class="badges"><span>前提: 第2章。<a href="/docker/theory/05-ports">Docker 第5章</a>を読んでいると比べやすい</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>rootless の podman が 80 番を公開できない理由を、練習機の設定の値で説明できる</li>
@@ -22,6 +24,7 @@ rootless の podman は student の権限しか持たないので、練習機の
 <li>slirp4netns と pasta で、コンテナから見えるアドレスがどう違うかを示せる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: slirp4netns と pasta のオプション、netavark のブリッジ（root の podman の既定の網。rootless でも <code>podman network create</code> で作った網で使う）、
 aardvark-dns による名前解決、IPv6。</div></div>
+</details>
 
 <h2 id="port80">80 番を公開する</h2>
 <div class="sgoal"><b>この節で分かること</b>: 一般ユーザのコンテナが、公開できないポートがあること。</div>

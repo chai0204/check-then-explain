@@ -8,12 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/kvm/">KVM</a> › <a href="/kvm/theory/">理論編</a> › 第2章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/kvm/theory/#draft">詳しく</a></p>
 </div>
 <h1>2. KVM の入口は /dev/kvm ひとつ</h1>
 <p class="lead">KVM は Linux のカーネルの部品（<code>kvm</code> と <code>kvm_intel</code> / <code>kvm_amd</code> のモジュール）で、使う側に見えるのは <code>/dev/kvm</code> というファイル1つだけである。
 コンテナに KVM を渡すとは、このファイルを置き、開くことを許すことだ。同じ番号のファイルを自分で作っても、root でも開けない。
 開けるかどうかは、ファイルがあるか・ファイルの権限・コンテナの許可（device cgroup）の3つの関門で決まり、どこで止まったかはエラーの文言で分かる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 25分</span></summary>
 <div class="badges"><span>前提: 第1章まで読了</span><span>前提: 端末をもう1つ開ける</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>KVM がカーネルのモジュールで、<code>/dev/kvm</code>（文字デバイス 10, 232）を出していることを示せる</li>
@@ -21,6 +23,7 @@
 <li><code>--device /dev/kvm</code> と <code>--group-add</code> が何を渡し、何を渡さないか（持てる特権の上限 <code>CapBnd</code> は docker の既定のまま）を測って言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: KVM に何を頼むかの細かい種類（ioctl の名前）、cgroup v1 と v2 の違いや、デバイスの許可が中でどう実装されているか（BPF）、
 <code>/dev/kvm</code> の権限を決めている udev の規則の書き方、podman の rootless で渡すときの細部。</div></div>
+</details>
 
 <h2 id="module">KVM は、あなたの PC のカーネルの中にある</h2>
 <div class="sgoal"><b>この節で分かること</b>: KVM がどこにあり、使う側から何が見えるか。</div>
@@ -258,6 +261,7 @@ $ lab check 02
 </section>
 <footer><a href="/">トップ</a> · <a href="/kvm/">KVM</a> · <a href="/kvm/theory/">理論編 目次</a> · <a href="/kvm/practice/">実践編</a> · <a href="/kvm/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/kvm/chapters.js"></script>
 <script src="/kvm/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

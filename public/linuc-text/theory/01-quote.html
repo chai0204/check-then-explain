@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-text/">コマンドラインとテキスト処理</a> › <a href="/linuc-text/theory/">理論編</a> › 第1章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/#draft">詳しく</a></p>
 </div>
 <h1>1. 引用符と変数は、コマンドに届く前に片づく</h1>
 <p class="lead"><code>echo '$HOME'</code> は <code>$HOME</code> と出し、<code>echo "$HOME"</code> は <code>/home/lab</code> と出す。違いを作ったのは <code>echo</code> ではない。<code>echo</code> に渡る前に、シェルが引用符を読んで、消している。そして変数に入れた値は、言わなければ次に起動するプログラムに届かない。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 15分</span></summary>
 <div class="badges"><span>前提: 檻が起動している</span><span>前提: cd と ls が打てる</span><span>所要 15分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.03.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>シングルクォート・ダブルクォート・バックスラッシュで、<code>$</code> と空白と <code>*</code> の扱いがどう変わるかを言える</li><li>シェル変数と環境変数の違いを、<code>set</code> と <code>env</code> の出力の差で示せる</li><li><code>export</code>・<code>unset</code>・<code>変数=値 コマンド</code> がそれぞれどこまで効くかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: 配列、<code>${変数:-既定値}</code> のようなパラメータ展開、<code>declare</code> の各オプション、<code>readonly</code>、<code>printf</code> の書式。どれも主題1.06（シェルスクリプト）の側で扱う。ここで覚えるのは、引用符3種類の違いと、<code>set</code> / <code>env</code> / <code>export</code> / <code>unset</code> の役割だけでよい。</div></div>
+</details>
 <p>この章からは、檻の中の <code>~/text</code> で打つ。練習用のファイルが置いてあり、檻を起動し直すたびに元の中身に戻る。</p>
 
 <h2 id="quote">引用符は、シェルへの指示である</h2>
@@ -214,6 +217,7 @@ $ bash -x child.sh
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-text/">コマンドラインとテキスト処理</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/practice/">実践編</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-text/chapters.js"></script>
 <script src="/linuc-text/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

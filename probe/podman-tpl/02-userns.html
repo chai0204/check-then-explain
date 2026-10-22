@@ -8,11 +8,13 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <a href="/podman/theory/">理論編</a> › 第2章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/#draft">詳しく</a></p>
 </div>
 <h1>2. コンテナの中の root は、外では student</h1>
 <p class="lead">rootless の podman のコンテナの中で <code>id</code> を打つと、root と答える。ところがその root が作ったファイルは、練習機の上では student の持ち物になっている。
 コンテナは<b>ユーザ名前空間</b>の中で動き、中の UID を外の別の UID に読み替える表（UID の対応表）を持っている。表の材料は <code>/etc/subuid</code> に書かれた、student が使ってよい UID の範囲（サブ UID）である。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 22分</span></summary>
 <div class="badges"><span>前提: 第1章</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>コンテナの中の UID が、練習機の上でどの UID になるかを、UID の対応表から計算できる</li>
@@ -20,6 +22,7 @@
 <li><code>podman unshare</code> で、コンテナと同じ見え方の中に入って、持ち主の食い違いを直せる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: ユーザ名前空間の中のケーパビリティの細部、<code>--userns=keep-id</code> などの対応表の作り方の選択肢、
 ファイルシステムの ID の読み替え（idmapped mount）、<code>/etc/subgid</code> のグループ側の細部（UID と同じ形）。</div></div>
+</details>
 
 <h2 id="root">中の root が作ったファイルの、外での持ち主</h2>
 <div class="sgoal"><b>この節で分かること</b>: rootless のコンテナの root が、練習機の上で誰として振る舞うか。</div>

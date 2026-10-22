@@ -8,12 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/podman/">Podman</a> › <a href="/podman/theory/">理論編</a> › 第3章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/podman/theory/#draft">詳しく</a></p>
 </div>
 <h1>3. イメージの置き場所は、ユーザごとに別</h1>
 <p class="lead">docker のイメージは、練習機に1か所（root の dockerd の置き場所）しかない。podman のイメージは、<b>使うユーザごとに別の置き場所</b>にある。
 student の podman に入っているイメージは、同じ練習機の <code>sudo podman</code>（root の podman）からは見えない。
 置き場所から置き場所へは、イメージを書き出して読み込めば運べるが、運び方によって変わるものと変わらないものがある。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 18分</span></summary>
 <div class="badges"><span>前提: 第2章</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>rootless と root の podman が、別の置き場所（<code>~/.local/share/containers/storage</code> と <code>/var/lib/containers/storage</code>）を使うことを示せる</li>
@@ -21,6 +23,7 @@ student の podman に入っているイメージは、同じ練習機の <code>
 <li>運んだ後に、イメージの ID（設定の指紋）は変わらず、ダイジェスト（設計図の指紋）が変わりうる理由を言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: storage.conf の全項目、ストレージドライバ（overlay と vfs）の選び方、<code>podman image scp</code>、
 追加の読み取り専用の置き場所（additional image stores）。</div></div>
+</details>
 
 <h2 id="where">student と root は、別のイメージを見ている</h2>
 <div class="sgoal"><b>この節で分かること</b>: 同じ練習機の podman が、ユーザによって違う一覧を出すこと。</div>
@@ -113,6 +116,7 @@ REPOSITORY  TAG         IMAGE ID    CREATED     SIZE</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/podman/">Podman</a> · <a href="/podman/theory/">理論編 目次</a> · <a href="/podman/practice/">実践編</a> · <a href="/podman/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/podman/chapters.js"></script>
 <script src="/podman/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

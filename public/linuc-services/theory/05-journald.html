@@ -8,14 +8,18 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-services/">時刻・ログ・メール</a> › <a href="/linuc-services/theory/">理論編</a> › 第5章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-services/theory/#draft">詳しく</a></p>
 </div>
 <h1>5. journald は隣にある別の箱</h1>
 <p class="lead"><code>logger</code> で1行投げると、<code>/var/log/lab-app.log</code> と <code>journalctl</code> の両方に出る。どちらも1件ずつで、合計2件保存されている。保存は別々で、別々の規則で捨てる。ただし入口は1本で、<code>logger</code> の1行はまず journald が受け取り、journald がそれを rsyslog に回している。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 第4章まで読了</span><span>前提: 檻が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.09.2（重要度5）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>journald と rsyslog が同じ1行を二重に持つことを、数えて確かめられる</li><li><code>logger</code> の1行が journald を通ってから rsyslog に届くことを、転送を止めて確かめられる</li><li><code>Storage=</code> の既定（<code>auto</code>）がディレクトリの有無で決まることを説明できる</li><li><code>journalctl</code> の絞り込みを、ユニット・優先度・時刻・タグで書ける</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: journal のバイナリ形式、<code>--merge</code> やリモートの journal（journal-remote）、<code>systemd-journal-gatewayd</code> は扱わない。<code>Seal=</code>（改ざん検知）も外す。<code>ForwardToSyslog=</code> は、rsyslog への入口になっていることを確かめるところだけ扱う。覚えるのは保存先が2つあることと、絞り込みの書き方だけでよい。</div></div>
+</details>
+
 <h2 id="double">同じ1行が、2つの箱に入っている</h2>
 <div class="sgoal"><b>この節で分かること</b>: rsyslog と journald が、同じ1行を別々に保存していること。</div>
 <p>第4章の受け皿がある状態で、1行投げて両方で数える。</p>
@@ -260,6 +264,7 @@ journal はどこに保存されているか。</p>
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-services/">時刻・ログ・メール</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/practice/">実践編</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-services/chapters.js"></script>
 <script src="/linuc-services/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

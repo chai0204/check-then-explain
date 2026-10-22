@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-shell/">シェルとスクリプト</a> › <a href="/linuc-shell/theory/">理論編</a> › 第4章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/#draft">詳しく</a></p>
 </div>
 <h1>4. 先頭行を読むのはカーネルで、bash ではない</h1>
 <p class="lead"><code>#!/bin/sh</code> で始まるスクリプトを <code>bash hello.sh</code> で動かすと動く。<code>chmod +x</code> して <code>./hello.sh</code> で動かすと、同じファイルが文法エラーになる。先頭行の <code>#!</code> を読むのは「直接実行された」ときのカーネルだけで、<code>bash hello.sh</code> のときはただのコメントだからである。スクリプトを他の人に使わせるときは、この先頭行に、権限・所有者・置き場所・PATH の4つが加わる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 22分</span></summary>
 <div class="badges"><span>前提: 第3章まで読了</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.06.2（重要度6）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>./x.sh</code>・<code>bash x.sh</code>・<code>. x.sh</code> のそれぞれで、何がファイルを読むのか、どんな権限が要るのかを言える</li><li>先頭行 <code>#!</code> が何を決めるか、Ubuntu の <code>/bin/sh</code> が dash であることが何を引き起こすかを説明できる</li><li><code>chmod</code> と <code>chown</code> でスクリプトを全員が使える形にでき、スクリプトには r と x の両方が要る理由を言える</li><li>使う人の PATH に左右されないスクリプトの書き方を言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: SUID・SGID・スティッキービット（主題1.02 で扱う）、ACL、<code>install</code> コマンド、<code>#!/usr/bin/env bash</code> と <code>#!/bin/bash</code> の使い分けの細部。<code>chmod</code> の数字は 755・644・700・711 が読めれば足りる。</div></div>
+</details>
 
 <h2 id="three">同じファイルを、3つの書き方で動かす</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>./x.sh</code> と <code>bash x.sh</code> の違い。先頭行がいつ使われるか。</div>
@@ -268,6 +271,7 @@ $ sudo -iu alice report
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-shell/">シェルとスクリプト</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/practice/">実践編</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-shell/chapters.js"></script>
 <script src="/linuc-shell/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

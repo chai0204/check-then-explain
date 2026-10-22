@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-admin/">アカウント・ジョブ・ロケール</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>本文に載せた出力はすべて実機（コンテナの中の仮想マシン）の記録で、演習8本は模範解答どおりに通ることを確認してあります
    （未達のときに判定が鳴ることも、8本すべてで確認済み）。
    それでも <b>導線の不備</b>は残っている可能性があります。
@@ -19,21 +19,22 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — システム管理</h1>
 <p class="lead">LinuC レベル1 <strong>102 試験・主題1.08</strong>（アカウント管理・ジョブスケジューリング・ローカライゼーション）を、
 コンテナの中で動く練習機（仮想マシン）で実際に打って確かめる9章。
 <strong>1章ごとに「実際に打つと何が出るか」を先に置いて</strong>います。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します（時刻や日付など、打った日時で変わるものを除く）。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>時刻や日付など、打った日時で変わるものは除きます。
 出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<h2 id="spine">この9章を貫いている1つの事実</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="spine">この9章を貫いている1つの事実</h2></summary>
 <div class="goal">
 <p><b>管理コマンドが書き換えるのは、台帳（/etc やスプールにあるテキスト）の1行だけである。
 その1行が効くかどうかは、台帳を読む側（ログイン・cron・at・プログラム）が、いつ・どの列を読むかで決まる。</b></p>
@@ -44,8 +45,9 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 PAM の設定ファイルの書き方、LDAP などの外部のユーザ管理、systemd のタイマーの書き方、gettext の仕組み、Unicode の正規化。
 どれもレベル1の主題1.08 の範囲外で、この9章では名前が出る程度です。</div>
 </div>
-
-<h2 id="range">LinuC 出題範囲との対応</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="range">LinuC 出題範囲との対応</h2></summary>
 <p>公式の出題範囲（<a href="https://linuc.org/linuc1/range/102.html">LinuC-1 Version 10.0 / 102 試験</a>）の
 主題1.08 を、章に割り当てたものです。「詳細」欄に挙げられている語が、どの章で実際に手を動かす対象になるかを並べてあります。</p>
 <div class="scroll"><table>
@@ -80,8 +82,9 @@ cron と at の置き場所と許可ファイルの読み方、cron.hourly と a
 （<code>probe/linuc-admin-rhel-compare.sh</code>）を「比較」の見出しで添え、違いを表にしてあります。</p>
 <p>他の主題（1.01〜1.07・1.09〜1.11）の対応は
 <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。</p>
-
-<h2 id="cram">試験の直前に見る表</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="cram">試験の直前に見る表</h2></summary>
 <p>出題範囲の「詳細」欄に並ぶ語を、1行の意味と、手を動かして確かめた章で引けるようにしたものです。</p>
 <div class="scroll"><table>
 <tr><th>語</th><th>一行の意味</th><th>章</th></tr>
@@ -133,6 +136,7 @@ cron と at の置き場所と許可ファイルの読み方、cron.hourly と a
 <tr><td>ISO-8859</td><td>ASCII に西欧などの文字を足した1バイトの系列（ISO-8859-1 = Latin-1）。文字は 0xA0〜0xFF に置く。日本語なし</td><td><a href="/linuc-admin/theory/09-iconv#fail">9</a></td></tr>
 <tr><td>ISO-2022-JP</td><td>7ビットとエスケープシーケンスで日本語を書く方式。日本語の電子メールの伝統</td><td><a href="/linuc-admin/theory/09-iconv#bytes">9</a></td></tr>
 </table></div>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
@@ -209,5 +213,6 @@ cron と at の置き場所と許可ファイルの読み方、cron.hourly と a
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-admin/">アカウント・ジョブ・ロケール</a> · <a href="/linuc-admin/theory/">理論編 目次</a> · <a href="/linuc-admin/practice/">実践編</a> · <a href="/linuc-admin/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

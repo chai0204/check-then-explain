@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-text/">コマンドラインとテキスト処理</a> › <a href="/linuc-text/theory/">理論編</a> › 第9章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/#draft">詳しく</a></p>
 </div>
 <h1>9. . は何にでも当たる1文字</h1>
 <p class="lead"><code>grep 10.0.0.5 ips.txt</code> は、4行のうち4行すべてに当たる。<code>.</code> はピリオドではなく「任意の1文字」で、しかも <code>grep</code> は行のどこかに当たればその行を出す。<code>grep</code> に渡したのは IP アドレスではなく<b>正規表現</b>という小さな言語だった。そしてその言語は、<code>grep</code> に届く前にシェルに書き換えられることがある。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 22分</span></summary>
 <div class="badges"><span>前提: 第8章まで</span><span>前提: 檻が起動している</span><span>所要 22分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.03.4（重要度2）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>正規表現の部品（<code>.</code> <code>*</code> <code>^</code> <code>$</code> <code>[ ]</code> <code>[^ ]</code> <code>\</code>、拡張の <code>+</code> <code>?</code> <code>{ }</code> <code>|</code> <code>( )</code>）を読める</li><li><code>grep</code> の <code>-E -F -v -i -n -c -l -w -x -r</code> を使い分けられる</li><li>基本正規表現と拡張正規表現の違いと、<code>egrep</code> <code>fgrep</code> が何者かを言える</li><li>パターンを引用符で囲む理由を、シェルのワイルドカード展開から説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: Perl 互換の正規表現（<code>grep -P</code>）、後方参照を使った検索、POSIX 文字クラス（<code>[[:digit:]]</code>）の全種類、最長一致の細かい規則。<code>regex(7)</code> の中身を全部読む必要もない。</div></div>
+</details>
 
 <h2 id="dot">. は、ピリオドではない</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>grep</code> がパターンをどう解釈し、行のどこに当てているか。</div>
@@ -219,6 +222,7 @@ C は先頭に別の文字があり、D は末尾が5桁なので外れる。</p
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-text/">コマンドラインとテキスト処理</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/practice/">実践編</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-text/chapters.js"></script>
 <script src="/linuc-text/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

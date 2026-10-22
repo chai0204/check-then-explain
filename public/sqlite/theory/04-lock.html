@@ -10,8 +10,9 @@
 
 <h1>4. 同時に書けるのは1人だけ</h1>
 <p class="lead"><code>database is locked</code> は、DB が返してきた拒否通知ではない。自分が起動したプロセスが、ファイルに掛かった印を見て、自分で書いた1行である。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 14分</span></summary>
 <div class="badges"><span>前提: 第3章まで</span><span>所要 14分</span><span class="impact-a">影響度 A</span><span>最終検証 2026-09-30</span></div>
-
 <div class="goal"><h4>この章のゴール</h4><ul>
 <li><code>database is locked</code> が出る条件を、そのとき誰がロックを持っているかで説明できる</li>
 <li>ロック中の読み取りが <code>0</code> を返す理由を説明できる</li>
@@ -20,6 +21,7 @@
 <div class="skip"><b>ここで覚えなくていいこと</b>: ロックの5状態（SHARED / RESERVED / PENDING / EXCLUSIVE）の遷移図は覚えなくていい。この章は「印が掛かっているか、いないか」の2値だけで進む。<br>
 <code>busy_timeout</code> に何秒を入れるべきかも決めなくていい。既定が「待たない」であることだけ押さえる。<br>
 WAL ファイルの内部形式も読まなくていい。この章で扱うことは全部、外から観測できる。</div></div>
+</details>
 
 <h2 id="who">この行を出しているのは、自分のプロセス</h2>
 <div class="sgoal"><b>この節で分かること</b>: ロックを持っている側と、エラーを出している側は別のプロセスである。</div>
@@ -487,6 +489,7 @@ WAL は素直に効く。<strong>そうでない条件が1つでもあるなら�
 </section>
 <footer><a href="/">トップ</a> · <a href="/sqlite/">SQLite</a> · <a href="/sqlite/theory/">理論編 目次</a> · <a href="/sqlite/practice/">実践編</a> · <a href="/sqlite/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/sqlite/chapters.js"></script>
 <script src="/sqlite/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

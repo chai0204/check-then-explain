@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-services/">時刻・ログ・メール</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>本文に載せた出力はすべて実機の記録で、演習6本は模範解答どおりに通ることを確認してあります
    （未達のときに判定が鳴ることも、6本すべてで確認済み）。
    それでも <b>導線の不備</b>は残っている可能性があります。
@@ -19,21 +19,21 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — 重要なシステムサービス</h1>
 <p class="lead">LinuC レベル1 <strong>102 試験・主題1.09</strong>（時刻・ログ・メール）を、
 全部コンテナの中で実際に打って確かめる7章。
 読むだけで終わらせないために、<strong>1章ごとに「実際に打つと何が出るか」を先に置いて</strong>います。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<h2 id="spine">この7章を貫いている1つの事実</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="spine">この7章を貫いている1つの事実</h2></summary>
 <div class="goal">
 <p><b>送り手は、中身とラベルだけを渡す。宛先を決めているのは、受け手側にある設定ファイルである。</b></p>
 <p><code>logger</code> は facility と priority しか渡さない。<code>chronyd</code> は設定に書かれた基準としか話さず、時計を動かすかどうかも起動の指定が決める（この檻の <code>chronyd</code> は時計を動かさない <code>-x</code> で起動してある）。
@@ -44,8 +44,9 @@ SMTP のやりとり、NTP のパケット形式、rsyslog の RainerScript の�
 journal のバイナリ形式、TLS による暗号化。どれもレベル1の範囲外です。
 ログを別のマシン（ログサーバー）へ送る・受け取るのは範囲内なので、第4章で扱います。</div>
 </div>
-
-<h2 id="range">LinuC 出題範囲との対応</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="range">LinuC 出題範囲との対応</h2></summary>
 <p>公式の出題範囲（<a href="https://linuc.org/linuc1/range/102.html">LinuC-1 Version 10.0 / 102 試験</a>）の
 主題1.09 を、章に割り当てたものです。「詳細」欄に挙げられている語が、どの章で実際に手を動かす対象になるかを並べてあります。</p>
 <div class="scroll"><table>
@@ -76,8 +77,9 @@ journal のバイナリ形式、TLS による暗号化。どれもレベル1の�
 <code>tzselect</code> は質問に番号で答える対話式なので、答えを流し込んで最後の1行だけを見ています（第2章）。</p>
 <p>他の主題（1.01〜1.08・1.10・1.11）の対応は
 <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。どこがまだ無いかもそこで分かります。</p>
-
-<h2 id="cram">試験の直前に見る表</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="cram">試験の直前に見る表</h2></summary>
 <p>出題範囲の「詳細」欄に並ぶ語を、上から順に1行ずつ並べました。公式の例題で問われる書き方（<code>date</code> の書式、<code>dateext</code>、<code>mail</code> のオプションなど）も1行に入れてあります。意味が出てこない語だけ、右の章に戻ってください。</p>
 <div class="scroll"><table>
 <tr><th>語</th><th>一行の意味</th><th>章</th></tr>
@@ -124,6 +126,7 @@ journal のバイナリ形式、TLS による暗号化。どれもレベル1の�
 <tr><td><code>postfix</code></td><td>この檻の MTA。<code>sendmail</code>・<code>mailq</code>・<code>newaliases</code> の名前のコマンドを持つ</td><td><a href="/linuc-services/theory/07-mail#mta">7</a></td></tr>
 <tr><td><code>exim</code></td><td>もう1つの MTA（Ubuntu では <code>exim4</code>）。postfix とは同時に入らない（どちらも <code>mail-transport-agent</code>）</td><td><a href="/linuc-services/theory/07-mail#mta">7</a></td></tr>
 </table></div>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
@@ -188,5 +191,6 @@ journal のバイナリ形式、TLS による暗号化。どれもレベル1の�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-services/">時刻・ログ・メール</a> · <a href="/linuc-services/theory/">理論編 目次</a> · <a href="/linuc-services/practice/">実践編</a> · <a href="/linuc-services/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

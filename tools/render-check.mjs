@@ -110,6 +110,10 @@ for (const theme of themes) {
 
     console.log(`${f}: 章${ch} / 章リスト${lis.length} / 用語リンク${terms.length}本（${Object.keys(byId).length}語）`);
     if (!nav) fail(`${f}: 進捗バー（.chapnav）が描画されていない`);
+    // 章の一覧は閉じた箱。開いたまま描かれると、本文の前に全章が並ぶ（2026-10-22 に閉じた）
+    else if (nav.tagName !== "DETAILS" || nav.open) fail(`${f}: 章の一覧（.chapnav）が閉じた箱になっていない`);
+    else if (nav.nextElementSibling && nav.nextElementSibling.matches("details.fold") === false && doc.querySelector(".wrap > details.fold"))
+      fail(`${f}: 章の一覧が、章の頭の閉じた箱と並んでいない`);
     if (lis.length !== chapterCount) fail(`${f}: 章リストが ${lis.length}/${chapterCount}`);
     if (curLi.length !== 1) fail(`${f}: 現在章の印（li.cur）が ${curLi.length}個`);
     if (!terms.length) fail(`${f}: 用語リンクが1本も張られていない`);

@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-shell/">シェルとスクリプト</a> › <a href="/linuc-shell/theory/">理論編</a> › 第1章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/#draft">詳しく</a></p>
 </div>
 <h1>1. 読まれる起動ファイルは、シェルの生まれ方で決まる</h1>
 <p class="lead">この檻に入ったとき、入口の案内が出た。同じ端末で <code>bash</code> と打っても出ない。同じ bash なのに、起動したときに読むファイルが違うからである。どれを読むかは「ログインしたのか」「人と対話しているのか」で決まる。そして <code>~/.bash_profile</code> を1つ作るだけで、<code>~/.profile</code> と <code>~/.bashrc</code> が<b>両方とも</b>読まれなくなる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 檻が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.06.1（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>いまのシェルがログインシェルか、対話シェルかを、<code>shopt login_shell</code> と <code>$-</code> で確かめられる</li><li><code>/etc/profile</code>・<code>/etc/bash.bashrc</code>・<code>~/.bash_profile</code>・<code>~/.bash_login</code>・<code>~/.profile</code>・<code>~/.bashrc</code>・<code>~/.bash_logout</code> が、どの起動のしかたで読まれるかを表で言える</li><li><code>~/.bash_profile</code> を作ると何が読まれなくなるかを、理由まで説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: zsh や csh の起動ファイル（<code>~/.zshrc</code> など）、<code>BASH_ENV</code> と <code>--posix</code> の細かい規則、<code>/etc/environment</code> を読む PAM の仕組み、ssh でのログイン（この檻に sshd は入れていない）。覚えるのは bash が読む7つのファイルと、その読まれ方だけでよい。</div></div>
+</details>
 
 <h2 id="two">同じ bash なのに、案内が出るときと出ないときがある</h2>
 <div class="sgoal"><b>この節で分かること</b>: ログインシェルと、そうでないシェルの見分け方。</div>
@@ -368,6 +371,7 @@ $ head -1 /etc/profile
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-shell/">シェルとスクリプト</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/practice/">実践編</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-shell/chapters.js"></script>
 <script src="/linuc-shell/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

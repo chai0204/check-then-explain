@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>本文に載せた出力はすべて実機の記録で、第1章から第11章まで、読者と同じ打ち方（端末つきの対話シェルに1行ずつ）で
    1つの練習機に順に打った記録と突き合わせてあります。演習10本は、模範解答どおりに通ること・始まりの状態で判定が鳴ることを
    すべて確かめてあります。読者がやりがちな途中の状態（演習ごとに1〜4通り）でも鳴ること、模範解答と違う正しいやり方
@@ -22,7 +22,7 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — ハードウェア、ディスク、パーティション、ファイルシステム</h1>
 <p class="lead">LinuC レベル1 <strong>101 試験・主題1.05</strong>を、
@@ -30,22 +30,23 @@
 まず空のディスクを一通り使えるようにし（第1・2章）、そのあと1段ずつ詳しく見ていきます:
 パーティションの表（第3・4章）→ ファイルシステム（第5章）→ マウント（第6・7章）→ スワップ（第8章）→ LVM（第9章）→ 部品とドライバ（第10・11章）。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<h2 id="order">読む順番と、前提</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="order">読む順番と、前提</h2></summary>
 <p>章は、第1章から順に、同じ1台の練習機で打っていく前提で書いてあります（前の章で作った区画やファイルシステムを、次の章で使います）。
 演習を先にやった練習機では本文と違う画面になるので、その場合は外で <code>vm reset --yes</code> を打ってから第1章を始めてください（<a href="/linuc-disks/practice/#ex">実践編</a>に詳しく書いてあります）。
 各章の冒頭に「前の章までにやったこと」と「この章でやること」を書いてあります。
 前提として要るのは、主題1.01〜1.04 のコースで扱った範囲（端末でコマンドを打つ・ファイルとディレクトリ・パーミッション・<code>sudo</code>・パイプと <code>grep</code>）です。このコースが説明なしで使うものと、それが出たコースの章は、<a href="/linuc-disks/theory/01-look">第1章</a>の冒頭に一覧にしてあります。
 それ以外の語は、カーネル・ドライバ・セクタのような一般的な語も、使う前にその場で一言で説明しています。</p>
 <p><b>前の版（1.0.x）を使っていた人は</b>、章と演習の順番が変わったので、先に<a href="/linuc-disks/practice/#start">実践編の「はじめる」</a>の「前の版（1.0.x）で進めた人へ」の箱を読んでください。</p>
-
-<h2 id="spine">11章を通して確かめること</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="spine">11章を通して確かめること</h2></summary>
 <div class="goal">
 <p>ディスクは、<b>装置・パーティションの表・（LVM）・ファイルシステム・マウントの段</b>が重なってできています。
 このコースでは段を1つずつ増やしながら使っていき、どの章でも、まず普通に使ってみてから、「1つの段を変えたら、隣の段はどうなるか」を自分の手で確かめます。
@@ -55,8 +56,9 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 ファイルシステムの内部の形、RAID、iSCSI や NFS のようなネットワーク越しのディスク、
 ディスクの暗号化（LUKS）、systemd の <code>.mount</code> ユニットの書き方。どれも主題1.05 の範囲外で、この11章には出てきません。</div>
 </div>
-
-<h2 id="range">LinuC 出題範囲との対応</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="range">LinuC 出題範囲との対応</h2></summary>
 <p>公式の出題範囲（<a href="https://linuc.org/linuc1/range/101.html">LinuC-1 Version 10.0 / 101 試験</a>）の
 主題1.05 を、章に割り当てたものです。「詳細」欄に挙げられている語が、どの章で実際に手を動かす対象になるかを並べてあります。</p>
 <div class="scroll"><table>
@@ -105,6 +107,7 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 <code>/proc/cpuinfo</code> などは KVM を使わない完全エミュレーションでの表示です。</p>
 <p>他の主題（1.01〜1.04・1.06〜1.11）の対応は
 <a href="/linuc/">LinuC 出題範囲マップ</a>にまとめてあります。</p>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
@@ -223,5 +226,6 @@ AI の回答は毎回違い、公式ドキュメントはあなたの環境を�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-disks/">ハードウェアとディスク</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/practice/">実践編</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/shared/comments.js"></script>
 </body></html>

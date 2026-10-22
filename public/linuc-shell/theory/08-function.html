@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-shell/">シェルとスクリプト</a> › <a href="/linuc-shell/theory/">理論編</a> › 第8章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-shell/theory/#draft">詳しく</a></p>
 </div>
 <h1>8. 関数は、子ではない</h1>
 <p class="lead">名前に番号を振るスクリプトで、番号が 1 の次に 21 へ飛んだ。区切り線を引く関数が、中の <code>for</code> で同じ名前の変数 <code>i</code> を使っていたからである。スクリプトは子のプロセスで動くが、関数は呼んだシェルの<b>中で</b>動く。だから変数を共有し、<code>exit</code> すれば全体が終わる。<code>bash -x</code> は、その書き換わりを1行ずつ見せる道具である。最後に、8章が1つの事実から出ていたことをまとめる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 第7章まで読了</span><span>所要 20分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.06.2（重要度6）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>名前() { … }</code> と <code>function 名前 { … }</code> で関数を作れ、その違い（dash で使えるか）を言える</li><li><code>local</code>・<code>return</code>・<code>exit</code> が関数の中で何をするかを、記録で説明できる</li><li><code>bash -x</code> と <code>bash -v</code> の出力の違いを言い、原因の見当を付けるのに使える</li><li>8章の結果を「子が受け取ったもの・親に返せたもの」の表で説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>export -f</code>（関数を子に渡す bash 独自の機能）、<code>FUNCNAME</code>・<code>BASH_SOURCE</code>、<code>PS4</code> による <code>-x</code> の表示の変更、再帰。デバッグは <code>bash -x</code>・<code>bash -v</code>・<code>set -x</code>・<code>set +x</code> の4つで足りる。</div></div>
+</details>
 
 <h2 id="same">関数は、いまのシェルの中で動く</h2>
 <div class="sgoal"><b>この節で分かること</b>: 関数の2つの書き方と、子に渡らないこと。</div>
@@ -253,6 +256,7 @@ bash で動かすなら（先頭行が <code>#!/bin/bash</code>）どれでも�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-shell/">シェルとスクリプト</a> · <a href="/linuc-shell/theory/">理論編 目次</a> · <a href="/linuc-shell/practice/">実践編</a> · <a href="/linuc-shell/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-shell/chapters.js"></script>
 <script src="/linuc-shell/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

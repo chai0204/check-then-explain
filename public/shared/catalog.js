@@ -2,14 +2,18 @@
 // 表は静的な HTML として全行が焼かれているので、このスクリプトが動かなくても一覧は読める
 // （そのときは全件が既定の並び = 確認済みを先に、次に公開日の新しい順で出る）。
 // 条件は URL（?q=…&cert=… / ?sql=…）にも映し、そのまま共有できる。
+// 受けた印（shared/site.js の window.cteDone。このブラウザの localStorage）があれば、行に印を出し、絞り込みと「別の端末へ写す」を足す。
 (() => {
+  const arrivedHash = location.hash;   // 写すリンク（#done=…）。下の apply() が URL を書き換える前に読んでおく
   const tbl = document.querySelector("table.catalog");
   const form = document.querySelector(".catalog-controls");
   if (!tbl || !form) return;
   const body = tbl.tBodies[0];
   const rows = [...body.rows];
   const $ = (id) => document.getElementById(id);
-  const ctl = { q: $("cq"), status: $("c-status"), cert: $("c-cert"), domain: $("c-domain"), method: $("c-method"), diff: $("c-diff"), sort: $("c-sort") };
+  const ctl = { q: $("cq"), status: $("c-status"), cert: $("c-cert"), domain: $("c-domain"), method: $("c-method"), diff: $("c-diff"), mine: $("c-mine"), sort: $("c-sort") };
+  const done = window.cteDone && window.cteDone.usable ? window.cteDone : null;
+  if (!done || !ctl.mine) { if (ctl.mine) ctl.mine.remove(); delete ctl.mine; }
   const count = $("c-count"), more = $("c-more"), wide = tbl.closest(".catalog-wide");
   const PAGE = 10;
   let limit = PAGE;
@@ -32,6 +36,7 @@
     if (resetLimit) limit = PAGE;
     const words = norm(ctl.q.value).split(/\s+/).filter(Boolean);
     const sorted = [...rows].sort(byKey[ctl.sort.value] || byKey.rec);
+    const marks = done ? done.all() : {};
     let matched = 0;
     for (const r of sorted) {
       const d = r.dataset;
@@ -40,6 +45,7 @@
         && (!ctl.domain.value || d.domain.split(" ").includes(ctl.domain.value))
         && (!ctl.method.value || d.method === ctl.method.value)
         && (!ctl.diff.value || d.diff === ctl.diff.value)
+        && (!ctl.mine || !ctl.mine.value || (ctl.mine.value === "done") === Boolean(marks[d.slug]))
         && words.every((w) => norm(d.q).includes(w));
       if (ok) matched++;
       r.hidden = !ok || matched > limit;
@@ -60,6 +66,79 @@
   more.addEventListener("click", () => { limit += PAGE; apply(false); });
   form.hidden = false;
   apply(true);
+  if (done) mine();
+
+  // ---- 受けた印 ----
+  function mine() {
+    const titleOf = Object.fromEntries(rows.map((r) => [r.dataset.slug, r.dataset.title]));
+    const node = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+    const button = (text, cls, onclick) => { const b = node("button", cls, text); b.type = "button"; b.addEventListener("click", onclick); return b; };
+    // 行の印
+    function markRows() {
+      const m = done.all();
+      for (const r of rows) {
+        const cell = r.cells[0];
+        let t = cell.querySelector(".tag.done");
+        if (m[r.dataset.slug]) {
+          if (!t) { t = node("span", "tag done", "✓ 受けた"); cell.querySelector("a").after(t); }
+          t.title = `${m[r.dataset.slug]} に印を付けた`;
+        } else if (t) t.remove();
+      }
+    }
+    // 別の端末へ写すリンク（#done=記事:日付,…）。開いた先で確かめてから取り込む。URL の # より後ろはサーバに送られない
+    const move = $("c-move"), moveBody = $("c-move-body"), moveN = $("c-move-n");
+    function drawMove() {
+      if (!move) return;
+      const m = done.all(), keys = Object.keys(m).filter((k) => titleOf[k]).sort();
+      moveN.textContent = keys.length ? `このブラウザに ${keys.length} 件` : "";
+      const intro = node("p", "", "受けた印は、このブラウザの中（localStorage）にだけあり、サーバには送っていません。別の端末やブラウザで同じ印を見たいときは、下のリンクをその端末で開き、出てきた確認で「取り込む」を押します。その端末にある印は消えません。");
+      if (!keys.length) {
+        moveBody.replaceChildren(intro, node("p", "detail", "まだ印がありません。記事のホームか、実践編の終わりで付けられます。"));
+      } else {
+        const url = `${location.origin}/#done=${keys.map((k) => `${k}:${m[k]}`).join(",")}`;
+        const box = node("input"); box.type = "text"; box.readOnly = true; box.value = url; box.setAttribute("aria-label", "写すリンク");
+        box.addEventListener("focus", () => box.select());
+        const copy = button("リンクをコピー", "", async () => {
+          try { await navigator.clipboard.writeText(url); copy.textContent = "コピーしました"; }
+          catch { box.focus(); box.select(); copy.textContent = "選択しました（長押しかコピーで写せます）"; }
+          setTimeout(() => { copy.textContent = "リンクをコピー"; }, 2500);
+        });
+        const row = node("p", "movelink"); row.append(box, copy);
+        if (navigator.share) row.append(button("共有", "", () => navigator.share({ title: "受けた印（確かめて説明する）", url }).catch(() => {})));
+        moveBody.replaceChildren(intro, row, node("p", "detail", keys.map((k) => `${titleOf[k]}（${m[k]}）`).join("・")));
+      }
+      move.hidden = false;
+    }
+    // 写すリンクで来たとき: 取り込むかを先に聞く（知らないうちに印が増えないように）
+    // トップを開いたまま写すリンクを開く（アドレス欄に貼る）と、ページは読み直されず # より後ろだけが変わる。そのときも聞く
+    function offerImport(hash) {
+      const mm = hash.match(/^#done=([^#]*)$/);
+      if (!mm) return;
+      if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+      let entries = [];
+      try { entries = decodeURIComponent(mm[1]).split(",").map((x) => x.split(":")); } catch { entries = []; }
+      entries = entries.filter(([k, d]) => titleOf[k] && /^\d{4}-\d{2}-\d{2}$/.test(d || ""));
+      const have = done.all();
+      const fresh = entries.filter(([k]) => !have[k]);
+      const bar = node("div", "note importbar"), msg = node("span", "msg");
+      bar.append(msg);
+      if (!entries.length) msg.textContent = "このリンクには、取り込める受けた印がありませんでした。";
+      else if (!fresh.length) msg.textContent = `このリンクの受けた印 ${entries.length} 件は、このブラウザにもう全部あります。`;
+      else {
+        msg.textContent = `このリンクには、このブラウザに無い受けた印が ${fresh.length} 件あります（${fresh.map(([k]) => titleOf[k]).join("・")}）。このブラウザに取り込みますか？`;
+        bar.append(button("取り込む", "", () => { const n = done.merge(fresh); bar.replaceChildren(node("span", "msg", `${n} 件を取り込みました。`)); }),
+                   button("取り込まない", "no", () => bar.remove()));
+      }
+      document.querySelectorAll(".importbar").forEach((b) => b.remove());
+      document.querySelector("h1").before(bar);
+      bar.scrollIntoView({ block: "nearest" });
+    }
+    done.subscribe(() => { markRows(); drawMove(); apply(false); });
+    markRows();
+    drawMove();
+    offerImport(arrivedHash);
+    addEventListener("hashchange", () => { if (/^#done=/.test(location.hash)) offerImport(location.hash); });
+  }
 
   // ---- SQL モード ----
   // 台帳（/catalog/catalog.sql）を、ブラウザの中の SQLite（sql.js）に読み込んで引く。

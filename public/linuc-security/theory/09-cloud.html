@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-security/">セキュリティ</a> › <a href="/linuc-security/theory/">理論編</a> › 第9章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。この章は<b>理論のみ</b>（クラウドの管理コンソールは檻に入らないため端末記録がありません）。<a href="/linuc-security/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。この章は<b>理論のみ</b>（クラウドの管理コンソールは檻に入らないため端末記録がありません）。<a href="/linuc-security/theory/#draft">詳しく</a></p>
 </div>
 <h1>9. クラウドでは、守る範囲が分かれている</h1>
 <p class="lead">パブリッククラウドにサーバを置くと、「サーバの OS の中だけ守れば安全」という感覚が崩れる。外から届くのは、OS の中のファイアウォールと、OS の<b>外側</b>にあるファイアウォール（セキュリティグループ）の<b>両方が通すものだけ</b>だからだ。しかもその外側の設定をするのは、事業者ではなく利用者自身である。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 14分</span></summary>
 <div class="badges"><span>前提: 第8章まで読了</span><span>理論のみ（檻の外）</span><span>所要 14分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.10.4（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>パブリッククラウドとオンプレミスで、セキュリティの責任分担がどう違うかを言える</li><li>管理コンソール・セキュリティグループ（ファイアウォール）・ルーティング・リージョン・揮発性ストレージの意味を説明できる</li><li>管理コンソールへの経路と、多要素認証・多段階認証・ワンタイムパスワードの違いを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: 特定のクラウド事業者（AWS・Azure・Google Cloud など）の固有のサービス名・画面・料金体系はレベル1では問われない。ここでは事業者を問わない<b>共通の考え方</b>だけを扱う。</div></div>
+</details>
 
 <h2 id="share">OS の中だけ見ても、到達は決まらない</h2>
 <div class="sgoal"><b>この節で分かること</b>: 外からの到達を決める層と、利用者と事業者の責任分担。</div>
@@ -102,6 +105,7 @@ OS を全開にしてもセキュリティグループが閉じていれば届�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-security/">セキュリティ</a> · <a href="/linuc-security/theory/">理論編 目次</a> · <a href="/linuc-security/practice/">実践編</a> · <a href="/linuc-security/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-security/chapters.js"></script>
 <script src="/linuc-security/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

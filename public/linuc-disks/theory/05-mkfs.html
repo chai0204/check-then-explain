@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第5章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/#draft">詳しく</a></p>
 </div>
 <h1>5. ファイルシステムの種類と作り方</h1>
 <p class="lead">第4章では、<code>vdb</code> を GPT で6つに区切った（ESP・<code>/boot</code>・スワップ・<code>/</code>・<code>/var</code>・<code>/home</code> のつもり）。この章では、それぞれの区画に用途に合った種類のファイルシステムを作り、作ったファイルシステムの大きさを区画の大きさと比べて、種類ごとの違いを確かめる。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 22分</span></summary>
 <div class="badges"><span>前提: 第4章まで読了</span><span>前提: vdb が第4章の6つの区画になっている</span><span>所要 22分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>mkfs</code> で ext3・ext4・XFS・VFAT・Btrfs を作り分けられ、ラベルを付けられる（<code>mkfs -t 種類</code> と <code>mkfs.種類</code> の関係も言える）</li><li>作ったファイルシステムの大きさを <code>df</code> で読み、区画の大きさと比べて、違いがどこから来るかを確かめ、<code>tune2fs</code> で設定を変えられる</li><li>5つの種類が何に向いているかを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: 管理情報の内部の形は扱わない。<code>mkfs</code> の細かいオプション（ブロックの大きさなど）も扱わない。ファイルシステムの検査と修復（<code>fsck</code>・<code>xfs_repair</code>）は、Version 10.0 の出題範囲では 101 ではなく 201 試験に入っているので扱わない。</div></div>
+</details>
 
 <h2 id="mkfs">種類ごとに mkfs で作る</h2>
 <div class="sgoal"><b>この節で分かること</b>: 5種類のファイルシステムの作り方と、作ったときに何が決まるか。</div>
@@ -243,6 +246,7 @@ Journal features:         journal_64bit journal_checksum_v3</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-disks/">ハードウェアとディスク</a> · <a href="/linuc-disks/theory/">理論編 目次</a> · <a href="/linuc-disks/practice/">実践編</a> · <a href="/linuc-disks/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-disks/chapters.js"></script>
 <script src="/linuc-disks/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

@@ -8,13 +8,15 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <a href="/qemu/theory/">理論編</a> › 第2章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/qemu/theory/#draft">詳しく</a></p>
 </div>
 <h1>2. シリアルの先は、あなたの端末そのもの</h1>
 <p class="lead">第1章で QEMU を抜けた端末で、長い1行を出してみる。80 桁で切れて、続きが消える。QEMU はもう終わっているのに、端末の折り返しが止まったままになっている。
 止めたのは QEMU ではなく、仮想の PC の中のファームウェア（SeaBIOS）がシリアルポートに書いた数バイトだった。
 <code>-nographic</code> は、仮想の PC のシリアルポートを、あなたの端末に直結する。そこを流れるバイトは、文字であると同時に、<b>あなたの端末への命令</b>にもなる。
 同じ1本の線には、QEMU 自身への窓口（モニタ）も同居している。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 第1章を同じ端末で終えている</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>QEMU を終えた後に端末の表示が壊れる理由を、仮想の PC がシリアルに書いたバイト（エスケープシーケンス）で説明し、<code>tput smam</code> で直せる</li>
@@ -23,6 +25,7 @@
 <li>QEMU のモニタ（HMP）と QMP で状態を尋ね、<code>system_powerdown</code> と <code>quit</code> の違いを「誰が止めると決めるか」で説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: エスケープシーケンスの一覧、モニタの命令の一覧（<code>help</code> で出る）、QMP の命令の引数の書き方、
 <code>socat</code> のオプション。<code>Ctrl-a</code> の後に押す文字は <code>h</code>（一覧を出す）だけ覚えておけば、残りは画面で引ける。</div></div>
+</details>
 
 <h2 id="broken">端末が壊れていた</h2>
 <div class="sgoal"><b>この節で分かること</b>: QEMU を終えても、端末に残るものがあること。</div>
@@ -211,6 +214,7 @@ SeaBIOS は画面が無いと伝えられたときだけ、シリアルを画面
 </section>
 <footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/qemu/chapters.js"></script>
 <script src="/qemu/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

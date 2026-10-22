@@ -8,15 +8,20 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-disks/">ハードウェアとディスク</a> › <a href="/linuc-disks/theory/">理論編</a> › 第1章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-disks/theory/#draft">詳しく</a></p>
 </div>
 <h1>1. 練習機に入り、つながっているディスクを眺める</h1>
 <p class="lead">このコースでは、練習機（このコースの檻の中で動く、練習用の Linux の機械）につながった空のディスクを、区切って・ファイルシステムを作って・マウントして使えるようにするところから始め、表の形式、ファイルシステムの種類、起動のたびのマウント、スワップ、LVM（複数のディスクを1つにまとめる仕組み。第9章）、部品の情報と、部品を動かすプログラム（ドライバ。第11章）へと順に進む。始める前に要るのは、<a href="/linuc-disks/practice/">実践編</a>の「はじめる」で起動した檻と、そこに入った端末1つ（<code>docker exec -it lab-linuc-disks bash -l</code> で開いたもの）と、下の表の「前のコースで出たもの」である。この章では、練習機に入り、つながっているディスクを <code>lsblk</code> と <code>df</code> の2つのコマンドで眺める。まだ何も変えない。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 17分</span></summary>
 <div class="badges"><span>前提: 実践編の「はじめる」で檻を起動した</span><span>所要 17分</span><span class="impact-a">影響度 A</span><span>出題範囲 1.05.2（重要度4）</span><span>出題範囲 1.05.3（重要度4）</span><span>最終検証 2026-10-20</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>プロンプトを見て、いま外のコンテナ（<code>lab@host</code>）と練習機の中（<code>student@linuc</code>）のどちらにいるかを言え、<code>ssh linuc</code> と <code>exit</code> で行き来できる</li><li><code>lsblk</code> の出力から、ディスク・パーティション・光学ドライブと、その大きさ・マウント先を読める</li><li><code>df -h</code> の出力から、マウントされているファイルシステムの大きさと空きを読め、<code>lsblk</code> との違いを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: 仮想マシンを作るしくみ（QEMU と libvirt。主題1.01 のコース）は扱わない。<code>lsblk</code> の MAJ:MIN 列と、<code>df</code> のディスクではない行（<code>tmpfs</code>・<code>efivarfs</code>）は、この章では読まない。ディスクの名前の付き方の細かい規則（この練習機に無い種類のディスクの名前）も扱わない。</div></div>
-<div class="note"><b>前のコースで出たもの</b>: このコースは、次のものを説明なしで使う。忘れていたら、リンク先の章を読み返してから進む。
+</details>
+<details class="fold">
+<summary>前のコースで出たもの<span class="hint">11項目</span></summary>
+<p>このコースは、次のものを説明なしで使う。忘れていたら、リンク先の章を読み返してから進む。</p>
 <div class="scroll"><table>
 <tr><th>もの</th><th>何のためにあるか（一言）</th><th>出たところ</th></tr>
 <tr><td>シェル・<code>;</code>・<code>echo</code></td><td>打ったコマンドを読んで動かすプログラム・1行に2つのコマンドを続けて書く・受け取った文字をそのまま出す</td><td><a href="/linuc-text/theory/01-quote">主題1.03 第1章</a></td></tr>
@@ -30,7 +35,8 @@
 <tr><td><code>mkdir</code>・<code>rmdir</code>・<code>touch</code>・<code>rm</code>・<code>cp</code></td><td>ディレクトリを作る・空のディレクトリを消す・空のファイルを作る（時刻を変える）・消す・写す</td><td><a href="/linuc-files/theory/04-cp-mv-rm">主題1.02 第4章</a></td></tr>
 <tr><td><code>sudo</code>・パッケージ</td><td>root（その機械の管理者）の権限で打つ・ソフトウェアを配るまとまり</td><td><a href="/linuc-packages/theory/01-install">主題1.04 第1章</a></td></tr>
 <tr><td>コンテナ・<code>ssh</code></td><td>PC の中に区切って作った作業場・別のコンピュータにログインする</td><td><a href="/linuc-boot/theory/03-container">主題1.01 第3章</a>・<a href="/linuc-boot/theory/02-ssh">第2章</a></td></tr>
-</table></div></div>
+</table></div>
+</details>
 
 <h2 id="where">外と練習機の中 — 2つの場所</h2>
 <div class="sgoal"><b>この節で分かること</b>: いま打っている端末が外のコンテナか練習機の中かを見分け、行き来する方法。</div>

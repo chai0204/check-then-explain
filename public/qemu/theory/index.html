@@ -8,8 +8,8 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/qemu/">QEMU</a> › <strong>理論編</strong></nav>
 
-<div class="draftbar">
-<p><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。</p>
+<details class="draftbar fold-draft" id="draft">
+<summary><b>ドラフト</b>: このテーマは<b>著者が読者として通していません</b>。<span class="hint">詳しく</span></summary>
 <p>本文に載せた出力はすべて実機の記録で、第1章から第7章までを1つのシェルで通して打った記録とも突き合わせてあります。
    演習6本は模範解答どおりに通ること・未達のときに判定が鳴ることを、6本すべてで確認済みです。
    それでも <b>導線の不備</b>は残っている可能性があります。
@@ -19,7 +19,7 @@
 <p>詰まったところ・本文と違う出力が出たところは、
    <a href="https://github.com/chai0204/check-then-explain/issues/new/choose">Issue</a> か
    各ページ下のコメントに書いてください。それが直す順番になります。</p>
-</div>
+</details>
 
 <h1>理論編 — QEMU</h1>
 <p class="lead">このサイトの仮想マシン型の檻は、コンテナの中で QEMU が練習機を1台動かしている。
@@ -27,14 +27,14 @@
 <b>仮想マシンが何でできているか</b>を確かめる7章。部品の組み立て・シリアルとモニタ・ディスク・CPU の翻訳・ネットワーク・ファームウェアを順に見て、
 最後に libvirt が組み立てているコマンド行を読む。</p>
 
-<div class="promise">
-<p>このページのコマンドは、あなたの画面に本文と同じ文字を出します。
-出なければ教材のバグとして直します。
+<details class="fold pledge">
+<summary><span class="lbl">約束</span>このページのコマンドは、あなたの画面に本文と同じ文字を出します</summary>
+<p>出なければ教材のバグとして直します。
 AI の回答は毎回違い、公式ドキュメントはあなたの環境を知りません。
 ここにあるのは、誰かが実際に一度通した記録です。</p>
-</div>
-
-<h2 id="spine">この7章を貫いている1つの事実</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="spine">この7章を貫いている1つの事実</h2></summary>
 <div class="sgoal"><b>この節で分かること</b>: 7章の挙動が、どれも1つの事実から出てくること</div>
 <div class="goal">
 <p><b>仮想マシンは、QEMU という1つのプロセスである。CPU もディスクも NIC もシリアルポートも、そのプロセスの中のソフトウェアが演じていて、何を演じるかは起動のときのコマンド行が決める（動いている間も、QMP で部品を足せる）。</b></p>
@@ -46,8 +46,9 @@ libvirt は、そのコマンド行を組み立てて QEMU を起動し、モニ
 QEMU のオプションの全部、マシン型の版の違い、QMP の命令の一覧、qcow2 のファイルの中の表の形、
 TCG が作る中間の命令（TCG ops）、UEFI の Secure Boot の鍵のしくみ。どれも本文では名前が出るだけです。</div>
 </div>
-
-<h2 id="scope">この記事で扱うこと・扱わないこと</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="scope">この記事で扱うこと・扱わないこと</h2></summary>
 <div class="sgoal"><b>この節で分かること</b>: 7章の範囲と、ほかの記事に任せたもの</div>
 <div class="scroll"><table>
 <tr><th>扱うこと</th><th>章</th><th>この記事で実際に打つもの</th></tr>
@@ -75,8 +76,9 @@ TCG が作る中間の命令（TCG ops）、UEFI の Secure Boot の鍵のしく
 <tr><td>tap・ブリッジのネットワーク、PCI のパススルー</td><td>ホストの特権（<code>CAP_NET_ADMIN</code>・<code>/dev/net/tun</code>・IOMMU）が要る。この檻は特権を1つも渡さない</td></tr>
 <tr><td>ライブマイグレーション（動いている仮想マシンを、別の QEMU へ移す）</td><td>範囲外。QEMU 同士がソケットで状態を送るだけなので特権は要らず、この檻の中でも、QMP の <code>migrate</code> と、受け取る側の <code>-incoming</code> で試せる</td></tr>
 </table></div>
-
-<h2 id="cages">このサイトの他の記事の檻は、QEMU をどう使っているか</h2>
+</details>
+<details class="fold sec">
+<summary><h2 id="cages">このサイトの他の記事の檻は、QEMU をどう使っているか</h2></summary>
 <div class="sgoal"><b>この節で分かること</b>: 実践編で打っている <code>docker run</code> の各オプションが、QEMU の何に当たるか</div>
 <p>このサイトの LinuC の5つの記事（<a href="/linuc-boot/">起動・仮想化・プロセス</a>・<a href="/linuc-disks/">ハードウェアとディスク</a>・<a href="/linuc-network/">ネットワークの基礎</a>・<a href="/linuc-admin/">アカウント・ジョブ・ロケール</a>・<a href="/linuc-security/">セキュリティ</a>）は、
 仮想マシン型の檻で練習機を動かしています。読者が打つのは次の2行でした。</p>
@@ -107,6 +109,7 @@ docker exec -it lab-linuc-boot bash -l</code></pre>
 コンテナの中のプログラムはホストのカーネルの上で直接動くので、翻訳も起動の待ち時間もありません。
 仮想マシン型にしているのは、ブート・ディスクの分割・カーネルモジュール・NIC の設定のように、自分のカーネルが要る題材の記事だけです。
 この記事の檻は、その仮想マシン型の檻と同じ土台（同じ QEMU と同じ練習機のディスク）から、コンテナの起動のときに libvirt で練習機を用意する係を外したものです（練習機は、あなたが打つまで1台も動いていません）。</p>
+</details>
 
 <h2 id="chapters">章</h2>
 <div class="toc">
@@ -189,6 +192,7 @@ docker exec -it lab-linuc-boot bash -l</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/qemu/">QEMU</a> · <a href="/qemu/theory/">理論編 目次</a> · <a href="/qemu/practice/">実践編</a> · <a href="/qemu/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/qemu/chapters.js"></script>
 <script src="/qemu/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

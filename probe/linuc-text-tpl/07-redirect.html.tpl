@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-text/">コマンドラインとテキスト処理</a> › <a href="/linuc-text/theory/">理論編</a> › 第7章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-text/theory/#draft">詳しく</a></p>
 </div>
 <h1>7. リダイレクトは、左から順に配線する</h1>
 <p class="lead"><code>&gt; out.txt</code> を付けても、エラーは画面に出る。<code>&gt;</code> が付け替えるのは出力の口のうち1本だけだからだ。そして <code>2&gt;&amp;1</code> は「エラーもまとめる」という呪文ではなく、「2番の口を、<b>いま</b>1番が向いている先へつなぐ」という1回きりの配線である。配線はコマンドが動き出す前に、シェルが左から順に済ませている。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 18分</span></summary>
 <div class="badges"><span>前提: 第6章まで</span><span>前提: 檻が起動している</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.03.3（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>標準入力（0番）・標準出力（1番）・標準エラー出力（2番）と、<code>&gt;</code> <code>&gt;&gt;</code> <code>&lt;</code> <code>2&gt;</code> <code>2&gt;&amp;1</code> <code>&amp;&gt;</code> の意味を言える</li><li><code>cmd &gt; f 2&gt;&amp;1</code> と <code>cmd 2&gt;&amp;1 &gt; f</code> の結果の違いを、左から順に処理される規則で説明できる</li><li><code>sort f &gt; f</code> が空になる理由と、<code>noclobber</code> <code>&gt;|</code> <code>/dev/null</code> ヒアドキュメントの使いどころを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: 3番以降の口を開く <code>exec 3&gt;</code>、プロセス置換 <code>&lt;(...)</code>、読み書き両用の <code>&lt;&gt;</code>、名前付きパイプ。パイプ（<code>|</code>）は第8章で扱う。</div></div>
+</details>
 
 <h2 id="fd">出力の口は2本ある</h2>
 <div class="sgoal"><b>この節で分かること</b>: 標準出力と標準エラー出力が別の口であること。</div>
@@ -172,6 +175,7 @@ $ rm out.txt err.txt both.txt only.txt amp.txt note.txt upper.txt greet.txt copy
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-text/">コマンドラインとテキスト処理</a> · <a href="/linuc-text/theory/">理論編 目次</a> · <a href="/linuc-text/practice/">実践編</a> · <a href="/linuc-text/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-text/chapters.js"></script>
 <script src="/linuc-text/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

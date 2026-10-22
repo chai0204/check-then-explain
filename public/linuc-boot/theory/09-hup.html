@@ -8,11 +8,13 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> › <a href="/linuc-boot/theory/">理論編</a> › 第9章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-boot/theory/#draft">詳しく</a></p>
 </div>
 <h1>9. exit では消えず、切断で消える</h1>
 <p class="lead"><code>&amp;</code> でバックグラウンドに回したジョブは、ログアウトすると消える——と教わることが多い。練習機で確かめると、<code>exit</code> で抜けたときは消えなかった。
 消えたのは、回線が切れたときだった。消すのはログアウトではなく、回線が切れたときに届く SIGHUP という合図で、それをどう扱うかを決めておくのが <code>nohup</code> と <code>tmux</code> / <code>screen</code> である。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 16分</span></summary>
 <div class="badges"><span>前提: 第8章まで読了</span><span>前提: 端末を2つ開いている</span><span>所要 16分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.01.4（重要度3）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>&amp;</code>・<code>Ctrl+Z</code>・<code>jobs</code>・<code>bg</code>・<code>fg</code> で、フォアグラウンドとバックグラウンドを行き来できる</li>
@@ -20,6 +22,7 @@
 <li><code>nohup</code> と <code>tmux</code> / <code>screen</code> で、切断しても止まらない処理を残せる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: tmux と screen の画面分割・設定ファイル（<code>~/.tmux.conf</code>・<code>~/.screenrc</code>）、
 <code>disown</code> や <code>setsid</code> など他の切り離し方、bash がジョブを管理する仕組み（プロセスグループ・端末の制御）の細部。</div></div>
+</details>
 
 <h2 id="jobs">フォアグラウンドとバックグラウンド</h2>
 <div class="sgoal"><b>この節で分かること</b>: ジョブを止めて、後ろで動かして、前に戻す。</div>
@@ -252,6 +255,7 @@ screen なら <code>Ctrl+A</code> → <code>d</code> で抜け、<code>screen -r
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-boot/">Linux の起動・仮想化・プロセス</a> · <a href="/linuc-boot/theory/">理論編 目次</a> · <a href="/linuc-boot/practice/">実践編</a> · <a href="/linuc-boot/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-boot/chapters.js"></script>
 <script src="/linuc-boot/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

@@ -8,12 +8,14 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/docker/">Docker</a> › <a href="/docker/theory/">理論編</a> › 第1章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/docker/theory/#draft">詳しく</a></p>
 </div>
 <h1>1. コンテナは、練習機の上で動く1つのプロセス</h1>
 <p class="lead"><code>docker run</code> を打つと、小さな計算機が1台立ち上がったように見える。
 ところが練習機の <code>ps</code> には、そのコンテナが<b>普通のプロセスとして1行で</b>並んでいる。
 カーネルは練習機のもので、コンテナが自分で持っているのは「見え方の区切り」と「使える量の区切り」だけである。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 実践編の入口で練習機に入れた（ssh linuc）</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>最終検証 2026-10-14</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>コンテナが練習機の上の1つのプロセスであることを、<code>ps</code> と <code>/proc</code> の値で示せる</li>
@@ -21,6 +23,7 @@
 <li><code>docker</code> コマンドからコンテナのプロセスができるまでの経路（dockerd → containerd → shim → runc）を、動いているプロセスで示せる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: 名前空間の全種類の細部（ipc・time・cgroup 名前空間）、cgroup v1 と v2 の違い、
 containerd の内部（スナップショッタやプラグインの構成）、OCI ランタイム仕様の項目の一覧。名前が出てくるだけで先に進める。</div></div>
+</details>
 
 <h2 id="run">Alpine のコンテナを1つ起動する</h2>
 <div class="sgoal"><b>この節で分かること</b>: コンテナの中で最初に動いているもの（PID 1）と、カーネルの持ち主。</div>
@@ -216,6 +219,7 @@ CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES</code></p
 </section>
 <footer><a href="/">トップ</a> · <a href="/docker/">Docker</a> · <a href="/docker/theory/">理論編 目次</a> · <a href="/docker/practice/">実践編</a> · <a href="/docker/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/docker/chapters.js"></script>
 <script src="/docker/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

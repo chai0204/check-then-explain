@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> › <a href="/linuc-packages/theory/">理論編</a> › 第6章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-packages/theory/#draft">詳しく</a></p>
 </div>
 <h1>6. パッケージはどこから来るか</h1>
 <p class="lead"><b>前の章までにやったこと</b>: パッケージを入れる・調べる・消すを一通りやり、台帳とファイルの関係（第4章）と、依存関係で一緒に入るもの・消しても残るもの（第5章）を確かめた。そのたびに apt は <code>file:/srv/lab-repo</code> というリポジトリから取ってきていた（<code>Get:</code> の行）。<b>この章でやること</b>: apt がどのリポジトリへ、何を見て取りに行くのかを確かめる。新しい版の置き場を足して、labhello を新しい版に上げる。最後に、名前やファイルからパッケージを探す。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 25分</span></summary>
 <div class="badges"><span>前提: 第5章まで読了</span><span>前提: Debian 系の檻を起動し直した直後</span><span>所要 25分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.04.1（重要度3）</span><span>最終検証 2026-10-21</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>apt がパッケージを取りに行く先を書いた表（<code>/etc/apt/sources.list</code>）の1行を読み、行を足す</li><li>取りに行く先を1つ足してから、新しい版に上がるまでに何が要るかを、実際に上げて確かめる</li><li>入っていないパッケージを、名前と説明（<code>apt search</code>）やファイル名（<code>apt-file search</code>）から探す</li><li><code>apt</code> と <code>apt-get</code>・<code>apt-cache</code> の使い分けを確かめる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: リポジトリに署名（作り手が付ける、本物だと確かめるための印）をする手順と、それを確かめるための鍵の配り方、署名を確かめるしくみの細部、ミラー（同じ中身を配る別のサーバ）の選び方、ソースパッケージ（<code>deb-src</code>）、<code>apt-cache policy</code> に出る数字（<code>500</code>・<code>100</code>。どの版を選ぶかの優先度）の決め方の細部。その数字は「どこから来た版か」の印として読めれば足りる。</div></div>
+</details>
 
 <h2 id="policy">どこから来た版か — apt-cache policy</h2>
 <div class="sgoal"><b>この節で分かること</b>: 入っている版と、入れられる版が、それぞれどこに載っているか。</div>
@@ -317,6 +320,7 @@ $ apt-file search bin/dig</code></pre>
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-packages/">パッケージ管理（apt と yum）</a> · <a href="/linuc-packages/theory/">理論編 目次</a> · <a href="/linuc-packages/practice/">実践編</a> · <a href="/linuc-packages/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-packages/chapters.js"></script>
 <script src="/linuc-packages/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-files/">ファイルとパーミッション</a> › <a href="/linuc-files/theory/">理論編</a> › 第5章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-files/theory/#draft">詳しく</a></p>
 </div>
 <h1>5. find は名前をたどり、中身の属性で選ぶ</h1>
 <p class="lead">36時間前に更新したファイルは <code>find -mtime +1</code> に引っかからない。<code>find</code> はディレクトリの名前をたどって1つずつ中身の属性を確かめるが、日数は24時間単位に切り捨て、大きさは単位に切り上げてから比べる。しかも <code>find</code> に渡る前に、シェルがパターンを書き換えてしまうことがある。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 20分</span></summary>
 <div class="badges"><span>前提: 第4章まで読了</span><span>前提: 檻が起動している</span><span>所要 20分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.02.2（重要度3）</span><span>出題範囲 1.02.4（重要度2）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li>名前・種類・大きさ・時刻・所有者・権限の条件を組み合わせて <code>find</code> を書ける</li><li><code>-mtime</code> と <code>-size</code> の数字の意味を、切り捨て・切り上げの規則から説明できる</li><li>見つけたものに <code>-exec</code> で操作し、<code>\;</code> と <code>+</code> の違いを言える</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>-printf</code> の書式、<code>-regex</code>、<code>-prune</code> による枝刈り、<code>xargs</code> との組み合わせ、<code>-atime</code> と <code>-ctime</code> の細かい違いは扱わない。<code>-atime</code>（読んだ時刻）と <code>-ctime</code>（属性を変えた時刻）は、<code>-mtime</code> と同じ数え方をすると分かれば足りる。</div></div>
+</details>
 
 <h2 id="basic">find の形 — どこから、どんな条件で</h2>
 <div class="sgoal"><b>この節で分かること</b>: <code>find</code> の書き方の骨格と、結果の並び順。</div>
@@ -248,6 +251,7 @@ MiB 単位に切り上げると 1 未満は 0 だけなので、空のファイ�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-files/">ファイルとパーミッション</a> · <a href="/linuc-files/theory/">理論編 目次</a> · <a href="/linuc-files/practice/">実践編</a> · <a href="/linuc-files/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-files/chapters.js"></script>
 <script src="/linuc-files/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>

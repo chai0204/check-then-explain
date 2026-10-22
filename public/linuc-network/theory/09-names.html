@@ -8,14 +8,17 @@
 <div class="wrap">
 <nav class="top"><a href="/">トップ</a> › <a href="/linuc-network/">ネットワークの基礎</a> › <a href="/linuc-network/theory/">理論編</a> › 第9章</nav>
 <div class="draftbar compact">
-<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/">詳しく</a></p>
+<p><b>ドラフト</b>: このテーマは著者が読者として通していません。出力はすべて実機の記録ですが、導線の不備が残っている可能性があります。<a href="/linuc-network/theory/#draft">詳しく</a></p>
 </div>
 <h1>9. dig と ping は、別の表を引いている</h1>
 <p class="lead"><code>dig +short www.lab.example</code> は 172.16.20.10 と答える。同じ名前で <code>ping</code> を打つと、172.16.20.99 へ飛んでいって <code>Destination Host Unreachable</code> になる。<code>dig</code> は DNS サーバだけに聞き、<code>ping</code> は先に <code>/etc/hosts</code> を読む。同じ名前でも、道具が違えば読む表が違う。</p>
+<details class="fold intro">
+<summary>この章のゴールと前提<span class="hint">所要 18分</span></summary>
 <div class="badges"><span>前提: 第8章を終えている（resolv.conf が 172.16.20.10 を向いている）</span><span>所要 18分</span><span class="impact-b">影響度 B</span><span>出題範囲 1.07.4（重要度2）</span><span>出題範囲 1.07.2（重要度4）</span><span>最終検証 2026-10-13</span></div>
 <div class="goal"><h4>この章のゴール</h4>
 <ul><li><code>/etc/nsswitch.conf</code> の <code>hosts:</code> 行から、名前をどの表からどの順に引くかを言える</li><li><code>getent ahosts</code> で ping と同じ引き方をして、/etc/hosts と DNS のどちらが答えたかを特定できる。<code>getent hosts</code> との違い（IPv6 を先に聞く）を言える</li><li>ホスト名の3つの置き場所（今の名前・<code>/etc/hostname</code>・<code>/etc/hosts</code> の 127.0.1.1）の関係を説明できる</li></ul>
 <div class="skip"><b>ここで覚えなくていいこと</b>: <code>nsswitch.conf</code> の hosts 以外の行（passwd / group などは主題1.08 のアカウント管理で使う）、mDNS（<code>.local</code> の名前）、<code>hostnamectl</code> の pretty / transient の名前の区別。</div></div>
+</details>
 
 <h2 id="mismatch">dig と ping が、違うアドレスへ行く</h2>
 <div class="sgoal"><b>この節で分かること</b>: ping が名前をどこから引いているか。</div>
@@ -301,6 +304,7 @@ ifconfig と ip、ifup と nmcli、dig と ping は、同じものを別々の�
 </section>
 <footer><a href="/">トップ</a> · <a href="/linuc-network/">ネットワークの基礎</a> · <a href="/linuc-network/theory/">理論編 目次</a> · <a href="/linuc-network/practice/">実践編</a> · <a href="/linuc-network/theory/glossary">用語辞書</a></footer>
 </div>
+<script src="/shared/site.js"></script>
 <script src="/linuc-network/chapters.js"></script>
 <script src="/linuc-network/theory/terms.js"></script>
 <script src="/shared/theory.js"></script>
